@@ -39,10 +39,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.client.RESTClient;
 import org.apache.gravitino.dto.MetalakeDTO;
-import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
-import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -51,6 +48,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.tag.TagList;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -290,31 +288,13 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals("tag3", tableSupportTagByNormalUser.getTag("tag3").name());
     assertThrows(ForbiddenException.class, () -> tableSupportTagByNormalUser.getTag("tag1"));
 
-    RESTClient restClient = getNormalUserRestClient();
-    String path =
-        "api/metalakes/" + METALAKE + "/objects/table/" + CATALOG + "." + SCHEMA + ".table1/tags";
-    TagNameListResponse nameListResponse =
-        restClient.get(
-            path,
-            TagNameListResponse.class,
-            Map.of(),
-            error -> {
-              throw new AssertionError(error);
-            });
-    Assertions.assertEquals(2, nameListResponse.getNames().length);
-    Assertions.assertTrue(nameListResponse.hasInaccessibleTags());
+    TagList<String> nameResult = tableSupportTagByNormalUser.listTagsWithVisibility();
+    Assertions.assertEquals(2, nameResult.tags().length);
+    Assertions.assertTrue(nameResult.hasInaccessibleTags());
 
-    MetadataObjectTagListResponse listResponse =
-        restClient.get(
-            path,
-            Map.of("details", "true"),
-            MetadataObjectTagListResponse.class,
-            Map.of(),
-            error -> {
-              throw new AssertionError(error);
-            });
-    Assertions.assertEquals(2, listResponse.getTags().length);
-    Assertions.assertTrue(listResponse.hasInaccessibleTags());
+    var detailsResult = tableSupportTagByNormalUser.listTagsInfoWithVisibility();
+    Assertions.assertEquals(2, detailsResult.tags().length);
+    Assertions.assertTrue(detailsResult.hasInaccessibleTags());
 
     String untaggedCatalog = "untagged_catalog";
     Map<String, String> properties = Maps.newHashMap();
@@ -334,21 +314,18 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
         "test visibility indicators",
         new HashMap<>());
     try {
-      String untaggedCatalogPath =
-          "api/metalakes/" + METALAKE + "/objects/catalog/" + untaggedCatalog + "/tags";
-      assertTagListResponse(untaggedCatalogPath, new String[0], false);
+      SupportsTags untaggedCatalogTags =
+          normalUserClient.loadMetalake(METALAKE).loadCatalog(untaggedCatalog).supportsTags();
+      assertTagList(untaggedCatalogTags, new String[0], false);
 
-      String inheritedHiddenTagPath =
-          "api/metalakes/"
-              + METALAKE
-              + "/objects/table/"
-              + CATALOG
-              + "."
-              + SCHEMA
-              + "."
-              + tableWithOnlyInheritedHiddenTag
-              + "/tags";
-      assertTagListResponse(inheritedHiddenTagPath, new String[0], true);
+      SupportsTags inheritedHiddenTags =
+          normalUserClient
+              .loadMetalake(METALAKE)
+              .loadCatalog(CATALOG)
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(SCHEMA, tableWithOnlyInheritedHiddenTag))
+              .supportsTags();
+      assertTagList(inheritedHiddenTags, new String[0], true);
     } finally {
       tableCatalog.dropTable(NameIdentifier.of(SCHEMA, tableWithOnlyInheritedHiddenTag));
       gravitinoMetalake.dropCatalog(untaggedCatalog, true);
@@ -540,47 +517,20 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     return new Column[] {Column.of("col1", Types.StringType.get())};
   }
 
-  private RESTClient getNormalUserRestClient() {
-    try {
-      Method restClientMethod =
-          normalUserClient.getClass().getSuperclass().getDeclaredMethod("restClient");
-      restClientMethod.setAccessible(true);
-      return (RESTClient) restClientMethod.invoke(normalUserClient);
-    } catch (ReflectiveOperationException e) {
-      throw new RuntimeException("Failed to access the normal user's REST client", e);
-    }
-  }
-
-  private void assertTagListResponse(
-      String path, String[] expectedTagNames, boolean hasInaccessibleTags) {
-    RESTClient restClient = getNormalUserRestClient();
-    TagNameListResponse nameListResponse =
-        restClient.get(
-            path,
-            TagNameListResponse.class,
-            Map.of(),
-            error -> {
-              throw new AssertionError(error);
-            });
-    String[] actualTagNames = nameListResponse.getNames();
+  private void assertTagList(
+      SupportsTags supportsTags, String[] expectedTagNames, boolean hasInaccessibleTags) {
+    TagList<String> nameResult = supportsTags.listTagsWithVisibility();
+    String[] actualTagNames = nameResult.tags();
     Arrays.sort(actualTagNames);
     Arrays.sort(expectedTagNames);
     Assertions.assertArrayEquals(expectedTagNames, actualTagNames);
-    Assertions.assertEquals(hasInaccessibleTags, nameListResponse.hasInaccessibleTags());
+    Assertions.assertEquals(hasInaccessibleTags, nameResult.hasInaccessibleTags());
 
-    MetadataObjectTagListResponse listResponse =
-        restClient.get(
-            path,
-            Map.of("details", "true"),
-            MetadataObjectTagListResponse.class,
-            Map.of(),
-            error -> {
-              throw new AssertionError(error);
-            });
+    var detailsResult = supportsTags.listTagsInfoWithVisibility();
     String[] actualDetailNames =
-        Arrays.stream(listResponse.getTags()).map(tag -> tag.name()).toArray(String[]::new);
+        Arrays.stream(detailsResult.tags()).map(tag -> tag.name()).toArray(String[]::new);
     Arrays.sort(actualDetailNames);
     Assertions.assertArrayEquals(expectedTagNames, actualDetailNames);
-    Assertions.assertEquals(hasInaccessibleTags, listResponse.hasInaccessibleTags());
+    Assertions.assertEquals(hasInaccessibleTags, detailsResult.hasInaccessibleTags());
   }
 }

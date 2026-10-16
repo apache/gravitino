@@ -27,6 +27,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
@@ -43,14 +44,16 @@ import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -361,14 +364,15 @@ public class TestSupportPolicies extends TestBase {
             + "/policies";
 
     String[] policies = new String[] {"policy1", "policy2"};
-    NameListResponse resp = new NameListResponse(policies);
+    PolicyNameListResponse resp = new PolicyNameListResponse(policies, true);
     buildMockResource(Method.GET, path, null, resp, SC_OK);
 
-    String[] actualPolicies = supportsPolicies.listPolicies();
-    Assertions.assertArrayEquals(policies, actualPolicies);
+    PolicyList<String> policyList = supportsPolicies.listPoliciesWithVisibility();
+    Assertions.assertArrayEquals(policies, policyList.policies());
+    Assertions.assertTrue(policyList.hasInaccessiblePolicies());
 
     // Return empty list
-    NameListResponse resp1 = new NameListResponse(new String[0]);
+    PolicyNameListResponse resp1 = new PolicyNameListResponse(new String[0], false);
     buildMockResource(Method.GET, path, null, resp1, SC_OK);
 
     String[] actualPolicies1 = supportsPolicies.listPolicies();
@@ -407,6 +411,7 @@ public class TestSupportPolicies extends TestBase {
             .withName("policy1")
             .withPolicyType("custom")
             .withContent(contentDTO)
+            .withInherited(Optional.of(false))
             .withAudit(AuditDTO.builder().withCreator("test").build())
             .build();
     PolicyDTO policy2 =
@@ -414,20 +419,28 @@ public class TestSupportPolicies extends TestBase {
             .withName("policy2")
             .withPolicyType("custom")
             .withContent(contentDTO)
+            .withInherited(Optional.of(true))
             .withAudit(AuditDTO.builder().withCreator("test").build())
             .build();
     PolicyDTO[] policies = new PolicyDTO[] {policy1, policy2};
-    PolicyListResponse resp = new PolicyListResponse(policies);
-    buildMockResource(Method.GET, path, null, resp, SC_OK);
+    MetadataObjectPolicyListResponse resp = new MetadataObjectPolicyListResponse(policies, true);
+    buildMockResource(
+        Method.GET, path, Collections.singletonMap("details", "true"), null, resp, SC_OK);
 
-    Policy[] actualPolicies = supportsPolicies.listPolicyInfos();
+    PolicyList<Policy> policyList = supportsPolicies.listPolicyInfosWithVisibility();
+    Policy[] actualPolicies = policyList.policies();
     Assertions.assertEquals(2, actualPolicies.length);
     Assertions.assertEquals("policy1", actualPolicies[0].name());
     Assertions.assertEquals("policy2", actualPolicies[1].name());
+    Assertions.assertFalse(actualPolicies[0].inherited().orElseThrow());
+    Assertions.assertTrue(actualPolicies[1].inherited().orElseThrow());
+    Assertions.assertTrue(policyList.hasInaccessiblePolicies());
 
     // Return empty list
-    PolicyListResponse resp1 = new PolicyListResponse(new PolicyDTO[0]);
-    buildMockResource(Method.GET, path, null, resp1, SC_OK);
+    MetadataObjectPolicyListResponse resp1 =
+        new MetadataObjectPolicyListResponse(new PolicyDTO[0], false);
+    buildMockResource(
+        Method.GET, path, Collections.singletonMap("details", "true"), null, resp1, SC_OK);
 
     Policy[] actualPolicies1 = supportsPolicies.listPolicyInfos();
     Assertions.assertArrayEquals(new Policy[0], actualPolicies1);
@@ -435,16 +448,30 @@ public class TestSupportPolicies extends TestBase {
     // Test throw NotFoundException
     ErrorResponse errorResp =
         ErrorResponse.notFound(NotFoundException.class.getSimpleName(), "mock error");
-    buildMockResource(Method.GET, path, null, errorResp, SC_NOT_FOUND);
+    buildMockResource(
+        Method.GET,
+        path,
+        Collections.singletonMap("details", "true"),
+        null,
+        errorResp,
+        SC_NOT_FOUND);
 
-    Throwable ex = Assertions.assertThrows(NotFoundException.class, supportsPolicies::listPolicies);
+    Throwable ex =
+        Assertions.assertThrows(NotFoundException.class, supportsPolicies::listPolicyInfos);
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test throw internal error
     ErrorResponse errorResp1 = ErrorResponse.internalError("mock error");
-    buildMockResource(Method.GET, path, null, errorResp1, SC_INTERNAL_SERVER_ERROR);
+    buildMockResource(
+        Method.GET,
+        path,
+        Collections.singletonMap("details", "true"),
+        null,
+        errorResp1,
+        SC_INTERNAL_SERVER_ERROR);
 
-    Throwable ex1 = Assertions.assertThrows(RuntimeException.class, supportsPolicies::listPolicies);
+    Throwable ex1 =
+        Assertions.assertThrows(RuntimeException.class, supportsPolicies::listPolicyInfos);
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
   }
 

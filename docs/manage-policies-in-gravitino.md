@@ -252,7 +252,11 @@ schema.supportsPolicies().associatePolicies(new String[] {"retention_30d"}, null
 ### List Policies on an Object
 
 The response includes policies inherited from ancestors. With `details=true` each policy carries an
-`inherited` field, which a plain name listing does not.
+`inherited` field, which a plain name listing does not. Both response modes include
+`hasInaccessiblePolicies`. Gravitino resolves direct and inherited policy associations before
+authorization filtering, so the flag also covers inaccessible inherited policies. The flag reveals
+only that at least one policy was omitted; it does not reveal the policy's name, count, details, or
+inheritance source.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -262,17 +266,44 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/policies?details=true"
 ```
 
+If every effective policy is inaccessible, the response contains an empty list and sets the flag:
+
+```json
+{
+  "code": 0,
+  "policies": [],
+  "hasInaccessiblePolicies": true
+}
+```
+
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
 Catalog catalog = client.loadCatalog("catalog1");
-String[] policyNames = catalog.supportsPolicies().listPolicies();
-Policy[] policies = catalog.supportsPolicies().listPolicyInfos();
+PolicyList<String> nameList = catalog.supportsPolicies().listPoliciesWithVisibility();
+String[] policyNames = nameList.policies();
+boolean omittedPolicies = nameList.hasInaccessiblePolicies();
+
+PolicyList<Policy> detailList = catalog.supportsPolicies().listPolicyInfosWithVisibility();
+Policy[] policies = detailList.policies();
+boolean omittedPolicyDetails = detailList.hasInaccessiblePolicies();
 ```
+
+The existing `listPolicies()` and `listPolicyInfos()` methods continue to return only the visible
+arrays.
 
 </TabItem>
 </Tabs>
+
+Interpret the visible list and `hasInaccessiblePolicies` together:
+
+| Visible list | `hasInaccessiblePolicies` | Meaning |
+|---|---:|---|
+| Empty | `false` | The object has no effective policy associations. |
+| Empty | `true` | All effective policy associations are inaccessible. |
+| Non-empty | `true` | The response includes visible policies and omits at least one inaccessible policy. |
+| Non-empty | `false` | All effective policy associations are visible. |
 
 ### Get One Policy on an Object
 

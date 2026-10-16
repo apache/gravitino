@@ -44,8 +44,9 @@ import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.ViewDTO;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.TagListResponse;
+import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -61,6 +62,7 @@ import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -496,14 +498,15 @@ public class TestSupportTags extends TestBase {
             + "/tags";
 
     String[] tags = new String[] {"tag1", "tag2"};
-    NameListResponse resp = new NameListResponse(tags);
+    TagNameListResponse resp = new TagNameListResponse(tags, true);
     buildMockResource(Method.GET, path, null, resp, SC_OK);
 
-    String[] actualTags = supportsTags.listTags();
-    Assertions.assertArrayEquals(tags, actualTags);
+    TagList<String> tagList = supportsTags.listTagsWithVisibility();
+    Assertions.assertArrayEquals(tags, tagList.tags());
+    Assertions.assertTrue(tagList.hasInaccessibleTags());
 
     // Return empty list
-    NameListResponse resp1 = new NameListResponse(new String[0]);
+    TagNameListResponse resp1 = new TagNameListResponse(new String[0], false);
     buildMockResource(Method.GET, path, null, resp1, SC_OK);
 
     String[] actualTags1 = supportsTags.listTags();
@@ -547,16 +550,18 @@ public class TestSupportTags extends TestBase {
             .withAudit(AuditDTO.builder().withCreator("test").build())
             .build();
     TagDTO[] tags = new TagDTO[] {tag1, tag2};
-    TagListResponse resp = new TagListResponse(tags);
+    MetadataObjectTagListResponse resp = new MetadataObjectTagListResponse(tags, true);
     buildMockResource(Method.GET, path, null, resp, SC_OK);
 
-    Tag[] actualTags = supportsTags.listTagsInfo();
+    TagList<Tag> tagList = supportsTags.listTagsInfoWithVisibility();
+    Tag[] actualTags = tagList.tags();
     Assertions.assertEquals(2, actualTags.length);
     Assertions.assertEquals("tag1", actualTags[0].name());
     Assertions.assertEquals("tag2", actualTags[1].name());
+    Assertions.assertTrue(tagList.hasInaccessibleTags());
 
     // Return empty list
-    TagListResponse resp1 = new TagListResponse(new TagDTO[0]);
+    MetadataObjectTagListResponse resp1 = new MetadataObjectTagListResponse(new TagDTO[0], false);
     buildMockResource(Method.GET, path, null, resp1, SC_OK);
 
     Tag[] actualTags1 = supportsTags.listTagsInfo();
