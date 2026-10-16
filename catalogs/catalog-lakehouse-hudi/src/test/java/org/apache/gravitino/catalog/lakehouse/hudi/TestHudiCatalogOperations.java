@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.hudi;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.CATALOG_BACKEND;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackendOps;
 import org.apache.gravitino.catalog.lakehouse.hudi.ops.InMemoryBackendOps;
@@ -28,6 +29,13 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -135,6 +143,79 @@ public class TestHudiCatalogOperations {
       Assertions.assertThrows(
           NoSuchTableException.class,
           () -> ops.loadTable(NameIdentifier.of("metalake", "catalog", "table")));
+    }
+  }
+
+  @Test
+  public void testCreateTableRejectsNanosecondTimestampsBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.TimestampType.withoutTimeZone(9),
+        "Unsupported Gravitino type for Hudi: timestamp(9). "
+            + "Hudi 0.15 cannot preserve timestamp precision greater than 6.");
+    assertCreateRejected(
+        Types.TimestampType.withTimeZone(9),
+        "Unsupported Gravitino type for Hudi: timestamp_tz(9). "
+            + "Hudi 0.15 cannot preserve timestamp precision greater than 6.");
+  }
+
+  @Test
+  public void testCreateTableRejectsVariantBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.VariantType.get(),
+        "Unsupported Gravitino type for Hudi: variant. "
+            + "Hudi 0.15 does not define a Variant column type.");
+  }
+
+  @Test
+  public void testCreateTableRejectsUnknownBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.NullType.get(),
+        "Unsupported Gravitino type for Hudi: unknown. "
+            + "Hudi 0.15 table columns require a concrete value type.");
+  }
+
+  @Test
+  public void testCreateTableRejectsGeometryBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.GeometryType.of("EPSG:3857"),
+        "Unsupported Gravitino type for Hudi: geometry. "
+            + "Hudi 0.15 does not define a Geometry type that preserves CRS semantics.");
+  }
+
+  @Test
+  public void testCreateTableRejectsGeographyBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.GeographyType.of("EPSG:4326", "SPHERICAL"),
+        "Unsupported Gravitino type for Hudi: geography. "
+            + "Hudi 0.15 does not define a Geography type that preserves CRS and edge "
+            + "algorithm semantics.");
+  }
+
+  private static void assertCreateRejected(Type type, String expectedMessage) throws Exception {
+    try (InMemoryBackendOps backend = new InMemoryBackendOps()) {
+      HudiCatalogOperations ops = new HudiCatalogOperations();
+      ops.hudiCatalogBackendOps = backend;
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+      Column[] columns = {
+        HudiColumn.builder().withName("v3_column").withType(type).withNullable(true).build()
+      };
+
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.createTable(
+                      ident,
+                      columns,
+                      null,
+                      Collections.emptyMap(),
+                      Transforms.EMPTY_TRANSFORM,
+                      Distributions.NONE,
+                      SortOrders.NONE,
+                      Indexes.EMPTY_INDEXES));
+
+      Assertions.assertEquals(expectedMessage, error.getMessage());
+      Assertions.assertFalse(backend.tableExists(ident));
     }
   }
 }
