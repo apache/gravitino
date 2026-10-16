@@ -24,15 +24,16 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /**
  * Placeholder built-in policy content for Iceberg manifest rewrite.
  *
  * <p>Configurable thresholds will be added when the rewrite-manifests policy lands; this class
- * registers the built-in type for TMS task mapping.
+ * registers {@link Policy.BuiltInType#ICEBERG_REWRITE_MANIFESTS}.
  */
-public class IcebergRewriteManifestsContent implements PolicyContent {
+public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
@@ -51,7 +52,13 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
           MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
 
   /** Default constructor for Jackson deserialization only. */
-  public IcebergRewriteManifestsContent() {}
+  public IcebergRewriteManifestsContent() {
+    this(PolicyExecutionSpec.empty());
+  }
+
+  IcebergRewriteManifestsContent(@Nullable PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
+  }
 
   @Override
   public Set<MetadataObject.Type> supportedObjectTypes() {
@@ -75,16 +82,20 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
 
   @Override
   public boolean equals(Object other) {
-    return other instanceof IcebergRewriteManifestsContent;
+    return other instanceof IcebergRewriteManifestsContent
+        && executionFieldsEqual((IcebergRewriteManifestsContent) other);
   }
 
   @Override
   public int hashCode() {
-    return IcebergRewriteManifestsContent.class.hashCode();
+    return executionFieldsHashCode();
   }
 
   @Override
   public String toString() {
-    return "IcebergRewriteManifestsContent{}";
+    StringBuilder sb = new StringBuilder("IcebergRewriteManifestsContent{");
+    appendExecutionFields(sb);
+    sb.append('}');
+    return sb.toString();
   }
 }
