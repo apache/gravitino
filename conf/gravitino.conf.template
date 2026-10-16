@@ -146,6 +146,14 @@ gravitino.lance-rest.namespace-backend = gravitino
 # The metalake name used for Lance REST service gravitino namespace backend, please create the metalake first before using it, and configure the metalake name here.
 # gravitino.lance-rest.gravitino-metalake = metalake
 
+# THE CONFIGURATION FOR table maintenance (TMS) cooldowns
+# Used when a maintenance policy omits minIntervalMs. Per-type defaults:
+# compaction / manifest-rewrite / snapshot-expiry = 3600000 (1h), orphan-cleanup = 86400000 (1d)
+# gravitino.maintenance.compaction.minIntervalMs = 3600000
+# gravitino.maintenance.manifest-rewrite.minIntervalMs = 3600000
+# gravitino.maintenance.snapshot-expiry.minIntervalMs = 3600000
+# gravitino.maintenance.orphan-cleanup.minIntervalMs = 86400000
+
 # THE CONFIGURATION FOR sensitive property key matching
 # Comma-separated keywords. Each entry is a literal substring, not a regular expression.
 # This list replaces the default (secret,password,token,credential,access,account).

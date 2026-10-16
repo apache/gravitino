@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.dto.policy;
 
+import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
+import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -39,6 +42,30 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
   void snapshotExpirationCreateAndUpdateRequestTypedContent() throws Exception {
     assertCreateAndUpdateRoundTrip(
         "system_iceberg_snapshot_expiration", PolicyContents.icebergSnapshotExpiration());
+  }
+
+  @Test
+  void rewriteManifestsResponseRoundTripWithExecutionPeers() throws Exception {
+    assertResponseRoundTripWithPeers(
+        "system_iceberg_rewrite_manifests",
+        PolicyContents.icebergRewriteManifests(
+            "0 30 1 * * ?",
+            true,
+            900_000L,
+            ImmutableMap.of("spark.executor.memory", "2g"),
+            ImmutableMap.of("queue", "tms")));
+  }
+
+  @Test
+  void snapshotExpirationResponseRoundTripWithExecutionPeers() throws Exception {
+    assertResponseRoundTripWithPeers(
+        "system_iceberg_snapshot_expiration",
+        PolicyContents.icebergSnapshotExpiration(
+            "0 0 4 * * ?",
+            false,
+            2_700_000L,
+            ImmutableMap.of("spark.driver.memory", "1g"),
+            ImmutableMap.of("metalake", "ml")));
   }
 
   private static void assertCreateAndUpdateRoundTrip(String policyType, PolicyContent expected)
@@ -64,5 +91,23 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
     PolicyUpdateRequest.UpdatePolicyContentRequest contentUpdate =
         (PolicyUpdateRequest.UpdatePolicyContentRequest) update;
     Assertions.assertEquals(expected, DTOConverters.fromDTO(contentUpdate.getNewContent()));
+  }
+
+  private static void assertResponseRoundTripWithPeers(String policyType, PolicyContent domain)
+      throws Exception {
+    PolicyDTO dto =
+        PolicyDTO.builder()
+            .withName("p")
+            .withPolicyType(policyType)
+            .withEnabled(true)
+            .withContent(DTOConverters.toDTO(domain))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
+            .build();
+    String json = JsonUtils.objectMapper().writeValueAsString(dto);
+    Assertions.assertTrue(json.contains("\"timeTrigger\""));
+    Assertions.assertFalse(json.contains("\"executionSpec\""));
+    PolicyDTO restored = JsonUtils.objectMapper().readValue(json, PolicyDTO.class);
+    Assertions.assertEquals(dto, restored);
+    Assertions.assertEquals(domain, DTOConverters.fromDTO(restored.content()));
   }
 }
