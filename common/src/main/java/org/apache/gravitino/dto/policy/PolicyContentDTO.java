@@ -37,7 +37,6 @@ import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
-import org.apache.gravitino.policy.PolicyExecutionFields;
 import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.apache.gravitino.policy.RowFilterContent;
 
@@ -78,7 +77,7 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return cron string, or {@code null} when unset
      */
     @Nullable
-    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    @JsonProperty("timeTrigger")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     default String timeTrigger() {
       return executionSpec().timeTrigger();
@@ -91,7 +90,7 @@ public interface PolicyContentDTO extends PolicyContent {
      *     when unset
      */
     @Nullable
-    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    @JsonProperty("commitTrigger")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     default Boolean commitTrigger() {
       return executionSpec().commitTrigger();
@@ -103,7 +102,7 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return milliseconds, or {@code null} when unset
      */
     @Nullable
-    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    @JsonProperty("minIntervalMs")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     default Long minIntervalMs() {
       return executionSpec().minIntervalMs();
@@ -114,7 +113,7 @@ public interface PolicyContentDTO extends PolicyContent {
      *
      * @return unmodifiable defensive copy; never {@code null} (empty when unset)
      */
-    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    @JsonProperty("jobOptions")
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     default Map<String, String> jobOptions() {
       return executionSpec().jobOptions();
@@ -125,7 +124,7 @@ public interface PolicyContentDTO extends PolicyContent {
      *
      * @return unmodifiable defensive copy; never {@code null} (empty when unset)
      */
-    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    @JsonProperty("updaterOptions")
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     default Map<String, String> updaterOptions() {
       return executionSpec().updaterOptions();
@@ -309,30 +308,30 @@ public interface PolicyContentDTO extends PolicyContent {
       return executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
     }
 
-    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    @JsonProperty("timeTrigger")
     private void setTimeTrigger(String timeTrigger) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
     }
 
-    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    @JsonProperty("commitTrigger")
     private void setCommitTrigger(Boolean commitTrigger) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
     }
 
-    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    @JsonProperty("minIntervalMs")
     private void setMinIntervalMs(Long minIntervalMs) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
     }
 
-    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    @JsonProperty("jobOptions")
     private void setJobOptions(Map<String, String> jobOptions) {
       this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
     }
 
-    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    @JsonProperty("updaterOptions")
     private void setUpdaterOptions(Map<String, String> updaterOptions) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
@@ -435,30 +434,30 @@ public interface PolicyContentDTO extends PolicyContent {
       return executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
     }
 
-    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    @JsonProperty("timeTrigger")
     private void setTimeTrigger(String timeTrigger) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
     }
 
-    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    @JsonProperty("commitTrigger")
     private void setCommitTrigger(Boolean commitTrigger) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
     }
 
-    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    @JsonProperty("minIntervalMs")
     private void setMinIntervalMs(Long minIntervalMs) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
     }
 
-    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    @JsonProperty("jobOptions")
     private void setJobOptions(Map<String, String> jobOptions) {
       this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
     }
 
-    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    @JsonProperty("updaterOptions")
     private void setUpdaterOptions(Map<String, String> updaterOptions) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
@@ -533,30 +532,30 @@ public interface PolicyContentDTO extends PolicyContent {
       return executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
     }
 
-    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    @JsonProperty("timeTrigger")
     private void setTimeTrigger(String timeTrigger) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
     }
 
-    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    @JsonProperty("commitTrigger")
     private void setCommitTrigger(Boolean commitTrigger) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
     }
 
-    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    @JsonProperty("minIntervalMs")
     private void setMinIntervalMs(Long minIntervalMs) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
     }
 
-    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    @JsonProperty("jobOptions")
     private void setJobOptions(Map<String, String> jobOptions) {
       this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
     }
 
-    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    @JsonProperty("updaterOptions")
     private void setUpdaterOptions(Map<String, String> updaterOptions) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
@@ -625,30 +624,30 @@ public interface PolicyContentDTO extends PolicyContent {
       return executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec;
     }
 
-    @JsonProperty(PolicyExecutionFields.TIME_TRIGGER_JSON_KEY)
+    @JsonProperty("timeTrigger")
     private void setTimeTrigger(String timeTrigger) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
     }
 
-    @JsonProperty(PolicyExecutionFields.COMMIT_TRIGGER_JSON_KEY)
+    @JsonProperty("commitTrigger")
     private void setCommitTrigger(Boolean commitTrigger) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
     }
 
-    @JsonProperty(PolicyExecutionFields.MIN_INTERVAL_MS_JSON_KEY)
+    @JsonProperty("minIntervalMs")
     private void setMinIntervalMs(Long minIntervalMs) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
     }
 
-    @JsonProperty(PolicyExecutionFields.JOB_OPTIONS_JSON_KEY)
+    @JsonProperty("jobOptions")
     private void setJobOptions(Map<String, String> jobOptions) {
       this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
     }
 
-    @JsonProperty(PolicyExecutionFields.UPDATER_OPTIONS_JSON_KEY)
+    @JsonProperty("updaterOptions")
     private void setUpdaterOptions(Map<String, String> updaterOptions) {
       this.executionSpec =
           ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
