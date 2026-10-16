@@ -22,6 +22,7 @@ package org.apache.gravitino.catalog.fileset.fs;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
@@ -54,6 +55,23 @@ public class TestFileSystemUtils {
     Assertions.assertEquals("v2", configuration.get("fs.s3a.impl"));
     Assertions.assertEquals("v3", configuration.get("fs.s3a.endpoint"));
     Assertions.assertEquals("v4", configuration.get("gravitino.bypass.fs.s3a.endpoint"));
+  }
+
+  @Test
+  void testCreateConfigurationPlainKeyWinsOverBypass() {
+    // The documented contract (pinned by testToHadoopConfigMap case 3) is plain-beats-bypass;
+    // the two-arg createConfiguration must honor it deterministically, and must strip only a
+    // bypass PREFIX (keys merely containing the bypass string stay verbatim).
+    Map<String, String> confMap =
+        ImmutableMap.of(
+            "fs.s3a.endpoint", "v3",
+            "gravitino.bypass.fs.s3a.endpoint", "v4",
+            "a.gravitino.bypass.b", "v5");
+    Configuration configuration =
+        FileSystemUtils.createCompatibleConfiguration(FileSystemProvider.GRAVITINO_BYPASS, confMap);
+    Assertions.assertEquals("v3", configuration.get("fs.s3a.endpoint"), "plain key must win");
+    Assertions.assertEquals(
+        "v5", configuration.get("a.gravitino.bypass.b"), "mid-key occurrences stay verbatim");
   }
 
   private static Stream<Arguments> mapArguments() {
