@@ -111,6 +111,8 @@ gravitino.authorization.serviceAdmins = anonymous
 gravitino.auxService.names = iceberg-rest,lance-rest
 # Iceberg REST service classpath
 gravitino.iceberg-rest.classpath = iceberg-rest-server/libs, iceberg-rest-server/conf
+# To use the experimental Iceberg dependencies, replace the classpath above with:
+# gravitino.iceberg-rest.classpath = iceberg-rest-experimental-server/libs, iceberg-rest-experimental-server/conf
 # Iceberg REST service host
 gravitino.iceberg-rest.host = 0.0.0.0
 # Iceberg REST service http port

@@ -19,7 +19,7 @@
 package org.apache.gravitino.policy.rego;
 
 /** Source literal types supported by {@code restricted-rego-v1}. */
-enum LiteralType {
+public enum LiteralType {
   /** String literal. */
   STRING,
   /** Exact base-10 numeric literal. */

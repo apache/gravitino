@@ -1147,6 +1147,24 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         allEtag, allEtag2, "ETag should be consistent for the same snapshots value");
   }
 
+  @Test
+  void testLoadTableETagIncludesReadRestrictionSeed() {
+    Optional<javax.ws.rs.core.EntityTag> unrestricted =
+        IcebergTableOperations.generateETag("s3://bucket/metadata.json", "all", "");
+    Optional<javax.ws.rs.core.EntityTag> firstRestriction =
+        IcebergTableOperations.generateETag(
+            "s3://bucket/metadata.json", "all", "{\"row-filter\":\"first\"}");
+    Optional<javax.ws.rs.core.EntityTag> secondRestriction =
+        IcebergTableOperations.generateETag(
+            "s3://bucket/metadata.json", "all", "{\"row-filter\":\"second\"}");
+
+    Assertions.assertTrue(unrestricted.isPresent());
+    Assertions.assertTrue(firstRestriction.isPresent());
+    Assertions.assertTrue(secondRestriction.isPresent());
+    Assertions.assertNotEquals(unrestricted, firstRestriction);
+    Assertions.assertNotEquals(firstRestriction, secondRestriction);
+  }
+
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testLoadTableSnapshotsRefsFiltering(Namespace namespace) {
