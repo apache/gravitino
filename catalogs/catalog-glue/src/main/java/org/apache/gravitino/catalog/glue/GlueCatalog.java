@@ -25,6 +25,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
 import org.apache.gravitino.storage.S3Properties;
 
 /**
@@ -89,14 +90,17 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
   public Map<String, String> propertiesWithCredentialProviders() {
     Map<String, String> props = super.propertiesWithCredentialProviders();
     // super() skips addCatalogSpecificCredentialProviders() when credential-providers is already
-    // set, so the aws-* → s3-* key mapping never runs. Apply it unconditionally here so that
-    // S3SecretKeyProvider.initialize() can read s3-access-key-id regardless of how the catalog
-    // was configured.
+    // set, so the aws-* → s3-* key mapping never runs. Remap keys and ensure aws-secret-key so Glue
+    // API credentials stay available via getCredentials. Do not force-append s3-secret-key when the
+    // user set credential-providers explicitly (e.g. s3-token); that would inject static S3 keys
+    // beside STS and break path-based credential selection. Auto-detect still registers
+    // s3-secret-key via addStorageCredentialProviders when providers are omitted.
     String accessKeyId = props.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretAccessKey = props.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(accessKeyId) && StringUtils.isNotBlank(secretAccessKey)) {
       props.putIfAbsent(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId);
       props.putIfAbsent(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey);
+      ensureCredentialProviderListed(props, AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE);
     }
     return props;
   }
@@ -107,6 +111,8 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
     String accessKeyId = properties.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretAccessKey = properties.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(accessKeyId) && StringUtils.isNotBlank(secretAccessKey)) {
+      // Glue API auth via aws-* keys; also remap to s3-* for storage credential vending.
+      credentialProviders.add(AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE);
       properties.putIfAbsent(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId);
       properties.putIfAbsent(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey);
     }

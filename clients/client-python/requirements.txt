@@ -19,6 +19,7 @@
 # the tools to publish the python client to Pypi
 requests==2.32.5
 dataclasses-json==0.6.7
+simplejson==3.20.1
 readerwriterlock==1.0.9
 fsspec==2026.2.0
 pyarrow==23.0.1

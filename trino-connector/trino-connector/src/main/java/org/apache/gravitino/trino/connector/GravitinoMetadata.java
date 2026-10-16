@@ -149,7 +149,19 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       Optional<ConnectorTableVersion> endVersion) {
     boolean tableExists =
         catalogConnectorMetadata.tableExists(tableName.getSchemaName(), tableName.getTableName());
-    if (!tableExists) return null;
+    if (!tableExists) {
+      // Trino resolves views through getView before reaching here. Gravitino views are not exposed
+      // through getView, so check for one only on a table miss to keep regular lookups cheap.
+      if (catalogConnectorMetadata.viewExists(
+          tableName.getSchemaName(), tableName.getTableName())) {
+        throw new TrinoException(
+            NOT_SUPPORTED,
+            String.format(
+                "%s is a view; views are not supported by the Gravitino Trino connector",
+                tableName));
+      }
+      return null;
+    }
 
     ConnectorTableHandle internalTableHandle =
         internalMetadata.getTableHandle(session, tableName, startVersion, endVersion);
@@ -228,6 +240,12 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
     // saveMode = SaveMode.IGNORE is used to ignore the table creation if it already exists
     catalogConnectorMetadata.createTable(table, saveMode == SaveMode.IGNORE);
+  }
+
+  @Override
+  public Optional<Type> getSupportedType(
+      ConnectorSession session, Map<String, Object> tableProperties, Type type) {
+    return metadataAdapter.getDataTypeTransformer().getSupportedType(type);
   }
 
   @Override

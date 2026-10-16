@@ -173,7 +173,7 @@ settings described above. Its job-specific `jobConf` keys are:
 | ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
 | `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
 | `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
-| `older_than`       | Timestamp in the Spark session time zone; must be at least 24 hours old               | Three days ago (Iceberg default) |
+| `older_than`       | Timestamp (explicit offset or Spark session time zone); must be at least 24 hours old | Three days ago (Iceberg default) |
 | `location`         | Scan only this directory within the table's storage location                          | Table location                   |
 | `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
 | `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
@@ -188,5 +188,63 @@ not supported. For a secured Iceberg REST catalog, supply its authentication
 settings explicitly in `spark_conf`, as described above.
 
 See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for a
-complete submission example. Orphan cleanup has no built-in scheduling policy
-in this release.
+complete submission example. For policy-driven submission, configure the handler
+and policy below. Periodic scheduling remains separate.
+
+### Orphan cleanup policy integration
+
+Register the handler alongside the existing optimizer providers:
+
+```properties
+gravitino.optimizer.strategyHandler.iceberg-orphan-file-removal.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler
+```
+
+The built-in job adapter is registered automatically. Keep the same Spark and
+catalog submission configuration as for direct orphan cleanup, including
+`catalog_name` (the catalog alias configured in Spark) and `spark_conf`.
+The adapter supplies `table_identifier`, `older_than`, `location`, and `dry_run`.
+These policy-derived values override shared submission defaults.
+
+Create a policy through `POST /api/metalakes/{metalake}/policies`:
+
+```json
+{
+  "name": "orphan_cleanup",
+  "policyType": "system_iceberg_orphan_file_removal",
+  "enabled": true,
+  "content": {
+    "olderThanDays": 3,
+    "dryRun": true
+  }
+}
+```
+
+Associate the policy with a tag and attach that tag to the target table, schema,
+or catalog, following the [policy setup walkthrough](./optimizer.md).
+`olderThanDays` defaults to 3 and must be between 1 and 36500 inclusive (approximately 100 years). This bound rejects impractical retention values before a policy is stored. `dryRun` defaults to false.
+
+The policy adapter subtracts `olderThanDays` from the current instant and always
+emits `older_than` as an explicit UTC timestamp ending in `Z`. Policy retention
+is therefore independent of `spark.sql.session.timeZone`. For direct job
+submission, timestamps without an offset use the Spark session time zone.
+
+Optional `location` must not have leading or trailing whitespace and must be the
+table's storage root or a descendant; submission requires the table's `location` metadata to validate a custom path. The Spark job
+rechecks containment and filesystem symlinks with its own credentials before
+listing or deleting files.
+
+The strategy operates on the whole table, including partitioned tables, and does
+not need table or partition statistics. Each explicit optimizer invocation makes
+an enabled, selected cleanup policy eligible with score 1. This does not install
+a periodic scheduler, cooldown, or last-run tracking. Because the trigger is always
+true and the score is always 1, every explicit `submit-strategy-jobs` invocation
+for an enabled, selected orphan policy submits a Spark cleanup job. Unlike
+threshold-based compaction, there is no metric gate to suppress repeated runs.
+Operators must control the invocation rate through external scheduling. Start
+with `dryRun: true` to inspect candidates; dry-run jobs still consume Spark
+resources and also need rate limiting.
+
+Use `submit-strategy-jobs --strategy-name orphan_cleanup` with the target
+identifiers. The CLI `--dry-run` previews recommendations without submitting jobs;
+the policy's `dryRun: true` submits a Spark job that lists candidates without
+deleting them. Start with that policy setting to inspect candidates.

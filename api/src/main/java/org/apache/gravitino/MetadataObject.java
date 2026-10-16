@@ -66,8 +66,6 @@ public interface MetadataObject {
     ROLE,
     /** A model is mapped to the model artifact in ML. */
     MODEL,
-    /** A model version is a checkpoint / snapshot linked to a registered model. */
-    MODEL_VERSION,
     /** A tag is used to help manage other metadata object. */
     TAG,
     /**

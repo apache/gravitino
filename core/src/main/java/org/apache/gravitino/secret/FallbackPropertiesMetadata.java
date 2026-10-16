@@ -29,14 +29,18 @@ import org.apache.gravitino.connector.PropertyEntry;
  *
  * <p>Registers shared base + credential-vending + cloud-storage entries ({@link
  * CloudPropertiesMetadata#STORAGE_PROPERTY_ENTRIES}) so officially non-hidden keys (for example
- * {@code credential-providers}, {@code s3-access-key-id}) are not fuzzy-recovered into {@code
- * getSecrets}. Undeclared sensitive-named keys still use fuzzy recovery; declared hidden secrets
- * (for example {@code s3-secret-access-key}) remain recoverable.
+ * {@code credential-providers}, {@code s3-token-expire-in-secs}) are not fuzzy-recovered into
+ * {@code getSecrets}. Undeclared sensitive-named keys still use fuzzy recovery. Declared hidden
+ * cloud credential keys (for example {@code s3-access-key-id}, {@code s3-secret-access-key}) are
+ * recovered via {@code getSecrets} when the caller holds {@code USE_SECRETS} and {@code
+ * INCLUDE_CREDENTIAL_SECRETS} (or is metalake owner); callers with only {@code USE_SECRETS} get
+ * those cloud keys via {@code getCredentials} instead.
  *
  * <p>Does not include the AWS access-key pair. That pair is a Glue catalog property merged only via
  * {@link org.apache.gravitino.connector.BaseCatalogPropertiesMetadata}, matching fileset and schema
  * metadata which also omit it. A catalog path that hits this fallback therefore treats {@code
- * aws-access-key-id} as undeclared (fuzzy mask / recover), the same as a fileset or schema.
+ * aws-access-key-id} as undeclared for masking; sensitive-named undeclared keys still fuzzy-recover
+ * into {@code getSecrets}.
  */
 final class FallbackPropertiesMetadata extends BasePropertiesMetadata {
 
@@ -44,8 +48,6 @@ final class FallbackPropertiesMetadata extends BasePropertiesMetadata {
 
   private static final Map<String, PropertyEntry<?>> CLOUD_PROPERTY_ENTRIES =
       CloudPropertiesMetadata.STORAGE_PROPERTY_ENTRIES;
-
-  private FallbackPropertiesMetadata() {}
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {

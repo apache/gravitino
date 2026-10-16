@@ -89,6 +89,22 @@ public interface SemanticModelMetaMapper {
       method = "listSemanticModelPOsBySchemaId")
   List<SemanticModelPO> listSemanticModelPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  /**
+   * Lists active Semantic Model identities by stable IDs without loading definition snapshots.
+   *
+   * @param semanticModelIds the IDs to look up
+   * @return active identity rows
+   */
+  @Select({
+    "<script>",
+    "SELECT semantic_model_id AS semanticModelId, semantic_model_name AS semanticModelName,",
+    "schema_id AS schemaId FROM " + TABLE_NAME + " WHERE deleted_at = 0 AND semantic_model_id IN",
+    "<foreach collection='semanticModelIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+    "</script>"
+  })
+  List<SemanticModelPO> listSemanticModelPOsByIds(
+      @Param("semanticModelIds") List<Long> semanticModelIds);
+
   /** Lists current Semantic Model snapshots under a fully qualified schema name. */
   @ResultMap("semanticModelPOResultMap")
   @SelectProvider(

@@ -22,6 +22,8 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
+
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
 )
@@ -61,6 +63,7 @@ from mcp_server.client.plain.plain_rest_client_topic_operation import (
 from mcp_server.client.plain.plain_rest_client_view_operation import (
     PlainRESTClientViewOperation,
 )
+from mcp_server.client.plain.utils import encode_path_segment
 
 
 def _make_mock_client(response_json: dict):
@@ -97,6 +100,61 @@ _ENCODED_QUERY_INJECTION = "name%3Fadmin%3Dtrue%23"
 _ENCODED_SLASH = "cat%2Fschema"
 
 METALAKE = "my_metalake"
+
+
+class TestEncodePathSegment(unittest.TestCase):
+    def test_rejects_empty_and_dot_segments(self):
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    encode_path_segment(name)
+
+    def test_preserves_encoding_and_string_conversion(self):
+        for value, expected in (
+            (_PATH_TRAVERSAL, _ENCODED_PATH_TRAVERSAL),
+            (_QUERY_INJECTION, _ENCODED_QUERY_INJECTION),
+            (_SLASH, _ENCODED_SLASH),
+            ("sales.v2", "sales.v2"),
+            ("%2e%2e", "%252e%252e"),
+            (1, "1"),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(encode_path_segment(value), expected)
+
+
+class TestPathNameValidation(unittest.IsolatedAsyncioTestCase):
+    """Invalid names must fail before httpx can normalize the request path."""
+
+    async def asyncSetUp(self):
+        self.requests = []
+
+        def respond(request):
+            self.requests.append(request)
+            return httpx.Response(
+                200, json={"code": 0, "dropped": True, "identifiers": []}
+            )
+
+        self.client = httpx.AsyncClient(
+            base_url="http://localhost:8090",
+            transport=httpx.MockTransport(respond),
+        )
+        self.addAsyncCleanup(self.client.aclose)
+
+    async def test_drop_table_rejects_invalid_names_before_request(self):
+        op = PlainRESTClientTableOperation(METALAKE, self.client)
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    await op.drop_table("catalog", "schema", name, False)
+                self.assertEqual(self.requests, [])
+
+    async def test_load_model_rejects_invalid_names_before_request(self):
+        op = PlainRESTClientModelOperation(METALAKE, self.client)
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    await op.load_model("catalog", "schema", name)
+                self.assertEqual(self.requests, [])
 
 
 class TestMetalakeOperation(unittest.TestCase):

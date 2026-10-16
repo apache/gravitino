@@ -20,14 +20,15 @@
 
 # Build every Apache Gravitino Flink connector runtime shadow jar present in
 # the source tree and prepare the layout consumed by the Docker image.
-# Flink only supports Scala 2.12.
+# Flink 1.x jars use the Scala 2.12 suffix; Flink 2.x jars have no Scala suffix.
 #
 # The set of Flink runtime modules is DISCOVERED from the Gradle project, so
 # this script does not hard-code which versions exist. Whatever the checked-out
-# branch supports (for example 1.19/1.20/2.1) is built automatically.
+# branch supports (for example 1.19/1.20/2.1/2.2) is built automatically.
 #
 # Output layout:
-#   packages/connectors/flink-<ver>/gravitino-flink-connector-runtime-<ver>_2.12-*.jar
+#   packages/connectors/flink-1.<minor>/gravitino-flink-connector-runtime-1.<minor>_2.12-*.jar
+#   packages/connectors/flink-2.<minor>/gravitino-flink-connector-runtime-2.<minor>-*.jar
 
 set -euo pipefail
 
@@ -52,7 +53,7 @@ versions="$(echo "${runtime_modules}" | sed 's/flink-runtime-//' | sort -u)"
 echo "Discovered Flink connector versions:"
 echo "${versions}" | sed 's/^/  - /'
 
-# Assemble each discovered runtime shadow jar (Scala 2.12 only).
+# Assemble each discovered runtime shadow jar.
 tasks=""
 for m in ${runtime_modules}; do
   tasks="${tasks} :flink-connector:${m}:shadowJar"
@@ -98,10 +99,25 @@ if [ "${copied}" -eq 0 ]; then
   exit 1
 fi
 
-# Stage the canonical Apache-2.0 LICENSE and NOTICE from the repository root so
-# the image ships the real texts (not drifting copies committed in-tree).
-cp "${gravitino_home}/LICENSE" "${conn_dir}/licenses/LICENSE"
-cp "${gravitino_home}/NOTICE" "${conn_dir}/licenses/NOTICE"
+# /licenses must describe what the shipped jars bundle, not the source tree.
+# Each jar already carries that pair in META-INF, generated from its resolved
+# dependency set, with the per-component texts it cites alongside them inside the
+# jar. Versions bundle different components, so each gets its own directory.
+license_jars="$(find "${conn_dir}/packages/connectors" -name '*.jar' | sort)"
+[ -n "${license_jars}" ] || { echo "ERROR: no staged jar to take licenses from" >&2; exit 1; }
+
+# Drop earlier staging; leftovers would ship licences for jars not in the image.
+mkdir -p "${conn_dir}/licenses"
+find "${conn_dir}/licenses" -mindepth 1 -maxdepth 1 ! -name '.gitignore' -exec rm -rf {} +
+
+while IFS= read -r jar; do
+  dest="${conn_dir}/licenses/$(basename "${jar}" .jar)"
+  mkdir -p "${dest}"
+  unzip -p "${jar}" META-INF/LICENSE > "${dest}/LICENSE" \
+    || { echo "ERROR: ${jar} has no META-INF/LICENSE" >&2; exit 1; }
+  unzip -p "${jar}" META-INF/NOTICE > "${dest}/NOTICE" \
+    || { echo "ERROR: ${jar} has no META-INF/NOTICE" >&2; exit 1; }
+done <<< "${license_jars}"
 
 echo ""
 echo "=== Flink connectors prepared (${copied} version(s)) ==="

@@ -44,8 +44,34 @@ a job runs. See [Placeholders](#placeholders).
 }
 ```
 
-`executable` and `scripts` must be reachable by the Gravitino server, which accepts local paths and
-HTTP, HTTPS, FTP, and FTPS URLs.
+`executable` and `scripts` are fetched by the job executor. With the `local` job executor they must
+be reachable by the Gravitino server, which accepts local paths and HTTP, HTTPS, FTP, and FTPS URLs.
+
+Each of them is fetched into the job's working directory under the file name of its path, so it
+must point to a file, and two different resources of a template must not share a file name: a run
+is rejected otherwise, instead of one file silently overwriting the other. The same applies to the
+`executable`, `jars`, `files` and `archives` of a Spark template.
+
+`executable` can also be a command name with no path, such as `python` or `bash`. Such a command is
+not fetched, it is looked up where the job runs: the `local` job executor looks it up on the `PATH`
+of the Gravitino server process, and setting `PATH` in `environments` doesn't change that. The
+scripts are still fetched next to it, into the job's working directory, so a template can run a
+script with an installed interpreter:
+
+```json
+{
+  "name": "python_report",
+  "jobType": "shell",
+  "executable": "python",
+  "arguments": ["report.py", "{{date}}"],
+  "scripts": ["https://repo.example.com/jobs/report.py"]
+}
+```
+
+A file name without a path, such as `run.sh`, is a command name too. Earlier versions fetched it as
+a file relative to the working directory of the Gravitino server; to run a file, write its absolute
+path or URI instead. To avoid running a different program than the one that was fetched, a run is
+rejected when a script has the same file name as a command-name `executable`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -384,12 +410,13 @@ default configurations:
 The local job executor is used for testing and development purposes, it runs the job in the local process.
 The following are the default configurations for the local job executor:
 
-| Property name                                       | Description                                                                                                                                       | Default value                          | Required |
-|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|
-| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       |
-| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
-| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
-| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
+| Property name                                          | Description                                                                                                                                                                                  | Default value                          | Required |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|
+| `gravitino.jobExecutor.local.waitingQueueSize`         | The size of the waiting queue for queued jobs in the local job executor                                                                                                                      | `100`                                  | No       |
+| `gravitino.jobExecutor.local.maxRunningJobs`           | The maximum number of running jobs in the local job executor                                                                                                                                 | `max(1, min(available cores / 2, 10))` | No       |
+| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs`    | The time in milliseconds to keep the job status in the local job executor                                                                                                                    | `3600000` (1 hour)                     | No       |
+| `gravitino.jobExecutor.local.cancelForceKillDelayInMs` | How long in milliseconds a cancelled job's process may keep running after it is asked to stop before the executor kills it forcibly. Raise it for jobs that need longer to shut down cleanly | `30000` (30 seconds)                   | No       |
+| `gravitino.jobExecutor.local.sparkHome`                | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job                                            | `None`                                 | No       |
 
 The local job executor always uses `gravitino.job.stagingDir` as its staging directory, the same one
 the job system stages jobs in. A `gravitino.jobExecutor.local.stagingDir` setting is ignored.

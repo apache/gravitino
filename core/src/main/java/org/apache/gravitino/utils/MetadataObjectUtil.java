@@ -58,7 +58,6 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
           .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
-          .put(MetadataObject.Type.MODEL_VERSION, Entity.EntityType.MODEL_VERSION)
           .put(MetadataObject.Type.TAG, Entity.EntityType.TAG)
           .put(MetadataObject.Type.POLICY, Entity.EntityType.POLICY)
           .put(MetadataObject.Type.JOB_TEMPLATE, Entity.EntityType.JOB_TEMPLATE)
@@ -135,7 +134,6 @@ public class MetadataObjectUtil {
       case TOPIC:
       case FILESET:
       case COLUMN:
-      case MODEL_VERSION:
       case MODEL:
       case FUNCTION:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
@@ -265,22 +263,6 @@ public class MetadataObjectUtil {
         check(env.internalTableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
         break;
 
-      case MODEL_VERSION:
-        NameIdentifierUtil.checkModelVersion(identifier);
-        NameIdentifier modelIdent = NameIdentifier.of(identifier.namespace().levels());
-        check(env.internalModelDispatcher().modelExists(modelIdent), exceptionToThrowSupplier);
-        try {
-          int version = Integer.parseInt(object.name());
-          check(
-              env.internalModelDispatcher().modelVersionExists(modelIdent, version),
-              exceptionToThrowSupplier);
-        } catch (NumberFormatException e) {
-          check(
-              env.internalModelDispatcher().modelVersionExists(modelIdent, object.name()),
-              exceptionToThrowSupplier);
-        }
-        break;
-
       case TOPIC:
         NameIdentifierUtil.checkTopic(identifier);
         check(env.internalTopicDispatcher().topicExists(identifier), exceptionToThrowSupplier);
@@ -300,6 +282,13 @@ public class MetadataObjectUtil {
       case VIEW:
         NameIdentifierUtil.checkView(identifier);
         check(env.internalViewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case SEMANTIC_MODEL:
+        NameIdentifierUtil.checkSemanticModel(identifier);
+        check(
+            env.internalSemanticModelDispatcher().semanticModelExists(identifier),
+            exceptionToThrowSupplier);
         break;
 
       case ROLE:

@@ -42,8 +42,10 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
@@ -150,8 +152,10 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
-    PolicyListResponse policyListResponse = response.readEntity(PolicyListResponse.class);
+    MetadataObjectPolicyListResponse policyListResponse =
+        response.readEntity(MetadataObjectPolicyListResponse.class);
     Assertions.assertEquals(0, policyListResponse.getCode());
+    Assertions.assertFalse(policyListResponse.hasInaccessiblePolicies());
     Assertions.assertEquals(catalogPolicyInfos.length, policyListResponse.getPolicies().length);
 
     Map<String, Policy> resultPolicies =
@@ -172,8 +176,9 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response1.getStatus());
 
-    NameListResponse nameListResponse = response1.readEntity(NameListResponse.class);
+    PolicyNameListResponse nameListResponse = response1.readEntity(PolicyNameListResponse.class);
     Assertions.assertEquals(0, nameListResponse.getCode());
+    Assertions.assertFalse(nameListResponse.hasInaccessiblePolicies());
     Assertions.assertEquals(catalogPolicyInfos.length, nameListResponse.getNames().length);
     Assertions.assertArrayEquals(
         Arrays.stream(catalogPolicyInfos).map(PolicyEntity::name).toArray(String[]::new),
@@ -390,14 +395,18 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
           operations.listPoliciesForMetadataObject(
               metalake, table.type().toString(), table.fullName(), true);
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
-      Assertions.assertEquals(
-          0, ((PolicyListResponse) detailsResponse.getEntity()).getPolicies().length);
+      MetadataObjectPolicyListResponse details =
+          (MetadataObjectPolicyListResponse) detailsResponse.getEntity();
+      Assertions.assertEquals(0, details.getPolicies().length);
+      Assertions.assertTrue(details.hasInaccessiblePolicies());
 
       Response namesResponse =
           operations.listPoliciesForMetadataObject(
               metalake, table.type().toString(), table.fullName(), false);
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), namesResponse.getStatus());
-      Assertions.assertEquals(0, ((NameListResponse) namesResponse.getEntity()).getNames().length);
+      PolicyNameListResponse names = (PolicyNameListResponse) namesResponse.getEntity();
+      Assertions.assertEquals(0, names.getNames().length);
+      Assertions.assertTrue(names.hasInaccessiblePolicies());
     }
     Mockito.verify(policyManager, Mockito.never())
         .listPolicyInfosForMetadataObject(metalake, schema);
