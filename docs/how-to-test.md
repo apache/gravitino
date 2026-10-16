@@ -72,6 +72,8 @@ public class TestSQLScripts extends TestJDBCBackend { ... }
 
 A method-level `@DatabaseFixture` replaces the class-level one. A class's backend is closed when the class finishes.
 
+The MySQL and PostgreSQL lanes treat their test data as disposable: they set `-Dgravitino.test.db.disposableData=true`, so the containers keep data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk. Other modules' integration tests, and the deprecated `:core:test`, keep the default container settings.
+
 #### `:core:test`
 
 In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` runs all core tests in one task. It is deprecated, and no CI job uses it. It selects no database: every database test runs against H2, and with `-PskipDockerTests=false` also against MySQL and PostgreSQL, building a new backend at every change of database. Without Docker, it runs the database tests like `coreH2Test`.

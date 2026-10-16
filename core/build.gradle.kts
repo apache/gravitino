@@ -162,6 +162,8 @@ fun registerCoreTestTask(
     systemProperty("junit.jupiter.execution.parallel.enabled", "false")
 
     if (backend != "h2") {
+      // The test databases are thrown away, so their containers can skip durability work.
+      systemProperty("gravitino.test.db.disposableData", "true")
       doFirst {
         if (rootProject.extra["dockerTest"] != true) {
           throw GradleException(

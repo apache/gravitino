@@ -42,6 +42,7 @@ public class MySQLContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(MySQLContainer.class);
 
   public static final String DEFAULT_IMAGE = "mysql:8.0";
+
   public static final String HOST_NAME = "gravitino-ci-mysql";
   public static final int MYSQL_PORT = 3306;
   public static final String USER_NAME = "root";
@@ -66,6 +67,15 @@ public class MySQLContainer extends BaseContainer {
   protected void setupContainer() {
     super.setupContainer();
     withLogConsumer(new PrintingContainerLog(format("%-14s| ", "MySQLContainer")));
+    if (disposableData()) {
+      container
+          .withTmpFs(Map.of("/var/lib/mysql", DISPOSABLE_DATA_TMPFS))
+          .withCommand(
+              "--innodb-flush-log-at-trx-commit=0",
+              "--sync-binlog=0",
+              "--skip-log-bin",
+              "--innodb-doublewrite=0");
+    }
   }
 
   @Override

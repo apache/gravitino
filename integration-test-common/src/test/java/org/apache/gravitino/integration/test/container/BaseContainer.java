@@ -64,6 +64,16 @@ public abstract class BaseContainer implements AutoCloseable {
   // Network of the container
   private final Optional<Network> network;
 
+  /**
+   * System property that marks database test data as disposable. When it is {@code true}, database
+   * containers keep their data in memory and skip durability work such as fsync. The core database
+   * test tasks set it.
+   */
+  public static final String DISPOSABLE_DATA_PROPERTY = "gravitino.test.db.disposableData";
+
+  /** {@code tmpfs} options for a disposable data directory. */
+  protected static final String DISPOSABLE_DATA_TMPFS = "rw,size=2g";
+
   protected final GenericContainer<?> container;
 
   protected BaseContainer(
@@ -231,5 +241,13 @@ public abstract class BaseContainer implements AutoCloseable {
     }
 
     public abstract CONTAINER build();
+  }
+
+  /**
+   * Returns whether this JVM's database test data is disposable; see {@link
+   * #DISPOSABLE_DATA_PROPERTY}.
+   */
+  protected static boolean disposableData() {
+    return Boolean.getBoolean(DISPOSABLE_DATA_PROPERTY);
   }
 }

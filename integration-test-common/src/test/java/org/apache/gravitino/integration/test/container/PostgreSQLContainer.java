@@ -64,6 +64,12 @@ public class PostgreSQLContainer extends BaseContainer {
   protected void setupContainer() {
     super.setupContainer();
     withLogConsumer(new PrintingContainerLog(format("%-14s| ", "PostgreSQLContainer")));
+    if (disposableData()) {
+      container
+          .withTmpFs(Map.of("/var/lib/postgresql/data", DISPOSABLE_DATA_TMPFS))
+          .withCommand(
+              "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off");
+    }
   }
 
   @Override
