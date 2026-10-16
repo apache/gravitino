@@ -18,7 +18,7 @@
 #
 [versions]
 db-scheduler = "16.12.0"
-awssdk = "2.31.73"
+awssdk = "2.55.14"
 azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
