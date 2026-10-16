@@ -19,11 +19,18 @@
 package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -32,6 +39,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.RowFilterContent;
@@ -304,17 +312,93 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
-  /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
+  /** Typed manifest rewrite policy content. */
   @EqualsAndHashCode
   @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO {
+    @JsonProperty("manifest_count_critical")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    private Long manifestCountCritical;
+
+    @JsonProperty("manifest_count_warning")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    private Long manifestCountWarning;
+
+    @JsonProperty("avg_manifest_size_threshold_bytes")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    private Long avgManifestSizeThresholdBytes;
+
+    @JsonProperty("spec_id")
+    @JsonDeserialize(using = ManifestSpecIdDeserializer.class)
+    private Integer specId;
+
+    @JsonProperty("use_caching")
+    private Boolean useCaching;
+
     private IcebergRewriteManifestsContentDTO() {}
 
     /**
-     * @return empty rewrite-manifests content DTO
+     * Returns manifest rewrite content with default thresholds.
+     *
+     * @return default rewrite-manifests content DTO
      */
     public static IcebergRewriteManifestsContentDTO instance() {
       return new IcebergRewriteManifestsContentDTO();
+    }
+
+    /**
+     * Returns manifest_count_critical.
+     *
+     * @return manifest_count_critical
+     */
+    public Long manifestCountCritical() {
+      return manifestCountCritical == null
+          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_CRITICAL
+          : manifestCountCritical;
+    }
+
+    /**
+     * Returns manifest_count_warning.
+     *
+     * @return manifest_count_warning
+     */
+    public Long manifestCountWarning() {
+      return manifestCountWarning == null
+          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_WARNING
+          : manifestCountWarning;
+    }
+
+    /**
+     * Returns avg_manifest_size_threshold_bytes.
+     *
+     * @return avg_manifest_size_threshold_bytes
+     */
+    public Long avgManifestSizeThresholdBytes() {
+      return avgManifestSizeThresholdBytes == null
+          ? IcebergRewriteManifestsContent.DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES
+          : avgManifestSizeThresholdBytes;
+    }
+
+    /**
+     * Returns spec_id.
+     *
+     * @return spec_id or null when omitted
+     */
+    @Nullable
+    public Integer specId() {
+      return specId;
+    }
+
+    /**
+     * Returns use_caching.
+     *
+     * @return use_caching or null when omitted
+     */
+    @Nullable
+    public Boolean useCaching() {
+      return useCaching;
     }
 
     @Override
@@ -338,8 +422,38 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
+    /** Reads a manifest threshold without silently coercing fractional values or strings. */
+    public static class ManifestThresholdDeserializer extends JsonDeserializer<Long> {
+      @Override
+      public Long deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(
+              Long.class, "Manifest thresholds must be 64-bit integers");
+        }
+        return parser.getLongValue();
+      }
+    }
+
+    /** Reads a partition spec ID without silently coercing fractional values or strings. */
+    public static class ManifestSpecIdDeserializer extends JsonDeserializer<Integer> {
+      @Override
+      public Integer deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(Integer.class, "spec_id must be a 32-bit integer");
+        }
+        return parser.getIntValue();
+      }
+    }
+
     private PolicyContent toDomainContent() {
-      return PolicyContents.icebergRewriteManifests();
+      return PolicyContents.icebergRewriteManifests(
+          manifestCountCritical(),
+          manifestCountWarning(),
+          avgManifestSizeThresholdBytes(),
+          specId(),
+          useCaching());
     }
   }
 

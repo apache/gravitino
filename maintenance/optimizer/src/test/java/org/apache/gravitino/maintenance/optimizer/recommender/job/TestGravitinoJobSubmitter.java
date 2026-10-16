@@ -24,12 +24,38 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteJobContext;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoJobSubmitter {
+  @Test
+  void testManifestAdapterPreservesResolvedSpecOverGlobalConfig() {
+    GravitinoJobAdapter adapter =
+        new GravitinoJobSubmitter()
+            .loadJobAdapter(IcebergRewriteManifestsContent.JOB_TEMPLATE_NAME_VALUE);
+    Assertions.assertInstanceOf(GravitinoManifestRewriteJobAdapter.class, adapter);
+    OptimizerConfig config =
+        new OptimizerConfig(
+            Map.of(
+                OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "spec_id", "99",
+                OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "catalog_name", "other",
+                OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "spark_master", "local[2]"));
+    Map<String, String> result =
+        GravitinoJobSubmitter.buildJobConfig(
+            config,
+            new ManifestRewriteJobContext(NameIdentifier.of("catalog", "db", "table"), 1, null),
+            adapter);
+    Assertions.assertEquals("1", result.get("spec_id"));
+    Assertions.assertEquals("catalog", result.get("catalog_name"));
+    Assertions.assertEquals("local[2]", result.get("spark_master"));
+    Assertions.assertFalse(result.containsKey("use_caching"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> adapter.jobConfig(null));
+  }
+
   @Test
   void loadJobAdapterReturnsCompactionAdapterForBuiltInTemplateName() {
     GravitinoJobSubmitter submitter = new GravitinoJobSubmitter();

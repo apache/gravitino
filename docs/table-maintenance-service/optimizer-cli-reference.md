@@ -572,6 +572,9 @@ Rewrite Manifests Results: Rewritten manifests: 24, Added manifests: 2
 
 Both counts at zero indicate a successful no-op, for example when no manifests for the selected spec need rewriting. Other specs remain unchanged.
 
+The [manifest rewrite policy](../iceberg-rewrite-manifests-policy.md) evaluates fresh per-spec
+measurements from the table-wide collector and submits this job with the evaluated `spec_id`.
+
 ## Related
 
 - [Table Maintenance Service](./optimizer.md) for the concepts and the walkthrough

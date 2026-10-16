@@ -80,6 +80,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 
 public class TestPolicyOperations extends BaseOperationsTest {
@@ -406,6 +408,42 @@ public class TestPolicyOperations extends BaseOperationsTest {
     ErrorResponse errorResp1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "spec_id,1.5",
+    "manifest_count_critical,500.5",
+    "manifest_count_warning,100.5",
+    "avg_manifest_size_threshold_bytes,4096.5"
+  })
+  public void testCreateManifestPolicyRejectsFractionalNumbers(String field, String value) {
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("rewrite")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS)
+            .withEnabled(true)
+            .withContent(PolicyContents.icebergRewriteManifests())
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(any(), any(), any(), any(), anyBoolean(), any()))
+        .thenReturn(policy);
+    String json =
+        "{\"name\":\"rewrite\",\"policyType\":\"system_iceberg_rewrite_manifests\","
+            + "\"enabled\":true,\"content\":{\""
+            + field
+            + "\":"
+            + value
+            + "}}";
+    try (Response response =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+    Mockito.verifyNoInteractions(policyManager);
   }
 
   @Test
