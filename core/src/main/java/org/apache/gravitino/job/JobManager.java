@@ -600,6 +600,31 @@ public class JobManager implements JobOperationDispatcher {
           "Job template with name %s under metalake %s does not exist",
           jobTemplateName,
           metalake);
+    } catch (OptimisticLockException e) {
+      // Cancellation is asynchronous and cannot undo work that already finished. Request it
+      // best-effort, but do not expose a retryable conflict after submitting an execution.
+      LOG.warn(
+          "Job {} was submitted as execution {} but could not be registered because of a "
+              + "concurrent operation, cancelling the execution",
+          jobEntity.name(),
+          jobExecutionId,
+          e);
+      try {
+        jobExecutor.cancelJob(jobExecutionId);
+      } catch (Exception cancelFailure) {
+        LOG.error(
+            "Failed to cancel the unregistered execution {} of job {}",
+            jobExecutionId,
+            jobEntity.name(),
+            cancelFailure);
+        e.addSuppressed(cancelFailure);
+      }
+      throw new RuntimeException(
+          String.format(
+              "Failed to register job %s after submitting execution %s; cancellation was attempted "
+                  + "but the execution may already have run. Check the execution before retrying",
+              jobEntity.name(), jobExecutionId),
+          e);
     } catch (IOException e) {
       throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
     }
@@ -793,10 +818,11 @@ public class JobManager implements JobOperationDispatcher {
                   NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
               deleteJobStagingDir(job);
             } catch (OptimisticLockException e) {
-              // Keep the files when deletion loses its CAS. The next cleanup run re-reads the
-              // job and checks retention eligibility again; this batch can process other jobs.
+              // Keep files when deletion conflicts or times out on a lock. The next cleanup run
+              // re-reads the job and checks retention eligibility again; other jobs in this batch
+              // can still be processed.
               LOG.info(
-                  "Job {} under metalake {} changed concurrently; deferring cleanup",
+                  "Job {} under metalake {} could not be deleted because of a concurrent operation; deferring cleanup",
                   job.name(),
                   metalake);
             } catch (IOException e) {
@@ -1317,9 +1343,9 @@ public class JobManager implements JobOperationDispatcher {
               }));
     } catch (OptimisticLockException e) {
       // A later poll re-reads both executor state and metadata. Never stop the scheduled
-      // task or replay external submission/cancellation because a metadata CAS lost.
+      // task or replay external submission/cancellation because a metadata write conflicted.
       LOG.info(
-          "Job {} under metalake {} changed concurrently; deferring status update",
+          "Job {} under metalake {} could not be updated because of a concurrent operation; deferring status update",
           job.name(),
           metalake);
       return Optional.empty();

@@ -100,6 +100,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -1403,6 +1404,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   if (dropped) {
                     secretManager.deleteSecretsFromProperties(schemaProps);
                   }
+                } catch (OptimisticLockException e) {
+                  // A conflict with a concurrent writer, such as a lock wait timeout.
+                  throw e;
                 } catch (Exception e) {
                   LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
                   throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
