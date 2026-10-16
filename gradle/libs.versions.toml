@@ -71,6 +71,8 @@ commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 iceberg = '1.11.0'
+datastrato-iceberg = "1.13.0"
+experimental-iceberg-git-commit = "e6118db078e09d960600c3c302e0f220457cb388"
 # Last Iceberg release compatible with Spark 3.3.
 iceberg4spark33 = "1.8.1"
 iceberg4spark35 = "1.11.0"
@@ -82,6 +84,7 @@ spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.3"
 spark40 = "4.0.3"
+spark41 = "4.1.3"
 kyuubi4spark = "1.12.0"
 kyuubi4authz = "1.10.2"
 trino = '435'

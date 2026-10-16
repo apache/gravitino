@@ -1183,6 +1183,7 @@ tasks {
         "copyJobsLib",
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+        ":iceberg:iceberg-rest-server-experiment:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
         ":plugins:idp-basic:copyLibAndConfigs",

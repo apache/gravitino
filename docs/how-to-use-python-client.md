@@ -31,39 +31,17 @@ pip install apache-gravitino
 
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
+3. [Manage Semantic Model metadata using Gravitino Python API](./manage-semantic-model-metadata-using-gravitino.md?language=python)
 
 ### Semantic Model Ossie Import and Export
 
-Import a standalone Apache Ossie YAML or JSON document into an existing schema of a
-relational catalog. Its dataset sources must refer to existing tables or views in the
-same metalake. The document supplies the model name; importing an existing name raises
-`SemanticModelAlreadyExistsException` without replacing it.
+Use `as_semantic_model_catalog()` on a loaded relational catalog to manage Semantic Models.
+The [Semantic Model guide](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+includes Python examples for native creation, list/load, alteration, deletion, and Apache Ossie
+YAML/JSON import and export, along with the source and permission requirements.
 
-```python
-from pathlib import Path
-
-from gravitino import GravitinoClient, NameIdentifier
-from gravitino.namespace import Namespace
-
-client = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-try:
-    models = client.load_catalog("catalog").as_semantic_model_catalog()
-    model = models.import_ossie_document(
-        Namespace.of("schema"), Path("sales.ossie.yaml").read_text(encoding="utf-8")
-    )
-    document = models.export_ossie_document(
-        NameIdentifier.of("schema", model.name()), document_format="json"
-    )
-    Path("sales.ossie.json").write_text(document, encoding="utf-8")
-finally:
-    client.close()
-```
-
-Both methods default to `document_format="yaml"`; use `"json"` for JSON input or output.
-The SDK transfers document text directly and requires no YAML parser. Import returns a
-`SemanticModel` using the existing lossless JSON decoder, while export returns the server's
-text unchanged. Model properties are exchanged through the root `GRAVITINO_PROPERTIES`
-custom extension, and `ossie-version` supplies the document version.
+The SDK transfers Ossie document text directly and requires no YAML parser. Import and export
+default to `document_format="yaml"`; use `"json"` for JSON documents.
 
 ### Fileset Example
 

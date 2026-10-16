@@ -247,7 +247,7 @@ client.delete_tag("pii")
 
 Both happen in one request, and either list can be omitted. The object type and full name go in the
 path, so the same call covers catalogs, schemas, tables, views, columns, filesets, topics, models,
-and functions.
+functions, and [Semantic Models](./manage-semantic-model-metadata-using-gravitino.md#tags-and-policies).
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -357,6 +357,10 @@ The response includes tags inherited from ancestors. With `details=true` each ta
 `inherited` field and its `assignmentValues`, which a plain name listing does not. An empty
 `assignmentValues` array means the tag is assigned without a value. `allowedValues` is null for an
 unrestricted tag, empty for a valueless-only tag, and otherwise contains the tag's allowed values.
+Both response modes include `hasInaccessibleTags`. Gravitino resolves direct and inherited tag
+assignments before authorization filtering, so the flag also covers inaccessible inherited tags.
+The flag reveals only that at least one tag was omitted; it does not reveal the tag's name, count,
+details, or inheritance source.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -380,7 +384,18 @@ The response includes each tag's definition and assignment details:
       "assignmentValues": ["finance", "risk"],
       "inherited": false
     }
-  ]
+  ],
+  "hasInaccessibleTags": false
+}
+```
+
+If every effective tag is inaccessible, the response contains an empty list and sets the flag:
+
+```json
+{
+  "code": 0,
+  "tags": [],
+  "hasInaccessibleTags": true
 }
 ```
 
@@ -389,24 +404,47 @@ The response includes each tag's definition and assignment details:
 
 ```java
 Table customers = ...
-String[] tagNames = customers.supportsTags().listTags();
-Tag[] tags = customers.supportsTags().listTagsInfo();
+TagList<String> nameList = customers.supportsTags().listTagsWithVisibility();
+String[] tagNames = nameList.tags();
+boolean omittedTags = nameList.hasInaccessibleTags();
+
+TagList<Tag> detailList = customers.supportsTags().listTagsInfoWithVisibility();
+Tag[] tags = detailList.tags();
+boolean omittedTagDetails = detailList.hasInaccessibleTags();
 String[] values =
     tags[0].assignment().map(assignment -> assignment.values()).orElse(new String[0]);
 ```
+
+The existing `listTags()` and `listTagsInfo()` methods continue to return only the visible arrays.
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
 customers = ...
-tag_names = customers.supports_tags().list_tags()
-tags = customers.supports_tags().list_tags_info()
+name_list = customers.supports_tags().list_tags_with_visibility()
+tag_names = name_list.tags()
+omitted_tags = name_list.has_inaccessible_tags()
+
+detail_list = customers.supports_tags().list_tags_info_with_visibility()
+tags = detail_list.tags()
+omitted_tag_details = detail_list.has_inaccessible_tags()
 values = tags[0].assignment_values()
 ```
 
+The existing `list_tags()` and `list_tags_info()` methods continue to return only the visible lists.
+
 </TabItem>
 </Tabs>
+
+Interpret the visible list and `hasInaccessibleTags` together:
+
+| Visible list | `hasInaccessibleTags` | Meaning |
+|---|---:|---|
+| Empty | `false` | The object has no effective tag assignments. |
+| Empty | `true` | All effective tag assignments are inaccessible. |
+| Non-empty | `true` | The response includes visible tags and omits at least one inaccessible tag. |
+| Non-empty | `false` | All effective tag assignments are visible. |
 
 ### Get One Tag on an Object
 
