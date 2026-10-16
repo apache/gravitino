@@ -42,7 +42,7 @@ import org.junit.jupiter.api.function.Executable;
 @Tag("gravitino-docker-test")
 public class IcebergExperimentalAuthorizationIT extends IcebergTableAuthorizationIT {
 
-  private static final String EXPERIMENTAL_SERVER_DIRECTORY = "iceberg-rest-experimental-server";
+  private static final String EXPERIMENTAL_SERVER_DIRECTORY = "iceberg-rest-server-experiment";
 
   @BeforeAll
   @Override

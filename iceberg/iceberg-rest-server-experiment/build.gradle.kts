@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "iceberg-rest-experimental-server"
+description = "iceberg-rest-server-experiment"
 
 plugins {
   `maven-publish`
@@ -66,12 +66,12 @@ tasks {
     dependsOn(copyDepends, "build")
     from(jar)
     from(copyDepends)
-    into("$rootDir/distribution/package/iceberg-rest-experimental-server/libs")
+    into("$rootDir/distribution/package/iceberg-rest-server-experiment/libs")
   }
 
   val copyConfigs by registering(Copy::class) {
     from(project(":iceberg:iceberg-rest-server").file("src/main/resources"))
-    into("$rootDir/distribution/package/iceberg-rest-experimental-server/conf")
+    into("$rootDir/distribution/package/iceberg-rest-server-experiment/conf")
 
     include("core-site.xml.template")
     include("hdfs-site.xml.template")

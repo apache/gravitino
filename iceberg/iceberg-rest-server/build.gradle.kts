@@ -294,8 +294,8 @@ val experimentalTest by tasks.registering(Test::class) {
     tasks.testClasses,
     tasks.jar,
     ":catalogs:catalog-lakehouse-iceberg:jar",
-    ":iceberg:iceberg-rest-experimental-server:copyDepends",
-    ":iceberg:iceberg-rest-experimental-server:jar"
+    ":iceberg:iceberg-rest-server-experiment:copyDepends",
+    ":iceberg:iceberg-rest-server-experiment:jar"
   )
 }
 
