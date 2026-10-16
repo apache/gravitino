@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.doris.integration.test;
 
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.BLOOM_FILTER_COLUMNS;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.COMPRESSION;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.LIGHT_SCHEMA_CHANGE;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
@@ -44,6 +45,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -97,6 +99,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 @Tag("doris-multi-version")
@@ -1545,6 +1549,123 @@ public class CatalogDorisIT extends BaseIT {
     assertEquals(2, partitions.size());
     assertPartition(Partitions.list("p1", p1Values, Collections.emptyMap()), partitions.get("p1"));
     assertPartition(Partitions.list("p2", p2Values, Collections.emptyMap()), partitions.get("p2"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"rename_col", "select"})
+  void testRenameColumn(String newName) {
+    NameIdentifier identifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    Index[] indexes = {
+      Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+    };
+
+    tableCatalog.createTable(
+        identifier,
+        createColumns(),
+        table_comment,
+        ImmutableMap.of(LIGHT_SCHEMA_CHANGE, "true"),
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null,
+        indexes);
+
+    tableCatalog.alterTable(
+        identifier, TableChange.renameColumn(new String[] {DORIS_COL_NAME2}, newName));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Table loadedTable = tableCatalog.loadTable(identifier);
+
+              assertEquals(4, loadedTable.columns().length);
+              assertFalse(
+                  Arrays.stream(loadedTable.columns())
+                      .anyMatch(c -> c.name().equals(DORIS_COL_NAME2)));
+              ITUtils.assertColumn(
+                  Column.of(newName, Types.VarCharType.of(10), "col_2_comment"),
+                  loadedTable.columns()[1]);
+            });
+  }
+
+  @Test
+  void testRenameColumnWithUppercaseSource() {
+    NameIdentifier identifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    Index[] indexes = {
+      Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+    };
+
+    tableCatalog.createTable(
+        identifier,
+        createColumns(),
+        table_comment,
+        ImmutableMap.of(LIGHT_SCHEMA_CHANGE, "true"),
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null,
+        indexes);
+
+    tableCatalog.alterTable(
+        identifier,
+        TableChange.renameColumn(
+            new String[] {DORIS_COL_NAME2.toUpperCase(Locale.ROOT)}, "renamed_col"));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Table loadedTable = tableCatalog.loadTable(identifier);
+
+              assertEquals(4, loadedTable.columns().length);
+              assertFalse(
+                  Arrays.stream(loadedTable.columns())
+                      .anyMatch(column -> column.name().equalsIgnoreCase(DORIS_COL_NAME2)));
+              ITUtils.assertColumn(
+                  Column.of("renamed_col", Types.VarCharType.of(10), "col_2_comment"),
+                  loadedTable.columns()[1]);
+            });
+  }
+
+  @Test
+  void testRenameColumnRequiresLightSchemaChange() {
+    NameIdentifier identifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Column[] columns = createColumns();
+
+    Index[] indexes = {
+      Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+    };
+
+    tableCatalog.createTable(
+        identifier,
+        columns,
+        table_comment,
+        ImmutableMap.of(LIGHT_SCHEMA_CHANGE, "false"),
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null,
+        indexes);
+
+    UnsupportedOperationException exception =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                tableCatalog.alterTable(
+                    identifier,
+                    TableChange.renameColumn(new String[] {DORIS_COL_NAME2}, "renamed_col")));
+    assertTrue(exception.getMessage().contains("RENAME COLUMN requires light_schema_change=true"));
+
+    Table loadedTable = tableCatalog.loadTable(identifier);
+    assertEquals(columns.length, loadedTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      ITUtils.assertColumn(columns[i], loadedTable.columns()[i]);
+    }
   }
 
   private Column findColumn(Table table, String columnName) {
