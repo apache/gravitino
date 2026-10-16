@@ -43,6 +43,8 @@ import org.apache.gravitino.cli.TestCliUtil;
 import org.apache.gravitino.cli.outputs.Column;
 import org.apache.gravitino.cli.outputs.TableFormat;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
@@ -966,6 +968,29 @@ public class TestTableFormat {
             + "+-------+-------+\n"
             + "| user1 |       |\n"
             + "+-------+-------+",
+        output);
+  }
+
+  @Test
+  void testListFunctionsWithTableFormat() {
+    CommandContext mockContext = TestCliUtil.getMockContext();
+    Function function1 =
+        TestCliUtil.getMockFunction("func1", "This is No.1", FunctionType.SCALAR, false, null);
+    Function function2 =
+        TestCliUtil.getMockFunction("func2", "This is No.2", FunctionType.SCALAR, false, null);
+    Function function3 =
+        TestCliUtil.getMockFunction("func3", "This is No.3", FunctionType.SCALAR, false, null);
+
+    TableFormat.output(new Function[] {function1, function2, function3}, mockContext);
+    String output = outContent.toString(StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-------+\n"
+            + "| Name  |\n"
+            + "+-------+\n"
+            + "| func1 |\n"
+            + "| func2 |\n"
+            + "| func3 |\n"
+            + "+-------+",
         output);
   }
 }
