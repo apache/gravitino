@@ -43,8 +43,7 @@ public class CloseContainerExtension implements BeforeAllCallback {
     private static final Logger LOGGER = LoggerFactory.getLogger(CloseableContainer.class);
     private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
 
-    // Log instead of failing: this runs for every integration-test module at the end of the plan,
-    // and a slow container teardown must not fail an otherwise green run.
+    // Log instead of failing: a container teardown error must not fail an otherwise green run.
     @Override
     public void close() {
       try {

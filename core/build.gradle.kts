@@ -173,6 +173,12 @@ fun registerCoreTestTask(
   }
 }
 
+// Nested fixture classes TestBackendTestExtension runs through EngineTestKit; Gradle's class scan
+// would run them directly too. Keep in sync with TestBackendTestExtension.FIXTURE.
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform { excludeTags("gravitino-test-fixture") }
+}
+
 registerCoreTestTask("coreUnitTest")
 registerCoreTestTask("coreH2Test", "h2")
 registerCoreTestTask("coreMySQLTest", "mysql")

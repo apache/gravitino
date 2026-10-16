@@ -37,29 +37,32 @@ This command runs all the unit tests and skips the integration tests.
 
 ### Core test lanes
 
-`core` tests run in four lanes, one CI job each:
+`core` tests run in four lanes, one CI job each. Each database lane selects its database through the `gravitino.core.test.backend` system property:
 
-| Lane | Runs | Needs Docker |
-| --- | --- | --- |
-| `./gradlew :core:coreUnitTest` | tests with no database backend | no |
-| `./gradlew :core:coreH2Test` | classes tagged for H2 | no |
-| `./gradlew :core:coreMySQLTest -PskipDockerTests=false` | classes tagged for MySQL | yes |
-| `./gradlew :core:corePostgreSQLTest -PskipDockerTests=false` | classes tagged for PostgreSQL | yes |
+| Lane | Runs | Database | Needs Docker |
+| --- | --- | --- | --- |
+| `./gradlew :core:coreUnitTest` | tests with no database backend | none | no |
+| `./gradlew :core:coreH2Test` | classes tagged for H2 | H2 | no |
+| `./gradlew :core:coreMySQLTest -PskipDockerTests=false` | classes tagged for MySQL | MySQL | yes |
+| `./gradlew :core:corePostgreSQLTest -PskipDockerTests=false` | classes tagged for PostgreSQL | PostgreSQL | yes |
 
 A class joins a database lane through `@CoreBackend.H2`, `@CoreBackend.MySQL`, `@CoreBackend.PostgreSQL` or `@CoreBackend.All`. Subclasses of `TestJDBCBackend` and `AbstractEntityStorageTest` inherit `@CoreBackend.All`. A class with none of these runs in `coreUnitTest`. A class tagged `gravitino-docker-test` with none of these runs in no lane, and `TestCoreLaneMembership` fails until you add one.
 
-When you add or move a core test, check that it runs in the lane you expect:
+To run one class or method, add `--tests` to its lane:
 
 ```shell
 ./gradlew :core:coreH2Test --tests 'org.apache.gravitino.storage.relational.service.TestYourService'
+./gradlew :core:coreMySQLTest -PskipDockerTests=false --tests 'org.apache.gravitino.storage.relational.service.TestYourService.testInsert'
 ```
 
 If the class is not in that lane, Gradle fails with "No tests found for given includes".
 
-In a database lane, each test class shares one database per backend. `@DatabaseFixture(resetStrategy = …)` picks how much is rebuilt before each test, from cheapest to most isolated:
+#### Database reuse and reset
+
+In a database lane, each test class shares one database per backend. `@DatabaseFixture(resetStrategy = ...)` picks how much is rebuilt before each test, from cheapest to most isolated:
 
 - `ResetStrategy.DELETE_ROWS` (the default) deletes the rows of every non-empty table; `AUTO_INCREMENT` counters keep counting.
-- `ResetStrategy.TRUNCATE_TABLES` truncates them, so the counters restart; it is slower, since `TRUNCATE` recreates each table.
+- `ResetStrategy.TRUNCATE_TABLES` truncates every table, so the counters restart; it is slower, since `TRUNCATE` recreates each table.
 - `ResetStrategy.FRESH_DATABASE` gives each test a new database and backend. Use it when a test changes the schema, closes the backend itself, or leaves writers running after it ends.
 
 ```java
@@ -67,9 +70,11 @@ In a database lane, each test class shares one database per backend. `@DatabaseF
 public class TestSQLScripts extends TestJDBCBackend { ... }
 ```
 
-A method-level `@DatabaseFixture` replaces the class-level one. A run with no lane selected and `dockerTest=true` switches between H2, MySQL and PostgreSQL for every test, so each test gets a fresh database regardless of the annotation.
+A method-level `@DatabaseFixture` replaces the class-level one. A class's backend is closed when the class finishes.
 
-In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` still runs all core tests in one task locally (H2 only unless you pass `-PskipDockerTests=false`), but it is deprecated and no CI job runs core tests through it.
+#### `:core:test`
+
+In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` runs all core tests in one task. It is deprecated, and no CI job uses it. It selects no database: every database test runs against H2, and with `-PskipDockerTests=false` also against MySQL and PostgreSQL, building a new backend at every change of database. Without Docker, it runs the database tests like `coreH2Test`.
 
 ## Run the Integration Tests
 

@@ -19,48 +19,68 @@
 
 package org.apache.gravitino.storage.relational;
 
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.TestTemplate;
 
-/** Checks what each {@link ResetStrategy} leaves behind for the next test of the same class. */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+/**
+ * Checks that {@link ResetStrategy#DELETE_ROWS} and {@link ResetStrategy#TRUNCATE_TABLES} empty the
+ * tables a test wrote to and leave counters as their Javadoc says; {@code TestBackendTestExtension}
+ * covers {@link ResetStrategy#FRESH_DATABASE}.
+ */
 public class TestResetStrategy extends TestJDBCBackend {
 
-  private long firstId;
-
   @TestTemplate
-  @Order(1)
-  void testInsertFirstRow() throws SQLException {
-    firstId = insertChangeLogRow();
+  void testDeleteRowsEmptiesEveryWrittenTable() throws SQLException {
+    insertChangeLogRow();
+    execute(
+        "INSERT INTO table_metrics (table_identifier, metric_name, metric_ts, metric_value)"
+            + " VALUES ('table', 'metric', 0, 'value')");
+    DatabaseResetter.reset(backendType, ResetStrategy.DELETE_ROWS);
+    Assertions.assertEquals(0L, rowCount("entity_change_log"));
+    Assertions.assertEquals(0L, rowCount("table_metrics"));
   }
 
   @TestTemplate
-  @Order(2)
   void testDeleteRowsKeepsCounting() throws SQLException {
-    Assertions.assertTrue(insertChangeLogRow() > firstId);
+    long before = insertChangeLogRow();
+    DatabaseResetter.reset(backendType, ResetStrategy.DELETE_ROWS);
+    Assertions.assertTrue(insertChangeLogRow() > before);
   }
 
   @TestTemplate
-  @Order(3)
-  @DatabaseFixture(resetStrategy = ResetStrategy.TRUNCATE_TABLES)
   void testTruncateTablesRestartsCounters() throws SQLException {
-    Assertions.assertEquals(firstId, insertChangeLogRow());
+    insertChangeLogRow();
+    DatabaseResetter.reset(backendType, ResetStrategy.TRUNCATE_TABLES);
+    Assertions.assertEquals(1L, insertChangeLogRow());
+  }
+
+  private static void execute(String sql) throws SQLException {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement statement = sqlSession.getConnection().createStatement()) {
+      statement.executeUpdate(sql);
+    }
+  }
+
+  private static long rowCount(String table) throws SQLException {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement statement = sqlSession.getConnection().createStatement();
+        ResultSet rs = statement.executeQuery("SELECT COUNT(*) FROM " + table)) {
+      Assertions.assertTrue(rs.next());
+      return rs.getLong(1);
+    }
   }
 
   private static long insertChangeLogRow() throws SQLException {
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement()) {
+        Statement statement = sqlSession.getConnection().createStatement()) {
       statement.executeUpdate(
           "INSERT INTO entity_change_log"
               + " (metalake_name, entity_type, entity_full_name, operate_type, created_at)"

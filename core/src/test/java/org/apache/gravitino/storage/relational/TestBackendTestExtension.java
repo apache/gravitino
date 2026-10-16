@@ -20,6 +20,11 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.platform.testkit.engine.EventConditions.displayName;
+import static org.junit.platform.testkit.engine.EventConditions.event;
+import static org.junit.platform.testkit.engine.EventConditions.finishedWithFailure;
+import static org.junit.platform.testkit.engine.EventConditions.test;
+import static org.junit.platform.testkit.engine.TestExecutionResultConditions.message;
 import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
@@ -27,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Config;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Tag;
@@ -45,17 +51,20 @@ import org.junit.platform.testkit.engine.Events;
  */
 class TestBackendTestExtension {
 
-  /** Keeps the fixtures out of every Gradle test task; only this test runs them. */
-  static final String FIXTURE = "gravitino-test-fixture";
+  // Gradle would otherwise discover and run these nested fixtures directly; core/build.gradle.kts
+  // excludes the tag. Keep the two in sync.
+  private static final String FIXTURE = "gravitino-test-fixture";
 
   private static final List<String> LOG = new ArrayList<>();
   private static boolean failNextCreate;
+  private static boolean failNextReset;
   private static boolean failNextClose;
 
   @BeforeEach
-  void clearLog() {
+  void resetFake() {
     LOG.clear();
     failNextCreate = false;
+    failNextReset = false;
     failNextClose = false;
   }
 
@@ -90,6 +99,35 @@ class TestBackendTestExtension {
   }
 
   @Test
+  void testClassClosesItsBackendWhenItFinishes() {
+    run(SharedFixture.class, UnmanagedFixture.class)
+        .assertStatistics(stats -> stats.succeeded(3).failed(0));
+
+    // UnmanagedFixture has no extension, so only SharedFixture's own afterAll can close it first.
+    assertEquals(
+        List.of(
+            "create h2 SharedFixture",
+            "reset DELETE_ROWS",
+            "reset DELETE_ROWS",
+            "close h2 SharedFixture",
+            "unmanaged test"),
+        LOG);
+  }
+
+  @Test
+  void testResetRunsBeforeTheTestsOwnBeforeEach() {
+    run(BeforeEachFixture.class).assertStatistics(stats -> stats.succeeded(1).failed(0));
+
+    assertEquals(
+        List.of(
+            "create h2 BeforeEachFixture",
+            "reset DELETE_ROWS",
+            "test's @BeforeEach",
+            "close h2 BeforeEachFixture"),
+        LOG);
+  }
+
+  @Test
   void testBackendTypeChangeReplacesTheBackend() {
     run(TwoBackendFixture.class).assertStatistics(stats -> stats.succeeded(2).failed(0));
 
@@ -111,10 +149,8 @@ class TestBackendTestExtension {
     assertEquals(
         List.of(
             "create h2 FreshFixture",
-            "reset FRESH_DATABASE",
             "close h2 FreshFixture",
             "create h2 FreshFixture",
-            "reset FRESH_DATABASE",
             "close h2 FreshFixture"),
         LOG);
   }
@@ -124,7 +160,7 @@ class TestBackendTestExtension {
     run(InheritedFreshFixture.class).assertStatistics(stats -> stats.succeeded(3).failed(0));
 
     assertEquals(3, count("create h2 InheritedFreshFixture"));
-    assertEquals(3, count("reset FRESH_DATABASE"));
+    assertEquals(0, LOG.stream().filter(entry -> entry.startsWith("reset")).count());
     assertEquals(3, count("close h2 InheritedFreshFixture"));
   }
 
@@ -138,7 +174,6 @@ class TestBackendTestExtension {
             "reset DELETE_ROWS",
             "close h2 MixedFixture",
             "create h2 MixedFixture",
-            "reset FRESH_DATABASE",
             "close h2 MixedFixture",
             "create h2 MixedFixture",
             "reset DELETE_ROWS",
@@ -158,7 +193,6 @@ class TestBackendTestExtension {
             "reset DELETE_ROWS",
             "close h2 FreshClassWithSharedMethodFixture",
             "create h2 FreshClassWithSharedMethodFixture",
-            "reset FRESH_DATABASE",
             "close h2 FreshClassWithSharedMethodFixture"),
         LOG);
   }
@@ -166,7 +200,12 @@ class TestBackendTestExtension {
   @Test
   void testFailedCreateFailsOnlyThatTest() {
     failNextCreate = true;
-    run(SharedFixture.class).assertStatistics(stats -> stats.succeeded(1).failed(1));
+    Events events = run(SharedFixture.class);
+
+    events.assertStatistics(stats -> stats.succeeded(1).failed(1));
+    events
+        .assertThatEvents()
+        .haveExactly(1, event(test("first"), finishedWithFailure(message("create failed"))));
 
     assertEquals(
         List.of(
@@ -178,9 +217,40 @@ class TestBackendTestExtension {
   }
 
   @Test
+  void testFailedResetDiscardsTheBackend() {
+    failNextReset = true;
+    Events events = run(SharedFixture.class);
+
+    events.assertStatistics(stats -> stats.succeeded(1).failed(1));
+    events
+        .assertThatEvents()
+        .haveExactly(1, event(test("first"), finishedWithFailure(message("reset failed"))));
+
+    assertEquals(
+        List.of(
+            "create h2 SharedFixture",
+            "reset failed",
+            "close h2 SharedFixture",
+            "create h2 SharedFixture",
+            "reset DELETE_ROWS",
+            "close h2 SharedFixture"),
+        LOG);
+  }
+
+  @Test
   void testFailedCloseOnReplacementFailsTheReplacingTest() {
     failNextClose = true;
-    run(TwoBackendFixture.class).assertStatistics(stats -> stats.succeeded(1).failed(1));
+    Events events = run(TwoBackendFixture.class);
+
+    events.assertStatistics(stats -> stats.succeeded(1).failed(1));
+    events
+        .assertThatEvents()
+        .haveExactly(
+            1,
+            event(
+                test(),
+                displayName("first[MYSQL Backend]"),
+                finishedWithFailure(message("close failed"))));
 
     // The failed close leaves the slot empty, so nothing is left to close at the end.
     assertEquals(
@@ -200,6 +270,8 @@ class TestBackendTestExtension {
 
   private static Events run(Class<?>... fixtures) {
     return EngineTestKit.engine("junit-jupiter")
+        // Tests assert the cross-class order of LOG; system properties must not change it.
+        .enableImplicitConfigurationParameters(false)
         .configurationParameter(
             "junit.jupiter.testclass.order.default", "org.junit.jupiter.api.ClassOrderer$ClassName")
         .selectors(
@@ -224,10 +296,18 @@ class TestBackendTestExtension {
           }
           String name = backendType + " " + testClass.getSimpleName();
           LOG.add("create " + name);
-          return new BackendTestExtension.Backend(
-              backendType, testClass, mock(RelationalBackend.class), null, null) {
+          return new BackendTestExtension.LiveBackend(
+              backendType, testClass, mock(RelationalBackend.class), mock(Config.class), null) {
+            @Override
+            void bindGravitinoEnv() {}
+
             @Override
             void reset(ResetStrategy resetStrategy) {
+              if (failNextReset) {
+                failNextReset = false;
+                LOG.add("reset failed");
+                throw new IllegalStateException("reset failed");
+              }
               LOG.add("reset " + resetStrategy);
             }
 
@@ -258,6 +338,27 @@ class TestBackendTestExtension {
 
     @TestTemplate
     void second() {}
+  }
+
+  @Tag(FIXTURE)
+  static class BeforeEachFixture {
+    @RegisterExtension static final BackendTestExtension EXTENSION = fakeExtension("h2");
+
+    @BeforeEach
+    void setUp() {
+      LOG.add("test's @BeforeEach");
+    }
+
+    @TestTemplate
+    void first() {}
+  }
+
+  @Tag(FIXTURE)
+  static class UnmanagedFixture {
+    @Test
+    void first() {
+      LOG.add("unmanaged test");
+    }
   }
 
   @Tag(FIXTURE)
@@ -303,14 +404,14 @@ class TestBackendTestExtension {
     @RegisterExtension static final BackendTestExtension EXTENSION = fakeExtension("h2");
 
     @TestTemplate
-    void a() {}
+    void first() {}
 
     @TestTemplate
     @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
-    void b() {}
+    void second() {}
 
     @TestTemplate
-    void c() {}
+    void third() {}
   }
 
   @Tag(FIXTURE)
@@ -321,13 +422,13 @@ class TestBackendTestExtension {
 
     @TestTemplate
     @DatabaseFixture(resetStrategy = ResetStrategy.DELETE_ROWS)
-    void a() {}
+    void first() {}
 
     @TestTemplate
     @DatabaseFixture(resetStrategy = ResetStrategy.DELETE_ROWS)
-    void b() {}
+    void second() {}
 
     @TestTemplate
-    void c() {}
+    void third() {}
   }
 }

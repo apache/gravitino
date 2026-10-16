@@ -23,6 +23,7 @@ azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
 reactor-netty-core = "1.2.1"
+# JUnit Jupiter 5.x ships with JUnit Platform 1.x of the same minor; bump them together.
 junit = "5.8.1"
 junit-platform = "1.8.1"
 jackson = "2.15.2"

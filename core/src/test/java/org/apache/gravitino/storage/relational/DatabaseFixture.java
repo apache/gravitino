@@ -30,6 +30,9 @@ import java.lang.annotation.Target;
  * Declares how much of the database is rebuilt before each test of a class or method. A
  * method-level fixture replaces the class-level one. Without the annotation, a test class shares
  * one database and {@link ResetStrategy#DELETE_ROWS} empties it before each test.
+ *
+ * <p>{@code @Inherited} applies to classes only: a subclass method that overrides an annotated
+ * method must repeat the annotation.
  */
 @Documented
 @Inherited
@@ -37,10 +40,6 @@ import java.lang.annotation.Target;
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface DatabaseFixture {
 
-  /**
-   * Returns what is rebuilt before each test.
-   *
-   * @return the reset strategy
-   */
+  /** What is rebuilt before each test. */
   ResetStrategy resetStrategy() default ResetStrategy.DELETE_ROWS;
 }

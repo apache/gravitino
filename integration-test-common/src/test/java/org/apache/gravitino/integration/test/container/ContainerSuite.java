@@ -132,10 +132,6 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public static boolean initialized() {
-    return initialized;
-  }
-
   public static ContainerSuite getInstance() {
     if (instance == null) {
       synchronized (ContainerSuite.class) {

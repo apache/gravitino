@@ -82,6 +82,16 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+/**
+ * Base class for tests that run against a real relational backend. Write each test as a
+ * {@code @TestTemplate}: {@link BackendTestExtension} runs it once per backend and sets {@link
+ * #backend} and {@link #backendType} before it. A plain {@code @Test} gets neither, nor a reset.
+ *
+ * <p>The class shares one database; before each test, and before the test's own
+ * {@code @BeforeEach}, the tables written to are emptied ({@link ResetStrategy#DELETE_ROWS}). Use
+ * {@link DatabaseFixture} on the class or a method to choose another {@link ResetStrategy}. The
+ * backend is not built yet in {@code @BeforeAll}.
+ */
 @CoreBackend.All
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith({
@@ -104,7 +114,10 @@ public abstract class TestJDBCBackend {
     this.backendType = backendType;
   }
 
-  /** Empties the shared database again, for a test that runs several scenarios in a loop. */
+  /**
+   * Empties the shared database mid-test ({@link ResetStrategy#DELETE_ROWS}), for a test that runs
+   * several scenarios in a loop.
+   */
   protected void resetDatabase() throws SQLException {
     DatabaseResetter.reset(backendType, ResetStrategy.DELETE_ROWS);
   }

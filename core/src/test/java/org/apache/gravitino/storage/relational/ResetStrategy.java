@@ -20,17 +20,16 @@
 package org.apache.gravitino.storage.relational;
 
 /**
- * What is rebuilt before each database-backed test, from the cheapest to the most isolated. Only
- * one backend can be live per JVM ({@code SqlSessionFactoryHelper} is process-global), so every
- * strategy below {@link #FRESH_DATABASE} shares one database and backend per test class.
+ * What is rebuilt before each database-backed test, cheapest first. The first two share the test
+ * class's database; {@link #FRESH_DATABASE} builds its own.
  */
 public enum ResetStrategy {
   /** Rows are deleted from every non-empty table. {@code AUTO_INCREMENT} counters keep counting. */
   DELETE_ROWS,
 
   /**
-   * Every non-empty table is truncated, which restarts its {@code AUTO_INCREMENT} counters. Slower
-   * than {@link #DELETE_ROWS} because {@code TRUNCATE} recreates the table; use it only when a test
+   * Every table is truncated, which restarts its {@code AUTO_INCREMENT} counters. Slower than
+   * {@link #DELETE_ROWS} because {@code TRUNCATE} recreates each table; use it only when a test
    * relies on the counters.
    */
   TRUNCATE_TABLES,
