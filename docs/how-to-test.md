@@ -35,6 +35,29 @@ To run the unit tests, run the following command:
 
 This command runs all the unit tests and skips the integration tests.
 
+### Core test lanes
+
+`core` tests run in four lanes, one CI job each:
+
+| Lane | Runs | Needs Docker |
+| --- | --- | --- |
+| `./gradlew :core:coreUnitTest` | tests with no database backend | no |
+| `./gradlew :core:coreH2Test` | classes tagged for H2 | no |
+| `./gradlew :core:coreMySQLTest -PskipDockerTests=false` | classes tagged for MySQL | yes |
+| `./gradlew :core:corePostgreSQLTest -PskipDockerTests=false` | classes tagged for PostgreSQL | yes |
+
+A class joins a database lane through `@CoreBackend.H2`, `@CoreBackend.MySQL`, `@CoreBackend.PostgreSQL` or `@CoreBackend.All`. Subclasses of `TestJDBCBackend` and `AbstractEntityStorageTest` inherit `@CoreBackend.All`. A class with none of these runs in `coreUnitTest`. A class tagged `gravitino-docker-test` with none of these runs in no lane, and `TestCoreLaneMembership` fails until you add one.
+
+When you add or move a core test, check that it runs in the lane you expect:
+
+```shell
+./gradlew :core:coreH2Test --tests 'org.apache.gravitino.storage.relational.service.TestYourService'
+```
+
+If the class is not in that lane, Gradle fails with "No tests found for given includes".
+
+In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` still runs all core tests in one task locally (H2 only unless you pass `-PskipDockerTests=false`), but it is deprecated and no CI job runs core tests through it.
+
 ## Run the Integration Tests
 
 Gravitino has two modes to run the integration tests, the default `embedded` mode and `deploy` mode.

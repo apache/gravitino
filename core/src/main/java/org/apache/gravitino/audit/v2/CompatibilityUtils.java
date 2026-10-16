@@ -200,6 +200,8 @@ public class CompatibilityUtils {
           .put(OperationType.DROP_SEMANTIC_MODEL, Operation.DROP_SEMANTIC_MODEL)
           .put(OperationType.LOAD_SEMANTIC_MODEL, Operation.LOAD_SEMANTIC_MODEL)
           .put(OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL)
+          .put(OperationType.IMPORT_SEMANTIC_MODEL, Operation.IMPORT_SEMANTIC_MODEL)
+          .put(OperationType.EXPORT_SEMANTIC_MODEL, Operation.EXPORT_SEMANTIC_MODEL)
           .put(OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION)
           .put(OperationType.GET_FUNCTION, Operation.GET_FUNCTION)
           .put(OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION)

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.storage.mapper;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -36,8 +37,35 @@ public interface TableMaintenanceActionMapper {
   @Options(useGeneratedKeys = true, keyProperty = "actionMeta.id", keyColumn = "id")
   void insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta);
 
+  @UpdateProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "reclaimExpiredUnbound")
+  int reclaimExpiredUnbound(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectUnboundByTableAndPolicy")
+  TableMaintenanceActionPO selectUnboundByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectLiveUnboundByTableAndPolicy")
+  TableMaintenanceActionPO selectLiveUnboundByTableAndPolicy(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs);
+
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "bindJobId")
-  int bindJobId(@Param("id") long id, @Param("jobId") long jobId);
+  int bindJobId(
+      @Param("id") long id,
+      @Param("jobId") long jobId,
+      @Param("expectedCreatedAt") long expectedCreatedAt);
 
   @Nullable
   @SelectProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "selectById")
@@ -64,4 +92,16 @@ public interface TableMaintenanceActionMapper {
 
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteByJobId")
   int deleteByJobId(@Param("jobId") long jobId);
+
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectInFlightByTableAndPolicy")
+  List<TableMaintenanceActionPO> selectInFlightByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectMaxFinishedAt")
+  Long selectMaxFinishedAt(@Param("tableId") long tableId, @Param("policyId") long policyId);
 }

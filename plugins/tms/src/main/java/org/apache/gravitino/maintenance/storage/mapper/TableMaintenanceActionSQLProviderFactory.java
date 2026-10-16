@@ -57,12 +57,52 @@ public class TableMaintenanceActionSQLProviderFactory {
   }
 
   /**
-   * @param id action id
-   * @param jobId job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL in milliseconds
    * @return UPDATE statement
    */
-  public static String bindJobId(@Param("id") long id, @Param("jobId") long jobId) {
-    return getProvider().bindJobId(id, jobId);
+  public static String reclaimExpiredUnbound(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs) {
+    return getProvider().reclaimExpiredUnbound(tableId, policyId, claimTimeoutMs);
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public static String selectUnboundByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return getProvider().selectUnboundByTableAndPolicy(tableId, policyId);
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param claimTimeoutMs unbound claim TTL in milliseconds
+   * @return SELECT statement
+   */
+  public static String selectLiveUnboundByTableAndPolicy(
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("claimTimeoutMs") long claimTimeoutMs) {
+    return getProvider().selectLiveUnboundByTableAndPolicy(tableId, policyId, claimTimeoutMs);
+  }
+
+  /**
+   * @param id action id
+   * @param jobId job run id
+   * @param expectedCreatedAt claim lease start observed at acquire time
+   * @return UPDATE statement
+   */
+  public static String bindJobId(
+      @Param("id") long id,
+      @Param("jobId") long jobId,
+      @Param("expectedCreatedAt") long expectedCreatedAt) {
+    return getProvider().bindJobId(id, jobId, expectedCreatedAt);
   }
 
   /**
@@ -118,6 +158,26 @@ public class TableMaintenanceActionSQLProviderFactory {
    */
   public static String deleteByJobId(@Param("jobId") long jobId) {
     return getProvider().deleteByJobId(jobId);
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public static String selectInFlightByTableAndPolicy(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return getProvider().selectInFlightByTableAndPolicy(tableId, policyId);
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public static String selectMaxFinishedAt(
+      @Param("tableId") long tableId, @Param("policyId") long policyId) {
+    return getProvider().selectMaxFinishedAt(tableId, policyId);
   }
 
   static TableMaintenanceActionBaseSQLProvider getProvider() {

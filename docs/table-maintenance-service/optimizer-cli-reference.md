@@ -237,7 +237,7 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 
 ## Built-in Job Templates
 
-Five job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
+The following Iceberg job templates ship with the service. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
 
 | Job template                          | What it does                             |
 |---------------------------------------|-------------------------------------------|
@@ -246,6 +246,7 @@ Five job templates ship with the service, and they are complementary rather than
 | `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
 | `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage   |
 | `builtin-iceberg-rewrite-manifests`   | Consolidates small manifest files         |
+| `builtin-iceberg-update-manifest-stats` | Collects complete per-spec manifest maps |
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
 
@@ -281,6 +282,111 @@ table, so it must be asked for explicitly.
 `builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.
 
 Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-submission-configuration).
+
+## Update Manifest Statistics
+
+`builtin-iceberg-update-manifest-stats` is a separate Spark job that collects two table-level
+statistics, including for partitioned tables:
+
+| Statistic | Object entry for each decimal spec ID |
+| --- | --- |
+| `custom-manifest-number-by-spec` | Long manifest count |
+| `custom-avg-manifest-size-by-spec` | Double average manifest size in bytes |
+
+The job reads manifest metadata without scanning file statistics. It works after partition
+evolution, including for specs whose partition fields are absent from older files.
+`builtin-iceberg-update-stats` and the `submit-update-stats-job` CLI retain their existing behavior;
+they do not collect manifest statistics. Submit the new template directly through the jobs API.
+
+Each table cycle pins one current snapshot, calls `allManifests` once, and groups data and
+delete manifests by `partitionSpecId`. Every defined spec is included. A spec with no manifests,
+including a table without a snapshot, produces count `0` and average `0.0`.
+The job also publishes `custom-manifest-snapshot-id` in the same update (`-1` without a snapshot).
+Snapshot IDs identify measurements; they are not monotonically increasing version numbers.
+
+The template accepts `catalog_name`, `table_identifier`, `updater_options`, and optional
+`coordination_directory` and `spark_conf`, alongside the standard Spark template settings. There is no `spec_id` filter:
+collection always replaces the complete maps for the table.
+`updater_options` is a JSON string containing `gravitino_uri` and `metalake`; it can also select
+a `statistics_updater` implementing the existing table statistics update operation.
+For example:
+
+```bash
+curl -X POST http://localhost:8090/api/metalakes/test/jobs/runs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jobTemplateName": "builtin-iceberg-update-manifest-stats",
+    "jobConf": {
+      "catalog_name": "rest_catalog",
+      "table_identifier": "db.t1",
+      "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+      "spark_master": "local[2]",
+      "spark_executor_instances": "1",
+      "spark_executor_cores": "1",
+      "spark_executor_memory": "1g",
+      "spark_driver_memory": "1g",
+      "catalog_type": "rest",
+      "catalog_uri": "http://localhost:9001/iceberg",
+      "warehouse_location": ""
+    }
+  }'
+```
+
+For example, one collection can produce complete maps `{"0": 620, "1": 120}` and
+`{"0": 10485760.0, "1": 4194304.0}`. The collector owns both statistic names and publishes
+them together with the snapshot ID in one existing PUT/update call. Old map entries are
+replaced, not merged. Other statistic names are unchanged. No PATCH or merge API is needed.
+
+By default, `coordination_directory` is omitted or blank and publications use last-write-wins
+semantics. Each update contains the complete maps and snapshot ID; a concurrent older collection
+may overwrite newer measurements. Failed jobs can simply be rerun, with no lock files or recovery.
+Consumers requiring fresh statistics must compare `custom-manifest-snapshot-id` with the table's
+current snapshot ID (`-1` if none) and skip/recollect on a mismatch. This is a consumer requirement,
+not a freshness check enforced by this collector. Snapshot IDs must be compared for equality,
+not numerical ordering.
+
+### Optional shared coordination and recovery
+
+For stricter serialization, provision `coordination_directory` (`--coordination-dir` for direct Spark invocation) as an
+existing absolute directory on a shared filesystem that supports durable files and cross-host
+Java/POSIX file locks. Every runner for a destination table must use the same shared directory,
+metalake, and canonical catalog/schema/table names. A host-local directory, object-store mount,
+or filesystem without reliable cross-host locking does not satisfy this requirement.
+All writers of these statistic names must opt into this mode and use the same directory;
+mixing coordinated and uncoordinated writers does not provide serialization.
+
+The job locks a persistent file keyed by metalake and table before refreshing the Iceberg table
+or choosing a snapshot, and holds it through the PUT. Concurrent runs for that table fail;
+other tables can proceed. Snapshot IDs are recorded for provenance, not compared numerically.
+The job forces `gravitino.client.retryTimes=0` for its Gravitino client.
+Custom statistics updaters and any intervening proxies must likewise avoid retrying PUT requests;
+an automatic resend could hide an original request that is still executing. There are no expiring
+leases, automatic retries, scheduling, or cooldowns.
+
+Collection failures can be rerun normally: the lock is released without leaving a recovery marker.
+After collection and immediately before calling the updater, the job durably writes an in-progress
+marker. It clears the marker only after a successful update. A crash after the marker is written or
+an update failure leaves the marker in place, even after the operating system releases the lock.
+The updater interface cannot distinguish a failed request from a request still executing on the
+server, so these failures require recovery. The error reports the recovery file path.
+
+For example, run A sends a PUT and loses its connection while the server is still processing it.
+An immediate rerun B could publish newer measurements before A's delayed PUT overwrites them.
+The file lock prevents concurrent collection across hosts; the marker prevents this overlap after
+an ambiguous failure. Snapshot IDs provide provenance, but the existing PUT does not enforce
+snapshot ordering or fencing. Automatic reruns after ambiguous writes would require server-side
+conditional publication or an equivalent guarantee that the earlier request has ended.
+
+For recovery, stop all runners for that table and verify the previous process has terminated
+and any outstanding Gravitino PUT has completed or been definitively cancelled. While holding
+an exclusive lock on the reported file, truncate it to zero bytes and flush it to durable storage,
+then resume collection. Never delete or replace the file: a new inode can permit two independent
+locks. If the previous PUT outcome cannot be established, leave the marker intact.
+
+Consumers must read both objects from one table-statistics response and use the same chosen
+spec key in each. A missing object or key means collection is required, not zero manifests.
+`IcebergManifestStatistics.fromStatistics` returns an empty result for an incomplete pair.
+Automatic manifest policy triggering is separate follow-up work.
 
 ## Rewrite Data Files
 

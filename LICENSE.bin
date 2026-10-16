@@ -411,6 +411,9 @@
    Fabric8 Kubernetes Client
    Fabric8 Kubernetes Model
    Fabric8 zjsonpatch
+   db-scheduler
+   cron-utils (shaded into db-scheduler)
+   JSpecify
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
