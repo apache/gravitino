@@ -52,8 +52,8 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.DatabaseFixture;
-import org.apache.gravitino.storage.relational.DatabaseIsolation;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.storage.relational.ResetStrategy;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -68,7 +68,7 @@ import org.junit.jupiter.api.TestTemplate;
  * JobManager} and {@link LocalJobExecutor}, share the same relational metadata store. The status
  * pull and the cleanup are triggered manually, so that the test controls which node runs them when.
  */
-@DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+@DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
 public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private static final String METALAKE = "metalake_job_multi_node";

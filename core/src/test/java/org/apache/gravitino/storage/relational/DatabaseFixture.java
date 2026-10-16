@@ -27,11 +27,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Declares how a database-backed test class or method is isolated from the other tests in its
- * class. A method-level fixture overrides the class-level one.
+ * Declares how much of the database is rebuilt before each test of a class or method. A
+ * method-level fixture replaces the class-level one. Without the annotation, a test class shares
+ * one database and {@link ResetStrategy#DELETE_ROWS} empties it before each test.
  *
- * <p>By default a test class reuses one database. A run that switches backends between tests (no
- * lane selected and {@code dockerTest=true}) gives every test its own database anyway.
+ * <p>A run that switches backends between tests (no lane selected and {@code dockerTest=true})
+ * gives every test a fresh database regardless of this annotation.
  */
 @Documented
 @Inherited
@@ -40,16 +41,9 @@ import java.lang.annotation.Target;
 public @interface DatabaseFixture {
 
   /**
-   * Returns what each test gets fresh.
+   * Returns what is rebuilt before each test.
    *
-   * @return the isolation level
+   * @return the reset strategy
    */
-  DatabaseIsolation isolation() default DatabaseIsolation.RESET_TABLES;
-
-  /**
-   * Returns what the database guarantees at the start of each test.
-   *
-   * @return the reset mode
-   */
-  DatabaseReset reset() default DatabaseReset.DELETE_ROWS;
+  ResetStrategy resetStrategy() default ResetStrategy.DELETE_ROWS;
 }

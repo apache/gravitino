@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
  * <p>{@code SqlSessionFactoryHelper} is process-global, so only one backend can be live in a JVM.
  * The extension keeps it in a single slot and reuses it for the tests of one class; {@link
  * TestJDBCBackend} empties its tables before each test. It builds a new backend when the test class
- * or backend type changes, and for every {@link DatabaseIsolation#FRESH_DATABASE} test.
+ * or backend type changes, and for every {@link ResetStrategy#FRESH_DATABASE} test.
  *
  * <p>The slot is read and replaced without locking, so tests must run one at a time: the core
  * database tasks run in one JVM with JUnit parallel execution off.
@@ -191,7 +191,7 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
       if (testInstance instanceof TestJDBCBackend) {
         ((TestJDBCBackend) testInstance).setBackend(current.backend);
         ((TestJDBCBackend) testInstance).setBackendType(backendType);
-        ((TestJDBCBackend) testInstance).setDatabaseReset(reset(context));
+        ((TestJDBCBackend) testInstance).setResetStrategy(resetStrategy(context));
       }
     }
 
@@ -207,17 +207,12 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
     }
 
     private boolean freshDatabase(ExtensionContext context) {
-      return isolation(context) == DatabaseIsolation.FRESH_DATABASE;
+      return resetStrategy(context) == ResetStrategy.FRESH_DATABASE;
     }
 
-    private DatabaseIsolation isolation(ExtensionContext context) {
+    private ResetStrategy resetStrategy(ExtensionContext context) {
       DatabaseFixture fixture = fixture(context);
-      return fixture == null ? DatabaseIsolation.RESET_TABLES : fixture.isolation();
-    }
-
-    private DatabaseReset reset(ExtensionContext context) {
-      DatabaseFixture fixture = fixture(context);
-      return fixture == null ? DatabaseReset.DELETE_ROWS : fixture.reset();
+      return fixture == null ? ResetStrategy.DELETE_ROWS : fixture.resetStrategy();
     }
 
     // A method-level fixture replaces the class-level one.

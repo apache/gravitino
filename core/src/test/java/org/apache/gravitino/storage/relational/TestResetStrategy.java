@@ -31,9 +31,9 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.TestTemplate;
 
-/** Checks what each {@link DatabaseReset} leaves behind for the next test of the same class. */
+/** Checks what each {@link ResetStrategy} leaves behind for the next test of the same class. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TestDatabaseReset extends TestJDBCBackend {
+public class TestResetStrategy extends TestJDBCBackend {
 
   private long firstId;
 
@@ -51,7 +51,7 @@ public class TestDatabaseReset extends TestJDBCBackend {
 
   @TestTemplate
   @Order(3)
-  @DatabaseFixture(reset = DatabaseReset.TRUNCATE_TABLES)
+  @DatabaseFixture(resetStrategy = ResetStrategy.TRUNCATE_TABLES)
   void testTruncateTablesRestartsCounters() throws SQLException {
     Assertions.assertEquals(firstId, insertChangeLogRow());
   }

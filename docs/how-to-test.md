@@ -56,16 +56,18 @@ When you add or move a core test, check that it runs in the lane you expect:
 
 If the class is not in that lane, Gradle fails with "No tests found for given includes".
 
-In a database lane, each test class shares one database per backend, and `TestJDBCBackend` empties its tables before each test. A test that changes the schema, closes the backend itself, or leaves writers running after it ends needs its own database instead:
+In a database lane, each test class shares one database per backend. `@DatabaseFixture(resetStrategy = …)` picks how much is rebuilt before each test, from cheapest to most isolated:
+
+- `ResetStrategy.DELETE_ROWS` (the default) deletes the rows of every non-empty table; `AUTO_INCREMENT` counters keep counting.
+- `ResetStrategy.TRUNCATE_TABLES` truncates them, so the counters restart; it is slower, since `TRUNCATE` recreates each table.
+- `ResetStrategy.FRESH_DATABASE` gives each test a new database and backend. Use it when a test changes the schema, closes the backend itself, or leaves writers running after it ends.
 
 ```java
-@DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+@DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
 public class TestSQLScripts extends TestJDBCBackend { ... }
 ```
 
-`RESET_TABLES` is the default. A method-level `@DatabaseFixture` overrides the class-level one.
-
-Every table is empty at the start of each test. With the default `reset = DatabaseReset.DELETE_ROWS`, `AUTO_INCREMENT` counters may keep counting from earlier tests. A test that relies on them restarting uses `reset = DatabaseReset.TRUNCATE_TABLES`, which is slower because `TRUNCATE` recreates each table.
+A method-level `@DatabaseFixture` replaces the class-level one.
 
 In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` still runs all core tests in one task locally (H2 only unless you pass `-PskipDockerTests=false`), but it is deprecated and no CI job runs core tests through it.
 

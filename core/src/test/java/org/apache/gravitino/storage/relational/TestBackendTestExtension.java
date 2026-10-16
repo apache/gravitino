@@ -130,8 +130,8 @@ class TestBackendTestExtension {
     run(SharedTests.class, "first", "h2", test);
     run(TruncateTests.class, "first", "h2", test);
 
-    verify(test).setDatabaseReset(DatabaseReset.DELETE_ROWS);
-    verify(test).setDatabaseReset(DatabaseReset.TRUNCATE_TABLES);
+    verify(test).setResetStrategy(ResetStrategy.DELETE_ROWS);
+    verify(test).setResetStrategy(ResetStrategy.TRUNCATE_TABLES);
   }
 
   @Test
@@ -191,7 +191,7 @@ class TestBackendTestExtension {
     void first() {}
   }
 
-  @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+  @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
   private static class FreshTests {
     void first() {}
 
@@ -207,19 +207,19 @@ class TestBackendTestExtension {
   private static class MixedTests {
     void shared() {}
 
-    @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+    @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
     void fresh() {}
   }
 
-  @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+  @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
   private static class FreshClassWithSharedMethodTests {
-    @DatabaseFixture(isolation = DatabaseIsolation.RESET_TABLES)
+    @DatabaseFixture(resetStrategy = ResetStrategy.DELETE_ROWS)
     void shared() {}
 
     void fresh() {}
   }
 
-  @DatabaseFixture(reset = DatabaseReset.TRUNCATE_TABLES)
+  @DatabaseFixture(resetStrategy = ResetStrategy.TRUNCATE_TABLES)
   private static class TruncateTests {
     void first() {}
   }

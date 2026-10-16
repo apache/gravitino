@@ -99,7 +99,7 @@ public abstract class TestJDBCBackend {
   protected String backendType;
   protected RelationalBackend backend;
   private static final int RESET_TIMEOUT_SECONDS = 30;
-  private DatabaseReset databaseReset = DatabaseReset.DELETE_ROWS;
+  private ResetStrategy resetStrategy = ResetStrategy.DELETE_ROWS;
 
   public void setBackend(RelationalBackend backend) {
     this.backend = backend;
@@ -109,8 +109,8 @@ public abstract class TestJDBCBackend {
     this.backendType = backendType;
   }
 
-  public void setDatabaseReset(DatabaseReset databaseReset) {
-    this.databaseReset = databaseReset;
+  public void setResetStrategy(ResetStrategy resetStrategy) {
+    this.resetStrategy = resetStrategy;
   }
 
   @BeforeEach
@@ -130,7 +130,7 @@ public abstract class TestJDBCBackend {
       if (tables.isEmpty()) {
         return;
       }
-      if (databaseReset == DatabaseReset.DELETE_ROWS) {
+      if (resetStrategy != ResetStrategy.TRUNCATE_TABLES) {
         // One transaction, so the deletes share one commit instead of one fsync per table.
         connection.setAutoCommit(false);
         try {
