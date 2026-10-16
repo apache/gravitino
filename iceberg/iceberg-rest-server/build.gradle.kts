@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import org.gradle.api.attributes.Attribute
+
 description = "iceberg-rest-service"
 
 plugins {
@@ -31,12 +33,23 @@ val experimentalSparkVersion: String = libs.versions.spark35.get()
 val experimentalSparkMajorVersion: String = experimentalSparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg.get()
 val datastratoIcebergVersion: String = libs.versions.datastrato.iceberg.get()
+val datastratoIcebergGitCommit: String = libs.versions.experimental.iceberg.git.commit.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val caffeineVersion: String = libs.versions.caffeine.get()
 val jacksonVersion: String = libs.versions.jackson.get()
 
+val testRuntimeClasspath = configurations.testRuntimeClasspath.get()
 val experimentalTestRuntimeClasspath by configurations.creating {
-  extendsFrom(configurations.testRuntimeClasspath.get())
+  isCanBeConsumed = false
+  isCanBeResolved = true
+  extendsFrom(testRuntimeClasspath)
+  attributes {
+    testRuntimeClasspath.attributes.keySet().forEach { key ->
+      @Suppress("UNCHECKED_CAST")
+      val typedKey = key as Attribute<Any>
+      attribute(typedKey, testRuntimeClasspath.attributes.getAttribute(typedKey)!!)
+    }
+  }
   resolutionStrategy {
     force(
       "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
@@ -48,6 +61,8 @@ val experimentalTestRuntimeClasspath by configurations.creating {
     )
     eachDependency {
       if (requested.group == "org.apache.spark") {
+        // The Datastrato runtime is not published for Spark 3.4, so the experimental suite must
+        // use Spark 3.5 even though the regular suite uses Spark 3.4.
         useVersion(experimentalSparkVersion)
         because("The experimental Iceberg Spark runtime is published for Spark 3.5")
       } else if (requested.name.startsWith("iceberg-spark-runtime-")) {
@@ -243,7 +258,7 @@ val experimentalTest by tasks.registering(Test::class) {
     sourceSets.main.get().output +
     sourceSets.test.get().output +
     experimentalTestRuntimeClasspath
-  systemProperty("datastratoIcebergVersion", datastratoIcebergVersion)
+  systemProperty("datastratoIcebergGitCommit", datastratoIcebergGitCommit)
   setIncludes(
     setOf(
       "**/IcebergExperimentalAuthorizationIT.class"
