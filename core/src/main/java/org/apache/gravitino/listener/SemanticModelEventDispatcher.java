@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener;
 
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -38,6 +39,12 @@ import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelPreEv
 import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelPreEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelPreEvent;
@@ -45,6 +52,8 @@ import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelPreEvent;
 import org.apache.gravitino.listener.api.info.SemanticModelInfo;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
@@ -127,6 +136,54 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       return semanticModel;
     } catch (Exception e) {
       eventBus.dispatchEvent(new CreateSemanticModelFailureEvent(user, ident, e, createRequest));
+      throw e;
+    }
+  }
+
+  @Override
+  public SemanticModel importOssieDocument(
+      Namespace namespace,
+      OssieDocument document,
+      Consumer<SemanticModelDefinition> sourceValidator) {
+    String user = PrincipalUtils.getCurrentUserName();
+    OssieFormat format = document == null ? null : document.format();
+    try {
+      eventBus.dispatchEvent(new ImportSemanticModelPreEvent(user, namespace, format));
+      SemanticModel semanticModel =
+          dispatcher.importOssieDocument(namespace, document, sourceValidator);
+      eventBus.dispatchEvent(
+          new ImportSemanticModelEvent(
+              user,
+              NameIdentifier.of(namespace, semanticModel.name()),
+              format,
+              new SemanticModelInfo(semanticModel)));
+      return semanticModel;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ImportSemanticModelFailureEvent(user, namespace, format, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public SemanticModel importSemanticModel(
+      NameIdentifier ident,
+      @Nullable String comment,
+      SemanticModelDefinition definition,
+      Map<String, String> properties) {
+    throw new UnsupportedOperationException(
+        "Parsed imports are internal; use importOssieDocument with a source validator");
+  }
+
+  @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+    String user = PrincipalUtils.getCurrentUserName();
+    try {
+      eventBus.dispatchEvent(new ExportSemanticModelPreEvent(user, ident, format));
+      OssieDocument document = dispatcher.exportOssieDocument(ident, format);
+      eventBus.dispatchEvent(new ExportSemanticModelEvent(user, ident, format));
+      return document;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ExportSemanticModelFailureEvent(user, ident, format, e));
       throw e;
     }
   }

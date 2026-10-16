@@ -203,6 +203,8 @@ public class TestCompatibilityUtils {
       {OperationType.DROP_SEMANTIC_MODEL, Operation.DROP_SEMANTIC_MODEL},
       {OperationType.LOAD_SEMANTIC_MODEL, Operation.LOAD_SEMANTIC_MODEL},
       {OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL},
+      {OperationType.IMPORT_SEMANTIC_MODEL, Operation.IMPORT_SEMANTIC_MODEL},
+      {OperationType.EXPORT_SEMANTIC_MODEL, Operation.EXPORT_SEMANTIC_MODEL},
       {OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION},
       {OperationType.GET_FUNCTION, Operation.GET_FUNCTION},
       {OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION},

@@ -33,6 +33,8 @@ class Index(ABC):
         """The enum IndexType defines the type of the index.
 
         Catalogs may support generic key types and connector-specific index types.
+        `DATA_SKIPPING_ANNOY` and `DATA_SKIPPING_USEARCH` are exposed for reading legacy
+        ClickHouse index metadata only.
         """
 
         PRIMARY_KEY = "PRIMARY_KEY"
@@ -50,6 +52,12 @@ class Index(ABC):
         integrity by preventing duplicate entries in specific columns, and they can be applied to
         columns that are not designated as the primary key. The uniqueness constraint imposed by
         UNIQUE KEY helps in avoiding redundancy and ensuring data accuracy in the database."""
+
+        DATA_SKIPPING_ANNOY = "DATA_SKIPPING_ANNOY"
+        """Legacy ClickHouse Annoy index metadata. This type is metadata-only."""
+
+        DATA_SKIPPING_USEARCH = "DATA_SKIPPING_USEARCH"
+        """Legacy ClickHouse USearch index metadata. This type is metadata-only."""
 
         DATA_SKIPPING_TEXT = "DATA_SKIPPING_TEXT"
         """ClickHouse full-text data-skipping index loaded from native table metadata."""

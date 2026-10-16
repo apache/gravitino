@@ -25,6 +25,8 @@ from gravitino.utils.serdes import SerdesUtilsBase
 
 
 class IndexSerdes(SerdesUtilsBase, JsonSerializable[Index]):
+    INDEX_PROPERTIES = "properties"
+
     @classmethod
     def serialize(cls, value: Index) -> dict[str, Any]:
         result: dict[str, Any] = {cls.INDEX_TYPE: value.type().name.upper()}
@@ -33,7 +35,7 @@ class IndexSerdes(SerdesUtilsBase, JsonSerializable[Index]):
         result[cls.INDEX_FIELD_NAMES] = value.field_names()
         properties = value.properties()
         if properties:
-            result["properties"] = properties
+            result[cls.INDEX_PROPERTIES] = properties
 
         return result
 
@@ -57,5 +59,5 @@ class IndexSerdes(SerdesUtilsBase, JsonSerializable[Index]):
             index_type,
             data.get(cls.INDEX_NAME),
             data[cls.INDEX_FIELD_NAMES],
-            data.get("properties"),
+            data.get(cls.INDEX_PROPERTIES),
         )

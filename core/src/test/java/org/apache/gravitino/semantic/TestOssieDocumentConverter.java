@@ -41,7 +41,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
-import org.apache.gravitino.semantic.OssieDocumentConverter.ImportedSemanticModel;
+import org.apache.gravitino.semantic.OssieDocumentConverter.ParsedSemanticModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -89,8 +89,7 @@ public class TestOssieDocumentConverter {
             data: '{"domain":"sales"}'
         """;
 
-    ImportedSemanticModel yamlModel =
-        OssieDocumentConverter.importDocument(OssieDocument.yaml(yaml));
+    ParsedSemanticModel yamlModel = OssieDocumentConverter.importDocument(OssieDocument.yaml(yaml));
     assertEquals("sales", yamlModel.name());
     assertEquals("Governed sales definitions", yamlModel.comment());
     assertEquals(
@@ -118,8 +117,7 @@ public class TestOssieDocumentConverter {
           ]
         }
         """;
-    ImportedSemanticModel jsonModel =
-        OssieDocumentConverter.importDocument(OssieDocument.json(json));
+    ParsedSemanticModel jsonModel = OssieDocumentConverter.importDocument(OssieDocument.json(json));
     assertEquals("inventory", jsonModel.name());
     assertEquals("future-version", jsonModel.properties().get(PROPERTY_OSSIE_VERSION));
     assertEquals(
@@ -158,7 +156,7 @@ public class TestOssieDocumentConverter {
     assertEquals(JSON_MAPPER.readTree("{\"domain\":\"sales\"}"), properties);
     assertFalse(properties.has(PROPERTY_OSSIE_VERSION));
 
-    ImportedSemanticModel jsonRoundTrip = OssieDocumentConverter.importDocument(jsonDocument);
+    ParsedSemanticModel jsonRoundTrip = OssieDocumentConverter.importDocument(jsonDocument);
     assertEquals(semanticModel.name(), jsonRoundTrip.name());
     assertEquals(semanticModel.comment(), jsonRoundTrip.comment());
     assertEquals(semanticModel.definition(), jsonRoundTrip.definition());
@@ -169,7 +167,7 @@ public class TestOssieDocumentConverter {
     assertEquals(OssieFormat.YAML, yamlDocument.format());
     assertTrue(yamlDocument.content().contains("version:"));
     assertFalse(yamlDocument.content().contains("semantic_model:"));
-    ImportedSemanticModel yamlRoundTrip = OssieDocumentConverter.importDocument(yamlDocument);
+    ParsedSemanticModel yamlRoundTrip = OssieDocumentConverter.importDocument(yamlDocument);
     assertEquals(semanticModel.definition(), yamlRoundTrip.definition());
     assertEquals(semanticModel.properties(), yamlRoundTrip.properties());
   }
@@ -187,7 +185,7 @@ public class TestOssieDocumentConverter {
     JsonNode json = JSON_MAPPER.readTree(document.content());
     assertEquals("`sales.eu`.`ma``rt`.`ord.ers`", json.at("/datasets/0/source").textValue());
 
-    ImportedSemanticModel roundTrip = OssieDocumentConverter.importDocument(document);
+    ParsedSemanticModel roundTrip = OssieDocumentConverter.importDocument(document);
     assertEquals(source, roundTrip.definition().datasets()[0].source());
   }
 
@@ -199,7 +197,7 @@ public class TestOssieDocumentConverter {
     JsonNode json = JSON_MAPPER.readTree(document.content());
 
     assertEquals(DEFAULT_VERSION, json.path("version").textValue());
-    ImportedSemanticModel roundTrip = OssieDocumentConverter.importDocument(document);
+    ParsedSemanticModel roundTrip = OssieDocumentConverter.importDocument(document);
     assertEquals(DEFAULT_VERSION, roundTrip.properties().get(PROPERTY_OSSIE_VERSION));
   }
 
@@ -422,7 +420,7 @@ public class TestOssieDocumentConverter {
   @ParameterizedTest
   @EnumSource(OssieFormat.class)
   public void testConsumesEmptyPropertiesExtension(OssieFormat format) throws Exception {
-    ImportedSemanticModel request =
+    ParsedSemanticModel request =
         OssieDocumentConverter.importDocument(
             ossieDocument(documentWithExtension(GRAVITINO_PROPERTIES_VENDOR, "{}"), format));
     assertEquals(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION), request.properties());
@@ -441,7 +439,7 @@ public class TestOssieDocumentConverter {
       "not JSON"
     };
     for (String payload : payloads) {
-      ImportedSemanticModel request =
+      ParsedSemanticModel request =
           OssieDocumentConverter.importDocument(
               ossieDocument(documentWithExtension("GRAVITINO", payload), format));
       assertEquals(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION), request.properties());
@@ -451,7 +449,7 @@ public class TestOssieDocumentConverter {
           semanticModel(
               request.definition(),
               Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION));
-      ImportedSemanticModel roundTrip =
+      ParsedSemanticModel roundTrip =
           OssieDocumentConverter.importDocument(
               OssieDocumentConverter.exportDocument(model, format));
       assertEquals(model.definition(), roundTrip.definition());
@@ -478,7 +476,7 @@ public class TestOssieDocumentConverter {
             SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build(),
             Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION));
 
-    ImportedSemanticModel roundTrip =
+    ParsedSemanticModel roundTrip =
         OssieDocumentConverter.importDocument(OssieDocumentConverter.exportDocument(model, format));
     assertEquals(model.definition(), roundTrip.definition());
     assertEquals(model.properties(), roundTrip.properties());
@@ -557,7 +555,7 @@ public class TestOssieDocumentConverter {
             .path("dialect")
             .textValue());
 
-    ImportedSemanticModel roundTrip = OssieDocumentConverter.importDocument(document);
+    ParsedSemanticModel roundTrip = OssieDocumentConverter.importDocument(document);
     assertEquals("TRINO", roundTrip.definition().metrics()[0].expression().dialects()[0].dialect());
   }
 
@@ -640,7 +638,7 @@ public class TestOssieDocumentConverter {
         """;
     OssieDocument input =
         format == OssieFormat.JSON ? OssieDocument.json(content) : OssieDocument.yaml(content);
-    ImportedSemanticModel imported = OssieDocumentConverter.importDocument(input);
+    ParsedSemanticModel imported = OssieDocumentConverter.importDocument(input);
     AIContextObject context = imported.definition().aiContext().object();
     assertEquals("Use certified definitions", context.instructions());
     assertEquals(2, context.synonyms().length);
@@ -676,7 +674,7 @@ public class TestOssieDocumentConverter {
     root.putArray("relationships");
     root.putArray("metrics");
 
-    ImportedSemanticModel imported =
+    ParsedSemanticModel imported =
         OssieDocumentConverter.importDocument(ossieDocument(root, format));
     Dataset converted = imported.definition().datasets()[0];
     assertNull(imported.comment());

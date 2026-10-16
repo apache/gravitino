@@ -496,6 +496,20 @@ public class TestJsonUtils {
         objectMapper.readValue(expected, IndexDTO.class),
         objectMapper.readValue(jsonValue, IndexDTO.class));
 
+    Index legacyIndex =
+        IndexDTO.builder()
+            .withIndexType(Index.IndexType.DATA_SKIPPING_USEARCH)
+            .withName("idx_legacy_usearch")
+            .withFieldNames(new String[][] {{"embedding"}})
+            .withProperties(Map.of("clickhouse_type_full", "usearch(cosineDistance)"))
+            .build();
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(legacyIndex);
+    Index legacyRoundTrip = objectMapper.readValue(jsonValue, IndexDTO.class);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_USEARCH, legacyRoundTrip.type());
+    Assertions.assertEquals("idx_legacy_usearch", legacyRoundTrip.name());
+    Assertions.assertEquals(
+        Map.of("clickhouse_type_full", "usearch(cosineDistance)"), legacyRoundTrip.properties());
+
     Index idx2 =
         IndexDTO.builder()
             .withIndexType(Index.IndexType.PRIMARY_KEY)

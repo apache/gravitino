@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.system.storedprocedure;
 
+import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -35,6 +36,7 @@ import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import java.util.List;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
@@ -102,7 +104,31 @@ public class TestAlterCatalogStoredProcedure {
         assertThrows(
             TrinoException.class,
             () -> procedure.alterCatalog(CATALOG, ImmutableMap.of("k", "v"), List.of(), null));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS.toErrorCode(), error.getErrorCode());
     assertTrue(error.getMessage().contains("already registered"), error.getMessage());
     verify(otherMetalake, never()).alterCatalog(anyString(), any());
+  }
+
+  @Test
+  public void testAlterCatalogDeniedIsPermissionDenied() {
+    String message = "User joel is not authorized to perform operation alterCatalog";
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    CatalogConnectorContext context = mock(CatalogConnectorContext.class);
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+    when(manager.getCatalogConnector(METALAKE, CATALOG)).thenReturn(context);
+    when(context.getMetalake()).thenReturn(metalake);
+    when(context.getCatalog())
+        .thenReturn(new GravitinoCatalog(METALAKE, "memory", CATALOG, ImmutableMap.of(), 1L));
+    when(metalake.alterCatalog(eq(CATALOG), any())).thenThrow(new ForbiddenException(message));
+
+    AlterCatalogStoredProcedure procedure = new AlterCatalogStoredProcedure(manager, METALAKE);
+
+    TrinoException error =
+        assertThrows(
+            TrinoException.class,
+            () -> procedure.alterCatalog(CATALOG, ImmutableMap.of("k", "v"), List.of(), null));
+    assertEquals(PERMISSION_DENIED.toErrorCode(), error.getErrorCode());
+    assertEquals(message, error.getMessage());
   }
 }

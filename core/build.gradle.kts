@@ -105,7 +105,109 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
+// Core's tests run in four lanes: coreUnitTest, plus coreH2Test/coreMySQLTest/corePostgreSQLTest.
+// A class joins a backend lane through its @CoreBackend.* annotation; see CoreBackend.java.
+// Backend name -> the JUnit tag that admits a class to that lane. Keep in sync with CoreBackend.
+val coreBackendTestTags =
+  linkedMapOf(
+    "h2" to "gravitino-core-h2-test",
+    "mysql" to "gravitino-core-mysql-test",
+    "postgresql" to "gravitino-core-postgresql-test"
+  )
+val coreTestBackendProperty = "gravitino.core.test.backend"
+
+fun registerCoreTestTask(
+  taskName: String,
+  backend: String? = null
+) = tasks.register<Test>(taskName) {
+  group = "verification"
+  description =
+    if (backend == null) {
+      "Runs core unit tests."
+    } else {
+      "Runs core database tests against $backend."
+    }
+
+  testClassesDirs = sourceSets["test"].output.classesDirs
+  classpath = sourceSets["test"].runtimeClasspath
+
+  reports.html.outputLocation.set(
+    rootProject.layout.buildDirectory.dir("reports/tests/core/$taskName")
+  )
+
+  useJUnitPlatform {
+    if (backend == null) {
+      // Whatever carries no backend tag (and no Docker tag) is the unit suite.
+      excludeTags(*coreBackendTestTags.values.toTypedArray(), "gravitino-docker-test")
+    } else {
+      val ownBackendTag =
+        coreBackendTestTags[backend]
+          ?: throw GradleException("Unsupported core test backend: $backend")
+      // Plain tag include, applied by JUnit at discovery time, so classes not tagged for this
+      // backend never show up in this lane's JUnit XML. A class tagged for several backends
+      // runs under each of them.
+      includeTags(ownBackendTag)
+    }
+  }
+
+  if (backend != null) {
+    systemProperty(coreTestBackendProperty, backend)
+    // Read by the root setTestEnvironment inside doFirst, i.e. at execution time, after every
+    // configuration action has run - so it doesn't depend on register/configureEach ordering.
+    extensions.extraProperties["includeDockerTaggedTests"] = true
+
+    // Database tests mutate process-wide state and must remain sequential within each lane.
+    maxParallelForks = 1
+    systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+
+    if (backend != "h2") {
+      doFirst {
+        if (rootProject.extra["dockerTest"] != true) {
+          throw GradleException(
+            "$path requires Docker; use -PskipDockerTests=false with Docker running."
+          )
+        }
+      }
+    }
+  }
+}
+
+registerCoreTestTask("coreUnitTest")
+registerCoreTestTask("coreH2Test", "h2")
+registerCoreTestTask("coreMySQLTest", "mysql")
+registerCoreTestTask("corePostgreSQLTest", "postgresql")
+
+val coreSuiteCoverage =
+  providers.gradleProperty("coreSuiteCoverage").map(String::toBoolean).orElse(false)
+val coreSuiteTaskNames =
+  listOf("coreUnitTest", "coreH2Test", "coreMySQLTest", "corePostgreSQLTest")
+val coreSuiteExecutionData =
+  coreSuiteTaskNames.map { layout.buildDirectory.file("jacoco/$it.exec") }
+tasks.named<JacocoReport>("jacocoTestReport") {
+  if (coreSuiteCoverage.get()) {
+    dependsOn(tasks.named("classes"))
+    executionData.setFrom(coreSuiteExecutionData)
+  }
+}
+
+// :core:test is kept for IDEs and local habit, and is deprecated: run a lane instead. CI skips it
+// (`build` passes `-x :core:test`) and runs each lane in its own `core-test` job.
+// TestRestrictedRegoGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
+// the legacy :core:test run it; the database lanes don't need the input.
+listOf("coreUnitTest", "test").forEach {
+  tasks.named<Test>(it) {
+    inputs.file(rootProject.file("docs/policies.md"))
+    systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
+  }
+}
+
 tasks.test {
+  doFirst {
+    logger.warn(
+      "WARNING: :core:test is deprecated and does not correspond to any CI lane. Use " +
+        "coreUnitTest, coreH2Test, coreMySQLTest, or corePostgreSQLTest instead."
+    )
+  }
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode == "embedded") {
     environment("GRAVITINO_HOME", project.rootDir.path)
