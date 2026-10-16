@@ -45,4 +45,11 @@ public @interface DatabaseFixture {
    * @return the isolation level
    */
   DatabaseIsolation isolation() default DatabaseIsolation.RESET_TABLES;
+
+  /**
+   * Returns what the database guarantees at the start of each test.
+   *
+   * @return the reset mode
+   */
+  DatabaseReset reset() default DatabaseReset.DELETE_ROWS;
 }

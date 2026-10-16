@@ -65,6 +65,8 @@ public class TestSQLScripts extends TestJDBCBackend { ... }
 
 `RESET_TABLES` is the default. A method-level `@DatabaseFixture` overrides the class-level one.
 
+Every table is empty at the start of each test. With the default `reset = DatabaseReset.DELETE_ROWS`, `AUTO_INCREMENT` counters may keep counting from earlier tests. A test that relies on them restarting uses `reset = DatabaseReset.TRUNCATE_TABLES`, which is slower because `TRUNCATE` recreates each table.
+
 In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` still runs all core tests in one task locally (H2 only unless you pass `-PskipDockerTests=false`), but it is deprecated and no CI job runs core tests through it.
 
 ## Run the Integration Tests

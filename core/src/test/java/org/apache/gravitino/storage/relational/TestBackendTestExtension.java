@@ -125,6 +125,16 @@ class TestBackendTestExtension {
   }
 
   @Test
+  void testResetModeReachesTheTest() throws Exception {
+    TestJDBCBackend test = mock(TestJDBCBackend.class);
+    run(SharedTests.class, "first", "h2", test);
+    run(TruncateTests.class, "first", "h2", test);
+
+    verify(test).setDatabaseReset(DatabaseReset.DELETE_ROWS);
+    verify(test).setDatabaseReset(DatabaseReset.TRUNCATE_TABLES);
+  }
+
+  @Test
   void testDisplayNamePreservesMethodAndBackend() {
     TestTemplateInvocationContext context =
         extension.createInvocationContexts("testMethod", List.of("h2")).findFirst().orElseThrow();
@@ -133,12 +143,17 @@ class TestBackendTestExtension {
   }
 
   private void run(Class<?> testClass, String methodName, String backendType) throws Exception {
+    run(testClass, methodName, backendType, this);
+  }
+
+  private void run(Class<?> testClass, String methodName, String backendType, Object testInstance)
+      throws Exception {
     Method method = testClass.getDeclaredMethod(methodName);
     ExtensionContext context = mock(ExtensionContext.class);
     when(context.getRoot()).thenReturn(root);
     when(context.getRequiredTestMethod()).thenReturn(method);
     when(context.getRequiredTestClass()).thenAnswer(invocation -> testClass);
-    when(context.getRequiredTestInstance()).thenReturn(this);
+    when(context.getRequiredTestInstance()).thenReturn(testInstance);
 
     Extension callback =
         extension
@@ -202,5 +217,10 @@ class TestBackendTestExtension {
     void shared() {}
 
     void fresh() {}
+  }
+
+  @DatabaseFixture(reset = DatabaseReset.TRUNCATE_TABLES)
+  private static class TruncateTests {
+    void first() {}
   }
 }

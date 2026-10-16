@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -97,6 +98,7 @@ public abstract class TestJDBCBackend {
 
   protected String backendType;
   protected RelationalBackend backend;
+  private DatabaseReset databaseReset = DatabaseReset.DELETE_ROWS;
 
   public void setBackend(RelationalBackend backend) {
     this.backend = backend;
@@ -106,6 +108,10 @@ public abstract class TestJDBCBackend {
     this.backendType = backendType;
   }
 
+  public void setDatabaseReset(DatabaseReset databaseReset) {
+    this.databaseReset = databaseReset;
+  }
+
   @BeforeEach
   public void init() throws SQLException {
     truncateAllTables();
@@ -113,52 +119,70 @@ public abstract class TestJDBCBackend {
 
   private void truncateAllTables() throws SQLException {
     try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection()) {
-        try (Statement statement = connection.createStatement()) {
-          if ("postgresql".equalsIgnoreCase(backendType)) {
-            truncateAllTablesForPostgreSQL(connection);
-          } else {
-            String query = "SHOW TABLES";
-            List<String> tableList = new ArrayList<>();
-            try (ResultSet rs = statement.executeQuery(query)) {
-              while (rs.next()) {
-                tableList.add(rs.getString(1));
-              }
-            }
-            for (String table : tableList) {
-              statement.execute("TRUNCATE TABLE " + table);
-            }
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      List<String> tables = nonEmptyTables(statement, tables(statement));
+      if (tables.isEmpty()) {
+        return;
+      }
+      if (databaseReset == DatabaseReset.DELETE_ROWS) {
+        // One transaction, so the deletes share one commit instead of one fsync per table.
+        connection.setAutoCommit(false);
+        try {
+          for (String table : tables) {
+            statement.execute("DELETE FROM " + table);
           }
+          connection.commit();
+        } finally {
+          connection.setAutoCommit(true);
+        }
+      } else if ("postgresql".equalsIgnoreCase(backendType)) {
+        statement.execute(
+            tables.stream()
+                .map(table -> "TRUNCATE TABLE " + table + " RESTART IDENTITY CASCADE;")
+                .collect(Collectors.joining("\n", "DO $$ BEGIN\n", "\nEND $$;")));
+      } else {
+        for (String table : tables) {
+          statement.execute("TRUNCATE TABLE " + table);
         }
       }
     }
   }
 
-  private void truncateAllTablesForPostgreSQL(Connection connection) throws SQLException {
-    List<String> tableList = new ArrayList<>();
-    try (Statement statement = connection.createStatement()) {
-      String query =
-          "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()";
-      try (ResultSet rs = statement.executeQuery(query)) {
-        while (rs.next()) {
-          tableList.add(rs.getString(1));
-        }
+  private List<String> tables(Statement statement) throws SQLException {
+    String query =
+        "postgresql".equalsIgnoreCase(backendType)
+            ? "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()"
+            : "SHOW TABLES";
+    List<String> tables = new ArrayList<>();
+    try (ResultSet rs = statement.executeQuery(query)) {
+      while (rs.next()) {
+        tables.add(rs.getString(1));
       }
-
-      if (tableList.isEmpty()) {
-        return;
-      }
-
-      // Merge all TRUNCATE operations into a single DO block to improve efficiency
-      StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
-      for (String table : tableList) {
-        pgTruncateCommand.append(
-            String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", table));
-      }
-      pgTruncateCommand.append("END $$;");
-      statement.execute(pgTruncateCommand.toString());
     }
+    return tables;
+  }
+
+  // Resetting every table before every test dominated the database lanes: TRUNCATE recreates each
+  // table's files and syncs them to disk, even when the table is empty. One query finds the few
+  // tables a test wrote to, so only those are reset.
+  private static List<String> nonEmptyTables(Statement statement, List<String> tables)
+      throws SQLException {
+    List<String> nonEmpty = new ArrayList<>();
+    if (tables.isEmpty()) {
+      return nonEmpty;
+    }
+    String query =
+        tables.stream()
+            .map(table -> String.format("(SELECT '%s' FROM %s LIMIT 1)", table, table))
+            .collect(Collectors.joining(" UNION ALL "));
+    try (ResultSet rs = statement.executeQuery(query)) {
+      while (rs.next()) {
+        nonEmpty.add(rs.getString(1));
+      }
+    }
+    return nonEmpty;
   }
 
   protected BaseMetalake createAndInsertMakeLake(String metalakeName) throws IOException {

@@ -188,6 +188,7 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
       if (testInstance instanceof TestJDBCBackend) {
         ((TestJDBCBackend) testInstance).setBackend(current.backend);
         ((TestJDBCBackend) testInstance).setBackendType(backendType);
+        ((TestJDBCBackend) testInstance).setDatabaseReset(reset(context));
       }
     }
 
@@ -207,14 +208,23 @@ public class BackendTestExtension implements TestTemplateInvocationContextProvid
     }
 
     private DatabaseIsolation isolation(ExtensionContext context) {
+      DatabaseFixture fixture = fixture(context);
+      return fixture == null ? DatabaseIsolation.RESET_TABLES : fixture.isolation();
+    }
+
+    private DatabaseReset reset(ExtensionContext context) {
+      DatabaseFixture fixture = fixture(context);
+      return fixture == null ? DatabaseReset.DELETE_ROWS : fixture.reset();
+    }
+
+    // A method-level fixture replaces the class-level one.
+    @Nullable
+    private DatabaseFixture fixture(ExtensionContext context) {
       DatabaseFixture methodFixture =
           context.getRequiredTestMethod().getAnnotation(DatabaseFixture.class);
-      if (methodFixture != null) {
-        return methodFixture.isolation();
-      }
-      DatabaseFixture classFixture =
-          context.getRequiredTestClass().getAnnotation(DatabaseFixture.class);
-      return classFixture == null ? DatabaseIsolation.RESET_TABLES : classFixture.isolation();
+      return methodFixture != null
+          ? methodFixture
+          : context.getRequiredTestClass().getAnnotation(DatabaseFixture.class);
     }
   }
 
