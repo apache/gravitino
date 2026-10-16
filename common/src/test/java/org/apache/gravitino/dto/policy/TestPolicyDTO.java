@@ -31,6 +31,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 
 public class TestPolicyDTO {
 
@@ -239,4 +240,86 @@ public class TestPolicyDTO {
     Assertions.assertEquals(ImmutableList.of("analyst"), contentDTO.applicableRoles());
     Assertions.assertDoesNotThrow(contentDTO::validate);
   }
+
+  @Test
+  public void testIcebergCompactionMaintenancePeerFieldsSerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.IcebergCompactionContentDTO typedContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withExecutionSpec(
+                PolicyExecutionSpec.of(
+                    "0 0 2 * * ?",
+                    true,
+                    3_600_000L,
+                    ImmutableMap.of("spark.executor.memory", "4g"),
+                    ImmutableMap.of("metalake", "ml")))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("iceberg-compaction-tms")
+            .withComment("tms peers")
+            .withPolicyType("system_iceberg_compaction")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    Assertions.assertTrue(serJson.contains("\"timeTrigger\""));
+    Assertions.assertFalse(serJson.contains("\"executionSpec\""));
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+    Assertions.assertEquals(policyDTO, deserPolicyDTO);
+
+    PolicyContentDTO.IcebergCompactionContentDTO content =
+        (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
+    Assertions.assertEquals("0 0 2 * * ?", content.timeTrigger());
+    Assertions.assertEquals(Boolean.TRUE, content.commitTrigger());
+    Assertions.assertEquals(3_600_000L, content.minIntervalMs());
+    Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
+    Assertions.assertEquals("ml", content.updaterOptions().get("metalake"));
+    Assertions.assertDoesNotThrow(content::validate);
+  }
+
+  @Test
+  public void testExecutionPeerOptionMapsAreUnmodifiableCopies() {
+    PolicyContentDTO.IcebergCompactionContentDTO content =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withExecutionSpec(
+                PolicyExecutionSpec.of(
+                    null,
+                    null,
+                    null,
+                    ImmutableMap.of("spark.executor.memory", "4g"),
+                    ImmutableMap.of("metalake", "ml")))
+            .build();
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> content.jobOptions().put("spark.executor.memory", "8g"));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> content.updaterOptions().put("metalake", "other"));
+    Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
+    Assertions.assertEquals("ml", content.updaterOptions().get("metalake"));
+  }
+
+  @Test
+  public void testMaintenancePeerValidateOnDto() {
+    PolicyContentDTO.IcebergOrphanFileRemovalContentDTO orphanOnCommit =
+        PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
+            .withExecutionSpec(PolicyExecutionSpec.of(null, true, null, null, null))
+            .build();
+    IllegalArgumentException orphanEx =
+        Assertions.assertThrows(IllegalArgumentException.class, orphanOnCommit::validate);
+    Assertions.assertTrue(orphanEx.getMessage().contains("commitTrigger"));
+
+    // Cron syntax is not validated on the policy API; scheduler registration parses it.
+    PolicyContentDTO.IcebergCompactionContentDTO opaqueCron =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withExecutionSpec(PolicyExecutionSpec.of("a a a a a a", null, null, null, null))
+            .build();
+    Assertions.assertDoesNotThrow(opaqueCron::validate);
+  }
+
 }
