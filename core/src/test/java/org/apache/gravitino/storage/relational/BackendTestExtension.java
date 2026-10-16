@@ -116,11 +116,15 @@ public class BackendTestExtension
   public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
       ExtensionContext context) {
     String testMethodName = context.getRequiredTestMethod().getName();
+    return createInvocationContexts(testMethodName, backends());
+  }
+
+  /** Returns the backends each test runs against, in order. */
+  List<String> backends() {
     Optional<String> selectedBackend = BackendTestSelector.selectedBackend();
     if (selectedBackend.isPresent()) {
       LOG.info("Running tests with the selected {} backend.", selectedBackend.get());
-      return createInvocationContexts(
-          testMethodName, Collections.singletonList(selectedBackend.get()));
+      return List.of(selectedBackend.get());
     }
 
     List<String> backendsToTest = new ArrayList<>();
@@ -135,8 +139,7 @@ public class BackendTestExtension
       LOG.info(
           "Running tests with H2 backend only. Set env var 'dockerTest=true' to include all backends.");
     }
-
-    return createInvocationContexts(testMethodName, backendsToTest);
+    return List.copyOf(backendsToTest);
   }
 
   Stream<TestTemplateInvocationContext> createInvocationContexts(

@@ -20,235 +20,314 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-import java.lang.reflect.Method;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.AfterEachCallback;
-import org.junit.jupiter.api.extension.BeforeEachCallback;
-import org.junit.jupiter.api.extension.Extension;
-import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.platform.engine.DiscoverySelector;
+import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.junit.platform.testkit.engine.EngineTestKit;
+import org.junit.platform.testkit.engine.Events;
 
+/**
+ * Runs small fixture classes through a real JUnit engine and checks, from a log of what the
+ * extension did, when it builds, resets and closes backends.
+ */
 class TestBackendTestExtension {
 
-  private final List<RelationalBackend> backends = new ArrayList<>();
-  private final List<ResetStrategy> resets = new ArrayList<>();
-  private final BackendTestExtension extension =
-      new BackendTestExtension(
-          (backendType, testClass) -> {
-            RelationalBackend backend = mock(RelationalBackend.class);
-            backends.add(backend);
-            return new BackendTestExtension.Backend(backendType, testClass, backend, null, null) {
-              @Override
-              void reset(ResetStrategy resetStrategy) {
-                resets.add(resetStrategy);
-              }
-            };
-          });
-  private final ExtensionContext root = rootWithStore();
+  /** Keeps the fixtures out of every Gradle test task; only this test runs them. */
+  static final String FIXTURE = "gravitino-test-fixture";
 
-  @Test
-  void testClassReusesOneBackend() throws Exception {
-    run(SharedTests.class, "first", "h2");
-    run(SharedTests.class, "second", "h2");
+  private static final List<String> LOG = new ArrayList<>();
+  private static boolean failNextCreate;
+  private static boolean failNextClose;
 
-    assertEquals(1, backends.size());
-    verify(backends.get(0), never()).close();
+  @BeforeEach
+  void clearLog() {
+    LOG.clear();
+    failNextCreate = false;
+    failNextClose = false;
   }
 
   @Test
-  void testNextClassGetsANewBackend() throws Exception {
-    run(SharedTests.class, "first", "h2");
-    run(OtherSharedTests.class, "first", "h2");
-
-    assertEquals(2, backends.size());
-    verify(backends.get(0), times(1)).close();
-    verify(backends.get(1), never()).close();
-  }
-
-  @Test
-  void testBackendTypeChangeGetsANewBackend() throws Exception {
-    run(SharedTests.class, "first", "h2");
-    run(SharedTests.class, "first", "mysql");
-
-    assertEquals(2, backends.size());
-    verify(backends.get(0), times(1)).close();
-  }
-
-  @Test
-  void testFreshClassGetsABackendPerTest() throws Exception {
-    run(FreshTests.class, "first", "h2");
-    run(FreshTests.class, "second", "h2");
-
-    assertEquals(2, backends.size());
-    verify(backends.get(0), times(1)).close();
-    verify(backends.get(1), times(1)).close();
-  }
-
-  @Test
-  void testFreshMethodReplacesTheSharedBackend() throws Exception {
-    run(MixedTests.class, "shared", "h2");
-    run(MixedTests.class, "fresh", "h2");
-    run(MixedTests.class, "shared", "h2");
-
-    assertEquals(3, backends.size());
-    verify(backends.get(0), times(1)).close();
-    verify(backends.get(1), times(1)).close();
-    verify(backends.get(2), never()).close();
-  }
-
-  @Test
-  void testResetTablesMethodSharesInsideFreshClass() throws Exception {
-    run(FreshClassWithSharedMethodTests.class, "shared", "h2");
-    run(FreshClassWithSharedMethodTests.class, "shared", "h2");
-    assertEquals(1, backends.size());
-
-    run(FreshClassWithSharedMethodTests.class, "fresh", "h2");
-    assertEquals(2, backends.size());
-    verify(backends.get(0), times(1)).close();
-    verify(backends.get(1), times(1)).close();
-  }
-
-  @Test
-  void testSubclassInheritsFreshDatabase() throws Exception {
-    run(InheritedFreshTests.class, "third", "h2");
-    run(InheritedFreshTests.class, "fourth", "h2");
-
-    assertEquals(2, backends.size());
-    verify(backends.get(0), times(1)).close();
-    verify(backends.get(1), times(1)).close();
-  }
-
-  @Test
-  void testResetStrategyReachesTheBackend() throws Exception {
-    run(SharedTests.class, "first", "h2");
-    run(TruncateTests.class, "first", "h2");
-    run(FreshTests.class, "first", "h2");
+  void testClassReusesOneBackend() {
+    run(SharedFixture.class).assertStatistics(stats -> stats.succeeded(2).failed(0));
 
     assertEquals(
         List.of(
-            ResetStrategy.DELETE_ROWS, ResetStrategy.TRUNCATE_TABLES, ResetStrategy.FRESH_DATABASE),
-        resets);
+            "create h2 SharedFixture",
+            "reset DELETE_ROWS",
+            "reset DELETE_ROWS",
+            "close h2 SharedFixture"),
+        LOG);
   }
 
   @Test
-  void testClassClosesItsBackendWhenItFinishes() throws Exception {
-    run(SharedTests.class, "first", "h2");
-    finishClass(OtherSharedTests.class);
-    verify(backends.get(0), never()).close();
+  void testEachClassClosesItsBackendBeforeTheNextStarts() {
+    run(SharedFixture.class, TruncateFixture.class)
+        .assertStatistics(stats -> stats.succeeded(3).failed(0));
 
-    finishClass(SharedTests.class);
-    verify(backends.get(0), times(1)).close();
-
-    run(SharedTests.class, "second", "h2");
-    assertEquals(2, backends.size());
+    assertEquals(
+        List.of(
+            "create h2 SharedFixture",
+            "reset DELETE_ROWS",
+            "reset DELETE_ROWS",
+            "close h2 SharedFixture",
+            "create h2 TruncateFixture",
+            "reset TRUNCATE_TABLES",
+            "close h2 TruncateFixture"),
+        LOG);
   }
 
   @Test
-  void testDisplayNamePreservesMethodAndBackend() {
-    TestTemplateInvocationContext context =
-        extension.createInvocationContexts("testMethod", List.of("h2")).findFirst().orElseThrow();
+  void testBackendTypeChangeReplacesTheBackend() {
+    run(TwoBackendFixture.class).assertStatistics(stats -> stats.succeeded(2).failed(0));
 
-    assertEquals("testMethod[H2 Backend]", context.getDisplayName(1));
+    assertEquals(
+        List.of(
+            "create h2 TwoBackendFixture",
+            "reset DELETE_ROWS",
+            "close h2 TwoBackendFixture",
+            "create mysql TwoBackendFixture",
+            "reset DELETE_ROWS",
+            "close mysql TwoBackendFixture"),
+        LOG);
   }
 
-  private void run(Class<?> testClass, String methodName, String backendType) throws Exception {
-    run(testClass, methodName, backendType, this);
+  @Test
+  void testFreshClassGetsABackendPerTest() {
+    run(FreshFixture.class).assertStatistics(stats -> stats.succeeded(2).failed(0));
+
+    assertEquals(
+        List.of(
+            "create h2 FreshFixture",
+            "reset FRESH_DATABASE",
+            "close h2 FreshFixture",
+            "create h2 FreshFixture",
+            "reset FRESH_DATABASE",
+            "close h2 FreshFixture"),
+        LOG);
   }
 
-  private void run(Class<?> testClass, String methodName, String backendType, Object testInstance)
-      throws Exception {
-    Method method = testClass.getDeclaredMethod(methodName);
-    ExtensionContext context = mock(ExtensionContext.class);
-    when(context.getRoot()).thenReturn(root);
-    when(context.getRequiredTestMethod()).thenReturn(method);
-    when(context.getRequiredTestClass()).thenAnswer(invocation -> testClass);
-    when(context.getRequiredTestInstance()).thenReturn(testInstance);
+  @Test
+  void testSubclassInheritsFreshDatabase() {
+    run(InheritedFreshFixture.class).assertStatistics(stats -> stats.succeeded(3).failed(0));
 
-    Extension callback =
-        extension
-            .createInvocationContexts(methodName, List.of(backendType))
-            .findFirst()
-            .orElseThrow()
-            .getAdditionalExtensions()
-            .get(0);
-    ((BeforeEachCallback) callback).beforeEach(context);
-    ((AfterEachCallback) callback).afterEach(context);
+    assertEquals(3, count("create h2 InheritedFreshFixture"));
+    assertEquals(3, count("reset FRESH_DATABASE"));
+    assertEquals(3, count("close h2 InheritedFreshFixture"));
   }
 
-  private void finishClass(Class<?> testClass) throws Exception {
-    ExtensionContext context = mock(ExtensionContext.class);
-    when(context.getRoot()).thenReturn(root);
-    when(context.getRequiredTestClass()).thenAnswer(invocation -> testClass);
-    extension.afterAll(context);
+  @Test
+  void testFreshMethodReplacesTheSharedBackend() {
+    run(MixedFixture.class).assertStatistics(stats -> stats.succeeded(3).failed(0));
+
+    assertEquals(
+        List.of(
+            "create h2 MixedFixture",
+            "reset DELETE_ROWS",
+            "close h2 MixedFixture",
+            "create h2 MixedFixture",
+            "reset FRESH_DATABASE",
+            "close h2 MixedFixture",
+            "create h2 MixedFixture",
+            "reset DELETE_ROWS",
+            "close h2 MixedFixture"),
+        LOG);
   }
 
-  private static ExtensionContext rootWithStore() {
-    Map<Object, Object> entries = new HashMap<>();
-    ExtensionContext.Store store = mock(ExtensionContext.Store.class);
-    doAnswer(invocation -> entries.put(invocation.getArgument(0), invocation.getArgument(1)))
-        .when(store)
-        .put(any(), any());
-    when(store.get(any(), any(Class.class)))
-        .thenAnswer(invocation -> entries.get(invocation.getArgument(0)));
-    when(store.remove(any(), any(Class.class)))
-        .thenAnswer(invocation -> entries.remove(invocation.getArgument(0)));
-    ExtensionContext root = mock(ExtensionContext.class);
-    when(root.getStore(any(ExtensionContext.Namespace.class))).thenReturn(store);
-    return root;
+  @Test
+  void testSharedMethodInsideFreshClass() {
+    run(FreshClassWithSharedMethodFixture.class)
+        .assertStatistics(stats -> stats.succeeded(3).failed(0));
+
+    assertEquals(
+        List.of(
+            "create h2 FreshClassWithSharedMethodFixture",
+            "reset DELETE_ROWS",
+            "reset DELETE_ROWS",
+            "close h2 FreshClassWithSharedMethodFixture",
+            "create h2 FreshClassWithSharedMethodFixture",
+            "reset FRESH_DATABASE",
+            "close h2 FreshClassWithSharedMethodFixture"),
+        LOG);
   }
 
-  private static class SharedTests {
+  @Test
+  void testFailedCreateFailsOnlyThatTest() {
+    failNextCreate = true;
+    run(SharedFixture.class).assertStatistics(stats -> stats.succeeded(1).failed(1));
+
+    assertEquals(
+        List.of(
+            "create failed",
+            "create h2 SharedFixture",
+            "reset DELETE_ROWS",
+            "close h2 SharedFixture"),
+        LOG);
+  }
+
+  @Test
+  void testFailedCloseOnReplacementFailsTheReplacingTest() {
+    failNextClose = true;
+    run(TwoBackendFixture.class).assertStatistics(stats -> stats.succeeded(1).failed(1));
+
+    // The failed close leaves the slot empty, so nothing is left to close at the end.
+    assertEquals(
+        List.of("create h2 TwoBackendFixture", "reset DELETE_ROWS", "close h2 TwoBackendFixture"),
+        LOG);
+  }
+
+  @Test
+  void testDisplayNameNamesTheBackend() {
+    List<String> names =
+        run(TwoBackendFixture.class).started().stream()
+            .map(event -> event.getTestDescriptor().getDisplayName())
+            .collect(Collectors.toList());
+
+    assertEquals(List.of("first[H2 Backend]", "first[MYSQL Backend]"), names);
+  }
+
+  private static Events run(Class<?>... fixtures) {
+    return EngineTestKit.engine("junit-jupiter")
+        .configurationParameter(
+            "junit.jupiter.testclass.order.default", "org.junit.jupiter.api.ClassOrderer$ClassName")
+        .selectors(
+            Arrays.stream(fixtures)
+                .map(DiscoverySelectors::selectClass)
+                .toArray(DiscoverySelector[]::new))
+        .execute()
+        .testEvents();
+  }
+
+  private static long count(String entry) {
+    return LOG.stream().filter(entry::equals).count();
+  }
+
+  private static BackendTestExtension fakeExtension(String... backends) {
+    return new BackendTestExtension(
+        (backendType, testClass) -> {
+          if (failNextCreate) {
+            failNextCreate = false;
+            LOG.add("create failed");
+            throw new IllegalStateException("create failed");
+          }
+          String name = backendType + " " + testClass.getSimpleName();
+          LOG.add("create " + name);
+          return new BackendTestExtension.Backend(
+              backendType, testClass, mock(RelationalBackend.class), null, null) {
+            @Override
+            void reset(ResetStrategy resetStrategy) {
+              LOG.add("reset " + resetStrategy);
+            }
+
+            @Override
+            public void close() throws IOException {
+              LOG.add("close " + name);
+              if (failNextClose) {
+                failNextClose = false;
+                throw new IOException("close failed");
+              }
+            }
+          };
+        }) {
+      @Override
+      List<String> backends() {
+        return List.of(backends);
+      }
+    };
+  }
+
+  @Tag(FIXTURE)
+  @TestMethodOrder(MethodOrderer.MethodName.class)
+  static class SharedFixture {
+    @RegisterExtension static final BackendTestExtension EXTENSION = fakeExtension("h2");
+
+    @TestTemplate
     void first() {}
 
+    @TestTemplate
     void second() {}
   }
 
-  private static class OtherSharedTests {
-    void first() {}
-  }
-
-  @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
-  private static class FreshTests {
-    void first() {}
-
-    void second() {}
-  }
-
-  private static class InheritedFreshTests extends FreshTests {
-    void third() {}
-
-    void fourth() {}
-  }
-
-  private static class MixedTests {
-    void shared() {}
-
-    @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
-    void fresh() {}
-  }
-
-  @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
-  private static class FreshClassWithSharedMethodTests {
-    @DatabaseFixture(resetStrategy = ResetStrategy.DELETE_ROWS)
-    void shared() {}
-
-    void fresh() {}
-  }
-
+  @Tag(FIXTURE)
   @DatabaseFixture(resetStrategy = ResetStrategy.TRUNCATE_TABLES)
-  private static class TruncateTests {
+  static class TruncateFixture {
+    @RegisterExtension static final BackendTestExtension EXTENSION = fakeExtension("h2");
+
+    @TestTemplate
     void first() {}
+  }
+
+  @Tag(FIXTURE)
+  static class TwoBackendFixture {
+    @RegisterExtension static final BackendTestExtension EXTENSION = fakeExtension("h2", "mysql");
+
+    @TestTemplate
+    void first() {}
+  }
+
+  @Tag(FIXTURE)
+  @TestMethodOrder(MethodOrderer.MethodName.class)
+  @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
+  static class FreshFixture {
+    @RegisterExtension static final BackendTestExtension EXTENSION = fakeExtension("h2");
+
+    @TestTemplate
+    void first() {}
+
+    @TestTemplate
+    void second() {}
+  }
+
+  @Tag(FIXTURE)
+  @TestMethodOrder(MethodOrderer.MethodName.class)
+  static class InheritedFreshFixture extends FreshFixture {
+    @TestTemplate
+    void third() {}
+  }
+
+  @Tag(FIXTURE)
+  @TestMethodOrder(MethodOrderer.MethodName.class)
+  static class MixedFixture {
+    @RegisterExtension static final BackendTestExtension EXTENSION = fakeExtension("h2");
+
+    @TestTemplate
+    void a() {}
+
+    @TestTemplate
+    @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
+    void b() {}
+
+    @TestTemplate
+    void c() {}
+  }
+
+  @Tag(FIXTURE)
+  @TestMethodOrder(MethodOrderer.MethodName.class)
+  @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
+  static class FreshClassWithSharedMethodFixture {
+    @RegisterExtension static final BackendTestExtension EXTENSION = fakeExtension("h2");
+
+    @TestTemplate
+    @DatabaseFixture(resetStrategy = ResetStrategy.DELETE_ROWS)
+    void a() {}
+
+    @TestTemplate
+    @DatabaseFixture(resetStrategy = ResetStrategy.DELETE_ROWS)
+    void b() {}
+
+    @TestTemplate
+    void c() {}
   }
 }

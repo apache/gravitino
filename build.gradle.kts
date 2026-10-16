@@ -521,6 +521,8 @@ allprojects {
           ?: dockerTest
       val dorisMultiVersion = project.hasProperty("dorisMultiVersionTest")
       param.useJUnitPlatform {
+        // Fixture classes that a test runs through JUnit's EngineTestKit, never directly.
+        excludeTags("gravitino-test-fixture")
         if (!includeDockerTaggedTests) {
           excludeTags("gravitino-docker-test")
         }
