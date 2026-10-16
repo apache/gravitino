@@ -44,6 +44,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.MetadataUpdate;
@@ -455,23 +456,52 @@ class IcebergViewCatalogOperations {
    * Iceberg has no length-bound string type, only its single unbounded {@code string}. A view's
    * output column, unlike a physical table column, may legitimately carry Gravitino's {@link
    * Types.VarCharType} (e.g. {@code SELECT 'x' AS c} produces varchar(1)), since the connector
-   * layer does not apply physical-storage type restrictions to view columns. Widen it to Iceberg's
-   * string type before building the schema, or {@link ConvertUtil#toIcebergSchema} rejects it as an
+   * layer does not apply physical-storage type restrictions to view columns. Widen it, including
+   * any occurrence nested inside a list/map/struct (e.g. {@code ARRAY['x']}), to Iceberg's string
+   * type before building the schema, or {@link ConvertUtil#toIcebergSchema} rejects it as an
    * unsupported type.
    */
   private static Column[] widenVarcharColumns(Column[] columns) {
     return Arrays.stream(columns)
         .map(
             col ->
-                col.dataType() instanceof Types.VarCharType
-                    ? Column.of(
-                        col.name(),
-                        Types.StringType.get(),
-                        col.comment(),
-                        col.nullable(),
-                        col.autoIncrement(),
-                        col.defaultValue())
-                    : col)
+                Column.of(
+                    col.name(),
+                    widenVarchar(col.dataType()),
+                    col.comment(),
+                    col.nullable(),
+                    col.autoIncrement(),
+                    col.defaultValue()))
         .toArray(Column[]::new);
+  }
+
+  /** Recursively widens any {@link Types.VarCharType} nested inside {@code type}. */
+  private static Type widenVarchar(Type type) {
+    if (type instanceof Types.VarCharType) {
+      return Types.StringType.get();
+    } else if (type instanceof Types.ListType) {
+      Types.ListType listType = (Types.ListType) type;
+      return Types.ListType.of(widenVarchar(listType.elementType()), listType.elementNullable());
+    } else if (type instanceof Types.MapType) {
+      Types.MapType mapType = (Types.MapType) type;
+      return Types.MapType.of(
+          widenVarchar(mapType.keyType()),
+          widenVarchar(mapType.valueType()),
+          mapType.valueNullable());
+    } else if (type instanceof Types.StructType) {
+      Types.StructType structType = (Types.StructType) type;
+      Types.StructType.Field[] fields =
+          Arrays.stream(structType.fields())
+              .map(
+                  field ->
+                      Types.StructType.Field.of(
+                          field.name(),
+                          widenVarchar(field.type()),
+                          field.nullable(),
+                          field.comment()))
+              .toArray(Types.StructType.Field[]::new);
+      return Types.StructType.of(fields);
+    }
+    return type;
   }
 }
