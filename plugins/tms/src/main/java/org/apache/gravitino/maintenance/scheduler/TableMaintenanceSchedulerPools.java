@@ -80,11 +80,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     List<Scheduler> built =
         List.of(
             buildScheduler(
-                dataSource,
-                config,
-                config.expandThreads(),
-                EXPAND_TASKS_TABLE,
-                noopTask(POLICY_EXPAND)),
+                dataSource, config, config.expandThreads(), EXPAND_TASKS_TABLE, policyExpandTask()),
             buildScheduler(
                 dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, noopTask(CRON_JOB)),
             buildScheduler(
@@ -136,8 +132,21 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         .heartbeatInterval(Duration.ofMillis(config.heartbeatIntervalMs()))
         .missedHeartbeatsLimit(config.missedHeartbeatsLimit())
         .tableName(tableName)
+        .commitWhenAutocommitDisabled(true)
         .registerShutdownHook()
         .build();
+  }
+
+  /**
+   * Expand-pool task definition shared by the running scheduler and the policy registration client.
+   *
+   * <p>The handler stays a no-op until expand fan-out is implemented. Registration only inserts the
+   * row; execution is owned by the pool started in {@link #start}.
+   *
+   * @return the {@code policy-expand} task
+   */
+  public static Task<Void> policyExpandTask() {
+    return noopTask(POLICY_EXPAND);
   }
 
   private static Task<Void> noopTask(String taskName) {

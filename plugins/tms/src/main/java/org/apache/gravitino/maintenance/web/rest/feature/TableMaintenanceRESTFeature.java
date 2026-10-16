@@ -27,7 +27,10 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.scheduler.PolicyExpandPreCommitHook;
+import org.apache.gravitino.maintenance.scheduler.PolicyExpandScheduler;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.policy.PolicyPreCommitHooks;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
 import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
@@ -41,8 +44,10 @@ import org.slf4j.LoggerFactory;
  * enabled (§7.1).
  *
  * <p>TMS does not register public REST resources in this change; the feature only owns server
- * lifecycle for in-process scheduling. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs
- * during Jetty shutdown before {@code GravitinoEnv} closes the entity-store {@code DataSource}.
+ * lifecycle for in-process scheduling. While the pools are running, a policy pre-commit hook writes
+ * the matching {@code policy-expand} row on the same transaction as create, alter, enable, disable,
+ * and delete. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs during Jetty shutdown
+ * before {@code GravitinoEnv} closes the entity-store {@code DataSource}.
  *
  * <p>After {@link #stopSchedulers()}, a later {@link #configure} may start pools again and
  * re-register the destroy listener (needed for tests / embedded restarts in the same JVM).
@@ -56,6 +61,9 @@ public class TableMaintenanceRESTFeature implements Feature {
   public static final String EXTENSION_PACKAGE = TableMaintenanceRESTFeature.class.getPackageName();
 
   private static final AtomicReference<TableMaintenanceSchedulerPools> SCHEDULER_POOLS =
+      new AtomicReference<>();
+
+  private static final AtomicReference<PolicyExpandPreCommitHook> PRE_COMMIT_HOOK =
       new AtomicReference<>();
 
   @Override
@@ -80,6 +88,15 @@ public class TableMaintenanceRESTFeature implements Feature {
       return true;
     }
 
+    try {
+      registerPreCommitHook();
+    } catch (RuntimeException e) {
+      unregisterPreCommitHook();
+      SCHEDULER_POOLS.set(null);
+      pools.stop();
+      throw e;
+    }
+
     // Register only after a successful CAS so a later configure-after-stop can attach a listener
     // again on the new FeatureContext (listener is scoped to the Jersey Application).
     context.register(new SchedulerShutdownListener());
@@ -89,10 +106,25 @@ public class TableMaintenanceRESTFeature implements Feature {
 
   /** Stops scheduler pools. Invoked from Jersey destroy and tests. */
   public static void stopSchedulers() {
+    unregisterPreCommitHook();
     TableMaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);
     if (pools != null) {
       pools.stop();
       LOG.info("Table maintenance scheduler pools stopped");
+    }
+  }
+
+  private static void registerPreCommitHook() {
+    PolicyExpandPreCommitHook hook =
+        new PolicyExpandPreCommitHook(PolicyExpandScheduler.joiningCurrentTransaction());
+    PolicyPreCommitHooks.register(hook);
+    PRE_COMMIT_HOOK.set(hook);
+  }
+
+  private static void unregisterPreCommitHook() {
+    PolicyExpandPreCommitHook hook = PRE_COMMIT_HOOK.getAndSet(null);
+    if (hook != null) {
+      PolicyPreCommitHooks.unregister(hook);
     }
   }
 
