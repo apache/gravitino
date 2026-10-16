@@ -160,7 +160,7 @@ const RightContent = () => {
   }
 
   return (
-    <div className={semanticModelName ? 'flex h-full min-h-0 flex-col overflow-hidden px-6 py-4' : 'p-6'} ref={ref}>
+    <div className={semanticModelName ? 'flex h-full min-h-0 flex-col overflow-auto px-6 py-4' : 'p-6'} ref={ref}>
       <Breadcrumb
         className={semanticModelName ? 'mb-2 shrink-0' : 'mb-4 shrink-0'}
         separator='>'

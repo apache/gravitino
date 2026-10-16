@@ -74,3 +74,11 @@
 .table :global(.ant-table-pagination) {
   flex-shrink: 0;
 }
+
+/* On short windows, scroll the heading away instead of squeezing expanded fields into a sliver. */
+@media (max-height: 750px) {
+  .page {
+    flex-shrink: 0;
+    min-height: 580px;
+  }
+}

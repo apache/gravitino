@@ -23,12 +23,13 @@ import { parseOssiePreview } from './ossiePreview'
 describe('OSSIE preview', () => {
   it.each(['json', 'yaml'])('counts nested fields and metadata in %s', format => {
     const json =
-      '{"name":"reporting","datasets":[{"fields":[{},{}]},{"fields":[{}]}],"relationships":[{}],"metrics":[{},{}]}'
+      '{"version":"0.2.0","name":"reporting","datasets":[{"fields":[{},{}]},{"fields":[{}]}],"relationships":[{}],"metrics":[{},{}]}'
 
     const yaml =
-      'name: reporting\ndatasets:\n  - fields: [{}, {}]\n  - fields: [{}]\nrelationships: [{}]\nmetrics: [{}, {}]\n'
+      'version: 0.2.0\nname: reporting\ndatasets:\n  - fields: [{}, {}]\n  - fields: [{}]\nrelationships: [{}]\nmetrics: [{}, {}]\n'
     expect(parseOssiePreview(format === 'json' ? json : yaml, format)).toEqual({
       name: 'reporting',
+      version: '0.2.0',
       datasets: 2,
       fields: 3,
       relationships: 1,
@@ -36,8 +37,9 @@ describe('OSSIE preview', () => {
     })
   })
   it('allows optional omitted or null collections without rewriting source text', () => {
-    expect(parseOssiePreview('name: model\nmetrics: null', 'yaml')).toEqual({
+    expect(parseOssiePreview('version: 0.2.0\nname: model\nmetrics: null', 'yaml')).toEqual({
       name: 'model',
+      version: '0.2.0',
       datasets: 0,
       fields: 0,
       relationships: 0,
@@ -50,11 +52,17 @@ describe('OSSIE preview', () => {
     ['name: [', 'yaml'],
     ['[]', 'json'],
     ['name: 42', 'yaml'],
-    ['name: model\ndatasets: bad', 'yaml'],
-    ['name: model\ndatasets: [null]', 'yaml'],
-    ['name: model\ndatasets: [{fields: bad}]', 'yaml'],
-    ['name: model\n---\nname: other', 'yaml']
+    ['version: 0.2.0\nname: model\ndatasets: bad', 'yaml'],
+    ['version: 0.2.0\nname: model\ndatasets: [null]', 'yaml'],
+    ['version: 0.2.0\nname: model\ndatasets: [{fields: bad}]', 'yaml'],
+    ['version: 0.2.0\nname: model\n---\nname: other', 'yaml']
   ])('rejects unparseable or uncountable documents: %s', (text, format) => {
     expect(() => parseOssiePreview(text, format)).toThrow()
   })
+})
+
+it.each([undefined, null, 2, {}, [], '', '   '])('rejects invalid OSSIE version %j', version => {
+  expect(() => parseOssiePreview(JSON.stringify({ name: 'model', version }), 'json')).toThrow(
+    'non-empty string version'
+  )
 })

@@ -107,8 +107,8 @@ const submit = async () => {
 describe('OSSIE import', () => {
   it.each([
     ['model.yaml', 'application/yaml', 'name: imported\nversion: 0.2.0.dev0\n'],
-    ['model.YML', 'application/yaml', 'name: imported\n'],
-    ['model.json', 'application/json', '{ "name": "imported", "ai_context": "Guide" }']
+    ['model.YML', 'application/yaml', 'name: imported\nversion: 0.2.0.dev0\n'],
+    ['model.json', 'application/json', '{ "version": "0.2.0.dev0", "name": "imported", "ai_context": "Guide" }']
   ])('imports %s unchanged and refreshes the list and loaded tree', async (name, type, text) => {
     defHttp.post.mockResolvedValue({ semanticModel: { name: 'imported' } })
     await renderDialog()
@@ -119,6 +119,8 @@ describe('OSSIE import', () => {
     expect(document.body.textContent).toContain('Remove file')
     expect(document.body.textContent).toContain('bytes')
     expect(document.body.textContent).toContain('Import preview')
+    expect(document.body.textContent).toContain('OSSIE version')
+    expect(document.body.textContent).toContain('0.2.0.dev0')
     expect(document.body.textContent).toContain('demo / sales / mart')
     expect(document.body.textContent).toContain('imported')
     await submit()
@@ -144,7 +146,7 @@ describe('OSSIE import', () => {
       .mockRejectedValueOnce({ response: { data: { message: 'datasets[0].source is invalid' } } })
       .mockResolvedValue({ semanticModel: { name: 'imported' } })
     await renderDialog()
-    await selectFile('model.json', '{"name":"imported"}')
+    await selectFile('model.json', '{"name":"imported","version":"0.2.0"}')
     await submit()
     expect(document.querySelector('.ant-alert-message').textContent).toBe('Import failed')
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
@@ -178,8 +180,8 @@ describe('OSSIE import', () => {
     const input = document.querySelector('input[type="file"]')
     Object.defineProperty(input, 'files', { configurable: true, value: [file] })
     await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })))
-    await selectFile('new.json', '{"name":"new"}')
-    await act(async () => finish('name: old'))
+    await selectFile('new.json', '{"name":"new","version":"0.2.0"}')
+    await act(async () => finish('name: old\nversion: 0.2.0'))
     expect(document.querySelector('[data-refer="import-preview"]').textContent).toContain('new')
     expect(document.querySelector('[data-refer="import-preview"]').textContent).not.toContain('old')
   })
@@ -196,3 +198,14 @@ describe('OSSIE import', () => {
     expect(close).not.toHaveBeenCalled()
   })
 })
+
+it.each(['{"name":"model"}', '{"name":"model","version":2}', 'name: model\nversion: " "'])(
+  'blocks version-invalid preview %s',
+  async text => {
+    await renderDialog()
+    await selectFile(text.startsWith('{') ? 'model.json' : 'model.yaml', text)
+    expect(document.body.textContent).toContain('non-empty string version')
+    expect(document.querySelector('[data-refer="import-semantic-model-submit"]').disabled).toBe(true)
+    expect(defHttp.post).not.toHaveBeenCalled()
+  }
+)

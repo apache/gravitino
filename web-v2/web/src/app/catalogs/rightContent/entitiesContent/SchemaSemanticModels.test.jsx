@@ -89,10 +89,13 @@ afterEach(async () => {
 describe('Semantic Model ownership action', () => {
   it.each([true, false])('gates Set Owner on authorization (enabled=%s)', async anthEnable => {
     store = configureStore({ reducer: { metalakes: reducer, auth: () => ({ anthEnable }) } })
+    const args = { metalake: 'demo', catalog: 'sales', schema: 'mart' }
+    store.dispatch(fetchSemanticModels.pending('load', args))
     store.dispatch(
       fetchSemanticModels.fulfilled(
         { semanticModels: [{ name: 'orders', namespace: ['demo', 'sales', 'mart'] }] },
-        'load'
+        'load',
+        args
       )
     )
     await act(async () =>

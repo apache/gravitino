@@ -145,6 +145,14 @@ export default function ImportSemanticModelDialog({ open, setOpen, metalake, cat
             {metalake} / {catalog} / {schema}
           </Typography.Text>
         </div>
+        {selection && (
+          <div>
+            <Typography.Text type='secondary' className='block'>
+              OSSIE version
+            </Typography.Text>
+            <Typography.Text strong>{selection.preview.version}</Typography.Text>
+          </div>
+        )}
         <Upload
           accept='.yaml,.yml,.json'
           maxCount={1}

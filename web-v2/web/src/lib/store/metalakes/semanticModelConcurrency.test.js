@@ -28,7 +28,18 @@ import reducer, {
   setSelectedNodes,
   getSemanticModelDetails,
   getCurrentEntityTags,
-  getSchemaDetails
+  getCurrentEntityPolicies,
+  getSchemaDetails,
+  getTableDetails,
+  getCatalogDetails,
+  getFilesetDetails,
+  getTopicDetails,
+  getModelDetails,
+  getFunctionDetails,
+  getViewDetails,
+  getMetalakeDetails,
+  setActiveCatalogEntity,
+  updateSemanticModel
 } from './index'
 
 const adapter = defHttp.getAxios().defaults.adapter
@@ -76,6 +87,7 @@ it.each([0, 1])('loads both the schema tab and tree when concurrent response %s 
   expect(listResult.meta.requestStatus).toBe('fulfilled')
   expect(treeResult.meta.requestStatus).toBe('fulfilled')
   expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['orders'])
+  expect(store.getState().metalakes.semanticModelRequests).toEqual({})
   expect(treeResult.payload.data.some(node => node.node === 'semanticModel' && node.name === 'orders')).toBe(true)
 })
 
@@ -115,6 +127,7 @@ it.each(['list', 'tree'])('ignores an older %s response after a successful list 
   await initial
   expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['orders', 'imported'])
   expect(store.getState().metalakes.metalakeTree[0].children.map(model => model.name)).toEqual(['orders', 'imported'])
+  expect(store.getState().metalakes.semanticModelRequests).toEqual({})
 })
 
 it.each(['model', 'schema', 'pending model'])(
@@ -155,26 +168,112 @@ it.each(['model', 'schema', 'pending model'])(
   }
 )
 
-it('ignores tags from the previous selected entity even before the next tags request', async () => {
+it.each([getCurrentEntityTags, getCurrentEntityPolicies])(
+  'ignores old entity tags/policies before the next request',
+  async fetch => {
+    const store = configureStore({ reducer: { metalakes: reducer } })
+    let respond
+    defHttp.getAxios().defaults.adapter = config =>
+      new Promise(resolve => {
+        respond = () =>
+          resolve({
+            config,
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            data: { code: 0, tags: [{ name: 'old' }], policies: [{ name: 'old' }] }
+          })
+      })
+
+    const request = store.dispatch(
+      fetch({
+        init: true,
+        metalake: 'demo',
+        metadataObjectType: 'semantic_model',
+        metadataObjectFullName: 'sales.mart.old'
+      })
+    )
+    await vi.waitFor(() => expect(respond).toBeTypeOf('function'))
+    store.dispatch(setSelectedNodes(['new']))
+    respond()
+    await request
+    expect(store.getState().metalakes.currentEntityTags).toEqual([])
+    expect(store.getState().metalakes.currentEntityPolicies).toEqual([])
+  }
+)
+
+it.each([
+  [getMetalakeDetails, { metalake: 'demo' }, { name: 'demo' }],
+  [getCatalogDetails, { metalake: 'demo', catalog: 'sales' }, { catalog: { name: 'sales' } }],
+  [getSchemaDetails, {}, { schema: { name: 'mart' } }],
+  [getTableDetails, { table: 'orders' }, { table: { name: 'orders', columns: [], distribution: { funcArgs: [] } } }],
+  [getFilesetDetails, { fileset: 'orders' }, { fileset: { name: 'orders' } }],
+  [getTopicDetails, { topic: 'orders' }, { topic: { name: 'orders' } }],
+  [getModelDetails, { model: 'orders' }, { model: { name: 'orders' } }],
+  [getFunctionDetails, { functionName: 'orders' }, { function: { name: 'orders' } }],
+  [getViewDetails, { view: 'orders' }, { view: { name: 'orders' } }]
+])('rejects a late $typePrefix writer after model navigation', async (thunk, args, payload) => {
+  const namespace = { metalake: 'demo', catalog: 'sales', schema: 'mart' }
   const store = configureStore({ reducer: { metalakes: reducer } })
-  let respond
+  const responses = []
   defHttp.getAxios().defaults.adapter = config =>
     new Promise(resolve => {
-      respond = () =>
-        resolve({ config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, tags: [{ name: 'old' }] } })
+      responses.push(data =>
+        resolve({ config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, ...data } })
+      )
     })
+  const old = store.dispatch(thunk({ ...namespace, ...args, init: true }))
+  await vi.waitFor(() => expect(responses).toHaveLength(1))
+  const nextArgs = { ...namespace, semanticModel: 'orders', init: true }
+  store.dispatch(setActiveCatalogEntity(nextArgs))
+  const next = store.dispatch(getSemanticModelDetails(nextArgs))
+  await vi.waitFor(() => expect(responses).toHaveLength(2))
+  responses[1]({ semanticModel: { name: 'orders', definition: { datasets: [] } } })
+  await next
+  const before = store.getState().metalakes
+  responses[0](payload)
+  await old
+  expect(store.getState().metalakes).toEqual(before)
+})
 
-  const request = store.dispatch(
-    getCurrentEntityTags({
-      init: true,
-      metalake: 'demo',
-      metadataObjectType: 'semantic_model',
-      metadataObjectFullName: 'sales.mart.old'
+it('refreshes the saved schema tree without replacing the newly selected schema list', async () => {
+  const namespace = { metalake: 'demo', catalog: 'sales', schema: 'mart' }
+  const key = '{{demo}}{{sales}}{{relational}}{{mart}}'
+  const store = configureStore({ reducer: { metalakes: reducer } })
+  store.dispatch(setMetalakeTree([{ key, node: 'schema', children: [] }]))
+  store.dispatch(setLoadedNodes([key]))
+  store.dispatch(setActiveCatalogEntity({ ...namespace, semanticModel: 'orders' }))
+  let finishSave
+  defHttp.getAxios().defaults.adapter = config =>
+    new Promise(resolve => {
+      const respond = data =>
+        resolve({ config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, ...data } })
+      if (config.method === 'put') finishSave = () => respond({ semanticModel: { name: 'renamed' } })
+      else respond({ identifiers: [{ name: config.url.includes('/mart/') ? 'renamed' : 'schema_b_model' }] })
     })
-  )
-  await vi.waitFor(() => expect(respond).toBeTypeOf('function'))
-  store.dispatch(setSelectedNodes(['new']))
-  respond()
-  await request
-  expect(store.getState().metalakes.currentEntityTags).toEqual([])
+  const save = store.dispatch(updateSemanticModel({ ...namespace, semanticModel: 'orders', data: { updates: [] } }))
+  await vi.waitFor(() => expect(finishSave).toBeTypeOf('function'))
+  store.dispatch(setActiveCatalogEntity({ ...namespace, schema: 'other' }))
+  await store.dispatch(fetchSemanticModels({ ...namespace, schema: 'other', init: true }))
+  finishSave()
+  await save
+  expect(store.getState().metalakes.semanticModels.map(model => model.name)).toEqual(['schema_b_model'])
+  expect(store.getState().metalakes.metalakeTree[0].children.map(model => model.name)).toEqual(['renamed'])
+  expect(store.getState().metalakes.semanticModelRequests).toEqual({})
+})
+
+it.each(['success', 'failure', 'abort'])('releases request records after %s across many schemas', async result => {
+  const store = configureStore({ reducer: { metalakes: reducer } })
+  defHttp.getAxios().defaults.adapter = config => {
+    if (result === 'failure') return Promise.reject(new Error('Unavailable'))
+    if (result === 'abort') return new Promise(() => {})
+
+    return Promise.resolve({ config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, identifiers: [] } })
+  }
+  for (let i = 0; i < 20; i++) {
+    const request = store.dispatch(fetchSemanticModels({ metalake: 'demo', catalog: 'sales', schema: 'schema_' + i }))
+    if (result === 'abort') request.abort()
+    await request
+  }
+  expect(store.getState().metalakes.semanticModelRequests).toEqual({})
 })

@@ -19,6 +19,7 @@
 
 'use client'
 
+import { catalogEntityKey } from '@/lib/utils/catalogEntity'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button,
@@ -91,7 +92,8 @@ export default function SemanticModelDetailsPage() {
   const auth = useAppSelector(state => state.auth)
   const { anthEnable } = auth
   const store = useAppSelector(state => state.metalakes)
-  const semanticModel = store.activatedDetails?.name === semanticModelName ? store.activatedDetails : null
+  const detailsKey = catalogEntityKey({ metalake, catalog, schema, semanticModel: semanticModelName })
+  const semanticModel = store.activatedDetailsKey === detailsKey ? store.activatedDetails : null
   const [tabKey, setTabKey] = useState('Datasets')
   const [openEdit, setOpenEdit] = useState(false)
   const [metadataEdit, setMetadataEdit] = useState(null)
@@ -112,6 +114,14 @@ export default function SemanticModelDetailsPage() {
   }, [])
 
   const definition = semanticModel?.definition
+  useEffect(() => {
+    if (definition) return
+    setMetadataEdit(null)
+    setFieldContext(null)
+    setMetadataDetails(null)
+    setOpenEdit(false)
+    setExpandedDefinition(false)
+  }, [definition])
   const properties = semanticModel?.properties
   const createdAt = semanticModel?.audit?.createTime
   const createdAtText = !createdAt || !isValidDate(createdAt) ? '-' : formatToDateTime(createdAt)
@@ -747,7 +757,7 @@ export default function SemanticModelDetailsPage() {
           </pre>
         </Modal>
       )}
-      {metadataDetails && (
+      {definition && metadataDetails && (
         <Modal
           open
           title={`${metadataDetails.label} details`}
@@ -760,7 +770,7 @@ export default function SemanticModelDetailsPage() {
           {renderMetadata(metadataDetails.entity, metadataDetails.label, metadataDetails.target)}
         </Modal>
       )}
-      {fieldContext && (
+      {definition && fieldContext && (
         <Modal
           open
           title={`${fieldContext.name} AI Context`}
@@ -784,7 +794,7 @@ export default function SemanticModelDetailsPage() {
           />
         </Modal>
       )}
-      {metadataEdit && (
+      {definition && metadataEdit && (
         <SemanticMetadataEditor
           definition={definition}
           target={metadataEdit}

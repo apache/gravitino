@@ -27,6 +27,9 @@ export const parseOssiePreview = (document, format) => {
   if (!isPlainObject(model)) throw new Error('The OSSIE document must be an object.')
   if (typeof model.name !== 'string' || !model.name.trim()) throw new Error('The document must declare a model name.')
 
+  if (typeof model.version !== 'string' || !model.version.trim())
+    throw new Error('The document must declare a non-empty string version.')
+
   const count = (values, path) => {
     if (values == null) return 0
     if (!Array.isArray(values)) throw new Error(`${path} must be an array.`)
@@ -43,6 +46,7 @@ export const parseOssiePreview = (document, format) => {
 
   return {
     name: model.name,
+    version: model.version,
     datasets,
     fields,
     relationships: count(model.relationships, 'relationships'),

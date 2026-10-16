@@ -29,16 +29,26 @@ import {
   updateSemanticMetadata
 } from '@/lib/utils/semanticMetadata'
 
-export default function SemanticMetadataEditor({
-  definition,
-  target,
-  metalake,
-  catalog,
-  schema,
-  semanticModel,
-  onClose,
-  onSaved
-}) {
+export default function SemanticMetadataEditor(props) {
+  try {
+    getSemanticMetadataEntity(props.definition, props.target)
+  } catch (error) {
+    return (
+      <Modal
+        open
+        title='Metadata unavailable'
+        onCancel={props.onClose}
+        footer={<Button onClick={props.onClose}>Close</Button>}
+      >
+        <Alert type='error' showIcon message={error.message} />
+      </Modal>
+    )
+  }
+
+  return <SemanticMetadataForm {...props} />
+}
+
+function SemanticMetadataForm({ definition, target, metalake, catalog, schema, semanticModel, onClose, onSaved }) {
   const { token } = theme.useToken()
   const dispatch = useAppDispatch()
   const [form] = Form.useForm()
@@ -204,8 +214,14 @@ export default function SemanticMetadataEditor({
         name='dialects'
         rules={[
           {
-            validator: (_, values) =>
-              values?.length ? Promise.resolve() : Promise.reject(new Error('Add at least one dialect expression.'))
+            validator: (_, values) => {
+              if (!values?.length) return Promise.reject(new Error('Add at least one dialect expression.'))
+              const names = values.map(value => value?.dialect).filter(Boolean)
+              if (new Set(names).size !== names.length)
+                return Promise.reject(new Error('Dialect names must be unique.'))
+
+              return Promise.resolve()
+            }
           }
         ]}
       >
@@ -217,15 +233,7 @@ export default function SemanticMetadataEditor({
                   {...rest}
                   name={[name, 'dialect']}
                   label='Dialect'
-                  rules={[
-                    { required: true, whitespace: true },
-                    {
-                      validator: (_, value) =>
-                        (form.getFieldValue('dialects') || []).filter(item => item?.dialect === value).length > 1
-                          ? Promise.reject(new Error('Dialect names must be unique.'))
-                          : Promise.resolve()
-                    }
-                  ]}
+                  rules={[{ required: true, whitespace: true }]}
                 >
                   <Input />
                 </Form.Item>
@@ -339,7 +347,17 @@ export default function SemanticMetadataEditor({
             />
           </div>
         )}
-        <Form form={form} initialValues={initial} layout='vertical' disabled={saving} name='semanticMetadata'>
+        <Form
+          form={form}
+          initialValues={initial}
+          layout='vertical'
+          disabled={saving}
+          name='semanticMetadata'
+          onValuesChange={changed => {
+            // Form.List does not revalidate its own rules when a nested field changes.
+            if (changed.dialects) form.validateFields([['dialects']]).catch(() => {})
+          }}
+        >
           <Tabs
             tabBarStyle={{ position: 'sticky', top: 0, zIndex: 1, background: token.colorBgContainer }}
             activeKey={section}

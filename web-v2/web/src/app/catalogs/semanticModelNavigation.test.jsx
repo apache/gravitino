@@ -81,7 +81,7 @@ const navigate = async model => {
     catalog: 'sales',
     catalogType: 'relational',
     schema: 'mart',
-    ...(model ? { semanticModel: model } : {})
+    ...(typeof model === 'object' ? model : model ? { semanticModel: model } : {})
   })
   await act(async () =>
     root.render(
@@ -108,4 +108,55 @@ it.each(['second', null])('ignores old detail follow-ups while navigating to %s'
     expect(store.getState().metalakes.activatedDetails.name).toBe('second')
     expect(store.getState().metalakes.activatedDetailsLoading).toBe(false)
   }
+})
+
+it.each(['table', 'schema'])('cancels %s details and all follow-ups when opening a model', async kind => {
+  let resolveOld
+  defHttp.get.mockImplementation(({ url }) => {
+    if (url.endsWith(kind === 'table' ? '/tables/orders' : '/schemas/mart'))
+      return new Promise(resolve => {
+        resolveOld = resolve
+      })
+
+    return Promise.resolve({
+      identifiers: [],
+      tags: [],
+      policies: [],
+      semanticModel: { name: 'orders', definition: { datasets: [] } }
+    })
+  })
+  await navigate(kind === 'table' ? { table: 'orders' } : null)
+  expect(resolveOld).toBeTypeOf('function')
+  await navigate('orders')
+  const before = store.getState().metalakes
+  const calls = defHttp.get.mock.calls.length
+  await act(async () =>
+    resolveOld({ table: { name: 'orders', columns: [], distribution: { funcArgs: [] } }, schema: { name: 'mart' } })
+  )
+  expect(store.getState().metalakes).toEqual(before)
+  expect(defHttp.get.mock.calls).toHaveLength(calls)
+})
+
+it('ignores a canceled table list and its loading writes after opening a model', async () => {
+  let resolveTables
+  defHttp.get.mockImplementation(({ url }) => {
+    if (url.endsWith('/tables'))
+      return new Promise(resolve => {
+        resolveTables = resolve
+      })
+
+    return Promise.resolve({
+      identifiers: [],
+      tags: [],
+      policies: [],
+      schema: { name: 'mart' },
+      semanticModel: { name: 'orders', definition: { datasets: [] } }
+    })
+  })
+  await navigate(null)
+  expect(resolveTables).toBeTypeOf('function')
+  await navigate('orders')
+  const before = store.getState().metalakes
+  await act(async () => resolveTables({ identifiers: [{ name: 'old_table' }] }))
+  expect(store.getState().metalakes).toEqual(before)
 })

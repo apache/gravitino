@@ -24,8 +24,9 @@ import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { defHttp } from '@/lib/utils/axios'
-import reducer, { getSemanticModelDetails } from '@/lib/store/metalakes'
+import reducer, { getSemanticModelDetails, getTableDetails, resetActivatedDetails } from '@/lib/store/metalakes'
 import SemanticModelDetailsPage from './SemanticModelDetailsPage'
+import SemanticMetadataEditor from '../SemanticMetadataEditor'
 
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), name: 'sales model' }))
 
@@ -130,11 +131,13 @@ const definitionWith = context => ({
 })
 
 const renderDetails = async (definition, details = {}) => {
-  store.dispatch(getSemanticModelDetails.pending('load', { init: true }))
+  const args = { init: true, metalake: 'demo', catalog: 'sales', schema: 'mart', semanticModel: navigation.name }
+  store.dispatch(getSemanticModelDetails.pending('load', args))
   store.dispatch(
     getSemanticModelDetails.fulfilled(
       { semanticModel: { name: navigation.name, definition, properties: {}, ...details }, init: true },
-      'load'
+      'load',
+      args
     )
   )
   await act(async () =>
@@ -911,3 +914,95 @@ it.each([false, true])(
     expect(defHttp.get.mock.calls.every(([request]) => request.url.endsWith('/semantic-models'))).toBe(true)
   }
 )
+
+it.each(['table', 'other schema'])('never displays same-named %s metadata as the routed model', async source => {
+  await renderDetails(definitionWith(() => null))
+  const thunk = source === 'table' ? getTableDetails : getSemanticModelDetails
+
+  const args = {
+    init: true,
+    metalake: 'demo',
+    catalog: 'sales',
+    schema: source === 'table' ? 'mart' : 'other',
+    ...(source === 'table' ? { table: navigation.name } : { semanticModel: navigation.name })
+  }
+  await act(async () => {
+    store.dispatch(thunk.pending('other', args))
+    store.dispatch(
+      thunk.fulfilled(
+        {
+          init: true,
+          [source === 'table' ? 'table' : 'semanticModel']: {
+            name: navigation.name,
+            comment: 'Unrelated comment',
+            columns: [],
+            definition: definitionWith(() => 'unrelated')
+          }
+        },
+        'other',
+        args
+      )
+    )
+  })
+  expect(document.body.textContent).not.toContain('Unrelated comment')
+  expect(document.querySelector('[aria-label="Edit dataset orders"]')).toBeNull()
+})
+
+it.each(['field', 'dataset'])('closes the %s snapshot modal when the definition is cleared', async kind => {
+  await renderDetails(definitionWith(() => 'guidance'))
+  await click(document.querySelector('button.ant-table-row-expand-icon'))
+  if (kind === 'dataset') await click(findText('button', 'View dataset details'))
+  else {
+    await click(document.querySelector('[aria-label="amount AI Context"]'))
+  }
+  expect(document.querySelector('.ant-modal')).not.toBeNull()
+  await act(async () => store.dispatch(resetActivatedDetails()))
+  expect(document.querySelector('.ant-modal')).toBeNull()
+  expect(defHttp.put).not.toHaveBeenCalled()
+})
+
+it.each([
+  [undefined, { kind: 'model' }],
+  [undefined, { kind: 'field', datasetName: 'orders', name: 'amount' }],
+  [{ datasets: [] }, { kind: 'dataset', name: 'orders' }],
+  [{ datasets: [{ name: 'orders', fields: [] }] }, { kind: 'field', datasetName: 'orders', name: 'amount' }]
+])('renders a closable error when the editor mounts with unavailable metadata', async (definition, target) => {
+  const close = vi.fn()
+  await act(async () =>
+    root.render(
+      <Provider store={store}>
+        <SemanticMetadataEditor definition={definition} target={target} onClose={close} />
+      </Provider>
+    )
+  )
+  expect(document.body.textContent).toContain('The selected metadata no longer exists')
+  expect(findText('.ant-modal button', 'Save')).toBeUndefined()
+  await click(findText('.ant-modal button', 'Close'))
+  expect(close).toHaveBeenCalledOnce()
+  expect(defHttp.put).not.toHaveBeenCalled()
+})
+
+it.each(['rename', 'remove'])('clears duplicate dialect errors immediately after %s', async correction => {
+  const definition = definitionWith(() => null)
+  definition.datasets[0].fields[0].expression.dialects = [
+    { dialect: 'ANSI_SQL', expression: 'amount' },
+    { dialect: 'TRINO', expression: 'amount' }
+  ]
+  await renderDetails(definition)
+  await click(document.querySelector('button.ant-table-row-expand-icon'))
+  await click(document.querySelector('[aria-label="Edit field amount"]'))
+
+  const changeDialect = async value =>
+    act(async () => {
+      Simulate.change(document.querySelector('#semanticMetadata_dialects_1_dialect'), { target: { value } })
+      await new Promise(resolve => setTimeout(resolve, 300))
+    })
+  await changeDialect('ANSI_SQL')
+  await click(findText('.ant-modal button', 'Save'))
+  expect(document.body.textContent).toContain('Dialect names must be unique')
+  if (correction === 'rename') await changeDialect('TRINO')
+  else await click(document.querySelector('[aria-label="Remove dialect 2"]'))
+  await act(async () => new Promise(resolve => setTimeout(resolve, 400)))
+  expect(document.body.textContent).not.toContain('Dialect names must be unique')
+  expect(defHttp.put).not.toHaveBeenCalled()
+})

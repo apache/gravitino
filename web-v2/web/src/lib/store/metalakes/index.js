@@ -17,6 +17,7 @@
  * under the License.
  */
 
+import { catalogEntityKey } from '@/lib/utils/catalogEntity'
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
 import { to, extractPlaceholder, updateTreeData, findInTree } from '@/lib/utils'
@@ -587,13 +588,14 @@ export const getMetadataObjectsForPolicy = createAsyncThunk(
 
 export const fetchCatalogs = createAsyncThunk(
   'appMetalakes/fetchCatalogs',
-  async ({ init, update, page, metalake }, { getState, dispatch }) => {
+  async ({ init, update, page, metalake }, { getState, dispatch, signal }) => {
     if (init) {
       await dispatch(resetTree())
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
     const [err, res] = await to(getCatalogsApi({ metalake }))
+    if (signal.aborted) return
     await dispatch(setTableLoading(false))
 
     if (err || !res) {
@@ -927,12 +929,13 @@ export const switchInUseCatalog = createAsyncThunk(
 
 export const fetchSchemas = createAsyncThunk(
   'appMetalakes/fetchSchemas',
-  async ({ init, page, metalake, catalog, catalogType, parentSchema }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, catalogType, parentSchema }, { getState, dispatch, signal }) => {
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
     const [err, res] = await to(getSchemasApi({ metalake, catalog, parentSchema }))
+    if (signal.aborted) return
     await dispatch(setTableLoading(false))
 
     if (err || !res) {
@@ -1160,12 +1163,13 @@ export const deleteSchema = createAsyncThunk(
 
 export const fetchTables = createAsyncThunk(
   'appMetalakes/fetchTables',
-  async ({ init, page, metalake, catalog, schema }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, schema }, { getState, dispatch, signal }) => {
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
     const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
+    if (signal.aborted) return
     await dispatch(setTableLoading(false))
 
     if (init && (err || !res)) {
@@ -1223,13 +1227,8 @@ export const fetchTables = createAsyncThunk(
 
 export const getTableDetails = createAsyncThunk(
   'appMetalakes/getTableDetails',
-  async ({ init, metalake, catalog, schema, table }, { getState, dispatch }) => {
-    if (init) {
-      await dispatch(resetTableData())
-      await dispatch(setTableLoading(true))
-    }
+  async ({ init, metalake, catalog, schema, table }) => {
     const [err, res] = await to(getTableDetailsApi({ metalake, catalog, schema, table }))
-    await dispatch(setTableLoading(false))
     if (err || !res) {
       throw new Error(err)
     }
@@ -1330,17 +1329,7 @@ export const getTableDetails = createAsyncThunk(
       node: 'tableColumn'
     }))
 
-    dispatch(setTableProps(tableProps))
-
-    dispatch(
-      setExpandedNodes([
-        `{{${metalake}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
-      ])
-    )
-
-    return { table: resTable, init }
+    return { table: resTable, tableProps, init }
   }
 )
 
@@ -1480,13 +1469,14 @@ export const deleteTable = createAsyncThunk(
 
 export const fetchFilesets = createAsyncThunk(
   'appMetalakes/fetchFilesets',
-  async ({ init, page, metalake, catalog, schema }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, schema }, { getState, dispatch, signal }) => {
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
 
     const [err, res] = await to(getFilesetsApi({ metalake, catalog, schema }))
+    if (signal.aborted) return
     await dispatch(setTableLoading(false))
 
     if (init && (err || !res)) {
@@ -1542,27 +1532,14 @@ export const fetchFilesets = createAsyncThunk(
 
 export const getFilesetDetails = createAsyncThunk(
   'appMetalakes/getFilesetDetails',
-  async ({ init, metalake, catalog, schema, fileset }, { getState, dispatch }) => {
-    if (init) {
-      await dispatch(resetTableData())
-      await dispatch(setTableLoading(true))
-    }
+  async ({ init, metalake, catalog, schema, fileset }) => {
     const [err, res] = await to(getFilesetDetailsApi({ metalake, catalog, schema, fileset }))
-    init && (await dispatch(setTableLoading(false)))
 
     if (err || !res) {
       throw new Error(err)
     }
 
     const { fileset: resFileset } = res
-
-    await dispatch(
-      setExpandedNodes([
-        `{{${metalake}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`
-      ])
-    )
 
     return { fileset: resFileset, init }
   }
@@ -1722,13 +1699,14 @@ export const getFilesetFiles = createAsyncThunk(
 
 export const fetchTopics = createAsyncThunk(
   'appMetalakes/fetchTopics',
-  async ({ init, page, metalake, catalog, schema }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, schema }, { getState, dispatch, signal }) => {
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
 
     const [err, res] = await to(getTopicsApi({ metalake, catalog, schema }))
+    if (signal.aborted) return
     await dispatch(setTableLoading(false))
     if (init && (err || !res)) {
       await dispatch(resetTableData())
@@ -1783,26 +1761,14 @@ export const fetchTopics = createAsyncThunk(
 
 export const getTopicDetails = createAsyncThunk(
   'appMetalakes/getTopicDetails',
-  async ({ init, metalake, catalog, schema, topic }, { getState, dispatch }) => {
-    if (init) {
-      await dispatch(setTableLoading(true))
-    }
+  async ({ init, metalake, catalog, schema, topic }) => {
     const [err, res] = await to(getTopicDetailsApi({ metalake, catalog, schema, topic }))
-    await dispatch(setTableLoading(false))
 
     if (err || !res) {
       throw new Error(err)
     }
 
     const { topic: resTopic } = res
-
-    await dispatch(
-      setExpandedNodes([
-        `{{${metalake}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`
-      ])
-    )
 
     return { topic: resTopic, init }
   }
@@ -1941,13 +1907,14 @@ export const deleteTopic = createAsyncThunk(
 
 export const fetchModels = createAsyncThunk(
   'appMetalakes/fetchModels',
-  async ({ init, page, metalake, catalog, schema }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, schema }, { getState, dispatch, signal }) => {
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
 
     const [err, res] = await to(getModelsApi({ metalake, catalog, schema }))
+    if (signal.aborted) return
     await dispatch(setTableLoading(false))
 
     if (init && (err || !res)) {
@@ -2147,13 +2114,14 @@ export const deleteModel = createAsyncThunk(
 
 export const fetchModelVersions = createAsyncThunk(
   'appMetalakes/fetchModelVersions',
-  async ({ init, page, metalake, catalog, schema, model }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, schema, model }, { getState, dispatch, signal }) => {
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
 
     const [err, res] = await to(getModelVersionsApi({ metalake, catalog, schema, model }))
+    if (signal.aborted) return
     await dispatch(setTableLoading(false))
     if (err || !res) {
       throw new Error(err)
@@ -2259,8 +2227,9 @@ export const deleteVersion = createAsyncThunk(
 
 export const fetchFunctions = createAsyncThunk(
   'appMetalakes/fetchFunctions',
-  async ({ init, metalake, catalog, schema }, { dispatch }) => {
+  async ({ init, metalake, catalog, schema }, { dispatch, signal }) => {
     const [err, res] = await to(getFunctionsApi({ metalake, catalog, schema, details: true }))
+    if (signal.aborted) return
 
     if (init && (err || !res)) {
       throw new Error(err)
@@ -2294,8 +2263,9 @@ export const getFunctionDetails = createAsyncThunk(
 
 export const fetchViews = createAsyncThunk(
   'appMetalakes/fetchViews',
-  async ({ init, metalake, catalog, schema }, { getState, dispatch }) => {
+  async ({ init, metalake, catalog, schema }, { getState, dispatch, signal }) => {
     const [err, res] = await to(getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
+    if (signal.aborted) return
 
     if (err || !res) {
       // Catalog doesn't support views (HTTP 501, or legacy 405 with code 1006) — return empty views silently
@@ -2382,7 +2352,7 @@ export const deleteView = createAsyncThunk(
 
 export const fetchSemanticModels = createAsyncThunk(
   'appMetalakes/fetchSemanticModels',
-  async ({ init, metalake, catalog, schema }, { getState, dispatch, requestId }) => {
+  async ({ init, metalake, catalog, schema }, { getState, requestId }) => {
     const schemaKey = semanticModelSchemaKey({ metalake, catalog, schema })
     const [err, res] = await to(getSemanticModelsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
 
@@ -2426,22 +2396,6 @@ export const fetchSemanticModels = createAsyncThunk(
       }
     })
 
-    if (
-      init &&
-      getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`)
-    ) {
-      dispatch(
-        setIntoTreeNodes({
-          key: schemaKey,
-          data: mergeWithSemanticModelNodes({
-            tree: getState().metalakes.metalakeTree,
-            key: schemaKey,
-            entities: semanticModels
-          })
-        })
-      )
-    }
-
     return { semanticModels, init, schemaKey }
   }
 )
@@ -2471,10 +2425,11 @@ export const getSemanticModelDetails = createAsyncThunk(
 
 export const createSemanticModel = createAsyncThunk(
   'appMetalakes/createSemanticModel',
-  async ({ data, metalake, catalog, schema }, { dispatch }) => {
+  async ({ data, metalake, catalog, schema }, { dispatch, getState }) => {
+    const activeEntity = getState().metalakes.activeCatalogEntity
     await dispatch(setTableLoading(true))
     const [err, res] = await to(createSemanticModelApi({ data, metalake, catalog, schema }))
-    await dispatch(setTableLoading(false))
+    if (getState().metalakes.activeCatalogEntity === activeEntity) await dispatch(setTableLoading(false))
 
     if (err || !res) {
       return { err: true }
@@ -2488,10 +2443,11 @@ export const createSemanticModel = createAsyncThunk(
 
 export const updateSemanticModel = createAsyncThunk(
   'appMetalakes/updateSemanticModel',
-  async ({ metalake, catalog, schema, semanticModel, data }, { dispatch }) => {
+  async ({ metalake, catalog, schema, semanticModel, data }, { dispatch, getState }) => {
+    const activeEntity = getState().metalakes.activeCatalogEntity
     await dispatch(setTableLoading(true))
     const [err, res] = await to(updateSemanticModelApi({ metalake, catalog, schema, semanticModel, data }))
-    await dispatch(setTableLoading(false))
+    if (getState().metalakes.activeCatalogEntity === activeEntity) await dispatch(setTableLoading(false))
 
     if (err || !res?.semanticModel) {
       return { err: true, message: semanticModelErrorMessage(err, 'Failed to update the Semantic Model.') }
@@ -2505,10 +2461,11 @@ export const updateSemanticModel = createAsyncThunk(
 
 export const deleteSemanticModel = createAsyncThunk(
   'appMetalakes/deleteSemanticModel',
-  async ({ metalake, catalog, schema, semanticModel }, { dispatch }) => {
+  async ({ metalake, catalog, schema, semanticModel }, { dispatch, getState }) => {
+    const activeEntity = getState().metalakes.activeCatalogEntity
     await dispatch(setTableLoading(true))
     const [err, res] = await to(deleteSemanticModelApi({ metalake, catalog, schema, semanticModel }))
-    await dispatch(setTableLoading(false))
+    if (getState().metalakes.activeCatalogEntity === activeEntity) await dispatch(setTableLoading(false))
 
     if (err) {
       throw err instanceof Error ? err : new Error(err?.message ?? String(err))
@@ -2523,6 +2480,20 @@ export const deleteSemanticModel = createAsyncThunk(
     return res
   }
 )
+
+// Keep the latest list generation only until all overlapping list/tree loads have settled.
+const trackSemanticModelRequest = (state, key, requestId, list = false) => {
+  const request = (state.semanticModelRequests[key] ??= { inFlight: [] })
+  request.inFlight.push(requestId)
+  if (list) request.requestId = requestId
+}
+
+const finishSemanticModelRequest = (state, key, requestId) => {
+  const request = state.semanticModelRequests[key]
+  if (!request) return
+  request.inFlight = request.inFlight.filter(id => id !== requestId)
+  if (!request.inFlight.length) delete state.semanticModelRequests[key]
+}
 
 export const appMetalakesSlice = createSlice({
   name: 'appMetalakes',
@@ -2540,8 +2511,12 @@ export const appMetalakesSlice = createSlice({
     semanticModels: [],
     semanticModelRequests: {},
     semanticModelListRequestId: null,
-    semanticModelDetailRequestId: null,
+    entityDetailRequestId: null,
     entityTagsRequestId: null,
+    entityPoliciesRequestId: null,
+    activeCatalogEntity: null,
+    activeSemanticModelSchema: null,
+    activatedDetailsKey: null,
     columns: [],
     filesets: [],
     topics: [],
@@ -2560,6 +2535,25 @@ export const appMetalakesSlice = createSlice({
     currentEntityPolicies: []
   },
   reducers: {
+    setActiveCatalogEntity(state, action) {
+      const key = catalogEntityKey(action.payload)
+      const schemaKey = action.payload.schema ? semanticModelSchemaKey(action.payload) : null
+      if (state.activeSemanticModelSchema !== schemaKey) state.semanticModels = []
+      state.activeSemanticModelSchema = schemaKey
+      if (state.activeCatalogEntity === key) return
+      state.activeCatalogEntity = key
+      state.activatedDetails = null
+      state.activatedDetailsKey = null
+      state.entityDetailRequestId = null
+      state.entityTagsRequestId = null
+      state.entityPoliciesRequestId = null
+      state.currentEntityTags = []
+      state.currentEntityPolicies = []
+      state.activatedDetailsLoading = false
+      state.tableLoading = false
+      state.tableData = []
+      state.tableProps = []
+    },
     setFilteredMetalakes(state, action) {
       state.filteredMetalakes = action.payload
     },
@@ -2574,8 +2568,10 @@ export const appMetalakesSlice = createSlice({
     },
     setSelectedNodes(state, action) {
       if (state.selectedNodes.join() !== action.payload.join()) {
-        state.semanticModelDetailRequestId = null
+        state.entityDetailRequestId = null
         state.entityTagsRequestId = null
+        state.entityPoliciesRequestId = null
+        state.currentEntityPolicies = []
         state.currentEntityTags = []
       }
       state.selectedNodes = action.payload
@@ -2614,9 +2610,11 @@ export const appMetalakesSlice = createSlice({
       state.functions = []
       state.views = []
       state.semanticModels = []
+      state.activatedDetailsKey = null
+      state.entityPoliciesRequestId = null
       state.semanticModelRequests = {}
       state.semanticModelListRequestId = null
-      state.semanticModelDetailRequestId = null
+      state.entityDetailRequestId = null
       state.entityTagsRequestId = null
       state.columns = []
       state.filesets = []
@@ -2635,7 +2633,8 @@ export const appMetalakesSlice = createSlice({
     },
     resetActivatedDetails(state, action) {
       state.activatedDetails = null
-      state.semanticModelDetailRequestId = null
+      state.entityDetailRequestId = null
+      state.activatedDetailsKey = null
 
       // Also clear table-related data to avoid stale content when switching details
       state.tableData = []
@@ -2906,9 +2905,13 @@ export const appMetalakesSlice = createSlice({
       state.tables = []
       state.views = []
       state.semanticModels = []
+      state.activeCatalogEntity = null
+      state.activeSemanticModelSchema = null
+      state.activatedDetailsKey = null
+      state.entityPoliciesRequestId = null
       state.semanticModelRequests = {}
       state.semanticModelListRequestId = null
-      state.semanticModelDetailRequestId = null
+      state.entityDetailRequestId = null
       state.entityTagsRequestId = null
       state.columns = []
       state.filesets = []
@@ -2929,13 +2932,78 @@ export const appMetalakesSlice = createSlice({
     }
   },
   extraReducers: builder => {
+    const detailThunks = [
+      [getMetalakeDetails, 'metalake'],
+      [getCatalogDetails, 'catalog'],
+      [getSchemaDetails, 'schema'],
+      [getTableDetails, 'table'],
+      [getFilesetDetails, 'fileset'],
+      [getTopicDetails, 'topic'],
+      [getModelDetails, 'model'],
+      [getFunctionDetails, 'function'],
+      [getViewDetails, 'view'],
+      [getSemanticModelDetails, 'semanticModel']
+    ]
+    for (const [thunk, kind] of detailThunks) {
+      const keyFor = arg => catalogEntityKey({ ...arg, function: arg.functionName || arg.function })
+
+      const isVisible = (state, action) =>
+        (kind === 'metalake' || action.meta.arg?.init) &&
+        (!state.activeCatalogEntity || state.activeCatalogEntity === keyFor(action.meta.arg))
+      builder.addCase(thunk.pending, (state, action) => {
+        if (!isVisible(state, action)) return
+        state.entityDetailRequestId = action.meta.requestId
+        state.activatedDetails = null
+        state.activatedDetailsKey = null
+        if (['table', 'fileset', 'topic'].includes(kind)) {
+          state.tableLoading = true
+          state.tableData = []
+          state.tableProps = []
+        }
+      })
+      builder.addCase(thunk.fulfilled, (state, action) => {
+        if (!isVisible(state, action) || state.entityDetailRequestId !== action.meta.requestId) return
+        state.activatedDetails = kind === 'metalake' ? action.payload : action.payload[kind]
+        state.activatedDetailsKey = keyFor(action.meta.arg)
+        if (['table', 'fileset', 'topic'].includes(kind)) {
+          state.tableLoading = false
+          const { metalake, catalog, schema } = action.meta.arg
+          const type = { table: 'relational', fileset: 'fileset', topic: 'messaging' }[kind]
+          state.expandedNodes = [
+            ...new Set([
+              ...state.expandedNodes,
+              `{{${metalake}}}`,
+              `{{${metalake}}}{{${catalog}}}{{${type}}}`,
+              `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}`
+            ])
+          ]
+        }
+        if (kind === 'table') {
+          state.tableData = action.payload.table.columns || []
+          state.tableProps = action.payload.tableProps
+        }
+      })
+      builder.addCase(thunk.rejected, (state, action) => {
+        if (action.meta.aborted) return
+        if (action.meta.arg.init || kind === 'metalake') {
+          if (!isVisible(state, action) || state.entityDetailRequestId !== action.meta.requestId) return
+          state.tableLoading = false
+        }
+        if (action.error.name !== 'CanceledError' && !action.error.message.includes('CanceledError'))
+          toast.error(action.error.message)
+      })
+    }
     builder.addCase(fetchMetalakes.fulfilled, (state, action) => {
       state.metalakes = action.payload.metalakes
     })
     builder.addCase(fetchMetalakes.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
+    })
+    builder.addCase(setIntoTreeNodeWithFetch.pending, (state, action) => {
+      if (extractPlaceholder(action.meta.arg.key).length === 4)
+        trackSemanticModelRequest(state, action.meta.arg.key, action.meta.requestId)
     })
     builder.addCase(setIntoTreeNodeWithFetch.fulfilled, (state, action) => {
       const { key, data, entities, semanticModelRequestId } = action.payload
@@ -2943,9 +3011,7 @@ export const appMetalakesSlice = createSlice({
 
       // A pre-refresh tree load must not restore an older Semantic Model list either.
       const currentModels =
-        latest?.semanticModels ??
-        findInTree(state.metalakeTree, 'key', key)?.children?.filter(node => node.node === 'semanticModel') ??
-        []
+        findInTree(state.metalakeTree, 'key', key)?.children?.filter(node => node.node === 'semanticModel') ?? []
 
       const children =
         latest && latest.requestId !== semanticModelRequestId
@@ -2953,21 +3019,15 @@ export const appMetalakesSlice = createSlice({
           : data
 
       state.metalakeTree = updateTreeData(state.metalakeTree, key, children)
+      finishSemanticModelRequest(state, key, action.meta.requestId)
 
       if (entities && state.selectedNodes.includes(key)) {
         state.tableData = entities
       }
     })
     builder.addCase(setIntoTreeNodeWithFetch.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getMetalakeDetails.fulfilled, (state, action) => {
-      state.activatedDetails = action.payload
-    })
-    builder.addCase(getMetalakeDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      finishSemanticModelRequest(state, action.meta.arg.key, action.meta.requestId)
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -2977,13 +3037,13 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(getCurrentEntityOwner.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
       state.currentMetalakeOwner = null
     })
     builder.addCase(setEntityOwner.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -2997,42 +3057,46 @@ export const appMetalakesSlice = createSlice({
     })
     builder.addCase(getCurrentEntityTags.rejected, (state, action) => {
       if (action.meta.aborted || (action.meta.arg.init && state.entityTagsRequestId !== action.meta.requestId)) return
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
+    builder.addCase(getCurrentEntityPolicies.pending, (state, action) => {
+      if (action.meta.arg.init) state.entityPoliciesRequestId = action.meta.requestId
+    })
     builder.addCase(getCurrentEntityPolicies.fulfilled, (state, action) => {
-      if (action.payload.init) {
+      if (action.payload.init && state.entityPoliciesRequestId === action.meta.requestId) {
         state.currentEntityPolicies = action.payload.policies
       }
     })
     builder.addCase(getCurrentEntityPolicies.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (action.meta.arg.init && state.entityPoliciesRequestId !== action.meta.requestId) return
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(getMetadataObjectsForTag.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(getMetadataObjectsForPolicy.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(createCatalog.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(testCatalogConnection.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(updateCatalog.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3048,22 +3112,12 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchCatalogs.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getCatalogDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
-        state.activatedDetails = action.payload.catalog
-      }
-    })
-    builder.addCase(getCatalogDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteCatalog.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3078,32 +3132,22 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchSchemas.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getSchemaDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
-        state.activatedDetails = action.payload.schema
-      }
-    })
-    builder.addCase(getSchemaDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(createSchema.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(updateSchema.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteSchema.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3114,33 +3158,22 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchTables.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getTableDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
-        state.activatedDetails = action.payload.table
-        state.tableData = action.payload.columns || []
-      }
-    })
-    builder.addCase(getTableDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(createTable.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(updateTable.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteTable.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3151,34 +3184,22 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchFilesets.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getFilesetDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
-        state.activatedDetails = action.payload.fileset
-      }
-
-      // state.tableData = []
-    })
-    builder.addCase(getFilesetDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(createFileset.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(updateFileset.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteFileset.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3186,7 +3207,7 @@ export const appMetalakesSlice = createSlice({
       state.tableData = action.payload.files
     })
     builder.addCase(getFilesetFiles.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3197,32 +3218,22 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchTopics.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getTopicDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
-        state.activatedDetails = action.payload.topic
-      }
-    })
-    builder.addCase(getTopicDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(createTopic.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(updateTopic.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteTopic.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3233,32 +3244,22 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchModels.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getModelDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
-        state.activatedDetails = action.payload.model
-      }
-    })
-    builder.addCase(getModelDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(registerModel.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(updateModel.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteModel.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3269,25 +3270,15 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchModelVersions.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(fetchFunctions.fulfilled, (state, action) => {
       state.functions = action.payload.functions
     })
-    builder.addCase(getFunctionDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
-        state.activatedDetails = action.payload.function
-      }
-    })
     builder.addCase(fetchFunctions.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getFunctionDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3295,84 +3286,71 @@ export const appMetalakesSlice = createSlice({
       state.views = action.payload.views
     })
     builder.addCase(fetchViews.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getViewDetails.fulfilled, (state, action) => {
-      if (action.payload.init) {
-        state.activatedDetails = action.payload.view
-      }
-    })
-    builder.addCase(getViewDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteView.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(fetchSemanticModels.pending, (state, action) => {
       const key = semanticModelSchemaKey(action.meta.arg)
-      state.semanticModelRequests[key] = { requestId: action.meta.requestId }
-      state.semanticModelListRequestId = action.meta.requestId
+      trackSemanticModelRequest(state, key, action.meta.requestId, true)
+      if (!state.activeCatalogEntity || state.activeSemanticModelSchema === key)
+        state.semanticModelListRequestId = action.meta.requestId
     })
     builder.addCase(fetchSemanticModels.fulfilled, (state, action) => {
-      if (action.payload.stale) return
-      const request = state.semanticModelRequests[action.payload.schemaKey]
-      if (request && request.requestId !== action.meta.requestId) return
-      if (request) request.semanticModels = action.payload.semanticModels
-      if (!state.semanticModelListRequestId || state.semanticModelListRequestId === action.meta.requestId) {
-        state.semanticModels = action.payload.semanticModels
+      const key = semanticModelSchemaKey(action.meta.arg)
+      const request = state.semanticModelRequests[key]
+      if (!action.payload.stale && request?.requestId === action.meta.requestId) {
+        const data = mergeWithSemanticModelNodes({
+          tree: state.metalakeTree,
+          key,
+          entities: action.payload.semanticModels
+        })
+        state.metalakeTree = updateTreeData(state.metalakeTree, key, data)
+        if (
+          (!state.activeCatalogEntity || state.activeSemanticModelSchema === key) &&
+          state.semanticModelListRequestId === action.meta.requestId
+        )
+          state.semanticModels = action.payload.semanticModels
       }
+      finishSemanticModelRequest(state, key, action.meta.requestId)
     })
     builder.addCase(fetchSemanticModels.rejected, (state, action) => {
-      if (action.error.name !== 'CanceledError' && !action.error.message.includes('CanceledError')) {
-        toast.error(action.error.message)
-      }
-    })
-    builder.addCase(getSemanticModelDetails.pending, (state, action) => {
-      if (action.meta.arg.init) {
-        state.semanticModelDetailRequestId = action.meta.requestId
-        state.activatedDetails = null
-      }
-    })
-    builder.addCase(getSemanticModelDetails.fulfilled, (state, action) => {
-      if (action.payload.init && state.semanticModelDetailRequestId === action.meta.requestId) {
-        state.activatedDetails = action.payload.semanticModel
-      }
-    })
-    builder.addCase(getSemanticModelDetails.rejected, (state, action) => {
-      if (action.meta.aborted || (action.meta.arg.init && state.semanticModelDetailRequestId !== action.meta.requestId))
-        return
-      if (action.error.name !== 'CanceledError' && !action.error.message.includes('CanceledError')) {
+      finishSemanticModelRequest(state, semanticModelSchemaKey(action.meta.arg), action.meta.requestId)
+      if (
+        !action.meta.aborted &&
+        action.error.name !== 'CanceledError' &&
+        !action.error.message.includes('CanceledError')
+      ) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteSemanticModel.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(getVersionDetails.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(linkVersion.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(updateVersion.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
     builder.addCase(deleteVersion.rejected, (state, action) => {
-      if (!action.error.message.includes('CanceledError')) {
+      if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
     })
@@ -3383,6 +3361,7 @@ export const {
   setFilteredMetalakes,
   setMetalakeTree,
   setSelectedNodes,
+  setActiveCatalogEntity,
   removeExpandedNode,
   resetMetalakeStore,
   resetExpandNode,

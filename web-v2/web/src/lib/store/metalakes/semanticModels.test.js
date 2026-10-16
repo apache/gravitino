@@ -77,7 +77,8 @@ describe('semantic model tree identity', () => {
 
 describe('semantic model load errors', () => {
   it.each([true, false])('rejects list failures and retains previous data when init=%s', async init => {
-    store.dispatch(fetchSemanticModels.fulfilled({ semanticModels: [{ name: 'existing' }] }, 'old'))
+    store.dispatch(fetchSemanticModels.pending('old', namespace))
+    store.dispatch(fetchSemanticModels.fulfilled({ semanticModels: [{ name: 'existing' }] }, 'old', namespace))
     defHttp.get.mockRejectedValue({ message: 'Server unavailable', response: { status: 500 } })
     const result = await store.dispatch(fetchSemanticModels({ ...namespace, init }))
     expect(result.meta.requestStatus).toBe('rejected')
