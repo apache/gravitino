@@ -47,7 +47,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 import org.opentest4j.AssertionFailedError;
 
-@DatabaseFixture(DatabaseIsolation.FRESH_NAMESPACE)
+@DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
 public class TestSQLScripts extends TestJDBCBackend {
 
   @TestTemplate

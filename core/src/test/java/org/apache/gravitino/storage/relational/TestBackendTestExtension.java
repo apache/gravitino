@@ -200,7 +200,7 @@ class TestBackendTestExtension {
     void second() {}
   }
 
-  @DatabaseFixture(DatabaseIsolation.FRESH_NAMESPACE)
+  @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
   private static class FreshIsolationTests {
     void first() {}
 
@@ -210,7 +210,7 @@ class TestBackendTestExtension {
   private static class MixedIsolationTests {
     void resettable() {}
 
-    @DatabaseFixture(DatabaseIsolation.FRESH_NAMESPACE)
+    @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
     void fresh() {}
   }
 }

@@ -68,7 +68,7 @@ import org.junit.jupiter.api.TestTemplate;
  * JobManager} and {@link LocalJobExecutor}, share the same relational metadata store. The status
  * pull and the cleanup are triggered manually, so that the test controls which node runs them when.
  */
-@DatabaseFixture(DatabaseIsolation.FRESH_NAMESPACE)
+@DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
 public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private static final String METALAKE = "metalake_job_multi_node";

@@ -269,7 +269,7 @@ public class BackendTestExtension
     @Override
     public void beforeEach(ExtensionContext context) throws Exception {
       BackendResource resource;
-      if (reuseBackend && isolation(context) == DatabaseIsolation.RESETTABLE_NAMESPACE) {
+      if (reuseBackend && isolation(context) == DatabaseIsolation.RESET_TABLES) {
         resource = getOrCreateClassBackend(context);
       } else {
         if (reuseBackend) {
@@ -341,11 +341,11 @@ public class BackendTestExtension
       DatabaseFixture methodFixture =
           context.getRequiredTestMethod().getAnnotation(DatabaseFixture.class);
       if (methodFixture != null) {
-        return methodFixture.value();
+        return methodFixture.isolation();
       }
       DatabaseFixture classFixture =
           context.getRequiredTestClass().getAnnotation(DatabaseFixture.class);
-      return classFixture == null ? DatabaseIsolation.RESETTABLE_NAMESPACE : classFixture.value();
+      return classFixture == null ? DatabaseIsolation.RESET_TABLES : classFixture.isolation();
     }
   }
 

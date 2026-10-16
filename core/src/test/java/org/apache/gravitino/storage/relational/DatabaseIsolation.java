@@ -19,11 +19,17 @@
 
 package org.apache.gravitino.storage.relational;
 
-/** Isolation policies for database-backed tests. */
+/** What each database-backed test gets fresh, from the cheapest level to the most isolated. */
 public enum DatabaseIsolation {
-  /** Reuse a class-scoped fixture and reset its tables before each test. */
-  RESETTABLE_NAMESPACE,
+  /**
+   * One backend and database per test class and backend type; {@link TestJDBCBackend} truncates
+   * every table before each test.
+   */
+  RESET_TABLES,
 
-  /** Create and close a fresh database backend for each test. */
-  FRESH_NAMESPACE
+  /**
+   * A new database and backend for each test, closed afterwards. Use it when a test changes the
+   * schema, closes the backend itself, or leaves writers running after it ends.
+   */
+  FRESH_DATABASE
 }

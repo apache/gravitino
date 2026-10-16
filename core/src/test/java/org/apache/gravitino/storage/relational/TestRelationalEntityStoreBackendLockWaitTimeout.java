@@ -50,7 +50,7 @@ import org.mockito.Mockito;
  * Verifies real backend lock timeouts, transaction cleanup, and retries through the entity store.
  */
 @Tag("gravitino-docker-test")
-@DatabaseFixture(DatabaseIsolation.FRESH_NAMESPACE)
+@DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
 public class TestRelationalEntityStoreBackendLockWaitTimeout extends TestJDBCBackend {
 
   @AfterEach
