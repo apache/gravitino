@@ -63,6 +63,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveSchema;
@@ -1322,6 +1323,89 @@ class TestHiveCatalogOperations {
             null));
 
     Assertions.assertEquals("bob", hiveTableCaptor.getValue().auditInfo().creator());
+  }
+
+  @Test
+  void testAlterViewReplacePreservesEffectiveOwnerWhenPayloadOwnerIsStale() throws Exception {
+    // The caller (e.g. CatalogConnectorMetadata.createView()) observes the current owner through
+    // loadView(), which already prefers the live HMS owner (bob) over the stale payload owner
+    // (alice). Replacing the view as bob therefore emits no owner SetProperty, since the caller
+    // sees no change. alterView() must seed its own notion of "current owner" from that same
+    // effective HMS owner, not the stale payload owner, or it silently overwrites HMS back to
+    // alice.
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        buildNativeTrinoViewTable(/* payloadOwner= */ "alice", /* hmsOwner= */ "bob", Map.of());
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    op.alterView(
+        NameIdentifier.of("db", "v_trino"),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    Assertions.assertEquals("bob", hiveTableCaptor.getValue().auditInfo().creator());
+    TrinoNativeViewCodec.ViewDefinition decoded =
+        TrinoNativeViewCodec.decode(hiveTableCaptor.getValue().viewOriginalText());
+    Assertions.assertEquals("bob", decoded.owner);
+  }
+
+  @Test
+  void testAlterViewRenamePreservesEffectiveOwnerWhenPayloadOwnerIsStale() throws Exception {
+    // A rename doesn't touch the owner at all, so it must not revert HMS ownership back to the
+    // stale payload owner either.
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        buildNativeTrinoViewTable(/* payloadOwner= */ "alice", /* hmsOwner= */ "bob", Map.of());
+    when(hiveClient.getTable(anyString(), anyString(), eq("v_trino"))).thenReturn(currentTable);
+    when(hiveClient.getTable(anyString(), anyString(), eq("v_trino2")))
+        .thenThrow(new NoSuchTableException("v_trino2 does not exist"));
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    op.alterView(NameIdentifier.of("db", "v_trino"), ViewChange.rename("v_trino2"));
+
+    Assertions.assertEquals("bob", hiveTableCaptor.getValue().auditInfo().creator());
+  }
+
+  @Test
+  void testAlterViewRenameDoesNotReassignOwnerForInvokerView() throws Exception {
+    // A SECURITY INVOKER native view has no owner in its payload at all, so currentOwner stays
+    // null and TRINO_VIEW_OWNER_PROPERTY is never seeded into updatedProperties. The owner-sync
+    // block must not run in that case: resolveHmsOwner() falls back to the current principal when
+    // the property is absent, which would otherwise reassign real HMS ownership (here, alice) to
+    // whoever happens to run an unrelated change like this rename.
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        buildNativeTrinoViewTable(/* payloadOwner= */ null, /* hmsOwner= */ "alice", Map.of());
+    when(hiveClient.getTable(anyString(), anyString(), eq("v_trino"))).thenReturn(currentTable);
+    when(hiveClient.getTable(anyString(), anyString(), eq("v_trino2")))
+        .thenThrow(new NoSuchTableException("v_trino2 does not exist"));
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    op.alterView(NameIdentifier.of("db", "v_trino"), ViewChange.rename("v_trino2"));
+
+    Assertions.assertEquals("alice", hiveTableCaptor.getValue().auditInfo().creator());
   }
 
   @Test

@@ -245,7 +245,11 @@ class HiveViewCatalogOperations implements ViewCatalog {
                   + " is a native Trino view with a non-empty SQL path; Gravitino cannot "
                   + "represent this field, so altering it would silently discard it");
         }
-        currentOwner = currentDefinition.owner;
+        if (currentDefinition.owner != null) {
+          String hmsOwner =
+              currentHiveTable.auditInfo() == null ? null : currentHiveTable.auditInfo().creator();
+          currentOwner = preferNonEmpty(hmsOwner, currentDefinition.owner);
+        }
       }
 
       String newViewName = currentHiveTable.name();
@@ -341,7 +345,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
       // in the view payload, so a Gravitino-managed replace/property change must keep the HMS
       // owner in sync with TRINO_VIEW_OWNER_PROPERTY or the two would immediately diverge again.
       AuditInfo updatedAuditInfo = currentHiveTable.auditInfo();
-      if (isTrinoView) {
+      if (isTrinoView && updatedProperties.containsKey(TRINO_VIEW_OWNER_PROPERTY)) {
         String targetOwner = resolveHmsOwner(Dialects.TRINO, updatedProperties);
         String currentCreator = updatedAuditInfo == null ? null : updatedAuditInfo.creator();
         if (!targetOwner.equals(currentCreator)) {
