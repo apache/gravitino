@@ -439,6 +439,35 @@ public class TestEntityChangeLogPoller {
   }
 
   @Test
+  void testFailedReplayPageResumesFromSavedPageCursor() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(5, 5));
+    when(mapper.selectRecentEntityChanges(-1, 0, 5, 60000, 2)).thenReturn(changes(1, 2));
+    when(mapper.selectRecentEntityChanges(0, 2, 5, 60000, 2))
+        .thenThrow(new IllegalStateException("replay database unavailable"))
+        .thenReturn(changes(3, 3));
+    AtomicLong clock = new AtomicLong();
+    List<EntityChangeRecord> received = new ArrayList<>();
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessions, mapper);
+      EntityChangeLogPoller poller =
+          spy(new EntityChangeLogPoller(1, 2, new EntityChangeLogMetricsSource()));
+      doAnswer(ignored -> clock.get()).when(poller).nanoTime();
+      poller.registerListener(replayListener(received));
+      // A full first page saves the (created_at, id) page cursor.
+      Assertions.assertTrue(poller.pollChanges());
+      // The second page fails; the saved cursor and sweep ceiling are kept.
+      Assertions.assertFalse(poller.pollChanges());
+      clock.addAndGet(TimeUnit.SECONDS.toNanos(1));
+      // After the poll interval the same page is retried instead of restarting the sweep.
+      Assertions.assertFalse(poller.pollChanges());
+      verify(mapper, times(1)).selectRecentEntityChanges(-1, 0, 5, 60000, 2);
+      verify(mapper, times(2)).selectRecentEntityChanges(0, 2, 5, 60000, 2);
+      Assertions.assertEquals(List.of(5L, 1L, 2L, 3L), ids(received));
+    }
+  }
+
+  @Test
   void testUnseenRowAfterFirstSweepLogsLateCommitWarning() {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     when(mapper.selectEntityChanges(0, 2)).thenReturn(changes(2, 2));
