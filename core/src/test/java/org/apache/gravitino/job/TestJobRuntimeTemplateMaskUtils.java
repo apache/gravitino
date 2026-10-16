@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.job.JobTemplate.JobType;
@@ -153,6 +154,76 @@ public class TestJobRuntimeTemplateMaskUtils {
   @Test
   void testMaskSensitiveFieldsNull() {
     Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveFields(null));
+  }
+
+  @Test
+  void testMaskSensitiveFieldsCarriesAllSparkDtoFields() {
+    AuditDTO audit = AuditDTO.builder().withCreator("alice").build();
+    SparkJobTemplateDTO input =
+        SparkJobTemplateDTO.builder()
+            .withName("spark_job")
+            .withComment("keep-comment")
+            .withJobType(JobType.SPARK)
+            .withExecutable("local:///app.jar")
+            .withArguments(
+                ImmutableList.of("--updater-options", "{\"password\":\"pw\"}", "--table", "db.t"))
+            .withEnvironments(ImmutableMap.of("K", "v"))
+            .withCustomFields(ImmutableMap.of("cf", "1"))
+            .withClassName("org.example.App")
+            .withJars(ImmutableList.of("a.jar"))
+            .withFiles(ImmutableList.of("f.txt"))
+            .withArchives(ImmutableList.of("a.zip"))
+            .withConfigs(ImmutableMap.of("spark.executor.memory", "1g"))
+            .withAudit(audit)
+            .build();
+
+    SparkJobTemplateDTO spark =
+        (SparkJobTemplateDTO) JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+
+    Assertions.assertEquals(input.name(), spark.name());
+    Assertions.assertEquals(input.comment(), spark.comment());
+    Assertions.assertEquals(input.jobType(), spark.jobType());
+    Assertions.assertEquals(input.executable(), spark.executable());
+    Assertions.assertEquals(input.environments(), spark.environments());
+    Assertions.assertEquals(input.customFields(), spark.customFields());
+    Assertions.assertEquals(input.className(), spark.className());
+    Assertions.assertEquals(input.jars(), spark.jars());
+    Assertions.assertEquals(input.files(), spark.files());
+    Assertions.assertEquals(input.archives(), spark.archives());
+    Assertions.assertEquals(input.configs(), spark.configs());
+    Assertions.assertEquals(input.audit(), spark.audit());
+    Assertions.assertNotEquals(input.arguments(), spark.arguments());
+    Assertions.assertFalse(spark.arguments().get(1).contains("pw"));
+  }
+
+  @Test
+  void testMaskSensitiveFieldsCarriesAllShellDtoFields() {
+    AuditDTO audit = AuditDTO.builder().withCreator("bob").build();
+    ShellJobTemplateDTO input =
+        ShellJobTemplateDTO.builder()
+            .withName("shell_job")
+            .withComment("shell-comment")
+            .withJobType(JobType.SHELL)
+            .withExecutable("/bin/sh")
+            .withArguments(ImmutableList.of("-c", "echo ok"))
+            .withEnvironments(ImmutableMap.of("HOME", "/tmp"))
+            .withCustomFields(ImmutableMap.of("owner", "tms"))
+            .withScripts(ImmutableList.of("a.sh"))
+            .withAudit(audit)
+            .build();
+
+    ShellJobTemplateDTO shell =
+        (ShellJobTemplateDTO) JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
+
+    Assertions.assertEquals(input.name(), shell.name());
+    Assertions.assertEquals(input.comment(), shell.comment());
+    Assertions.assertEquals(input.jobType(), shell.jobType());
+    Assertions.assertEquals(input.executable(), shell.executable());
+    Assertions.assertEquals(input.arguments(), shell.arguments());
+    Assertions.assertEquals(input.environments(), shell.environments());
+    Assertions.assertEquals(input.customFields(), shell.customFields());
+    Assertions.assertEquals(input.scripts(), shell.scripts());
+    Assertions.assertEquals(input.audit(), shell.audit());
   }
 
   @Test

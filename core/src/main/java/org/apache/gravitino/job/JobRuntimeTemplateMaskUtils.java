@@ -108,6 +108,10 @@ public final class JobRuntimeTemplateMaskUtils {
    * the same argument walk so a hand-written template that uses these flags does not leak; built-in
    * credential JSON lives on the Spark template.
    *
+   * <p>The DTO is rebuilt field by field (there is no DTO copy helper). When adding a field to
+   * {@link SparkJobTemplateDTO} or {@link ShellJobTemplateDTO}, update this method and the
+   * field-carry-over tests in {@code TestJobRuntimeTemplateMaskUtils}.
+   *
    * @param jobTemplateDTO the resolved runtime job template DTO
    * @return a masked copy, or null
    */

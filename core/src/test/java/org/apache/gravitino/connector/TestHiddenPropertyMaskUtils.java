@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.connector;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -211,6 +214,19 @@ public class TestHiddenPropertyMaskUtils {
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         HiddenPropertyMaskUtils.maskSensitiveJsonValue("{not-json,\"password\":\"x\"}"));
+  }
+
+  @Test
+  void testMaskSensitiveJsonValuePreservesNumericLiteralWhenMaskingSibling() throws Exception {
+    String masked =
+        HiddenPropertyMaskUtils.maskSensitiveJsonValue(
+            "{\"count\":1e2,\"password\":\"pw\",\"flag\":true}");
+    Assertions.assertFalse(masked.contains("\"pw\""));
+    Assertions.assertTrue(masked.contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertTrue(masked.contains("true"));
+    // JsonNode + USE_BIG_DECIMAL_FOR_FLOATS preserves the numeric value (not a leaked secret).
+    JsonNode root = JsonUtils.anyFieldMapper().readTree(masked);
+    Assertions.assertEquals(0, root.get("count").decimalValue().compareTo(new BigDecimal("100")));
   }
 
   @Test
