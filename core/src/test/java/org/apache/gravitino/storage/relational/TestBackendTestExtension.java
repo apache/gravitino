@@ -116,6 +116,43 @@ class TestBackendTestExtension {
   }
 
   @Test
+  void testResetTablesMethodSharesInsideFreshClass() throws Exception {
+    CountingBackendFactory factory = new CountingBackendFactory();
+    BackendTestExtension extension = new BackendTestExtension(factory);
+    TestContexts contexts = new TestContexts(FreshClassWithSharedMethodTests.class);
+    extension.beforeAll(contexts.classContext);
+
+    runInvocation(extension, true, contexts.methodContext("shared"));
+    runInvocation(extension, true, contexts.methodContext("shared"));
+    assertEquals(1, factory.backends.size());
+    verify(factory.backends.get(0), never()).close();
+
+    runInvocation(extension, true, contexts.methodContext("fresh"));
+    assertEquals(2, factory.backends.size());
+    verify(factory.backends.get(0), times(1)).close();
+    verify(factory.backends.get(1), times(1)).close();
+
+    extension.afterAll(contexts.classContext);
+  }
+
+  @Test
+  void testSubclassInheritsFreshDatabase() throws Exception {
+    CountingBackendFactory factory = new CountingBackendFactory();
+    BackendTestExtension extension = new BackendTestExtension(factory);
+    TestContexts contexts = new TestContexts(InheritedFreshTests.class);
+    extension.beforeAll(contexts.classContext);
+
+    runInvocation(extension, true, contexts.methodContext("third"));
+    runInvocation(extension, true, contexts.methodContext("fourth"));
+
+    assertEquals(2, factory.backends.size());
+    verify(factory.backends.get(0), times(1)).close();
+    verify(factory.backends.get(1), times(1)).close();
+
+    extension.afterAll(contexts.classContext);
+  }
+
+  @Test
   void testDisplayNamePreservesMethodAndBackend() {
     BackendTestExtension extension =
         new BackendTestExtension(
@@ -211,6 +248,20 @@ class TestBackendTestExtension {
     void resettable() {}
 
     @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+    void fresh() {}
+  }
+
+  private static class InheritedFreshTests extends FreshIsolationTests {
+    void third() {}
+
+    void fourth() {}
+  }
+
+  @DatabaseFixture(isolation = DatabaseIsolation.FRESH_DATABASE)
+  private static class FreshClassWithSharedMethodTests {
+    @DatabaseFixture(isolation = DatabaseIsolation.RESET_TABLES)
+    void shared() {}
+
     void fresh() {}
   }
 }
