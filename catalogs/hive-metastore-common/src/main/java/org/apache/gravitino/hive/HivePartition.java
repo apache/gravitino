@@ -26,12 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
+import org.apache.hadoop.hive.common.FileUtils;
 
 /** Represents a Hive identity partition with helpers to build and parse partition specs. */
 public final class HivePartition implements IdentityPartition {
@@ -110,9 +110,14 @@ public final class HivePartition implements IdentityPartition {
   }
 
   private String buildPartitionName() {
-    return IntStream.range(0, fieldNames.length)
-        .mapToObj(idx -> fieldNames[idx][0] + PARTITION_VALUE_DELIMITER + values[idx].value())
-        .collect(Collectors.joining(PARTITION_NAME_DELIMITER));
+    // HMS escapes special characters in partition names (%, =, /, :, # and more) via URL
+    // encoding - HiveTableConverter's read path already builds names with FileUtils.makePartName,
+    // so the write path must use the same escaping or names containing those characters parse
+    // back to different values and never match on get/drop lookups.
+    List<String> names = Arrays.stream(fieldNames).map(fn -> fn[0]).collect(Collectors.toList());
+    List<String> stringValues =
+        Arrays.stream(values).map(v -> String.valueOf(v.value())).collect(Collectors.toList());
+    return FileUtils.makePartName(names, stringValues);
   }
 
   @Override
@@ -146,7 +151,8 @@ public final class HivePartition implements IdentityPartition {
         .map(
             field -> {
               String[] kv = field.split(PARTITION_VALUE_DELIMITER, 2);
-              return kv.length > 1 ? kv[1] : "";
+              // makePartName URL-encodes special characters; undo it to recover the raw value.
+              return kv.length > 1 ? FileUtils.unescapePathName(kv[1]) : "";
             })
         .collect(Collectors.toList());
   }
@@ -173,7 +179,11 @@ public final class HivePartition implements IdentityPartition {
                   throw new NoSuchPartitionException(
                       "Hive partition %s does not exist in Hive Metastore", partitionSpec);
                 }
-                partSpecMap.put(keyValue[0], keyValue[1]);
+                // Names arriving here are HMS-canonical (escaped); the partial-value filter
+                // downstream compares against HMS's raw stored values, so unescape first.
+                partSpecMap.put(
+                    FileUtils.unescapePathName(keyValue[0]),
+                    FileUtils.unescapePathName(keyValue[1]));
               });
     }
 
@@ -187,7 +197,11 @@ public final class HivePartition implements IdentityPartition {
       return new String[0][0];
     }
     return Arrays.stream(partitionName.split(PARTITION_NAME_DELIMITER))
-        .map(part -> new String[] {part.split(PARTITION_VALUE_DELIMITER, 2)[0]})
+        .map(
+            part ->
+                new String[] {
+                  FileUtils.unescapePathName(part.split(PARTITION_VALUE_DELIMITER, 2)[0])
+                })
         .toArray(String[][]::new);
   }
 }
