@@ -34,9 +34,9 @@ import org.junit.platform.commons.support.HierarchyTraversalMode;
 import org.junit.platform.commons.support.ReflectionSupport;
 
 /**
- * Fails when a core test class runs in no lane: it carries {@code gravitino-docker-test}, which
- * keeps it out of {@code coreUnitTest}, but no {@link CoreBackend} tag, which keeps it out of every
- * database lane. Nothing else notices a class that leaves every lane at once.
+ * Fails when a core test class runs in no task: it carries {@code gravitino-docker-test}, which
+ * keeps it out of {@code test}, but no {@link CoreBackend} tag, which keeps it out of the database
+ * tasks. Nothing else notices a class that leaves every task at once.
  */
 class TestCoreLaneMembership {
 

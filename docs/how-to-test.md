@@ -35,31 +35,32 @@ To run the unit tests, run the following command:
 
 This command runs all the unit tests and skips the integration tests.
 
-### Core test lanes
+### Core tests
 
-`core` tests run in four lanes, one CI job each. Each database lane selects its database through the `gravitino.core.test.backend` system property:
+`core` tests run in three tasks, one CI job each. Each task selects one database through the `gravitino.core.test.backend` system property:
 
-| Lane | Runs | Database | Needs Docker |
+| Task | Runs | Database | Needs Docker |
 | --- | --- | --- | --- |
-| `./gradlew :core:coreUnitTest` | tests with no database backend | none | no |
-| `./gradlew :core:coreH2Test` | classes tagged for H2 | H2 | no |
+| `./gradlew :core:test` | unit tests, and classes tagged for H2 | H2 | no |
 | `./gradlew :core:coreMySQLTest -PskipDockerTests=false` | classes tagged for MySQL | MySQL | yes |
 | `./gradlew :core:corePostgreSQLTest -PskipDockerTests=false` | classes tagged for PostgreSQL | PostgreSQL | yes |
 
-A class joins a database lane through `@CoreBackend.H2`, `@CoreBackend.MySQL`, `@CoreBackend.PostgreSQL` or `@CoreBackend.All`. Subclasses of `TestJDBCBackend` and `AbstractEntityStorageTest` inherit `@CoreBackend.All`. A class with none of these runs in `coreUnitTest`. A class tagged `gravitino-docker-test` with none of these runs in no lane, and `TestCoreLaneMembership` fails until you add one.
+`./gradlew build` runs `:core:test`, and also the MySQL and PostgreSQL tasks when you pass `-PskipDockerTests=false`; skip those with `-x :core:coreMySQLTest -x :core:corePostgreSQLTest`.
 
-To run one class or method, add `--tests` to its lane:
+A class joins a database backend through `@CoreBackend.H2`, `@CoreBackend.MySQL`, `@CoreBackend.PostgreSQL` or `@CoreBackend.All`. Subclasses of `TestJDBCBackend` and `AbstractEntityStorageTest` inherit `@CoreBackend.All`. A class with none of these is a unit test and runs in `:core:test`. A class tagged `gravitino-docker-test` with none of these runs nowhere, and `TestCoreLaneMembership` fails until you add one.
+
+To run one class or method, add `--tests` to its task:
 
 ```shell
-./gradlew :core:coreH2Test --tests 'org.apache.gravitino.storage.relational.service.TestYourService'
+./gradlew :core:test --tests 'org.apache.gravitino.storage.relational.service.TestYourService'
 ./gradlew :core:coreMySQLTest -PskipDockerTests=false --tests 'org.apache.gravitino.storage.relational.service.TestYourService.testInsert'
 ```
 
-If the class is not in that lane, Gradle fails with "No tests found for given includes".
+If the class does not run in that task, Gradle fails with "No tests found for given includes".
 
 #### Database reuse and reset
 
-In a database lane, each test class shares one database per backend. `@DatabaseFixture(resetStrategy = ...)` picks how much is rebuilt before each test, from cheapest to most isolated:
+Each database-backed test class shares one database per backend. `@DatabaseFixture(resetStrategy = ...)` picks how much is rebuilt before each test, from cheapest to most isolated:
 
 - `ResetStrategy.DELETE_ROWS` (the default) deletes the rows of every non-empty table; `AUTO_INCREMENT` counters keep counting.
 - `ResetStrategy.TRUNCATE_TABLES` truncates every table, so the counters restart; it is slower, since `TRUNCATE` recreates each table.
@@ -72,11 +73,9 @@ public class TestSQLScripts extends TestJDBCBackend { ... }
 
 A method-level `@DatabaseFixture` replaces the class-level one. A class's backend is closed when the class finishes.
 
-The MySQL and PostgreSQL lanes treat their test data as disposable: they set `-Dgravitino.test.db.disposableData=true`, so the containers keep data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk. Other modules' integration tests, and the deprecated `:core:test`, keep the default container settings.
+The MySQL and PostgreSQL tasks treat their test data as disposable: they set `-Dgravitino.test.db.disposableData=true`, so the containers keep data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk. Other modules' integration tests keep the default container settings.
 
-#### `:core:test`
-
-In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` runs all core tests in one task. It is deprecated, and no CI job uses it. It selects no database: every database test runs against H2, and with `-PskipDockerTests=false` also against MySQL and PostgreSQL, building a new backend at every change of database. Without Docker, it runs the database tests like `coreH2Test`.
+In CI, `build (17)` skips the core tasks; each reports under its own `core-test (17, <backend>)` check.
 
 ## Run the Integration Tests
 
