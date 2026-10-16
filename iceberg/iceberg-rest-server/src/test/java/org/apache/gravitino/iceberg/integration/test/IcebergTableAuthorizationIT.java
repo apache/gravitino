@@ -45,6 +45,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 @Tag("gravitino-docker-test")
 public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
@@ -55,6 +56,15 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
   public void startIntegrationTest() throws Exception {
     super.startIntegrationTest();
     catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
+  }
+
+  /**
+   * Verifies the exception thrown when an authorized user loads a table that does not exist.
+   *
+   * @param executable the table load operation
+   */
+  protected void assertNoSuchTableException(Executable executable) {
+    Assertions.assertThrowsExactly(AnalysisException.class, executable);
   }
 
   @BeforeEach
@@ -272,8 +282,7 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     setSchemaOwner(NORMAL_USER);
     Assertions.assertDoesNotThrow(() -> sql("DESC TABLE %s", tableName));
     // With ownership: non-existent table returns 404 (AnalysisException)
-    Assertions.assertThrowsExactly(
-        AnalysisException.class, () -> sql("DESC TABLE %s_not_exist", tableName));
+    assertNoSuchTableException(() -> sql("DESC TABLE %s_not_exist", tableName));
 
     setSchemaOwner(SUPER_USER);
     Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("DESC TABLE %s", tableName));

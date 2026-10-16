@@ -214,6 +214,12 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
     ownerPollHighWaterUpdatedAtId = maxSeenUpdatedAtId[0];
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public boolean supportsReplay() {
+    return true;
+  }
+
   /**
    * Invalidates the affected {@code metadataIdCache} keys from an entity-change batch.
    *
@@ -229,8 +235,8 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
    * being thrown up. Such a row does not point at any cache key, so skipping it leaves nothing
    * stale behind.
    *
-   * <p><b>Recovering from a failure:</b> the poller hands each batch over only once and never sends
-   * it again, so a failed removal has to be handled here. Otherwise {@code metadataIdCache} would
+   * <p><b>Recovering from a failure:</b> the poller does not guarantee a retry after a failed
+   * callback, so a failed removal has to be handled here. Otherwise {@code metadataIdCache} would
    * keep an out-of-date name&#8594;id entry and hand it to authorization checks until that entry's
    * TTL runs out. So the whole {@code metadataIdCache} is cleared instead. That is safe: everything
    * in it can be looked up again, and clearing it also covers the entry that failed plus the rest
