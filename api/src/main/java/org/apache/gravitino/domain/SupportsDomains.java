@@ -21,17 +21,17 @@ package org.apache.gravitino.domain;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * Interface for listing the domains of a metadata object, such as a catalog, schema or table.
+ * Interface for listing the domains of a leaf metadata object, such as a table, view or fileset.
+ * Catalogs and schemas do not support it, since they are never members of a domain; the domain a
+ * catalog or schema passes down to the objects under it is visible from its tags.
  *
- * <p>A leaf object belongs to a domain when its effective tags include the domain's backing tag.
- * The effective tags are its own tags plus those inherited from its schema and catalog; for the
- * same tag, the assignment nearest to the object wins. Only the domains visible to the caller are
- * listed, and a parent domain is not listed for the members of its sub-domains; its name is
- * available from {@link Domain#parent()} of the listed sub-domain.
- *
- * <p>A catalog or schema is never a member of a domain. For a catalog or schema, the domains whose
- * backing tag its own effective tags include are listed: it carries those domains for the leaf
- * objects under it.
+ * <p>The domains listed are all the domains visible to the caller whose scope contains the object:
+ * the domains whose backing tag the object's effective tags match, and the parents of those that
+ * are sub-domains. The effective tags are the object's own tags plus those inherited from its
+ * schema and catalog; for the same tag, the assignment nearest to the object wins. Each domain
+ * comes with its {@link Domain#relations() relations} to the object; an object tagged only with the
+ * backing tag of sub-domain "Trading" lists Trading as {@link DomainRelation.Type#DIRECT} and its
+ * parent "Finance" as {@link DomainRelation.Type#VIA_SUBDOMAIN} Trading.
  *
  * <p>To add an object to a domain or remove it, associate the domain's backing tag with the object
  * or remove it, through {@link org.apache.gravitino.tag.SupportsTags}.
@@ -40,16 +40,15 @@ import org.apache.gravitino.annotation.Evolving;
 public interface SupportsDomains {
 
   /**
-   * Lists the names of the domains the object belongs to, directly or through inheritance.
+   * Lists the names of the domains whose scope contains the object.
    *
    * @return The names of the domains.
    */
   String[] listDomains();
 
   /**
-   * Lists the domains the object belongs to with details, directly or through inheritance. For an
-   * inherited membership, {@link Domain#inheritedFrom()} returns the catalog or schema it is
-   * inherited from.
+   * Lists the domains whose scope contains the object, with details. {@link Domain#relations()} of
+   * each domain returns how the object relates to it.
    *
    * @return The domains.
    */

@@ -21,21 +21,23 @@ package org.apache.gravitino.domain;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.tag.TagValue;
 
 /**
  * Interface for the domain operations of a metalake. Operations on a single domain, such as
  * publishing it or managing its sub-domains, are on {@link Domain}.
  *
- * <p>A domain in {@link Domain.Status#DRAFT} status is visible only to its owner and the users who
- * can manage it. For other users it is omitted from lists, and getting it throws {@link
- * NoSuchDomainException}.
+ * <p>A domain in {@link Domain.Status#DRAFT} status is returned only to its owner and to the users
+ * who can manage it, its parent or the metalake. For other users it is omitted from lists, and
+ * getting it throws {@link NoSuchDomainException}.
  */
 @Evolving
 public interface DomainOperations {
@@ -67,32 +69,37 @@ public interface DomainOperations {
 
   /**
    * Creates a top-level domain in {@link Domain.Status#DRAFT} status. Use {@link
-   * Domain#createSubdomain(String, String, Map, TagValue)} to create a sub-domain.
+   * Domain#createSubdomain(String, String, Map, TagValue, boolean)} to create a sub-domain.
    *
-   * <p>If no backing tag is given, a tag named after the domain is created and used as the backing
-   * tag. If a tag with that name already exists, it is used only when it backs no other domain and
-   * the caller owns it or the metalake; otherwise the creation fails.
+   * <p>The backing tag is always given explicitly. With {@code createBackingTag} set, a new tag
+   * without values is created with the given name and owned by the caller; otherwise the given
+   * existing tag, with its optional value, is bound. An existing tag is never adopted implicitly.
    *
    * @param name The name of the domain.
    * @param comment The comment of the domain, or null.
    * @param properties The properties of the domain, or null.
-   * @param backingTag The existing tag, with an optional value, that backs the domain, or null to
-   *     create the default backing tag.
+   * @param backingTag The backing tag of the domain: the name of the tag to create, or an existing
+   *     tag with an optional value.
+   * @param createBackingTag Whether to create the backing tag as a new tag.
    * @return The created domain.
    * @throws DomainAlreadyExistsException If a domain with the same name already exists.
-   * @throws NoSuchTagException If the given backing tag does not exist.
-   * @throws ForbiddenException If the caller does not own the given backing tag or the metalake, or
-   *     a tag with the default name exists and the caller does not own it or the metalake.
-   * @throws IllegalArgumentException If a tag with the default name already backs another domain,
-   *     or the value of the given backing tag is not allowed by the tag.
+   * @throws NoSuchTagException If the existing backing tag to bind does not exist.
+   * @throws TagAlreadyExistsException If the backing tag to create already exists.
+   * @throws BackingTagAlreadyBoundException If the binding conflicts with the backing tag of
+   *     another domain.
+   * @throws ForbiddenException If the caller does not own the existing backing tag or the metalake,
+   *     or may not create tags.
+   * @throws IllegalArgumentException If the backing tag is null, a value is given for a tag to
+   *     create, or the value is not allowed by the existing tag.
    */
   Domain createDomain(
       String name,
       @Nullable String comment,
       @Nullable Map<String, String> properties,
-      @Nullable TagValue backingTag)
-      throws DomainAlreadyExistsException, NoSuchTagException, ForbiddenException,
-          IllegalArgumentException;
+      TagValue backingTag,
+      boolean createBackingTag)
+      throws DomainAlreadyExistsException, NoSuchTagException, TagAlreadyExistsException,
+          BackingTagAlreadyBoundException, ForbiddenException, IllegalArgumentException;
 
   /**
    * Alters a domain. Renaming a domain does not rename its backing tag.

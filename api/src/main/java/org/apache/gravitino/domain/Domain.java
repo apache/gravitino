@@ -22,12 +22,13 @@ import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.tag.TagValue;
 
 /**
@@ -38,9 +39,10 @@ import org.apache.gravitino.tag.TagValue;
  * the object wins: a table that carries {@code dept=hr} under a schema that carries {@code
  * dept=finance} is a member of the domain backed by {@code dept=hr} only.
  *
- * <p>A domain is either top-level or a sub-domain of exactly one top-level domain. A new domain is
- * in {@link Status#DRAFT} status and is visible only to its owner and the users who can manage it
- * until it is published.
+ * <p>A domain is either top-level or a sub-domain of exactly one top-level domain. Privileges on a
+ * domain, and its ownership, also apply to its sub-domains. A new domain is in {@link Status#DRAFT}
+ * status and, until it is published, is returned only to its owner and to the users who can manage
+ * it, its parent or the metalake.
  *
  * <p>A {@code Domain} is a snapshot. The operations on it that change the domain itself, such as
  * {@link #publish()} and {@link #attachToParent(String)}, return a new snapshot and leave this one
@@ -52,9 +54,12 @@ public interface Domain extends Auditable {
 
   /** The status of a domain. */
   enum Status {
-    /** The domain is visible only to its owner and the users who can manage it. */
+    /**
+     * The domain is returned only to its owner and to the users who can manage it, its parent or
+     * the metalake.
+     */
     DRAFT,
-    /** The domain is visible to all users who can use it. */
+    /** The domain is returned to all users who can use it. */
     PUBLISHED
   }
 
@@ -102,20 +107,23 @@ public interface Domain extends Auditable {
    * assignment of the tag, with or without values. A backing tag with a value matches the
    * assignments whose values contain it, compared exactly and case-sensitively.
    *
+   * <p>The domain refers to the tag itself, not to its name: a renamed tag keeps backing the
+   * domain, and a new tag with the name of a deleted one does not.
+   *
    * @return The backing tag of the domain, or empty if the backing tag has been removed or deleted
    *     and no new one has been set.
    */
   Optional<TagValue> backingTag();
 
   /**
-   * Returns the metadata object the domain membership is inherited from. It is set only on the
-   * domains returned by {@link SupportsDomains#listDomainsInfo()}, when the object belongs to the
-   * domain through the backing tag of its catalog or schema.
+   * Returns how the metadata object relates to this domain. It is set only on the domains returned
+   * by {@link SupportsDomains#listDomainsInfo()}, and lists every relation that applies, with no
+   * precedence among them.
    *
-   * @return The catalog or schema the membership is inherited from, or empty if the object carries
-   *     the backing tag itself or the domain is not listed for a metadata object.
+   * @return The relations of the metadata object to this domain, or an empty array if the domain is
+   *     not listed for a metadata object.
    */
-  Optional<MetadataObject> inheritedFrom();
+  DomainRelation[] relations();
 
   /**
    * Publishes the domain, making it visible to all users who can use it. A sub-domain can be
@@ -128,9 +136,9 @@ public interface Domain extends Auditable {
   Domain publish() throws NoSuchDomainException, IllegalArgumentException;
 
   /**
-   * Unpublishes the domain, making it visible only to its owner and the users who can manage it. A
-   * domain can be unpublished only when it has no published sub-domains. Unpublishing a draft
-   * domain has no effect.
+   * Unpublishes the domain, making it visible only to its owner and to the users who can manage it,
+   * its parent or the metalake. A domain can be unpublished only when it has no published
+   * sub-domains. Unpublishing a draft domain has no effect.
    *
    * @return The unpublished domain.
    * @throws NoSuchDomainException If the domain does not exist or is not visible to the caller.
@@ -142,6 +150,10 @@ public interface Domain extends Auditable {
    * Attaches this domain as a sub-domain of the given parent. If this domain is a sub-domain of
    * another domain, it is moved under the given parent. Attaching to the current parent has no
    * effect. The backing tag is not renamed.
+   *
+   * <p>Since privileges on a parent apply to its sub-domains, attaching or moving changes who can
+   * see and manage this domain without any grant changing: the users with privileges on the old
+   * parent lose them on this domain, and those with privileges on the new parent gain them.
    *
    * @param parent The name of the parent domain.
    * @return The attached domain.
@@ -158,6 +170,10 @@ public interface Domain extends Auditable {
    * this snapshot shows. Detaching a top-level domain has no effect. The backing tag is not
    * renamed.
    *
+   * <p>Since privileges on a parent apply to its sub-domains, detaching changes who can see and
+   * manage this domain without any grant changing: the users with privileges on the former parent
+   * lose them on this domain.
+   *
    * @return The detached domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    */
@@ -173,43 +189,50 @@ public interface Domain extends Auditable {
    * @return The updated domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    * @throws NoSuchTagException If the tag does not exist.
+   * @throws BackingTagAlreadyBoundException If the binding conflicts with the backing tag of
+   *     another domain.
    * @throws ForbiddenException If the caller does not own the tag or the metalake.
    * @throws IllegalArgumentException If the value is not allowed by the tag.
    */
   Domain updateBackingTag(@Nullable TagValue backingTag)
-      throws NoSuchDomainException, NoSuchTagException, ForbiddenException,
-          IllegalArgumentException;
+      throws NoSuchDomainException, NoSuchTagException, BackingTagAlreadyBoundException,
+          ForbiddenException, IllegalArgumentException;
 
   /**
    * Creates a sub-domain under this domain. The new sub-domain is in {@link Status#DRAFT} status.
    *
-   * <p>If no backing tag is given, a tag named after the domain path, such as "Finance/Trading", is
-   * created and used as the backing tag. If a tag with that name already exists, it is used only
-   * when it backs no other domain and the caller owns it or the metalake; otherwise the creation
-   * fails.
+   * <p>The backing tag is always given explicitly. With {@code createBackingTag} set, a new tag
+   * without values is created with the given name and owned by the caller; otherwise the given
+   * existing tag, with its optional value, is bound. An existing tag is never adopted implicitly.
    *
    * @param name The name of the sub-domain.
    * @param comment The comment of the sub-domain, or null.
    * @param properties The properties of the sub-domain, or null.
-   * @param backingTag The existing tag, with an optional value, that backs the sub-domain, or null
-   *     to create the default backing tag.
+   * @param backingTag The backing tag of the sub-domain: the name of the tag to create, or an
+   *     existing tag with an optional value.
+   * @param createBackingTag Whether to create the backing tag as a new tag.
    * @return The created sub-domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    * @throws DomainAlreadyExistsException If a domain with the same name already exists.
-   * @throws NoSuchTagException If the given backing tag does not exist.
-   * @throws ForbiddenException If the caller does not own the given backing tag or the metalake, or
-   *     a tag with the default name exists and the caller does not own it or the metalake.
-   * @throws IllegalArgumentException If a tag with the default name already backs another domain,
-   *     the value of the given backing tag is not allowed by the tag, this domain is itself a
-   *     sub-domain, or the sub-domain cannot be created under this domain.
+   * @throws NoSuchTagException If the existing backing tag to bind does not exist.
+   * @throws TagAlreadyExistsException If the backing tag to create already exists.
+   * @throws BackingTagAlreadyBoundException If the binding conflicts with the backing tag of
+   *     another domain.
+   * @throws ForbiddenException If the caller does not own the existing backing tag or the metalake,
+   *     or may not create tags.
+   * @throws IllegalArgumentException If the backing tag is null, a value is given for a tag to
+   *     create, the value is not allowed by the existing tag, this domain is itself a sub-domain,
+   *     or the sub-domain cannot be created under this domain.
    */
   Domain createSubdomain(
       String name,
       @Nullable String comment,
       @Nullable Map<String, String> properties,
-      @Nullable TagValue backingTag)
+      TagValue backingTag,
+      boolean createBackingTag)
       throws NoSuchDomainException, DomainAlreadyExistsException, NoSuchTagException,
-          ForbiddenException, IllegalArgumentException;
+          TagAlreadyExistsException, BackingTagAlreadyBoundException, ForbiddenException,
+          IllegalArgumentException;
 
   /**
    * Lists the names of the sub-domains of this domain.
@@ -235,10 +258,10 @@ public interface Domain extends Auditable {
    *
    * <p>A catalog or schema that carries a backing tag is expanded to the leaf objects under it that
    * Gravitino has recorded, and the catalog or schema itself is not listed. Objects of an external
-   * catalog that Gravitino has not recorded yet are not listed. An object is listed once, even if
-   * it is a member of several domains in the scope, see {@link DomainMember#subdomain()}. With the
-   * whole scope selected, the default, the members of this domain itself are the listed members
-   * whose {@link DomainMember#subdomain()} is empty.
+   * catalog that Gravitino has not recorded yet are not listed. An object is listed once, with all
+   * its {@link DomainMember#relations() relations} to this domain. The members of this domain
+   * itself are the listed members whose relations include {@link DomainRelation.Type#DIRECT} or
+   * {@link DomainRelation.Type#INHERITED}.
    *
    * @param filter The filter of the members. {@code DomainMemberFilter.builder().build()} lists the
    *     whole scope of this domain.

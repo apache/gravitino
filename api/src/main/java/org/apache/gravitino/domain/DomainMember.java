@@ -19,7 +19,6 @@
 package org.apache.gravitino.domain;
 
 import com.google.common.collect.Sets;
-import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
@@ -50,16 +49,16 @@ public interface DomainMember {
   MetadataObject object();
 
   /**
-   * Returns the sub-domain the member comes from. Among the domains selected by the {@link
-   * DomainMemberFilter}, an object whose effective tags match the listed domain's backing tag is
-   * reported as a member of the listed domain, even if they also match the backing tag of a
-   * sub-domain; otherwise one of the sub-domains whose backing tag they match is reported. For
-   * example, when schema {@code cat.db} carries the backing tag of "Finance" and table {@code
-   * cat.db.trades} carries that of its sub-domain "Trading", listing Finance reports the table as a
-   * member of Finance itself.
+   * Returns how the member relates to the listed domain, within the domains selected by the {@link
+   * DomainMemberFilter}. Every relation that applies is listed, with no precedence among them: when
+   * schema {@code cat.db} carries the backing tag of "Finance" and table {@code cat.db.trades}
+   * carries that of its sub-domain "Trading", listing Finance reports the table as {@link
+   * DomainRelation.Type#INHERITED} from {@code cat.db} and {@link
+   * DomainRelation.Type#VIA_SUBDOMAIN} Trading. The member belongs to the listed domain itself when
+   * its relations include {@link DomainRelation.Type#DIRECT} or {@link
+   * DomainRelation.Type#INHERITED}.
    *
-   * @return The name of the sub-domain, or empty if the object is a member of the listed domain
-   *     itself.
+   * @return The relations of the member to the listed domain, never empty.
    */
-  Optional<String> subdomain();
+  DomainRelation[] relations();
 }

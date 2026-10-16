@@ -23,7 +23,6 @@ import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.SupportsCredentials;
-import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
@@ -273,16 +272,6 @@ public interface Catalog extends Auditable {
    */
   default SupportsTags supportsTags() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support tag operations");
-  }
-
-  /**
-   * Returns the domain operations for this catalog.
-   *
-   * @return The {@link SupportsDomains} if the catalog supports domain operations.
-   * @throws UnsupportedOperationException If the catalog does not support domain operations.
-   */
-  default SupportsDomains supportsDomains() {
-    throw new UnsupportedOperationException("Catalog does not support domain operations.");
   }
 
   /**
