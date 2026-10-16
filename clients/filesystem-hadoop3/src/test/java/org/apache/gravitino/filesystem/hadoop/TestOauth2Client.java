@@ -65,6 +65,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockserver.matchers.Times;
+import org.mockserver.model.ClearType;
 import org.mockserver.model.Header;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
@@ -402,5 +403,54 @@ public class TestOauth2Client extends TestGvfsBase {
           // Trigger lazy initialization
           fs.exists(managedFilesetPath);
         });
+  }
+
+  @Test
+  public void testFileSystemClientSecretBasicAuthentication() {
+    Map<String, String> configuration = new HashMap<>();
+    configuration.put(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY, serverUri());
+    configuration.put(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, metalakeName);
+    configuration.put(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
+        GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE);
+    configuration.put(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY,
+        Oauth2MockServerBase.serverUri());
+    configuration.put(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_CREDENTIAL_KEY,
+        credential);
+    configuration.put(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY, normal_path);
+    configuration.put(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY, scope);
+    configuration.put(
+        GravitinoVirtualFileSystemConfiguration
+            .FS_GRAVITINO_CLIENT_OAUTH2_AUTHENTICATION_METHOD_KEY,
+        "client_secret_basic");
+
+    HttpRequest tokenRequest = request().withMethod("POST").withPath("/" + normal_path);
+    Oauth2MockServerBase.mockServer().clear(tokenRequest, ClearType.LOG);
+
+    GravitinoVirtualFileSystemUtils.createClient(configuration);
+
+    String expectedAuthorization =
+        "Basic " + Base64.getEncoder().encodeToString(credential.getBytes(StandardCharsets.UTF_8));
+
+    HttpRequest[] recordedRequests =
+        Oauth2MockServerBase.mockServer().retrieveRecordedRequests(tokenRequest);
+
+    boolean basicAuthenticationFound = false;
+    for (HttpRequest recordedRequest : recordedRequests) {
+      if (expectedAuthorization.equals(recordedRequest.getFirstHeader("Authorization"))) {
+        basicAuthenticationFound = true;
+        break;
+      }
+    }
+
+    assertTrue(
+        basicAuthenticationFound,
+        "OAuth2 token request should use HTTP Basic client authentication");
   }
 }

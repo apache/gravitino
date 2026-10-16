@@ -15,16 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import time
 import json
+import time
 from dataclasses import dataclass
 from http import HTTPStatus
 
-from dataclasses_json import dataclass_json
 import jwt
+from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend as crypto_default_backend
+from dataclasses_json import dataclass_json
 
 from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
 from gravitino.exceptions.handlers.oauth_error_handler import (
@@ -166,3 +166,22 @@ def mock_authentication_with_jwt():
             status_code=HTTPStatus.OK.value,
         ),
     ]
+
+
+def mock_authentication_with_basic_jwt():
+    _, new_access_token = mock_old_new_jwt()
+
+    return TestResponse(
+        body=json.dumps(
+            {
+                "code": 0,
+                "access_token": new_access_token,
+                "issued_token_type": "2",
+                "token_type": "bearer",
+                "expires_in": 3600,
+                "scope": "test",
+                "refresh_token": None,
+            }
+        ),
+        status_code=HTTPStatus.OK.value,
+    )
