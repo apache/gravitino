@@ -50,7 +50,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     TableCatalog hiveCatalog = new HiveTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    applyS3Credential(gravitinoCatalogClient, all);
+    applyS3Credential(catalog(), all);
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return hiveCatalog;
   }

@@ -115,7 +115,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     CredentialPropertyUtils.applyIcebergCredentials(
-        CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
+        CredentialPropertyUtils.getCredentials(catalog()), all);
     return all;
   }
 

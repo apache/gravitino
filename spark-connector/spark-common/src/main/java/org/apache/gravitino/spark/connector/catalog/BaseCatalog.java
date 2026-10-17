@@ -169,14 +169,26 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return new SparkTableChangeConverter(sparkTypeConverter);
   }
 
+  /**
+   * Returns the Gravitino catalog instance to use for metadata operations.
+   *
+   * @return the Gravitino catalog
+   */
+  protected Catalog catalog() {
+    if (gravitinoCatalogClient != null) {
+      return gravitinoCatalogClient;
+    }
+    return gravitinoCatalogManager.getGravitinoCatalogInfo(catalogName);
+  }
+
   @Override
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
-    this.gravitinoCatalogClient = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
-    String provider = gravitinoCatalogClient.provider();
+    Catalog gravitinoCatalog = catalog();
+    String provider = gravitinoCatalog.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalogClient);
+    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalog);
     this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
@@ -194,7 +206,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     String gravitinoNamespace = getDatabase(namespace);
     try {
       NameIdentifier[] identifiers =
-          gravitinoCatalogClient.asTableCatalog().listTables(Namespace.of(gravitinoNamespace));
+          catalog().asTableCatalog().listTables(Namespace.of(gravitinoNamespace));
       return Arrays.stream(identifiers)
           .map(
               identifier ->
@@ -256,7 +268,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     org.apache.gravitino.rel.expressions.transforms.Transform[] partitionings =
         sparkTransformConverter.toGravitinoPartitionings(transforms);
 
-    return gravitinoCatalogClient
+    return catalog()
         .asTableCatalog()
         .createTable(
             gravitinoIdentifier,
@@ -312,7 +324,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     try {
       invalidateTable(ident);
       org.apache.gravitino.rel.Table gravitinoTable =
-          gravitinoCatalogClient
+          catalog()
               .asTableCatalog()
               .alterTable(
                   NameIdentifier.of(getDatabase(ident), ident.name()), gravitinoTableChanges);
@@ -333,7 +345,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   @Override
   public boolean dropTable(Identifier ident) {
     invalidateTable(ident);
-    return gravitinoCatalogClient
+    return catalog()
         .asTableCatalog()
         .dropTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
@@ -341,7 +353,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   @Override
   public boolean purgeTable(Identifier ident) {
     invalidateTable(ident);
-    return gravitinoCatalogClient
+    return catalog()
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
@@ -363,7 +375,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       return false;
     }
     try {
-      return gravitinoCatalogClient
+      return catalog()
           .asViewCatalog()
           .viewExists(NameIdentifier.of(getDatabase(ident), ident.name()));
     } catch (UnsupportedOperationException e) {
@@ -386,7 +398,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         org.apache.gravitino.rel.TableChange.rename(newIdent.name());
     try {
       invalidateTable(oldIdent);
-      gravitinoCatalogClient
+      catalog()
           .asTableCatalog()
           .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
@@ -396,7 +408,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public String[][] listNamespaces() throws NoSuchNamespaceException {
-    String[] schemas = gravitinoCatalogClient.asSchemas().listSchemas();
+    String[] schemas = catalog().asSchemas().listSchemas();
     return Arrays.stream(schemas).map(schema -> new String[] {schema}).toArray(String[][]::new);
   }
 
@@ -413,7 +425,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throws NoSuchNamespaceException {
     validateNamespace(namespace);
     try {
-      Schema schema = gravitinoCatalogClient.asSchemas().loadSchema(namespace[0]);
+      Schema schema = catalog().asSchemas().loadSchema(namespace[0]);
       String comment = schema.comment();
       Map<String, String> properties = schema.properties();
       if (comment != null) {
@@ -435,7 +447,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     Map<String, String> properties = new HashMap<>(metadata);
     String comment = properties.remove(SupportsNamespaces.PROP_COMMENT);
     try {
-      gravitinoCatalogClient.asSchemas().createSchema(namespace[0], comment, properties);
+      catalog().asSchemas().createSchema(namespace[0], comment, properties);
     } catch (SchemaAlreadyExistsException e) {
       throw new NamespaceAlreadyExistsException(namespace);
     }
@@ -460,7 +472,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                 })
             .toArray(SchemaChange[]::new);
     try {
-      gravitinoCatalogClient.asSchemas().alterSchema(namespace[0], schemaChanges);
+      catalog().asSchemas().alterSchema(namespace[0], schemaChanges);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(namespace);
     }
@@ -471,7 +483,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throws NoSuchNamespaceException, NonEmptyNamespaceException {
     validateNamespace(namespace);
     try {
-      return gravitinoCatalogClient.asSchemas().dropSchema(namespace[0], cascade);
+      return catalog().asSchemas().dropSchema(namespace[0], cascade);
     } catch (NonEmptySchemaException e) {
       throw new NonEmptyNamespaceException(namespace);
     }
@@ -489,7 +501,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     View gravitinoView;
     try {
       gravitinoView =
-          gravitinoCatalogClient
+          catalog()
               .asViewCatalog()
               .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
     } catch (NoSuchViewException | UnsupportedOperationException | ForbiddenException e) {
@@ -520,7 +532,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throws NoSuchTableException {
     try {
       String database = getDatabase(ident);
-      return gravitinoCatalogClient
+      return catalog()
           .asTableCatalog()
           .loadTable(
               NameIdentifier.of(database, ident.name()),
@@ -534,7 +546,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throws NoSuchTableException {
     try {
       String database = getDatabase(ident);
-      return gravitinoCatalogClient
+      return catalog()
           .asTableCatalog()
           .loadTable(
               NameIdentifier.of(database, ident.name()),
@@ -567,7 +579,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     String gravitinoNamespace = getDatabase(namespace);
     try {
       Function[] functions =
-          gravitinoCatalogClient
+          catalog()
               .asFunctionCatalog()
               .listFunctionInfos(Namespace.of(gravitinoNamespace));
       // Filter functions that have Spark runtime implementation
@@ -592,7 +604,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     NameIdentifier gravitinoIdentifier = NameIdentifier.of(getDatabase(ident), ident.name());
     try {
       Function function =
-          gravitinoCatalogClient.asFunctionCatalog().getFunction(gravitinoIdentifier);
+          catalog().asFunctionCatalog().getFunction(gravitinoIdentifier);
       for (FunctionDefinition definition : function.definitions()) {
         for (FunctionImpl impl : definition.impls()) {
           if (!isSparkImplementation(impl)) {
