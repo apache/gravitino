@@ -233,6 +233,32 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
 
+  /** Default recent-history replay window in seconds. */
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS = 60L;
+
+  /** Default maximum locally remembered event IDs. */
+  public static final int DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES = 100000;
+
+  /** Window for replaying recent change records to catch out-of-order commits. */
+  public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS =
+      new ConfigBuilder("gravitino.entityChangeLog.replayWindowSecs")
+          .doc(
+              "Recent change log replay window in seconds; 0 disables replay. This bounds recorded created_at age, not commit age. "
+                  + "Replay sweeps start at most once per max(pollIntervalSecs, replayWindowSecs / 4)")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .longConf()
+          .checkValue(value -> value >= 0 && value <= 86400, "Must be between 0 and 86400 seconds")
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+
+  /** Maximum event IDs retained locally to suppress repeated replay invalidations. */
+  public static final ConfigEntry<Integer> ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES =
+      new ConfigBuilder("gravitino.entityChangeLog.replayMaxEntries")
+          .doc("Maximum locally remembered event IDs for recent change log replay deduplication")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
+
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_RETENTION_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.retentionSecs")
           .doc("The retention time in seconds for entity change logs. Set 0 to disable cleanup")

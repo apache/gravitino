@@ -123,6 +123,27 @@ class TestHTTPClientHeaders(unittest.TestCase):
         self.assertEqual("configured/type", configured_headers["Content-Type"])
         self.assertEqual(configured_headers, client.request_headers)
 
+    def test_raw_data_uses_request_local_headers(self):
+        client = HTTPClient(
+            "http://localhost:8090", request_headers={"X-Configured": "configured"}
+        )
+
+        with patch("gravitino.utils.http_client.build_opener") as build_opener:
+            requests = self._capture_requests(
+                build_opener, [self._success_response(), self._success_response()]
+            )
+            client.post("/string", data="raw", headers={"X-Per-Request": "string"})
+            client.post("/bytes", data=b"raw")
+
+        self.assertEqual("raw", requests[0].data.decode("utf-8"))
+        self.assertEqual("string", self._header_value(requests[0], "X-Per-Request"))
+        self.assertIsNone(self._header_value(requests[1], "X-Per-Request"))
+        for request in requests:
+            self.assertEqual("configured", self._header_value(request, "X-Configured"))
+            self.assertEqual(
+                "application/json", self._header_value(request, "Content-Type")
+            )
+
     def test_failed_request_headers_do_not_leak(self):
         client = HTTPClient("http://localhost:8090")
         error_body = (
