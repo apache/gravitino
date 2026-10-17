@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
 from gravitino.exceptions.base import NotFoundException, RESTException
+from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.filesystem.gvfs_default_operations import DefaultGVFSOperations
 from gravitino.name_identifier import NameIdentifier
 
@@ -80,6 +81,51 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(merged["s-secret"], "ss")
         self.assertEqual(merged["f-vis"], "3")
         self.assertEqual(merged["f-secret"], "fs")
+
+    def test_metadata_cache_avoids_repeated_metadata_loads(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090",
+            metalake_name="ml",
+            options={GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE: True},
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {"c-vis": "1"}
+        catalog.get_secrets.return_value = {"c-secret": "cs"}
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {"s-vis": "2"}
+        schema.get_secrets.return_value = {"s-secret": "ss"}
+        catalog.as_fileset_catalog.return_value.load_fileset.return_value = fileset
+        fileset.properties.return_value = {"f-vis": "3"}
+        fileset.get_secrets.return_value = {"f-secret": "fs"}
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+        fileset_ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                first = operations._merge_fileset_properties(
+                    fileset_ident, "file:///tmp/data"
+                )
+                second = operations._merge_fileset_properties(
+                    fileset_ident, "file:///tmp/data"
+                )
+
+        self.assertEqual(first["f-secret"], "fs")
+        self.assertEqual(first, second)
+        # The second merge must come from the metadata cache: no repeated loads.
+        client.load_catalog.assert_called_once_with("catalog")
+        catalog.as_schemas.return_value.load_schema.assert_called_once_with("schema")
+        catalog.as_fileset_catalog.return_value.load_fileset.assert_called_once_with(
+            NameIdentifier.of("schema", "fs")
+        )
+        # Secrets are not cached and are fetched on every merge.
+        self.assertEqual(catalog.get_secrets.call_count, 2)
+        self.assertEqual(schema.get_secrets.call_count, 2)
+        self.assertEqual(fileset.get_secrets.call_count, 2)
 
     def test_secret_override(self):
         operations = DefaultGVFSOperations(
