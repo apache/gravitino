@@ -567,6 +567,7 @@ components:
               - PRODUCE_TOPIC
               - USE_MODEL
               - EXECUTE_FUNCTION
+              - USE_SEMANTIC_MODEL
         applicableRoles:
           type: array
           minItems: 1
