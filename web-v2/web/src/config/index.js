@@ -312,7 +312,8 @@ export const transformsLimitMap = {
   year: ['date', 'timestamp', 'timestamp_tz'],
   month: ['date', 'timestamp', 'timestamp_tz'],
   day: ['date', 'timestamp', 'timestamp_tz'],
-  hour: ['timestamp', 'timestamp_tz']
+  hour: ['timestamp', 'timestamp_tz'],
+  range: ['integer', 'long', 'decimal', 'date', 'time', 'timestamp', 'timestamp_tz', 'string']
 }
 
 export const sortOrdersInfoMap = {
