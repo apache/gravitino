@@ -150,7 +150,6 @@ public class TestJettyServer {
     }
   }
 
-  /** Starts the server with a servlet that throws, and returns Jetty's error page for it. */
   @Test
   public void testStopLetsInFlightRequestFinish() throws Exception {
     int port = RESTUtils.findAvailablePort(5000, 6000);
@@ -190,6 +189,7 @@ public class TestJettyServer {
     stop.get(10, TimeUnit.SECONDS);
   }
 
+  /** Starts the server with a servlet that throws, and returns Jetty's error page for it. */
   private String requestFailingServlet(Config config) throws IOException {
     int port = RESTUtils.findAvailablePort(5000, 6000);
     config.set(JettyServerConfig.WEBSERVER_HOST, "127.0.0.1");
