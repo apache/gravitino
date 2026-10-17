@@ -71,6 +71,19 @@ public interface Fileset extends Auditable {
   /** The property name for the default location name of the fileset. */
   String PROPERTY_DEFAULT_LOCATION_NAME = "default-location-name";
 
+  /**
+   * The property name that controls whether dropping a managed fileset also deletes its storage
+   * locations. Defaults to true; set it to false to keep the data while removing the metadata.
+   */
+  String PROPERTY_DELETE_DATA_ON_DROP = "delete-data-on-drop";
+
+  /**
+   * The property name that allows creating a managed fileset on a location that already exists and
+   * is not empty. Defaults to false, in which case such a location must be registered as an
+   * external fileset instead.
+   */
+  String PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED = "allow-existing-location-as-managed";
+
   /** The reserved location name to indicate the location name is unknown. */
   String LOCATION_NAME_UNKNOWN = "unknown";
 

@@ -55,7 +55,10 @@ See [How to use GVFS](./how-to-use-gvfs.md).
 ### Managed and External
 
 A managed fileset belongs to Gravitino. Creating it creates the directory, and deleting it deletes
-the data.
+the data. Because of that, a managed fileset cannot be created on a location that already exists
+and is not empty; register such a location as an external fileset, or set
+`allow-existing-location-as-managed` to `true` if Gravitino really should take it over. A managed
+fileset whose data must survive a drop can set `delete-data-on-drop` to `false`.
 
 An external fileset points at a location that already exists and stays under someone else's control.
 Deleting it removes the Gravitino record and leaves the files alone.

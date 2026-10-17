@@ -20,8 +20,10 @@ package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+import static org.apache.gravitino.file.Fileset.PROPERTY_DELETE_DATA_ON_DROP;
 import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
@@ -542,6 +544,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           });
     } else {
       try {
+        boolean allowExistingLocationAsManaged =
+            (boolean)
+                propertiesMetadata
+                    .filesetPropertiesMetadata()
+                    .getOrDefault(properties, PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED);
         // formalize the path to avoid path without scheme, uri, authority, etc.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
           Map<String, String> fsConf =
@@ -578,6 +585,25 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 formalizePath,
                 entry.getKey());
           } else {
+            // A managed fileset takes its data with it on drop, so silently adopting a location
+            // that already holds files would put data Gravitino never created at risk.
+            if (type == Fileset.Type.MANAGED
+                && !allowExistingLocationAsManaged
+                && fs.listStatus(formalizePath).length > 0) {
+              throw new IllegalArgumentException(
+                  "Location "
+                      + formalizePath
+                      + " for managed fileset "
+                      + ident
+                      + " already exists and is not empty, location name: "
+                      + entry.getKey()
+                      + ". Register it as an "
+                      + Fileset.Type.EXTERNAL
+                      + " fileset, or set "
+                      + PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED
+                      + "=true to manage it anyway");
+            }
+
             LOG.info(
                 "Fileset {} manages the existing location {} with location name {}",
                 ident,
@@ -755,7 +781,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               Entity.EntityType.FILESET,
               FilesetEntity.class,
               filesetEntity -> {
-                if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
+                if (deletesStorageOnDrop(filesetEntity)) {
                   try {
                     deleteManagedFilesetStorage(ident, filesetEntity);
                   } catch (IOException ioe) {
@@ -772,6 +798,20 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     } catch (IOException ioe) {
       throw ExceptionMessages.wrap("Failed to delete fileset " + ident, ioe);
     }
+  }
+
+  /**
+   * Whether dropping the fileset also removes its storage locations. Only managed filesets own
+   * their data, and even those can opt out through {@link Fileset#PROPERTY_DELETE_DATA_ON_DROP}.
+   */
+  private boolean deletesStorageOnDrop(FilesetEntity filesetEntity) {
+    if (disableFSOps || filesetEntity.filesetType() != Fileset.Type.MANAGED) {
+      return false;
+    }
+    return (boolean)
+        propertiesMetadata
+            .filesetPropertiesMetadata()
+            .getOrDefault(filesetEntity.properties(), PROPERTY_DELETE_DATA_ON_DROP);
   }
 
   /**
@@ -950,7 +990,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // the schema path.
       ClassLoader cl = Thread.currentThread().getContextClassLoader();
       filesets.parallelStream()
-          .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
+          .filter(this::deletesStorageOnDrop)
           .forEach(
               f -> {
                 ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
