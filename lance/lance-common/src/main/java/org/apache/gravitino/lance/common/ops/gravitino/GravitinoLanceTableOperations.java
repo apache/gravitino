@@ -35,11 +35,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
@@ -51,6 +54,8 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.errors.NamespaceNotFoundException;
+import org.lance.namespace.errors.TableAlreadyExistsException;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
@@ -61,6 +66,8 @@ import org.lance.namespace.model.DescribeTableResponse;
 import org.lance.namespace.model.DropTableResponse;
 import org.lance.namespace.model.JsonArrowSchema;
 import org.lance.namespace.model.RegisterTableResponse;
+import org.lance.namespace.model.RenameTableRequest;
+import org.lance.namespace.model.RenameTableResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -392,6 +399,74 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     Table table = namespaceWrapper.asTableCatalog(catalog).alterTable(tableIdentifier, changes);
 
     return handler.handle(table, request);
+  }
+
+  @Override
+  public RenameTableResponse renameTable(
+      String tableId, String delimiter, RenameTableRequest request) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(delimiter), "Delimiter cannot be blank.");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(tableId), "Table identifier cannot be blank.");
+    Preconditions.checkArgument(request != null, "Rename table request cannot be null.");
+
+    String[] tableIdLevels = StringUtils.splitByWholeSeparatorPreserveAllTokens(tableId, delimiter);
+    Preconditions.checkArgument(
+        tableIdLevels != null
+            && tableIdLevels.length == 3
+            && Arrays.stream(tableIdLevels).allMatch(StringUtils::isNotBlank),
+        "Expected at 3-level namespace but got: %s",
+        tableIdLevels == null ? 0 : tableIdLevels.length);
+
+    String newTableName = request.getNewTableName();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(newTableName), "New table name cannot be blank.");
+    Preconditions.checkArgument(
+        !newTableName.contains(delimiter),
+        "New table name cannot contain the namespace delimiter: %s",
+        delimiter);
+
+    String newSchemaName = null;
+    List<String> newNamespaceId = request.getNewNamespaceId();
+    if (newNamespaceId != null && !newNamespaceId.isEmpty()) {
+      Preconditions.checkArgument(
+          newNamespaceId.size() == 2 && newNamespaceId.stream().allMatch(StringUtils::isNotBlank),
+          "Expected at 2-level target namespace but got: %s",
+          newNamespaceId.size());
+      Preconditions.checkArgument(
+          Objects.equals(tableIdLevels[0], newNamespaceId.get(0)),
+          "Cannot rename a table across catalogs.");
+      Preconditions.checkArgument(
+          newNamespaceId.stream().noneMatch(level -> level.contains(delimiter)),
+          "Target namespace levels cannot contain the namespace delimiter: %s",
+          delimiter);
+      newSchemaName = newNamespaceId.get(1);
+    }
+
+    String catalogName = tableIdLevels[0];
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(tableIdLevels[1], tableIdLevels[2]);
+    if (newSchemaName != null && !namespaceWrapper.schemaExists(catalog, newSchemaName)) {
+      throw new NamespaceNotFoundException(
+          "Schema not found: " + newSchemaName,
+          CommonUtil.formatCurrentStackTrace(),
+          String.join(delimiter, newNamespaceId));
+    }
+    try {
+      namespaceWrapper
+          .asTableCatalog(catalog)
+          .alterTable(tableIdentifier, TableChange.rename(newTableName, newSchemaName));
+    } catch (UnsupportedOperationException e) {
+      throw new InvalidInputException(
+          "Table is not a Lance table: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
+    } catch (IllegalArgumentException e) {
+      if (e.getCause() instanceof EntityAlreadyExistsException) {
+        throw new TableAlreadyExistsException(
+            e.getMessage(), CommonUtil.formatCurrentStackTrace(), tableId);
+      }
+      throw e;
+    }
+
+    return new RenameTableResponse();
   }
 
   @SuppressWarnings("unchecked")
