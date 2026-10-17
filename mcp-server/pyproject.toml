@@ -35,7 +35,7 @@ dependencies = [
     # requires fakeredis>=2.32.1, but fakeredis 2.35.0 removed FakeConnection from
     # fakeredis.aioredis, which pydocket still uses. Pin fakeredis to <2.35.0 until the
     # tracked pydocket/fakeredis compatibility issue is resolved.
-    "fakeredis<2.38.0",
+    "fakeredis<2.39.0",
 ]
 
 # Development-only dependencies. These are NOT shipped in the MCP server image:
