@@ -51,6 +51,7 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.server.handler.StatisticsHandler;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -196,7 +197,11 @@ public class JettyServer {
 
     HandlerCollection handlers = new HandlerCollection();
     handlers.addHandler(servletContextHandler);
-    server.setHandler(handlers);
+    // Without a StatisticsHandler, stopping the server closes the connections of in-flight
+    // requests at once. With it, stop waits up to the stop timeout for them to finish.
+    StatisticsHandler statisticsHandler = new StatisticsHandler();
+    statisticsHandler.setHandler(handlers);
+    server.setHandler(statisticsHandler);
   }
 
   public synchronized void start() throws RuntimeException {

@@ -33,6 +33,9 @@ import java.io.Reader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import javax.servlet.http.HttpServlet;
@@ -148,6 +151,45 @@ public class TestJettyServer {
   }
 
   /** Starts the server with a servlet that throws, and returns Jetty's error page for it. */
+  @Test
+  public void testStopLetsInFlightRequestFinish() throws Exception {
+    int port = RESTUtils.findAvailablePort(5000, 6000);
+    Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HOST, "127.0.0.1");
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+    jettyServer.initialize(JettyServerConfig.fromConfig(config), "test", false);
+    SlowServlet servlet = new SlowServlet();
+    jettyServer.addServlet(servlet, "/slow");
+    jettyServer.start();
+
+    CompletableFuture<String> response =
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                HttpURLConnection connection =
+                    (HttpURLConnection)
+                        new URL("http://127.0.0.1:" + port + "/slow").openConnection();
+                try (Reader body =
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)) {
+                  return connection.getResponseCode() + " " + CharStreams.toString(body);
+                } finally {
+                  connection.disconnect();
+                }
+              } catch (IOException e) {
+                return e.toString();
+              }
+            });
+    assertTrue(servlet.entered.await(10, TimeUnit.SECONDS));
+
+    // Stop while the request is still being handled, then let the servlet finish.
+    CompletableFuture<Void> stop = CompletableFuture.runAsync(jettyServer::stop);
+    Thread.sleep(500);
+    servlet.release.countDown();
+
+    assertEquals("200 done", response.get(10, TimeUnit.SECONDS));
+    stop.get(10, TimeUnit.SECONDS);
+  }
+
   private String requestFailingServlet(Config config) throws IOException {
     int port = RESTUtils.findAvailablePort(5000, 6000);
     config.set(JettyServerConfig.WEBSERVER_HOST, "127.0.0.1");
@@ -166,6 +208,23 @@ public class TestJettyServer {
       }
     } finally {
       connection.disconnect();
+    }
+  }
+
+  private static class SlowServlet extends HttpServlet {
+    private final CountDownLatch entered = new CountDownLatch(1);
+    private final CountDownLatch release = new CountDownLatch(1);
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+      entered.countDown();
+      try {
+        release.await(10, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      response.getWriter().write("done");
     }
   }
 
