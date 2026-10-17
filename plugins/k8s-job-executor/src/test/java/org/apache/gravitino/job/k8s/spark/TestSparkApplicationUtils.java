@@ -459,6 +459,61 @@ public class TestSparkApplicationUtils {
   }
 
   @Test
+  public void testBuiltinJobRunsBuiltinJobsJar() {
+    // The executable of a built-in job template is the jobs jar on the Gravitino server.
+    for (String uri :
+        new String[] {
+          "/gravitino/auxlib/gravitino-jobs-2.0.0.jar", "file:///gravitino/auxlib/jobs.jar"
+        }) {
+      SparkJobTemplate template =
+          newTemplateBuilder().withName("builtin-sparkpi").withExecutable(uri).build();
+      Assertions.assertEquals(
+          "local:///opt/gravitino/jobs/gravitino-jobs.jar", getSpec(template, configs).get("jars"));
+      Assertions.assertEquals(
+          "s3a://bucket/gravitino-jobs.jar",
+          getSpec(
+                  template,
+                  newConfigs(
+                      ImmutableMap.of(
+                          K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR,
+                          "s3a://bucket/gravitino-jobs.jar")))
+              .get("jars"));
+    }
+  }
+
+  @Test
+  public void testBuiltinJobKeepsClusterReachableExecutable() {
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withName("builtin-sparkpi")
+            .withExecutable("https://repo/gravitino-jobs.jar")
+            .build();
+    Assertions.assertEquals(
+        "https://repo/gravitino-jobs.jar", getSpec(template, configs).get("jars"));
+  }
+
+  @Test
+  public void testBuiltinJobsJarOnlyReplacesExecutableOfBuiltinJobs() {
+    // Not a built-in job: "builtin-" must be the prefix of the name.
+    SparkJobTemplate userJob =
+        newTemplateBuilder().withName("my-builtin-job").withExecutable("/opt/app.jar").build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, userJob, configs));
+
+    // The other resources of a built-in job are still checked.
+    SparkJobTemplate builtinJob =
+        newTemplateBuilder()
+            .withName("builtin-sparkpi")
+            .withExecutable("/gravitino/auxlib/gravitino-jobs-2.0.0.jar")
+            .withJars(ImmutableList.of("/gravitino/auxlib/other.jar"))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, builtinJob, configs));
+  }
+
+  @Test
   public void testRejectEnvironments() {
     SparkJobTemplate template =
         SparkJobTemplate.builder()
@@ -480,6 +535,15 @@ public class TestSparkApplicationUtils {
     map.put("spark.conf.spark.driver.memory", "2g");
     map.putAll(extra);
     return new K8sJobExecutorConfigs(map);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> getSpec(
+      SparkJobTemplate template, K8sJobExecutorConfigs configs) {
+    return (Map<String, Object>)
+        SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs)
+            .getAdditionalProperties()
+            .get("spec");
   }
 
   private static SparkJobTemplate.Builder newTemplateBuilder() {
