@@ -33,6 +33,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/checkout-and-sync
 
       - uses: ./.github/actions/setup-java-toolchains
         with:

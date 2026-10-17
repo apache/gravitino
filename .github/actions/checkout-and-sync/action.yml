@@ -1,0 +1,186 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Checkout and sync
+description: Check out the upstream base branch and merge the contributor branch for fork CI.
+
+outputs:
+  base-ref:
+    description: Upstream branch used as the comparison base.
+    value: ${{ steps.base.outputs.base_ref }}
+  base-sha:
+    description: Upstream commit checked out before merging contributor changes.
+    value: ${{ steps.upstream.outputs.base_sha }}
+  head-sha:
+    description: Commit tested after contributor changes are merged.
+    value: ${{ steps.head.outputs.head_sha }}
+  synced:
+    description: Whether contributor changes were merged onto the upstream base.
+    value: ${{ steps.base.outputs.should_sync }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve pull request base branch
+      id: base
+      shell: bash
+      env:
+        EVENT_BASE_REF: ${{ github.base_ref }}
+        GH_TOKEN: ${{ github.token }}
+        HEAD_OWNER: ${{ github.repository_owner }}
+        HEAD_BRANCH: ${{ github.ref_name }}
+        HEAD_REPOSITORY: ${{ github.repository }}
+        HEAD_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        if [[ "${GITHUB_REPOSITORY}" == "apache/gravitino" && \
+          ("${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == refs/heads/branch-*) ]]; then
+          echo "base_ref=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "should_sync=false" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+
+        repository_response="$(curl --fail-with-body --silent --show-error \
+          --header "Accept: application/vnd.github+json" \
+          --header "Authorization: Bearer ${GH_TOKEN}" \
+          --header "X-GitHub-Api-Version: 2022-11-28" \
+          "${GITHUB_API_URL}/repos/${HEAD_REPOSITORY}")"
+        source_repository="$(jq -r '.source.full_name // empty' <<< "${repository_response}")"
+
+        if [[ "${HEAD_REPOSITORY}" != "apache/gravitino" && \
+          "${source_repository}" != "apache/gravitino" ]]; then
+          echo "base_ref=${EVENT_BASE_REF:-${GITHUB_REF_NAME}}" >> "${GITHUB_OUTPUT}"
+          echo "should_sync=false" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+
+        response="[]"
+        match_count=0
+        for attempt in 1 2 3; do
+          response="$(curl --fail-with-body --silent --show-error \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --get \
+            --data-urlencode "state=open" \
+            --data-urlencode "head=${HEAD_OWNER}:${HEAD_BRANCH}" \
+            --data-urlencode "per_page=10" \
+            "https://api.github.com/repos/apache/gravitino/pulls")"
+          match_count="$(jq -r \
+            --arg head_sha "${HEAD_SHA}" \
+            --arg head_repository "${HEAD_REPOSITORY}" \
+            '[.[] | select(.head.sha == $head_sha and .head.repo.full_name == $head_repository)]
+             | length' \
+            <<< "${response}")"
+          if [[ "${match_count}" == "1" ]]; then
+            break
+          fi
+          if [[ "${attempt}" != "3" ]]; then
+            sleep 3
+          fi
+        done
+
+        if [[ "${match_count}" == "0" ]]; then
+          # No pull request yet: guess the base as the upstream default branch or one of the
+          # latest release branches, whichever the contributor branch is fewest commits ahead of.
+          api() {
+            curl --fail-with-body --silent --show-error \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/apache/gravitino$1"
+          }
+          candidates=("$(api "" | jq -r '.default_branch')")
+          while IFS= read -r branch; do
+            candidates+=("${branch}")
+          done < <(api "/branches?per_page=100" \
+            | jq -r '.[].name | select(test("^branch-[0-9]+\\.[0-9]+$"))' | sort -V | tail -n 3)
+          base_ref=""
+          best_ahead=""
+          for candidate in "${candidates[@]}"; do
+            ahead="$(api "/compare/${candidate}...${HEAD_REPOSITORY/\//:}:${HEAD_SHA}" | jq -r '.ahead_by')"
+            echo "${candidate}: contributor branch is ${ahead} commit(s) ahead"
+            if [[ -z "${best_ahead}" || "${ahead}" -lt "${best_ahead}" ]]; then
+              base_ref="${candidate}"
+              best_ahead="${ahead}"
+            fi
+          done
+          echo "::notice::No open pull request yet; testing against ${base_ref}."
+          echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
+          echo "should_sync=true" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+
+        if [[ "${match_count}" != "1" ]]; then
+          echo "::error::Expected one open apache/gravitino pull request for ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA}, found ${match_count}."
+          exit 1
+        fi
+
+        base_ref="$(jq -r \
+          --arg head_sha "${HEAD_SHA}" \
+          --arg head_repository "${HEAD_REPOSITORY}" \
+          '.[]
+           | select(.head.sha == $head_sha and .head.repo.full_name == $head_repository)
+           | .base.ref' \
+          <<< "${response}")"
+
+        echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
+        echo "should_sync=true" >> "${GITHUB_OUTPUT}"
+
+    - name: Checkout upstream base branch
+      if: steps.base.outputs.should_sync == 'true'
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        repository: apache/gravitino
+        ref: ${{ steps.base.outputs.base_ref }}
+
+    - name: Resolve upstream base commit
+      id: upstream
+      shell: bash
+      run: echo "base_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+    - name: Merge contributor branch
+      if: steps.base.outputs.should_sync == 'true'
+      shell: bash
+      env:
+        BASE_REF: ${{ steps.base.outputs.base_ref }}
+        HEAD_REPOSITORY: ${{ github.repository }}
+        HEAD_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        # Fetch the pushed commit rather than the branch tip, which may have moved since.
+        git fetch "https://github.com/${HEAD_REPOSITORY}.git" "${HEAD_SHA}"
+        if ! git \
+          -c user.name='Apache Gravitino CI' \
+          -c user.email='dev@gravitino.apache.org' \
+          merge --no-commit --no-ff "${HEAD_SHA}"; then
+          git diff --name-only --diff-filter=U | sed 's/^/Conflict: /'
+          echo "::error::${HEAD_SHA} does not merge cleanly into ${BASE_REF}. Merge or rebase onto the latest ${BASE_REF} and push again."
+          exit 1
+        fi
+        git \
+          -c user.name='Apache Gravitino CI' \
+          -c user.email='dev@gravitino.apache.org' \
+          commit --allow-empty -m 'Merge contributor branch for CI'
+
+    - name: Resolve tested commit
+      id: head
+      shell: bash
+      run: echo "head_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
