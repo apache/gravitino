@@ -298,6 +298,43 @@ Rename cannot be combined with other changes in a single `alterView` call. Submi
 
 Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
 
+## Iceberg Compatibility
+
+Paimon can maintain Iceberg metadata for a table by setting the `metadata.iceberg.storage` table property
+(see [Paimon Iceberg metadata](https://paimon.apache.org/docs/master/iceberg/)). When it is set to
+`rest-catalog`, Paimon publishes the table's Iceberg metadata through the Iceberg REST service named by
+`metadata.iceberg.rest.uri`, and `metadata.iceberg.rest.warehouse` selects which Gravitino catalog stores
+that metadata (see
+[Client Catalog Selection](./iceberg-rest-service.md#client-catalog-selection)). An Iceberg client pointed
+at the same service can then read the Paimon table.
+
+:::info
+Gravitino's Iceberg REST service serves table metadata as the producing engine published it, so the
+visibility rules of that engine still apply.
+:::
+
+For **primary-key** tables, Paimon's publication rule decides what Iceberg readers can see. Iceberg readers
+cannot merge LSM files, so for incremental commits Paimon publishes only the data files that have been
+merged to the highest LSM level, while a plain `INSERT` writes its files below that level. Such writes are
+committed to the Paimon table, and are visible to Paimon readers, but they do not appear in the Iceberg
+metadata until a full compaction moves the merged result to the highest level. The first commit of a table
+is an exception, because it publishes a full snapshot, so the first write is visible immediately.
+
+Run a full compaction to establish the visibility boundary:
+
+```sql
+CALL paimon_catalog.sys.compact(table => 'db.tbl', compact_strategy => 'full');
+```
+
+Alternatively, let Paimon compact periodically with `compaction.optimization-interval` or
+`full-compaction.delta-commits`. Deletion-vector mode (`metadata.iceberg.format-version` = `3`,
+`deletion-vectors.enabled` = `true`, `deletion-vectors.bitmap64` = `true`, read by an Iceberg client with
+v3 support) publishes files above level 0 as well, which shortens the delay but still excludes the newest
+level-0 files.
+
+See [Primary Key Tables](https://paimon.apache.org/docs/master/iceberg/primary-key-table/) in the Paimon
+documentation for the full publication rules.
+
 ## HDFS Configuration
 
 Place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
