@@ -17,6 +17,8 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -142,6 +144,33 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(
         0, operations.parsePartitioning("toStartOfQuarter(event_time, 1)").length);
     Assertions.assertEquals(0, operations.parsePartitioning("toStartOfYear(event_time, 1)").length);
+  }
+
+  @Test
+  public void testComplexExpressionFallsBackToPartitionColumn() {
+    // A nested/arithmetic expression cannot be resolved to a simple column name; when exactly one
+    // column participates in the partition, that column is used as a fallback.
+    Transform[] monthPartitions =
+        operations.parsePartitioning(
+            "toYYYYMM(toDate(statis_ymd + 1))", Collections.singletonList("statis_ymd"));
+    Assertions.assertEquals(1, monthPartitions.length);
+    assertSingleFieldTransform(monthPartitions[0], Transforms.NAME_OF_MONTH, "statis_ymd");
+
+    Transform[] dayPartitions =
+        operations.parsePartitioning(
+            "toDate(toDate(event_time))", Collections.singletonList("event_time"));
+    Assertions.assertEquals(1, dayPartitions.length);
+    assertSingleFieldTransform(dayPartitions[0], Transforms.NAME_OF_DAY, "event_time");
+
+    // A complex expression with multiple participating columns cannot be resolved to a single
+    // column, so the whole partition key stays unstructured.
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toDate(a + 1)", List.of("a", "b")).length);
+
+    // A hash expression has no known granularity, so it must not fall back to identity even when a
+    // single column participates in the partition.
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("cityHash64(toString(x)) % 7", List.of("x")).length);
   }
 
   private void assertFunctionTransform(
