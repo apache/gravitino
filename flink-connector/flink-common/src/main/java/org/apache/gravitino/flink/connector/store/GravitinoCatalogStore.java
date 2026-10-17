@@ -148,6 +148,9 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     return discoverFactories(
         catalogFactory -> (catalogFactory.factoryIdentifier().equalsIgnoreCase(catalogType)),
         String.format(
+            "Failed to correctly match the Flink catalog factory for catalog type [%s].",
+            catalogType),
+        String.format(
             "Flink catalog type [%s] matched multiple flink catalog factories, it should only match one.",
             catalogType));
   }
@@ -165,12 +168,20 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
                 .gravitinoCatalogProvider()
                 .equalsIgnoreCase(provider),
         String.format(
+            "Failed to correctly match the Flink catalog factory for provider %s. It may be served by a separate extension jar.",
+            provider),
+        String.format(
             "Gravitino catalog provider [%s] matched multiple flink catalog factories, it should only match one.",
             provider));
   }
 
-  private BaseCatalogFactory discoverFactories(Predicate<Factory> predicate, String errorMessage) {
-    return discoverFactories(ServiceLoader.load(Factory.class).iterator(), predicate, errorMessage);
+  private BaseCatalogFactory discoverFactories(
+      Predicate<Factory> predicate, String notFoundMessage, String multipleMatchMessage) {
+    return discoverFactories(
+        ServiceLoader.load(Factory.class).iterator(),
+        predicate,
+        notFoundMessage,
+        multipleMatchMessage);
   }
 
   /**
@@ -178,11 +189,15 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
    *
    * @param serviceLoaderIterator service loader iterator for Flink factories
    * @param predicate predicate used to match the expected factory
-   * @param errorMessage error message used when multiple matches are found
+   * @param notFoundMessage error message used when no match is found
+   * @param multipleMatchMessage error message used when multiple matches are found
    * @return the matched catalog factory
    */
   BaseCatalogFactory discoverFactories(
-      Iterator<Factory> serviceLoaderIterator, Predicate<Factory> predicate, String errorMessage) {
+      Iterator<Factory> serviceLoaderIterator,
+      Predicate<Factory> predicate,
+      String notFoundMessage,
+      String multipleMatchMessage) {
     final List<Factory> factories = new ArrayList<>();
     while (true) {
       try {
@@ -210,13 +225,22 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     }
 
     if (factories.isEmpty()) {
-      throw new RuntimeException("Failed to correctly match the Flink catalog factory.");
+      throw new RuntimeException(notFoundMessage);
     }
     // It should only match one.
     if (factories.size() > 1) {
-      throw new RuntimeException(errorMessage);
+      throw new RuntimeException(multipleMatchMessage);
     }
     return (BaseCatalogFactory) factories.get(0);
+  }
+
+  BaseCatalogFactory discoverFactories(
+      Iterator<Factory> serviceLoaderIterator, Predicate<Factory> predicate, String errorMessage) {
+    return discoverFactories(
+        serviceLoaderIterator,
+        predicate,
+        "Failed to correctly match the Flink catalog factory.",
+        errorMessage);
   }
 
   private static Map<String, String> propsWithSecrets(Catalog catalog) {
