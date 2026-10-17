@@ -57,3 +57,8 @@ jobs:
     with:
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
+
+  DaftIcebergIT:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    uses: ./.github/workflows/daft-iceberg-it-action.yml
