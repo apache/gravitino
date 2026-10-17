@@ -19,11 +19,13 @@
 package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -175,6 +177,66 @@ public class TestPolicyDTO {
         IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY, contentDTO.rewriteStrategy());
     Assertions.assertEquals(
         IcebergDataCompactionContent.DEFAULT_SORT_ORDER, contentDTO.sortOrder());
+    Assertions.assertDoesNotThrow(contentDTO::validate);
+  }
+
+  @Test
+  public void testAccessControlPolicySerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.AccessControlContentDTO typedContent =
+        PolicyContentDTO.AccessControlContentDTO.builder()
+            .withPrivileges(
+                ImmutableList.of(Privilege.Name.SELECT_TABLE, Privilege.Name.PROBE_TABLE_LIKE))
+            .withApplicableRoles(ImmutableList.of("analyst", "auditor"))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("pii-read")
+            .withComment("typed policy")
+            .withPolicyType("system_access_control")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+
+    Assertions.assertEquals(policyDTO, deserPolicyDTO);
+    Assertions.assertInstanceOf(
+        PolicyContentDTO.AccessControlContentDTO.class, deserPolicyDTO.content());
+
+    PolicyContentDTO.AccessControlContentDTO deserContent =
+        (PolicyContentDTO.AccessControlContentDTO) deserPolicyDTO.content();
+    Assertions.assertEquals(
+        ImmutableList.of(Privilege.Name.SELECT_TABLE, Privilege.Name.PROBE_TABLE_LIKE),
+        deserContent.privileges());
+    Assertions.assertEquals(ImmutableList.of("analyst", "auditor"), deserContent.applicableRoles());
+  }
+
+  @Test
+  public void testAccessControlPolicyDeserializesPrivilegeNames() throws JsonProcessingException {
+    // Privileges travel as enum names on the wire; a change to that encoding would break every
+    // existing policy stored against this type.
+    String json =
+        "{"
+            + "\"name\":\"pii-read\","
+            + "\"comment\":\"typed policy\","
+            + "\"policyType\":\"system_access_control\","
+            + "\"enabled\":true,"
+            + "\"content\":{"
+            + "\"privileges\":[\"SELECT_TABLE\"],"
+            + "\"applicableRoles\":[\"analyst\"]"
+            + "}"
+            + "}";
+
+    PolicyDTO policyDTO = JsonUtils.objectMapper().readValue(json, PolicyDTO.class);
+    PolicyContentDTO.AccessControlContentDTO contentDTO =
+        (PolicyContentDTO.AccessControlContentDTO) policyDTO.content();
+
+    Assertions.assertEquals(ImmutableList.of(Privilege.Name.SELECT_TABLE), contentDTO.privileges());
+    Assertions.assertEquals(ImmutableList.of("analyst"), contentDTO.applicableRoles());
     Assertions.assertDoesNotThrow(contentDTO::validate);
   }
 }
