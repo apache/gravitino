@@ -65,10 +65,17 @@ public class UserMetaService {
   private UserMetaService() {}
 
   private UserPO getUserPOByMetalakeIdAndName(Long metalakeId, String userName) {
+    return getUserPOByMetalakeIdAndName(metalakeId, userName, false);
+  }
+
+  private UserPO getUserPOByMetalakeIdAndName(Long metalakeId, String userName, boolean withRoles) {
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeIdAndName(metalakeId, userName));
+            mapper ->
+                withRoles
+                    ? mapper.selectUserWithRolesByMetalakeIdAndName(metalakeId, userName)
+                    : mapper.selectUserMetaByMetalakeIdAndName(metalakeId, userName));
 
     if (userPO == null) {
       throw new NoSuchEntityException(
@@ -105,8 +112,8 @@ public class UserMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = userPO.getRolePOs();
 
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
@@ -239,8 +246,8 @@ public class UserMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
+    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = oldUserPO.getRolePOs();
     UserEntity oldUserEntity = POConverters.fromUserPO(oldUserPO, rolePOs, identifier.namespace());
 
     UserEntity newEntity = (UserEntity) updater.apply((E) oldUserEntity);

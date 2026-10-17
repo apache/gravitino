@@ -66,10 +66,18 @@ public class GroupMetaService {
   private GroupMetaService() {}
 
   private GroupPO getGroupPOByMetalakeIdAndName(Long metalakeId, String groupName) {
+    return getGroupPOByMetalakeIdAndName(metalakeId, groupName, false);
+  }
+
+  private GroupPO getGroupPOByMetalakeIdAndName(
+      Long metalakeId, String groupName, boolean withRoles) {
     GroupPO GroupPO =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
-            mapper -> mapper.selectGroupMetaByMetalakeIdAndName(metalakeId, groupName));
+            mapper ->
+                withRoles
+                    ? mapper.selectGroupWithRolesByMetalakeIdAndName(metalakeId, groupName)
+                    : mapper.selectGroupMetaByMetalakeIdAndName(metalakeId, groupName));
 
     if (GroupPO == null) {
       throw new NoSuchEntityException(
@@ -106,8 +114,8 @@ public class GroupMetaService {
 
     NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
     long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
-    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
+    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = groupPO.getRolePOs();
 
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
@@ -280,9 +288,8 @@ public class GroupMetaService {
     NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
     Long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
 
-    GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs =
-        RoleMetaService.getInstance().listRolesByGroupId(oldGroupPO.getGroupId());
+    GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = oldGroupPO.getRolePOs();
     GroupEntity oldGroupEntity =
         POConverters.fromGroupPO(oldGroupPO, rolePOs, identifier.namespace());
 
