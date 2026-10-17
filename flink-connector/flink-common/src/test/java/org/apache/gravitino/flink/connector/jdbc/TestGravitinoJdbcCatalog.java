@@ -26,6 +26,10 @@ import java.util.Optional;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
+import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.Audit;
@@ -66,14 +70,35 @@ public abstract class TestGravitinoJdbcCatalog {
         catalogCompat().jdbcDynamicTableFactory().getClass(), factory.get().getClass());
   }
 
+  @Test
+  void testCatalogWithoutDefaultDatabase() throws Exception {
+    TestableGravitinoJdbcCatalog catalog =
+        new TestableGravitinoJdbcCatalog(catalogCompat(), null, Collections.emptyMap());
+
+    Assertions.assertNull(catalog.getDefaultDatabase());
+    Assertions.assertDoesNotThrow(catalog::open);
+    Assertions.assertFalse(catalog.isInnerCatalogCreated());
+    Assertions.assertEquals(
+        CatalogTableStatistics.UNKNOWN,
+        catalog.getTableStatistics(ObjectPath.fromString("database.table")));
+    Assertions.assertEquals(
+        CatalogColumnStatistics.UNKNOWN,
+        catalog.getTableColumnStatistics(ObjectPath.fromString("database.table")));
+
+    CatalogException exception =
+        Assertions.assertThrows(CatalogException.class, catalog::getInnerCatalog);
+    Assertions.assertTrue(exception.getMessage().contains("No default database is configured"));
+  }
+
   private static class TestableGravitinoJdbcCatalog extends GravitinoJdbcCatalog {
     private final CatalogCompat catalogCompat;
+    private boolean innerCatalogCreated;
 
     TestableGravitinoJdbcCatalog(
-        CatalogCompat catalogCompat, String catalogName, Map<String, String> options) {
+        CatalogCompat catalogCompat, String defaultDatabase, Map<String, String> options) {
       super(
-          new MockCatalogContext(catalogName, options),
-          "default",
+          new MockCatalogContext("test", options),
+          defaultDatabase,
           Mockito.mock(SchemaAndTablePropertiesConverter.class),
           Mockito.mock(PartitionConverter.class));
       this.catalogCompat = catalogCompat;
@@ -86,7 +111,21 @@ public abstract class TestGravitinoJdbcCatalog {
 
     @Override
     protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
-      throw new UnsupportedOperationException("not exercised by this test");
+      innerCatalogCreated = true;
+      throw new UnsupportedOperationException("The inner catalog must not be created");
+    }
+
+    @Override
+    protected Catalog catalog() {
+      return new PlainCatalogStub();
+    }
+
+    boolean isInnerCatalogCreated() {
+      return innerCatalogCreated;
+    }
+
+    AbstractCatalog getInnerCatalog() {
+      return realCatalog();
     }
   }
 
