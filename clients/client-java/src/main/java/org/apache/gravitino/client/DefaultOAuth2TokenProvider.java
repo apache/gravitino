@@ -29,6 +29,8 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
   private String scope;
   private String path;
   private String token;
+  private OAuth2ClientAuthenticationMethod authenticationMethod =
+      OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST;
 
   private DefaultOAuth2TokenProvider() {}
 
@@ -38,7 +40,8 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
       Long expires = OAuth2ClientUtil.expiresAtMillis(token);
       if (expires == null || expires <= System.currentTimeMillis()) {
         token =
-            OAuth2ClientUtil.fetchToken(client, Collections.emptyMap(), credential, scope, path)
+            OAuth2ClientUtil.fetchToken(
+                    client, Collections.emptyMap(), credential, scope, path, authenticationMethod)
                 .getAccessToken();
       }
       return token;
@@ -61,6 +64,20 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
     private String credential;
     private String scope;
     private String path;
+    private OAuth2ClientAuthenticationMethod authenticationMethod =
+        OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST;
+
+    /**
+     * Sets the OAuth2 client authentication method.
+     *
+     * @param authenticationMethod OAuth2 client authentication method.
+     * @return This Builder instance.
+     */
+    public Builder withClientAuthenticationMethod(
+        OAuth2ClientAuthenticationMethod authenticationMethod) {
+      this.authenticationMethod = authenticationMethod;
+      return this;
+    }
 
     /**
      * Sets the scope for the HTTP token requests.
@@ -111,8 +128,10 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
       provider.credential = credential;
       provider.scope = scope;
       provider.path = path;
+      provider.authenticationMethod = authenticationMethod;
       provider.token =
-          OAuth2ClientUtil.fetchToken(client, Collections.emptyMap(), credential, scope, path)
+          OAuth2ClientUtil.fetchToken(
+                  client, Collections.emptyMap(), credential, scope, path, authenticationMethod)
               .getAccessToken();
       return provider;
     }
