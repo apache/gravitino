@@ -18,6 +18,11 @@ The Iceberg REST server and the main Gravitino server expose different interface
 | Interfaces         | [Iceberg REST API spec](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) | [Gravitino unified interfaces](https://gravitino.apache.org/docs/latest/api/rest/gravitino-rest-api) |
 | Managed table type | Iceberg table only                                                                                       | JDBC, Hive, Iceberg, Hudi, Paimon, etc                                                               |
 
+Tables created by other engines that publish Iceberg metadata through this service, for example Paimon
+tables with `metadata.iceberg.storage` set to `rest-catalog`, are served as the producing engine published
+them, so that engine's visibility rules still apply. For Paimon primary-key tables, see
+[Iceberg compatibility](./lakehouse-paimon-catalog.md#iceberg-compatibility).
+
 ### Capabilities
 
 The Iceberg REST server provides:
