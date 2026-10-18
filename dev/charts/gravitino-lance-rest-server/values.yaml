@@ -205,3 +205,8 @@ tolerations: []
 affinity: {}
 
 topologySpreadConstraints: []
+
+## Priority class name for the Lance REST Server pod
+## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+##
+priorityClassName: ""
