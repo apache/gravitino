@@ -183,9 +183,9 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
 
   /**
    * Derives the storage-related Iceberg client config from the catalog's warehouse location. Only
-   * non-secret settings (native FileIO impl, custom endpoint, region, path-style access) are
-   * carried over; static access keys and JDBC credentials are deliberately excluded since the REST
-   * path vends its own temporary credentials.
+   * non-secret settings (native FileIO impl, custom endpoint, region, path-style access, proxy
+   * endpoint) are carried over; static access keys and JDBC credentials are deliberately excluded
+   * since the REST path vends its own temporary credentials.
    */
   private Map<String, String> buildStorageProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> icebergProperties =
@@ -209,6 +209,8 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
         icebergProperties,
         IcebergPropertiesConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
         storageProperties);
+    copyIfPresent(
+        icebergProperties, IcebergPropertiesConstants.ICEBERG_S3_PROXY_ENDPOINT, storageProperties);
     copyIfPresent(
         icebergProperties, IcebergPropertiesConstants.ICEBERG_OSS_ENDPOINT, storageProperties);
     return storageProperties;
