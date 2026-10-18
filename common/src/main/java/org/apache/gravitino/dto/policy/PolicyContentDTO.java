@@ -19,8 +19,10 @@
 package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -29,6 +31,7 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
@@ -479,6 +482,70 @@ public interface PolicyContentDTO extends PolicyContent {
 
     private ColumnMaskContent toDomainContent() {
       return PolicyContents.columnMask(expression);
+    }
+  }
+
+  /** Represents typed access-control policy content. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class AccessControlContentDTO implements PolicyContentDTO {
+
+    @JsonProperty("privileges")
+    private List<Privilege.Name> privileges;
+
+    @JsonProperty("applicableRoles")
+    private List<String> applicableRoles;
+
+    // Default constructor for Jackson deserialization only.
+    private AccessControlContentDTO() {}
+
+    /**
+     * Returns the privileges the rule confers on the tagged object.
+     *
+     * @return the conferred privileges
+     */
+    public List<Privilege.Name> privileges() {
+      return privileges == null
+          ? Collections.emptyList()
+          : Collections.unmodifiableList(new ArrayList<>(privileges));
+    }
+
+    /**
+     * Returns the roles that satisfy the rule's condition.
+     *
+     * @return the applicable role names
+     */
+    public List<String> applicableRoles() {
+      return applicableRoles == null
+          ? Collections.emptyList()
+          : Collections.unmodifiableList(new ArrayList<>(applicableRoles));
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.accessControl(privileges(), applicableRoles());
     }
   }
 }
