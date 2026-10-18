@@ -27,6 +27,9 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import javax.ws.rs.core.EntityTag;
+import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.ADLSTokenCredential;
@@ -52,9 +55,11 @@ import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.types.Types.IntegerType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
+import org.apache.iceberg.view.ViewMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -112,6 +117,67 @@ public class TestIcebergRESTUtils {
       NestedField clonedField = clonedIcebergRESTObject.schema().columns().get(i);
       Assertions.assertEquals(field, clonedField);
     }
+  }
+
+  @Test
+  void testGenerateViewETag() {
+    String metadataLocation = "s3://bucket/warehouse/db/view1/metadata/00001-abc.metadata.json";
+
+    Optional<EntityTag> etag = IcebergRESTUtils.generateViewETag(metadataLocation);
+    Assertions.assertTrue(
+        etag.isPresent(), "A view ETag should be generated for a metadata file location");
+    Assertions.assertEquals(
+        etag,
+        IcebergRESTUtils.generateViewETag(metadataLocation),
+        "The view ETag must be deterministic for the same metadata location");
+    Assertions.assertNotEquals(
+        etag,
+        IcebergRESTUtils.generateETag(metadataLocation),
+        "A view ETag must not collide with the table ETag of the same metadata location");
+    Assertions.assertNotEquals(
+        etag,
+        IcebergRESTUtils.generateViewETag(metadataLocation.replace("00001", "00002")),
+        "The view ETag must change when the metadata location changes");
+    Assertions.assertFalse(
+        IcebergRESTUtils.generateViewETag(null).isPresent(),
+        "No ETag should be generated without a metadata location");
+    Assertions.assertFalse(IcebergRESTUtils.generateViewETag("").isPresent());
+  }
+
+  @Test
+  void testBuildViewResponseWithETag() {
+    String metadataLocation = "s3://bucket/warehouse/db/view1/metadata/00001-abc.metadata.json";
+    ViewMetadata viewMetadata = mock(ViewMetadata.class);
+    when(viewMetadata.metadataFileLocation()).thenReturn(metadataLocation);
+    LoadViewResponse loadViewResponse = mock(LoadViewResponse.class);
+    when(loadViewResponse.metadata()).thenReturn(viewMetadata);
+
+    Response response = IcebergRESTUtils.buildResponseWithETag(loadViewResponse);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(loadViewResponse, response.getEntity());
+    Assertions.assertEquals(
+        IcebergRESTUtils.generateViewETag(metadataLocation).get().toString(),
+        response.getHeaderString("ETag"));
+
+    ViewMetadata metadataWithoutLocation = mock(ViewMetadata.class);
+    when(metadataWithoutLocation.metadataFileLocation()).thenReturn(null);
+    LoadViewResponse responseWithoutLocation = mock(LoadViewResponse.class);
+    when(responseWithoutLocation.metadata()).thenReturn(metadataWithoutLocation);
+    Response noETagResponse = IcebergRESTUtils.buildResponseWithETag(responseWithoutLocation);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), noETagResponse.getStatus());
+    Assertions.assertNull(
+        noETagResponse.getHeaderString("ETag"),
+        "No ETag header should be set when the view metadata location is unknown");
+  }
+
+  @Test
+  void testEtagMatches() {
+    EntityTag etag = new EntityTag("abc123");
+    Assertions.assertTrue(IcebergRESTUtils.etagMatches("abc123", etag));
+    Assertions.assertTrue(IcebergRESTUtils.etagMatches("\"abc123\"", etag));
+    Assertions.assertFalse(IcebergRESTUtils.etagMatches("other-value", etag));
+    Assertions.assertFalse(IcebergRESTUtils.etagMatches(null, etag));
+    Assertions.assertFalse(IcebergRESTUtils.etagMatches("   ", etag));
   }
 
   @Test

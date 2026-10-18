@@ -134,7 +134,8 @@ public class TestIcebergViewAuthorizationExpression {
   @Test
   public void testLoadView() throws NoSuchMethodException, OgnlException {
     Method method =
-        IcebergViewOperations.class.getMethod("loadView", String.class, String.class, String.class);
+        IcebergViewOperations.class.getMethod(
+            "loadView", String.class, String.class, String.class, String.class);
     AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
     String expression = annotation.expression();
     MockAuthorizationExpressionEvaluator mockEvaluator =
@@ -233,7 +234,8 @@ public class TestIcebergViewAuthorizationExpression {
   @Test
   public void testLoadViewIcebergAuthorizationMetadata() throws NoSuchMethodException {
     Method method =
-        IcebergViewOperations.class.getMethod("loadView", String.class, String.class, String.class);
+        IcebergViewOperations.class.getMethod(
+            "loadView", String.class, String.class, String.class, String.class);
     AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
     assertEquals(
         AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION,

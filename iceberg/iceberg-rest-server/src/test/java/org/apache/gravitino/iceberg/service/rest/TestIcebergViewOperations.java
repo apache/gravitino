@@ -247,6 +247,84 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_foo1");
+
+    Response response = doLoadView(namespace, "etag_foo1");
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in load view response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+
+    // Repeated loads of an unchanged view must produce the same ETag
+    Response secondResponse = doLoadView(namespace, "etag_foo1");
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), secondResponse.getStatus());
+    Assertions.assertEquals(
+        etag, secondResponse.getHeaderString("ETag"), "ETag should be stable across loads");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewReturns304WhenETagMatches(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_304_foo1");
+
+    String etag = doLoadView(namespace, "etag_304_foo1").getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in load view response");
+
+    Response response = doLoadViewWithIfNoneMatch(namespace, "etag_304_foo1", etag);
+    Assertions.assertEquals(
+        Response.Status.NOT_MODIFIED.getStatusCode(),
+        response.getStatus(),
+        "Should return 304 when the view ETag matches");
+    Assertions.assertEquals(etag, response.getHeaderString("ETag"));
+    Assertions.assertFalse(response.hasEntity(), "304 response should not carry a body");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewReturns200WhenETagDoesNotMatch(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_mismatch_foo1");
+
+    Response response =
+        doLoadViewWithIfNoneMatch(namespace, "etag_mismatch_foo1", "\"non-matching-etag-value\"");
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(),
+        response.getStatus(),
+        "Should return 200 when the view ETag does not match");
+    Assertions.assertNotNull(
+        response.getHeaderString("ETag"), "ETag header should be present in the 200 response");
+    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
+    Assertions.assertEquals(viewSchema.columns(), loadViewResponse.metadata().schema().columns());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewETagChangesAfterReplace(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_replace_foo1");
+    String firstEtag = doLoadView(namespace, "etag_replace_foo1").getHeaderString("ETag");
+    Assertions.assertNotNull(firstEtag, "ETag header should be present in load view response");
+
+    verifyReplaceSucc(namespace, "etag_replace_foo1", getViewMeta(namespace, "etag_replace_foo1"));
+
+    String secondEtag = doLoadView(namespace, "etag_replace_foo1").getHeaderString("ETag");
+    Assertions.assertNotNull(secondEtag, "ETag header should be present after replace");
+    Assertions.assertNotEquals(
+        firstEtag, secondEtag, "ETag should change after the view metadata is rewritten");
+
+    // The stale ETag must no longer produce a 304
+    Response staleResponse = doLoadViewWithIfNoneMatch(namespace, "etag_replace_foo1", firstEtag);
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(),
+        staleResponse.getStatus(),
+        "A stale ETag should not return 304 after the view is replaced");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testReplaceView(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
     verifyCreateViewSucc(namespace, "replace_foo1");
@@ -410,6 +488,12 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadView(Namespace ns, String name) {
     return getViewClientBuilder(ns, Optional.of(name)).get();
+  }
+
+  private Response doLoadViewWithIfNoneMatch(Namespace ns, String name, String ifNoneMatch) {
+    return getViewClientBuilder(ns, Optional.of(name))
+        .header(IcebergViewOperations.IF_NONE_MATCH, ifNoneMatch)
+        .get();
   }
 
   private Response doRegisterView(Namespace ns, String name) {
