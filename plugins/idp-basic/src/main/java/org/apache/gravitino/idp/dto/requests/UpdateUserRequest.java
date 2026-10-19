@@ -104,6 +104,9 @@ public class UpdateUserRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         newPassword != null || enabled != null, "\"newPassword\" or \"enabled\" field is required");
+    Preconditions.checkArgument(
+        newPassword != null || oldPassword == null,
+        "\"oldPassword\" is only allowed when changing the password");
     if (newPassword != null) {
       IdpCredentialValidator.validatePassword(newPassword);
     }

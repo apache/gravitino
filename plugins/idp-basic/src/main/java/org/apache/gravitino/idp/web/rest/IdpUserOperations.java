@@ -106,11 +106,9 @@ public class IdpUserOperations {
         httpRequest,
         () -> {
           request.validate();
-          enforceSelfPasswordUpdateRules(user, request);
+          enforceUpdateUserRules(user, request);
           changePasswordIfRequested(user, request);
-          if (request.getEnabled() != null) {
-            userGroupManager.updateEnabled(user, request.getEnabled());
-          }
+          updateEnabledIfRequested(user, request);
           return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
         },
         "user",
@@ -119,52 +117,69 @@ public class IdpUserOperations {
   }
 
   /**
-   * Non-service-admins may only change their own password and cannot update {@code enabled}.
+   * Enforces who may update which fields. Non-service-admins may only change their own password and
+   * cannot update {@code enabled}. Self-service password changes require {@code oldPassword};
+   * service-admin resets of another user must not send {@code oldPassword}.
    *
    * @param user the path username being updated
    * @param request the update request
    */
-  private static void enforceSelfPasswordUpdateRules(String user, UpdateUserRequest request) {
+  private static void enforceUpdateUserRules(String user, UpdateUserRequest request) {
     String currentUser = PrincipalUtils.getCurrentUserName();
     List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
-    if (IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
+    boolean isServiceAdmin = IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser);
+    if (!isServiceAdmin) {
+      if (!user.equals(currentUser)) {
+        throw new ForbiddenException(
+            "Only service admins can update another user's password or enabled flag");
+      }
+      if (request.getEnabled() != null) {
+        throw new ForbiddenException("Only service admins can update the enabled flag");
+      }
+    }
+    if (request.getNewPassword() == null) {
       return;
     }
-    if (!user.equals(currentUser)) {
-      throw new ForbiddenException(
-          "Only service admins can update another user's password or enabled flag");
-    }
-    if (request.getEnabled() != null) {
-      throw new ForbiddenException("Only service admins can update the enabled flag");
+    if (user.equals(currentUser)) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(request.getOldPassword()),
+          "\"oldPassword\" is required when changing your own password");
+    } else {
+      Preconditions.checkArgument(
+          request.getOldPassword() == null,
+          "\"oldPassword\" is only allowed when changing your own password");
     }
   }
 
   /**
-   * Applies a password update. Self-service changes require and verify {@code oldPassword}.
-   * Service-admin resets of another user must not send {@code oldPassword}.
+   * Applies a password update when {@code newPassword} is present. Caller must already have run
+   * {@link #enforceUpdateUserRules}.
    *
    * @param user the path username being updated
    * @param request the update request
    */
   private void changePasswordIfRequested(String user, UpdateUserRequest request) {
     if (request.getNewPassword() == null) {
-      Preconditions.checkArgument(
-          request.getOldPassword() == null,
-          "\"oldPassword\" is only allowed when changing the password");
       return;
     }
-    String currentUser = PrincipalUtils.getCurrentUserName();
-    if (user.equals(currentUser)) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(request.getOldPassword()),
-          "\"oldPassword\" is required when changing your own password");
+    if (user.equals(PrincipalUtils.getCurrentUserName())) {
       userGroupManager.changePassword(user, request.getNewPassword(), request.getOldPassword());
-      return;
+    } else {
+      userGroupManager.changePassword(user, request.getNewPassword());
     }
-    Preconditions.checkArgument(
-        request.getOldPassword() == null,
-        "\"oldPassword\" is only allowed when changing your own password");
-    userGroupManager.changePassword(user, request.getNewPassword());
+  }
+
+  /**
+   * Applies an enabled-flag update when {@code enabled} is present. Caller must already have run
+   * {@link #enforceUpdateUserRules}.
+   *
+   * @param user the path username being updated
+   * @param request the update request
+   */
+  private void updateEnabledIfRequested(String user, UpdateUserRequest request) {
+    if (request.getEnabled() != null) {
+      userGroupManager.updateEnabled(user, request.getEnabled());
+    }
   }
 
   @DELETE

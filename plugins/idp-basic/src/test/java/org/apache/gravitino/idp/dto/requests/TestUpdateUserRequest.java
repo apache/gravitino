@@ -75,12 +75,17 @@ public class TestUpdateUserRequest {
     Assertions.assertDoesNotThrow(() -> new UpdateUserRequest(VALID_PASSWORD).validate());
     Assertions.assertDoesNotThrow(() -> new UpdateUserRequest(null, false).validate());
     Assertions.assertDoesNotThrow(() -> new UpdateUserRequest(VALID_PASSWORD, true).validate());
+    Assertions.assertDoesNotThrow(
+        () -> new UpdateUserRequest(VALID_PASSWORD, "old_password12", null).validate());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new UpdateUserRequest().validate());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new UpdateUserRequest(" ").validate());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new UpdateUserRequest("short").validate());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new UpdateUserRequest(null, "leftover-old-12", false).validate());
   }
 
   @Test
