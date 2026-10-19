@@ -121,8 +121,6 @@ public final class SparkApplicationUtils {
    */
   public static GenericKubernetesResource buildSparkApplication(
       JobContext context, SparkJobTemplate template, K8sJobExecutorConfigs configs) {
-    template.environments().keySet().forEach(name -> checkEnvironmentName(template, name));
-
     String executable = getExecutableUri(context, template, configs);
     checkClusterReachable(executable);
     template.jars().forEach(SparkApplicationUtils::checkClusterReachable);
@@ -134,6 +132,7 @@ public final class SparkApplicationUtils {
         .environments()
         .forEach(
             (name, value) -> {
+              checkEnvironmentName(template, name);
               sparkConf.put(SPARK_DRIVER_ENV_PREFIX + name, value);
               sparkConf.put(SPARK_EXECUTOR_ENV_PREFIX + name, value);
             });
@@ -247,10 +246,9 @@ public final class SparkApplicationUtils {
         || name.startsWith("..")) {
       throw new IllegalArgumentException(
           String.format(
-              "Environment variable name '%s' of job template %s is invalid: it must consist of"
-                  + " letters, digits, '_', '-' or '.', must not start with a digit or '..', and"
-                  + " must not be '.'",
-              name, template.name()));
+              "Environment variable name '%s' of job template %s is invalid: it must match %s,"
+                  + " must not be '.' and must not start with '..'",
+              name, template.name(), ENVIRONMENT_NAME_PATTERN.pattern()));
     }
   }
 
