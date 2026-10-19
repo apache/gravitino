@@ -378,8 +378,10 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   protected void purgeTable(String databaseName, String tableName) {
     LOG.info("Attempting to purge table {} from database {}", tableName, databaseName);
+    // Reject unsupported purge operations before borrowing an execution connection.
+    String sql = generatePurgeTableSql(databaseName, tableName);
     try (Connection connection = getConnection(databaseName)) {
-      JdbcConnectorUtils.executeUpdate(connection, generatePurgeTableSql(databaseName, tableName));
+      JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Purge table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);

@@ -99,6 +99,7 @@ public class TestStarRocksTableOperationsSqlGeneration {
         "StarRocks does not support purge table in Gravitino, please use drop table",
         exception.getMessage());
     Assertions.assertTrue(connections.executedSql().isEmpty());
+    Assertions.assertEquals(0, connections.totalBorrows());
     Assertions.assertEquals(0, connections.borrowed());
   }
 
