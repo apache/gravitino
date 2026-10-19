@@ -41,6 +41,7 @@ import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions;
 import org.apache.spark.sql.jdbc.JdbcDialects;
 import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
@@ -186,7 +187,14 @@ final class DorisPhysicalSchemaValidator35 {
         throw mismatch(identifier, "unsupported Doris type for " + logical.name());
       }
       DataType expected = typeConverter.toSparkType(logical.dataType());
-      if (!expected.equals(spark.dataType())) {
+      // Spark 3.5 reports SMALLINT as IntegerType in JDBC metadata. The existing JDBC table
+      // still scans it with the logical ShortType schema and JDBC getShort().
+      boolean compatibleSmallInt =
+          "smallint".equals(baseType(jdbc.typeName()))
+              && "smallint".equals(baseType(fe.typeName()))
+              && DataTypes.ShortType.equals(expected)
+              && DataTypes.IntegerType.equals(spark.dataType());
+      if (!expected.equals(spark.dataType()) && !compatibleSmallInt) {
         throw mismatch(identifier, "logical and Spark physical types differ for " + logical.name());
       }
       validateLogicalTypeSignature(identifier, logical, fe.signature());

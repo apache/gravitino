@@ -44,10 +44,12 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTypeConverter;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions;
+import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -201,6 +203,53 @@ public class TestDorisPhysicalSchemaValidator35 {
                 jdbcColumns,
                 feColumns,
                 new SparkJdbcTypeConverter()));
+  }
+
+  @Test
+  void testSmallIntMetadataRepresentationsPreserveLogicalShortType() {
+    assertEquals(
+        DataTypes.ShortType, new SparkJdbcTypeConverter().toSparkType(Types.ShortType.get()));
+    for (DataType physicalType : Arrays.asList(DataTypes.ShortType, DataTypes.IntegerType)) {
+      for (boolean nullable : new boolean[] {false, true}) {
+        assertDoesNotThrow(
+            () ->
+                validateSingleColumn(
+                    Types.ShortType.get(), physicalType, "SMALLINT", "SMALLINT", nullable));
+      }
+    }
+  }
+
+  @Test
+  void testSmallIntCompatibilityRequiresMatchingSmallIntMetadata() {
+    List<String> typeNames = Arrays.asList("SMALLINT", "TINYINT", "INT", "BIGINT");
+    for (String jdbcType : typeNames) {
+      for (String feType : typeNames) {
+        if ("SMALLINT".equals(jdbcType) && "SMALLINT".equals(feType)) {
+          continue;
+        }
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                validateSingleColumn(
+                    Types.ShortType.get(), DataTypes.IntegerType, jdbcType, feType, false));
+      }
+    }
+  }
+
+  @Test
+  void testSmallIntCompatibilityDoesNotAllowOtherLogicalOrSparkTypes() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.ByteType.get(), DataTypes.IntegerType, "SMALLINT", "SMALLINT", false));
+    for (DataType physicalType : Arrays.asList(DataTypes.ByteType, DataTypes.LongType)) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              validateSingleColumn(
+                  Types.ShortType.get(), physicalType, "SMALLINT", "SMALLINT", false));
+    }
   }
 
   @Test
@@ -413,8 +462,21 @@ public class TestDorisPhysicalSchemaValidator35 {
                 new SparkJdbcTypeConverter()));
   }
 
-  private static Column logicalColumn(
-      String name, org.apache.gravitino.rel.types.Type type, boolean nullable) {
+  private static void validateSingleColumn(
+      Type logicalType, DataType physicalType, String jdbcType, String feType, boolean nullable) {
+    DorisPhysicalSchemaValidator35.validateColumns(
+        Identifier.of(new String[] {"db"}, "table"),
+        logicalTable(logicalColumn("value", logicalType, nullable)),
+        DataTypes.createStructType(
+            new StructField[] {DataTypes.createStructField("value", physicalType, nullable)}),
+        Arrays.asList(
+            new DorisPhysicalSchemaValidator35.PhysicalColumn("value", jdbcType, nullable, 0)),
+        Arrays.asList(
+            new DorisPhysicalSchemaValidator35.PhysicalColumn("value", feType, nullable, 0)),
+        new SparkJdbcTypeConverter());
+  }
+
+  private static Column logicalColumn(String name, Type type, boolean nullable) {
     Column column = mock(Column.class);
     when(column.name()).thenReturn(name);
     when(column.dataType()).thenReturn(type);
