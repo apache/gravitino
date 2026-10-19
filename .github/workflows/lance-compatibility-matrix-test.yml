@@ -6,11 +6,11 @@ on:
       lance_spark_versions:
         description: "Comma-separated lance-spark-bundle versions"
         required: false
-        default: "0.2.0,0.4.0,0.5.1,0.8.0"
+        default: "0.2.0,0.4.0,0.5.1,0.6.1,0.7.1,0.8.0"
       lance_ray_versions:
-        description: "Comma-separated lance-ray versions"
+        description: "Comma-separated lance-ray rows, each <lance-ray>=<lance-namespace>"
         required: false
-        default: "0.4.2,0.3.0"
+        default: "0.5.0=0.8.6,0.4.2=0.7.5,0.3.0=0.7.5,0.2.0=0.4.5"
   schedule:
     # Run weekly on main so compatibility drift is caught outside PR validation.
     - cron: "0 18 * * 0"
@@ -23,5 +23,5 @@ jobs:
   lance-matrix:
     uses: ./.github/workflows/lance-compatibility-matrix-test-action.yml
     with:
-      lance_spark_versions: ${{ github.event.inputs.lance_spark_versions || '0.2.0,0.4.0,0.5.1,0.8.0' }}
-      lance_ray_versions: ${{ github.event.inputs.lance_ray_versions || '0.4.2,0.3.0' }}
+      lance_spark_versions: ${{ github.event.inputs.lance_spark_versions || '0.2.0,0.4.0,0.5.1,0.6.1,0.7.1,0.8.0' }}
+      lance_ray_versions: ${{ github.event.inputs.lance_ray_versions || '0.5.0=0.8.6,0.4.2=0.7.5,0.3.0=0.7.5,0.2.0=0.4.5' }}

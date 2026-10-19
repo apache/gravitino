@@ -32,11 +32,14 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 // Without an explicit property, the integration test matrix covers every
 // declared version and the normal test task uses 0.8.0 as its primary bundle,
 // since 0.8.0 is the bundle built on lance-core 12.0.0 / lance-namespace 0.11.1.
+// The default list spans every lance-namespace generation a released bundle
+// speaks: pre-0.7 (0.2.0, 0.4.0), 0.7.5 (0.5.1), 0.8.6 (0.6.1, 0.7.1) and
+// 0.11.1 (0.8.0).
 // An explicit property is a targeted diagnostic override; its first version
 // remains the primary bundle for compatibility with the existing behavior.
 val lanceSparkBundleVersionsProperty = project.properties["lanceSparkBundleVersions"] as? String
 val lanceSparkBundleVersions: List<String> =
-  (lanceSparkBundleVersionsProperty ?: "0.2.0,0.4.0,0.5.1,0.8.0")
+  (lanceSparkBundleVersionsProperty ?: "0.2.0,0.4.0,0.5.1,0.6.1,0.7.1,0.8.0")
     .split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 if (lanceSparkBundleVersions.isEmpty()) {
   throw GradleException("lanceSparkBundleVersions must contain at least one version")
