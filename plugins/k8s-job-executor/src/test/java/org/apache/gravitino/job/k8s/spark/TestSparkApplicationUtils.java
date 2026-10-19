@@ -548,8 +548,26 @@ public class TestSparkApplicationUtils {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  public void testAcceptEnvironmentNames() {
+    for (String valid : new String[] {"-X", ".X", "_X", "a.b-c_1", ".a.."}) {
+      SparkJobTemplate template =
+          SparkJobTemplate.builder()
+              .withName("user-job")
+              .withExecutable("https://repo/app.jar")
+              .withClassName("org.example.App")
+              .withEnvironments(ImmutableMap.of(valid, "v"))
+              .build();
+      Map<String, String> sparkConf =
+          (Map<String, String>) getSpec(template, configs).get("sparkConf");
+      Assertions.assertEquals("v", sparkConf.get("spark.kubernetes.driverEnv." + valid), valid);
+      Assertions.assertEquals("v", sparkConf.get("spark.executorEnv." + valid), valid);
+    }
+  }
+
+  @Test
   public void testRejectInvalidEnvironmentName() {
-    for (String invalid : new String[] {"", "MY VAR", "A=B", "1ST", "PATH/X"}) {
+    for (String invalid : new String[] {"", "MY VAR", "A=B", "1ST", "PATH/X", ".", "..", "..CFG"}) {
       SparkJobTemplate template =
           SparkJobTemplate.builder()
               .withName("user-job")
@@ -562,6 +580,7 @@ public class TestSparkApplicationUtils {
               IllegalArgumentException.class,
               () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
       Assertions.assertTrue(e.getMessage().contains("user-job"), e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("'" + invalid + "'"), e.getMessage());
       // The value of an environment variable never goes into an error message.
       Assertions.assertFalse(e.getMessage().contains("secret-value"), e.getMessage());
     }

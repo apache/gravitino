@@ -89,7 +89,10 @@ public final class SparkApplicationUtils {
   private static final String SPARK_DRIVER_ENV_PREFIX = "spark.kubernetes.driverEnv.";
   private static final String SPARK_EXECUTOR_ENV_PREFIX = "spark.executorEnv.";
 
-  // The names every Kubernetes version accepts for the environment variable of a container.
+  // The environment variable names that Spark passes to the executors: Spark 3.5 drops any other
+  // spark.executorEnv.* key with only a warning, while the driver would still get it. Kubernetes
+  // without the relaxed environment variable validation accepts the same names, except '.' and
+  // the names starting with '..', which are rejected separately.
   private static final Pattern ENVIRONMENT_NAME_PATTERN =
       Pattern.compile("[-._a-zA-Z][-._a-zA-Z0-9]*");
 
@@ -106,9 +109,9 @@ public final class SparkApplicationUtils {
    *
    * <p>The environment variables of the job template are set for the driver and the executors
    * through the Spark configurations {@code spark.kubernetes.driverEnv.*} and {@code
-   * spark.executorEnv.*}, so their values can be read in the SparkApplication and in its pods. They
-   * override the default Spark configurations of the job executor, and the Spark configurations of
-   * the job template override them.
+   * spark.executorEnv.*}, which means their values are visible in the SparkApplication and in its
+   * pods. They override the default Spark configurations of the job executor, and the Spark
+   * configurations of the job template override them.
    *
    * @param context the context of the job run
    * @param template the runtime job template, whose resources are the URIs given in the template
@@ -237,13 +240,16 @@ public final class SparkApplicationUtils {
   }
 
   private static void checkEnvironmentName(SparkJobTemplate template, String name) {
-    // Checked here, as Kubernetes would otherwise reject the name only when the operator creates
-    // the driver pod.
-    if (!ENVIRONMENT_NAME_PATTERN.matcher(name).matches()) {
+    // Checked here, as an invalid name would otherwise only miss the executors, or fail the job
+    // when the operator creates the driver pod.
+    if (!ENVIRONMENT_NAME_PATTERN.matcher(name).matches()
+        || ".".equals(name)
+        || name.startsWith("..")) {
       throw new IllegalArgumentException(
           String.format(
-              "Environment variable name %s of job template %s is invalid: it must consist of"
-                  + " letters, digits, '_', '-' or '.', and must not start with a digit",
+              "Environment variable name '%s' of job template %s is invalid: it must consist of"
+                  + " letters, digits, '_', '-' or '.', must not start with a digit or '..', and"
+                  + " must not be '.'",
               name, template.name()));
     }
   }
