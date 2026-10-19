@@ -19,23 +19,30 @@
 
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
@@ -52,6 +59,48 @@ public class TestGravitinoDorisCatalogSpark35 {
     assertThrows(
         IllegalArgumentException.class,
         () -> GravitinoDorisCatalogSpark35.requiredJdbcCredential(catalog));
+  }
+
+  @Test
+  void testMissingDriverClassRemainsDiagnosableWithoutConnectionDetails() {
+    String catalogName = "doris";
+    String driverClass = "org.example.MissingDorisJdbcDriver";
+    String urlPassword = "test-url-secret";
+    String jdbcUrl = "jdbc:mysql://fe.example.invalid:9030/db?password=" + urlPassword;
+    String jdbcPassword = "test-vended-secret";
+    Catalog catalog = mock(Catalog.class);
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog(catalogName)).thenReturn(catalog);
+    when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+    when(catalog.provider()).thenReturn("jdbc-doris");
+    when(catalog.properties()).thenReturn(Map.of("jdbc-url", jdbcUrl, "jdbc-driver", driverClass));
+    when(catalog.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials())
+        .thenReturn(new Credential[] {new JdbcCredential("vended-user", jdbcPassword)});
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets()).thenReturn(Map.of());
+
+    GravitinoCatalogManager manager =
+        GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> client);
+    try {
+      ClassNotFoundException failure =
+          assertThrows(
+              ClassNotFoundException.class,
+              () ->
+                  new GravitinoDorisCatalogSpark35()
+                      .initialize(catalogName, new CaseInsensitiveStringMap(Map.of())));
+      assertTrue(failure.getMessage().contains(driverClass));
+      StringWriter stackTrace = new StringWriter();
+      failure.printStackTrace(new PrintWriter(stackTrace));
+      String diagnostics = stackTrace.toString();
+      assertFalse(diagnostics.contains(jdbcUrl));
+      assertFalse(diagnostics.contains(urlPassword));
+      assertFalse(diagnostics.contains(jdbcPassword));
+    } finally {
+      manager.close();
+    }
   }
 
   @Test

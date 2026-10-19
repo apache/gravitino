@@ -25,7 +25,6 @@ import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.Properties;
-import java.util.logging.Logger;
 
 /** Loadable JDBC driver for inspecting Spark's physical-schema connection properties. */
 public class DorisTestDriver implements Driver {
@@ -74,7 +73,7 @@ public class DorisTestDriver implements Driver {
   }
 
   @Override
-  public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+  public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
     throw new SQLFeatureNotSupportedException();
   }
 }
