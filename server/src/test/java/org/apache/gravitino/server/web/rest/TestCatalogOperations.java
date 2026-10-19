@@ -27,6 +27,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -388,6 +389,50 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Assertions.assertNotNull(connectionError.getStack());
     Assertions.assertTrue(
         String.join("\n", connectionError.getStack()).contains("database connection detail"));
+  }
+
+  @Test
+  void testJdbcDriverDefaultOnPublicEndpoints() {
+    CatalogCreateRequest req =
+        new CatalogCreateRequest(
+            "catalog1",
+            Catalog.Type.RELATIONAL,
+            "lakehouse-iceberg",
+            "comment",
+            ImmutableMap.of(
+                "catalog-backend", "jdbc", "uri", "jdbc:postgresql://host:5432/catalog"));
+    when(manager.createCatalog(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(buildCatalog("metalake1", "catalog1"));
+
+    Response create =
+        target("/metalakes/metalake1/catalogs")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), create.getStatus());
+    verify(manager)
+        .createCatalog(
+            any(),
+            any(),
+            any(),
+            any(),
+            argThat(props -> "org.postgresql.Driver".equals(props.get("jdbc-driver"))),
+            any(),
+            any());
+
+    Response connection =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), connection.getStatus());
+    verify(manager)
+        .testConnection(
+            any(),
+            any(),
+            any(),
+            any(),
+            argThat(props -> "org.postgresql.Driver".equals(props.get("jdbc-driver"))));
   }
 
   @Test
