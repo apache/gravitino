@@ -106,7 +106,8 @@ public class RESTService implements GravitinoAuxiliaryService {
         };
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
-    if (shouldEnableMetrics(auxMode, icebergConfig)) {
+    boolean metricsEnabled = shouldEnableMetrics(auxMode, icebergConfig);
+    if (metricsEnabled) {
       server.addMetricsServlets(metricsSystem);
     }
 
@@ -223,6 +224,22 @@ public class RESTService implements GravitinoAuxiliaryService {
             EventSource.GRAVITINO_ICEBERG_REST_SERVER,
             new IcebergHealthCheckPathMatcher()),
         ICEBERG_SPEC);
+    if (metricsEnabled) {
+      server.addFilter(new RequestContextFilter(eventBus), JettyServer.METRICS_PATH_SPECS.get(0));
+      server.addFilter(new RequestContextFilter(eventBus), JettyServer.METRICS_PATH_SPECS.get(1));
+      server.addFilter(
+          new HttpAuditFilter(
+              eventBus,
+              EventSource.GRAVITINO_ICEBERG_REST_SERVER,
+              new IcebergHealthCheckPathMatcher()),
+          JettyServer.METRICS_PATH_SPECS.get(0));
+      server.addFilter(
+          new HttpAuditFilter(
+              eventBus,
+              EventSource.GRAVITINO_ICEBERG_REST_SERVER,
+              new IcebergHealthCheckPathMatcher()),
+          JettyServer.METRICS_PATH_SPECS.get(1));
+    }
     server.addSystemFilters(ICEBERG_SPEC);
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
@@ -233,7 +250,14 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health/*");
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
 
-    server.addCustomFilters(ICEBERG_SPEC);
+    if (metricsEnabled) {
+      server.addCustomFilters(
+          ICEBERG_SPEC,
+          JettyServer.METRICS_PATH_SPECS.get(0),
+          JettyServer.METRICS_PATH_SPECS.get(1));
+    } else {
+      server.addCustomFilters(ICEBERG_SPEC);
+    }
   }
 
   static boolean shouldEnableMetrics(boolean auxiliaryMode, IcebergConfig icebergConfig) {

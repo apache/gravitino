@@ -85,7 +85,8 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     server.initialize(serverConfig, SERVICE_NAME, false);
-    if (shouldEnableMetrics(auxMode, lanceConfig)) {
+    boolean metricsEnabled = shouldEnableMetrics(auxMode, lanceConfig);
+    if (metricsEnabled) {
       server.addMetricsServlets(metricsSystem);
     }
 
@@ -145,6 +146,18 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         new HttpAuditFilter(
             eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
         LANCE_SPEC);
+    if (metricsEnabled) {
+      server.addFilter(new RequestContextFilter(eventBus), JettyServer.METRICS_PATH_SPECS.get(0));
+      server.addFilter(new RequestContextFilter(eventBus), JettyServer.METRICS_PATH_SPECS.get(1));
+      server.addFilter(
+          new HttpAuditFilter(
+              eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
+          JettyServer.METRICS_PATH_SPECS.get(0));
+      server.addFilter(
+          new HttpAuditFilter(
+              eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
+          JettyServer.METRICS_PATH_SPECS.get(1));
+    }
     server.addSystemFilters(LANCE_SPEC);
     if (auxMode) {
       server.addFilter(
@@ -160,7 +173,12 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
-    server.addCustomFilters(LANCE_SPEC);
+    if (metricsEnabled) {
+      server.addCustomFilters(
+          LANCE_SPEC, JettyServer.METRICS_PATH_SPECS.get(0), JettyServer.METRICS_PATH_SPECS.get(1));
+    } else {
+      server.addCustomFilters(LANCE_SPEC);
+    }
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",

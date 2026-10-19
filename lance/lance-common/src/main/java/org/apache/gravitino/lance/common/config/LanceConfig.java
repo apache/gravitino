@@ -48,7 +48,7 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .doc(
               "Whether to expose /metrics and /prometheus/metrics in standalone mode. "
                   + "This setting is ignored when running as an auxiliary service.")
-          .version(ConfigConstants.VERSION_2_0_0)
+          .version(ConfigConstants.VERSION_1_3_2)
           .booleanConf()
           .createWithDefault(false);
 
