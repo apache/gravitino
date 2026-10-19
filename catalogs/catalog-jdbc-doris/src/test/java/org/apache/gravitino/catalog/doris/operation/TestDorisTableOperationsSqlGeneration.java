@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisExceptionConverter;
@@ -56,6 +57,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
@@ -266,19 +268,19 @@ public class TestDorisTableOperationsSqlGeneration {
         ops.updateColumnTypeSql(unsetDefault, Types.LongType.get()).contains("bigint NULL ;"));
   }
 
-  /** Verifies nested column names remain unsupported for type changes. */
-  @Test
-  public void testUpdateColumnTypeRejectsNestedColumnName() {
+  /**
+   * Verifies rejected nested-column changes follow the alter-table exception contract.
+   *
+   * @param change the nested-column change to reject
+   */
+  @ParameterizedTest
+  @MethodSource("nestedColumnChanges")
+  public void testRejectsNestedColumnName(TableChange change) {
     TestableDorisTableOperations ops = new TestableDorisTableOperations();
 
-    UnsupportedOperationException exception =
+    IllegalArgumentException exception =
         Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                ops.alterTableSql(
-                    "test_table",
-                    TableChange.updateColumnType(
-                        new String[] {"parent", "child"}, Types.LongType.get())));
+            IllegalArgumentException.class, () -> ops.alterTableSql("test_table", change));
 
     Assertions.assertEquals("Doris does not support nested column names.", exception.getMessage());
   }
@@ -1540,5 +1542,15 @@ public class TestDorisTableOperationsSqlGeneration {
     Mockito.when(resultSet.next()).thenReturn(true);
     Mockito.when(resultSet.getString(1)).thenReturn(dorisVersion);
     return dataSource;
+  }
+
+  private static Stream<TableChange> nestedColumnChanges() {
+    String[] fieldName = {"parent", "child"};
+    return Stream.of(
+        TableChange.addColumn(fieldName, Types.LongType.get()),
+        TableChange.updateColumnComment(fieldName, "new comment"),
+        TableChange.updateColumnPosition(fieldName, TableChange.ColumnPosition.first()),
+        TableChange.deleteColumn(fieldName, false),
+        TableChange.updateColumnType(fieldName, Types.LongType.get()));
   }
 }
