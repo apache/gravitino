@@ -178,6 +178,78 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testConflictingUpdatePreservesWinningVersion() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    Namespace namespace = Namespace.of(metalakeName, catalogName, schemaName);
+    long tableId = RandomIdGenerator.INSTANCE.nextId();
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withPosition(0)
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity original =
+        TableEntity.builder()
+            .withId(tableId)
+            .withName("conflicting_table")
+            .withNamespace(namespace)
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService service = TableMetaService.getInstance();
+    service.insertTable(original, false);
+    TableEntity winner =
+        TableEntity.builder()
+            .withId(tableId)
+            .withName(original.name())
+            .withNamespace(namespace)
+            .withComment("winner")
+            .withProperties(ImmutableMap.of("key", "winner"))
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity loser =
+        TableEntity.builder()
+            .withId(tableId)
+            .withName(original.name())
+            .withNamespace(namespace)
+            .withComment("loser")
+            .withProperties(ImmutableMap.of("key", "loser"))
+            .withColumns(List.of())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    IOException conflict =
+        assertThrows(
+            IOException.class,
+            () ->
+                service.updateTable(
+                    original.nameIdentifier(),
+                    (TableEntity old) -> {
+                      // The outer update has read its old snapshot, but has not begun its write
+                      // transaction.
+                      try {
+                        service.updateTable(
+                            original.nameIdentifier(), (TableEntity ignored) -> winner);
+                      } catch (IOException e) {
+                        throw new AssertionError(e);
+                      }
+                      return loser;
+                    }));
+    Assertions.assertEquals(
+        TableMetaService.UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + original.nameIdentifier(),
+        conflict.getMessage());
+    TableEntity stored = service.getTableByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals(winner.comment(), stored.comment());
+    Assertions.assertEquals(winner.properties(), stored.properties());
+    compareTwoColumns(winner.columns(), stored.columns());
+  }
+
+  @TestTemplate
   public void testUpdateTable() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";

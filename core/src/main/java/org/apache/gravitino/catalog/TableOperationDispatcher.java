@@ -23,6 +23,7 @@ import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+import static org.apache.gravitino.storage.relational.service.TableMetaService.UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 
@@ -30,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -984,8 +986,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         () ->
             operateOnEntity(
                 tableIdent,
-                id ->
-                    store.update(
+                id -> {
+                  try {
+                    return store.update(
                         id,
                         TableEntity.class,
                         TABLE,
@@ -1012,7 +1015,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                             PrincipalUtils.getCurrentPrincipal().getName())
                                         .withLastModifiedTime(Instant.now())
                                         .build())
-                                .build()),
+                                .build());
+                  } catch (IOException e) {
+                    if (!(UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + id).equals(e.getMessage())) {
+                      throw e;
+                    }
+                    // Column repair is best-effort. Retain this load's existing snapshot rather
+                    // than lose its metadata or replay a write against a concurrent change.
+                    // This snapshot can be stale; this does not provide HA read consistency.
+                    LOG.warn(
+                        "Skipping column repair for table {} after a concurrent metadata update; "
+                            + "retaining the metadata snapshot read by this load",
+                        id,
+                        e);
+                    return combinedTable.tableFromGravitino();
+                  }
+                },
                 "UPDATE",
                 combinedTable.tableFromGravitino().id()));
   }
