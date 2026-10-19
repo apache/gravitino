@@ -99,6 +99,12 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       Distribution distribution,
       Index[] indexes) {
 
+    if (ArrayUtils.isNotEmpty(indexes)) {
+      throw new UnsupportedOperationException(
+          "StarRocks catalog does not support creating table indexes. "
+              + "Remove indexes from the create table request.");
+    }
+
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append(String.format("CREATE TABLE `%s` ( \n", tableName));
     // Add columns

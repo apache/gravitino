@@ -153,7 +153,7 @@ Unsupported for now.
 
 ### Table Indexes
 
-Unsupported
+Unsupported. Creating a table with non-empty index definitions is rejected before the table is created.
 
 ### Table Partitioning
 
