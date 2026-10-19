@@ -20,11 +20,13 @@ package org.apache.gravitino.catalog.starrocks.operation;
 
 import java.sql.Connection;
 import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.catalog.jdbc.utils.ConnectionCountingDataSource;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTableOperations;
 import org.apache.gravitino.rel.TableChange;
@@ -51,6 +53,11 @@ public class TestStarRocksTableOperationsSqlGeneration {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new StarRocksTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+    }
+
+    private TestableStarRocksTableOperations(ConnectionCountingDataSource connections) {
+      this();
+      dataSource = connections.dataSource();
     }
 
     public String createTableSql(
@@ -141,6 +148,33 @@ public class TestStarRocksTableOperationsSqlGeneration {
         ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution),
         ops.createTableSql(
             "test_table", new JdbcColumn[] {column}, distribution, "comment", indexes));
+  }
+
+  @Test
+  void testPurgeIsRejectedWithoutExecutingSql() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations(connections);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> ops.purge("database", "test_table"));
+
+    Assertions.assertEquals(
+        "StarRocks does not support purge table in Gravitino, please use drop table",
+        exception.getMessage());
+    Assertions.assertTrue(connections.executedSql().isEmpty());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  void testDropStillExecutesDropTable() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations(connections);
+
+    Assertions.assertTrue(ops.drop("database", "test_table"));
+
+    Assertions.assertEquals(List.of("DROP TABLE `test_table`"), connections.executedSql());
+    Assertions.assertEquals(0, connections.borrowed());
   }
 
   @Test
