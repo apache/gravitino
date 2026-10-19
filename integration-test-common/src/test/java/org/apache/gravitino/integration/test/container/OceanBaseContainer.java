@@ -84,6 +84,7 @@ public class OceanBaseContainer extends BaseContainer {
 
     await()
         .atMost(30, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
         .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {

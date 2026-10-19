@@ -205,6 +205,7 @@ public class DorisContainer extends BaseContainer {
 
     await()
         .atMost(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
         .pollInterval(STARTUP_TIMEOUT_SECONDS / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {

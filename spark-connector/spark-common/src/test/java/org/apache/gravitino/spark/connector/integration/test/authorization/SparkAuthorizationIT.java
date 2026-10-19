@@ -117,7 +117,6 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   @AfterAll
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
-    containerSuite.close();
     setEnv("SPARK_USER", AuthConstants.ANONYMOUS_USER);
     // HADOOP_USER_NAME will be set by spark auto.
     setEnv("HADOOP_USER_NAME", AuthConstants.ANONYMOUS_USER);

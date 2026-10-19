@@ -454,9 +454,10 @@ allprojects {
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
       param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:4.14.0")
 
-      // Disable Ryuk for integration tests
-      // Ryuk need privileged mode, if we want to rootless or run non-privileged mode, we need to disable it.
-      param.environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+      // Ryuk is on: it removes this JVM's test containers even when the JVM is killed, and needs only
+      // the Docker socket, not privileged mode. On rootless Podman, turn it off with Testcontainers'
+      // own switch: export TESTCONTAINERS_RYUK_DISABLED=true (#6475).
+      param.environment("TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED", "false")
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false

@@ -88,6 +88,8 @@ dependencies {
   // every module that uses the test artifacts needs them at test runtime.
   "testArtifacts"(libs.testcontainers.mysql)
   "testArtifacts"(libs.testcontainers.postgresql)
+  // The container classes wait with Awaitility, which Gravitino's code style imports unshaded.
+  "testArtifacts"(libs.awaitility)
 }
 
 artifacts {

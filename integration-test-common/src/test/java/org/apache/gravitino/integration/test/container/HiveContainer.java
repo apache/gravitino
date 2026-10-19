@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -91,7 +92,11 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   public void close() {
-    copyHiveLog();
+    // A private container is closed by its JUnit store and again by the suite at the end of the
+    // run; only a running container has logs to copy.
+    if (container.isRunning()) {
+      copyHiveLog();
+    }
     super.close();
   }
 
@@ -122,11 +127,14 @@ public class HiveContainer extends BaseContainer {
     LOG.info("Hive report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
   }
 
-  @Override
-  protected boolean checkContainerStatus(int retryLimit) {
+  // Ready means HDFS has a live data node and the Hive CLI can list databases.
+  private void awaitHiveCli() {
     await()
         .atMost(150, TimeUnit.SECONDS)
-        .pollInterval(150 / retryLimit, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
+        // Each check runs the Hive CLI, which takes seconds; a short interval only stops it from
+        // waiting long after Hive is up.
+        .pollInterval(1, TimeUnit.SECONDS)
         .until(
             () -> {
               try {
@@ -137,11 +145,7 @@ public class HiveContainer extends BaseContainer {
                       format(
                           "Command [%s] exited with %s",
                           String.join(" ", commandAndArgs), execResult.getExitCode());
-                  LOG.error("{}", message);
-                  LOG.error("stderr: {}", execResult.getStderr());
-                  LOG.error("stdout: {}", execResult.getStdout());
-
-                  outputHiveStatus();
+                  LOG.info("{}, stderr: {}", message, execResult.getStderr());
                 } else {
                   LOG.info("Hive container startup success!");
                   return true;
@@ -151,31 +155,27 @@ public class HiveContainer extends BaseContainer {
               }
               return false;
             });
+  }
 
-    final String showDatabaseSQL = "show databases";
-    // Starting both the regular Hive cluster and the Kerberos-enabled Hive cluster at the same time
-    // takes a long time.
-    await()
-        .atMost(120, TimeUnit.SECONDS)
-        .pollInterval(120 / retryLimit, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result = executeInContainer("hive", "-e", showDatabaseSQL);
-                if (result.getStdout().contains("default")) {
-                  return true;
-                }
-              } catch (Exception e) {
-                LOG.error("Failed to execute sql: {}", showDatabaseSQL, e);
-              }
-              return false;
-            });
+  @Override
+  protected boolean checkContainerStatus(int retryLimit) {
+    try {
+      awaitHiveCli();
+    } catch (RuntimeException e) {
+      // Each report runs two more CLIs, so only print it once Hive has run out of time.
+      outputHiveStatus();
+      throw e;
+    }
+
+    // Creating a table also creates /user/hive/warehouse in HDFS as the image's own user; Kerberos
+    // tests such as HiveUserAuthenticationIT rely on that directory and its permissions.
     final String createTableSQL =
         "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
             + "salary String, destination String) ";
     await()
         .atMost(120, TimeUnit.SECONDS)
-        .pollInterval(120 / retryLimit, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
+        .pollInterval(1, TimeUnit.SECONDS)
         .until(
             () -> {
               try {
@@ -196,8 +196,12 @@ public class HiveContainer extends BaseContainer {
             });
 
     String containerIp = getContainerIpAddress();
+    // The metastore opens its port only after the SQL checks above; under CI load that can take
+    // well over 10 seconds, so give it the same kind of budget as the other stages.
     await()
-        .atMost(10, TimeUnit.SECONDS)
+        .atMost(60, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
+        .pollInterval(Duration.ofSeconds(1))
         .until(
             () -> {
               try (Socket socket = new Socket()) {
