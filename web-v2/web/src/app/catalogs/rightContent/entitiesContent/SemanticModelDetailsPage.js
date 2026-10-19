@@ -41,7 +41,6 @@ import styles from './SemanticModelDetailsPage.module.css'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Tags from '@/components/CustomTags'
-import Policies from '@/components/PolicyTag'
 import GetOwner from '@/components/GetOwner'
 import Icons from '@/components/Icons'
 import PropertiesContent from '@/components/PropertiesContent'
@@ -610,11 +609,13 @@ export default function SemanticModelDetailsPage() {
                     placement='bottom'
                     title='Policies'
                     content={
-                      <Policies
-                        readOnly
-                        metadataObjectType='semantic_model'
-                        metadataObjectFullName={metadataObjectFullName}
-                      />
+                      <Space direction='vertical' size={4} className='max-w-sm'>
+                        {store.currentEntityPolicies.map(policy => (
+                          <Typography.Text key={policy.name} className='break-all'>
+                            {policy.name}
+                          </Typography.Text>
+                        ))}
+                      </Space>
                     }
                   >
                     <a className='text-defaultPrimary' aria-label='View Semantic Model policies'>

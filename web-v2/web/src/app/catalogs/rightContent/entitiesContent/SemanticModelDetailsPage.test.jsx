@@ -33,7 +33,7 @@ import reducer, {
 import SemanticModelDetailsPage from './SemanticModelDetailsPage'
 import SemanticMetadataEditor from '../SemanticMetadataEditor'
 
-const navigation = vi.hoisted(() => ({ replace: vi.fn(), name: 'sales model' }))
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), name: 'sales model' }))
 
 vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), put: vi.fn() } }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn() } }))
@@ -1072,33 +1072,37 @@ it('edits the time dimension through the field form', async () => {
   expect(document.querySelector('.ant-modal')).toBeNull()
 })
 
-it.each([true, false])(
-  'shows inherited=%s policies read-only with the Semantic Model metadata identity',
-  async inherited => {
-    await renderDetails(definitionWith(() => null))
-    await selectTab('Overview')
-    const policies = [{ name: 'retention', enabled: true, inherited }]
-    defHttp.get.mockResolvedValue({ policies })
-    await act(async () =>
-      store.dispatch(
-        getCurrentEntityPolicies({
-          init: true,
-          metalake: 'demo',
-          metadataObjectType: 'semantic_model',
-          metadataObjectFullName: `sales.mart.${navigation.name}`,
-          details: true
-        })
-      )
+it.each([true, false])('shows inherited=%s policies without editing or navigation', async inherited => {
+  await renderDetails(definitionWith(() => null))
+  await selectTab('Overview')
+  const policies = [{ name: 'retention', enabled: true, inherited }]
+  defHttp.get.mockResolvedValue({ policies })
+  await act(async () =>
+    store.dispatch(
+      getCurrentEntityPolicies({
+        init: true,
+        metalake: 'demo',
+        metadataObjectType: 'semantic_model',
+        metadataObjectFullName: `sales.mart.${navigation.name}`,
+        details: true
+      })
     )
-    const link = document.querySelector('[aria-label="View Semantic Model policies"]')
-    expect(link.textContent).toBe('1')
-    await act(async () => {
-      Simulate.mouseEnter(link)
-      await new Promise(resolve => setTimeout(resolve, 200))
-    })
-    expect(document.querySelector('.ant-popover').textContent).toContain('retention')
-    expect(document.querySelector('.ant-popover .ant-tag-close-icon')).toBeNull()
-    expect(document.querySelector('.ant-popover').textContent).not.toContain('Associate Policy')
-    expect(defHttp.get.mock.lastCall[0].url).toContain('/semantic_model/')
-  }
-)
+  )
+  const link = document.querySelector('[aria-label="View Semantic Model policies"]')
+  expect(link.textContent).toBe('1')
+  await act(async () => {
+    Simulate.mouseEnter(link)
+    await new Promise(resolve => setTimeout(resolve, 200))
+  })
+  expect(document.querySelector('.ant-popover').textContent).toContain('retention')
+  expect(document.querySelector('.ant-popover .ant-tag-close-icon')).toBeNull()
+  expect(document.querySelector('.ant-popover').textContent).not.toContain('Associate Policy')
+  expect(defHttp.get.mock.lastCall[0].url).toContain('/semantic_model/')
+  const requestsBeforeClick = defHttp.get.mock.calls.length
+  await click(findText('.ant-popover span', 'retention'))
+  expect(navigation.push).not.toHaveBeenCalled()
+  expect(navigation.replace).not.toHaveBeenCalled()
+  expect(defHttp.get).toHaveBeenCalledTimes(requestsBeforeClick)
+  expect(link.textContent).toBe('1')
+  expect(document.querySelector('.ant-popover').textContent).toContain('retention')
+})
