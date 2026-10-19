@@ -24,6 +24,7 @@ The following table outlines the tested compatibility between Gravitino versions
 | ------------------------------ | ------------------------------ | --------------------------------------------- |
 | 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
 | 1.3.0                          | 0.2.0, 0.4.0, 0.5.1            | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
+| 2.0.0                          | 0.2.0, 0.4.0, 0.5.1, 0.8.0     | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
 
 :::note
 - These version entries show which versions are expected to work together.
@@ -53,6 +54,13 @@ The following table outlines the tested compatibility between Gravitino versions
   raising `ImportError: cannot import name
   'LanceNamespaceStorageOptionsProvider' from 'lance'`. You can use
   `lance-ray` 0.2.0 with Gravitino 1.3.0 by pinning `pylance` to 3.x or 4.x.
+- **Gravitino 2.0.0 embeds `lance-core` 12.0.0 and `lance-namespace-core` 0.11.1**, the same
+  pair that `lance-spark` 0.8.0 is built on. Relative to 0.7.5, that release only *adds* optional
+  request fields (`branch`, `tag`) and a `context` map on responses, which Gravitino leaves empty.
+  The older `lance-spark` 0.2.0 / 0.4.0 / 0.5.1 bundles and `lance-namespace` 0.7.5 Python clients
+  keep working, because both ignore response fields they do not know. `branch` and `tag` are
+  accepted but ignored, and the branch, materialized-view, `update_field_metadata` and `rename`
+  endpoints are not implemented.
 - Before using in production, test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
@@ -87,9 +95,9 @@ Generic Catalog unknown-format loading errors or change the Generic Catalog's fo
 Both connectors ship with a multi-version integration test driver so the
 matrix can be re-verified (and extended) without ad-hoc scripting:
 
-For Lance Spark, the default `test` task uses the explicitly verified `0.5.1`
+For Lance Spark, the default `test` task uses the explicitly verified `0.8.0`
 bundle, while `lanceSparkMatrixTest` uses the declared matrix
-(`0.2.0`, `0.4.0`, and `0.5.1`). Passing `-PlanceSparkBundleVersions=...` is a
+(`0.2.0`, `0.4.0`, `0.5.1`, and `0.8.0`). Passing `-PlanceSparkBundleVersions=...` is a
 targeted diagnostic override; the supplied versions form the matrix and the
 first supplied version remains the primary for the normal `test` task.
 
@@ -98,7 +106,7 @@ first supplied version remains the primary for the normal `test` task.
 # The default list intentionally omits 0.1.0 / 0.1.1: those bundles call the
 # removed /create-empty endpoint and will fail with 404 against 1.3.0+.
 ./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
-    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1 \
+    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1,0.8.0 \
     -PskipDockerTests=true
 # Per-version JUnit reports land under
 # lance/lance-rest-server/build/reports/lance-spark-matrix/<version>/.
@@ -305,7 +313,8 @@ pip install lance-ray
 :::info
 - Ray will be automatically installed if not already present
 - For Gravitino 1.3.0, use a `lance-namespace` client compatible with
-  server-side `lance-namespace-core` 0.7.5 or newer.
+  server-side `lance-namespace-core` 0.7.5 or newer; Gravitino 2.0.0 serves
+  `lance-namespace-core` 0.11.1, which also accepts those older clients.
 - Ensure Ray version compatibility in your environment before deployment
 :::
 
