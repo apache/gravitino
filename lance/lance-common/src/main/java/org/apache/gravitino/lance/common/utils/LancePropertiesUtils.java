@@ -20,11 +20,8 @@
 package org.apache.gravitino.lance.common.utils;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
-<<<<<<< HEAD
-=======
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
->>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
 
 import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
@@ -40,8 +37,6 @@ public final class LancePropertiesUtils {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * Returns whether the supplied table format identifies a Lance table.
    *
    * @param tableFormat the table format, which may be null
@@ -82,7 +77,6 @@ public final class LancePropertiesUtils {
   }
 
   /**
->>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
    * Extracts Lance storage options from a property map.
    *
    * @param tableProperties the source properties

@@ -37,22 +37,21 @@ import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-<<<<<<< HEAD
-=======
-import javax.annotation.Nullable;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
->>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -72,6 +71,12 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -156,35 +161,17 @@ public class TestGenericCatalogOperations {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     ops = new GenericCatalogOperations(store, idGenerator);
-<<<<<<< HEAD
-=======
-
-    // A second instance, initialized so that it uses the test provider, to exercise the provision
-    // and unprovision callbacks. The shared instance above is never initialized and has no
-    // provider.
-    opsWithFakeProvider = new GenericCatalogOperations(store, idGenerator);
-    opsWithFakeProvider.initialize(
-        ImmutableMap.of(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER,
-            FakeTableLocationProvider.NAME),
-        null /* CatalogInfo, unused */,
-        new GenericCatalog());
-
-    // A third instance left on the built-in provider, to show that an external table carrying its
-    // own location is resolved the same way whichever provider a catalog is configured with.
-    opsWithDefaultProvider = new GenericCatalogOperations(store, idGenerator);
-    opsWithDefaultProvider.initialize(
-        ImmutableMap.of(), null /* CatalogInfo, unused */, new GenericCatalog());
   }
 
   @TempDir private Path lanceDataDir;
 
-  /** The provider must see effective ownership before allocating a registered table location. */
+  /** Registered tables must be persisted as external whatever the caller passed. */
   @ParameterizedTest
   @CsvSource(
       value = {"NULL", "false", "true"},
       nullValues = "NULL")
-  void testRegisterPropertiesAreExternalBeforeProvisioning(String external) {
+  void testRegisterPropertiesAreExternal(String external) {
+    GenericCatalogOperations lanceOps = initializedOps();
     NameIdentifier schemaIdent = createSchema();
     NameIdentifier ident =
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "registered");
@@ -205,7 +192,7 @@ public class TestGenericCatalogOperations {
     Map<String, String> original = Map.copyOf(properties);
 
     Table created =
-        opsWithFakeProvider.createTable(
+        lanceOps.createTable(
             ident,
             new Column[0],
             null,
@@ -216,18 +203,11 @@ public class TestGenericCatalogOperations {
             new Index[0]);
 
     Assertions.assertEquals("true", created.properties().get(Table.PROPERTY_EXTERNAL));
-    Assertions.assertEquals(
-        "true",
-        FakeTableLocationProvider.provisioned()
-            .get(0)
-            .tableProperties()
-            .get(Table.PROPERTY_EXTERNAL));
     Assertions.assertEquals(original, properties);
-    Assertions.assertTrue(opsWithFakeProvider.dropTable(ident));
-    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    Assertions.assertTrue(lanceOps.dropTable(ident));
   }
 
-  /** Legacy registrations preserve real data and avoid provider reclamation on drop/cascade. */
+  /** Legacy registrations preserve real data on drop and schema cascade; purge deletes it. */
   @ParameterizedTest
   @CsvSource(
       value = {
@@ -240,6 +220,7 @@ public class TestGenericCatalogOperations {
       },
       nullValues = "NULL")
   void testLegacyRegisteredLanceOwnership(String external, String operation) throws Exception {
+    GenericCatalogOperations lanceOps = initializedOps();
     NameIdentifier schemaIdent = createSchema();
     String location = lanceDataDir.resolve("legacy").toString();
     // Arrow Schema and Gravitino Schema share a simple name in this test class.
@@ -279,36 +260,37 @@ public class TestGenericCatalogOperations {
     store.put(entity, false);
 
     if ("purge".equals(operation)) {
-      Assertions.assertTrue(opsWithFakeProvider.purgeTable(ident));
+      Assertions.assertTrue(lanceOps.purgeTable(ident));
     } else if ("cascade".equals(operation)) {
-      Assertions.assertTrue(opsWithFakeProvider.dropSchema(schemaIdent, true));
+      Assertions.assertTrue(lanceOps.dropSchema(schemaIdent, true));
     } else {
-      Assertions.assertTrue(opsWithFakeProvider.dropTable(ident));
+      Assertions.assertTrue(lanceOps.dropTable(ident));
     }
 
-    Assertions.assertFalse(opsWithFakeProvider.tableExists(ident));
+    Assertions.assertFalse(lanceOps.tableExists(ident));
     if ("purge".equals(operation)) {
       Assertions.assertFalse(Files.exists(lanceDataDir.resolve("legacy/_versions")));
-      Assertions.assertEquals(1, FakeTableLocationProvider.unprovisioned().size());
-      Assertions.assertEquals(
-          location,
-          FakeTableLocationProvider.unprovisioned()
-              .get(0)
-              .tableProperties()
-              .get(Table.PROPERTY_LOCATION));
     } else {
-      Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
       try (Dataset dataset = Dataset.open().uri(location).build()) {
         Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
       }
     }
   }
 
-  @BeforeEach
-  public void resetProvider() {
-    FakeTableLocationProvider.reset();
-    FakeTableDelegator.reset();
->>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
+  private static GenericCatalogOperations initializedOps() {
+    GenericCatalogOperations initialized = new GenericCatalogOperations(store, idGenerator);
+    initialized.initialize(ImmutableMap.of(), null /* CatalogInfo, unused */, new GenericCatalog());
+    return initialized;
+  }
+
+  private NameIdentifier createSchema() {
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, randomSchemaName());
+    ops.createSchema(
+        schemaIdent,
+        null,
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+    return schemaIdent;
   }
 
   @AfterAll

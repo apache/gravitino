@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.lance.common.utils;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,8 +32,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestLancePropertiesUtils {
 
-<<<<<<< HEAD
-=======
   /** Verifies the binary Lance format predicate's case and null handling. */
   @Test
   public void testIsLanceTableFormatIsCaseInsensitiveAndNullSafe() {
@@ -74,7 +74,6 @@ public class TestLancePropertiesUtils {
     Assertions.assertEquals(original, properties);
   }
 
->>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
   @Test
   public void testGetLanceStorageOptions() {
     Map<String, String> properties =

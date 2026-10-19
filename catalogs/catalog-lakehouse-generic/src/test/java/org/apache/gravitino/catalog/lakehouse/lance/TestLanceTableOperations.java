@@ -36,6 +36,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +49,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.meta.AuditInfo;
@@ -66,9 +69,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.Dataset;
 import org.lance.Version;
+import org.lance.WriteParams;
 import org.lance.index.IndexOptions;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
@@ -100,7 +105,7 @@ public class TestLanceTableOperations {
     String location = tempDir.resolve("registered").toString();
     Column[] columns = {Column.of("id", Types.IntegerType.get())};
     when(idGenerator.nextId()).thenReturn(10L);
-    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+    try (Dataset ignored = writeDataset(location)) {
       // Seed a dataset owned by the caller before registering it.
     }
     Map<String, String> properties = Maps.newHashMap();
@@ -169,7 +174,7 @@ public class TestLanceTableOperations {
     String location = tempDir.resolve("legacy").toString();
     Column[] columns = {Column.of("id", Types.IntegerType.get())};
     when(idGenerator.nextId()).thenReturn(10L);
-    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+    try (Dataset ignored = writeDataset(location)) {
       // A historical registration must never transfer ownership to Gravitino implicitly.
     }
     Map<String, String> properties =
@@ -1287,5 +1292,13 @@ public class TestLanceTableOperations {
               storedTable.set(updated);
               return updated;
             });
+  }
+
+  private static Dataset writeDataset(String location) {
+    return Dataset.write()
+        .schema(new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true)))))
+        .uri(location)
+        .mode(WriteParams.WriteMode.CREATE)
+        .execute();
   }
 }

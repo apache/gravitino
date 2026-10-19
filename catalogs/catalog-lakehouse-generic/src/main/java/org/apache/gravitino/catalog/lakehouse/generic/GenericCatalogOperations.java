@@ -234,6 +234,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
+    properties = LancePropertiesUtils.normalizeTableProperties(properties);
     String tableLocation = calculateTableLocation(schema, ident, properties);
 
     String format = properties.getOrDefault(Table.PROPERTY_TABLE_FORMAT, null);
@@ -250,27 +251,6 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     Preconditions.checkArgument(tableOpsSupplier != null, "Unsupported table format: %s", format);
     ManagedTableOperations tableOps = configureTableOps(tableOpsSupplier.get());
 
-<<<<<<< HEAD
-=======
-    // The provider is consulted only once the request is known to be one this catalog can serve.
-    // A provider that allocates real storage has no compensating callback, so every check that can
-    // be made before asking it for a location is one reservation it does not have to reclaim.
-    //
-    // It is consulted even when the request carries its own `location`. The catalog used to skip
-    // it there, which read as respect for the caller's choice but left the provider unable to see,
-    // let alone refuse, a path outside the policy it exists to enforce -- the very bypass this SPI
-    // is meant to close. The supplied value is visible as the `location` entry of the context's
-    // table properties, and the built-in provider returns it verbatim as its first branch, so a
-    // catalog on the built-in provider is unaffected. What an allocating provider does with it is
-    // the provider's decision: honour it, rewrite it, or reject the creation.
-    properties = LancePropertiesUtils.normalizeTableProperties(properties);
-    String tableLocation = provisionTableLocation(ident, properties, schema);
-
-    Map<String, String> newProperties = Maps.newHashMap(properties);
-    newProperties.put(Table.PROPERTY_LOCATION, tableLocation);
-    newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
-
->>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
     Table createdTable =
         tableOps.createTable(
             ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
@@ -302,153 +282,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   @Override
   public boolean dropTable(NameIdentifier ident) throws UnsupportedOperationException {
-<<<<<<< HEAD
     boolean dropped = tableOps(ident).dropTable(ident);
     tableFormatCache.invalidate(ident);
-=======
-    return dropOrPurgeTable(ident, false /* purge */);
-  }
-
-  /**
-   * Returns the cache mapping a table to its format, so that tests can assert it is kept in step
-   * with the tables that exist.
-   *
-   * @return the table format cache
-   */
-  @VisibleForTesting
-  Cache<NameIdentifier, String> tableFormatCache() {
-    return tableFormatCache;
-  }
-
-  /**
-   * Drops or purges a table, and hands its location back to the {@link TableLocationProvider}
-   * afterwards.
-   *
-   * <p>The table properties are read before the removal, because they carry the location the
-   * provider has to hand back, and the unprovisioning itself happens after the removal so that a
-   * provider never reclaims the storage of a table that is still there. A provider failing to
-   * unprovision is logged at WARN rather than propagated: the table is already gone at that point,
-   * so failing the request would report a drop that did in fact happen as unsuccessful and invite a
-   * retry that cannot undo anything.
-   *
-   * @param ident the identifier of the table to drop
-   * @param purge whether to purge the table instead of dropping it
-   * @return true if the table was dropped, false if it did not exist
-   */
-  private boolean dropOrPurgeTable(NameIdentifier ident, boolean purge) {
-    return dropOrPurgeTable(
-        ident, purge, loadSchema(NameIdentifier.of(ident.namespace().levels())));
-  }
-
-  /**
-   * Drops or purges a table, resolving its parent schema through the given supplier.
-   *
-   * <p>The schema is passed in rather than loaded here so that a cascading schema drop, where every
-   * table shares one parent, loads it once instead of once per table. It stays eager: the context
-   * is built in full before the table is removed, so that a store read failing fails the request
-   * while the table is still there, rather than from inside a callback where it could only be
-   * reported as a provider failure it is not.
-   *
-   * @param ident the identifier of the table to drop
-   * @param purge whether to purge the table instead of dropping it
-   * @param schema the table's parent schema
-   * @return true if the table was dropped, false if it did not exist
-   */
-  private boolean dropOrPurgeTable(NameIdentifier ident, boolean purge, Schema schema) {
-    Map<String, String> tableProperties;
-    try {
-      tableProperties = store.get(ident, TABLE, TableEntity.class).properties();
-    } catch (NoSuchEntityException e) {
-      return false;
-    } catch (IOException e) {
-      throw new RuntimeException(
-          String.format("Failed to load table %s before dropping it", ident), e);
-    }
-
-    // Built entirely before the drop, so that a store read failing here fails the request while
-    // the table is still there, rather than after it is gone where it could only be reported as a
-    // provider failure it is not.
-    TableLocationContext context =
-        TableLocationContext.builder()
-            .withTableIdentifier(ident)
-            .withTableProperties(tableProperties)
-            .withSchema(schema)
-            .withCatalogProperties(catalogProperties)
-            .build();
-
-    // The properties just read are handed on rather than left to be read again: resolving the
-    // table format is a second store read for the very same entity whenever the format cache is
-    // cold, which for a drop it usually is.
-    ManagedTableOperations tableOps = tableOps(ident, tableProperties);
-    boolean dropped;
-    try {
-      dropped = purge ? tableOps.purgeTable(ident) : tableOps.dropTable(ident);
-    } catch (RuntimeException e) {
-      // A format that fails partway through a removal may already have deleted the metadata --
-      // LanceTableOperations removes the entity first and deletes the dataset second, and wraps a
-      // failure of the second step. The table can be gone with its location still allocated, and
-      // the caller sees only the format's exception, so the location is named here or nowhere. It
-      // is not unprovisioned: the format may equally have failed before touching storage, and
-      // handing back a location that still has data under it is the unrecoverable direction, the
-      // same reasoning as limitation (2) on a failed creation.
-      LOG.warn(
-          "Table format failed to {} table {}. If the metadata was already removed, its location "
-              + "'{}' is not handed back to table location provider '{}' and may be leaked.",
-          purge ? "purge" : "drop",
-          ident,
-          context.tableProperties().get(Table.PROPERTY_LOCATION),
-          tableLocationProvider.name(),
-          e);
-      throw e;
-    } finally {
-      // In a finally because a format that threw may still have removed the metadata, and a cache
-      // entry for a table that no longer exists is a stale format for whatever is created next
-      // under the same name.
-      tableFormatCache.invalidate(ident);
-    }
-
-    // The rule is "hand the location back once the data under it is gone", and `external` only
-    // approximates it on a drop: the table formats leave an external dataset in place there, so
-    // asking for the location back would invite the provider to delete exactly what the catalog
-    // just promised not to touch. A purge is the opposite request --
-    // LanceTableOperations#purgeTable
-    // deletes the external dataset its dropTable leaves alone -- so the location is handed back
-    // there whichever way `external` reads.
-    //
-    // The decision is made here rather than handed to the provider. By the time this runs the data
-    // is gone in all three cases that reach it, so there is nothing left for a provider to decide
-    // differently; and the case that is skipped is the one where a provider reclaiming by path
-    // would delete a user's data irrecoverably.
-    // Read the same way the table formats and the property metadata read it: a catalog that
-    // disagreed with the format about a value like `external=yes` would skip reclaiming a location
-    // the format had just deleted the data under.
-    // Use the same effective ownership as the format, including legacy Lance registrations.
-    boolean external = LancePropertiesUtils.isExternalTable(context.tableProperties());
-    if (dropped && (purge || !external)) {
-      TableLocationProvider provider = tableLocationProvider;
-      try {
-        provider.unprovisionTableLocation(context);
-      } catch (Exception e) {
-        LOG.warn(
-            "Table {} was already {}, but table location provider '{}' failed to unprovision its "
-                + "location '{}'. The storage may be leaked and needs to be reclaimed manually.",
-            ident,
-            purge ? "purged" : "dropped",
-            provider.name(),
-            context.tableProperties().get(Table.PROPERTY_LOCATION),
-            e);
-      }
-    } else if (dropped) {
-      LOG.debug(
-          "Table {} is external and was dropped rather than purged, so its location '{}' is left "
-              + "alone rather than handed back to table location provider '{}': the data is still "
-              + "there and the catalog does not own it.",
-          ident,
-          context.tableProperties().get(Table.PROPERTY_LOCATION),
-          tableLocationProvider.name());
-    }
-
->>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
     return dropped;
   }
 

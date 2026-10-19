@@ -21,6 +21,7 @@ package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,12 +36,6 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-<<<<<<< HEAD:lance/lance-rest-server/src/test/java/org/apache/gravitino/lance/service/rest/TestGravitinoLanceTableOperations.java
-=======
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.lance.namespace.errors.InvalidInputException;
->>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932)):lance/lance-rest-server/src/test/java/org/apache/gravitino/lance/common/ops/gravitino/TestGravitinoLanceTableOperations.java
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
@@ -105,35 +100,35 @@ class TestGravitinoLanceTableOperations {
         "Only RENAME alteration is supported currently.", exception.getMessage());
   }
 
-  @ParameterizedTest
-  @CsvSource(
-      value = {"NULL", "false", "true"},
-      nullValues = "NULL")
-  void testDeregisterLegacyRegisteredTable(String external) {
-    Table table = Mockito.mock(Table.class);
-    Map<String, String> properties =
-        new HashMap<>(
-            Map.of(
-                Table.PROPERTY_TABLE_FORMAT,
-                "lance",
-                "lance.register",
-                "true",
-                "location",
-                "/existing"));
-    if (external != null) {
-      properties.put(Table.PROPERTY_EXTERNAL, external);
+  @Test
+  void testDeregisterLegacyRegisteredTable() {
+    for (String external : Arrays.asList(null, "false", "true")) {
+      Table table = Mockito.mock(Table.class);
+      Map<String, String> properties =
+          new HashMap<>(
+              Map.of(
+                  Table.PROPERTY_TABLE_FORMAT,
+                  "lance",
+                  "lance.register",
+                  "true",
+                  "location",
+                  "/existing"));
+      if (external != null) {
+        properties.put(Table.PROPERTY_EXTERNAL, external);
+      }
+      Mockito.when(table.properties()).thenReturn(properties);
+      TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+      Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
+      Mockito.when(tableCatalog.dropTable(Mockito.any(NameIdentifier.class))).thenReturn(true);
+
+      Assertions.assertEquals(
+          "/existing",
+          operations(tableCatalog).deregisterTable("catalog.schema.table", ".").getLocation(),
+          "external=" + external);
+
+      Mockito.verify(tableCatalog).dropTable(NameIdentifier.of("schema", "table"));
+      Mockito.verify(tableCatalog, Mockito.never()).purgeTable(Mockito.any());
     }
-    Mockito.when(table.properties()).thenReturn(properties);
-    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
-    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
-    Mockito.when(tableCatalog.dropTable(Mockito.any(NameIdentifier.class))).thenReturn(true);
-
-    Assertions.assertEquals(
-        "/existing",
-        operations(tableCatalog).deregisterTable("catalog.schema.table", ".").getLocation());
-
-    Mockito.verify(tableCatalog).dropTable(NameIdentifier.of("schema", "table"));
-    Mockito.verify(tableCatalog, Mockito.never()).purgeTable(Mockito.any());
   }
 
   @Test
@@ -162,5 +157,13 @@ class TestGravitinoLanceTableOperations {
 
     // Verify dropTable was never called — the guard must reject before reaching the catalog layer.
     Mockito.verify(tableCatalog, Mockito.never()).dropTable(Mockito.any());
+  }
+
+  private static GravitinoLanceTableOperations operations(TableCatalog tableCatalog) {
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Mockito.when(catalog.asTableCatalog()).thenReturn(tableCatalog);
+    GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
+    Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
+    return new GravitinoLanceTableOperations(wrapper);
   }
 }
