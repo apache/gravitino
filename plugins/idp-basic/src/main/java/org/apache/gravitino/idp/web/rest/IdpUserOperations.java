@@ -106,7 +106,6 @@ public class IdpUserOperations {
         httpRequest,
         () -> {
           request.validate();
-          enforceUpdateUserRules(user, request);
           changePasswordIfRequested(user, request);
           updateEnabledIfRequested(user, request);
           return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
@@ -117,81 +116,9 @@ public class IdpUserOperations {
   }
 
   /**
-   * Dispatches update authorization to the service-admin or normal-user rule set.
-   *
-   * @param user the path username being updated
-   * @param request the update request
-   */
-  private static void enforceUpdateUserRules(String user, UpdateUserRequest request) {
-    String currentUser = PrincipalUtils.getCurrentUserName();
-    List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
-    if (IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
-      enforceServiceAdminUpdateRules(user, currentUser, serviceAdmins, request);
-    } else {
-      enforceNormalUserUpdateRules(user, currentUser, request);
-    }
-  }
-
-  /**
-   * Service admins may update any non-admin user's {@code enabled} flag and may reset passwords.
-   * The {@code enabled} flag of a configured service admin cannot be changed. Changing their own
-   * password still requires {@code oldPassword}; resetting another user must not send {@code
-   * oldPassword}.
-   *
-   * @param user the path username being updated
-   * @param currentUser the authenticated caller
-   * @param serviceAdmins configured service admin usernames
-   * @param request the update request
-   */
-  private static void enforceServiceAdminUpdateRules(
-      String user, String currentUser, List<String> serviceAdmins, UpdateUserRequest request) {
-    if (request.getEnabled() != null) {
-      Preconditions.checkArgument(
-          !IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, user),
-          "Cannot update the enabled flag of service admin %s",
-          user);
-    }
-    if (request.getNewPassword() == null) {
-      return;
-    }
-    if (user.equals(currentUser)) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(request.getOldPassword()),
-          "\"oldPassword\" is required when changing your own password");
-    } else {
-      Preconditions.checkArgument(
-          request.getOldPassword() == null,
-          "\"oldPassword\" is only allowed when changing your own password");
-    }
-  }
-
-  /**
-   * Non-service-admins may only change their own password and cannot update {@code enabled}.
-   * Self-service password changes require {@code oldPassword}.
-   *
-   * @param user the path username being updated
-   * @param currentUser the authenticated caller
-   * @param request the update request
-   */
-  private static void enforceNormalUserUpdateRules(
-      String user, String currentUser, UpdateUserRequest request) {
-    if (!user.equals(currentUser)) {
-      throw new ForbiddenException(
-          "Only service admins can update another user's password or enabled flag");
-    }
-    if (request.getEnabled() != null) {
-      throw new ForbiddenException("Only service admins can update the enabled flag");
-    }
-    if (request.getNewPassword() != null) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(request.getOldPassword()),
-          "\"oldPassword\" is required when changing your own password");
-    }
-  }
-
-  /**
-   * Applies a password update when {@code newPassword} is present. Caller must already have run
-   * {@link #enforceUpdateUserRules}.
+   * Changes the user's password when {@code newPassword} is present. Self-service changes require
+   * {@code oldPassword}. Service admins may reset another user without {@code oldPassword} and must
+   * not send it. Non-service-admins may only change their own password.
    *
    * @param user the path username being updated
    * @param request the update request
@@ -200,24 +127,47 @@ public class IdpUserOperations {
     if (request.getNewPassword() == null) {
       return;
     }
-    if (user.equals(PrincipalUtils.getCurrentUserName())) {
+    String currentUser = PrincipalUtils.getCurrentUserName();
+    List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+    boolean isServiceAdmin = IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser);
+    if (!isServiceAdmin && !user.equals(currentUser)) {
+      throw new ForbiddenException(
+          "Only service admins can update another user's password or enabled flag");
+    }
+    if (user.equals(currentUser)) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(request.getOldPassword()),
+          "\"oldPassword\" is required when changing your own password");
       userGroupManager.changePassword(user, request.getNewPassword(), request.getOldPassword());
     } else {
+      Preconditions.checkArgument(
+          request.getOldPassword() == null,
+          "\"oldPassword\" is only allowed when changing your own password");
       userGroupManager.changePassword(user, request.getNewPassword());
     }
   }
 
   /**
-   * Applies an enabled-flag update when {@code enabled} is present. Caller must already have run
-   * {@link #enforceUpdateUserRules}.
+   * Updates the user's enabled flag when {@code enabled} is present. Only service admins may change
+   * enabled, and the target must not be a configured service admin.
    *
    * @param user the path username being updated
    * @param request the update request
    */
   private void updateEnabledIfRequested(String user, UpdateUserRequest request) {
-    if (request.getEnabled() != null) {
-      userGroupManager.updateEnabled(user, request.getEnabled());
+    if (request.getEnabled() == null) {
+      return;
     }
+    String currentUser = PrincipalUtils.getCurrentUserName();
+    List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+    if (!IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
+      throw new ForbiddenException("Only service admins can update the enabled flag");
+    }
+    Preconditions.checkArgument(
+        !IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, user),
+        "Cannot update the enabled flag of service admin %s",
+        user);
+    userGroupManager.updateEnabled(user, request.getEnabled());
   }
 
   @DELETE
