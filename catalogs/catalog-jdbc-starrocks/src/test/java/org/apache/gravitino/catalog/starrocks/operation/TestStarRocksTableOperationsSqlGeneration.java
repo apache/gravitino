@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.starrocks.operation;
 
+import java.sql.Connection;
 import java.util.Collections;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -32,10 +33,15 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EmptySource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 
 public class TestStarRocksTableOperationsSqlGeneration {
 
@@ -54,6 +60,15 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     public String createTableSql(
         String tableName, JdbcColumn[] columns, Distribution distribution, String comment) {
+      return createTableSql(tableName, columns, distribution, comment, Indexes.EMPTY_INDEXES);
+    }
+
+    String createTableSql(
+        String tableName,
+        JdbcColumn[] columns,
+        Distribution distribution,
+        String comment,
+        Index[] indexes) {
       return generateCreateTableSql(
           tableName,
           columns,
@@ -61,7 +76,7 @@ public class TestStarRocksTableOperationsSqlGeneration {
           Collections.emptyMap(),
           Transforms.EMPTY_TRANSFORM,
           distribution,
-          Indexes.EMPTY_INDEXES);
+          indexes);
     }
 
     public String alterTableSql(String tableName, TableChange... changes) {
@@ -77,6 +92,55 @@ public class TestStarRocksTableOperationsSqlGeneration {
               StringIdentifier.addToComment(StringIdentifier.fromId(42), "existing comment"))
           .build();
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(Index.IndexType.class)
+  void testCreateTableRejectsIndexesBeforeConnecting(Index.IndexType indexType) {
+    TestableStarRocksTableOperations ops =
+        new TestableStarRocksTableOperations() {
+          @Override
+          protected Connection getConnection(String databaseName) {
+            throw new AssertionError("Index validation must happen before acquiring a connection");
+          }
+        };
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(Types.IntegerType.get()).build();
+    Index index = Indexes.of(indexType, "test_index", new String[][] {{"col1"}});
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.create(
+                    "database",
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    "comment",
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.hash(1, NamedReference.field("col1")),
+                    new Index[] {index}));
+
+    Assertions.assertEquals(
+        "StarRocks catalog does not support creating table indexes. "
+            + "Remove indexes from the create table request.",
+        exception.getMessage());
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @EmptySource
+  void testCreateTableWithoutIndexes(Index[] indexes) {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(Types.IntegerType.get()).build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
+
+    Assertions.assertEquals(
+        ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution),
+        ops.createTableSql(
+            "test_table", new JdbcColumn[] {column}, distribution, "comment", indexes));
   }
 
   @Test
