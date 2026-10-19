@@ -43,7 +43,7 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 │    Service       │ 
 └────────┬────────┘
          │ 
-         ▼ Gravitino Client API
+         ▼ Gravitino internal API or HTTP client
 ┌─────────────────┐
 │ Gravitino Server │ 
 │(Metadata Backend)│
@@ -130,12 +130,20 @@ To enable the Lance REST service within Gravitino server, configure the followin
 | `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
 | `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       |
 | `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (only `gravitino` is supported)                   | gravitino               | Yes      |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (required when namespace-backend is `gravitino`)        | http://localhost:8090   | Yes      |
+| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (unused in auxiliary mode)                             | http://localhost:8090   | No       |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      |
 
 **Authentication to the Gravitino Server**
 
-The Lance REST service makes its own requests to the Gravitino server. Those requests must carry
+In auxiliary mode, Lance REST uses the in-process Gravitino dispatchers and does not require a
+second set of credentials or the Gravitino server URI. Authenticated requests retain the caller
+identity. With metadata authorization disabled, anonymous requests use the configured Lance service
+identity. With metadata authorization enabled, anonymous requests retain their identity and are
+subject to the same permission checks as other callers. The main server authenticators
+protect incoming Lance REST requests. When `gravitino.authorization.enable` is enabled, Lance
+namespace and table endpoints enforce metadata permissions and filter listings for the caller.
+
+In standalone mode, the Lance REST service makes HTTP requests to the Gravitino server. Those requests must carry
 credentials, otherwise a Gravitino server configured with an authenticator other than `simple`
 rejects them and every Lance operation fails. Configure the auth type to match the Gravitino
 server:
@@ -159,9 +167,11 @@ gravitino.auxService.names = lance-rest
 gravitino.lance-rest.httpPort = 9101
 gravitino.lance-rest.host = 0.0.0.0
 gravitino.lance-rest.namespace-backend = gravitino
-gravitino.lance-rest.gravitino-uri = http://localhost:8090
 gravitino.lance-rest.gravitino-metalake = my_metalake
 ```
+
+In auxiliary mode, `gravitino.lance-rest.gravitino-uri` is not required because the Lance
+REST service uses Gravitino's internal API.
 
 ### Run Standalone
 
@@ -182,7 +192,8 @@ Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-ser
 | `gravitino.lance-rest.host`               | Service hostname           | 0.0.0.0               | No       |
 
 :::tip
-In most cases, you only need to configure `gravitino.lance-rest.gravitino-metalake` and other properties can use their default values.
+In standalone deployments, you only need to configure `gravitino.lance-rest.gravitino-metalake`,
+`gravitino.lance-rest.gravitino-uri`, and other properties can use their default values.
 :::
 
 

@@ -20,11 +20,18 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.errors.LanceNamespaceException;
 import org.lance.namespace.errors.NamespaceNotFoundException;
 import org.lance.namespace.model.ListNamespacesResponse;
 import org.mockito.Mockito;
@@ -37,7 +44,7 @@ class TestGravitinoLanceNameSpaceOperations {
   void testListNamespacesOnSchemaReturnsEmptyList() {
     GravitinoLanceNamespaceWrapper namespaceWrapper =
         Mockito.mock(GravitinoLanceNamespaceWrapper.class);
-    Catalog catalog = mockCatalogWithSchema("schema", true);
+    Catalog catalog = mockCatalogWithSchema(namespaceWrapper, "schema", true);
     when(namespaceWrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
     GravitinoLanceNameSpaceOperations operations =
         new GravitinoLanceNameSpaceOperations(namespaceWrapper);
@@ -53,7 +60,7 @@ class TestGravitinoLanceNameSpaceOperations {
   void testListNamespacesOnNonExistentSchemaThrows() {
     GravitinoLanceNamespaceWrapper namespaceWrapper =
         Mockito.mock(GravitinoLanceNamespaceWrapper.class);
-    Catalog catalog = mockCatalogWithSchema("bogus_schema", false);
+    Catalog catalog = mockCatalogWithSchema(namespaceWrapper, "bogus_schema", false);
     when(namespaceWrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
     GravitinoLanceNameSpaceOperations operations =
         new GravitinoLanceNameSpaceOperations(namespaceWrapper);
@@ -91,11 +98,53 @@ class TestGravitinoLanceNameSpaceOperations {
     Assertions.assertEquals("Catalog not found: bogus_catalog", exception.getMessage());
   }
 
-  private static Catalog mockCatalogWithSchema(String schemaName, boolean exists) {
+  @Test
+  void testDropCatalogRetainsBackendFailureDetails() {
+    for (RuntimeException backendFailure :
+        List.of(
+            new NonEmptyEntityException("backend nonempty entity"),
+            new NonEmptyCatalogException("backend nonempty catalog"),
+            new CatalogInUseException("backend catalog in use"))) {
+      GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
+      when(wrapper.dropCatalog("catalog", false)).thenThrow(backendFailure);
+      GravitinoLanceNameSpaceOperations operations = new GravitinoLanceNameSpaceOperations(wrapper);
+
+      InvalidInputException failure =
+          Assertions.assertThrows(
+              InvalidInputException.class,
+              () -> operations.dropNamespace("catalog", DELIMITER, "fail", "restrict"));
+
+      Assertions.assertTrue(failure.getDetail().contains(backendFailure.getMessage()));
+      Assertions.assertTrue(failure.getDetail().contains(backendFailure.getClass().getName()));
+    }
+  }
+
+  @Test
+  void testDropSchemaRetainsBackendFailureDetails() {
+    for (RuntimeException backendFailure :
+        List.of(
+            new NonEmptySchemaException("backend nonempty schema"),
+            new NoSuchCatalogException("backend missing catalog"))) {
+      GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
+      Catalog catalog = Mockito.mock(Catalog.class);
+      when(wrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
+      when(wrapper.dropSchema(catalog, "schema", false)).thenThrow(backendFailure);
+      GravitinoLanceNameSpaceOperations operations = new GravitinoLanceNameSpaceOperations(wrapper);
+
+      LanceNamespaceException failure =
+          Assertions.assertThrows(
+              LanceNamespaceException.class,
+              () -> operations.dropNamespace("catalog.schema", DELIMITER, "fail", "restrict"));
+
+      Assertions.assertTrue(failure.getDetail().contains(backendFailure.getMessage()));
+      Assertions.assertTrue(failure.getDetail().contains(backendFailure.getClass().getName()));
+    }
+  }
+
+  private static Catalog mockCatalogWithSchema(
+      GravitinoLanceNamespaceWrapper wrapper, String schemaName, boolean exists) {
     Catalog catalog = Mockito.mock(Catalog.class);
-    SupportsSchemas schemas = Mockito.mock(SupportsSchemas.class);
-    when(catalog.asSchemas()).thenReturn(schemas);
-    when(schemas.schemaExists(schemaName)).thenReturn(exists);
+    when(wrapper.schemaExists(catalog, schemaName)).thenReturn(exists);
     return catalog;
   }
 }

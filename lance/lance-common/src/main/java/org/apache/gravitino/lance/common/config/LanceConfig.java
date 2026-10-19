@@ -128,6 +128,12 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
     return get(METALAKE_NAME);
   }
 
+  /** Returns whether the Gravitino metalake is configured with a non-blank name. */
+  public boolean isGravitinoMetalakeConfigured() {
+    String metalake = getGravitinoMetalake();
+    return metalake != null && !metalake.isBlank();
+  }
+
   public String getGravitinoAuthType() {
     return get(GRAVITINO_AUTH_TYPE);
   }
