@@ -75,9 +75,9 @@ These rules apply to user creation, password changes, and `GRAVITINO_INITIAL_ADM
 
 Passwords may be reset by a service admin or changed by the user for their own account.
 Callers authenticate with HTTP Basic. A self-service password change must also send
-`currentPassword` in the request body so the server can verify it against the stored hash.
-A service admin resetting another user's password sends only the new `password` and must not
-send `currentPassword`.
+`oldPassword` in the request body so the server can verify it against the stored hash.
+A service admin resetting another user's password sends only `newPassword` and must not
+send `oldPassword`.
 
 ## Managing Users and Groups
 
@@ -93,16 +93,16 @@ Send `Accept: application/vnd.gravitino.v1+json` on every request, and
 |---------------|--------|-------------------------|------------------------------------------------------------|
 | Get a user    | GET    | `/api/idp/users/{user}` | None                                                       |
 | Add a user    | POST   | `/api/idp/users`        | `{"user":"alice","password":"{password}"}`                 |
-| Update a user | PUT    | `/api/idp/users/{user}` | `{"password":"{new_password}"}` and/or `{"enabled":false}`; self password change also requires `{"currentPassword":"{current_password}"}` |
+| Update a user | PUT    | `/api/idp/users/{user}` | `{"newPassword":"{new_password}"}` and/or `{"enabled":false}`; self password change also requires `{"oldPassword":"{old_password}"}` |
 | Remove a user | DELETE | `/api/idp/users/{user}` | None                                                       |
 
-The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `password` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled. Non-admin callers may get or update only their own user, and on update may change only their password (not `enabled` or another user). When changing your own password, `currentPassword` is required and must match the stored password. When a service admin resets another user's password, `currentPassword` must be omitted.
+The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `newPassword` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled. Non-admin callers may get or update only their own user, and on update may change only their password (not `enabled` or another user). When changing your own password, `oldPassword` is required and must match the stored password. When a service admin resets another user's password, `oldPassword` must be omitted.
 
 ```shell
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
   -H "Authorization: Basic $(echo -n 'alice:{user_password}' | base64)" \
-  -d '{"password":"{new_password}","currentPassword":"{user_password}"}' \
+  -d '{"newPassword":"{new_password}","oldPassword":"{user_password}"}' \
   http://localhost:8090/api/idp/users/alice
 ```
 
@@ -110,7 +110,7 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
   -H "Authorization: Basic $(echo -n 'admin:{admin_password}' | base64)" \
-  -d '{"password":"{new_password}"}' \
+  -d '{"newPassword":"{new_password}"}' \
   http://localhost:8090/api/idp/users/alice
 ```
 

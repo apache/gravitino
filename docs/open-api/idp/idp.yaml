@@ -115,12 +115,12 @@ paths:
       summary: Update local user store user
       description: >
         Updates the password and/or enabled flag of the specified local user store user and returns
-        the user object. At least one of `password` or `enabled` is required. Disabled users cannot
-        authenticate. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
-        Service admins may update any user. Authenticated non-admin users may update only their own
-        password and cannot change `enabled` or another user's account. Changing your own password
-        requires `currentPassword` and verifies it against the stored hash. A service admin
-        resetting another user's password must omit `currentPassword`.
+        the user object. At least one of `newPassword` or `enabled` is required. Disabled users
+        cannot authenticate. Users listed in `gravitino.authorization.serviceAdmins` cannot be
+        disabled. Service admins may update any user. Authenticated non-admin users may update only
+        their own password and cannot change `enabled` or another user's account. Changing your own
+        password requires `oldPassword` and verifies it against the stored hash. A service admin
+        resetting another user's password must omit `oldPassword`.
       operationId: updateIdpUser
       requestBody:
         required: true
@@ -418,18 +418,18 @@ components:
       type: object
       anyOf:
         - required:
-            - password
+            - newPassword
         - required:
             - enabled
       properties:
-        password:
+        newPassword:
           type: string
           format: password
           minLength: 12
           maxLength: 64
           description: The new password of the local user store user.
           writeOnly: true
-        currentPassword:
+        oldPassword:
           type: string
           format: password
           description: >
@@ -528,13 +528,13 @@ components:
 
     UpdateUserPasswordRequest:
       value: {
-        "password": "Passw0rd-5678"
+        "newPassword": "Passw0rd-5678"
       }
 
     UpdateOwnUserPasswordRequest:
       value: {
-        "password": "Passw0rd-5678",
-        "currentPassword": "Passw0rd-1234"
+        "newPassword": "Passw0rd-5678",
+        "oldPassword": "Passw0rd-1234"
       }
 
     UpdateUserEnabledRequest:
@@ -651,7 +651,7 @@ components:
       value: {
         "code": 1001,
         "type": "IllegalArgumentException",
-        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"password\" or \"enabled\" field is required]"
+        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"newPassword\" or \"enabled\" field is required]"
       }
 
     IdpAddGroupIllegalArgumentException:

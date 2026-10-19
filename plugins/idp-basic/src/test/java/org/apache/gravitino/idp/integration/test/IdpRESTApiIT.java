@@ -179,7 +179,7 @@ public class IdpRESTApiIT extends BaseIT {
         403,
         put(
             "/idp/users/" + USER2,
-            new UpdateUserRequest(UPDATED_PASSWORD, UPDATED_PASSWORD, null),
+            new UpdateUserRequest(UPDATED_PASSWORD),
             USER1,
             UPDATED_PASSWORD),
         ErrorConstants.FORBIDDEN_CODE);

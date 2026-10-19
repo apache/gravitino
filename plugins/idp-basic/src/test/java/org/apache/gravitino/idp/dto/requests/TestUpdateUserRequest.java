@@ -37,17 +37,18 @@ public class TestUpdateUserRequest {
         JsonUtils.objectMapper().readValue(serJson, UpdateUserRequest.class);
 
     Assertions.assertEquals(request, deserRequest);
-    Assertions.assertEquals(VALID_PASSWORD, deserRequest.getPassword());
-    Assertions.assertNull(deserRequest.getCurrentPassword());
+    Assertions.assertEquals(VALID_PASSWORD, deserRequest.getNewPassword());
+    Assertions.assertNull(deserRequest.getOldPassword());
+    Assertions.assertTrue(serJson.contains("\"newPassword\""));
+    Assertions.assertFalse(serJson.contains("\"password\""));
 
-    UpdateUserRequest withCurrent =
-        new UpdateUserRequest(VALID_PASSWORD, "current_password12", null);
-    UpdateUserRequest deserWithCurrent =
+    UpdateUserRequest withOld = new UpdateUserRequest(VALID_PASSWORD, "old_password12", null);
+    UpdateUserRequest deserWithOld =
         JsonUtils.objectMapper()
             .readValue(
-                JsonUtils.objectMapper().writeValueAsString(withCurrent), UpdateUserRequest.class);
-    Assertions.assertEquals(withCurrent, deserWithCurrent);
-    Assertions.assertEquals("current_password12", deserWithCurrent.getCurrentPassword());
+                JsonUtils.objectMapper().writeValueAsString(withOld), UpdateUserRequest.class);
+    Assertions.assertEquals(withOld, deserWithOld);
+    Assertions.assertEquals("old_password12", deserWithOld.getOldPassword());
 
     // Test with null password
     UpdateUserRequest request1 = new UpdateUserRequest();
@@ -57,7 +58,7 @@ public class TestUpdateUserRequest {
         JsonUtils.objectMapper().readValue(serJson1, UpdateUserRequest.class);
 
     Assertions.assertEquals(request1, deserRequest1);
-    Assertions.assertNull(deserRequest1.getPassword());
+    Assertions.assertNull(deserRequest1.getNewPassword());
 
     UpdateUserRequest enabledOnly = new UpdateUserRequest(null, false);
     UpdateUserRequest deserEnabled =
@@ -65,7 +66,7 @@ public class TestUpdateUserRequest {
             .readValue(
                 JsonUtils.objectMapper().writeValueAsString(enabledOnly), UpdateUserRequest.class);
     Assertions.assertEquals(enabledOnly, deserEnabled);
-    Assertions.assertNull(deserEnabled.getPassword());
+    Assertions.assertNull(deserEnabled.getNewPassword());
     Assertions.assertFalse(deserEnabled.getEnabled());
   }
 
@@ -84,13 +85,12 @@ public class TestUpdateUserRequest {
 
   @Test
   public void testUpdateUserRequestToStringDoesNotExposePassword() {
-    String requestString =
-        new UpdateUserRequest(VALID_PASSWORD, "current_password12", null).toString();
+    String requestString = new UpdateUserRequest(VALID_PASSWORD, "old_password12", null).toString();
 
     Assertions.assertFalse(requestString.contains(VALID_PASSWORD));
-    Assertions.assertFalse(requestString.contains("current_password12"));
-    Assertions.assertFalse(requestString.contains("password="));
-    Assertions.assertFalse(requestString.contains("currentPassword="));
-    Assertions.assertFalse(requestString.contains("\"password\""));
+    Assertions.assertFalse(requestString.contains("old_password12"));
+    Assertions.assertFalse(requestString.contains("newPassword="));
+    Assertions.assertFalse(requestString.contains("oldPassword="));
+    Assertions.assertFalse(requestString.contains("\"newPassword\""));
   }
 }

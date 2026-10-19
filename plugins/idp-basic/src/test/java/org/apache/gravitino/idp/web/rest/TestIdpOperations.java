@@ -166,24 +166,24 @@ class TestIdpOperations extends JerseyTest {
   }
 
   @Test
-  void testAdminSelfPasswordChangeRequiresCurrentPassword() {
-    UpdateUserRequest missingCurrent = new UpdateUserRequest(VALID_PASSWORD);
+  void testAdminSelfPasswordChangeRequiresOldPassword() {
+    UpdateUserRequest missingOld = new UpdateUserRequest(VALID_PASSWORD);
     assertError(
         Response.Status.BAD_REQUEST,
-        put("/idp/users/admin", missingCurrent),
+        put("/idp/users/admin", missingOld),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
 
-    UpdateUserRequest withCurrent = new UpdateUserRequest(VALID_PASSWORD, "admin-current-12", null);
-    when(MANAGER.changePassword("admin", VALID_PASSWORD, "admin-current-12")).thenReturn(true);
+    UpdateUserRequest withOld = new UpdateUserRequest(VALID_PASSWORD, "admin-old-pass12", null);
+    when(MANAGER.changePassword("admin", VALID_PASSWORD, "admin-old-pass12")).thenReturn(true);
     when(MANAGER.getUser("admin")).thenReturn(buildUser("admin"));
     Assertions.assertEquals(
         "admin",
-        put("/idp/users/admin", withCurrent).readEntity(IdpUserResponse.class).getUser().name());
+        put("/idp/users/admin", withOld).readEntity(IdpUserResponse.class).getUser().name());
   }
 
   @Test
-  void testAdminResetRejectsCurrentPassword() {
-    UpdateUserRequest req = new UpdateUserRequest(VALID_PASSWORD, "other-current-12", null);
+  void testAdminResetRejectsOldPassword() {
+    UpdateUserRequest req = new UpdateUserRequest(VALID_PASSWORD, "other-old-pass12", null);
     assertError(
         Response.Status.BAD_REQUEST,
         put("/idp/users/user1", req),

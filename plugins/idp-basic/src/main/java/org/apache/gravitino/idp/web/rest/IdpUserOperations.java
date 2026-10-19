@@ -140,28 +140,28 @@ public class IdpUserOperations {
   }
 
   /**
-   * Applies a password update. Self-service changes require and verify {@code currentPassword}.
-   * Service-admin resets of another user must not send {@code currentPassword}.
+   * Applies a password update. Self-service changes require and verify {@code oldPassword}.
+   * Service-admin resets of another user must not send {@code oldPassword}.
    *
    * @param user the path username being updated
    * @param request the update request
    */
   private void changePasswordIfRequested(String user, UpdateUserRequest request) {
-    if (request.getPassword() == null) {
+    if (request.getNewPassword() == null) {
       return;
     }
     String currentUser = PrincipalUtils.getCurrentUserName();
     if (user.equals(currentUser)) {
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(request.getCurrentPassword()),
-          "\"currentPassword\" is required when changing your own password");
-      userGroupManager.changePassword(user, request.getPassword(), request.getCurrentPassword());
+          StringUtils.isNotBlank(request.getOldPassword()),
+          "\"oldPassword\" is required when changing your own password");
+      userGroupManager.changePassword(user, request.getNewPassword(), request.getOldPassword());
       return;
     }
     Preconditions.checkArgument(
-        request.getCurrentPassword() == null,
-        "\"currentPassword\" is only allowed when changing your own password");
-    userGroupManager.changePassword(user, request.getPassword());
+        request.getOldPassword() == null,
+        "\"oldPassword\" is only allowed when changing your own password");
+    userGroupManager.changePassword(user, request.getNewPassword());
   }
 
   @DELETE

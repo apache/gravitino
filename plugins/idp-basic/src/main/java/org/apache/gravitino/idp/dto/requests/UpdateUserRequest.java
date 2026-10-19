@@ -38,14 +38,14 @@ import org.apache.gravitino.rest.RESTRequest;
 @Jacksonized
 public class UpdateUserRequest implements RESTRequest {
 
-  @JsonProperty("password")
+  @JsonProperty("newPassword")
   @ToString.Exclude
-  private final String password;
+  private final String newPassword;
 
-  @JsonProperty("currentPassword")
+  @JsonProperty("oldPassword")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @ToString.Exclude
-  private final String currentPassword;
+  private final String oldPassword;
 
   @JsonProperty("enabled")
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -59,39 +59,39 @@ public class UpdateUserRequest implements RESTRequest {
   /**
    * Creates a new UpdateUserRequest that updates only the password.
    *
-   * @param password The new password of the built-in IdP user.
+   * @param newPassword The new password of the built-in IdP user.
    */
-  public UpdateUserRequest(String password) {
-    this(password, null, null);
+  public UpdateUserRequest(String newPassword) {
+    this(newPassword, null, null);
   }
 
   /**
    * Creates a new UpdateUserRequest.
    *
-   * @param password The new password of the built-in IdP user, or {@code null} to leave it
+   * @param newPassword The new password of the built-in IdP user, or {@code null} to leave it
    *     unchanged.
    * @param enabled Whether the built-in IdP user should be enabled, or {@code null} to leave it
    *     unchanged.
    */
-  public UpdateUserRequest(String password, Boolean enabled) {
-    this(password, null, enabled);
+  public UpdateUserRequest(String newPassword, Boolean enabled) {
+    this(newPassword, null, enabled);
   }
 
   /**
    * Creates a new UpdateUserRequest.
    *
-   * @param password The new password of the built-in IdP user, or {@code null} to leave it
+   * @param newPassword The new password of the built-in IdP user, or {@code null} to leave it
    *     unchanged.
-   * @param currentPassword The caller's current password when changing their own password, or
-   *     {@code null} when a service admin resets another user's password or when {@code password}
-   *     is not being updated.
+   * @param oldPassword The caller's current password when changing their own password, or {@code
+   *     null} when a service admin resets another user's password or when {@code newPassword} is
+   *     not being updated.
    * @param enabled Whether the built-in IdP user should be enabled, or {@code null} to leave it
    *     unchanged.
    */
-  public UpdateUserRequest(String password, String currentPassword, Boolean enabled) {
+  public UpdateUserRequest(String newPassword, String oldPassword, Boolean enabled) {
     super();
-    this.password = password;
-    this.currentPassword = currentPassword;
+    this.newPassword = newPassword;
+    this.oldPassword = oldPassword;
     this.enabled = enabled;
   }
 
@@ -103,9 +103,9 @@ public class UpdateUserRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        password != null || enabled != null, "\"password\" or \"enabled\" field is required");
-    if (password != null) {
-      IdpCredentialValidator.validatePassword(password);
+        newPassword != null || enabled != null, "\"newPassword\" or \"enabled\" field is required");
+    if (newPassword != null) {
+      IdpCredentialValidator.validatePassword(newPassword);
     }
   }
 }
