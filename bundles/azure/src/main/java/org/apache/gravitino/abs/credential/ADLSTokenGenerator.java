@@ -29,9 +29,14 @@ import com.azure.storage.file.datalake.sas.DataLakeServiceSasSignatureValues;
 import com.azure.storage.file.datalake.sas.PathSasPermission;
 import java.io.IOException;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialGenerator;
@@ -70,34 +75,14 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
 
     Set<String> writePaths = pathContext.getWritePaths();
     Set<String> readPaths = pathContext.getReadPaths();
-    Set<String> combinedPaths = new HashSet<>(writePaths);
+    Set<String> combinedPaths = new TreeSet<>(writePaths);
     combinedPaths.addAll(readPaths);
 
-    if (combinedPaths.size() != 1) {
-      throw new IllegalArgumentException(
-          "ADLS should contain exactly one unique path, but found: "
-              + combinedPaths.size()
-              + " paths: "
-              + combinedPaths);
-    }
-    String uniquePath = combinedPaths.iterator().next();
-
-    ClientSecretCredential clientSecretCredential =
-        new ClientSecretCredentialBuilder()
-            .tenantId(tenantId)
-            .clientId(clientId)
-            .clientSecret(clientSecret)
-            .build();
-
-    DataLakeServiceClient dataLakeServiceClient =
-        new DataLakeServiceClientBuilder()
-            .endpoint(endpoint)
-            .credential(clientSecretCredential)
-            .buildClient();
+    ADLSLocationUtils.ADLSLocationParts locationParts = findCommonLocation(combinedPaths);
 
     OffsetDateTime start = OffsetDateTime.now();
     OffsetDateTime expiry = OffsetDateTime.now().plusSeconds(tokenExpireSecs);
-    UserDelegationKey userDelegationKey = dataLakeServiceClient.getUserDelegationKey(start, expiry);
+    UserDelegationKey userDelegationKey = getUserDelegationKey(start, expiry);
 
     PathSasPermission pathSasPermission =
         new PathSasPermission().setReadPermission(true).setListPermission(true);
@@ -111,7 +96,6 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
 
     DataLakeServiceSasSignatureValues signatureValues =
         new DataLakeServiceSasSignatureValues(expiry, pathSasPermission);
-    ADLSLocationUtils.ADLSLocationParts locationParts = ADLSLocationUtils.parseLocation(uniquePath);
     String sasToken =
         new DataLakeSasImplUtil(
                 signatureValues,
@@ -123,6 +107,69 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
 
     return new ADLSTokenCredential(
         locationParts.getAccountName(), sasToken, expiry.toInstant().toEpochMilli());
+  }
+
+  UserDelegationKey getUserDelegationKey(OffsetDateTime start, OffsetDateTime expiry) {
+    ClientSecretCredential clientSecretCredential =
+        new ClientSecretCredentialBuilder()
+            .tenantId(tenantId)
+            .clientId(clientId)
+            .clientSecret(clientSecret)
+            .build();
+
+    DataLakeServiceClient dataLakeServiceClient =
+        new DataLakeServiceClientBuilder()
+            .endpoint(endpoint)
+            .credential(clientSecretCredential)
+            .buildClient();
+    return dataLakeServiceClient.getUserDelegationKey(start, expiry);
+  }
+
+  private ADLSLocationUtils.ADLSLocationParts findCommonLocation(Set<String> paths) {
+    if (paths.isEmpty()) {
+      throw new IllegalArgumentException(
+          "ADLS credential context should contain at least one path");
+    }
+
+    List<ADLSLocationUtils.ADLSLocationParts> locations =
+        paths.stream().map(ADLSLocationUtils::parseLocation).collect(Collectors.toList());
+    ADLSLocationUtils.ADLSLocationParts first = locations.get(0);
+    boolean hasDifferentScope =
+        locations.stream()
+            .anyMatch(
+                location ->
+                    !storageAccountName.equalsIgnoreCase(location.getAccountName())
+                        || !first.getAccountName().equalsIgnoreCase(location.getAccountName())
+                        || !first.getContainer().equalsIgnoreCase(location.getContainer()));
+    if (hasDifferentScope) {
+      throw new IllegalArgumentException(
+          "ADLS paths must belong to the configured storage account and a single container, but found: "
+              + paths);
+    }
+
+    List<String> commonSegments = pathSegments(first.getPath());
+    for (int i = 1; i < locations.size(); i++) {
+      List<String> segments = pathSegments(locations.get(i).getPath());
+      int commonSegmentCount = 0;
+      while (commonSegmentCount < commonSegments.size()
+          && commonSegmentCount < segments.size()
+          && commonSegments.get(commonSegmentCount).equals(segments.get(commonSegmentCount))) {
+        commonSegmentCount++;
+      }
+      commonSegments = new ArrayList<>(commonSegments.subList(0, commonSegmentCount));
+    }
+
+    return new ADLSLocationUtils.ADLSLocationParts(
+        first.getContainer(), first.getAccountName(), String.join("/", commonSegments));
+  }
+
+  private static List<String> pathSegments(String path) {
+    if (path == null || path.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return Arrays.stream(path.split("/"))
+        .filter(segment -> !segment.isEmpty())
+        .collect(Collectors.toList());
   }
 
   @Override

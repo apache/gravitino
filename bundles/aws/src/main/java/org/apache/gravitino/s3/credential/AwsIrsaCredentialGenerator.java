@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.AwsIrsaCredential;
@@ -55,6 +56,7 @@ import software.amazon.awssdk.services.sts.model.Credentials;
 /** Generate AWS IRSA credentials according to the read and write paths. */
 public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCredential> {
 
+  private final Supplier<String> environmentRoleArnSupplier;
   private WebIdentityTokenSource tokenSource;
   private String roleArn;
   private int tokenExpireSecs;
@@ -64,12 +66,24 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
   private StsClient basicModeStsClient;
   private Map<String, StsAssumeRoleWithWebIdentityCredentialsProvider> basicModeProviders;
 
+  /** Creates an AWS IRSA credential generator. */
+  public AwsIrsaCredentialGenerator() {
+    this(() -> System.getenv("AWS_ROLE_ARN"));
+  }
+
+  AwsIrsaCredentialGenerator(Supplier<String> environmentRoleArnSupplier) {
+    this.environmentRoleArnSupplier = Objects.requireNonNull(environmentRoleArnSupplier);
+  }
+
   @Override
   public void initialize(Map<String, String> properties) {
     this.tokenSource = WebIdentityTokenSources.create(properties);
 
     S3CredentialConfig s3CredentialConfig = new S3CredentialConfig(properties);
-    this.roleArn = s3CredentialConfig.s3RoleArn();
+    this.roleArn =
+        properties.containsKey(S3CredentialConfig.S3_ROLE_ARN.getKey())
+            ? s3CredentialConfig.s3RoleArn()
+            : null;
     this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
     this.region = s3CredentialConfig.region();
     this.stsEndpoint = s3CredentialConfig.stsEndpoint();
@@ -330,7 +344,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
 
   private String getValidatedRoleArn(String configRoleArn) {
     String effectiveRoleArn =
-        StringUtils.isNotBlank(configRoleArn) ? configRoleArn : System.getenv("AWS_ROLE_ARN");
+        StringUtils.isNotBlank(configRoleArn) ? configRoleArn : environmentRoleArnSupplier.get();
     if (StringUtils.isBlank(effectiveRoleArn)) {
       throw new IllegalStateException(
           "No role ARN available. Either configure s3-role-arn or ensure AWS_ROLE_ARN environment variable is set.");

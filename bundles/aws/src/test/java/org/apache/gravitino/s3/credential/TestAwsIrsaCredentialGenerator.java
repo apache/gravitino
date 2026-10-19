@@ -85,6 +85,39 @@ class TestAwsIrsaCredentialGenerator {
   }
 
   @Test
+  void basicModeFallsBackToEnvironmentRoleArn(@TempDir Path dir) throws IOException {
+    Map<String, String> properties = createProperties(dir);
+    properties.remove("s3-role-arn");
+
+    try (AwsIrsaCredentialGenerator generator =
+        new AwsIrsaCredentialGenerator(() -> "arn:aws:iam::123456789012:role/environment-role")) {
+      generator.initialize(properties);
+
+      AwsIrsaCredential credential = generator.generate(() -> "test-user");
+
+      assertEquals("access-key", credential.accessKeyId());
+    }
+
+    String body = URLDecoder.decode(requestBody.get(), StandardCharsets.UTF_8.name());
+    assertTrue(body.contains("RoleArn=arn:aws:iam::123456789012:role/environment-role"));
+  }
+
+  @Test
+  void basicModeFailsWhenNoRoleArnIsAvailable(@TempDir Path dir) throws IOException {
+    Map<String, String> properties = createProperties(dir);
+    properties.remove("s3-role-arn");
+
+    try (AwsIrsaCredentialGenerator generator = new AwsIrsaCredentialGenerator(() -> null)) {
+      generator.initialize(properties);
+
+      IllegalStateException exception =
+          assertThrows(IllegalStateException.class, () -> generator.generate(() -> "test-user"));
+
+      assertTrue(exception.getMessage().contains("No role ARN available"));
+    }
+  }
+
+  @Test
   void basicModeReusesCachedStsCredentials(@TempDir Path dir) throws IOException {
     try (AwsIrsaCredentialGenerator generator = new AwsIrsaCredentialGenerator()) {
       generator.initialize(createProperties(dir));
