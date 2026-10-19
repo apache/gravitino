@@ -448,11 +448,14 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   private Table loadReadableTable(
       TableCatalog tables, String catalogName, NameIdentifier identifier) {
-    Table table = tables.loadTable(identifier);
+    // Loading a Lance table can repair stored metadata and open the dataset. Check permission
+    // first so a denied request cannot trigger those reads or writes. The authorization filter
+    // reports absent managed metadata as NoSuchTableException, allowing CREATE-only callers to
+    // create a missing table without first gaining read privileges.
     namespaceWrapper
         .metadataFilter()
         .checkReadTable(catalogName, identifier.namespace().level(0), identifier.name());
-    return table;
+    return tables.loadTable(identifier);
   }
 
   private static String normalizeCreateMode(String mode, String tableId) {

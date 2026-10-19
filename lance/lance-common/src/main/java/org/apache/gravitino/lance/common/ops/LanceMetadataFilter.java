@@ -19,6 +19,7 @@
 package org.apache.gravitino.lance.common.ops;
 
 import java.util.List;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.lance.namespace.errors.PermissionDeniedException;
 
 /**
@@ -53,6 +54,7 @@ public interface LanceMetadataFilter {
    * @param schemaName the schema holding the table
    * @param tableName the table to read
    * @throws PermissionDeniedException if the caller cannot read the table
+   * @throws NoSuchTableException if the authorization backend confirms that the table is absent
    */
   default void checkReadTable(String catalogName, String schemaName, String tableName) {}
 

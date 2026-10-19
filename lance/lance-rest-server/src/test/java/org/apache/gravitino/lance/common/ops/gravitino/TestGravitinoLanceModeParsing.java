@@ -34,6 +34,7 @@ import java.util.regex.Pattern;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.lance.common.ops.LanceMetadataFilter;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -232,6 +233,7 @@ class TestGravitinoLanceModeParsing {
     Catalog catalog = Mockito.mock(Catalog.class);
     when(namespaceWrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
     when(namespaceWrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
+    when(namespaceWrapper.metadataFilter()).thenReturn(LanceMetadataFilter.NOOP);
     return new GravitinoLanceTableOperations(namespaceWrapper);
   }
 

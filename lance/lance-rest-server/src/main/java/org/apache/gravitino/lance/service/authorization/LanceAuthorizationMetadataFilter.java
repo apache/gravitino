@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.lance.service.authorization;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.lance.common.ops.LanceMetadataFilter;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -62,6 +65,18 @@ public class LanceAuthorizationMetadataFilter implements LanceMetadataFilter {
 
   @Override
   public void checkReadTable(String catalogName, String schemaName, String tableName) {
+    NameIdentifier identifier =
+        NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, tableName);
+    try {
+      // The generic lakehouse catalog manages table metadata in Gravitino's entity store. An
+      // existence lookup here avoids calling the provider, whose loadTable may hydrate schemas
+      // or persist dataset versions before a read permission check has succeeded.
+      if (!GravitinoEnv.getInstance().entityStore().exists(identifier, Entity.EntityType.TABLE)) {
+        throw new NoSuchTableException("Table %s does not exist", identifier);
+      }
+    } catch (IOException failure) {
+      throw new RuntimeException("Failed to check table " + identifier, failure);
+    }
     checkRead(
         NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, tableName),
         Entity.EntityType.TABLE,

@@ -80,12 +80,15 @@ class TestGravitinoLanceExistOk {
     Assertions.assertSame(
         denial, Assertions.assertThrows(PermissionDeniedException.class, this::create));
 
+    Mockito.verify(tables, Mockito.never()).loadTable(Mockito.any());
     verifyNoCreate();
   }
 
   @Test
-  void testMissingTableUsesCreateWithoutReadCheck() {
-    Mockito.when(tables.loadTable(IDENTIFIER)).thenThrow(new NoSuchTableException("missing"));
+  void testMissingTableUsesStrictCreate() {
+    Mockito.doThrow(new NoSuchTableException("missing"))
+        .when(filter)
+        .checkReadTable("catalog", "schema", "table");
     Mockito.when(
             tables.createTable(
                 Mockito.eq(IDENTIFIER),
@@ -97,14 +100,16 @@ class TestGravitinoLanceExistOk {
     Assertions.assertEquals("existing-location", create().getLocation());
 
     assertCreateMode();
-    Mockito.verifyNoInteractions(filter);
+    Mockito.verify(tables, Mockito.never()).loadTable(Mockito.any());
   }
 
   @Test
   void testConcurrentCreatorIsLoadedWithoutReusingCreateHook() {
-    Mockito.when(tables.loadTable(IDENTIFIER))
-        .thenThrow(new NoSuchTableException("missing"))
-        .thenReturn(table);
+    Mockito.doThrow(new NoSuchTableException("missing"))
+        .doNothing()
+        .when(filter)
+        .checkReadTable("catalog", "schema", "table");
+    Mockito.when(tables.loadTable(IDENTIFIER)).thenReturn(table);
     Mockito.when(
             tables.createTable(
                 Mockito.eq(IDENTIFIER),
@@ -116,15 +121,13 @@ class TestGravitinoLanceExistOk {
     Assertions.assertEquals("existing-location", create().getLocation());
 
     assertCreateMode();
-    Mockito.verify(tables, Mockito.times(2)).loadTable(IDENTIFIER);
-    Mockito.verify(filter).checkReadTable("catalog", "schema", "table");
+    Mockito.verify(tables).loadTable(IDENTIFIER);
+    Mockito.verify(filter, Mockito.times(2)).checkReadTable("catalog", "schema", "table");
   }
 
   @Test
   void testConcurrentCreatorCannotBypassReadPermission() {
-    Mockito.when(tables.loadTable(IDENTIFIER))
-        .thenThrow(new NoSuchTableException("missing"))
-        .thenReturn(table);
+
     Mockito.when(
             tables.createTable(
                 Mockito.eq(IDENTIFIER),
@@ -132,14 +135,16 @@ class TestGravitinoLanceExistOk {
                 Mockito.isNull(),
                 Mockito.anyMap()))
         .thenThrow(new TableAlreadyExistsException("concurrent creator"));
-    Mockito.doThrow(new PermissionDeniedException("denied", "", "table"))
+    Mockito.doThrow(
+            new NoSuchTableException("missing"),
+            new PermissionDeniedException("denied", "", "table"))
         .when(filter)
         .checkReadTable("catalog", "schema", "table");
 
     Assertions.assertThrows(PermissionDeniedException.class, this::create);
 
     assertCreateMode();
-    Mockito.verify(tables, Mockito.times(2)).loadTable(IDENTIFIER);
+    Mockito.verify(tables, Mockito.never()).loadTable(Mockito.any());
   }
 
   private CreateTableResponse create() {
