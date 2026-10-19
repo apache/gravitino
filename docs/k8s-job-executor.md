@@ -361,6 +361,13 @@ configurations: a variable `REGION` becomes `spark.kubernetes.driverEnv.REGION` 
 `spark.executorEnv.REGION`. A name must consist of letters, digits, `_`, `-`, and `.`, can't start
 with a digit or `..`, and can't be `.`. Otherwise, the run is rejected.
 
+The variables are set in the driver and executor containers, while the local job executor sets them
+on the `spark-submit` process on the Gravitino server. A template written for the local job
+executor may set variables to paths on the Gravitino server, such as `SPARK_HOME`,
+`SPARK_CONF_DIR`, or `HADOOP_CONF_DIR`. In the pods, such a variable overrides the value of the
+image. A `SPARK_HOME` that isn't the Spark home of the image fails the job, as the driver can't
+start `$SPARK_HOME/bin/spark-submit`. Any path in `environments` must be a path in the Spark image.
+
 :::caution
 The values are readable in the `SparkApplication` and in the driver and executor pods, as well as
 in the job template stored in Gravitino and in the `runtimeJobTemplate` of a job returned by the
