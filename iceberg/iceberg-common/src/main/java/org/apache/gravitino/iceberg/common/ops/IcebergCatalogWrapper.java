@@ -38,6 +38,7 @@ import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.TableMetadata;
@@ -48,6 +49,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
@@ -323,6 +325,19 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public boolean tableExists(TableIdentifier tableIdentifier) {
     return getCatalog().tableExists(tableIdentifier);
+  }
+
+  /**
+   * Returns whether the identifier resolves to a metadata table rather than to a table with that
+   * name. For example, {@code db.t.files} resolves to the files table of {@code db.t} when the
+   * namespace {@code db.t} has no table {@code files}.
+   *
+   * @param tableIdentifier the table identifier
+   * @return true if loading the identifier returns a metadata table
+   * @throws NoSuchTableException if neither exists
+   */
+  public boolean resolvesToMetadataTable(TableIdentifier tableIdentifier) {
+    return getCatalog().loadTable(tableIdentifier) instanceof BaseMetadataTable;
   }
 
   public ListTablesResponse listTable(Namespace namespace) {
