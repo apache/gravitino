@@ -89,12 +89,12 @@ Send `Accept: application/vnd.gravitino.v1+json` on every request, and
 
 ### User Operations
 
-| Operation     | Method | Path                    | Body                                                       |
-|---------------|--------|-------------------------|------------------------------------------------------------|
-| Get a user    | GET    | `/api/idp/users/{user}` | None                                                       |
-| Add a user    | POST   | `/api/idp/users`        | `{"user":"alice","password":"{password}"}`                 |
-| Update a user | PUT    | `/api/idp/users/{user}` | `{"newPassword":"{new_password}"}` and/or `{"enabled":false}`; self password change also requires `{"oldPassword":"{old_password}"}` |
-| Remove a user | DELETE | `/api/idp/users/{user}` | None                                                       |
+| Operation     | Method | Path                    | Body                                                          |
+|---------------|--------|-------------------------|---------------------------------------------------------------|
+| Get a user    | GET    | `/api/idp/users/{user}` | None                                                          |
+| Add a user    | POST   | `/api/idp/users`        | `{"user":"alice","password":"{password}"}`                    |
+| Update a user | PUT    | `/api/idp/users/{user}` | `{"newPassword":"{new_password}"}` and/or `{"enabled":false}` |
+| Remove a user | DELETE | `/api/idp/users/{user}` | None                                                          |
 
 The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `newPassword` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled. Non-admin callers may get or update only their own user, and on update may change only their password (not `enabled` or another user). When changing your own password, `oldPassword` is required and must match the stored password. When a service admin resets another user's password, `oldPassword` must be omitted.
 
