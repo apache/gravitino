@@ -264,6 +264,13 @@ The OceanBase catalog does not support creating partitioned tables in the curren
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
+#### Drop and Purge Table
+
+- Dropping a table runs `DROP TABLE` in OceanBase. Whether OceanBase keeps the dropped table in its
+  recycle bin depends on the OceanBase configuration.
+- Purging a table is not supported. A purge request fails with an unsupported-operation error, and
+  the table and its data stay unchanged. Use drop instead.
+
 #### Alter Table Operations
 
 Gravitino supports these table alteration operations:
