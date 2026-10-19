@@ -22,7 +22,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.regex.Pattern;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.SupportsSchemas;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.lance.namespace.errors.NamespaceNotFoundException;
@@ -37,7 +36,7 @@ class TestGravitinoLanceNameSpaceOperations {
   void testListNamespacesOnSchemaReturnsEmptyList() {
     GravitinoLanceNamespaceWrapper namespaceWrapper =
         Mockito.mock(GravitinoLanceNamespaceWrapper.class);
-    Catalog catalog = mockCatalogWithSchema("schema", true);
+    Catalog catalog = mockCatalogWithSchema(namespaceWrapper, "schema", true);
     when(namespaceWrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
     GravitinoLanceNameSpaceOperations operations =
         new GravitinoLanceNameSpaceOperations(namespaceWrapper);
@@ -53,7 +52,7 @@ class TestGravitinoLanceNameSpaceOperations {
   void testListNamespacesOnNonExistentSchemaThrows() {
     GravitinoLanceNamespaceWrapper namespaceWrapper =
         Mockito.mock(GravitinoLanceNamespaceWrapper.class);
-    Catalog catalog = mockCatalogWithSchema("bogus_schema", false);
+    Catalog catalog = mockCatalogWithSchema(namespaceWrapper, "bogus_schema", false);
     when(namespaceWrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
     GravitinoLanceNameSpaceOperations operations =
         new GravitinoLanceNameSpaceOperations(namespaceWrapper);
@@ -91,11 +90,10 @@ class TestGravitinoLanceNameSpaceOperations {
     Assertions.assertEquals("Catalog not found: bogus_catalog", exception.getMessage());
   }
 
-  private static Catalog mockCatalogWithSchema(String schemaName, boolean exists) {
+  private static Catalog mockCatalogWithSchema(
+      GravitinoLanceNamespaceWrapper wrapper, String schemaName, boolean exists) {
     Catalog catalog = Mockito.mock(Catalog.class);
-    SupportsSchemas schemas = Mockito.mock(SupportsSchemas.class);
-    when(catalog.asSchemas()).thenReturn(schemas);
-    when(schemas.schemaExists(schemaName)).thenReturn(exists);
+    when(wrapper.schemaExists(catalog, schemaName)).thenReturn(exists);
     return catalog;
   }
 }

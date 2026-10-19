@@ -19,18 +19,25 @@
 package org.apache.gravitino.lance;
 
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
+import static org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService.METALAKE_BINDING;
 
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.inject.Singleton;
 import javax.servlet.Servlet;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
+import org.apache.gravitino.lance.service.authorization.LanceAuthorizationMetadataFilter;
+import org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -41,6 +48,7 @@ import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
+import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -68,7 +76,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
-    LanceConfig lanceConfig = new LanceConfig(properties);
+    LanceConfig lanceConfig = new LanceConfig(new HashMap<>(properties));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
     server = new JettyServer();
@@ -77,7 +85,25 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     server.initialize(serverConfig, SERVICE_NAME, false);
 
-    this.lanceNamespace = loadNamespaceImpl(lanceConfig);
+    this.lanceNamespace = loadNamespaceImpl(lanceConfig, auxMode);
+
+    // Metadata authorization relies on the Gravitino authorizer running in the same process, so it
+    // is only applied when Lance REST is an auxiliary service of the Gravitino server.
+    // The Gravitino configuration is only available in auxiliary mode, so it is read behind the
+    // mode check.
+    boolean authorizationEnabled =
+        auxMode && GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
+    boolean enableMetadataAuthorization =
+        authorizationEnabled && lanceConfig.isGravitinoMetalakeConfigured();
+    String metalakeName = lanceConfig.getGravitinoMetalake();
+    if (authorizationEnabled && !enableMetadataAuthorization) {
+      // A missing metalake makes the Lance backend unusable, but it should not prevent the main
+      // Gravitino server from starting. The backend reports the missing setting when it is used.
+      LOG.warn("Lance REST metadata authorization is disabled because no metalake is configured");
+    }
+    if (enableMetadataAuthorization) {
+      lanceNamespace.setMetadataFilter(new LanceAuthorizationMetadataFilter(metalakeName));
+    }
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
@@ -88,6 +114,14 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
+            if (enableMetadataAuthorization) {
+              // Pass the metalake through HK2 constructor injection so authorization code does not
+              // need mutable process-wide state.
+              bind(metalakeName).to(String.class).named(METALAKE_BINDING);
+              bind(LanceRESTAuthInterceptionService.class)
+                  .to(InterceptionService.class)
+                  .in(Singleton.class);
+            }
             bind(lanceNamespace).to(NamespaceWrapper.class).ranked(1);
           }
         });
@@ -106,6 +140,13 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addFilter(
         new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
+    // Anonymous callers must remain anonymous when metadata authorization is enabled.
+    // Substituting a privileged service identity here would bypass their permission checks.
+    if (auxMode && !authorizationEnabled) {
+      server.addFilter(
+          new LanceServiceIdentityFilter(lanceConfig.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME)),
+          LANCE_SPEC);
+    }
 
     registerMetricsPathFilters(server, eventBus);
 
@@ -117,9 +158,10 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addCustomFilters(customFilterPaths.toArray(new String[0]));
 
     LOG.info(
-        "Initialized Lance REST service for backend {} in {} mode",
+        "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
         lanceConfig.getNamespaceBackend(),
-        auxMode ? "auxiliary" : "standalone");
+        auxMode ? "auxiliary" : "standalone",
+        enableMetadataAuthorization ? "enabled" : "disabled");
   }
 
   @Override
@@ -167,15 +209,15 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
   }
 
-  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig) {
+  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig, boolean auxMode) {
     String backendType = lanceConfig.get(NAMESPACE_BACKEND);
     LanceNamespaceBackend lanceNamespaceBackend = LanceNamespaceBackend.fromType(backendType);
 
     try {
       Constructor<? extends NamespaceWrapper> constructor =
-          lanceNamespaceBackend.getWrapperClass().getConstructor(LanceConfig.class);
+          lanceNamespaceBackend.getWrapperClass().getConstructor(LanceConfig.class, boolean.class);
 
-      return constructor.newInstance(lanceConfig);
+      return constructor.newInstance(lanceConfig, auxMode);
     } catch (Exception e) {
       LOG.error("Error loading namespace implementation for backend type: {}", backendType, e);
       throw new RuntimeException("Failed to load namespace implementation", e);
