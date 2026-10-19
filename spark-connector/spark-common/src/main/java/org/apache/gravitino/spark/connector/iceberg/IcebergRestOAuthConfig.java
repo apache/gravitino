@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.iceberg;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,6 +46,9 @@ class IcebergRestOAuthConfig {
   static final String CREDENTIAL = "credential";
   static final String OAUTH2_SERVER_URI = "oauth2-server-uri";
   static final String SCOPE = "scope";
+  static final String AUTH_TYPE_BASIC = "basic";
+  static final String BASIC_USERNAME = "rest.auth.basic.username";
+  static final String BASIC_PASSWORD = "rest.auth.basic.password";
 
   // Properties whose presence alone implies the user is explicitly configuring legacy OAuth2
   // (triggering validation), as opposed to optional extras that ride along with it. TOKEN is not
@@ -76,6 +80,10 @@ class IcebergRestOAuthConfig {
 
     String authType =
         sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
+    if (AuthProperties.isBasic(authType)) {
+      return applyBasicCredentials(sparkConf, result);
+    }
+
     boolean reuseOAuth2 =
         sparkConf.getBoolean(GravitinoSparkConfig.GRAVITINO_ICEBERG_REUSE_OAUTH2, true)
             && AuthProperties.isOAuth2(authType);
@@ -105,6 +113,26 @@ class IcebergRestOAuthConfig {
 
     validateLegacyOAuth2(result);
     return result;
+  }
+
+  // Reuses Gravitino's Basic credentials unless the caller already chose an auth type.
+  private static Map<String, String> applyBasicCredentials(
+      SparkConf sparkConf, Map<String, String> config) {
+    if (StringUtils.isNotBlank(config.get(AUTH_TYPE))) {
+      return config;
+    }
+
+    String username = sparkConf.get(GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME, null);
+    String password = sparkConf.get(GravitinoSparkConfig.GRAVITINO_BASIC_PASSWORD, null);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(username) && StringUtils.isNotBlank(password),
+        "Incomplete Iceberg REST Basic configuration; %s and %s are required",
+        GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME,
+        GravitinoSparkConfig.GRAVITINO_BASIC_PASSWORD);
+    config.put(AUTH_TYPE, AUTH_TYPE_BASIC);
+    config.put(BASIC_USERNAME, username);
+    config.put(BASIC_PASSWORD, password);
+    return config;
   }
 
   private static void putIfConfigured(Map<String, String> config, String key, String value) {
