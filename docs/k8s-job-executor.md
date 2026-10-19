@@ -57,8 +57,9 @@ The job executor then adjusts the result:
   operator runs Spark in cluster mode only, so a job whose `spark.submit.deployMode` is another
   mode, such as `client`, is rejected.
 - `spark.kubernetes.container.image` and `spark.kubernetes.authenticate.driver.serviceAccountName`
-  take the values of `spark.image` and `spark.serviceAccount` of the job executor if the job
-  doesn't set them. A job template can therefore run with its own image and service account.
+  take the values of `spark.image` and `spark.serviceAccount` of the job executor if neither the
+  job template nor a server-level default sets them. A job template can therefore run with its
+  own image and service account.
 - `spark.kubernetes.namespace` is the namespace that the `configs` of the job template set, or else
   `namespace` of the job executor. A server-level default of it with the `spark.conf.` prefix is
   ignored: set `namespace` instead.
@@ -84,6 +85,33 @@ The built-in job templates are the exception. Their `executable` is the path of 
 jar on the Gravitino server, and the job executor replaces it with `spark.builtinJobsJar`, by default
 `local:///opt/gravitino/jobs/gravitino-jobs.jar`, a file in the [Spark image](#spark-image).
 
+### Built-In Jobs
+
+The built-in job templates set the resources of the driver and the executors in their own
+`configs`, from placeholders. Size a built-in job with its job configuration, for example
+`spark_executor_instances`, `spark_executor_cores`, `spark_executor_memory`, and
+`spark_driver_memory`, not with server-level defaults: the `configs` of a template override them.
+The `spark_master` parameter has no effect, as `spark.master` is removed.
+
+The `spark_conf` parameter of a built-in job is applied by the driver after it starts. Setting
+`spark.jars` there has no effect, and setting `spark.master` there runs the job in local mode inside
+the driver pod. Set such configurations as server-level defaults instead, which apply to every
+Spark configuration that the built-in templates don't set, such as `spark.jars`, the scheduler
+configurations, or volumes.
+
+### Rejected Runs
+
+A run is rejected, and no job is created, when:
+
+- The job template is a shell template.
+- A resource of the job is a path on the Gravitino server, see [Job Resources](#job-resources).
+- `spark.submit.deployMode` is another mode than `cluster`.
+- `spark.kubernetes.namespace` isn't a valid namespace name, or an environment variable name is
+  invalid, see [Environment Variables](#environment-variables).
+- Kubernetes rejects the `SparkApplication`, for example because the namespace doesn't exist, the
+  job executor lacks a permission, or the operator isn't installed. The error carries the reason
+  that Kubernetes gives.
+
 ### Job Status
 
 The job status follows the state of the `SparkApplication`:
@@ -103,8 +131,14 @@ A job also fails in these cases:
   deletes the `SparkApplication` before failing the job.
 - The `SparkApplication` is deleted by someone else before the job finishes.
 
-A status that the job executor can't read, for example one written by a newer operator, keeps the job
-`QUEUED` until the operator deletes the `SparkApplication`. Use a supported operator version.
+After its outcome, a `SparkApplication` moves to `ResourceReleased` or
+`TerminatedWithoutReleaseResources`. A job in these states keeps the outcome that the operator
+recorded before them, or fails if there is none.
+
+A state that the job executor doesn't know, for example of a newer operator, keeps the job `STARTED`
+if it has started and `QUEUED` otherwise, until the operator records an outcome. A status that the
+job executor can't read keeps the job `QUEUED` until the operator deletes the `SparkApplication`.
+Use a supported operator version.
 
 A job is one run of the application: the operator never restarts it.
 
@@ -118,10 +152,10 @@ permission on Secrets or ConfigMaps, and no cluster-wide permission.
 | Resource                                 | Verb     | Used to                                                                                                                             |
 |------------------------------------------|----------|-------------------------------------------------------------------------------------------------------------------------------------|
 | `sparkapplications` (`spark.apache.org`) | `create` | Submit a job                                                                                                                        |
-| `sparkapplications` (`spark.apache.org`) | `get`    | Query and cancel a job, and read its output                                                                                         |
+| `sparkapplications` (`spark.apache.org`) | `get`    | Query, submit, and cancel a job, and read its output                                                                                         |
 | `sparkapplications` (`spark.apache.org`) | `list`   | Query all the jobs of a namespace with one call. Optional: without it, the job executor gets the jobs one by one and logs a warning |
 | `sparkapplications` (`spark.apache.org`) | `update` | Mark a job as cancelled by Gravitino                                                                                                |
-| `sparkapplications` (`spark.apache.org`) | `delete` | Cancel a job                                                                                                                        |
+| `sparkapplications` (`spark.apache.org`) | `delete` | Cancel a job, and delete the `SparkApplication` of a job that got no status or whose submission failed                                                                                                                        |
 | `pods`                                   | `list`   | Find the driver pod, for the output and the times of a job                                                                          |
 | `pods`                                   | `delete` | Delete the driver pod of a failed job that hasn't terminated, for example after the driver start timeout                            |
 | `pods/log`                               | `get`    | Read the output of a job                                                                                                            |
@@ -133,11 +167,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: gravitino-job-executor
+  namespace: default
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: gravitino-job-executor
+  namespace: default
 rules:
   - apiGroups: ["spark.apache.org"]
     resources: ["sparkapplications"]
@@ -153,6 +189,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: gravitino-job-executor
+  namespace: default
 subjects:
   - kind: ServiceAccount
     name: gravitino-job-executor
@@ -213,14 +250,16 @@ The Gravitino server doesn't start if the connection is misconfigured:
 
 - `masterUrl` is set together with `kubeconfig` or `context`, or `caCertFile` or `tokenFile` is set
   without `masterUrl`.
-- `masterUrl` doesn't start with `https://`, or with `http://` when neither `caCertFile` nor
-  `tokenFile` is set, as a token would otherwise be sent in clear text.
+- `masterUrl` doesn't start with `https://` or `http://`.
+- `masterUrl` starts with `http://` and `tokenFile` is set, which would send the token in clear
+  text, or `caCertFile` is set, which has no effect without TLS.
 - A configured file doesn't exist, or the token file has no token.
-- The kubeconfig has no `context` of that name, or the context selects no cluster with a server.
+- The kubeconfig is empty or can't be parsed, has no `context` of that name, or has no current
+  context while `context` isn't set, or the context selects no cluster with a server.
 - The default lookup finds no kubeconfig, and Gravitino doesn't run in a pod.
 
-In every case, the jobs run in `namespace`, not in the namespace of the kubeconfig context or of the
-pod that Gravitino runs in.
+In every case, the jobs run in `namespace` unless their job template sets its own, not in the
+namespace of the kubeconfig context or of the pod that Gravitino runs in.
 
 For example, to connect to another cluster with the service account created in
 [Kubernetes Permissions](#kubernetes-permissions), issue a token for it in that cluster:
@@ -247,8 +286,9 @@ stay unfinished until the name is changed back.
 If the API server can't be reached, each request is tried `1 + requestRetries` times, each waiting
 up to `connectionTimeoutInMs`, or `requestTimeoutInMs` for an API server that accepts the request
 but doesn't answer. With the defaults, a job submission or cancellation fails after about 15
-seconds if the API server can't be reached, or 30 seconds if it doesn't answer. After a status query fails this way, the status queries of the other jobs fail
-right away for 10 seconds, and Gravitino tries them again on its next status pull.
+seconds if the API server can't be reached, or 30 seconds if it doesn't answer. After a status
+query fails this way, the status queries of the other jobs fail right away for 10 seconds, and
+Gravitino tries them again on its next status pull.
 
 ### Enable the Job Executor
 
@@ -350,9 +390,9 @@ partitions:
 - A job that waits in the queue for longer than `spark.driverStartTimeoutInMs` fails. Set this
   timeout longer than the longest time a job may wait.
 
-These behaviors were verified with YuniKorn 1.10.0 installed without its admission controller
-(`embedAdmissionController=false`). Gang scheduling and other schedulers, such as Volcano and Kueue,
-aren't verified with the job executor.
+The job executor doesn't depend on a scheduler: queueing works through the Spark configurations
+above. The behaviors above were observed with YuniKorn 1.10.0 installed without its admission
+controller (`embedAdmissionController=false`).
 
 ## Environment Variables
 
@@ -414,15 +454,27 @@ and its value is the Secret and the key in it:
 The output of a job is the log of its driver pod, read from Kubernetes on every request:
 
 - The standard error is merged into the standard output, so `stderr` is always empty.
-- The output is available while the driver pod exists, which is `spark.resourceRetainDurationInMs`
-  after the job finishes, one day by default. After that, the output is empty.
+- The output is available while the driver pod exists. After that, the output is empty.
+
+The driver pod is deleted, and the output with it:
+
+- `spark.resourceRetainDurationInMs` after the job finishes, 1 day by default, or earlier when the
+  `SparkApplication` is deleted after `spark.ttlAfterStopInMs`.
+- Right away when the job is cancelled, as cancelling deletes the `SparkApplication` and its pods.
+- When the driver pod of a failed job hasn't terminated, for example after the driver start
+  timeout. The job executor deletes it so that it can't run the job later.
 
 The start and finish times of a job are the ones Kubernetes reports for the driver container, in
 whole seconds. The operator records that a job finished 10 seconds to 2 minutes after the driver
 exits, so the status of a job can lag behind by that time, but its times don't.
 
-The finish time of a cancelled job is the time Gravitino observes the cancellation, which can be up
-to `gravitino.job.statusPullIntervalInMs` late.
+The actual times are lost in these cases:
+
+- When the driver pod is gone before Gravitino records the finished job, the times are the ones the
+  operator recorded, which can be later than the actual ones.
+- When the `SparkApplication` is gone before Gravitino records the finished job, for example a
+  cancelled job, the finish time is the time Gravitino observes it. The finish time of a cancelled
+  job is therefore usually up to `gravitino.job.statusPullIntervalInMs` late.
 
 ## Multiple Servers and Restarts
 
@@ -432,8 +484,8 @@ The job executor keeps no job state on the Gravitino server:
   any job, and read its output. Configure all of them with the same cluster and the same `cluster`
   name.
 - Jobs keep running while Gravitino is down, and Gravitino picks up their status when it is back.
-  The `SparkApplication` of a job is deleted `spark.ttlAfterStopInMs` after the job stops, seven days
-  by default. A job that Gravitino hasn't recorded as finished by then fails.
+  The `SparkApplication` of a job is deleted `spark.ttlAfterStopInMs` after the job stops, 7 days by
+  default. A job that Gravitino hasn't recorded as finished by then fails.
 - Gravitino deployments that share a namespace need different `namePrefix` values, so that their
   `SparkApplication` names don't collide.
 
@@ -445,13 +497,13 @@ The job executor keeps no job state on the Gravitino server:
 - A job whose executors can't be scheduled stays `STARTED`: there is no timeout for the executors.
 - The operator checks the start timeouts about every 2 minutes, so a job can fail up to 2 minutes
   after `spark.driverStartTimeoutInMs` or `spark.driverReadyTimeoutInMs`.
-- The finish time of a cancelled job can be up to `gravitino.job.statusPullIntervalInMs` late.
-- The output of a job is no longer available `spark.resourceRetainDurationInMs` after it finishes.
+- The finish time of a cancelled job is usually up to `gravitino.job.statusPullIntervalInMs` late.
+- The output of a job is no longer available `spark.resourceRetainDurationInMs` after it finishes,
+  and a cancelled job loses its output right away.
 - Unfinished jobs fail if Gravitino is down for longer than `spark.ttlAfterStopInMs` after they stop.
 - The job executor doesn't limit the number of unfinished jobs, see [Queueing](#queueing).
-- The `spark_conf` parameter of the built-in jobs is applied by the driver after it starts. Setting
-  `spark.jars` there has no effect, and setting `spark.master` there runs the job in local mode
-  inside the driver pod. Set such configurations as server-level defaults instead.
+- Setting `spark.jars` or `spark.master` in the `spark_conf` parameter of a built-in job doesn't
+  work, see [Built-In Jobs](#built-in-jobs).
 
 ## Run a Built-In Job on a Local Cluster
 
@@ -459,6 +511,12 @@ The following steps run the built-in job `builtin-iceberg-rewrite-data-files` on
 cluster of [OrbStack](https://orbstack.dev/), which shares the local Docker images. Another local
 cluster, such as kind, also needs the Spark image loaded into it. The steps need `kubectl`, `helm`,
 `docker`, and a Gravitino distribution, see [How to build](./how-to-build.md).
+
+Point `kubectl` and `helm` at the cluster first:
+
+```shell
+kubectl config use-context orbstack
+```
 
 ### Step 1: Install the Spark Kubernetes Operator
 
@@ -553,7 +611,8 @@ kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/iceberg-table --time
 ### Step 4: Configure and Start Gravitino
 
 Append the following to `conf/gravitino.conf`. The four `spark.conf.` lines mount the warehouse
-volume into the driver and the executors of every job.
+volume into the driver and the executors of every job. The short status pull interval shows the job
+progress quickly, and is for this walkthrough only: Gravitino logs a warning about it.
 
 ```text
 gravitino.job.executor = k8s
@@ -611,7 +670,8 @@ curl -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/demo/jobs/runs/{job_id}?includeOutput=true"
 ```
 
-The `status` of the job turns from `queued` to `started` and then to `succeeded`. Its `stdout` is
+The `status` of the job turns from `queued` to `started` and then to `succeeded`, the REST
+values of `QUEUED`, `STARTED`, and `SUCCEEDED`. Its `stdout` is
 the log of the Spark driver, which contains the result of the job:
 
 ```text

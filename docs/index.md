@@ -170,7 +170,7 @@ Gravitino provides governance features to manage metadata in a unified way. See:
 * [Manage jobs in Gravitino](./manage-jobs-in-gravitino.md): a complete guide to using Gravitino
   to manage jobs.
 * [Local job executor](./local-job-executor.md) and
-  [Kubernetes job executor](./k8s-job-executor.md): where the jobs run and how to configure it.
+  [Kubernetes job executor](./k8s-job-executor.md): where the jobs run and how to configure them.
 
 ### Gravitino Iceberg REST Catalog Service
 
