@@ -71,6 +71,7 @@ A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with t
 
 #### S3 Secret Key Credential
 
+<<<<<<< HEAD
 A credential with static S3 access key id and secret access key.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations  | Description                                            | Default value | Required |
@@ -80,6 +81,18 @@ A credential with static S3 access key id and secret access key.
 | `s3-secret-access-key`              | `gravitino.iceberg-rest.s3-secret-access-key` | The static secret access key used to access S3 data.   | (none)        | Yes      |
 
 #### S3 Token Credential
+=======
+| Property                    | Description                                                                                                                               | Default value | Required |
+|-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `s3-role-arn`               | ARN of the role to assume. When omitted, Gravitino uses the pod's `AWS_ROLE_ARN`.                                                         | (none)        | No       |
+| `s3-region`                 | AWS region for STS operations.                                                                                                            | (none)        | No       |
+| `s3-token-expire-in-secs`   | Session lifetime of the vended credentials. Cannot exceed the role's maximum session duration.                                            | 3600          | No       |
+| `s3-token-service-endpoint` | Alternative STS endpoint, for S3-compatible storage.                                                                                      | (none)        | No       |
+
+For path-based requests, Gravitino always scopes the credentials with a session policy covering the requested data, metadata, and write locations. Catalog-level requests do not include a session policy and inherit the selected role's permissions. The role is selected from `s3-role-arn` when configured, or from the pod's `AWS_ROLE_ARN` otherwise.
+
+The selected role needs the same permission policy as `s3-token` above. Its trust policy must allow `sts:AssumeRoleWithWebIdentity` from the pod's Kubernetes service account identity.
+>>>>>>> 026a66035 ([#13927] fix(credential): handle AWS IRSA fallback and ADLS paths (#13928))
 
 An S3 token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html). To use an S3 token credential, you should create a role and grant it proper privileges.
 
@@ -126,11 +139,15 @@ An OSS token is a token credential with scoped privileges, by leveraging STS [As
 
 A credential with static Azure storage account name and key.
 
+<<<<<<< HEAD
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations        | Description                                               | Default value | Required |
 |-------------------------------------|-----------------------------------------------------|-----------------------------------------------------------|---------------|----------|
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`       | `azure-account-key` for Azure account key credential.     | (none)        | Yes      |
 | `azure-storage-account-name`        | `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data. | (none)        | Yes      |
 | `azure-storage-account-key`         | `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.  | (none)        | Yes      |
+=======
+Gravitino requests an Azure [user delegation SAS](https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas) and returns it to the client. The SAS is scoped to the single requested root directory that covers the table location and any requested write paths. This is normally the table path, but a custom write path that is its parent results in a broader SAS scope. Requests with independent root paths cannot be represented by one directory-scoped SAS and are rejected.
+>>>>>>> 026a66035 ([#13927] fix(credential): handle AWS IRSA fallback and ADLS paths (#13928))
 
 #### ADLS Token Credential
 
