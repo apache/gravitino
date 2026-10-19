@@ -42,6 +42,9 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.RangerContainer;
+import org.apache.gravitino.integration.test.container.RangerFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.TableChange;
@@ -54,6 +57,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@RangerFixture
 public abstract class RangerBaseE2EIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerBaseE2EIT.class);
   public static final String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
@@ -104,6 +108,8 @@ public abstract class RangerBaseE2EIT extends BaseIT {
       String.format("ALTER TABLE new_table RENAME TO %s", tableName);
 
   protected static final String SQL_DROP_TABLE = String.format("DROP TABLE %s", tableName);
+
+  @FixtureContainer protected RangerContainer ranger;
 
   protected static void generateRangerSparkSecurityXML(String modeName) throws IOException {
     String templatePath =

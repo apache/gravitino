@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Locale;
@@ -31,8 +30,9 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -52,13 +52,14 @@ import org.junit.jupiter.api.TestInstance;
 /** Integration tests for Hive catalog view CRUD operations. */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture
 public class CatalogHiveViewIT extends BaseIT {
 
   private static final String PROVIDER = "hive";
   private static final String VIEW_COMMENT = "hive view comment";
   private static final String HIVE_DIALECT = "hive";
 
-  private final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private HiveContainer hive;
   private HiveServer2Sql hiveSql;
   private String metalakeName;
   private String catalogName;
@@ -71,8 +72,6 @@ public class CatalogHiveViewIT extends BaseIT {
   @BeforeAll
   public void setup() throws Exception {
     super.startIntegrationTest();
-    containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2));
 
     metalakeName = GravitinoITUtils.genRandomName("hive_view_it_metalake");
     catalogName = GravitinoITUtils.genRandomName("hive_view_it_catalog");
@@ -83,9 +82,7 @@ public class CatalogHiveViewIT extends BaseIT {
 
     String hmsUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put(HiveConstants.METASTORE_URIS, hmsUri);
@@ -95,7 +92,7 @@ public class CatalogHiveViewIT extends BaseIT {
             catalogName, Catalog.Type.RELATIONAL, PROVIDER, "comment", catalogProperties);
     viewCatalog = catalog.asViewCatalog();
     catalog.asSchemas().createSchema(schemaName, "schema comment", Maps.newHashMap());
-    hiveSql = new HiveServer2Sql(containerSuite.getHiveContainer());
+    hiveSql = new HiveServer2Sql(hive);
   }
 
   @AfterEach

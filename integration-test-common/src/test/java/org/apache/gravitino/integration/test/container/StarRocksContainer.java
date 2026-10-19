@@ -39,7 +39,7 @@ import org.testcontainers.containers.Network;
 public class StarRocksContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(StarRocksContainer.class);
 
-  public static final String DEFAULT_IMAGE = "starrocks/allin1-ubuntu:3.3.22";
+  public static final String DEFAULT_IMAGE = TestImages.STARROCKS;
   public static final String HOST_NAME = "gravitino-ci-starrocks";
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "";

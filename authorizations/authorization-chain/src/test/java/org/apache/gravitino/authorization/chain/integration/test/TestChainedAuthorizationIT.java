@@ -80,7 +80,7 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
     registerCustomConfigs(configs);
 
     super.startIntegrationTest();
-    RangerITEnv.init(RangerBaseE2EIT.metalakeName, false);
+    RangerITEnv.init(ranger, RangerBaseE2EIT.metalakeName, false);
     RangerITEnv.startHiveRangerContainer();
 
     HIVE_METASTORE_URIS =

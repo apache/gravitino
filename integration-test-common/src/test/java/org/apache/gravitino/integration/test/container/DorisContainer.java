@@ -53,7 +53,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 public class DorisContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(DorisContainer.class);
 
-  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_DORIS_DOCKER_IMAGE");
+  public static final String DEFAULT_IMAGE = TestImages.DORIS;
   public static final String HOST_NAME = "gravitino-ci-doris";
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
@@ -275,7 +275,7 @@ public class DorisContainer extends BaseContainer {
   public static class Builder
       extends BaseContainer.Builder<DorisContainer.Builder, DorisContainer> {
     private Builder() {
-      this.image = (DEFAULT_IMAGE != null && !DEFAULT_IMAGE.isEmpty()) ? DEFAULT_IMAGE : null;
+      this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
       this.exposePorts = ImmutableSet.of(FE_HTTP_PORT, FE_MYSQL_PORT);
     }

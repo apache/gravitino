@@ -113,6 +113,17 @@ public class TestContainerExtension {
   }
 
   @Test
+  void testSubclassFixtureReplacesSuperclassFixtureOfSameType() {
+    run(OverridingFixture.class)
+        .testEvents()
+        .assertStatistics(stats -> stats.succeeded(1).failed(0));
+
+    Assertions.assertEquals(
+        List.of(new FakeSpec("second")), ContainerExtension.specs(OverridingFixture.class));
+    Assertions.assertFalse(LOG.contains("start first"), LOG.toString());
+  }
+
+  @Test
   void testTwoFixturesOfOneTypeFailClearly() {
     run(AmbiguousFixture.class)
         .testEvents()
@@ -130,6 +141,9 @@ public class TestContainerExtension {
         ContainerExtension.specs(AmbiguousFixture.class));
     Assertions.assertEquals(
         List.of(new KafkaSpec()), ContainerExtension.specs(KafkaFixtureOnly.class));
+    Assertions.assertEquals(
+        List.of(new HiveSpec(HiveVersion.HIVE3, HiveAuth.KERBEROS)),
+        ContainerExtension.specs(HiveFixtureOnly.class));
   }
 
   private static EngineExecutionResults run(Class<?> fixture) {
@@ -162,7 +176,7 @@ public class TestContainerExtension {
   static final class FirstFactory implements ContainerFixture.SpecFactory<FakeFirstFixture> {
     @Override
     public ContainerSpec<?> specFor(FakeFirstFixture fixture) {
-      return new FakeSpec("first");
+      return new FakeSpec(fixture.value());
     }
   }
 
@@ -177,7 +191,9 @@ public class TestContainerExtension {
   @Retention(RetentionPolicy.RUNTIME)
   @ExtendWith(ContainerExtension.class)
   @ContainerFixture(FirstFactory.class)
-  @interface FakeFirstFixture {}
+  @interface FakeFirstFixture {
+    String value() default "first";
+  }
 
   @Target(ElementType.TYPE)
   @Retention(RetentionPolicy.RUNTIME)
@@ -272,6 +288,15 @@ public class TestContainerExtension {
   }
 
   @Tag(FIXTURE)
+  @FakeFirstFixture("second")
+  static class OverridingFixture extends FixtureBase {
+    @Test
+    void test(FakeContainer container) {
+      Assertions.assertSame(SECOND, container);
+    }
+  }
+
+  @Tag(FIXTURE)
   @FakeFirstFixture
   @FakeSecondFixture
   static class AmbiguousFixture {
@@ -282,4 +307,8 @@ public class TestContainerExtension {
   @Tag(FIXTURE)
   @KafkaFixture
   static class KafkaFixtureOnly {}
+
+  @Tag(FIXTURE)
+  @HiveFixture(version = HiveVersion.HIVE3, auth = HiveAuth.KERBEROS)
+  static class HiveFixtureOnly {}
 }

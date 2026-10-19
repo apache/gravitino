@@ -20,9 +20,17 @@ package org.apache.gravitino.integration.test.container;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.wait.strategy.HttpWaitStrategy;
 
 /** Tests the LocalStack readiness check without Docker. */
 public class TestGravitinoLocalStackContainer {
+
+  @Test
+  void testWaitsForTheHealthEndpoint() {
+    GravitinoLocalStackContainer container = GravitinoLocalStackContainer.builder().build();
+
+    Assertions.assertInstanceOf(HttpWaitStrategy.class, container.waitStrategy());
+  }
 
   @Test
   void testS3MustBeAvailableOrRunning() {

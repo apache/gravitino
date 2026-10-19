@@ -61,4 +61,47 @@ public class TestContainerSlot {
     Assertions.assertNull(slot.get());
     Assertions.assertSame(restarted, slot.getOrStart(HiveContainer.HIVE2, () -> restarted));
   }
+
+  @Test
+  void testFailedStartStoresNoContainerAndAllowsARetry() {
+    ContainerSlot<String, HiveContainer> slot = new ContainerSlot<>();
+    IllegalStateException failure = new IllegalStateException("not ready");
+    HiveContainer retried = Mockito.mock(HiveContainer.class);
+
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                slot.getOrStart(
+                    HiveContainer.HIVE2,
+                    () -> {
+                      throw failure;
+                    })));
+
+    Assertions.assertNull(slot.get());
+    Assertions.assertSame(retried, slot.getOrStart(HiveContainer.HIVE2, () -> retried));
+  }
+
+  @Test
+  void testFailedReplacementClosesThePreviousContainerOnce() {
+    ContainerSlot<String, HiveContainer> slot = new ContainerSlot<>();
+    HiveContainer hive2 = Mockito.mock(HiveContainer.class);
+    slot.getOrStart(HiveContainer.HIVE2, () -> hive2);
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            slot.getOrStart(
+                HiveContainer.HIVE3,
+                () -> {
+                  throw new IllegalStateException("not ready");
+                }));
+
+    Mockito.verify(hive2, Mockito.times(1)).close();
+    Assertions.assertNull(slot.get());
+    HiveContainer restarted = Mockito.mock(HiveContainer.class);
+    Assertions.assertSame(restarted, slot.getOrStart(HiveContainer.HIVE2, () -> restarted));
+    Mockito.verify(hive2, Mockito.times(1)).close();
+  }
 }

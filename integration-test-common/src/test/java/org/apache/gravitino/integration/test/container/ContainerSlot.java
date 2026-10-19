@@ -30,6 +30,10 @@ import javax.annotation.Nullable;
  * heavy service, such as Hive versions, that tests never need together and that would not fit side
  * by side on a CI runner.
  *
+ * <p>A start that throws leaves the slot empty, so the next request starts again instead of being
+ * handed a container that never became ready. The slot cannot close that container: the starter
+ * creates it and never returns it, so the starter closes it, as {@code ContainerSuite} does.
+ *
  * @param <K> what makes two requests different, such as a Hive version
  * @param <C> the container type
  */
@@ -47,6 +51,8 @@ final class ContainerSlot<K, C extends BaseContainer> {
       container.close();
       clear();
     }
+    // Assigned only after the starter returns: a failed start must not be remembered as the
+    // running container.
     C started = starter.get();
     container = started;
     key = requestedKey;

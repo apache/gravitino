@@ -29,8 +29,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -47,7 +49,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
  */
 public class GravitinoLocalStackContainer extends BaseContainer {
 
-  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE");
+  public static final String DEFAULT_IMAGE = TestImages.LOCALSTACK;
   public static final String HOST_NAME = "gravitino-ci-localstack";
   public static final int PORT = 4566;
 
@@ -79,13 +81,12 @@ public class GravitinoLocalStackContainer extends BaseContainer {
   }
 
   @Override
-  protected void setupContainer() {
-    super.setupContainer();
-    container.waitingFor(
-        Wait.forHttp("/_localstack/health")
-            .forPort(PORT)
-            .forStatusCode(200)
-            .forResponsePredicate(GravitinoLocalStackContainer::reportsS3Ready));
+  @Nullable
+  protected WaitStrategy waitStrategy() {
+    return Wait.forHttp("/_localstack/health")
+        .forPort(PORT)
+        .forStatusCode(200)
+        .forResponsePredicate(GravitinoLocalStackContainer::reportsS3Ready);
   }
 
   @Override

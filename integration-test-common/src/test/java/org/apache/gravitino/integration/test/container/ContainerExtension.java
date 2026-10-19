@@ -47,6 +47,10 @@ import org.junit.platform.commons.support.ModifierSupport;
  * <p>This is dependency injection built on JUnit's own extension points ({@link ParameterResolver}
  * and {@link TestInstancePostProcessor}), so tests need no DI framework.
  *
+ * <p>Fixtures on superclasses apply too, but a class's fixture replaces a superclass's fixture of
+ * the same annotation type, so {@code @HiveFixture(version = HIVE3)} on a subclass of a Hive2 test
+ * runs Hive3 only.
+ *
  * <p>Each container starts once per run and is shared by every class that asks for the same spec.
  * The containers close when the run ends, through {@link CloseContainerExtension}.
  */
@@ -127,8 +131,8 @@ public class ContainerExtension
   }
 
   // Fixtures on the class and its superclasses, nearest class first, one per annotation type.
-  // A subclass that re-declares a fixture, for example with another version, replaces the
-  // superclass's; keeping both would start two containers and make injection by type ambiguous.
+  // Hierarchies such as TestHive3HMS extends TestHive2HMS re-declare a fixture with another
+  // version; keeping both would start two containers and make injection by type ambiguous.
   static List<ContainerSpec<?>> specs(Class<?> testClass) {
     List<ContainerSpec<?>> specs = new ArrayList<>();
     Set<Class<? extends Annotation>> seen = new HashSet<>();

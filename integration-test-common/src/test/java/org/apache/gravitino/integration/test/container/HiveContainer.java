@@ -44,9 +44,8 @@ import org.testcontainers.containers.Network;
 public class HiveContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(HiveContainer.class);
 
-  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_HIVE_DOCKER_IMAGE");
-  public static final String KERBEROS_IMAGE =
-      System.getenv("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE");
+  public static final String DEFAULT_IMAGE = TestImages.HIVE;
+  public static final String KERBEROS_IMAGE = TestImages.KERBEROS_HIVE;
 
   public static final String HOST_NAME = "gravitino-ci-hive";
   public static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";

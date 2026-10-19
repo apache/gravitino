@@ -89,7 +89,16 @@ public class TestContainerSuite {
   }
 
   @Test
-  void testStartTimedRethrowsStartFailure() {
+  void testStartTimedKeepsAStartedContainerRunning() {
+    BaseContainer container = mockContainer();
+
+    ContainerSuite.startTimed(container);
+
+    Mockito.verify(container, Mockito.never()).close();
+  }
+
+  @Test
+  void testStartTimedClosesAndRethrowsFailedStart() {
     BaseContainer container = mockContainer();
     IllegalStateException failure = new IllegalStateException("not ready");
     Mockito.doThrow(failure).when(container).start();
@@ -98,6 +107,39 @@ public class TestContainerSuite {
         failure,
         Assertions.assertThrows(
             IllegalStateException.class, () -> ContainerSuite.startTimed(container)));
+    Mockito.verify(container).close();
+  }
+
+  @Test
+  void testStartTimedReportsStartFailureWhenCloseFails() {
+    BaseContainer container = mockContainer();
+    IllegalStateException failure = new IllegalStateException("not ready");
+    IllegalStateException closeFailure = new IllegalStateException("cannot stop");
+    Mockito.doThrow(failure).when(container).start();
+    Mockito.doThrow(closeFailure).when(container).close();
+
+    IllegalStateException thrown =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> ContainerSuite.startTimed(container));
+
+    Assertions.assertSame(failure, thrown);
+    Assertions.assertArrayEquals(new Throwable[] {closeFailure}, thrown.getSuppressed());
+  }
+
+  @Test
+  void testStartTimedReportsStartFailureWhenCloseThrowsAnError() {
+    BaseContainer container = mockContainer();
+    IllegalStateException failure = new IllegalStateException("not ready");
+    AssertionError closeFailure = new AssertionError("cannot stop");
+    Mockito.doThrow(failure).when(container).start();
+    Mockito.doThrow(closeFailure).when(container).close();
+
+    IllegalStateException thrown =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> ContainerSuite.startTimed(container));
+
+    Assertions.assertSame(failure, thrown);
+    Assertions.assertArrayEquals(new Throwable[] {closeFailure}, thrown.getSuppressed());
   }
 
   private static BaseContainer mockContainer() {

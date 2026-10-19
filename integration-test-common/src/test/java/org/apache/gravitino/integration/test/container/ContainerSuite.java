@@ -102,6 +102,8 @@ public class ContainerSuite implements Closeable {
 
   private static volatile RustFSContainer rustFSContainer;
 
+  private static volatile GravitinoMotoContainer motoContainer;
+
   /**
    * We can share the same Hive container as Hive container with S3 contains the following
    * differences: 1. Configuration of S3 and corresponding environment variables 2. The Hive
@@ -379,7 +381,7 @@ public class ContainerSuite implements Closeable {
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
-                  .withImage("mysql:5.7")
+                  .withImage(TestImages.MYSQL_5_7)
                   .withHostName("gravitino-ci-mysql-v5")
                   .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
@@ -504,6 +506,27 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  /** Starts the shared Moto server, the AWS mock behind the Glue catalog tests. */
+  public void startMotoContainer() {
+    if (motoContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (motoContainer == null) {
+          initIfNecessary();
+          GravitinoMotoContainer.Builder builder =
+              GravitinoMotoContainer.builder().withNetwork(network);
+          GravitinoMotoContainer container = closer.register(builder.build());
+          try {
+            start(container);
+          } catch (Exception e) {
+            LOG.error("Failed to start Moto container", e);
+            throw new RuntimeException("Failed to start Moto container", e);
+          }
+          motoContainer = container;
+        }
+      }
+    }
+  }
+
   public void startStarRocksContainer() {
     if (starRocksContainer == null) {
       synchronized (ContainerSuite.class) {
@@ -533,7 +556,7 @@ public class ContainerSuite implements Closeable {
           // Start ClickHouse container
           ClickHouseContainer.Builder clickHouseBuilder =
               ClickHouseContainer.builder()
-                  .withImage(resolveClickHouseImage())
+                  .withImage(TestImages.CLICKHOUSE)
                   .withFilesToMount(resolveClickHouseTestFiles())
                   .withHostName("gravitino-ci-clickhouse")
                   .withEnvVars(
@@ -567,7 +590,7 @@ public class ContainerSuite implements Closeable {
           for (int node = 1; node <= CLICKHOUSE_CLUSTER_SIZE; node++) {
             ClickHouseContainer.Builder clickHouseBuilder =
                 ClickHouseContainer.builder()
-                    .withImage(resolveClickHouseImage())
+                    .withImage(TestImages.CLICKHOUSE)
                     .withFilesToMount(resolveClickHouseTestFiles())
                     .withHostName(CLICKHOUSE_CLUSTER_HOST_PREFIX + node)
                     .withEnvVars(
@@ -665,6 +688,11 @@ public class ContainerSuite implements Closeable {
 
   public GravitinoLocalStackContainer getLocalStackContainer() {
     return gravitinoLocalStackContainer;
+  }
+
+  /** Returns the shared Moto server, or null before {@link #startMotoContainer()} runs. */
+  public GravitinoMotoContainer getMotoContainer() {
+    return motoContainer;
   }
 
   /** Starts the shared RustFS object store for S3 credential-vending tests. */
@@ -801,12 +829,19 @@ public class ContainerSuite implements Closeable {
 
   // Logs one greppable line per start, including the container's own readiness check, so CI logs
   // show where container time goes. Failed starts are logged too, with ok=false.
+  //
+  // A failed start is closed here because Testcontainers leaves the container running when its
+  // readiness check times out, and the caller never stores it, so the next start* call would start
+  // another one beside it. The closer still holds it; closing it again at run end is a no-op.
   static void startTimed(BaseContainer container) {
     long startNanos = System.nanoTime();
     boolean ok = false;
     try {
       container.start();
       ok = true;
+    } catch (Throwable e) {
+      closeFailedStart(container, e);
+      throw e;
     } finally {
       LOG.info(
           "[CONTAINER-TIMING] container={} image={} hostName={} ok={} startMs={}",
@@ -815,6 +850,23 @@ public class ContainerSuite implements Closeable {
           container.hostName,
           ok,
           (System.nanoTime() - startNanos) / 1_000_000);
+    }
+  }
+
+  private static void closeFailedStart(BaseContainer container, Throwable startFailure) {
+    LOG.warn(
+        "Closing {} (image={}, hostName={}) after its start failed",
+        container.getClass().getSimpleName(),
+        container.getContainer().getDockerImageName(),
+        container.hostName);
+    try {
+      container.close();
+    } catch (Throwable closeFailure) {
+      // The start failure is the one the test must report; the close failure only rides along.
+      LOG.warn("Failed to close {}", container.getClass().getSimpleName(), closeFailure);
+      if (closeFailure != startFailure) {
+        startFailure.addSuppressed(closeFailure);
+      }
     }
   }
 
@@ -981,14 +1033,8 @@ public class ContainerSuite implements Closeable {
     zooKeeperContainer = null;
     gravitinoLocalStackContainer = null;
     rustFSContainer = null;
+    motoContainer = null;
     hiveContainerWithS3 = null;
-  }
-
-  private static String resolveClickHouseImage() {
-    String configuredImage = System.getenv(CLICKHOUSE_TEST_IMAGE_ENV);
-    return configuredImage == null || configuredImage.isBlank()
-        ? ClickHouseContainer.DEFAULT_IMAGE
-        : configuredImage.trim();
   }
 
   private static Map<String, String> resolveClickHouseTestFiles() {
