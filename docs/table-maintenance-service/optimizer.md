@@ -97,6 +97,12 @@ Each step ends with a check. If a check fails, stop there, since every step depe
   `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`). Without it, the job fails after
   Spark starts with an error naming the missing Iceberg classes. See
   [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+- With the [Kubernetes job executor](../k8s-job-executor.md), the jobs run in Spark pods: put the
+  Iceberg Spark runtime in the Spark image or in
+  `gravitino.jobExecutor.k8s.spark.conf.spark.jars` rather than in `spark_conf`, leave
+  `spark.master` out of `spark_conf`, and use catalog URIs, warehouse locations, and a
+  `gravitino_uri` in `updater_options` that the pods can reach, not `localhost`. See
+  [Built-In Jobs](../k8s-job-executor.md#built-in-jobs).
 - `gravitino.job.statusPullIntervalInMs` lowered to `10000` and the server restarted. The default is five minutes, which makes every status check in this walkthrough feel broken.
 
 If your Iceberg REST backend runs in memory, do not restart it partway through. Restarting resets both metadata and data files, and you start over.

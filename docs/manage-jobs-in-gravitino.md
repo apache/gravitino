@@ -21,8 +21,8 @@ runs Spark jobs on Kubernetes. Running jobs anywhere else means implementing an 
 :::note
 1. The job system is still under development, so some features may not be fully
    implemented yet.
-2. The aim of the job system is not to replace the existing job executors. So, it can only
-   support running a single job at a time, and it doesn't support job scheduling for now.
+2. The aim of the job system is not to replace the existing job executors, and it doesn't
+   support job scheduling for now.
    :::
 
 ## Job Template Operations
@@ -47,10 +47,12 @@ a job runs. See [Placeholders](#placeholders).
 `executable` and `scripts` are fetched by the job executor. With the `local` job executor they must
 be reachable by the Gravitino server, which accepts local paths and HTTP, HTTPS, FTP, and FTPS URLs.
 
-Each of them is fetched into the job's working directory under the file name of its path, so it
-must point to a file, and two different resources of a template must not share a file name: a run
-is rejected otherwise, instead of one file silently overwriting the other. The same applies to the
-`executable`, `jars`, `files` and `archives` of a Spark template.
+With the local job executor, each of them is fetched into the job's working directory under the
+file name of its path, so it must point to a file, and two different resources of a template must
+not share a file name: a run is rejected otherwise, instead of one file silently overwriting the
+other. The same applies to the `executable`, `jars`, `files` and `archives` of a Spark template.
+The Kubernetes job executor doesn't fetch the resources, see
+[Kubernetes Job Executor](./k8s-job-executor.md#job-resources).
 
 `executable` can also be a command name with no path, such as `python` or `bash`. Such a command is
 not fetched, it is looked up where the job runs: the `local` job executor looks it up on the `PATH`
@@ -401,11 +403,8 @@ To run jobs anywhere else, implement a
 
 The job system still needs more work:
 
-1. Support modification of job templates.
-2. Support running Spark jobs (Java and PySpark) based on the Spark job template in the local job
-   executor.
-3. Support more job templates, like Python, SQL, etc.
-4. Support more job executors, like Apache Airflow, Apache Livy, etc.
-5. Support uploading job template related artifacts to the Gravitino server, also support
+1. Support more job templates, like Python, SQL, etc.
+2. Support more job executors, like Apache Airflow, Apache Livy, etc.
+3. Support uploading job template related artifacts to the Gravitino server, also support
    downloading the artifacts from more distributed file systems like HDFS, S3, etc.
-6. Support job scheduling, like running jobs periodically, or based on some events.
+4. Support job scheduling, like running jobs periodically, or based on some events.

@@ -27,7 +27,7 @@ For job templates and the job API, see [Manage Jobs](./manage-jobs-in-gravitino.
 
 The local job executor fetches the resources of a job, that is its executable, scripts, jars, files,
 and archives, into the staging directory of the job, and runs the job there as a process on the
-Gravitino server host. The resources must be reachable by the Gravitino server, which accepts local
+Gravitino server host. An `executable` that is a command name, such as `python`, isn't fetched. The resources must be reachable by the Gravitino server, which accepts local
 paths and HTTP, HTTPS, FTP, and FTPS URLs.
 
 The executor always uses `gravitino.job.stagingDir` as its staging directory, the same one the job
@@ -43,7 +43,7 @@ Set the following configurations in the `gravitino.conf` file:
 | `gravitino.jobExecutor.local.maxRunningJobs`           | The maximum number of running jobs in the local job executor                                                                                                                                 | `max(1, min(available cores / 2, 10))` | No       |
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs`    | The time in milliseconds to keep the job status in the local job executor                                                                                                                    | `3600000` (1 hour)                     | No       |
 | `gravitino.jobExecutor.local.cancelForceKillDelayInMs` | How long in milliseconds a cancelled job's process may keep running after it is asked to stop before the executor kills it forcibly. Raise it for jobs that need longer to shut down cleanly | `30000` (30 seconds)                   | No       |
-| `gravitino.jobExecutor.local.sparkHome`                | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job                                            | `None`                                 | No       |
+| `gravitino.jobExecutor.local.sparkHome`                | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job                                            | (none)                                 | No       |
 
 ## Queueing
 
@@ -54,7 +54,8 @@ jobs.
 
 ## Environment Variables
 
-The `environments` of a job template are set as the environment variables of the job's process.
+The `environments` of a job template are set as the environment variables of the job's process,
+which is `spark-submit` for a Spark template.
 
 ## Job Output and Times
 
