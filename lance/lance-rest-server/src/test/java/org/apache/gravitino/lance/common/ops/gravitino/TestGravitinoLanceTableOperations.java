@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.lance.service.rest;
+package org.apache.gravitino.lance.common.ops.gravitino;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 
@@ -27,10 +27,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceNamespaceWrapper;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
-import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableOperations;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
@@ -142,10 +140,12 @@ class TestGravitinoLanceTableOperations {
         .thenReturn(managedTable);
 
     Catalog catalog = Mockito.mock(Catalog.class);
-    Mockito.when(catalog.asTableCatalog()).thenReturn(tableCatalog);
 
     GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
     Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
+    // In auxiliary mode the catalog is accessed through the namespace wrapper's dispatcher rather
+    // than catalog.asTableCatalog() directly, so stub the wrapper routing accordingly.
+    Mockito.when(wrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
 
     GravitinoLanceTableOperations ops = new GravitinoLanceTableOperations(wrapper);
 
@@ -161,9 +161,9 @@ class TestGravitinoLanceTableOperations {
 
   private static GravitinoLanceTableOperations operations(TableCatalog tableCatalog) {
     Catalog catalog = Mockito.mock(Catalog.class);
-    Mockito.when(catalog.asTableCatalog()).thenReturn(tableCatalog);
     GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
     Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
+    Mockito.when(wrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
     return new GravitinoLanceTableOperations(wrapper);
   }
 }

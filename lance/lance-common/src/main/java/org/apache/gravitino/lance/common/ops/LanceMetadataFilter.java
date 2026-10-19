@@ -1,0 +1,94 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.lance.common.ops;
+
+import java.util.List;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.lance.namespace.errors.PermissionDeniedException;
+
+/**
+ * Checks metadata reads and filters lists before pagination; {@link #NOOP} disables these checks.
+ */
+public interface LanceMetadataFilter {
+
+  /** A filter that returns every listed name unchanged. */
+  LanceMetadataFilter NOOP = new LanceMetadataFilter() {};
+
+  /**
+   * Checks access before returning properties of an existing catalog from a create request.
+   *
+   * @param catalogName the catalog to read
+   * @throws PermissionDeniedException if the caller cannot read the catalog
+   */
+  default void checkReadCatalog(String catalogName) {}
+
+  /**
+   * Checks access before returning properties of an existing schema from a create request.
+   *
+   * @param catalogName the catalog holding the schema
+   * @param schemaName the schema to read
+   * @throws PermissionDeniedException if the caller cannot read the schema
+   */
+  default void checkReadSchema(String catalogName, String schemaName) {}
+
+  /**
+   * Checks access before returning an existing table from a create request.
+   *
+   * @param catalogName the catalog holding the table
+   * @param schemaName the schema holding the table
+   * @param tableName the table to read
+   * @throws PermissionDeniedException if the caller cannot read the table
+   * @throws NoSuchTableException if the authorization backend confirms that the table is absent
+   */
+  default void checkReadTable(String catalogName, String schemaName, String tableName) {}
+
+  /**
+   * Filters the catalogs listed for the root namespace.
+   *
+   * @param catalogNames the catalog names to filter.
+   * @return the catalog names the current caller may see.
+   */
+  default List<String> filterCatalogs(List<String> catalogNames) {
+    return catalogNames;
+  }
+
+  /**
+   * Filters the schemas listed under a catalog.
+   *
+   * @param catalogName the catalog holding the schemas.
+   * @param schemaNames the schema names to filter.
+   * @return the schema names the current caller may see.
+   */
+  default List<String> filterSchemas(String catalogName, List<String> schemaNames) {
+    return schemaNames;
+  }
+
+  /**
+   * Filters the tables listed under a schema.
+   *
+   * @param catalogName the catalog holding the schema.
+   * @param schemaName the schema holding the tables.
+   * @param tableNames the table names to filter.
+   * @return the table names the current caller may see.
+   */
+  default List<String> filterTables(
+      String catalogName, String schemaName, List<String> tableNames) {
+    return tableNames;
+  }
+}
