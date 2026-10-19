@@ -26,7 +26,6 @@ import com.github.dockerjava.api.model.Info;
 import com.github.dockerjava.api.model.Network.Ipam.Config;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,6 +45,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
@@ -55,12 +56,14 @@ import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Network;
 
-public class ContainerSuite implements Closeable {
+public class ContainerSuite {
   public static final Logger LOG = LoggerFactory.getLogger(ContainerSuite.class);
   private static volatile ContainerSuite instance = null;
   private static volatile boolean initialized = false;
@@ -869,22 +872,48 @@ public class ContainerSuite implements Closeable {
   // another one beside it. The closer still holds it; closing it again at run end is a no-op.
   static void startTimed(BaseContainer container) {
     long startNanos = System.nanoTime();
+    long pullMs = 0;
     boolean ok = false;
     try {
+      pullMs = pullImage(container);
       container.start();
       ok = true;
     } catch (Throwable e) {
       closeFailedStart(container, e);
       throw e;
     } finally {
+      long totalMs = (System.nanoTime() - startNanos) / 1_000_000;
+      long containerMs = container.lastContainerStartMs();
       LOG.info(
-          "[CONTAINER-TIMING] container={} image={} hostName={} ok={} startMs={}",
+          "[CONTAINER-TIMING] container={} image={} hostName={} ok={} startMs={} pullMs={}"
+              + " containerMs={} readyMs={}",
           container.getClass().getSimpleName(),
           container.getContainer().getDockerImageName(),
           container.hostName,
           ok,
-          (System.nanoTime() - startNanos) / 1_000_000);
+          totalMs,
+          pullMs,
+          containerMs,
+          Math.max(0, totalMs - pullMs - containerMs));
     }
+  }
+
+  // Resolves (and if needed pulls) the image before start(), so the timing line can report the pull
+  // apart from the start: CI runners pull every image fresh, a warm Mac does not.
+  private static long pullImage(BaseContainer container) {
+    long pullNanos = System.nanoTime();
+    Future<String> image = container.getContainer().getImage();
+    if (image != null) {
+      try {
+        image.get();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Interrupted while pulling " + container.hostName, e);
+      } catch (ExecutionException e) {
+        throw new IllegalStateException("Failed to pull the image for " + container.hostName, e);
+      }
+    }
+    return (System.nanoTime() - pullNanos) / 1_000_000;
   }
 
   private static void closeFailedStart(BaseContainer container, Throwable startFailure) {
@@ -1025,14 +1054,30 @@ public class ContainerSuite implements Closeable {
   }
 
   /**
-   * Stops every container and resets the suite. Only {@code CloseContainerExtension} calls this,
-   * once at the end of the run; tests never close the shared suite, because later classes in the
-   * same JVM would have to restart every container.
+   * Closes the suite when the JUnit run ends, through a resource in the root store. Calling it
+   * again is harmless; the store keeps one resource. {@code CloseContainerExtension} calls it
+   * before every class, so the run's containers stop once, after the last class.
    *
-   * @throws IOException never; close failures are logged
+   * @param context any extension context of the run
    */
-  @Override
-  public void close() throws IOException {
+  public static void closeWhenRunEnds(ExtensionContext context) {
+    // Store.computeIfAbsent is atomic, so concurrent classes register the closer once.
+    context.getRoot().getStore(Namespace.GLOBAL).computeIfAbsent(RunCloser.class);
+  }
+
+  private static final class RunCloser implements AutoCloseable {
+    @Override
+    public void close() {
+      getInstance().close();
+      LOG.info("Containers were closed at the end of the run");
+    }
+  }
+
+  // Stops every container and resets the suite; logs instead of failing, so a teardown error does
+  // not fail a green run. Package-private so tests cannot close the shared suite: later classes in
+  // the same JVM would have to restart every container. Only the run's closer above and this
+  // package's unit tests call it.
+  void close() {
     try {
       closer.close();
     } catch (Exception e) {

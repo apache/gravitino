@@ -34,6 +34,11 @@ public record LocalStackSpec() implements ContainerSpec<GravitinoLocalStackConta
 
   static final class Factory implements ContainerFixture.SpecFactory<LocalStackFixture> {
     @Override
+    public Startup startupFor(LocalStackFixture fixture) {
+      return fixture.startup();
+    }
+
+    @Override
     public LocalStackSpec specFor(LocalStackFixture fixture) {
       return new LocalStackSpec();
     }

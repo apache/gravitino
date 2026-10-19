@@ -33,8 +33,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
  */
 @Documented
 @Inherited
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 @ExtendWith(ContainerExtension.class)
 @ContainerFixture(LocalStackSpec.Factory.class)
-public @interface LocalStackFixture {}
+public @interface LocalStackFixture {
+
+  /**
+   * Returns when the container starts.
+   *
+   * @return the startup mode; before {@code @BeforeAll} by default
+   */
+  Startup startup() default Startup.EAGER;
+}

@@ -32,8 +32,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
  */
 @Documented
 @Inherited
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 @ExtendWith(ContainerExtension.class)
 @ContainerFixture(OceanBaseSpec.Factory.class)
-public @interface OceanBaseFixture {}
+public @interface OceanBaseFixture {
+
+  /**
+   * Returns when the container starts.
+   *
+   * @return the startup mode; before {@code @BeforeAll} by default
+   */
+  Startup startup() default Startup.EAGER;
+}

@@ -71,6 +71,11 @@ public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerS
 
   static final class Factory implements ContainerFixture.SpecFactory<HiveFixture> {
     @Override
+    public Startup startupFor(HiveFixture fixture) {
+      return fixture.startup();
+    }
+
+    @Override
     public HiveSpec specFor(HiveFixture fixture) {
       return new HiveSpec(fixture.version(), fixture.auth());
     }

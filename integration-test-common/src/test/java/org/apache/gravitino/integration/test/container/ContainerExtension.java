@@ -24,10 +24,14 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
+import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionConfigurationException;
@@ -40,6 +44,8 @@ import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 import org.junit.platform.commons.support.AnnotationSupport;
 import org.junit.platform.commons.support.HierarchyTraversalMode;
 import org.junit.platform.commons.support.ModifierSupport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Starts the containers a test class declares with fixture annotations, such as {@link
@@ -53,6 +59,9 @@ import org.junit.platform.commons.support.ModifierSupport;
  * the same annotation type, so {@code @HiveFixture(version = HIVE3)} on a subclass of a Hive2 test
  * runs Hive3 only.
  *
+ * <p>A fixture annotation on a {@link FixtureContainer} field picks that field's container instead
+ * of the class's fixtures, so one class can hold two containers of one type.
+ *
  * <p>By default ({@link Scope#RUN}) each container starts once per run and is shared by every class
  * that asks for the same spec; the containers close when the run ends, through {@link
  * CloseContainerExtension}. A {@link Scope#CLASS} container is private to the class and closes
@@ -60,38 +69,83 @@ import org.junit.platform.commons.support.ModifierSupport;
  * only reach instance fields and the parameters of test and {@code @BeforeEach} methods.
  */
 public class ContainerExtension
-    implements BeforeAllCallback, BeforeEachCallback, ParameterResolver, TestInstancePostProcessor {
+    implements AfterAllCallback,
+        BeforeAllCallback,
+        BeforeEachCallback,
+        ParameterResolver,
+        TestInstancePostProcessor {
 
   private static final String PRIVATE_CONTAINER = "privateContainer";
+  private static final String INJECTED = "injectedSpecs";
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerExtension.class);
+
+  // Where unused-fixture warnings go; a test swaps it to read them.
+  static Consumer<String> warnings = LOG::warn;
 
   private final CloseContainerExtension suiteCloser = new CloseContainerExtension();
 
   /** A fixture on the test class: what it asks for and how long its container lives. */
-  record Declaration(ContainerSpec<?> spec, Scope scope) {}
+  record Declaration(ContainerSpec<?> spec, Scope scope, Startup startup) {}
 
   @Override
   public void beforeAll(ExtensionContext context) {
     suiteCloser.beforeAll(context);
     Class<?> testClass = context.getRequiredTestClass();
     for (Declaration declaration : declarations(testClass)) {
-      if (declaration.scope() != Scope.METHOD) {
+      if (declaration.scope() != Scope.METHOD && declaration.startup() == Startup.EAGER) {
         container(declaration, context);
       }
     }
     injectFields(testClass, null, ModifierSupport::isStatic, context, false);
+    // JUnit registers an extension declared only on an instance field after it post-processes the
+    // instance, so postProcessTestInstance() never ran for it. A PER_CLASS instance exists here.
+    context
+        .getTestInstance()
+        .ifPresent(
+            instance ->
+                injectFields(
+                    instance.getClass(), instance, ModifierSupport::isNotStatic, context, false));
+  }
+
+  // A fixture whose container no field or parameter received still started; say so, since it
+  // usually means a leftover fixture or a test that reaches the container another way.
+  @Override
+  public void afterAll(ExtensionContext context) {
+    Set<ContainerSpec<?>> injected = injected(context);
+    for (Declaration declaration : declarations(context.getRequiredTestClass())) {
+      if (!injected.contains(declaration.spec())) {
+        warnings.accept(
+            String.format(
+                "%s declares a fixture for %s but never injects its container; inject it into a"
+                    + " field or parameter, or remove the fixture",
+                context.getRequiredTestClass().getSimpleName(), declaration.spec()));
+      }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Set<ContainerSpec<?>> injected(ExtensionContext context) {
+    return classContext(context)
+        .getStore(Namespace.create(ContainerExtension.class))
+        .computeIfAbsent(INJECTED, key -> ConcurrentHashMap.newKeySet(), Set.class);
   }
 
   @Override
   public void beforeEach(ExtensionContext context) {
+    // An extension declared only on an instance field of a PER_METHOD class never gets
+    // beforeAll(), so register the run's closer here too; registering twice is harmless.
+    suiteCloser.beforeAll(context);
     Class<?> testClass = context.getRequiredTestClass();
     for (Declaration declaration : declarations(testClass)) {
       if (declaration.scope() == Scope.METHOD) {
         container(declaration, context);
       }
     }
+    Object instance = context.getRequiredTestInstance();
+    // An extension declared only on an instance field missed postProcessTestInstance().
+    injectFields(testClass, instance, ModifierSupport::isNotStatic, context, false);
     // Each test gets a new METHOD container, so refill the fields that hold one.
-    injectFields(
-        testClass, context.getRequiredTestInstance(), ModifierSupport::isNotStatic, context, true);
+    injectFields(testClass, instance, ModifierSupport::isNotStatic, context, true);
   }
 
   // Runs when the instance is created, before beforeAll(), so instance fields are filled before an
@@ -119,7 +173,9 @@ public class ContainerExtension
                 testClass.getSimpleName(), field.getName()));
       }
       Declaration declaration =
-          declarationFor(field.getType(), testClass, "field " + field.getName());
+          fieldDeclaration(field)
+              .orElseGet(
+                  () -> declarationFor(field.getType(), testClass, "field " + field.getName()));
       if (declaration.scope() == Scope.METHOD && ModifierSupport.isStatic(field)) {
         throw methodScopeOutsideTest(testClass, declaration.spec());
       }
@@ -128,11 +184,48 @@ public class ContainerExtension
       }
       try {
         field.setAccessible(true);
+        // A RUN or CLASS container does not change within an instance, so a filled instance field
+        // stays; several callbacks below may each be the first to see the instance.
+        if (!methodScoped && testInstance != null && field.get(testInstance) != null) {
+          continue;
+        }
         field.set(testInstance, container(declaration, context));
+        injected(context).add(declaration.spec());
       } catch (IllegalAccessException e) {
         throw new ExtensionConfigurationException("Cannot set field " + field.getName(), e);
       }
     }
+  }
+
+  // A fixture annotation on the field itself, which wins over the class's fixtures.
+  private static Optional<Declaration> fieldDeclaration(Field field) {
+    List<Declaration> found = new ArrayList<>();
+    for (Annotation annotation : field.getDeclaredAnnotations()) {
+      ContainerFixture fixture = annotation.annotationType().getAnnotation(ContainerFixture.class);
+      if (fixture != null) {
+        found.add(declare(fixture, annotation));
+      }
+    }
+    if (found.size() > 1) {
+      throw new ExtensionConfigurationException(
+          String.format(
+              "%s: field %s has %d fixture annotations; use one",
+              field.getDeclaringClass().getSimpleName(), field.getName(), found.size()));
+    }
+    if (found.isEmpty()) {
+      return Optional.empty();
+    }
+    Class<?> containerType = found.get(0).spec().containerType();
+    if (!field.getType().isAssignableFrom(containerType)) {
+      throw new ExtensionConfigurationException(
+          String.format(
+              "%s: field %s of type %s cannot hold a %s",
+              field.getDeclaringClass().getSimpleName(),
+              field.getName(),
+              field.getType().getSimpleName(),
+              containerType.getSimpleName()));
+    }
+    return Optional.of(found.get(0));
   }
 
   @Override
@@ -147,6 +240,7 @@ public class ContainerExtension
             parameter.getParameter().getType(),
             context.getRequiredTestClass(),
             "parameter " + parameter.getParameter().getName());
+    injected(context).add(declaration.spec());
     return container(declaration, context);
   }
 
@@ -249,6 +343,7 @@ public class ContainerExtension
       throw new IllegalStateException(
           "Cannot create the spec factory " + fixture.value().getName(), e);
     }
-    return new Declaration(factory.specFor(annotation), factory.scopeFor(annotation));
+    return new Declaration(
+        factory.specFor(annotation), factory.scopeFor(annotation), factory.startupFor(annotation));
   }
 }

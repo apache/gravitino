@@ -30,13 +30,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * Declares that a test class needs a Hive server. Test and lifecycle methods receive it as a {@link
  * HiveContainer} parameter, and fields marked {@link FixtureContainer} receive it too.
  *
- * <p>A class gets one Hive: the annotation is not repeatable, and both authentication modes inject
- * as {@link HiveContainer}. A subclass may declare its own {@code HiveFixture}; it replaces the
- * superclass's.
+ * <p>On the class, it declares one Hive: the annotation is not repeatable, and both authentication
+ * modes inject as {@link HiveContainer}. A subclass may declare its own {@code HiveFixture}; it
+ * replaces the superclass's. A class that needs two Hives, such as a plain and a Kerberos one, puts
+ * the annotation on each {@link FixtureContainer} field instead.
  */
 @Documented
 @Inherited
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 @ExtendWith(ContainerExtension.class)
 @ContainerFixture(HiveSpec.Factory.class)
@@ -63,4 +64,11 @@ public @interface HiveFixture {
    * @return the scope; the whole run by default, shared with other classes
    */
   Scope scope() default Scope.RUN;
+
+  /**
+   * Returns when the container starts.
+   *
+   * @return the startup mode; before {@code @BeforeAll} by default
+   */
+  Startup startup() default Startup.EAGER;
 }

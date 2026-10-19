@@ -51,8 +51,9 @@ import org.testcontainers.lifecycle.Startable;
 /**
  * The base for all integration test containers: it applies the common settings and manages the
  * lifecycle. Gravitino's own images have no official Testcontainers module, so they start from an
- * image name; services that have an official module supply that module instead, so they keep its
- * defaults and readiness check.
+ * image name; services that have an official module supply that module instead. A supplied module
+ * keeps its own readiness check only when the subclass also returns {@code null} from {@link
+ * #waitStrategy()}; otherwise the default port check replaces it.
  */
 public abstract class BaseContainer implements Startable {
   public static final Logger LOG = LoggerFactory.getLogger(BaseContainer.class);
@@ -70,6 +71,8 @@ public abstract class BaseContainer implements Startable {
   private final Optional<Network> network;
 
   protected final GenericContainer<?> container;
+
+  private volatile long lastContainerStartMs;
 
   /**
    * Builds the container from an image name. Used by Gravitino's own images, which have no official
@@ -222,7 +225,22 @@ public abstract class BaseContainer implements Startable {
 
   @Override
   public void start() {
-    container.start();
+    long startNanos = System.nanoTime();
+    try {
+      container.start();
+    } finally {
+      lastContainerStartMs = (System.nanoTime() - startNanos) / 1_000_000;
+    }
+  }
+
+  /**
+   * Returns how long the last {@code start()} spent in Testcontainers' own start: creating and
+   * starting the container and its wait strategy, without this class's own readiness check.
+   *
+   * @return the time in milliseconds, or 0 before the first start
+   */
+  public long lastContainerStartMs() {
+    return lastContainerStartMs;
   }
 
   @Override

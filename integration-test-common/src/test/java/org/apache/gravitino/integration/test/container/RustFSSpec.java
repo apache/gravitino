@@ -34,6 +34,11 @@ public record RustFSSpec() implements ContainerSpec<RustFSContainer> {
 
   static final class Factory implements ContainerFixture.SpecFactory<RustFSFixture> {
     @Override
+    public Startup startupFor(RustFSFixture fixture) {
+      return fixture.startup();
+    }
+
+    @Override
     public RustFSSpec specFor(RustFSFixture fixture) {
       return new RustFSSpec();
     }

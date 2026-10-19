@@ -34,6 +34,11 @@ public record RangerSpec() implements ContainerSpec<RangerContainer> {
 
   static final class Factory implements ContainerFixture.SpecFactory<RangerFixture> {
     @Override
+    public Startup startupFor(RangerFixture fixture) {
+      return fixture.startup();
+    }
+
+    @Override
     public RangerSpec specFor(RangerFixture fixture) {
       return new RangerSpec();
     }

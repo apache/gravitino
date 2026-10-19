@@ -98,6 +98,11 @@ public record ClickHouseSpec(int nodes, TestDatabaseName database)
 
   static final class Factory implements ContainerFixture.SpecFactory<ClickHouseFixture> {
     @Override
+    public Startup startupFor(ClickHouseFixture fixture) {
+      return fixture.startup();
+    }
+
+    @Override
     public ClickHouseSpec specFor(ClickHouseFixture fixture) {
       return new ClickHouseSpec(fixture.nodes(), fixture.database());
     }

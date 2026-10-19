@@ -37,6 +37,11 @@ public record DorisSpec(DorisImageName version) implements ContainerSpec<DorisCo
 
   static final class Factory implements ContainerFixture.SpecFactory<DorisFixture> {
     @Override
+    public Startup startupFor(DorisFixture fixture) {
+      return fixture.startup();
+    }
+
+    @Override
     public DorisSpec specFor(DorisFixture fixture) {
       return new DorisSpec(fixture.version());
     }

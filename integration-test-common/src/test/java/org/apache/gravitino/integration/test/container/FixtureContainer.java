@@ -31,6 +31,16 @@ import java.lang.annotation.Target;
  *
  * <p>Use it where a method parameter cannot reach, such as an overridden {@code @BeforeAll} method.
  *
+ * <p>A fixture annotation on the field itself picks that field's container, so one class can hold
+ * two containers of the same type. A field fixture does not register for method parameters.
+ *
+ * <pre>{@code
+ * class GvfsMultipleClusterIT extends BaseIT {
+ *   @HiveFixture @FixtureContainer private HiveContainer hive;
+ *   @HiveFixture(auth = HiveAuth.KERBEROS) @FixtureContainer private HiveContainer kerberosHive;
+ * }
+ * }</pre>
+ *
  * <pre>{@code
  * @KafkaFixture
  * class OwnerIT extends BaseIT {

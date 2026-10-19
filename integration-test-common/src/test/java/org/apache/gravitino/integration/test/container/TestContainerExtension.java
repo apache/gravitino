@@ -32,6 +32,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,6 +101,58 @@ public class TestContainerExtension {
   }
 
   @Test
+  void testFieldFixturesGiveOneClassTwoContainersOfOneType() {
+    run(TwoFieldFixtures.class)
+        .testEvents()
+        .assertStatistics(stats -> stats.succeeded(1).failed(0));
+    run(TwoStaticFieldFixtures.class)
+        .testEvents()
+        .assertStatistics(stats -> stats.succeeded(1).failed(0));
+    run(TwoFieldFixturesPerMethod.class)
+        .testEvents()
+        .assertStatistics(stats -> stats.succeeded(1).failed(0));
+  }
+
+  @Test
+  void testFieldFixtureOfWrongTypeFailsClearly() {
+    run(WrongTypeFieldFixture.class)
+        .allEvents()
+        .assertThatEvents()
+        .haveExactly(
+            1,
+            event(
+                finishedWithFailure(
+                    instanceOf(ExtensionConfigurationException.class),
+                    message(m -> m.contains("cannot hold a OtherContainer")))));
+  }
+
+  @Test
+  void testLazyFixtureStartsWhenAsked() {
+    run(LazyFixture.class).testEvents().assertStatistics(stats -> stats.succeeded(1).failed(0));
+
+    // The superclass @BeforeAll runs before the container starts, as BaseIT's server start would.
+    Assertions.assertEquals(List.of("setUp", "start first", "test"), LOG);
+  }
+
+  @Test
+  void testUnusedFixtureWarns() {
+    List<String> warnings = new ArrayList<>();
+    Consumer<String> original = ContainerExtension.warnings;
+    ContainerExtension.warnings = warnings::add;
+    try {
+      run(UnusedFixture.class).testEvents().assertStatistics(stats -> stats.succeeded(1).failed(0));
+      run(InjectedFixture.class).testEvents().assertStatistics(stats -> stats.succeeded(2));
+      run(FieldFixture.class).testEvents().assertStatistics(stats -> stats.succeeded(1));
+    } finally {
+      ContainerExtension.warnings = original;
+    }
+
+    Assertions.assertEquals(1, warnings.size(), warnings.toString());
+    Assertions.assertTrue(
+        warnings.get(0).startsWith("UnusedFixture declares a fixture for FakeSpec"));
+  }
+
+  @Test
   void testFinalFieldFailsClearly() {
     run(FinalFieldFixture.class)
         .testEvents()
@@ -149,6 +203,11 @@ public class TestContainerExtension {
     Assertions.assertEquals(
         List.of(new HiveSpec(HiveVersion.HIVE3, HiveAuth.KERBEROS)),
         ContainerExtension.specs(HiveFixtureOnly.class));
+    Assertions.assertEquals(
+        List.of(
+            new MySQLSpec(MySQLVersion.MYSQL_5_7, TestDatabaseName.MYSQL_CATALOG_MYSQL_IT),
+            new PostgreSQLSpec(PGImageName.VERSION_13, TestDatabaseName.PG_CATALOG_POSTGRESQL_IT)),
+        ContainerExtension.specs(DatabaseFixturesOnly.class));
   }
 
   @Test
@@ -286,6 +345,11 @@ public class TestContainerExtension {
     public Scope scopeFor(FakeFirstFixture fixture) {
       return fixture.scope();
     }
+
+    @Override
+    public Startup startupFor(FakeFirstFixture fixture) {
+      return fixture.startup();
+    }
   }
 
   static final class OtherFactory implements ContainerFixture.SpecFactory<FakeOtherFixture> {
@@ -302,7 +366,7 @@ public class TestContainerExtension {
     }
   }
 
-  @Target(ElementType.TYPE)
+  @Target({ElementType.TYPE, ElementType.FIELD})
   @Retention(RetentionPolicy.RUNTIME)
   @ExtendWith(ContainerExtension.class)
   @ContainerFixture(FirstFactory.class)
@@ -310,15 +374,17 @@ public class TestContainerExtension {
     String value() default "first";
 
     Scope scope() default Scope.RUN;
+
+    Startup startup() default Startup.EAGER;
   }
 
-  @Target(ElementType.TYPE)
+  @Target({ElementType.TYPE, ElementType.FIELD})
   @Retention(RetentionPolicy.RUNTIME)
   @ExtendWith(ContainerExtension.class)
   @ContainerFixture(SecondFactory.class)
   @interface FakeSecondFixture {}
 
-  @Target(ElementType.TYPE)
+  @Target({ElementType.TYPE, ElementType.FIELD})
   @Retention(RetentionPolicy.RUNTIME)
   @ExtendWith(ContainerExtension.class)
   @ContainerFixture(OtherFactory.class)
@@ -399,6 +465,96 @@ public class TestContainerExtension {
     void test() {}
   }
 
+  // Shaped like GvfsMultipleClusterIT: no class fixture, two fields of one type, read in an
+  // overridden @BeforeAll.
+  @Tag(FIXTURE)
+  static class TwoFieldFixtures extends SetUpBase {
+    @FakeFirstFixture @FixtureContainer private FakeContainer first;
+    @FakeSecondFixture @FixtureContainer private FakeContainer second;
+
+    @Override
+    @BeforeAll
+    void setUp() {
+      Assertions.assertSame(FIRST, first);
+      Assertions.assertSame(SECOND, second);
+    }
+
+    @Test
+    void test() {
+      Assertions.assertSame(FIRST, first);
+      Assertions.assertSame(SECOND, second);
+    }
+  }
+
+  @Tag(FIXTURE)
+  static class TwoStaticFieldFixtures {
+    @FakeFirstFixture @FixtureContainer private static FakeContainer first;
+    @FakeSecondFixture @FixtureContainer private static FakeContainer second;
+
+    @BeforeAll
+    static void setUp() {
+      Assertions.assertSame(FIRST, first);
+      Assertions.assertSame(SECOND, second);
+    }
+
+    @Test
+    void test() {
+      Assertions.assertSame(SECOND, second);
+    }
+  }
+
+  @Tag(FIXTURE)
+  static class TwoFieldFixturesPerMethod {
+    @FakeFirstFixture @FixtureContainer private FakeContainer first;
+    @FakeSecondFixture @FixtureContainer private FakeContainer second;
+
+    @Test
+    void test() {
+      Assertions.assertSame(FIRST, first);
+      Assertions.assertSame(SECOND, second);
+    }
+  }
+
+  @Tag(FIXTURE)
+  static class WrongTypeFieldFixture {
+    @SuppressWarnings("UnusedVariable")
+    @FakeOtherFixture
+    @FixtureContainer
+    private static FakeContainer wrong;
+
+    @Test
+    void test() {}
+  }
+
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  static class LoggingSetUpBase {
+    @BeforeAll
+    void setUp() {
+      LOG.add("setUp");
+    }
+  }
+
+  @Tag(FIXTURE)
+  @FakeFirstFixture(startup = Startup.LAZY)
+  static class LazyFixture extends LoggingSetUpBase {
+    @BeforeAll
+    void startAfterSetUp(FakeContainer container) {
+      Assertions.assertSame(FIRST, container);
+    }
+
+    @Test
+    void test() {
+      LOG.add("test");
+    }
+  }
+
+  @Tag(FIXTURE)
+  @FakeFirstFixture
+  static class UnusedFixture {
+    @Test
+    void test() {}
+  }
+
   @FakeFirstFixture
   abstract static class FixtureBase {}
 
@@ -434,6 +590,13 @@ public class TestContainerExtension {
   @Tag(FIXTURE)
   @HiveFixture(version = HiveVersion.HIVE3, auth = HiveAuth.KERBEROS)
   static class HiveFixtureOnly {}
+
+  @Tag(FIXTURE)
+  @MySQLFixture(
+      version = MySQLVersion.MYSQL_5_7,
+      database = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT)
+  @PostgreSQLFixture(database = TestDatabaseName.PG_CATALOG_POSTGRESQL_IT)
+  static class DatabaseFixturesOnly {}
 
   @Tag(FIXTURE)
   @FakeFirstFixture(scope = Scope.CLASS)

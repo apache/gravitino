@@ -40,8 +40,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
  */
 @Documented
 @Inherited
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 @ExtendWith(ContainerExtension.class)
 @ContainerFixture(RangerSpec.Factory.class)
-public @interface RangerFixture {}
+public @interface RangerFixture {
+
+  /**
+   * Returns when the container starts.
+   *
+   * @return the startup mode; before {@code @BeforeAll} by default
+   */
+  Startup startup() default Startup.EAGER;
+}

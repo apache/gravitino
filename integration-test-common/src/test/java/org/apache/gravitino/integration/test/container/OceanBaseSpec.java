@@ -34,6 +34,11 @@ public record OceanBaseSpec() implements ContainerSpec<OceanBaseContainer> {
 
   static final class Factory implements ContainerFixture.SpecFactory<OceanBaseFixture> {
     @Override
+    public Startup startupFor(OceanBaseFixture fixture) {
+      return fixture.startup();
+    }
+
+    @Override
     public OceanBaseSpec specFor(OceanBaseFixture fixture) {
       return new OceanBaseSpec();
     }

@@ -66,5 +66,15 @@ public @interface ContainerFixture {
     default Scope scopeFor(A fixture) {
       return Scope.RUN;
     }
+
+    /**
+     * Returns when the fixture's container starts.
+     *
+     * @param fixture the fixture annotation on the test class
+     * @return the startup mode; {@link Startup#EAGER} unless the fixture has a startup attribute
+     */
+    default Startup startupFor(A fixture) {
+      return Startup.EAGER;
+    }
   }
 }
