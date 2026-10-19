@@ -142,6 +142,34 @@ public class TestContainerSuite {
     Assertions.assertArrayEquals(new Throwable[] {closeFailure}, thrown.getSuppressed());
   }
 
+  @Test
+  void testStartPrivateStartsAndRegistersWithoutKeepingTheContainer() throws Exception {
+    BaseContainer container = mockContainer();
+
+    BaseContainer started =
+        ContainerSuite.startPrivate(null, network -> container, ContainerSuite::startTimed);
+
+    Assertions.assertSame(container, started);
+    Mockito.verify(container, Mockito.times(1)).start();
+    for (Field field : ContainerSuite.class.getDeclaredFields()) {
+      if (!Modifier.isStatic(field.getModifiers()) || field.getName().equals("closer")) {
+        continue;
+      }
+      field.setAccessible(true);
+      Object value = field.get(null);
+      Assertions.assertNotSame(container, value, field.getName());
+      if (value instanceof Map) {
+        Assertions.assertFalse(((Map<?, ?>) value).containsValue(container), field.getName());
+      } else if (value instanceof Collection) {
+        Assertions.assertFalse(((Collection<?>) value).contains(container), field.getName());
+      }
+    }
+
+    // Registered with the closer, so the end of the run closes it even if the caller does not.
+    ContainerSuite.getInstance().close();
+    Mockito.verify(container).close();
+  }
+
   private static BaseContainer mockContainer() {
     GenericContainer<?> genericContainer = Mockito.mock(GenericContainer.class);
     Mockito.when(genericContainer.getDockerImageName()).thenReturn("test/image:1.0");

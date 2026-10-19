@@ -50,8 +50,9 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -69,12 +70,13 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@HiveFixture
 public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
+
+  @FixtureContainer private HiveContainer hive;
 
   private static final String CATALOG = "catalog";
   private static final String SCHEMA = "schema";
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private String role = "role";
   private String defaultBaseLocation;
@@ -82,7 +84,6 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startHiveContainer();
     super.startIntegrationTest();
     client
         .loadMetalake(METALAKE)
@@ -443,7 +444,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
       defaultBaseLocation =
           String.format(
               "hdfs://%s:%d/user/hive/%s",
-              containerSuite.getHiveContainer().getContainerIpAddress(),
+              hive.getContainerIpAddress(),
               HiveContainer.HDFS_DEFAULTFS_PORT,
               SCHEMA.toLowerCase());
     }

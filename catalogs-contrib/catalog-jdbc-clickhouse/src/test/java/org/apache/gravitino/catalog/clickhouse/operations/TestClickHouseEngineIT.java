@@ -40,7 +40,8 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.ClickHouseFixture;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.indexes.Index;
@@ -86,21 +87,18 @@ import org.testcontainers.DockerClientFactory;
  */
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_ENGINE_IT)
 public class TestClickHouseEngineIT {
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_ENGINE_IT;
 
-  private ClickHouseContainer clickHouseContainer;
+  @FixtureContainer private ClickHouseContainer clickHouseContainer;
   private ClickHouseDatabaseOperations databaseOperations;
   private ClickHouseTableOperations tableOperations;
   private String schemaName;
 
   @BeforeAll
   public void setup() throws Exception {
-    containerSuite.startClickHouseContainer(TEST_DB_NAME);
-    clickHouseContainer = containerSuite.getClickHouseContainer();
-
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), clickHouseContainer.getJdbcUrl());
     catalogProperties.put(

@@ -71,8 +71,7 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
     WAREHOUSE =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 
   // Checks an Iceberg REST warehouse misconfiguration is caught on create. See issue #11943.

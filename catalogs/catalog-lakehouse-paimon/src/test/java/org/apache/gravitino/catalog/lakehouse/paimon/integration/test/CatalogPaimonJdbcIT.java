@@ -23,7 +23,9 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -32,7 +34,10 @@ import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture
 public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
+
+  @FixtureContainer private HiveContainer hive;
 
   @Override
   protected Map<String, String> initPaimonCatalogProperties() {
@@ -47,8 +52,7 @@ public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
     WAREHOUSE =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse-catalog-paimon/",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
     URI = mySQLContainer.getJdbcUrl(TEST_DB_NAME);
     jdbcUser = mySQLContainer.getUsername();
     jdbcPassword = mySQLContainer.getPassword();

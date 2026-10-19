@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.integration.test;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.BeforeAll;
@@ -38,15 +37,12 @@ public class IcebergRestKerberosJdbcWithUserImpersonationCatalogIT
 
   private static final String NORMAL_USER = "normal";
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-
   @BeforeAll
   void prepareSQLContext() {
     // Change the ownership of /user/hive to normal user for user impersonation test. If we do not
     // change the ownership, the normal user will not have the permission to create table on HDFS
     // warehouse as the /user/hive is owned by user `cli`.
-    IcebergRestKerberosTestEnv.hdfs(containerSuite.getKerberosHiveContainer())
-        .setOwner("/user/hive/", NORMAL_USER, true);
+    IcebergRestKerberosTestEnv.hdfs(kerberosHive).setOwner("/user/hive/", NORMAL_USER, true);
 
     super.prepareSQLContext();
   }
@@ -90,7 +86,7 @@ public class IcebergRestKerberosJdbcWithUserImpersonationCatalogIT
     }
 
     IcebergRestKerberosTestEnv.configureSparkKerberos(
-        sparkConf, HDFS_CLIENT_PRINCIPAL, containerSuite.getKerberosHiveContainer().getHostName());
+        sparkConf, HDFS_CLIENT_PRINCIPAL, kerberosHive.getHostName());
 
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }

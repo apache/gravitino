@@ -67,7 +67,9 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
+import org.apache.gravitino.integration.test.container.ClickHouseFixture;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -108,6 +110,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT)
 public class CatalogClickHouseIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-clickhouse";
@@ -132,7 +135,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
   private ClickHouseService clickhouseService;
 
-  private ClickHouseContainer CLICKHOUSE_CONTAINER;
+  @FixtureContainer private ClickHouseContainer CLICKHOUSE_CONTAINER;
 
   private TestDatabaseName TEST_DB_NAME;
 
@@ -143,9 +146,6 @@ public class CatalogClickHouseIT extends BaseIT {
   @BeforeAll
   public void startup() throws IOException, SQLException {
     TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT;
-
-    containerSuite.startClickHouseContainer(TEST_DB_NAME);
-    CLICKHOUSE_CONTAINER = containerSuite.getClickHouseContainer();
 
     clickhouseService = new ClickHouseService(CLICKHOUSE_CONTAINER, TEST_DB_NAME);
     createMetalake();

@@ -30,7 +30,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * Declares that a test class needs a Hive server. Test and lifecycle methods receive it as a {@link
  * HiveContainer} parameter, and fields marked {@link FixtureContainer} receive it too.
  *
- * <p>A subclass may declare its own {@code HiveFixture}; it replaces the superclass's.
+ * <p>A class gets one Hive: the annotation is not repeatable, and both authentication modes inject
+ * as {@link HiveContainer}. A subclass may declare its own {@code HiveFixture}; it replaces the
+ * superclass's.
  */
 @Documented
 @Inherited
@@ -53,4 +55,12 @@ public @interface HiveFixture {
    * @return the authentication mode; none by default
    */
   HiveAuth auth() default HiveAuth.NONE;
+
+  /**
+   * Returns how long the Hive container lives. Use {@link Scope#CLASS} or {@link Scope#METHOD} for
+   * tests that change Hive in ways later tests would see, such as adding Kerberos principals.
+   *
+   * @return the scope; the whole run by default, shared with other classes
+   */
+  Scope scope() default Scope.RUN;
 }

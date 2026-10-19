@@ -27,7 +27,8 @@ import java.lang.annotation.Target;
 
 /**
  * Marks an annotation as a container fixture, such as {@link KafkaFixture}, and names how to turn
- * it into a {@link ContainerSpec}. {@link ContainerExtension} reads every fixture on a test class.
+ * it into a {@link ContainerSpec}. {@link ContainerExtension} reads the nearest fixture of each
+ * annotation type on a test class and its superclasses.
  */
 @Documented
 @Target(ElementType.ANNOTATION_TYPE)
@@ -55,5 +56,15 @@ public @interface ContainerFixture {
      * @return the spec
      */
     ContainerSpec<?> specFor(A fixture);
+
+    /**
+     * Returns how long the fixture's container lives.
+     *
+     * @param fixture the fixture annotation on the test class
+     * @return the scope; {@link Scope#RUN} unless the fixture has a scope attribute
+     */
+    default Scope scopeFor(A fixture) {
+      return Scope.RUN;
+    }
   }
 }

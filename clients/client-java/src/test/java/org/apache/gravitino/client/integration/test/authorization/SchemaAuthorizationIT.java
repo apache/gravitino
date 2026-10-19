@@ -39,8 +39,9 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -50,11 +51,12 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@HiveFixture
 public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
 
-  private static final String CATALOG = "catalog";
+  @FixtureContainer private HiveContainer hive;
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private static final String CATALOG = "catalog";
 
   private static String hmsUri;
 
@@ -62,13 +64,10 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startHiveContainer();
     super.startIntegrationTest();
     hmsUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
     client

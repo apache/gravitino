@@ -29,6 +29,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
@@ -55,10 +56,14 @@ public class TestContainerExtension {
   private static final List<String> LOG = new ArrayList<>();
   private static final FakeContainer FIRST = Mockito.mock(FakeContainer.class);
   private static final FakeContainer SECOND = Mockito.mock(FakeContainer.class);
+  private static final OtherContainer OTHER = Mockito.mock(OtherContainer.class);
+  // Every private container FakeSpec.startPrivate returned, in start order.
+  private static final List<FakeContainer> PRIVATE = new ArrayList<>();
 
   @BeforeEach
   void clearLog() {
     LOG.clear();
+    PRIVATE.clear();
   }
 
   @Test
@@ -146,6 +151,76 @@ public class TestContainerExtension {
         ContainerExtension.specs(HiveFixtureOnly.class));
   }
 
+  @Test
+  void testClassScopeStartsOnePrivateContainerForTheClass() {
+    run(ClassScopeFixture.class)
+        .testEvents()
+        .assertStatistics(stats -> stats.succeeded(2).failed(0));
+
+    Assertions.assertEquals(List.of("startPrivate first"), LOG);
+    Assertions.assertEquals(1, PRIVATE.size());
+    Mockito.verify(PRIVATE.get(0), Mockito.times(1)).close();
+  }
+
+  @Test
+  void testMethodScopeStartsOnePrivateContainerPerTest() {
+    run(MethodScopeFixture.class)
+        .testEvents()
+        .assertStatistics(stats -> stats.succeeded(2).failed(0));
+
+    Assertions.assertEquals(
+        List.of("startPrivate first", "test", "startPrivate first", "test"), LOG);
+    Assertions.assertEquals(2, PRIVATE.size());
+    Assertions.assertNotSame(PRIVATE.get(0), PRIVATE.get(1));
+    for (FakeContainer container : PRIVATE) {
+      Mockito.verify(container, Mockito.times(1)).close();
+    }
+  }
+
+  @Test
+  void testRunAndClassScopeFixturesResolveToDifferentContainers() {
+    run(MixedScopeFixture.class)
+        .testEvents()
+        .assertStatistics(stats -> stats.succeeded(1).failed(0));
+
+    Assertions.assertEquals(1, Collections.frequency(LOG, "startPrivate first"), LOG.toString());
+    Assertions.assertFalse(LOG.contains("start first"), LOG.toString());
+  }
+
+  @Test
+  void testMethodScopeStaticFieldFailsClearly() {
+    run(MethodScopeStaticFieldFixture.class)
+        .allEvents()
+        .assertThatEvents()
+        .haveExactly(
+            1,
+            event(
+                finishedWithFailure(
+                    instanceOf(ExtensionConfigurationException.class),
+                    message(m -> m.contains("Scope.METHOD")))));
+    Assertions.assertTrue(PRIVATE.isEmpty());
+  }
+
+  @Test
+  void testMethodScopeBeforeAllParameterFailsClearly() {
+    run(MethodScopeBeforeAllFixture.class)
+        .allEvents()
+        .assertThatEvents()
+        .haveExactly(1, event(finishedWithFailure(message(m -> m.contains("Scope.METHOD")))));
+    Assertions.assertTrue(PRIVATE.isEmpty());
+  }
+
+  @Test
+  void testStartPrivateIsUnsupportedByDefault() {
+    UnsupportedOperationException e =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> new KafkaSpec().startPrivate(ContainerSuite.getInstance()));
+
+    Assertions.assertEquals(
+        "scope CLASS/METHOD is not supported for KafkaSpec yet", e.getMessage());
+  }
+
   private static EngineExecutionResults run(Class<?> fixture) {
     return EngineTestKit.engine("junit-jupiter")
         .selectors(DiscoverySelectors.selectClass(fixture))
@@ -171,12 +246,52 @@ public class TestContainerExtension {
       LOG.add("start " + name);
       return name.equals("first") ? FIRST : SECOND;
     }
+
+    @Override
+    public FakeContainer startPrivate(ContainerSuite suite) {
+      LOG.add("startPrivate " + name);
+      FakeContainer container = Mockito.mock(FakeContainer.class);
+      PRIVATE.add(container);
+      return container;
+    }
+  }
+
+  // Only ever mocked, so the constructor never runs.
+  abstract static class OtherContainer extends BaseContainer {
+    OtherContainer() {
+      super((String) null, null, null, null, null, null, Optional.empty());
+    }
+  }
+
+  record OtherSpec() implements ContainerSpec<OtherContainer> {
+    @Override
+    public Class<OtherContainer> containerType() {
+      return OtherContainer.class;
+    }
+
+    @Override
+    public OtherContainer getOrStart(ContainerSuite suite) {
+      LOG.add("start other");
+      return OTHER;
+    }
   }
 
   static final class FirstFactory implements ContainerFixture.SpecFactory<FakeFirstFixture> {
     @Override
     public ContainerSpec<?> specFor(FakeFirstFixture fixture) {
       return new FakeSpec(fixture.value());
+    }
+
+    @Override
+    public Scope scopeFor(FakeFirstFixture fixture) {
+      return fixture.scope();
+    }
+  }
+
+  static final class OtherFactory implements ContainerFixture.SpecFactory<FakeOtherFixture> {
+    @Override
+    public ContainerSpec<?> specFor(FakeOtherFixture fixture) {
+      return new OtherSpec();
     }
   }
 
@@ -193,6 +308,8 @@ public class TestContainerExtension {
   @ContainerFixture(FirstFactory.class)
   @interface FakeFirstFixture {
     String value() default "first";
+
+    Scope scope() default Scope.RUN;
   }
 
   @Target(ElementType.TYPE)
@@ -200,6 +317,12 @@ public class TestContainerExtension {
   @ExtendWith(ContainerExtension.class)
   @ContainerFixture(SecondFactory.class)
   @interface FakeSecondFixture {}
+
+  @Target(ElementType.TYPE)
+  @Retention(RetentionPolicy.RUNTIME)
+  @ExtendWith(ContainerExtension.class)
+  @ContainerFixture(OtherFactory.class)
+  @interface FakeOtherFixture {}
 
   @Tag(FIXTURE)
   @FakeFirstFixture
@@ -311,4 +434,89 @@ public class TestContainerExtension {
   @Tag(FIXTURE)
   @HiveFixture(version = HiveVersion.HIVE3, auth = HiveAuth.KERBEROS)
   static class HiveFixtureOnly {}
+
+  @Tag(FIXTURE)
+  @FakeFirstFixture(scope = Scope.CLASS)
+  static class ClassScopeFixture {
+    @FixtureContainer private static FakeContainer staticField;
+    @FixtureContainer private FakeContainer instanceField;
+
+    @BeforeAll
+    static void beforeAll(FakeContainer parameter) {
+      Assertions.assertNotSame(FIRST, parameter);
+      Assertions.assertSame(staticField, parameter);
+    }
+
+    @Test
+    void first(FakeContainer parameter) {
+      assertAllArePrivate(parameter);
+    }
+
+    @Test
+    void second(FakeContainer parameter) {
+      assertAllArePrivate(parameter);
+    }
+
+    private void assertAllArePrivate(FakeContainer parameter) {
+      Assertions.assertSame(PRIVATE.get(0), staticField);
+      Assertions.assertSame(staticField, instanceField);
+      Assertions.assertSame(staticField, parameter);
+    }
+  }
+
+  // One instance for both tests, so the field must be refilled before each test.
+  @Tag(FIXTURE)
+  @FakeFirstFixture(scope = Scope.METHOD)
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  static class MethodScopeFixture {
+    @FixtureContainer private FakeContainer instanceField;
+
+    @Test
+    void first(FakeContainer parameter) {
+      assertCurrent(parameter);
+    }
+
+    @Test
+    void second(FakeContainer parameter) {
+      assertCurrent(parameter);
+    }
+
+    private void assertCurrent(FakeContainer parameter) {
+      Assertions.assertSame(PRIVATE.get(PRIVATE.size() - 1), instanceField);
+      Assertions.assertSame(instanceField, parameter);
+      LOG.add("test");
+    }
+  }
+
+  @Tag(FIXTURE)
+  @FakeFirstFixture(scope = Scope.CLASS)
+  @FakeOtherFixture
+  static class MixedScopeFixture {
+    @Test
+    void test(FakeContainer fake, OtherContainer other) {
+      Assertions.assertSame(PRIVATE.get(0), fake);
+      Assertions.assertSame(OTHER, other);
+    }
+  }
+
+  @Tag(FIXTURE)
+  @FakeFirstFixture(scope = Scope.METHOD)
+  static class MethodScopeStaticFieldFixture {
+    @SuppressWarnings("UnusedVariable")
+    @FixtureContainer
+    private static FakeContainer staticField;
+
+    @Test
+    void test() {}
+  }
+
+  @Tag(FIXTURE)
+  @FakeFirstFixture(scope = Scope.METHOD)
+  static class MethodScopeBeforeAllFixture {
+    @BeforeAll
+    static void beforeAll(FakeContainer parameter) {}
+
+    @Test
+    void test() {}
+  }
 }

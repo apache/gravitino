@@ -45,4 +45,18 @@ public interface ContainerSpec<C extends BaseContainer> {
    * @return the running container
    */
   C getOrStart(ContainerSuite suite);
+
+  /**
+   * Starts a new container for this spec that only the caller uses, for fixtures with {@link
+   * Scope#CLASS} or {@link Scope#METHOD}. The caller closes it; it never replaces the shared
+   * container.
+   *
+   * @param suite the shared container suite, which starts the container on its network
+   * @return the running private container
+   * @throws UnsupportedOperationException if this spec has no private containers yet
+   */
+  default C startPrivate(ContainerSuite suite) {
+    throw new UnsupportedOperationException(
+        "scope CLASS/METHOD is not supported for " + getClass().getSimpleName() + " yet");
+  }
 }

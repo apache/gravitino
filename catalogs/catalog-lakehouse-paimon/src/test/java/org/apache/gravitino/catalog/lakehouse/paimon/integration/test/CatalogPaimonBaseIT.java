@@ -51,7 +51,6 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -93,7 +92,6 @@ import org.junit.jupiter.api.Test;
 
 public abstract class CatalogPaimonBaseIT extends BaseIT {
 
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static final TestDatabaseName TEST_DB_NAME =
       TestDatabaseName.PG_TEST_PAIMON_CATALOG_MULTIPLE_JDBC_LOAD;
   protected static MySQLContainer mySQLContainer;
@@ -135,9 +133,9 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     initSparkEnv();
   }
 
-  protected void startNecessaryContainers() {
-    containerSuite.startHiveContainer();
-  }
+  // Subclasses declare their containers as fixtures; this hook lets one prepare them, such as
+  // creating a bucket, before the catalog is created.
+  protected void startNecessaryContainers() {}
 
   @AfterAll
   public void stop() {

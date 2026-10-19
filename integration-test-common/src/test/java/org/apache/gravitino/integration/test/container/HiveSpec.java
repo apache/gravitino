@@ -24,9 +24,10 @@ import java.util.Map;
  * A Hive server of one version and authentication mode.
  *
  * <p>Plain and Kerberos Hive run side by side, but each holds one version at a time: asking for a
- * different version stops the running Hive of that mode and starts the requested one (see {@link
+ * different version stops the running Hive of that mode and starts the requested one (see {@code
  * ContainerSlot}). Tests of one version therefore share a container, and a version switch costs a
- * restart, as with direct {@link ContainerSuite} calls.
+ * restart, as with direct {@link ContainerSuite} calls. A private Hive ({@link Scope#CLASS} or
+ * {@link Scope#METHOD}) leaves the shared one alone.
  */
 public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerSpec<HiveContainer> {
 
@@ -37,23 +38,46 @@ public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerS
 
   @Override
   public HiveContainer getOrStart(ContainerSuite suite) {
-    Map<String, String> env = Map.of(HiveContainer.HIVE_RUNTIME_VERSION, version.runtimeVersion());
     return switch (auth) {
       case NONE -> {
-        suite.startHiveContainer(env);
+        suite.startHiveContainer(env());
         yield suite.getHiveContainer();
       }
       case KERBEROS -> {
-        suite.startKerberosHiveContainer(env);
+        suite.startKerberosHiveContainer(env());
         yield suite.getKerberosHiveContainer();
       }
     };
+  }
+
+  // Keeps the shared Hive's host name: the Kerberos image derives its principals from it. On macOS
+  // the shared network then has two containers with one alias, which is fine because tests reach
+  // containers by IP; on Linux CI there is no shared network.
+  @Override
+  public HiveContainer startPrivate(ContainerSuite suite) {
+    return suite.startPrivate(network -> builder().withNetwork(network).build());
+  }
+
+  private HiveContainer.Builder builder() {
+    return switch (auth) {
+      case NONE -> ContainerSuite.hiveBuilder(env());
+      case KERBEROS -> ContainerSuite.kerberosHiveBuilder(env());
+    };
+  }
+
+  private Map<String, String> env() {
+    return Map.of(HiveContainer.HIVE_RUNTIME_VERSION, version.runtimeVersion());
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<HiveFixture> {
     @Override
     public HiveSpec specFor(HiveFixture fixture) {
       return new HiveSpec(fixture.version(), fixture.auth());
+    }
+
+    @Override
+    public Scope scopeFor(HiveFixture fixture) {
+      return fixture.scope();
     }
   }
 }

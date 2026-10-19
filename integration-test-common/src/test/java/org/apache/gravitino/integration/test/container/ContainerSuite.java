@@ -46,6 +46,9 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.container.DatabaseContainer.Durability;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
@@ -152,21 +155,13 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startHiveContainer(Map<String, String> env) {
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    builder.putAll(env);
-    builder.put("HADOOP_USER_NAME", "anonymous");
-
     synchronized (ContainerSuite.class) {
       hiveContainer.getOrStart(
           hiveVersion(env),
           () -> {
             initIfNecessary();
-            HiveContainer.Builder hiveBuilder =
-                HiveContainer.builder()
-                    .withHostName("gravitino-ci-hive")
-                    .withEnvVars(builder.build())
-                    .withNetwork(network);
-            HiveContainer container = closer.register(hiveBuilder.build());
+            HiveContainer container =
+                closer.register(hiveBuilder(env).withNetwork(network).build());
             start(container);
             return container;
           });
@@ -244,17 +239,56 @@ public class ContainerSuite implements Closeable {
           hiveVersion(envVars),
           () -> {
             initIfNecessary();
-            HiveContainer.Builder hiveBuilder =
-                HiveContainer.builder()
-                    .withHostName("gravitino-ci-kerberos-hive")
-                    .withKerberosEnabled(true)
-                    .withEnvVars(envVars)
-                    .withNetwork(network);
-            HiveContainer container = closer.register(hiveBuilder.build());
+            HiveContainer container =
+                closer.register(kerberosHiveBuilder(envVars).withNetwork(network).build());
             start(container);
             return container;
           });
     }
+  }
+
+  // The shared Hive and a private one (HiveSpec.startPrivate) are built the same way.
+  static HiveContainer.Builder hiveBuilder(Map<String, String> env) {
+    return HiveContainer.builder()
+        .withHostName("gravitino-ci-hive")
+        .withEnvVars(
+            ImmutableMap.<String, String>builder()
+                .putAll(env)
+                .put("HADOOP_USER_NAME", "anonymous")
+                .build());
+  }
+
+  static HiveContainer.Builder kerberosHiveBuilder(Map<String, String> env) {
+    return HiveContainer.builder()
+        .withHostName("gravitino-ci-kerberos-hive")
+        .withKerberosEnabled(true)
+        .withEnvVars(env);
+  }
+
+  /**
+   * Starts a container that only the caller uses, for fixtures with {@link Scope#CLASS} or {@link
+   * Scope#METHOD}. It starts like a shared container, on the shared network, but no field keeps it,
+   * so it never replaces a shared container. The caller closes it; the suite also closes it at the
+   * end of the run in case the caller does not.
+   *
+   * @param build builds the container on the given network, which is null when there is none
+   * @param <C> the container type
+   * @return the running container
+   */
+  public <C extends BaseContainer> C startPrivate(Function<Network, C> build) {
+    initIfNecessary();
+    return startPrivate(network, build, ContainerSuite::start);
+  }
+
+  // Tests pass their own start so that no Docker and no disk cleanup run.
+  static <C extends BaseContainer> C startPrivate(
+      @Nullable Network network, Function<Network, C> build, Consumer<BaseContainer> start) {
+    C container = build.apply(network);
+    synchronized (ContainerSuite.class) {
+      closer.register(container);
+    }
+    start.accept(container);
+    return container;
   }
 
   public void startKerberosHiveContainer() {

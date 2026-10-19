@@ -25,8 +25,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.PrivilegedAction;
 import org.apache.commons.io.FileUtils;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -42,10 +44,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@HiveFixture(auth = HiveAuth.KERBEROS)
 public class HDFSKerberosIT {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSKerberosIT.class);
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private static HiveContainer kerberosHive;
+
   private static final String CLIENT_PRINCIPAL = "cli@HADOOPKRB";
   private static UserGroupInformation clientUGI;
 
@@ -53,28 +57,20 @@ public class HDFSKerberosIT {
 
   @BeforeAll
   public static void setup() throws IOException {
-    containerSuite.startKerberosHiveContainer();
-
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
     File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
 
     // Copy the keytab and krb5.conf from the container
     keytabPath = file.getAbsolutePath() + "/client.keytab";
-    containerSuite
-        .getKerberosHiveContainer()
-        .getContainer()
-        .copyFileFromContainer("/etc/admin.keytab", keytabPath);
+    kerberosHive.getContainer().copyFileFromContainer("/etc/admin.keytab", keytabPath);
 
     String krb5TmpPath = file.getAbsolutePath() + "/krb5.conf_tmp";
     String krb5Path = file.getAbsolutePath() + "/krb5.conf";
-    containerSuite
-        .getKerberosHiveContainer()
-        .getContainer()
-        .copyFileFromContainer("/etc/krb5.conf", krb5TmpPath);
+    kerberosHive.getContainer().copyFileFromContainer("/etc/krb5.conf", krb5TmpPath);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
-    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+    String ip = kerberosHive.getContainerIpAddress();
     String content = FileUtils.readFileToString(new File(krb5TmpPath), StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
@@ -131,7 +127,6 @@ public class HDFSKerberosIT {
   private static String defaultBaseLocation() {
     return String.format(
         "hdfs://%s:%d/user/",
-        containerSuite.getKerberosHiveContainer().getContainerIpAddress(),
-        HiveContainer.HDFS_DEFAULTFS_PORT);
+        kerberosHive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 }

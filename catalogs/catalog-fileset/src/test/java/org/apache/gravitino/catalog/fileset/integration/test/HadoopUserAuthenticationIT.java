@@ -45,8 +45,11 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.Scope;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.KerberosHdfs;
@@ -60,11 +63,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.utility.MountableFile;
 
+// A private Kerberos Hive: the test adds principals with kadmin and changes HDFS permissions,
+// which would break the shared Kerberos Hive for later classes.
 @Tag("gravitino-docker-test")
+@HiveFixture(auth = HiveAuth.KERBEROS, scope = Scope.CLASS)
 public class HadoopUserAuthenticationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopUserAuthenticationIT.class);
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final String SDK_KERBEROS_PRINCIPAL_KEY = "client.kerberos.principal";
   private static final String SDK_KERBEROS_KEYTAB_KEY = "client.kerberos.keytab";
@@ -95,7 +99,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
 
   private static KerberosHdfs hdfs;
 
-  private static HiveContainer kerberosHiveContainer;
+  @FixtureContainer private static HiveContainer kerberosHive;
 
   private static final String METALAKE_NAME =
       GravitinoITUtils.genRandomName("CatalogHadoop_metalake");
@@ -108,19 +112,16 @@ public class HadoopUserAuthenticationIT extends BaseIT {
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startKerberosHiveContainer();
-    kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
-
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
     File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
     TMP_DIR = file.getAbsolutePath();
 
-    HDFS_URL = String.format("hdfs://%s:9000", kerberosHiveContainer.getContainerIpAddress());
+    HDFS_URL = String.format("hdfs://%s:9000", kerberosHive.getContainerIpAddress());
 
     // Prepare kerberos related-config;
     prepareKerberosConfig();
-    hdfs = KerberosHdfs.of(kerberosHiveContainer, TMP_DIR + HADOOP_CLIENT_KEYTAB);
+    hdfs = KerberosHdfs.of(kerberosHive, TMP_DIR + HADOOP_CLIENT_KEYTAB);
 
     // Config kerberos configuration for Gravitino server
     addKerberosConfig();
@@ -141,28 +142,28 @@ public class HadoopUserAuthenticationIT extends BaseIT {
 
   private static void prepareKerberosConfig() throws IOException {
     // Keytab of the Gravitino SDK client
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
 
     createKeyTableForSchemaAndFileset();
 
     // Keytab of the Gravitino server
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
 
     // Keytab of Gravitino server to connector to HDFS
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HADOOP_CLIENT_KEYTAB);
 
     String tmpKrb5Path = TMP_DIR + "krb5.conf_tmp";
     String krb5Path = TMP_DIR + "krb5.conf";
-    kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+    kerberosHive.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
-    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+    String ip = kerberosHive.getContainerIpAddress();
     String content = FileUtils.readFileToString(new File(tmpKrb5Path), StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
@@ -194,11 +195,11 @@ public class HadoopUserAuthenticationIT extends BaseIT {
             HADOOP_SCHEMA_PRINCIPAL,
             REALM),
         StandardCharsets.UTF_8);
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileToContainer(
             MountableFile.forHostPath(TMP_DIR + createSchemaShellFile), createSchemaShellFile);
-    kerberosHiveContainer.executeInContainer("bash", createSchemaShellFile);
+    kerberosHive.executeInContainer("bash", createSchemaShellFile);
 
     FileUtils.writeStringToFile(
         Paths.get(TMP_DIR + createFileSetShellFile).toFile(),
@@ -212,16 +213,16 @@ public class HadoopUserAuthenticationIT extends BaseIT {
             HADOOP_FILESET_PRINCIPAL,
             REALM),
         StandardCharsets.UTF_8);
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileToContainer(
             MountableFile.forHostPath(TMP_DIR + createFileSetShellFile), createFileSetShellFile);
-    kerberosHiveContainer.executeInContainer("bash", createFileSetShellFile);
+    kerberosHive.executeInContainer("bash", createFileSetShellFile);
 
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer(HADOOP_SCHEMA_KEYTAB, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer(HADOOP_FILESET_KEYTAB, TMP_DIR + HADOOP_FILESET_KEYTAB);
   }
