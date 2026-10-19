@@ -96,6 +96,7 @@ public class MetadataAuthzHelper {
 
   private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String MODEL_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
+  private static final String SCHEMA_OBJECT_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String SCHEMA_PARENT_SCOPES = "METALAKE, CATALOG";
   private static final String METALAKE_ONLY_SCOPE = "METALAKE";
   private static final String CATALOG_PARENT_SCOPES = "METALAKE";
@@ -108,58 +109,117 @@ public class MetadataAuthzHelper {
    */
   private static final Map<Entity.EntityType, Map<String, List<ParentScopeAccessPath>>>
       LIST_SHORT_CIRCUITS =
-          Map.of(
-              Entity.EntityType.USER,
-              principalListPaths(
-                  AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION,
-                  Privilege.Name.MANAGE_USERS),
-              Entity.EntityType.GROUP,
-              principalListPaths(
-                  AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION,
-                  Privilege.Name.MANAGE_GROUPS),
-              Entity.EntityType.ROLE,
-              principalListPaths(
-                  AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION,
-                  Privilege.Name.MANAGE_GRANTS),
-              Entity.EntityType.TABLE,
-              Map.of(
-                  AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(TABLE_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.SELECT_TABLE, TABLE_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.MODIFY_TABLE, TABLE_PARENT_SCOPES)),
-                  AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(TABLE_PARENT_SCOPES),
-                      tableLikeParentPrivilegePath(Privilege.Name.PROBE_TABLE_LIKE),
-                      tableLikeParentPrivilegePath(Privilege.Name.SELECT_TABLE),
-                      tableLikeParentPrivilegePath(Privilege.Name.MODIFY_TABLE),
-                      tableLikeParentPrivilegePath(Privilege.Name.CREATE_TABLE),
-                      tableLikeParentPrivilegePath(Privilege.Name.CREATE_VIEW))),
-              Entity.EntityType.MODEL,
-              Map.of(
-                  AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(MODEL_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.USE_MODEL, MODEL_PARENT_SCOPES))),
-              Entity.EntityType.JOB_TEMPLATE,
-              Map.of(
-                  AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(METALAKE_ONLY_SCOPE),
-                      parentPrivilegePath(Privilege.Name.USE_JOB_TEMPLATE, METALAKE_ONLY_SCOPE))),
-              Entity.EntityType.SCHEMA,
-              Map.of(
-                  AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(SCHEMA_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.USE_SCHEMA, SCHEMA_PARENT_SCOPES))),
-              Entity.EntityType.CATALOG,
-              Map.of(
-                  AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(CATALOG_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.USE_CATALOG, CATALOG_PARENT_SCOPES))));
+          Map.ofEntries(
+              Map.entry(
+                  Entity.EntityType.USER,
+                  principalListPaths(
+                      AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION,
+                      Privilege.Name.MANAGE_USERS)),
+              Map.entry(
+                  Entity.EntityType.GROUP,
+                  principalListPaths(
+                      AuthorizationExpressionConstants.LOAD_GROUP_AUTHORIZATION_EXPRESSION,
+                      Privilege.Name.MANAGE_GROUPS)),
+              Map.entry(
+                  Entity.EntityType.ROLE,
+                  principalListPaths(
+                      AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION,
+                      Privilege.Name.MANAGE_GRANTS)),
+              Map.entry(
+                  Entity.EntityType.TABLE,
+                  Map.of(
+                      AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(TABLE_PARENT_SCOPES),
+                          parentPrivilegePath(Privilege.Name.SELECT_TABLE, TABLE_PARENT_SCOPES),
+                          parentPrivilegePath(Privilege.Name.MODIFY_TABLE, TABLE_PARENT_SCOPES)),
+                      AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(TABLE_PARENT_SCOPES),
+                          tableLikeParentPrivilegePath(Privilege.Name.PROBE_TABLE_LIKE),
+                          tableLikeParentPrivilegePath(Privilege.Name.SELECT_TABLE),
+                          tableLikeParentPrivilegePath(Privilege.Name.MODIFY_TABLE),
+                          tableLikeParentPrivilegePath(Privilege.Name.CREATE_TABLE),
+                          tableLikeParentPrivilegePath(Privilege.Name.CREATE_VIEW)))),
+              Map.entry(
+                  Entity.EntityType.MODEL,
+                  Map.of(
+                      AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(MODEL_PARENT_SCOPES),
+                          parentPrivilegePath(Privilege.Name.USE_MODEL, MODEL_PARENT_SCOPES)))),
+              Map.entry(
+                  Entity.EntityType.VIEW,
+                  Map.of(
+                      AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.SELECT_VIEW, SCHEMA_OBJECT_PARENT_SCOPES)))),
+              Map.entry(
+                  Entity.EntityType.FUNCTION,
+                  Map.of(
+                      AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.EXECUTE_FUNCTION, SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.MODIFY_FUNCTION, SCHEMA_OBJECT_PARENT_SCOPES)))),
+              Map.entry(
+                  Entity.EntityType.FILESET,
+                  Map.of(
+                      AuthorizationExpressionConstants.FILTER_FILESET_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.READ_FILESET, SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.WRITE_FILESET, SCHEMA_OBJECT_PARENT_SCOPES)))),
+              Map.entry(
+                  Entity.EntityType.TOPIC,
+                  Map.of(
+                      AuthorizationExpressionConstants.FILTER_TOPICS_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.CONSUME_TOPIC, SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.PRODUCE_TOPIC, SCHEMA_OBJECT_PARENT_SCOPES)))),
+              Map.entry(
+                  Entity.EntityType.SEMANTIC_MODEL,
+                  Map.of(
+                      AuthorizationExpressionConstants
+                          .FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.USE_SEMANTIC_MODEL, SCHEMA_OBJECT_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.MODIFY_SEMANTIC_MODEL, SCHEMA_OBJECT_PARENT_SCOPES)))),
+              Map.entry(
+                  Entity.EntityType.JOB_TEMPLATE,
+                  Map.of(
+                      AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(METALAKE_ONLY_SCOPE),
+                          parentPrivilegePath(
+                              Privilege.Name.USE_JOB_TEMPLATE, METALAKE_ONLY_SCOPE)))),
+              Map.entry(
+                  Entity.EntityType.SCHEMA,
+                  Map.of(
+                      AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(SCHEMA_PARENT_SCOPES),
+                          parentPrivilegePath(Privilege.Name.USE_SCHEMA, SCHEMA_PARENT_SCOPES)))),
+              Map.entry(
+                  Entity.EntityType.CATALOG,
+                  Map.of(
+                      AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+                      List.of(
+                          parentOwnerPath(CATALOG_PARENT_SCOPES),
+                          parentPrivilegePath(
+                              Privilege.Name.USE_CATALOG, CATALOG_PARENT_SCOPES)))));
 
   /** A sufficient parent-scope access path and the deny privileges that can invalidate it. */
   private static final class ParentScopeAccessPath {
