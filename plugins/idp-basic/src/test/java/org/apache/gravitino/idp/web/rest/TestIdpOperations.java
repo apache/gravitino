@@ -210,15 +210,14 @@ class TestIdpOperations extends JerseyTest {
   }
 
   @Test
-  void testCannotDisableServiceAdmin() {
-    UpdateUserRequest req = new UpdateUserRequest(null, false);
-    doThrow(new IllegalArgumentException("Cannot disable service admin admin"))
-        .when(MANAGER)
-        .updateEnabled("admin", false);
-
+  void testCannotUpdateEnabledOfServiceAdmin() {
     assertError(
         Response.Status.BAD_REQUEST,
-        put("/idp/users/admin", req),
+        put("/idp/users/admin", new UpdateUserRequest(null, false)),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin", new UpdateUserRequest(null, true)),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
   }
 

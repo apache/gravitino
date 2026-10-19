@@ -126,22 +126,31 @@ public class IdpUserOperations {
     String currentUser = PrincipalUtils.getCurrentUserName();
     List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
     if (IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
-      enforceServiceAdminUpdateRules(user, currentUser, request);
+      enforceServiceAdminUpdateRules(user, currentUser, serviceAdmins, request);
     } else {
       enforceNormalUserUpdateRules(user, currentUser, request);
     }
   }
 
   /**
-   * Service admins may update any user and {@code enabled}. Changing their own password still
-   * requires {@code oldPassword}; resetting another user must not send {@code oldPassword}.
+   * Service admins may update any non-admin user's {@code enabled} flag and may reset passwords.
+   * The {@code enabled} flag of a configured service admin cannot be changed. Changing their own
+   * password still requires {@code oldPassword}; resetting another user must not send {@code
+   * oldPassword}.
    *
    * @param user the path username being updated
    * @param currentUser the authenticated caller
+   * @param serviceAdmins configured service admin usernames
    * @param request the update request
    */
   private static void enforceServiceAdminUpdateRules(
-      String user, String currentUser, UpdateUserRequest request) {
+      String user, String currentUser, List<String> serviceAdmins, UpdateUserRequest request) {
+    if (request.getEnabled() != null) {
+      Preconditions.checkArgument(
+          !IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, user),
+          "Cannot update the enabled flag of service admin %s",
+          user);
+    }
     if (request.getNewPassword() == null) {
       return;
     }
