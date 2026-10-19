@@ -24,7 +24,7 @@ The following table outlines the tested compatibility between Gravitino versions
 | ------------------------------ | ------------------------------ | --------------------------------------------- |
 | 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
 | 1.3.0                          | 0.2.0, 0.4.0, 0.5.1            | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
-| 2.0.0                          | 0.2.0, 0.4.0, 0.5.1, 0.8.0     | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
+| 2.0.0                          | 0.2.0, 0.4.0, 0.5.1, 0.6.1, 0.7.1, 0.8.0 | 0.2.0 - 0.5.0 (each with the paired `lance-namespace`, see below) |
 
 :::note
 - These version entries show which versions are expected to work together.
@@ -61,6 +61,22 @@ The following table outlines the tested compatibility between Gravitino versions
   keep working, because both ignore response fields they do not know. `branch` and `tag` are
   accepted but ignored, and the branch, materialized-view, `update_field_metadata` and `rename`
   endpoints are not implemented.
+- **The `lance-ray` matrix pins a `lance-namespace` per version, and the pairing is not the one
+  `lance-ray` itself locks.** `lance-ray` never bounds `lance-namespace`, so without a pin every
+  version resolves the same newest client; `pylance` is what actually bounds it (`pylance` 9-11
+  require `>=0.8.5,<0.9`, `pylance` 12-13 require `>=0.11.1,<0.12`). The verified rows against
+  Gravitino 2.0.0 are `lance-ray` 0.5.0 with `lance-namespace` 0.8.6, 0.4.2 and 0.3.0 with 0.7.5,
+  and 0.2.0 with 0.4.5. Two pairings are deliberately *not* the upstream ones:
+  `lance-ray` 0.5.0 cannot use `lance-namespace` 0.7.5 at all (`pylance>=9.0.0` makes it
+  unsatisfiable, pip reports `ResolutionImpossible`), and `lance-ray` 0.3.0 is paired with 0.7.5
+  rather than the 0.6.1 its own lockfile pins, because the 0.6.1 client creates tables through the
+  legacy `POST /v1/table/{id}/create-empty` endpoint that Gravitino does not serve.
+- **An unimplemented Lance REST endpoint currently answers `500`, not `404`.**
+  `LanceExceptionMapper` matches Gravitino's own `NotFoundException`, so Jersey's
+  `javax.ws.rs.NotFoundException` for an unmatched route falls through to
+  `InternalException("Internal server error")`. A client calling a removed or never-implemented
+  endpoint therefore sees an internal error rather than a not-found, which makes the
+  `create-empty` case above harder to diagnose than it should be.
 - Before using in production, test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
@@ -97,16 +113,18 @@ matrix can be re-verified (and extended) without ad-hoc scripting:
 
 For Lance Spark, the default `test` task uses the explicitly verified `0.8.0`
 bundle, while `lanceSparkMatrixTest` uses the declared matrix
-(`0.2.0`, `0.4.0`, `0.5.1`, and `0.8.0`). Passing `-PlanceSparkBundleVersions=...` is a
-targeted diagnostic override; the supplied versions form the matrix and the
-first supplied version remains the primary for the normal `test` task.
+(`0.2.0`, `0.4.0`, `0.5.1`, `0.6.1`, `0.7.1`, and `0.8.0`), which spans every
+`lance-namespace` generation a released bundle speaks. Passing
+`-PlanceSparkBundleVersions=...` is a targeted diagnostic override; the supplied
+versions form the matrix and the first supplied version remains the primary for
+the normal `test` task.
 
 ```bash
 # lance-spark — runs LanceSparkRESTServiceIT once per bundle version.
 # The default list intentionally omits 0.1.0 / 0.1.1: those bundles call the
 # removed /create-empty endpoint and will fail with 404 against 1.3.0+.
 ./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
-    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1,0.8.0 \
+    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1,0.6.1,0.7.1,0.8.0 \
     -PskipDockerTests=true
 # Per-version JUnit reports land under
 # lance/lance-rest-server/build/reports/lance-spark-matrix/<version>/.
@@ -114,9 +132,11 @@ first supplied version remains the primary for the normal `test` task.
 # lance-ray — provisions a venv per version under
 # clients/client-python/build/lance-ray-matrix/.venv-<version>/ and runs
 # tests/integration/test_lance_ray.py against each. The Gradle wrapper
-# below starts / stops Gravitino automatically.
+# below starts / stops Gravitino automatically. Each entry is
+# <lance-ray-version>=<lance-namespace-version>; a bare version instead
+# falls back to the runner's --lance-namespace-spec.
 ./gradlew :clients:client-python:lanceRayMatrixTest \
-    -PlanceRayVersions=0.4.2,0.3.0
+    -PlanceRayVersions=0.5.0=0.8.6,0.4.2=0.7.5,0.3.0=0.7.5,0.2.0=0.4.5
 ```
 
 ### Rationale
