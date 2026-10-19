@@ -142,18 +142,19 @@ public abstract class JdbcTableOperations implements TableOperation {
       SortOrder[] sortOrders)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
+    // Generate SQL before borrowing the execution connection so validation can fail early and
+    // generators that query the server do not hold another connection while doing so.
+    String sql =
+        generateCreateTableSql(
+            tableName,
+            columns,
+            comment,
+            properties,
+            partitioning,
+            distribution,
+            indexes,
+            sortOrders);
     try (Connection connection = getConnection(databaseName)) {
-      String sql =
-          generateCreateTableSql(
-              tableName,
-              columns,
-              comment,
-              properties,
-              partitioning,
-              distribution,
-              indexes,
-              sortOrders);
-
       JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Created table {} in database {} with SQL:\n{}", tableName, databaseName, sql);
     } catch (final SQLException se) {
