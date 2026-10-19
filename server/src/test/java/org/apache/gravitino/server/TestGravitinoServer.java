@@ -21,6 +21,7 @@ package org.apache.gravitino.server;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,8 +43,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
@@ -165,6 +168,29 @@ public class TestGravitinoServer {
   @Test
   public void testStopBeforeStart() throws Exception {
     gravitinoServer.stop();
+  }
+
+  @Test
+  public void testStopKeepsAuthorizerUntilWebServerStops() throws Exception {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    JettyServer webServer = Mockito.mock(JettyServer.class);
+    AtomicReference<GravitinoAuthorizer> authorizerDuringStop = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              authorizerDuringStop.set(GravitinoEnv.getInstance().gravitinoAuthorizer());
+              return null;
+            })
+        .when(webServer)
+        .stop();
+    Field serverField = GravitinoServer.class.getDeclaredField("server");
+    serverField.setAccessible(true);
+    serverField.set(gravitinoServer, webServer);
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(authorizer);
+
+    gravitinoServer.stop();
+
+    // Requests that the web server drains while stopping still need the authorizer.
+    assertSame(authorizer, authorizerDuringStop.get());
   }
 
   @Test

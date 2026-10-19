@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 
@@ -31,8 +32,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.HttpURLConnection;
+import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import javax.servlet.http.HttpServlet;
@@ -147,6 +152,59 @@ public class TestJettyServer {
     }
   }
 
+  @Test
+  public void testStopLetsInFlightRequestFinish() throws Exception {
+    int port = RESTUtils.findAvailablePort(5000, 6000);
+    Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HOST, "127.0.0.1");
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+    jettyServer.initialize(JettyServerConfig.fromConfig(config), "test", false);
+    SlowServlet servlet = new SlowServlet();
+    jettyServer.addServlet(servlet, "/slow");
+    jettyServer.start();
+
+    CompletableFuture<String> response =
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                HttpURLConnection connection =
+                    (HttpURLConnection)
+                        new URL("http://127.0.0.1:" + port + "/slow").openConnection();
+                try (Reader body =
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)) {
+                  return connection.getResponseCode() + " " + CharStreams.toString(body);
+                } finally {
+                  connection.disconnect();
+                }
+              } catch (IOException e) {
+                return e.toString();
+              }
+            });
+    assertTrue(servlet.entered.await(10, TimeUnit.SECONDS));
+
+    // Stop while the request is still being handled. Once new connections are refused the stop
+    // has started, and the request must still be waiting for the servlet.
+    CompletableFuture<Void> stop = CompletableFuture.runAsync(jettyServer::stop);
+    waitUntilConnectionsRefused(port);
+    assertFalse(response.isDone(), response::join);
+    servlet.release.countDown();
+
+    assertEquals("200 done", response.get(10, TimeUnit.SECONDS));
+    stop.get(10, TimeUnit.SECONDS);
+  }
+
+  private static void waitUntilConnectionsRefused(int port) throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (System.nanoTime() < deadline) {
+      try (Socket ignored = new Socket("127.0.0.1", port)) {
+        Thread.sleep(50);
+      } catch (IOException e) {
+        return;
+      }
+    }
+    fail("The server still accepts connections after stop was called");
+  }
+
   /** Starts the server with a servlet that throws, and returns Jetty's error page for it. */
   private String requestFailingServlet(Config config) throws IOException {
     int port = RESTUtils.findAvailablePort(5000, 6000);
@@ -166,6 +224,25 @@ public class TestJettyServer {
       }
     } finally {
       connection.disconnect();
+    }
+  }
+
+  private static class SlowServlet extends HttpServlet {
+    private final CountDownLatch entered = new CountDownLatch(1);
+    private final CountDownLatch release = new CountDownLatch(1);
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+      entered.countDown();
+      try {
+        release.await(10, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      // A fixed length lets Jetty finish the response before it signals the drain.
+      response.setContentLength("done".length());
+      response.getWriter().write("done");
     }
   }
 
