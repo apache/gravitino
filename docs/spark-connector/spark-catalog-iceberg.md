@@ -197,6 +197,8 @@ spark.sql.gravitino.iceberg.rest.rest.auth.basic.password  <password>
 See [Connect Spark to Iceberg REST](../iceberg-rest-engine/spark.md) for the full set of supported
 `rest.auth.*` properties and how to configure them when connecting directly to the IRC endpoint.
 
+When the Gravitino client uses Basic authentication (`spark.sql.gravitino.authType=basic`), the connector reuses its user name and password for IRC. Any `rest.auth.*` or `token` property set through `spark.sql.gravitino.iceberg.rest.*` disables the reuse.
+
 When the Gravitino client uses OAuth2, the connector reuses its OAuth2 client configuration for IRC by
 default. This avoids duplicating configuration when both endpoints accept the same client identity. The
 equivalent explicit setting is:
