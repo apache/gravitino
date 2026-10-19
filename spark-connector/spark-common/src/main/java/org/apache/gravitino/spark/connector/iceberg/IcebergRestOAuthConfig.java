@@ -81,7 +81,7 @@ class IcebergRestOAuthConfig {
     String authType =
         sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
     if (AuthProperties.isBasic(authType)) {
-      return reuseBasic(sparkConf, result);
+      return applyBasicCredentials(sparkConf, result);
     }
 
     boolean reuseOAuth2 =
@@ -116,7 +116,8 @@ class IcebergRestOAuthConfig {
   }
 
   // Reuses Gravitino's Basic credentials unless the caller already chose an auth type.
-  private static Map<String, String> reuseBasic(SparkConf sparkConf, Map<String, String> config) {
+  private static Map<String, String> applyBasicCredentials(
+      SparkConf sparkConf, Map<String, String> config) {
     if (StringUtils.isNotBlank(config.get(AUTH_TYPE))) {
       return config;
     }
