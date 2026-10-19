@@ -192,16 +192,25 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testCannotDisableServiceAdmin() throws IOException {
+  public void testCannotUpdateEnabledOfServiceAdmin() throws IOException {
     loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminDisable");
     manager.addUser("svcAdminDisable", VALID_PASSWORD);
 
-    IllegalArgumentException exception =
+    IllegalArgumentException disableException =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", false));
-    Assertions.assertEquals("Cannot disable service admin svcAdminDisable", exception.getMessage());
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        disableException.getMessage());
     Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
-    Assertions.assertTrue(manager.updateEnabled("svcAdminDisable", true));
+
+    IllegalArgumentException enableException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", true));
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        enableException.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
   }
 
   @Test

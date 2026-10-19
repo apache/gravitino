@@ -21,7 +21,6 @@ package org.apache.gravitino.idp.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -81,7 +80,6 @@ public class ChangePasswordRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(newPassword != null, "\"newPassword\" field is required");
-    IdpCredentialValidator.validatePassword(newPassword);
+    IdpCredentialValidator.validatePassword(newPassword, "newPassword");
   }
 }

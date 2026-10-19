@@ -221,11 +221,11 @@ public class IdpUserGroupManager implements Closeable {
    * @param enabled Whether the user should be enabled.
    * @return {@code true} if the enabled flag was updated
    * @throws NotFoundException if the user does not exist
-   * @throws IllegalArgumentException if {@code enabled} is {@code false} and the username is a
-   *     configured service admin
+   * @throws IllegalArgumentException if the username is a configured service admin
    */
   public boolean updateEnabled(String username, boolean enabled) {
-    checkCanDisableUser(username, enabled);
+    Preconditions.checkArgument(
+        !isServiceAdmin(username), "Cannot update the enabled flag of service admin %s", username);
     return USER_SERVICE.updateIdpUserEnabled(username, enabled);
   }
 

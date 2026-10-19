@@ -55,10 +55,14 @@ public class TestChangePasswordRequest {
     Assertions.assertDoesNotThrow(() -> new ChangePasswordRequest(VALID_PASSWORD).validate());
     Assertions.assertDoesNotThrow(
         () -> new ChangePasswordRequest(VALID_PASSWORD, "old_password12").validate());
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new ChangePasswordRequest().validate());
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new ChangePasswordRequest(" ").validate());
+    IllegalArgumentException missing =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> new ChangePasswordRequest().validate());
+    Assertions.assertTrue(missing.getMessage().contains("\"newPassword\""));
+    IllegalArgumentException blank =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> new ChangePasswordRequest(" ").validate());
+    Assertions.assertTrue(blank.getMessage().contains("\"newPassword\""));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new ChangePasswordRequest("short").validate());
   }

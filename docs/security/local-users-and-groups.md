@@ -90,13 +90,13 @@ Send `Accept: application/vnd.gravitino.v1+json` on every request, and
 
 ### User Operations
 
-| Operation              | Method | Path                              | Body                                                          |
-|------------------------|--------|-----------------------------------|---------------------------------------------------------------|
-| Get a user             | GET    | `/api/idp/users/{user}`           | None                                                          |
-| Add a user             | POST   | `/api/idp/users`                  | `{"user":"alice","password":"{password}"}`                    |
-| Change a user password | PUT    | `/api/idp/users/{user}/password`  | `{"newPassword":"{new_password}"}` (plus `oldPassword` for self) |
-| Update a user enabled  | PUT    | `/api/idp/users/{user}/enabled`   | `{"enabled":false}`                                           |
-| Remove a user          | DELETE | `/api/idp/users/{user}`           | None                                                          |
+| Operation              | Method | Path                             | Body                                                               |
+|------------------------|--------|----------------------------------|--------------------------------------------------------------------|
+| Get a user             | GET    | `/api/idp/users/{user}`          | None                                                               |
+| Add a user             | POST   | `/api/idp/users`                 | `{"user":"alice","password":"{password}"}`                         |
+| Change a user password | PUT    | `/api/idp/users/{user}/password` | `{"newPassword":"{new_password}"}` (plus `oldPassword` for self)   |
+| Update a user enabled  | PUT    | `/api/idp/users/{user}/enabled`  | `{"enabled":false}`                                                |
+| Remove a user          | DELETE | `/api/idp/users/{user}`          | None                                                               |
 
 The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. Password changes use `PUT /api/idp/users/{user}/password` with required `newPassword`. Enabled-flag updates use `PUT /api/idp/users/{user}/enabled` with required `enabled` and are service-admin only; users listed in `gravitino.authorization.serviceAdmins` cannot have their enabled flag changed. Non-admin callers may get only their own user and change only their own password. When changing your own password, `oldPassword` is required and must match the stored password. When a service admin resets another user's password, `oldPassword` must be omitted.
 
