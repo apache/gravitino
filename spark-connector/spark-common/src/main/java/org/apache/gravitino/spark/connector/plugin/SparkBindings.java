@@ -43,9 +43,9 @@ import scala.Function1;
 public final class SparkBindings {
 
   /**
-   * The catalog kinds every connector build must supply. Paimon is absent because Paimon publishes
-   * no artifact for every supported Spark and Scala version, so some builds legitimately ship no
-   * Paimon catalog.
+   * The catalog kinds every connector build must supply. Paimon is optional because it does not
+   * publish artifacts for every supported Spark and Scala version. Doris is optional because its
+   * specialized catalog is currently supplied only by the Spark 3.5 build.
    */
   private static final Set<SparkCatalogKind> REQUIRED_KINDS =
       EnumSet.complementOf(EnumSet.of(SparkCatalogKind.LAKEHOUSE_PAIMON, SparkCatalogKind.DORIS));

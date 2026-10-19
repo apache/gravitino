@@ -87,3 +87,4 @@ Gravitino spark connector will transform below property names which are defined 
 | `jdbc-driver`                   | `driver`                           | The driver of the JDBC connection. For example, com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark JDBC connector.
+

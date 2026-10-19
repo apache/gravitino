@@ -420,7 +420,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
                     getSparkSession().sessionState().catalogManager().catalog(CATALOG_NAME))
                 .loadTable(
                     Identifier.of(new String[] {DATABASE_NAME}, TABLE_NAME),
-                    java.util.Collections.emptySet()));
+                    Collections.emptySet()));
   }
 
   @Test

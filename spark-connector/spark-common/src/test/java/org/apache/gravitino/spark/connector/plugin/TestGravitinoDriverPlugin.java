@@ -177,9 +177,8 @@ public class TestGravitinoDriverPlugin {
   void testAKindThisBuildBoundNoCatalogForResolvesToNothing() {
     GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
 
-    // Paimon is the one kind a build may legitimately omit, so it is the only kind that can reach
-    // catalogClassName with nothing behind it. Providers that map to no kind at all are
-    // TestSparkCatalogKind's subject.
+    // Paimon and Doris are optional bindings; use Paimon to exercise an omitted binding.
+    // Providers that map to no kind at all are TestSparkCatalogKind's subject.
     Assertions.assertNull(plugin.catalogClassName(SparkCatalogKind.LAKEHOUSE_PAIMON));
   }
 

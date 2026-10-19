@@ -160,8 +160,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
                 return;
               }
-              // The provider is read once, here, and every decision below is made from the kind, so
-              // no two places can disagree about what this catalog is.
+              // Resolve the default kind from the provider. Opt-in settings below may select a
+              // specialized kind for the same provider.
               SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
               if (kind == null) {
                 LOG.warn(
