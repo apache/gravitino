@@ -473,7 +473,7 @@ curl -X POST \
 <TabItem value="java" label="Java">
 
 ```java
-// Add dependency: implementation("org.lance:lance-namespace-core:0.4.5")
+// Add dependency: implementation("org.lance:lance-namespace-core:0.11.1")
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -539,7 +539,7 @@ tableApi.createTable(
 <TabItem value="python" label="Python">
 
 ```python
-# Install: pip install lance-namespace==0.4.5
+# Install: pip install lance-namespace==0.11.1
 
 import lance_namespace as ln
 import requests

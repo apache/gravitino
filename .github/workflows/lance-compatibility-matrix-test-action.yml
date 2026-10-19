@@ -6,7 +6,7 @@ on:
       lance_spark_versions:
         required: false
         type: string
-        default: '0.2.0,0.4.0,0.5.1'
+        default: '0.2.0,0.4.0,0.5.1,0.8.0'
       lance_ray_versions:
         required: false
         type: string

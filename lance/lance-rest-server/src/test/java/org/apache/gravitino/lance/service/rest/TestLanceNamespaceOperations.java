@@ -687,6 +687,45 @@ public class TestLanceNamespaceOperations extends JerseyTest {
   }
 
   @Test
+  void testDescribeTableAcceptsNewOptionalRequestFields() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.describe_table_new_fields";
+    String delimiter = ".";
+
+    DescribeTableResponse describeTableResponse = new DescribeTableResponse();
+    describeTableResponse.setLocation("/path/to/describe_table_new_fields");
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean(), anyBoolean()))
+        .thenReturn(describeTableResponse);
+
+    // Sent as raw JSON rather than a built request object: lance-namespace 0.11.1 added the
+    // optional `branch` and `tag` fields, and newer clients put them on the wire even though
+    // Gravitino does not implement branches or tags. The server must accept such a payload
+    // instead of failing deserialization, and must ignore the two fields rather than letting
+    // them shift the version it resolves.
+    String rawRequest =
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_new_fields\"],"
+            + "\"version\":3,\"branch\":\"main\",\"tag\":\"v1\"}";
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(rawRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Mockito.verify(tableOps)
+        .describeTable(eq(tableIds), eq(delimiter), eq(Optional.of(3L)), eq(false), eq(true));
+
+    // The 0.11.1 response models carry a new `context` map. Gravitino never populates it, but the
+    // generated model defaults it to an empty map, so it is serialized as `"context":{}` rather
+    // than omitted. That is still compatible with older clients, which ignore unknown fields
+    // (the 0.7.5 Java client sets FAIL_ON_UNKNOWN_PROPERTIES=false and the Python model uses
+    // pydantic's default extra="ignore"). Pin down that the field stays empty, so the response
+    // carries no context the server did not intend to send.
+    String body = resp.readEntity(String.class);
+    Assertions.assertTrue(body.contains("\"context\":{}"), body);
+  }
+
+  @Test
   void testTableExists() {
     String tableIds = "catalog.scheme.table_exists";
     String delimiter = ".";
