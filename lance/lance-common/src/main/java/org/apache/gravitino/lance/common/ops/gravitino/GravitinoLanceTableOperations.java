@@ -42,6 +42,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
@@ -49,6 +50,7 @@ import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
@@ -189,15 +191,20 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     createTableProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
     createTableProperties.put(Table.PROPERTY_EXTERNAL, "true");
 
-    // Pass creation mode as property to delegate handling to LanceTableOperations
-    createTableProperties.put(LANCE_CREATION_MODE, normalizeCreateMode(mode, tableId));
-
-    // Single call - mode is handled server-side
+    String creationMode = normalizeCreateMode(mode, tableId);
+    boolean existOk = CreateMode.EXIST_OK.name().equals(creationMode);
+    // An existing table must never return through the create dispatcher: its owner hook runs
+    // whenever creation returns successfully, even if the provider merely loaded an existing table.
+    createTableProperties.put(
+        LANCE_CREATION_MODE, existOk ? CreateMode.CREATE.name() : creationMode);
     Table t =
-        namespaceWrapper
-            .asTableCatalog(catalog)
-            .createTable(
-                tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
+        createOrLoadTable(
+            catalogName,
+            catalog,
+            tableIdentifier,
+            columns.toArray(new Column[0]),
+            createTableProperties,
+            existOk);
     Map<String, String> properties = t.properties();
     Map<String, String> effectiveStorageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), properties);
@@ -411,6 +418,41 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     return JsonArrowSchemaConverter.convertToJsonArrowSchema(
         new org.apache.arrow.vector.types.pojo.Schema(fields));
+  }
+
+  private Table createOrLoadTable(
+      String catalogName,
+      Catalog catalog,
+      NameIdentifier identifier,
+      Column[] columns,
+      Map<String, String> properties,
+      boolean existOk) {
+    TableCatalog tables = namespaceWrapper.asTableCatalog(catalog);
+    if (existOk) {
+      try {
+        return loadReadableTable(tables, catalogName, identifier);
+      } catch (NoSuchTableException missing) {
+        // Create with CREATE, not EXIST_OK, so a concurrent creator cannot make the provider
+        // return an existing table through the ownership-changing create hook.
+      }
+    }
+    try {
+      return tables.createTable(identifier, columns, null, properties);
+    } catch (TableAlreadyExistsException conflict) {
+      if (!existOk) {
+        throw conflict;
+      }
+      return loadReadableTable(tables, catalogName, identifier);
+    }
+  }
+
+  private Table loadReadableTable(
+      TableCatalog tables, String catalogName, NameIdentifier identifier) {
+    Table table = tables.loadTable(identifier);
+    namespaceWrapper
+        .metadataFilter()
+        .checkReadTable(catalogName, identifier.namespace().level(0), identifier.name());
+    return table;
   }
 
   private static String normalizeCreateMode(String mode, String tableId) {

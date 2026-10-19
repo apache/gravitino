@@ -28,8 +28,9 @@ import org.apache.gravitino.lance.common.ops.LanceMetadataFilter;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.lance.namespace.errors.PermissionDeniedException;
 
-/** Removes the catalogs, schemas, and tables the caller may not see from a Lance listing. */
+/** Checks reads of existing metadata and filters the catalogs, schemas, and tables in listings. */
 public class LanceAuthorizationMetadataFilter implements LanceMetadataFilter {
 
   private final String metalakeName;
@@ -41,6 +42,30 @@ public class LanceAuthorizationMetadataFilter implements LanceMetadataFilter {
    */
   public LanceAuthorizationMetadataFilter(String metalakeName) {
     this.metalakeName = metalakeName;
+  }
+
+  @Override
+  public void checkReadCatalog(String catalogName) {
+    checkRead(
+        NameIdentifierUtil.ofCatalog(metalakeName, catalogName),
+        Entity.EntityType.CATALOG,
+        AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION);
+  }
+
+  @Override
+  public void checkReadSchema(String catalogName, String schemaName) {
+    checkRead(
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName),
+        Entity.EntityType.SCHEMA,
+        AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION);
+  }
+
+  @Override
+  public void checkReadTable(String catalogName, String schemaName, String tableName) {
+    checkRead(
+        NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, tableName),
+        Entity.EntityType.TABLE,
+        AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
   }
 
   @Override
@@ -68,6 +93,13 @@ public class LanceAuthorizationMetadataFilter implements LanceMetadataFilter {
         Entity.EntityType.TABLE,
         AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
         name -> NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, name));
+  }
+
+  private void checkRead(NameIdentifier identifier, Entity.EntityType type, String expression) {
+    if (!MetadataAuthzHelper.checkAccess(identifier, type, expression)) {
+      throw new PermissionDeniedException(
+          "Not authorized to read " + identifier, "", identifier.toString());
+    }
   }
 
   private List<String> filter(

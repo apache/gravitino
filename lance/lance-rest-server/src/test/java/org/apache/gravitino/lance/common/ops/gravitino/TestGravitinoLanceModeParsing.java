@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -102,6 +103,8 @@ class TestGravitinoLanceModeParsing {
   @Test
   void testCreateTableModeNormalizesCase() {
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    when(tableCatalog.loadTable(any(NameIdentifier.class)))
+        .thenThrow(new NoSuchTableException("missing"));
     Table table = Mockito.mock(Table.class);
     when(table.properties()).thenReturn(Map.of());
     when(tableCatalog.createTable(
@@ -115,7 +118,7 @@ class TestGravitinoLanceModeParsing {
     Mockito.verify(tableCatalog)
         .createTable(
             any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
-    Assertions.assertEquals("EXIST_OK", propertiesCaptor.getValue().get(LANCE_CREATION_MODE));
+    Assertions.assertEquals("CREATE", propertiesCaptor.getValue().get(LANCE_CREATION_MODE));
   }
 
   @Test

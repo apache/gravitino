@@ -56,7 +56,7 @@ public class LanceServiceIdentityFilter implements Filter {
       // AuthenticationFilter runs before this filter and keeps the rest of the filter chain inside
       // the caller's Subject. Starting another doAs block here would make the service user the
       // effective identity, so downstream code would no longer see the real caller. Continue the
-      // existing chain directly to preserve the caller's active roles and other principal details.
+      // existing chain directly to preserve the caller's groups and other principal details.
       if (!AuthConstants.ANONYMOUS_USER.equals(PrincipalUtils.getCurrentUserName())) {
         chain.doFilter(request, response);
         return;

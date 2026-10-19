@@ -20,6 +20,7 @@
 package org.apache.gravitino.lance.common.ops.gravitino;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -274,6 +275,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     // Catalog exists, handle based on mode
     switch (mode) {
       case EXIST_OK:
+        namespaceWrapper.metadataFilter().checkReadCatalog(catalogName);
         response.setProperties(
             Optional.ofNullable(catalog.properties()).orElse(Collections.emptyMap()));
         return response;
@@ -324,6 +326,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     // Schema exists, handle based on mode
     switch (mode) {
       case EXIST_OK:
+        namespaceWrapper.metadataFilter().checkReadSchema(catalogName, schemaName);
         response.setProperties(
             Optional.ofNullable(schema.properties()).orElse(Collections.emptyMap()));
         return response;
@@ -367,17 +370,17 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     } catch (NonEmptyCatalogException e) {
       throw new InvalidInputException(
           String.format("Catalog %s is not empty", catalogName),
-          CommonUtil.formatCurrentStackTrace(),
+          Throwables.getStackTraceAsString(e),
           catalogName);
     } catch (NonEmptyEntityException e) {
       throw new InvalidInputException(
           String.format("Catalog %s is not empty", catalogName),
-          CommonUtil.formatCurrentStackTrace(),
+          Throwables.getStackTraceAsString(e),
           catalogName);
     } catch (CatalogInUseException e) {
       throw new InvalidInputException(
           String.format("Catalog %s is in use", catalogName),
-          CommonUtil.formatCurrentStackTrace(),
+          Throwables.getStackTraceAsString(e),
           catalogName);
     }
   }
@@ -402,11 +405,11 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
       }
     } catch (NoSuchCatalogException e) {
       throw new NamespaceNotFoundException(
-          "Catalog not found: " + catalogName, CommonUtil.formatCurrentStackTrace(), catalogName);
+          "Catalog not found: " + catalogName, Throwables.getStackTraceAsString(e), catalogName);
     } catch (NonEmptySchemaException e) {
       throw new InvalidInputException(
           String.format("Schema %s is not empty.", schemaName),
-          CommonUtil.formatCurrentStackTrace(),
+          Throwables.getStackTraceAsString(e),
           schemaName);
     }
   }

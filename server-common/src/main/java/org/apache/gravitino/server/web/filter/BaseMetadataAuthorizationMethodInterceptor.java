@@ -193,9 +193,9 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   }
 
   /**
-   * Hook for requests that must validate the current user and active roles but do not have a
-   * metadata object on which to evaluate an expression. A protocol root-list request is a typical
-   * example: its returned children are filtered separately.
+   * Hook for requests that must validate the current user but do not have a metadata object on
+   * which to evaluate an expression. A protocol root-list request is a typical example: its
+   * returned children are filtered separately.
    *
    * @param target resolved authorization target
    * @return {@code true} to skip only expression evaluation
@@ -235,8 +235,8 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
 
         if (!skipStandardCheck && metalakeIdent != null) {
           String currentUser = PrincipalUtils.getCurrentUserName();
-          // Reuse this request context so user, role, and privilege checks see exactly the same
-          // active-role selection and can share cached authorization results.
+          // Reuse the request context across user validation and privilege evaluation so their
+          // authorization results can share the same per-request cache.
           try {
             AuthorizationUtils.checkCurrentUser(
                 metalakeIdent.name(), currentUser, authorizationRequestContext);

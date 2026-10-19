@@ -19,12 +19,42 @@
 package org.apache.gravitino.lance.common.ops;
 
 import java.util.List;
+import org.lance.namespace.errors.PermissionDeniedException;
 
-/** Filters Lance metadata before pagination; {@link #NOOP} keeps authorization-disabled lists. */
+/**
+ * Checks metadata reads and filters lists before pagination; {@link #NOOP} disables these checks.
+ */
 public interface LanceMetadataFilter {
 
   /** A filter that returns every listed name unchanged. */
   LanceMetadataFilter NOOP = new LanceMetadataFilter() {};
+
+  /**
+   * Checks access before returning properties of an existing catalog from a create request.
+   *
+   * @param catalogName the catalog to read
+   * @throws PermissionDeniedException if the caller cannot read the catalog
+   */
+  default void checkReadCatalog(String catalogName) {}
+
+  /**
+   * Checks access before returning properties of an existing schema from a create request.
+   *
+   * @param catalogName the catalog holding the schema
+   * @param schemaName the schema to read
+   * @throws PermissionDeniedException if the caller cannot read the schema
+   */
+  default void checkReadSchema(String catalogName, String schemaName) {}
+
+  /**
+   * Checks access before returning an existing table from a create request.
+   *
+   * @param catalogName the catalog holding the table
+   * @param schemaName the schema holding the table
+   * @param tableName the table to read
+   * @throws PermissionDeniedException if the caller cannot read the table
+   */
+  default void checkReadTable(String catalogName, String schemaName, String tableName) {}
 
   /**
    * Filters the catalogs listed for the root namespace.

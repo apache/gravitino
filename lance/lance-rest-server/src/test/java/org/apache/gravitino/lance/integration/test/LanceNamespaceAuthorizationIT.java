@@ -123,6 +123,19 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
   }
 
   @Test
+  public void testExistOkCannotReadInaccessibleCatalog() throws Exception {
+    assertStatus(403, post(WRITER, HIDDEN_CATALOG, "describe"));
+    assertStatus(403, create(WRITER, HIDDEN_CATALOG, "exist_ok", Map.of()));
+  }
+
+  @Test
+  public void testExistOkCannotReadInaccessibleSchema() throws Exception {
+    String schemaId = id(VISIBLE_CATALOG, HIDDEN_SCHEMA);
+    assertStatus(403, post(WRITER, schemaId, "describe"));
+    assertStatus(403, create(WRITER, schemaId, "exist_ok", Map.of()));
+  }
+
+  @Test
   public void testAnonymousRequestCannotAssumeServiceIdentity() throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder()

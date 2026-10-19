@@ -217,6 +217,49 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   @Test
+  public void testExistOkCannotReadInaccessibleTable() throws Exception {
+    assertStatus(403, table(PROBER, HIDDEN_TABLE, "describe"));
+    HttpResponse<String> response = create(PROBER, SCHEMA, HIDDEN_TABLE, "exist_ok");
+    assertStatus(403, response);
+    Assertions.assertFalse(response.body().contains(location(HIDDEN_TABLE)), response.body());
+    Assertions.assertEquals(location(HIDDEN_TABLE), describedLocation(ADMIN, HIDDEN_TABLE));
+  }
+
+  @Test
+  public void testExistOkPreservesExistingOwner() throws Exception {
+    String tableName = "existing_owner_table";
+    createTable(WRITE_SCHEMA, tableName);
+    GravitinoMetalake metalake = client.loadMetalake(getLanceRESTServerMetalakeName());
+    SecurableObject schemaScope =
+        SecurableObjects.ofSchema(
+            SecurableObjects.ofCatalog(CATALOG, new ArrayList<>()),
+            WRITE_SCHEMA,
+            new ArrayList<>());
+    grant(
+        metalake,
+        "exist_ok_read_role",
+        PROBER,
+        List.of(
+            SecurableObjects.ofTable(
+                schemaScope, tableName, new ArrayList<>(List.of(Privileges.SelectTable.allow())))));
+    MetadataObject object =
+        MetadataObjects.of(List.of(CATALOG, WRITE_SCHEMA, tableName), MetadataObject.Type.TABLE);
+    String owner = metalake.getOwner(object).orElseThrow().name();
+
+    assertStatus(200, create(PROBER, WRITE_SCHEMA, tableName, "exist_ok"));
+
+    Assertions.assertEquals(owner, metalake.getOwner(object).orElseThrow().name());
+    assertStatus(403, table(PROBER, WRITE_SCHEMA, tableName, "drop"));
+  }
+
+  @Test
+  public void testExistOkCreatesMissingTable() throws Exception {
+    String tableName = "new_exist_ok_table";
+    assertStatus(200, create(PROBER, WRITE_SCHEMA, tableName, "exist_ok"));
+    assertStatus(200, table(PROBER, WRITE_SCHEMA, tableName, "describe"));
+  }
+
+  @Test
   public void testTableReadRequiresTablePrivileges() throws Exception {
     assertStatus(200, table(READER, VISIBLE_TABLE, "describe"));
     assertStatus(200, table(READER, VISIBLE_TABLE, "exists"));
@@ -417,18 +460,26 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private void createTable(String schemaName, String tableName) throws Exception {
+    assertStatus(200, create(ADMIN, schemaName, tableName, "create"));
+  }
+
+  private HttpResponse<String> create(String user, String schemaName, String tableName, String mode)
+      throws Exception {
     Schema schema =
         new Schema(
             List.of(
                 Field.nullable("id", new ArrowType.Int(32, true)),
                 Field.nullable("value", new ArrowType.Utf8())));
     HttpRequest request =
-        request(ADMIN, "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create", "")
+        request(
+                user,
+                "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create",
+                "&mode=" + mode)
             .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
             .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location(tableName))
             .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
             .build();
-    assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> register(
