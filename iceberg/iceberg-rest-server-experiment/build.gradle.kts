@@ -69,6 +69,10 @@ dependencies {
 }
 
 tasks {
+  compileJava {
+    dependsOn(":iceberg:iceberg-rest-server:copyDepends")
+  }
+
   val copyDepends by registering(Sync::class) {
     dependsOn(":iceberg:iceberg-rest-server:copyDepends")
     from(configurations.runtimeClasspath)

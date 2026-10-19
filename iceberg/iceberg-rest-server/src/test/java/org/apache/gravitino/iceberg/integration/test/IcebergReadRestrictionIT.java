@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test;
 @Tag("gravitino-docker-test")
 public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
 
-  private static final String EXPERIMENTAL_SERVER_DIRECTORY = "iceberg-rest-experimental-server";
+  private static final String EXPERIMENTAL_SERVER_DIRECTORY = "iceberg-rest-server-experiment";
   private static final String SCHEMA_NAME = "schema";
 
   @BeforeAll

@@ -55,6 +55,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.restrictions.ReadRestrictions;
 import org.apache.iceberg.rest.restrictions.ReadRestrictionsParser;
+import org.apache.iceberg.types.Types;
 
 /** Loads tag-selected Gravitino policies into experimental Iceberg read restrictions. */
 public final class ExperimentalIcebergReadRestrictionLoader
@@ -84,7 +85,7 @@ public final class ExperimentalIcebergReadRestrictionLoader
         policyDispatcher.listPolicyInfosForMetadataObject(
             metalake, NameIdentifierUtil.toMetadataObject(tableName, Entity.EntityType.TABLE));
     Map<Integer, PolicyEntity[]> maskPolicies = new LinkedHashMap<>();
-    for (org.apache.iceberg.types.Types.NestedField field : schema.columns()) {
+    for (Types.NestedField field : schema.columns()) {
       NameIdentifier columnName =
           NameIdentifierUtil.ofColumn(
               metalake,
