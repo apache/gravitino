@@ -300,14 +300,8 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    // never called, as implemented generatePurgeTableSql(String databaseName, String tableName)
     throw new UnsupportedOperationException(
         "StarRocks does not support purge table in Gravitino, please use drop table");
-  }
-
-  @Override
-  protected String generatePurgeTableSql(String databaseName, String tableName) {
-    return String.format("TRUNCATE TABLE `%s`.`%s`", databaseName, tableName);
   }
 
   @Override
