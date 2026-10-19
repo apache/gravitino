@@ -29,9 +29,6 @@ import com.azure.storage.file.datalake.sas.DataLakeServiceSasSignatureValues;
 import com.azure.storage.file.datalake.sas.PathSasPermission;
 import java.io.IOException;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,7 +75,7 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
     Set<String> combinedPaths = new TreeSet<>(writePaths);
     combinedPaths.addAll(readPaths);
 
-    ADLSLocationUtils.ADLSLocationParts locationParts = findCommonLocation(combinedPaths);
+    ADLSLocationUtils.ADLSLocationParts locationParts = findCredentialLocation(combinedPaths);
 
     OffsetDateTime start = OffsetDateTime.now();
     OffsetDateTime expiry = OffsetDateTime.now().plusSeconds(tokenExpireSecs);
@@ -125,7 +122,7 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
     return dataLakeServiceClient.getUserDelegationKey(start, expiry);
   }
 
-  private ADLSLocationUtils.ADLSLocationParts findCommonLocation(Set<String> paths) {
+  private ADLSLocationUtils.ADLSLocationParts findCredentialLocation(Set<String> paths) {
     if (paths.isEmpty()) {
       throw new IllegalArgumentException(
           "ADLS credential context should contain at least one path");
@@ -147,29 +144,36 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
               + paths);
     }
 
-    List<String> commonSegments = pathSegments(first.getPath());
-    for (int i = 1; i < locations.size(); i++) {
-      List<String> segments = pathSegments(locations.get(i).getPath());
-      int commonSegmentCount = 0;
-      while (commonSegmentCount < commonSegments.size()
-          && commonSegmentCount < segments.size()
-          && commonSegments.get(commonSegmentCount).equals(segments.get(commonSegmentCount))) {
-        commonSegmentCount++;
-      }
-      commonSegments = new ArrayList<>(commonSegments.subList(0, commonSegmentCount));
+    List<ADLSLocationUtils.ADLSLocationParts> rootLocations =
+        locations.stream()
+            .filter(
+                location ->
+                    locations.stream()
+                        .noneMatch(
+                            possibleParent ->
+                                possibleParent != location
+                                    && isDescendantOf(location, possibleParent)))
+            .collect(Collectors.toList());
+    if (rootLocations.size() != 1) {
+      throw new IllegalArgumentException(
+          "ADLS credential paths must resolve to exactly one root location, but found: "
+              + rootLocations.size()
+              + " roots: "
+              + paths);
     }
 
-    return new ADLSLocationUtils.ADLSLocationParts(
-        first.getContainer(), first.getAccountName(), String.join("/", commonSegments));
+    return rootLocations.get(0);
   }
 
-  private static List<String> pathSegments(String path) {
-    if (path == null || path.isEmpty()) {
-      return Collections.emptyList();
+  private static boolean isDescendantOf(
+      ADLSLocationUtils.ADLSLocationParts location,
+      ADLSLocationUtils.ADLSLocationParts possibleParent) {
+    String path = ADLSLocationUtils.trimSlashes(location.getPath());
+    String parentPath = ADLSLocationUtils.trimSlashes(possibleParent.getPath());
+    if (parentPath.isEmpty()) {
+      return !path.isEmpty();
     }
-    return Arrays.stream(path.split("/"))
-        .filter(segment -> !segment.isEmpty())
-        .collect(Collectors.toList());
+    return path.startsWith(parentPath + "/");
   }
 
   @Override

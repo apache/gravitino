@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 class TestADLSTokenGenerator {
 
   @Test
-  void generatesTokenForCommonDirectoryOfMultiplePaths() throws Exception {
+  void generatesTokenForParentDirectoryOfMultiplePaths() throws Exception {
     try (ADLSTokenGenerator generator = new TestableADLSTokenGenerator()) {
       generator.initialize(createProperties());
       PathBasedCredentialContext context =
@@ -56,6 +56,25 @@ class TestADLSTokenGenerator {
       assertEquals("account", credential.accountName());
       assertTrue(credential.sasToken().contains("sr=d"));
       assertTrue(credential.sasToken().contains("sdd=2"));
+    }
+  }
+
+  @Test
+  void rejectsPathsWithoutProvidedCommonRoot() throws Exception {
+    String first = "abfss://container@account.dfs.core.windows.net/warehouse/table/data";
+    String second = "abfss://container@account.dfs.core.windows.net/warehouse/table/metadata";
+    try (ADLSTokenGenerator generator = new TestableADLSTokenGenerator()) {
+      generator.initialize(createProperties());
+      PathBasedCredentialContext context =
+          new PathBasedCredentialContext(
+              "test-user", Collections.emptySet(), new HashSet<>(Arrays.asList(first, second)));
+
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> generator.generate(context));
+
+      assertTrue(exception.getMessage().contains("exactly one root location"));
+      assertTrue(exception.getMessage().contains(first));
+      assertTrue(exception.getMessage().contains(second));
     }
   }
 
