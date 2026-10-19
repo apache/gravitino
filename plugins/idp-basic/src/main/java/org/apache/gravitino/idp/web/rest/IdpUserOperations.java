@@ -117,9 +117,7 @@ public class IdpUserOperations {
   }
 
   /**
-   * Enforces who may update which fields. Non-service-admins may only change their own password and
-   * cannot update {@code enabled}. Self-service password changes require {@code oldPassword};
-   * service-admin resets of another user must not send {@code oldPassword}.
+   * Dispatches update authorization to the service-admin or normal-user rule set.
    *
    * @param user the path username being updated
    * @param request the update request
@@ -127,16 +125,23 @@ public class IdpUserOperations {
   private static void enforceUpdateUserRules(String user, UpdateUserRequest request) {
     String currentUser = PrincipalUtils.getCurrentUserName();
     List<String> serviceAdmins = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
-    boolean isServiceAdmin = IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser);
-    if (!isServiceAdmin) {
-      if (!user.equals(currentUser)) {
-        throw new ForbiddenException(
-            "Only service admins can update another user's password or enabled flag");
-      }
-      if (request.getEnabled() != null) {
-        throw new ForbiddenException("Only service admins can update the enabled flag");
-      }
+    if (IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
+      enforceServiceAdminUpdateRules(user, currentUser, request);
+    } else {
+      enforceNormalUserUpdateRules(user, currentUser, request);
     }
+  }
+
+  /**
+   * Service admins may update any user and {@code enabled}. Changing their own password still
+   * requires {@code oldPassword}; resetting another user must not send {@code oldPassword}.
+   *
+   * @param user the path username being updated
+   * @param currentUser the authenticated caller
+   * @param request the update request
+   */
+  private static void enforceServiceAdminUpdateRules(
+      String user, String currentUser, UpdateUserRequest request) {
     if (request.getNewPassword() == null) {
       return;
     }
@@ -148,6 +153,30 @@ public class IdpUserOperations {
       Preconditions.checkArgument(
           request.getOldPassword() == null,
           "\"oldPassword\" is only allowed when changing your own password");
+    }
+  }
+
+  /**
+   * Non-service-admins may only change their own password and cannot update {@code enabled}.
+   * Self-service password changes require {@code oldPassword}.
+   *
+   * @param user the path username being updated
+   * @param currentUser the authenticated caller
+   * @param request the update request
+   */
+  private static void enforceNormalUserUpdateRules(
+      String user, String currentUser, UpdateUserRequest request) {
+    if (!user.equals(currentUser)) {
+      throw new ForbiddenException(
+          "Only service admins can update another user's password or enabled flag");
+    }
+    if (request.getEnabled() != null) {
+      throw new ForbiddenException("Only service admins can update the enabled flag");
+    }
+    if (request.getNewPassword() != null) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(request.getOldPassword()),
+          "\"oldPassword\" is required when changing your own password");
     }
   }
 
