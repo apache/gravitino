@@ -28,7 +28,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
+import org.apache.gravitino.integration.test.container.LocalStackFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -39,6 +41,7 @@ import org.junit.jupiter.api.Test;
 
 /** Integration test for accessing a Paimon filesystem catalog through Hadoop S3A. */
 @Tag("gravitino-docker-test")
+@LocalStackFixture
 public class CatalogPaimonS3AIT extends BaseIT {
 
   private static final String PROVIDER = "lakehouse-paimon";
@@ -52,12 +55,10 @@ public class CatalogPaimonS3AIT extends BaseIT {
   private final String schemaName = GravitinoITUtils.genRandomName("paimon_s3a_schema");
 
   private GravitinoMetalake metalake;
-  private GravitinoLocalStackContainer localStackContainer;
+  @FixtureContainer private GravitinoLocalStackContainer localStackContainer;
 
   @BeforeAll
   void setUp() {
-    containerSuite.startLocalStackContainer();
-    localStackContainer = containerSuite.getLocalStackContainer();
 
     // The container is ready once its health check passes.
     localStackContainer.createBucket(bucketName);

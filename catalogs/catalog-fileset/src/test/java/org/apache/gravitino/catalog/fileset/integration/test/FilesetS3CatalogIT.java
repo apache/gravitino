@@ -31,7 +31,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
+import org.apache.gravitino.integration.test.container.LocalStackFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
@@ -46,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@LocalStackFixture
 public class FilesetS3CatalogIT extends FilesetCatalogIT {
   private static final Logger LOG = LoggerFactory.getLogger(FilesetS3CatalogIT.class);
   private String bucketName = "s3-bucket-" + UUID.randomUUID().toString().replace("-", "");
@@ -53,16 +56,13 @@ public class FilesetS3CatalogIT extends FilesetCatalogIT {
   private String secretKey;
   private String s3Endpoint;
 
-  private GravitinoLocalStackContainer gravitinoLocalStackContainer;
+  @FixtureContainer private GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
   @VisibleForTesting
   public void startIntegrationTest() throws Exception {}
 
   @Override
   protected void startNecessaryContainer() {
-
-    containerSuite.startLocalStackContainer();
-    gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
     // The container is ready once its health check passes. LocalStack does not enforce IAM, so
     // the shared test keys work without creating a user.

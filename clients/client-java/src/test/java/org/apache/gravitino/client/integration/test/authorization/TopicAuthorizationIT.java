@@ -40,8 +40,9 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.KafkaContainer;
+import org.apache.gravitino.integration.test.container.KafkaFixture;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
@@ -55,23 +56,20 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@KafkaFixture
 public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
+  @FixtureContainer private KafkaContainer kafka;
 
   private static final String CATALOG = "catalog";
   private static final String SCHEMA = "default";
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String kafkaBootstrapServers;
   private static String role = "role";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startKafkaContainer();
     super.startIntegrationTest();
     kafkaBootstrapServers =
-        String.format(
-            "%s:%d",
-            containerSuite.getKafkaContainer().getContainerIpAddress(),
-            KafkaContainer.DEFAULT_BROKER_PORT);
+        String.format("%s:%d", kafka.getContainerIpAddress(), KafkaContainer.DEFAULT_BROKER_PORT);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("bootstrap.servers", kafkaBootstrapServers);
     client

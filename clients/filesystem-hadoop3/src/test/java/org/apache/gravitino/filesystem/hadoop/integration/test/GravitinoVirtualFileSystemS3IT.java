@@ -28,7 +28,9 @@ import java.util.Map;
 import java.util.UUID;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
+import org.apache.gravitino.integration.test.container.LocalStackFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.s3.fs.S3FileSystemProvider;
 import org.apache.gravitino.storage.S3Properties;
@@ -40,6 +42,7 @@ import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LocalStackFixture
 public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemS3IT.class);
 
@@ -48,7 +51,7 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
   private String secretKey;
   private String s3Endpoint;
 
-  private GravitinoLocalStackContainer gravitinoLocalStackContainer;
+  @FixtureContainer private GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -56,8 +59,6 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
   }
 
   private void startS3Mocker() {
-    containerSuite.startLocalStackContainer();
-    gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
     // The container is ready once its health check passes. LocalStack does not enforce IAM, so
     // the shared test keys work without creating a user.

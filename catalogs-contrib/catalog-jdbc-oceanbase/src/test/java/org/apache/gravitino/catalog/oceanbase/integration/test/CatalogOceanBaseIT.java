@@ -49,8 +49,9 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.OceanBaseContainer;
+import org.apache.gravitino.integration.test.container.OceanBaseFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -86,9 +87,9 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@OceanBaseFixture
 public class CatalogOceanBaseIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogOceanBaseIT.class);
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-oceanbase";
 
   private final String metalakeName = GravitinoITUtils.genRandomName("oceanbase_it_metalake");
@@ -112,7 +113,7 @@ public class CatalogOceanBaseIT extends BaseIT {
 
   private OceanBaseService oceanBaseService;
 
-  private OceanBaseContainer OCEANBASE_CONTAINER;
+  @FixtureContainer private OceanBaseContainer OCEANBASE_CONTAINER;
 
   private String TEST_DB_NAME;
 
@@ -123,9 +124,6 @@ public class CatalogOceanBaseIT extends BaseIT {
   @BeforeAll
   public void startup() throws IOException, SQLException {
     TEST_DB_NAME = "oceanbase_catalog_oceanbase_it";
-
-    containerSuite.startOceanBaseContainer();
-    OCEANBASE_CONTAINER = containerSuite.getOceanBaseContainer();
 
     oceanBaseService = new OceanBaseService(OCEANBASE_CONTAINER, TEST_DB_NAME);
     createMetalake();

@@ -48,6 +48,8 @@ dependencies {
   testImplementation(libs.guava)
   testImplementation(libs.httpclient5)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.platform.commons)
+  testImplementation(libs.junit.platform.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.jdbc)
@@ -68,10 +70,17 @@ dependencies {
   testImplementation(libs.hadoop3.client.runtime)
 
   testImplementation("org.junit.jupiter:junit-jupiter")
+  testImplementation("org.junit.platform:junit-platform-testkit")
 }
 
 tasks.test {
   useJUnitPlatform()
+}
+
+// Nested fixture classes TestContainerExtension runs through EngineTestKit; Gradle's class scan
+// would run them directly too. Keep in sync with TestContainerExtension.FIXTURE.
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform { excludeTags("gravitino-test-fixture") }
 }
 
 val testJar by tasks.registering(Jar::class) {

@@ -23,18 +23,21 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.LocalStackFixture;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@LocalStackFixture
 public class CatalogHiveS3IT extends CatalogHive3IT {
 
   private static final String S3_BUCKET_NAME = "my-test-bucket";
-  private GravitinoLocalStackContainer gravitinoLocalStackContainer;
+  @FixtureContainer private GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
   private static final String S3_ACCESS_KEY = "S3_ACCESS_KEY";
   private static final String S3_SECRET_KEY = "S3_SECRET_KEY";
@@ -47,8 +50,6 @@ public class CatalogHiveS3IT extends CatalogHive3IT {
   @Override
   protected void startNecessaryContainer() {
     hmsCatalog = "hive";
-    containerSuite.startLocalStackContainer();
-    gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
     // The container is ready once its health check passes. LocalStack does not enforce IAM, so
     // the shared test keys work without creating a user.

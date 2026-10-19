@@ -54,7 +54,9 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
+import org.apache.gravitino.integration.test.container.LocalStackFixture;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -76,6 +78,7 @@ import org.slf4j.LoggerFactory;
  */
 @Tag("gravitino-docker-test")
 @EnabledIfSystemProperty(named = ITUtils.TEST_MODE, matches = ITUtils.DEPLOY_TEST_MODE)
+@LocalStackFixture
 public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(TrinoTlsOAuthCredentialVendingIT.class);
@@ -97,14 +100,12 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private OAuthServer oauthServer;
   private TrinoContainer trinoContainer;
-  private GravitinoLocalStackContainer localStack;
+  @FixtureContainer private GravitinoLocalStackContainer localStack;
   private Path trinoConfigDirectory;
 
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    containerSuite.startLocalStackContainer();
-    localStack = containerSuite.getLocalStackContainer();
     createBucket();
     containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
 

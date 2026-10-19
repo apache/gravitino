@@ -22,7 +22,9 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
+import org.apache.gravitino.integration.test.container.LocalStackFixture;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
@@ -30,10 +32,11 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
+@LocalStackFixture
 public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
 
   private static final String S3_BUCKET_NAME = "my-test-bucket";
-  private static GravitinoLocalStackContainer localStackContainer;
+  @FixtureContainer private static GravitinoLocalStackContainer localStackContainer;
   private String accessKey;
   private String secretKey;
   private String endpoint;
@@ -82,8 +85,6 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
 
   @Override
   protected void startNecessaryContainers() {
-    containerSuite.startLocalStackContainer();
-    localStackContainer = containerSuite.getLocalStackContainer();
 
     // The container is ready once its health check passes.
     localStackContainer.createBucket(S3_BUCKET_NAME);
