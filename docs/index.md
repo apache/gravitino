@@ -62,6 +62,9 @@ Use either to manage metadata. See
   to learn how to manage relational metadata.
 * [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md)
   to learn how to manage view metadata.
+* [Manage Semantic Model metadata using Gravitino](./manage-semantic-model-metadata-using-gravitino.md)
+  to learn how to define, govern, and exchange semantic metadata. Start with
+  [Semantic Models](./semantic-models.md) for concepts and supported use cases.
 * [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
   how to manage fileset metadata.
 * [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage

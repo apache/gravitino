@@ -447,6 +447,10 @@ public class TestRelationalEntityStoreLockWaitTimeout {
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(false);

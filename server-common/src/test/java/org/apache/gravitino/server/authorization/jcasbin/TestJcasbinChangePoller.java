@@ -38,6 +38,20 @@ import org.junit.jupiter.api.Test;
 public class TestJcasbinChangePoller {
 
   @Test
+  void testReplayOptInAcceptsRepeatedInvalidations() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+    JcasbinChangeListener listener = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    Assertions.assertTrue(listener.supportsReplay());
+    List<EntityChangeRecord> batch =
+        List.of(change(1L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"));
+    listener.onEntityChange(batch);
+    listener.onEntityChange(batch);
+    String tableKey = key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "");
+    Assertions.assertEquals(List.of(tableKey, tableKey), metadataIdCache.invalidatedPrefixes);
+  }
+
+  @Test
   void testRejectsNonPositivePollInterval() {
     RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
     RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
