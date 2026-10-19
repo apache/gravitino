@@ -278,8 +278,9 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void stop() throws IOException {
-    GravitinoAuthorizerProvider.getInstance().close();
+    // Stop the web server first: it waits for in-flight requests, which still need the authorizer.
     server.stop();
+    GravitinoAuthorizerProvider.getInstance().close();
     gravitinoEnv.shutdown();
     if (lineageService != null) {
       lineageService.close();
