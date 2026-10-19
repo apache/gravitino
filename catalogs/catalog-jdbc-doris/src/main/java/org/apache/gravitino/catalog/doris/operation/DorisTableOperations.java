@@ -1017,6 +1017,15 @@ public class DorisTableOperations extends JdbcTableOperations {
       throw new UnsupportedOperationException("Doris does not support nested column names.");
     }
     String col = addColumn.fieldName()[0];
+    // Doris 2.1.5+ and 3.0.1+ reject ADD COLUMN ... AUTO_INCREMENT. Earlier 2.1.x and 3.0.0 accept
+    // it and record the flag, but never generate values for the added column.
+    if (addColumn.isAutoIncrement()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Doris does not support adding auto-increment column `%s`; "
+                  + "define auto-increment columns when creating the table",
+              col));
+    }
 
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
