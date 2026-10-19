@@ -38,6 +38,16 @@ public class TestUpdateUserRequest {
 
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals(VALID_PASSWORD, deserRequest.getPassword());
+    Assertions.assertNull(deserRequest.getCurrentPassword());
+
+    UpdateUserRequest withCurrent =
+        new UpdateUserRequest(VALID_PASSWORD, "current_password12", null);
+    UpdateUserRequest deserWithCurrent =
+        JsonUtils.objectMapper()
+            .readValue(
+                JsonUtils.objectMapper().writeValueAsString(withCurrent), UpdateUserRequest.class);
+    Assertions.assertEquals(withCurrent, deserWithCurrent);
+    Assertions.assertEquals("current_password12", deserWithCurrent.getCurrentPassword());
 
     // Test with null password
     UpdateUserRequest request1 = new UpdateUserRequest();
@@ -74,10 +84,13 @@ public class TestUpdateUserRequest {
 
   @Test
   public void testUpdateUserRequestToStringDoesNotExposePassword() {
-    String requestString = new UpdateUserRequest(VALID_PASSWORD).toString();
+    String requestString =
+        new UpdateUserRequest(VALID_PASSWORD, "current_password12", null).toString();
 
     Assertions.assertFalse(requestString.contains(VALID_PASSWORD));
+    Assertions.assertFalse(requestString.contains("current_password12"));
     Assertions.assertFalse(requestString.contains("password="));
+    Assertions.assertFalse(requestString.contains("currentPassword="));
     Assertions.assertFalse(requestString.contains("\"password\""));
   }
 }

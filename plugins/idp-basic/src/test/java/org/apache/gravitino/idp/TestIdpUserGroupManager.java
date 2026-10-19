@@ -152,6 +152,26 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
+  public void testChangePasswordWithCurrentPassword() throws IOException {
+    manager.addUser("testChangeWithCurrent", VALID_PASSWORD);
+
+    Assertions.assertTrue(
+        manager.changePassword("testChangeWithCurrent", NEW_VALID_PASSWORD, VALID_PASSWORD));
+    Assertions.assertEquals(
+        "testChangeWithCurrent",
+        manager.authenticate("testChangeWithCurrent", NEW_VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        UnauthorizedException.class,
+        () ->
+            manager.changePassword(
+                "testChangeWithCurrent", VALID_PASSWORD, "wrong-current-password"));
+    Assertions.assertEquals(
+        "testChangeWithCurrent",
+        manager.authenticate("testChangeWithCurrent", NEW_VALID_PASSWORD).name());
+  }
+
+  @Test
   public void testUpdateEnabled() throws IOException {
     manager.addUser("testEnabled", VALID_PASSWORD);
     Assertions.assertTrue(manager.getUser("testEnabled").enabled());

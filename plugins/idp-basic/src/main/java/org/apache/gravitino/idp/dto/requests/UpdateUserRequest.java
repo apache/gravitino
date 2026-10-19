@@ -42,13 +42,18 @@ public class UpdateUserRequest implements RESTRequest {
   @ToString.Exclude
   private final String password;
 
+  @JsonProperty("currentPassword")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @ToString.Exclude
+  private final String currentPassword;
+
   @JsonProperty("enabled")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Boolean enabled;
 
   /** Default constructor for UpdateUserRequest. (Used for Jackson deserialization.) */
   public UpdateUserRequest() {
-    this(null, null);
+    this(null, null, null);
   }
 
   /**
@@ -57,7 +62,7 @@ public class UpdateUserRequest implements RESTRequest {
    * @param password The new password of the built-in IdP user.
    */
   public UpdateUserRequest(String password) {
-    this(password, null);
+    this(password, null, null);
   }
 
   /**
@@ -69,8 +74,24 @@ public class UpdateUserRequest implements RESTRequest {
    *     unchanged.
    */
   public UpdateUserRequest(String password, Boolean enabled) {
+    this(password, null, enabled);
+  }
+
+  /**
+   * Creates a new UpdateUserRequest.
+   *
+   * @param password The new password of the built-in IdP user, or {@code null} to leave it
+   *     unchanged.
+   * @param currentPassword The caller's current password when changing their own password, or
+   *     {@code null} when a service admin resets another user's password or when {@code password}
+   *     is not being updated.
+   * @param enabled Whether the built-in IdP user should be enabled, or {@code null} to leave it
+   *     unchanged.
+   */
+  public UpdateUserRequest(String password, String currentPassword, Boolean enabled) {
     super();
     this.password = password;
+    this.currentPassword = currentPassword;
     this.enabled = enabled;
   }
 

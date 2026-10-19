@@ -118,7 +118,9 @@ paths:
         the user object. At least one of `password` or `enabled` is required. Disabled users cannot
         authenticate. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
         Service admins may update any user. Authenticated non-admin users may update only their own
-        password and cannot change `enabled` or another user's account.
+        password and cannot change `enabled` or another user's account. Changing your own password
+        requires `currentPassword` and verifies it against the stored hash. A service admin
+        resetting another user's password must omit `currentPassword`.
       operationId: updateIdpUser
       requestBody:
         required: true
@@ -129,6 +131,8 @@ paths:
             examples:
               UpdateUserPasswordRequest:
                 $ref: "#/components/examples/UpdateUserPasswordRequest"
+              UpdateOwnUserPasswordRequest:
+                $ref: "#/components/examples/UpdateOwnUserPasswordRequest"
               UpdateUserEnabledRequest:
                 $ref: "#/components/examples/UpdateUserEnabledRequest"
       responses:
@@ -425,6 +429,13 @@ components:
           maxLength: 64
           description: The new password of the local user store user.
           writeOnly: true
+        currentPassword:
+          type: string
+          format: password
+          description: >
+            The caller's current password. Required when changing your own password; must be
+            omitted when a service admin resets another user's password.
+          writeOnly: true
         enabled:
           type: boolean
           description: Whether the local user store user should be enabled.
@@ -518,6 +529,12 @@ components:
     UpdateUserPasswordRequest:
       value: {
         "password": "Passw0rd-5678"
+      }
+
+    UpdateOwnUserPasswordRequest:
+      value: {
+        "password": "Passw0rd-5678",
+        "currentPassword": "Passw0rd-1234"
       }
 
     UpdateUserEnabledRequest:

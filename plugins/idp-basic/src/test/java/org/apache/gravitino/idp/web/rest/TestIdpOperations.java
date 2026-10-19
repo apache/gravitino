@@ -166,6 +166,31 @@ class TestIdpOperations extends JerseyTest {
   }
 
   @Test
+  void testAdminSelfPasswordChangeRequiresCurrentPassword() {
+    UpdateUserRequest missingCurrent = new UpdateUserRequest(VALID_PASSWORD);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin", missingCurrent),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+
+    UpdateUserRequest withCurrent = new UpdateUserRequest(VALID_PASSWORD, "admin-current-12", null);
+    when(MANAGER.changePassword("admin", VALID_PASSWORD, "admin-current-12")).thenReturn(true);
+    when(MANAGER.getUser("admin")).thenReturn(buildUser("admin"));
+    Assertions.assertEquals(
+        "admin",
+        put("/idp/users/admin", withCurrent).readEntity(IdpUserResponse.class).getUser().name());
+  }
+
+  @Test
+  void testAdminResetRejectsCurrentPassword() {
+    UpdateUserRequest req = new UpdateUserRequest(VALID_PASSWORD, "other-current-12", null);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/user1", req),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+  }
+
+  @Test
   void testUpdateEnabled() {
     UpdateUserRequest req = new UpdateUserRequest(null, false);
     when(MANAGER.updateEnabled("user1", false)).thenReturn(true);

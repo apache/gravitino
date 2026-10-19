@@ -153,8 +153,25 @@ public class IdpRESTApiIT extends BaseIT {
     self.validate();
     Assertions.assertEquals(USER1, self.getUser().name());
 
+    assertError(
+        400,
+        put("/idp/users/" + USER1, new UpdateUserRequest(UPDATED_PASSWORD), USER1, USER_PASSWORD),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
+        401,
+        put(
+            "/idp/users/" + USER1,
+            new UpdateUserRequest(UPDATED_PASSWORD, "wrong-password-12", null),
+            USER1,
+            USER_PASSWORD),
+        ErrorConstants.UNAUTHORIZED_CODE);
+
     HttpResponse<String> selfUpdate =
-        put("/idp/users/" + USER1, new UpdateUserRequest(UPDATED_PASSWORD), USER1, USER_PASSWORD);
+        put(
+            "/idp/users/" + USER1,
+            new UpdateUserRequest(UPDATED_PASSWORD, USER_PASSWORD, null),
+            USER1,
+            USER_PASSWORD);
     Assertions.assertEquals(200, selfUpdate.statusCode(), selfUpdate.body());
     Assertions.assertEquals(200, get("/version", USER1, UPDATED_PASSWORD).statusCode());
 
@@ -162,7 +179,7 @@ public class IdpRESTApiIT extends BaseIT {
         403,
         put(
             "/idp/users/" + USER2,
-            new UpdateUserRequest(UPDATED_PASSWORD),
+            new UpdateUserRequest(UPDATED_PASSWORD, UPDATED_PASSWORD, null),
             USER1,
             UPDATED_PASSWORD),
         ErrorConstants.FORBIDDEN_CODE);

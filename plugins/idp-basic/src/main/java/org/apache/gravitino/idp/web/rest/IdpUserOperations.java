@@ -20,6 +20,7 @@ package org.apache.gravitino.idp.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +33,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
@@ -105,9 +107,7 @@ public class IdpUserOperations {
         () -> {
           request.validate();
           enforceSelfPasswordUpdateRules(user, request);
-          if (request.getPassword() != null) {
-            userGroupManager.changePassword(user, request.getPassword());
-          }
+          changePasswordIfRequested(user, request);
           if (request.getEnabled() != null) {
             userGroupManager.updateEnabled(user, request.getEnabled());
           }
@@ -137,6 +137,31 @@ public class IdpUserOperations {
     if (request.getEnabled() != null) {
       throw new ForbiddenException("Only service admins can update the enabled flag");
     }
+  }
+
+  /**
+   * Applies a password update. Self-service changes require and verify {@code currentPassword}.
+   * Service-admin resets of another user must not send {@code currentPassword}.
+   *
+   * @param user the path username being updated
+   * @param request the update request
+   */
+  private void changePasswordIfRequested(String user, UpdateUserRequest request) {
+    if (request.getPassword() == null) {
+      return;
+    }
+    String currentUser = PrincipalUtils.getCurrentUserName();
+    if (user.equals(currentUser)) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(request.getCurrentPassword()),
+          "\"currentPassword\" is required when changing your own password");
+      userGroupManager.changePassword(user, request.getPassword(), request.getCurrentPassword());
+      return;
+    }
+    Preconditions.checkArgument(
+        request.getCurrentPassword() == null,
+        "\"currentPassword\" is only allowed when changing your own password");
+    userGroupManager.changePassword(user, request.getPassword());
   }
 
   @DELETE
