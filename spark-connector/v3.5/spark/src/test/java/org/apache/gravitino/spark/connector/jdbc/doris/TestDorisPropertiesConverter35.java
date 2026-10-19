@@ -90,20 +90,7 @@ public class TestDorisPropertiesConverter35 {
   }
 
   @Test
-  void testSafeSparkCatalogOptionsArePassedThrough() {
-    Map<String, String> converted =
-        DorisPropertiesConverter35.getInstance()
-            .toSparkCatalogProperties(
-                new CaseInsensitiveStringMap(ImmutableMap.of("fetchSize", "100")),
-                ImmutableMap.of(
-                    "jdbc-url", "jdbc:mysql://fe:9030/db",
-                    "jdbc-driver", "com.mysql.cj.jdbc.Driver"));
-
-    assertEquals("100", converted.get("fetchsize"));
-  }
-
-  @Test
-  void testCatalogBypassOptionsAndApplicationPrecedenceArePreserved() {
+  void testSafeReadOptionsPreserveBypassDefaultsAndApplicationPrecedence() {
     Map<String, String> properties =
         Map.of(
             "jdbc-url", "jdbc:mysql://fe:9030/db",
@@ -115,9 +102,12 @@ public class TestDorisPropertiesConverter35 {
         new CaseInsensitiveStringMap(
             DorisPropertiesConverter35.getInstance()
                 .toSparkCatalogProperties(
-                    new CaseInsensitiveStringMap(Map.of("fetchSize", "200")), properties));
+                    new CaseInsensitiveStringMap(
+                        Map.of("fetchSize", "200", "connectTimeout", "5000")),
+                    properties));
 
     assertEquals("200", converted.get("fetchsize"));
+    assertEquals("5000", converted.get("connectTimeout"));
     assertEquals("false", converted.get("pushDownPredicate"));
     assertEquals("VERIFY_IDENTITY", converted.get("sslMode"));
     assertEquals(
