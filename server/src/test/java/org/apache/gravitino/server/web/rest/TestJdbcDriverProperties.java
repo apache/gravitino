@@ -30,16 +30,12 @@ public class TestJdbcDriverProperties {
   void testProviderDefaults() {
     Map<String, String> drivers =
         ImmutableMap.<String, String>builder()
-            .put("jdbc-bigquery", "com.simba.googlebigquery.jdbc42.Driver")
             .put("jdbc-clickhouse", "com.clickhouse.jdbc.ClickHouseDriver")
             .put("jdbc-doris", "com.mysql.cj.jdbc.Driver")
             .put("jdbc-hologres", "org.postgresql.Driver")
-            .put("jdbc-maxcompute", "com.aliyun.odps.jdbc.OdpsDriver")
             .put("jdbc-mysql", "com.mysql.cj.jdbc.Driver")
             .put("jdbc-oceanbase", "com.mysql.cj.jdbc.Driver")
-            .put("jdbc-oracle", "oracle.jdbc.OracleDriver")
             .put("jdbc-postgresql", "org.postgresql.Driver")
-            .put("jdbc-sqlserver", "com.microsoft.sqlserver.jdbc.SQLServerDriver")
             .put("jdbc-starrocks", "com.mysql.cj.jdbc.Driver")
             .build();
     drivers.forEach(
@@ -76,6 +72,8 @@ public class TestJdbcDriverProperties {
     Assertions.assertSame(
         unknown, JdbcDriverProperties.withDefaultDriver("lakehouse-iceberg", unknown));
     Assertions.assertSame(unknown, JdbcDriverProperties.withDefaultDriver("hive", unknown));
+    Assertions.assertSame(
+        unknown, JdbcDriverProperties.withDefaultDriver("jdbc-sqlserver", unknown));
     Assertions.assertNull(JdbcDriverProperties.withDefaultDriver(null, null));
     Assertions.assertEquals(
         "com.mysql.cj.jdbc.Driver",

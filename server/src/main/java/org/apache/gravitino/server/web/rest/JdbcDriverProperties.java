@@ -30,16 +30,12 @@ public final class JdbcDriverProperties {
   private static final String JDBC_DRIVER = "jdbc-driver";
   private static final Map<String, String> PROVIDER_DRIVERS =
       ImmutableMap.<String, String>builder()
-          .put("jdbc-bigquery", "com.simba.googlebigquery.jdbc42.Driver")
           .put("jdbc-clickhouse", "com.clickhouse.jdbc.ClickHouseDriver")
           .put("jdbc-doris", "com.mysql.cj.jdbc.Driver")
           .put("jdbc-hologres", "org.postgresql.Driver")
-          .put("jdbc-maxcompute", "com.aliyun.odps.jdbc.OdpsDriver")
           .put("jdbc-mysql", "com.mysql.cj.jdbc.Driver")
           .put("jdbc-oceanbase", "com.mysql.cj.jdbc.Driver")
-          .put("jdbc-oracle", "oracle.jdbc.OracleDriver")
           .put("jdbc-postgresql", "org.postgresql.Driver")
-          .put("jdbc-sqlserver", "com.microsoft.sqlserver.jdbc.SQLServerDriver")
           .put("jdbc-starrocks", "com.mysql.cj.jdbc.Driver")
           .build();
 
