@@ -56,17 +56,25 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
   @Override
   public Map<String, String> toSparkCatalogProperties(
       CaseInsensitiveStringMap options, Map<String, String> properties) {
+    validateReadOptions(options);
+    if (properties != null) {
+      for (String key : properties.keySet()) {
+        if (key.startsWith(SPARK_PROPERTY_PREFIX)) {
+          validateReadOption(key.substring(SPARK_PROPERTY_PREFIX.length()));
+        }
+      }
+    }
     Map<String, String> converted =
-        new HashMap<>(JdbcPropertiesConverter.getInstance().toSparkCatalogProperties(properties));
+        new HashMap<>(
+            JdbcPropertiesConverter.getInstance().toSparkCatalogProperties(null, properties));
     // Specialized mode accepts only the credential vended by Gravitino. The catalog-level
     // jdbc-user and jdbc-password remain available to the generic JDBC path.
     converted.remove("user");
     converted.remove("password");
-    validateReadOptions(options);
     if (options != null) {
       for (Map.Entry<String, String> option : options.entrySet()) {
-        String key = option.getKey();
-        converted.put(key, option.getValue());
+        converted.keySet().removeIf(key -> key.equalsIgnoreCase(option.getKey()));
+        converted.put(option.getKey(), option.getValue());
       }
     }
     return converted;
@@ -77,9 +85,7 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
       return;
     }
     for (String key : options.keySet()) {
-      if (PROTECTED_OPTIONS.contains(key.toLowerCase(Locale.ROOT))) {
-        throw new IllegalArgumentException("Protected Doris Spark option is not allowed: " + key);
-      }
+      validateReadOption(key);
     }
   }
 
@@ -96,5 +102,11 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
   @Override
   public Map<String, String> toSparkTableProperties(Map<String, String> properties) {
     return new HashMap<>(properties);
+  }
+
+  private static void validateReadOption(String key) {
+    if (PROTECTED_OPTIONS.contains(key.toLowerCase(Locale.ROOT))) {
+      throw new IllegalArgumentException("Protected Doris Spark option is not allowed: " + key);
+    }
   }
 }

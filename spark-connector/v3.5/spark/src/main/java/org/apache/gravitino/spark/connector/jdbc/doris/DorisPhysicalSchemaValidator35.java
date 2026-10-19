@@ -22,7 +22,6 @@ package org.apache.gravitino.spark.connector.jdbc.doris;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -39,6 +38,8 @@ import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions;
+import org.apache.spark.sql.jdbc.JdbcDialects;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -71,14 +72,13 @@ final class DorisPhysicalSchemaValidator35 {
       Identifier identifier,
       Table logicalTable,
       StructType sparkPhysicalSchema,
-      String jdbcUrl,
-      String jdbcUser,
-      String jdbcPassword,
+      JDBCOptions jdbcOptions,
       SparkTypeConverter typeConverter) {
     List<PhysicalColumn> jdbcColumns;
     List<PhysicalColumn> feColumns;
     String stage = "JDBC connection";
-    try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword)) {
+    try (Connection connection =
+        JdbcDialects.get(jdbcOptions.url()).createConnectionFactory(jdbcOptions).apply(-1)) {
       stage = "JDBC column metadata";
       jdbcColumns = loadJdbcColumns(connection, identifier);
       stage = "FE SHOW COLUMNS";

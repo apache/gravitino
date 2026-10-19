@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,27 +29,31 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.Driver;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTypeConverter;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import scala.collection.immutable.HashMap;
 
 /** Unit tests for Doris FE/JDBC physical schema validation. */
 public class TestDorisPhysicalSchemaValidator35 {
@@ -68,9 +73,12 @@ public class TestDorisPhysicalSchemaValidator35 {
                         new StructField[] {
                           DataTypes.createStructField("id", DataTypes.IntegerType, false)
                         }),
-                    jdbcUrl,
-                    "test-user",
-                    jdbcPassword,
+                    jdbcOptions(
+                        jdbcUrl,
+                        Map.of(
+                            "driver", "com.mysql.cj.jdbc.Driver",
+                            "user", "test-user",
+                            "password", jdbcPassword)),
                     new SparkJdbcTypeConverter()));
 
     assertTrue(failure.getMessage().contains("JDBC connection"));
@@ -94,7 +102,7 @@ public class TestDorisPhysicalSchemaValidator35 {
     when(statement.executeQuery(anyString()))
         .thenThrow(new SQLException("test-only-secret", "42000", 1234));
 
-    DriverManager.registerDriver(driver);
+    DorisTestDriver.setDelegate(driver);
     try {
       IllegalArgumentException failure =
           assertThrows(
@@ -107,9 +115,8 @@ public class TestDorisPhysicalSchemaValidator35 {
                           new StructField[] {
                             DataTypes.createStructField("id", DataTypes.IntegerType, false)
                           }),
-                      jdbcUrl,
-                      "test-user",
-                      "test-only-secret",
+                      jdbcOptions(
+                          jdbcUrl, Map.of("user", "test-user", "password", "test-only-secret")),
                       new SparkJdbcTypeConverter()));
       assertTrue(failure.getMessage().contains("FE SHOW COLUMNS"));
       assertTrue(failure.getMessage().contains("SQLState 42000"));
@@ -117,7 +124,58 @@ public class TestDorisPhysicalSchemaValidator35 {
       assertFalse(failure.getMessage().contains("test-only-secret"));
       assertNull(failure.getCause());
     } finally {
-      DriverManager.deregisterDriver(driver);
+      DorisTestDriver.clearDelegate();
+    }
+  }
+
+  @Test
+  void testValidationUsesConfiguredDriverAndConnectionProperties() throws Exception {
+    String jdbcUrl = "jdbc:doris-validator-test://host/db";
+    Driver driver = mock(Driver.class);
+    Connection connection = mock(Connection.class);
+    DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+    ResultSet jdbcColumns = mock(ResultSet.class);
+    Statement statement = mock(Statement.class);
+    ResultSet feColumns = mock(ResultSet.class);
+    when(driver.connect(eq(jdbcUrl), any(Properties.class))).thenReturn(connection);
+    when(connection.getMetaData()).thenReturn(metadata);
+    when(metadata.getColumns("db", "db", "table", "%")).thenReturn(jdbcColumns);
+    when(connection.createStatement()).thenReturn(statement);
+    when(statement.executeQuery("SHOW COLUMNS FROM `db`.`table`")).thenReturn(feColumns);
+    Table logicalTable = mock(Table.class);
+    when(logicalTable.columns()).thenReturn(new Column[0]);
+
+    DorisTestDriver.setDelegate(driver);
+    try {
+      DorisPhysicalSchemaValidator35.validate(
+          Identifier.of(new String[] {"db"}, "table"),
+          logicalTable,
+          new StructType(),
+          jdbcOptions(
+              jdbcUrl,
+              Map.of(
+                  "user", "vended-user",
+                  "password", "test-only-secret",
+                  "sslMode", "VERIFY_IDENTITY",
+                  "connectTimeout", "5000",
+                  "fetchsize", "100")),
+          new SparkJdbcTypeConverter());
+
+      ArgumentCaptor<Properties> properties = ArgumentCaptor.forClass(Properties.class);
+      verify(driver).connect(eq(jdbcUrl), properties.capture());
+      assertEquals("vended-user", properties.getValue().getProperty("user"));
+      assertEquals("test-only-secret", properties.getValue().getProperty("password"));
+      assertEquals("VERIFY_IDENTITY", properties.getValue().getProperty("sslMode"));
+      assertEquals("5000", properties.getValue().getProperty("connectTimeout"));
+      assertFalse(properties.getValue().containsKey("fetchsize"));
+      assertFalse(properties.getValue().containsKey("dbtable"));
+      assertFalse(properties.getValue().containsKey("driver"));
+      verify(connection).close();
+      verify(jdbcColumns).close();
+      verify(feColumns).close();
+      verify(statement).close();
+    } finally {
+      DorisTestDriver.clearDelegate();
     }
   }
 
@@ -368,5 +426,14 @@ public class TestDorisPhysicalSchemaValidator35 {
     Table table = mock(Table.class);
     when(table.columns()).thenReturn(new Column[] {column});
     return table;
+  }
+
+  private static JDBCOptions jdbcOptions(String url, Map<String, String> properties) {
+    scala.collection.immutable.Map<String, String> all =
+        new HashMap<String, String>().updated("driver", DorisTestDriver.class.getName());
+    for (Map.Entry<String, String> property : properties.entrySet()) {
+      all = all.updated(property.getKey(), property.getValue());
+    }
+    return new JDBCOptions(url, "db.table", all);
   }
 }

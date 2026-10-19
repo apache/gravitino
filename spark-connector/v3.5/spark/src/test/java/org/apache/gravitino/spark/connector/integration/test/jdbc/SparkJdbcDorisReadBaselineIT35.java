@@ -42,10 +42,18 @@ import org.apache.gravitino.integration.test.container.DorisImageName;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.integration.test.SparkEnvIT;
 import org.apache.gravitino.spark.connector.jdbc.doris.GravitinoDorisCatalogSpark35;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.read.Scan;
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2ScanRelation;
+import org.apache.spark.sql.execution.datasources.v2.V1ScanWrapper;
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScan;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import scala.collection.Iterator;
 
 /** Spark 3.5 integration tests for the governed Doris read baseline. */
 @Tag("gravitino-docker-test")
@@ -84,6 +92,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     properties.put(GRAVITINO_JDBC_PASSWORD, jdbcPassword);
     properties.put(GRAVITINO_JDBC_DRIVER, JDBC_DRIVER);
     properties.put("credential-providers", JdbcCredential.JDBC_CREDENTIAL_TYPE);
+    properties.put("spark.bypass.pushDownPredicate", "false");
     return properties;
   }
 
@@ -153,6 +162,42 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     Assertions.assertEquals("one", rows.get(0)[1]);
     Assertions.assertEquals(2, rows.get(1)[0]);
     Assertions.assertEquals("two", rows.get(1)[1]);
+  }
+
+  @Test
+  void testCatalogBypassReadOptionControlsPredicatePushdown() {
+    Dataset<Row> result =
+        getSparkSession()
+            .sql(
+                "SELECT id, name FROM "
+                    + CATALOG_NAME
+                    + "."
+                    + DATABASE_NAME
+                    + "."
+                    + TABLE_NAME
+                    + " WHERE id = 1");
+    List<Row> rows = result.collectAsList();
+
+    Assertions.assertEquals(1, rows.size());
+    Assertions.assertEquals(1, rows.get(0).getInt(0));
+    Assertions.assertEquals("one", rows.get(0).getString(1));
+    JDBCScan jdbcScan = null;
+    Iterator<LogicalPlan> leaves =
+        result.queryExecution().optimizedPlan().collectLeaves().iterator();
+    while (leaves.hasNext()) {
+      LogicalPlan leaf = leaves.next();
+      if (leaf instanceof DataSourceV2ScanRelation) {
+        Scan scan = ((DataSourceV2ScanRelation) leaf).scan();
+        if (scan instanceof V1ScanWrapper) {
+          scan = ((V1ScanWrapper) scan).v1Scan();
+        }
+        Assertions.assertTrue(scan instanceof JDBCScan, scan.getClass().getName());
+        jdbcScan = (JDBCScan) scan;
+      }
+    }
+    Assertions.assertNotNull(jdbcScan);
+    Assertions.assertEquals(0, jdbcScan.pushedPredicates().length);
+    Assertions.assertTrue(result.queryExecution().optimizedPlan().toString().contains("Filter"));
   }
 
   @Test

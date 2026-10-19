@@ -30,7 +30,6 @@ import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark35;
 import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTable;
-import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTypeConverter;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.NamespaceChange;
@@ -38,6 +37,7 @@ import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -45,22 +45,16 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 /** Spark 3.5 Gravitino-owned, read-only Doris catalog facade. */
 public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
 
-  private String jdbcUrl;
-  private String jdbcUser;
-  private String jdbcPassword;
-
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Map<String, String> all =
         DorisPropertiesConverter35.getInstance().toSparkCatalogProperties(options, properties);
     JdbcCredential credential = requiredJdbcCredential(gravitinoCatalogClient);
-    jdbcUrl = requireProperty(all, "url");
+    requireProperty(all, "url");
     requireProperty(all, "driver");
-    jdbcUser = credential.jdbcUser();
-    jdbcPassword = credential.jdbcPassword();
-    all.put("user", jdbcUser);
-    all.put("password", jdbcPassword);
+    all.put("user", credential.jdbcUser());
+    all.put("password", credential.jdbcPassword());
 
     JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
@@ -77,16 +71,14 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    if (!(sparkTable instanceof org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable)) {
+    if (!(sparkTable instanceof JDBCTable)) {
       throw new IllegalStateException("Unexpected Spark JDBC table implementation");
     }
     DorisPhysicalSchemaValidator35.validate(
         identifier,
         gravitinoTable,
         sparkTable.schema(),
-        jdbcUrl,
-        jdbcUser,
-        jdbcPassword,
+        ((JDBCTable) sparkTable).jdbcOptions(),
         sparkTypeConverter);
     SparkJdbcTable jdbcTable =
         (SparkJdbcTable)
@@ -104,11 +96,6 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
   @Override
   protected PropertiesConverter getPropertiesConverter() {
     return DorisPropertiesConverter35.getInstance();
-  }
-
-  @Override
-  protected SparkTypeConverter getSparkTypeConverter() {
-    return new SparkJdbcTypeConverter();
   }
 
   /** Rejects Spark's write-aware load path because this PR exposes batch read only. */

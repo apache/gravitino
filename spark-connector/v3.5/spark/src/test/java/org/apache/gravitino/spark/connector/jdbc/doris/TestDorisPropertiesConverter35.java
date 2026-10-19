@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Test;
@@ -52,13 +53,40 @@ public class TestDorisPropertiesConverter35 {
 
   @Test
   void testSparkCatalogOptionsAreRejected() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            DorisPropertiesConverter35.getInstance()
-                .toSparkCatalogProperties(
-                    new CaseInsensitiveStringMap(ImmutableMap.of("url", "jdbc:mysql://override")),
-                    ImmutableMap.of("jdbc-url", "jdbc:mysql://fe:9030/db")));
+    for (String key :
+        List.of(
+            "URL",
+            "user",
+            "password",
+            "driver",
+            "jdbc-url",
+            "jdbc-user",
+            "jdbc-password",
+            "jdbc-driver",
+            "dbtable",
+            "query",
+            "prepareQuery",
+            "sessionInitStatement")) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              DorisPropertiesConverter35.getInstance()
+                  .toSparkCatalogProperties(
+                      new CaseInsensitiveStringMap(Map.of(key, "override")),
+                      Map.of("jdbc-url", "jdbc:mysql://fe:9030/db")),
+          key);
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              DorisPropertiesConverter35.getInstance()
+                  .toSparkCatalogProperties(
+                      Map.of(
+                          "jdbc-url",
+                          "jdbc:mysql://fe:9030/db",
+                          "spark.bypass." + key,
+                          "override")),
+          "spark.bypass." + key);
+    }
   }
 
   @Test
@@ -72,5 +100,30 @@ public class TestDorisPropertiesConverter35 {
                     "jdbc-driver", "com.mysql.cj.jdbc.Driver"));
 
     assertEquals("100", converted.get("fetchsize"));
+  }
+
+  @Test
+  void testCatalogBypassOptionsAndApplicationPrecedenceArePreserved() {
+    Map<String, String> properties =
+        Map.of(
+            "jdbc-url", "jdbc:mysql://fe:9030/db",
+            "jdbc-driver", "com.mysql.cj.jdbc.Driver",
+            "spark.bypass.fetchSize", "100",
+            "spark.bypass.pushDownPredicate", "false",
+            "spark.bypass.sslMode", "VERIFY_IDENTITY");
+    CaseInsensitiveStringMap converted =
+        new CaseInsensitiveStringMap(
+            DorisPropertiesConverter35.getInstance()
+                .toSparkCatalogProperties(
+                    new CaseInsensitiveStringMap(Map.of("fetchSize", "200")), properties));
+
+    assertEquals("200", converted.get("fetchsize"));
+    assertEquals("false", converted.get("pushDownPredicate"));
+    assertEquals("VERIFY_IDENTITY", converted.get("sslMode"));
+    assertEquals(
+        "100",
+        DorisPropertiesConverter35.getInstance()
+            .toSparkCatalogProperties(properties)
+            .get("fetchSize"));
   }
 }
