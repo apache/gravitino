@@ -33,4 +33,49 @@ class TestIdpAuthorizationFilter {
     assertFalse(IdpAuthorizationFilter.isServiceAdmin(List.of("admin"), "other"));
     assertTrue(IdpAuthorizationFilter.isServiceAdmin(List.of("admin", "ops"), "admin"));
   }
+<<<<<<< HEAD
+=======
+
+  @Test
+  void testIsSelfUserAccess() {
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "users", "alice"), null));
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(
+            request("DELETE", "idp", "users", "alice"), "alice"));
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "users", "bob"), "alice"));
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(request("GET", "idp", "users", "bob"), "alice"));
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "groups", "alice"), "alice"));
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(
+            request("PUT", "idp", "users", "alice", "enabled"), "alice"));
+    assertTrue(
+        IdpAuthorizationFilter.isSelfUserAccess(request("GET", "idp", "users", "alice"), "alice"));
+    assertTrue(
+        IdpAuthorizationFilter.isSelfUserAccess(
+            request("PUT", "idp", "users", "alice", "password"), "alice"));
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "users", "alice"), "alice"));
+  }
+
+  private static ContainerRequestContext request(String method, String... segments) {
+    List<PathSegment> pathSegments =
+        Arrays.stream(segments).map(TestIdpAuthorizationFilter::segment).toList();
+    ContainerRequestContext context = mock(ContainerRequestContext.class);
+    UriInfo uriInfo = mock(UriInfo.class);
+    when(context.getMethod()).thenReturn(method);
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(uriInfo.getPathSegments()).thenReturn(pathSegments);
+    return context;
+  }
+
+  private static PathSegment segment(String path) {
+    PathSegment pathSegment = mock(PathSegment.class);
+    when(pathSegment.getPath()).thenReturn(path);
+    return pathSegment;
+  }
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
 }

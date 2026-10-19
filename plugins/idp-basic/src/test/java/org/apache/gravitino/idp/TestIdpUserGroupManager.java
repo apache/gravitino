@@ -135,6 +135,83 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testChangePasswordWithOldPassword() throws IOException {
+    manager.addUser("testChangeWithOld", VALID_PASSWORD);
+
+    Assertions.assertTrue(
+        manager.changePassword("testChangeWithOld", NEW_VALID_PASSWORD, VALID_PASSWORD));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.changePassword("testChangeWithOld", VALID_PASSWORD, "wrong-old-password"));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+  }
+
+  @Test
+  public void testUpdateEnabled() throws IOException {
+    manager.addUser("testEnabled", VALID_PASSWORD);
+    Assertions.assertTrue(manager.getUser("testEnabled").enabled());
+    Assertions.assertEquals(
+        "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
+
+    Assertions.assertTrue(manager.updateEnabled("testEnabled", false));
+    IdpUser disabled = manager.getUser("testEnabled");
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, disabled.auditInfo().lastModifier());
+    Assertions.assertNotNull(disabled.auditInfo().lastModifiedTime());
+    Assertions.assertThrows(
+        UnauthorizedException.class, () -> manager.authenticate("testEnabled", VALID_PASSWORD));
+
+    Assertions.assertTrue(manager.updateEnabled("testEnabled", true));
+    Assertions.assertTrue(manager.getUser("testEnabled").enabled());
+    Assertions.assertEquals(
+        "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        NotFoundException.class, () -> manager.updateEnabled("not-exist", false));
+  }
+
+  @Test
+  public void testCannotUpdateEnabledOfServiceAdmin() throws IOException {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminDisable");
+    manager.addUser("svcAdminDisable", VALID_PASSWORD);
+
+    IllegalArgumentException disableException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", false));
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        disableException.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
+
+    IllegalArgumentException enableException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", true));
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        enableException.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
+  }
+
+  @Test
+  public void testCannotAddDisabledServiceAdmin() {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminCreateDisabled");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.addUser("svcAdminCreateDisabled", VALID_PASSWORD, false));
+    Assertions.assertEquals(
+        "Cannot disable service admin svcAdminCreateDisabled", exception.getMessage());
+  }
+
+  @Test
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
   public void testAddGroup() throws IOException {
     IdpGroup group = manager.addGroup("testAddGroup");
     Assertions.assertEquals("testAddGroup", group.name());

@@ -73,6 +73,7 @@ These rules apply to user creation, password changes, and `GRAVITINO_INITIAL_ADM
 | Username        | Required, and must not contain a colon    |
 | Password length | 12 to 64 characters inclusive             |
 
+<<<<<<< HEAD
 Passwords are reset by an administrator rather than changed by the user, so a password change request carries the new password only and no current password.
 
 ## Managing Users and Groups
@@ -89,6 +90,58 @@ All management endpoints are under `http://{host}:{port}/api/idp` and require Ba
 | Remove a user   | DELETE | `/api/idp/users/{user}`  | None                                        |
 
 The add-user body uses the field name `user` rather than `name`.
+=======
+Passwords may be reset by a service admin or changed by the user for their own account.
+Callers authenticate with HTTP Basic. A self-service password change must also send
+`oldPassword` in the request body so the server can verify it against the stored hash.
+A service admin resetting another user's password sends only `newPassword` and must not
+send `oldPassword`.
+
+## Managing Users and Groups
+
+All management endpoints are under `http://{host}:{port}/api/idp` and require Basic authentication.
+Most operations require a service admin. Authenticated users may also `GET`
+`/api/idp/users/{user}` or `PUT` `/api/idp/users/{user}/password` for their own username
+(read profile / change password only).
+Send `Accept: application/vnd.gravitino.v1+json` on every request, and
+`Content-Type: application/json` on requests with a body.
+
+### User Operations
+
+| Operation              | Method | Path                             | Body                                                               |
+|------------------------|--------|----------------------------------|--------------------------------------------------------------------|
+| Get a user             | GET    | `/api/idp/users/{user}`          | None                                                               |
+| Add a user             | POST   | `/api/idp/users`                 | `{"user":"alice","password":"{password}"}`                         |
+| Change a user password | PUT    | `/api/idp/users/{user}/password` | `{"newPassword":"{new_password}"}` (plus `oldPassword` for self)   |
+| Update a user enabled  | PUT    | `/api/idp/users/{user}/enabled`  | `{"enabled":false}`                                                |
+| Remove a user          | DELETE | `/api/idp/users/{user}`          | None                                                               |
+
+The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. Password changes use `PUT /api/idp/users/{user}/password` with required `newPassword`. Enabled-flag updates use `PUT /api/idp/users/{user}/enabled` with required `enabled` and are service-admin only; users listed in `gravitino.authorization.serviceAdmins` cannot have their enabled flag changed. Non-admin callers may get only their own user and change only their own password. When changing your own password, `oldPassword` is required and must match the stored password. When a service admin resets another user's password, `oldPassword` must be omitted.
+
+```shell
+curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'alice:{user_password}' | base64)" \
+  -d '{"newPassword":"{new_password}","oldPassword":"{user_password}"}' \
+  http://localhost:8090/api/idp/users/alice/password
+```
+
+```shell
+curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:{admin_password}' | base64)" \
+  -d '{"newPassword":"{new_password}"}' \
+  http://localhost:8090/api/idp/users/alice/password
+```
+
+```shell
+curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:{admin_password}' | base64)" \
+  -d '{"enabled":false}' \
+  http://localhost:8090/api/idp/users/alice/enabled
+```
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
 
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \

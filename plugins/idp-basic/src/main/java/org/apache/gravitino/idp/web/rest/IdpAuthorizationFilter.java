@@ -32,9 +32,19 @@ import org.apache.gravitino.utils.PrincipalUtils;
 /**
  * Enforces built-in IdP management API access rules without server interception.
  *
+<<<<<<< HEAD
  * <p>Caller must be listed in {@link Configs#SERVICE_ADMINS}. This filter runs as a Jersey request
  * filter after the servlet {@code AuthenticationFilter} has authenticated the caller and populated
  * the current user principal.
+=======
+ * <p>Callers listed in {@link Configs#SERVICE_ADMINS} may perform all IdP management operations.
+ * Authenticated non-admin users may {@code GET} {@code /idp/users/{user}} or {@code PUT} {@code
+ * /idp/users/{user}/password} only for their own username. Other IdP management APIs remain
+ * service-admin only.
+ *
+ * <p>This filter runs as a Jersey request filter after the servlet {@code AuthenticationFilter} has
+ * authenticated the caller and populated the current user principal.
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
  *
  * <p>Registered only when {@code basic} is configured in {@link Configs#AUTHENTICATORS}. Scoped to
  * resources annotated with {@link IdpManagement} via Jersey name binding.
@@ -72,4 +82,31 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
   static boolean isServiceAdmin(List<String> serviceAdmins, String currentUser) {
     return currentUser != null && serviceAdmins != null && serviceAdmins.contains(currentUser);
   }
+<<<<<<< HEAD
+=======
+
+  /**
+   * Returns whether the request is a self-service user access: {@code GET /idp/users/{currentUser}}
+   * or {@code PUT /idp/users/{currentUser}/password}.
+   */
+  static boolean isSelfUserAccess(ContainerRequestContext requestContext, String currentUser) {
+    if (currentUser == null) {
+      return false;
+    }
+    List<PathSegment> segments = requestContext.getUriInfo().getPathSegments();
+    if (segments.size() < 3
+        || !"idp".equals(segments.get(0).getPath())
+        || !"users".equals(segments.get(1).getPath())
+        || !currentUser.equals(segments.get(2).getPath())) {
+      return false;
+    }
+    String method = requestContext.getMethod();
+    if ("GET".equalsIgnoreCase(method) && segments.size() == 3) {
+      return true;
+    }
+    return "PUT".equalsIgnoreCase(method)
+        && segments.size() == 4
+        && "password".equals(segments.get(3).getPath());
+  }
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
 }

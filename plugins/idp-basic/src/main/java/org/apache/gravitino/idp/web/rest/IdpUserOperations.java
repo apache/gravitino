@@ -20,6 +20,11 @@ package org.apache.gravitino.idp.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+<<<<<<< HEAD
+=======
+import com.google.common.base.Preconditions;
+import java.util.List;
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -31,10 +36,20 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+<<<<<<< HEAD
+=======
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.idp.dto.requests.UpdateUserEnabledRequest;
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
@@ -87,8 +102,16 @@ public class IdpUserOperations {
         request.getUser());
   }
 
+  /**
+   * Changes a user's password. Self-service changes require {@code oldPassword}. Service admins may
+   * reset another user without {@code oldPassword} and must not send it.
+   *
+   * @param user the username whose password is changed
+   * @param request the password change request
+   * @return the updated user response
+   */
   @PUT
-  @Path("{user}")
+  @Path("{user}/password")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "change-idp-user-password", absolute = true)
@@ -97,7 +120,30 @@ public class IdpUserOperations {
         httpRequest,
         () -> {
           request.validate();
+<<<<<<< HEAD
           userGroupManager.changePassword(user, request.getPassword());
+=======
+          String currentUser = PrincipalUtils.getCurrentUserName();
+          List<String> serviceAdmins =
+              GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+          boolean isServiceAdmin =
+              IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser);
+          if (!isServiceAdmin && !user.equals(currentUser)) {
+            throw new ForbiddenException("Only service admins can change another user's password");
+          }
+          if (user.equals(currentUser)) {
+            Preconditions.checkArgument(
+                StringUtils.isNotBlank(request.getOldPassword()),
+                "\"oldPassword\" is required when changing your own password");
+            userGroupManager.changePassword(
+                user, request.getNewPassword(), request.getOldPassword());
+          } else {
+            Preconditions.checkArgument(
+                request.getOldPassword() == null,
+                "\"oldPassword\" is only allowed when changing your own password");
+            userGroupManager.changePassword(user, request.getNewPassword());
+          }
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
           return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
         },
         "user",
@@ -105,6 +151,45 @@ public class IdpUserOperations {
         user);
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * Updates a user's enabled flag. Only service admins may call this API, and the target must not
+   * be a configured service admin.
+   *
+   * @param user the username whose enabled flag is updated
+   * @param request the enabled-flag update request
+   * @return the updated user response
+   */
+  @PUT
+  @Path("{user}/enabled")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "update-idp-user-enabled." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-idp-user-enabled", absolute = true)
+  public Response updateEnabled(@PathParam("user") String user, UpdateUserEnabledRequest request) {
+    return IdpRESTUtils.doAs(
+        httpRequest,
+        () -> {
+          request.validate();
+          String currentUser = PrincipalUtils.getCurrentUserName();
+          List<String> serviceAdmins =
+              GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+          if (!IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
+            throw new ForbiddenException("Only service admins can update the enabled flag");
+          }
+          Preconditions.checkArgument(
+              !IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, user),
+              "Cannot update the enabled flag of service admin %s",
+              user);
+          userGroupManager.updateEnabled(user, request.getEnabled());
+          return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
+        },
+        "user",
+        IdpOperationType.UPDATE,
+        user);
+  }
+
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
   @DELETE
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")

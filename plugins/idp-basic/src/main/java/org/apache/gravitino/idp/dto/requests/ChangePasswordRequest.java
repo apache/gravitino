@@ -36,10 +36,11 @@ import org.apache.gravitino.rest.RESTRequest;
 @Jacksonized
 public class ChangePasswordRequest implements RESTRequest {
 
-  @JsonProperty("password")
+  @JsonProperty("newPassword")
   @ToString.Exclude
-  private final String password;
+  private final String newPassword;
 
+<<<<<<< HEAD
   /** Default constructor for ChangePasswordRequest. (Used for Jackson deserialization.) */
   public ChangePasswordRequest() {
     this(null);
@@ -47,12 +48,44 @@ public class ChangePasswordRequest implements RESTRequest {
 
   /**
    * Creates a new ChangePasswordRequest.
+=======
+  @JsonProperty("oldPassword")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @ToString.Exclude
+  private final String oldPassword;
+
+  /** Default constructor for ChangePasswordRequest. (Used for Jackson deserialization.) */
+  public ChangePasswordRequest() {
+    this(null, null);
+  }
+
+  /**
+   * Creates a ChangePasswordRequest for an admin password reset (no old password).
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
    *
-   * @param password The new password of the built-in IdP user.
+   * @param newPassword The new password.
    */
+<<<<<<< HEAD
   public ChangePasswordRequest(String password) {
     super();
     this.password = password;
+=======
+  public ChangePasswordRequest(String newPassword) {
+    this(newPassword, null);
+  }
+
+  /**
+   * Creates a ChangePasswordRequest.
+   *
+   * @param newPassword The new password.
+   * @param oldPassword The caller's current password when changing their own password, or {@code
+   *     null} when a service admin resets another user's password.
+   */
+  public ChangePasswordRequest(String newPassword, String oldPassword) {
+    super();
+    this.newPassword = newPassword;
+    this.oldPassword = oldPassword;
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
   }
 
   /**
@@ -62,6 +95,10 @@ public class ChangePasswordRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
+<<<<<<< HEAD
     IdpCredentialValidator.validatePassword(password);
+=======
+    IdpCredentialValidator.validatePassword(newPassword, "newPassword");
+>>>>>>> d7e8b22ca ([#13925] improvement(idp-basic): Require currentPassword for self password change (#13926))
   }
 }
