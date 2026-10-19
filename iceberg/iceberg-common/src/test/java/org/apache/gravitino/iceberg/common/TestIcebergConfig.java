@@ -29,6 +29,23 @@ import org.junit.jupiter.api.Test;
 
 public class TestIcebergConfig {
   @Test
+  void testScanPlanTaskBatchSize() {
+    Assertions.assertEquals(100, new IcebergConfig().get(IcebergConfig.SCAN_PLAN_TASK_BATCH_SIZE));
+    for (int batchSize : new int[] {0, 1, Integer.MAX_VALUE}) {
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.SCAN_PLAN_TASK_BATCH_SIZE, String.valueOf(batchSize)));
+      Assertions.assertEquals(batchSize, config.get(IcebergConfig.SCAN_PLAN_TASK_BATCH_SIZE));
+    }
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new IcebergConfig(ImmutableMap.of(IcebergConstants.SCAN_PLAN_TASK_BATCH_SIZE, "-1"))
+                .get(IcebergConfig.SCAN_PLAN_TASK_BATCH_SIZE));
+  }
+
+  @Test
   public void testLoadIcebergConfig() {
     Map<String, String> properties =
         ImmutableMap.of(JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(), "1000");

@@ -200,8 +200,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
     Assertions.assertTrue(planResponse.get("file-scan-tasks").size() > 0);
     Assertions.assertFalse(
-        planResponse.has("plan-tasks"),
-        "Iceberg 1.11+ plan scan must not emit legacy plan-tasks JSON");
+        planResponse.has("plan-tasks"), "A plan small enough for one batch carries no plan-tasks");
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
@@ -248,8 +247,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(planResponse.has("file-scan-tasks"));
     Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
     Assertions.assertFalse(
-        planResponse.has("plan-tasks"),
-        "Iceberg 1.11+ plan scan must not emit legacy plan-tasks JSON");
+        planResponse.has("plan-tasks"), "A plan small enough for one batch carries no plan-tasks");
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
@@ -263,8 +261,8 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     dummyEventListener.clearEvent();
 
-    // Scan planning hands out no plan tasks yet, so every plan task presented here is one this
-    // server never issued, reported as 404 per the Iceberg REST spec.
+    // A plan task this server never issued is unknown, reported as 404 per the Iceberg REST spec.
+    // Redeeming a real plan task is covered by TestIcebergFetchScanTasksEndpoint.
     Response response =
         doFetchScanTasks(
             namespace, "fetch_tasks_table", new FetchScanTasksRequest("not-a-plan-task"));
