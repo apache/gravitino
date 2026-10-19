@@ -148,6 +148,9 @@ public class IdpUserOperations {
    */
   private void changePasswordIfRequested(String user, UpdateUserRequest request) {
     if (request.getNewPassword() == null) {
+      Preconditions.checkArgument(
+          request.getOldPassword() == null,
+          "\"oldPassword\" is only allowed when changing the password");
       return;
     }
     String currentUser = PrincipalUtils.getCurrentUserName();

@@ -158,13 +158,13 @@ public class IdpRESTApiIT extends BaseIT {
         put("/idp/users/" + USER1, new UpdateUserRequest(UPDATED_PASSWORD), USER1, USER_PASSWORD),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
     assertError(
-        401,
+        400,
         put(
             "/idp/users/" + USER1,
             new UpdateUserRequest(UPDATED_PASSWORD, "wrong-password-12", null),
             USER1,
             USER_PASSWORD),
-        ErrorConstants.UNAUTHORIZED_CODE);
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
 
     HttpResponse<String> selfUpdate =
         put(

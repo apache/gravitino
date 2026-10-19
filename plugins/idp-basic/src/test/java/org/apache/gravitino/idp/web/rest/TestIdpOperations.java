@@ -191,6 +191,15 @@ class TestIdpOperations extends JerseyTest {
   }
 
   @Test
+  void testEnabledOnlyUpdateRejectsOldPassword() {
+    UpdateUserRequest req = new UpdateUserRequest(null, "leftover-old-12", false);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/user1", req),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+  }
+
+  @Test
   void testUpdateEnabled() {
     UpdateUserRequest req = new UpdateUserRequest(null, false);
     when(MANAGER.updateEnabled("user1", false)).thenReturn(true);

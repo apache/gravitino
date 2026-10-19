@@ -161,7 +161,7 @@ public class TestIdpUserGroupManager {
         "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
 
     Assertions.assertThrows(
-        UnauthorizedException.class,
+        IllegalArgumentException.class,
         () -> manager.changePassword("testChangeWithOld", VALID_PASSWORD, "wrong-old-password"));
     Assertions.assertEquals(
         "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());

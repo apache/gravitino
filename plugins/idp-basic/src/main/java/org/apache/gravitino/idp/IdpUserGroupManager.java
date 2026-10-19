@@ -204,13 +204,12 @@ public class IdpUserGroupManager implements Closeable {
    * @param oldPassword The caller's current plaintext password.
    * @return {@code true} if the password was updated
    * @throws NotFoundException if the user does not exist
-   * @throws UnauthorizedException if {@code oldPassword} does not match the stored hash
+   * @throws IllegalArgumentException if {@code oldPassword} does not match the stored hash
    */
   public boolean changePassword(String username, String newPassword, String oldPassword) {
     IdpUser user = USER_SERVICE.getIdpUser(username);
     if (user.passwordHash() == null || !passwordHasher.verify(oldPassword, user.passwordHash())) {
-      throw new UnauthorizedException(
-          "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
+      throw new IllegalArgumentException("\"oldPassword\" does not match the stored password");
     }
     return changePassword(username, newPassword);
   }
