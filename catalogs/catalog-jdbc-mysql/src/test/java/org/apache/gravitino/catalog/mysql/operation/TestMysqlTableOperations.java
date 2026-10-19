@@ -39,7 +39,6 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -157,15 +156,13 @@ public class TestMysqlTableOperations extends TestMysql {
     assertionsTableInfo(
         newName, tableComment, alterColumns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
-    // Detect unsupported properties
+    // Reject an unsupported engine before generating or executing DDL.
     TableChange setProperty = TableChange.setProperty(MYSQL_ENGINE_KEY, "ABC");
-    GravitinoRuntimeException gravitinoRuntimeException =
+    IllegalArgumentException invalidEngine =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class,
+            IllegalArgumentException.class,
             () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), newName, setProperty));
-    Assertions.assertTrue(
-        StringUtils.contains(
-            gravitinoRuntimeException.getMessage(), "Unknown storage engine 'ABC'"));
+    Assertions.assertTrue(invalidEngine.getMessage().contains("engine"));
 
     // delete column
     TABLE_OPERATIONS.alterTable(

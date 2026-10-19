@@ -214,7 +214,9 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 :::
 
 :::caution
-- Doesn't support remove table properties. You can only add or modify properties, not delete properties.
+For MySQL table options, use the Gravitino property names listed below. Unknown properties, including SQL option names such as `ENGINE` or `ROW_FORMAT`, are rejected. Use the Gravitino property name `engine` instead.
+
+These properties can only be specified when creating a table; they cannot be changed or removed afterwards. Values are validated against their declared types before DDL is executed.
 :::
 
 | Property Name           | Description                                                                                                                                              | Default Value | Required | Reserved | Immutable |
