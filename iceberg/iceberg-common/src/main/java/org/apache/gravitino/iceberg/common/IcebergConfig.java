@@ -45,6 +45,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
 
+  /** Whether to expose metrics endpoints when the Iceberg REST service runs standalone. */
   public static final ConfigEntry<Boolean> METRICS_ENABLED =
       new ConfigBuilder("metrics.enabled")
           .doc(

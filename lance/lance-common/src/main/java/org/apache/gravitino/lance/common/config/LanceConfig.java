@@ -42,6 +42,7 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final String GRAVITINO_NAMESPACE_BACKEND = "gravitino";
   public static final String GRAVITINO_URI = "http://localhost:8090";
 
+  /** Whether to expose metrics endpoints when the Lance REST service runs standalone. */
   public static final ConfigEntry<Boolean> METRICS_ENABLED =
       new ConfigBuilder("metrics.enabled")
           .doc(
