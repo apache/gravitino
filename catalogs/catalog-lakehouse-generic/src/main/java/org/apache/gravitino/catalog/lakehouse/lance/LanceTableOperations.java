@@ -277,10 +277,15 @@ public class LanceTableOperations extends ManagedTableOperations {
       // Use super.loadTable to avoid triggering an unnecessary schema-refresh (which may open the
       // dataset) for a table that is about to be deleted anyway.
       Table table = super.loadTable(ident);
+<<<<<<< HEAD
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
               .orElse(false);
+=======
+      validateLanceTable(ident, table);
+      boolean external = LancePropertiesUtils.isExternalTable(table.properties());
+>>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -313,10 +318,15 @@ public class LanceTableOperations extends ManagedTableOperations {
     try {
       // Use super.loadTable to skip schema-refresh overhead when dropping.
       Table table = super.loadTable(ident);
+<<<<<<< HEAD
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
               .orElse(false);
+=======
+      validateLanceTable(ident, table);
+      boolean external = LancePropertiesUtils.isExternalTable(table.properties());
+>>>>>>> f742f1100 ([#13931] fix(lance): preserve externally owned registered datasets (#13932))
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -376,6 +386,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     if (register) {
+      properties = LancePropertiesUtils.normalizeTableProperties(properties);
       // Currently, register operation does not read the schema from the underlying Lance dataset.
       // So we can't get the version of the dataset here.
       return super.createTable(
