@@ -29,6 +29,8 @@ import com.azure.storage.file.datalake.sas.DataLakeServiceSasSignatureValues;
 import com.azure.storage.file.datalake.sas.PathSasPermission;
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -128,11 +130,11 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
           "ADLS credential context should contain at least one path");
     }
 
-    List<ADLSLocationUtils.ADLSLocationParts> locations =
+    List<ADLSLocationUtils.ADLSLocationParts> parsedLocations =
         paths.stream().map(ADLSLocationUtils::parseLocation).collect(Collectors.toList());
-    ADLSLocationUtils.ADLSLocationParts first = locations.get(0);
+    ADLSLocationUtils.ADLSLocationParts first = parsedLocations.get(0);
     boolean hasDifferentScope =
-        locations.stream()
+        parsedLocations.stream()
             .anyMatch(
                 location ->
                     !storageAccountName.equalsIgnoreCase(location.getAccountName())
@@ -143,6 +145,14 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
           "ADLS paths must belong to the configured storage account and a single container, but found: "
               + paths);
     }
+
+    Map<String, ADLSLocationUtils.ADLSLocationParts> uniqueLocations = new LinkedHashMap<>();
+    parsedLocations.forEach(
+        location ->
+            uniqueLocations.putIfAbsent(
+                location.getContainer() + "\0" + ADLSLocationUtils.trimSlashes(location.getPath()),
+                location));
+    List<ADLSLocationUtils.ADLSLocationParts> locations = new ArrayList<>(uniqueLocations.values());
 
     List<ADLSLocationUtils.ADLSLocationParts> rootLocations =
         locations.stream()
@@ -158,7 +168,7 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
       throw new IllegalArgumentException(
           "ADLS credential paths must resolve to exactly one root location, but found: "
               + rootLocations.size()
-              + " roots: "
+              + " roots in paths: "
               + paths);
     }
 

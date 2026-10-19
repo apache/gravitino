@@ -60,6 +60,27 @@ class TestADLSTokenGenerator {
   }
 
   @Test
+  void treatsEquivalentLocationsAsOneRoot() throws Exception {
+    try (ADLSTokenGenerator generator = new TestableADLSTokenGenerator()) {
+      generator.initialize(createProperties());
+      PathBasedCredentialContext context =
+          new PathBasedCredentialContext(
+              "test-user",
+              Collections.emptySet(),
+              new HashSet<>(
+                  Arrays.asList(
+                      "abfss://container@account.dfs.core.windows.net/warehouse/table",
+                      "abfs://container@Account.dfs.core.windows.net/warehouse/table/",
+                      "abfss://container@account.dfs.core.windows.net/warehouse/table/data")));
+
+      ADLSTokenCredential credential = generator.generate(context);
+
+      assertTrue(credential.sasToken().contains("sr=d"));
+      assertTrue(credential.sasToken().contains("sdd=2"));
+    }
+  }
+
+  @Test
   void rejectsPathsWithoutProvidedCommonRoot() throws Exception {
     String first = "abfss://container@account.dfs.core.windows.net/warehouse/table/data";
     String second = "abfss://container@account.dfs.core.windows.net/warehouse/table/metadata";
@@ -75,6 +96,23 @@ class TestADLSTokenGenerator {
       assertTrue(exception.getMessage().contains("exactly one root location"));
       assertTrue(exception.getMessage().contains(first));
       assertTrue(exception.getMessage().contains(second));
+    }
+  }
+
+  @Test
+  void rejectsSiblingPathsWithCommonStringPrefix() throws Exception {
+    String first = "abfss://container@account.dfs.core.windows.net/warehouse/table";
+    String second = "abfss://container@account.dfs.core.windows.net/warehouse/table2";
+    try (ADLSTokenGenerator generator = new TestableADLSTokenGenerator()) {
+      generator.initialize(createProperties());
+      PathBasedCredentialContext context =
+          new PathBasedCredentialContext(
+              "test-user", Collections.emptySet(), new HashSet<>(Arrays.asList(first, second)));
+
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> generator.generate(context));
+
+      assertTrue(exception.getMessage().contains("exactly one root location"));
     }
   }
 
@@ -111,6 +149,22 @@ class TestADLSTokenGenerator {
 
       assertTrue(exception.getMessage().contains(first));
       assertTrue(exception.getMessage().contains(second));
+    }
+  }
+
+  @Test
+  void rejectsSinglePathFromUnconfiguredStorageAccount() throws Exception {
+    String path = "abfss://container@other.dfs.core.windows.net/warehouse/table";
+    try (ADLSTokenGenerator generator = new TestableADLSTokenGenerator()) {
+      generator.initialize(createProperties());
+      PathBasedCredentialContext context =
+          new PathBasedCredentialContext(
+              "test-user", Collections.emptySet(), Collections.singleton(path));
+
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> generator.generate(context));
+
+      assertTrue(exception.getMessage().contains(path));
     }
   }
 

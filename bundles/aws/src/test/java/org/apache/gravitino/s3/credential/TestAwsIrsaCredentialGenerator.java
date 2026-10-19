@@ -85,9 +85,10 @@ class TestAwsIrsaCredentialGenerator {
   }
 
   @Test
-  void basicModeFallsBackToEnvironmentRoleArn(@TempDir Path dir) throws IOException {
+  void basicModeFallsBackToEnvironmentRoleArnWhenConfiguredRoleIsBlank(@TempDir Path dir)
+      throws IOException {
     Map<String, String> properties = createProperties(dir);
-    properties.remove("s3-role-arn");
+    properties.put("s3-role-arn", " ");
 
     try (AwsIrsaCredentialGenerator generator =
         new AwsIrsaCredentialGenerator(() -> "arn:aws:iam::123456789012:role/environment-role")) {
@@ -100,6 +101,28 @@ class TestAwsIrsaCredentialGenerator {
 
     String body = URLDecoder.decode(requestBody.get(), StandardCharsets.UTF_8.name());
     assertTrue(body.contains("RoleArn=arn:aws:iam::123456789012:role/environment-role"));
+  }
+
+  @Test
+  void pathModeFallsBackToEnvironmentRoleArn(@TempDir Path dir) throws IOException {
+    Map<String, String> properties = createProperties(dir);
+    properties.remove("s3-role-arn");
+
+    try (AwsIrsaCredentialGenerator generator =
+        new AwsIrsaCredentialGenerator(() -> "arn:aws:iam::123456789012:role/environment-role")) {
+      generator.initialize(properties);
+      PathBasedCredentialContext context =
+          new PathBasedCredentialContext(
+              "test-user", Collections.singleton("s3://bucket/table"), Collections.emptySet());
+
+      AwsIrsaCredential credential = generator.generate(context);
+
+      assertEquals("access-key", credential.accessKeyId());
+    }
+
+    String body = URLDecoder.decode(requestBody.get(), StandardCharsets.UTF_8.name());
+    assertTrue(body.contains("RoleArn=arn:aws:iam::123456789012:role/environment-role"));
+    assertTrue(body.contains("Policy="));
   }
 
   @Test

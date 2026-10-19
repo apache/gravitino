@@ -81,7 +81,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
 
     S3CredentialConfig s3CredentialConfig = new S3CredentialConfig(properties);
     this.roleArn =
-        properties.containsKey(S3CredentialConfig.S3_ROLE_ARN.getKey())
+        StringUtils.isNotBlank(properties.get(S3CredentialConfig.S3_ROLE_ARN.getKey()))
             ? s3CredentialConfig.s3RoleArn()
             : null;
     this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
