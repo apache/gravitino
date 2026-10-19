@@ -29,13 +29,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.job.JobContext;
+import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.job.k8s.K8sJobExecutorConfigs;
 import org.apache.gravitino.job.k8s.K8sJobResourceUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Builds the SparkApplication of a Spark job, a custom resource of <a
@@ -43,6 +45,8 @@ import org.apache.gravitino.job.k8s.K8sJobResourceUtils;
  * 0.9.x.
  */
 public final class SparkApplicationUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(SparkApplicationUtils.class);
 
   /** The SparkApplication resource definition. */
   public static final ResourceDefinitionContext SPARK_APPLICATION =
@@ -83,8 +87,6 @@ public final class SparkApplicationUtils {
   private static final String SPARK_FILES = "spark.files";
   private static final String SPARK_ARCHIVES = "spark.archives";
 
-  private static final Pattern URI_SCHEME = Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*):");
-
   private static final Pattern URI_USER_INFO = Pattern.compile("(?<=://)[^/?#@]*@");
 
   private static final Pattern URI_QUERY_OR_FRAGMENT = Pattern.compile("[?#].*$");
@@ -92,7 +94,9 @@ public final class SparkApplicationUtils {
   private SparkApplicationUtils() {}
 
   /**
-   * Builds the SparkApplication of a Spark job.
+   * Builds the SparkApplication of a Spark job. A built-in job, whose executable is the jobs jar on
+   * the Gravitino server, runs the jar of {@link K8sJobExecutorConfigs#SPARK_BUILTIN_JOBS_JAR}
+   * instead.
    *
    * @param context the context of the job run
    * @param template the runtime job template, whose resources are the URIs given in the template
@@ -111,7 +115,8 @@ public final class SparkApplicationUtils {
               template.name(), template.environments().keySet()));
     }
 
-    checkClusterReachable(template.executable());
+    String executable = getExecutableUri(context, template, configs);
+    checkClusterReachable(executable);
     template.jars().forEach(SparkApplicationUtils::checkClusterReachable);
     template.files().forEach(SparkApplicationUtils::checkClusterReachable);
     template.archives().forEach(SparkApplicationUtils::checkClusterReachable);
@@ -161,7 +166,7 @@ public final class SparkApplicationUtils {
       spec.put("mainClass", template.className());
     }
     // The operator takes the main resource of a Python application from pyFiles.
-    spec.put(isPythonFile(template.executable()) ? "pyFiles" : "jars", template.executable());
+    spec.put(isPythonFile(executable) ? "pyFiles" : "jars", executable);
     spec.put("driverArgs", new ArrayList<>(template.arguments()));
     spec.put("sparkConf", sparkConf);
     spec.put("runtimeVersions", ImmutableMap.of("sparkVersion", configs.sparkVersion()));
@@ -197,6 +202,28 @@ public final class SparkApplicationUtils {
     return app;
   }
 
+  private static String getExecutableUri(
+      JobContext context, SparkJobTemplate template, K8sJobExecutorConfigs configs) {
+    // The executable of a built-in job template is the path of the jobs jar on the Gravitino
+    // server, which is what the local job executor runs. An executable that is already reachable
+    // from the cluster is kept as it is.
+    if (template.name().startsWith(JobTemplateProvider.BUILTIN_NAME_PREFIX)
+        && !K8sJobResourceUtils.isClusterReachable(template.executable())) {
+      // The job records the executable of the template, so log the jar that actually runs. It must
+      // be the same version as the jobs jar of the server, which the template comes from.
+      LOG.info(
+          "Job {} of built-in job template {} runs the jobs jar {} set by {} instead of {} on the"
+              + " Gravitino server",
+          context.jobId(),
+          template.name(),
+          configs.sparkBuiltinJobsJar(),
+          K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR,
+          template.executable());
+      return configs.sparkBuiltinJobsJar();
+    }
+    return template.executable();
+  }
+
   /**
    * Checks that a resource of the job, or each of them if it is a comma-separated list as Spark
    * accepts, is a URI that the cluster can reach rather than a path on the Gravitino server.
@@ -208,11 +235,7 @@ public final class SparkApplicationUtils {
       if (uris.length > 1 && StringUtils.isBlank(uri)) {
         continue;
       }
-      Matcher scheme = URI_SCHEME.matcher(uri.trim());
-      // No scheme, a Windows drive letter, or a file URI.
-      if (!scheme.find()
-          || scheme.group(1).length() == 1
-          || "file".equalsIgnoreCase(scheme.group(1))) {
+      if (!K8sJobResourceUtils.isClusterReachable(uri)) {
         throw new IllegalArgumentException(
             String.format(
                 "Resource %s of the job is a path on the Gravitino server, which the Spark job on"
