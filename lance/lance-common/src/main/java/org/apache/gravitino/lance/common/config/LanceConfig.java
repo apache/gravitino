@@ -42,6 +42,15 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final String GRAVITINO_NAMESPACE_BACKEND = "gravitino";
   public static final String GRAVITINO_URI = "http://localhost:8090";
 
+  public static final ConfigEntry<Boolean> METRICS_ENABLED =
+      new ConfigBuilder("metrics.enabled")
+          .doc(
+              "Whether to expose /metrics and /prometheus/metrics in standalone mode. "
+                  + "This setting is ignored when running as an auxiliary service.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .booleanConf()
+          .createWithDefault(false);
+
   public static final ConfigEntry<String> NAMESPACE_BACKEND =
       new ConfigBuilder(CONFIG_NAMESPACE_BACKEND)
           .doc("The backend implementation for namespace operations")

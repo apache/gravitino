@@ -37,4 +37,16 @@ public class TestLanceRESTService {
                 new LanceConfig(Collections.singletonMap("includeErrorStackTrace", "false")))
             .isIncludeErrorStackTrace());
   }
+
+  @Test
+  public void testMetricsAreEnabledOnlyForConfiguredStandaloneMode() {
+    LanceConfig disabledConfig = new LanceConfig();
+    assertFalse(LanceRESTService.shouldEnableMetrics(false, disabledConfig));
+    assertFalse(LanceRESTService.shouldEnableMetrics(true, disabledConfig));
+
+    LanceConfig enabledConfig =
+        new LanceConfig(Collections.singletonMap(LanceConfig.METRICS_ENABLED.getKey(), "true"));
+    assertTrue(LanceRESTService.shouldEnableMetrics(false, enabledConfig));
+    assertFalse(LanceRESTService.shouldEnableMetrics(true, enabledConfig));
+  }
 }

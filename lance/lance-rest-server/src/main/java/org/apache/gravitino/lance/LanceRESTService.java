@@ -85,6 +85,9 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     server.initialize(serverConfig, SERVICE_NAME, false);
+    if (shouldEnableMetrics(auxMode, lanceConfig)) {
+      server.addMetricsServlets(metricsSystem);
+    }
 
     this.lanceNamespace = loadNamespaceImpl(lanceConfig, auxMode);
 
@@ -164,6 +167,10 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         lanceConfig.getNamespaceBackend(),
         auxMode ? "auxiliary" : "standalone",
         enableMetadataAuthorization ? "enabled" : "disabled");
+  }
+
+  static boolean shouldEnableMetrics(boolean auxiliaryMode, LanceConfig lanceConfig) {
+    return !auxiliaryMode && lanceConfig.get(LanceConfig.METRICS_ENABLED);
   }
 
   @Override

@@ -106,6 +106,9 @@ public class RESTService implements GravitinoAuxiliaryService {
         };
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
+    if (shouldEnableMetrics(auxMode, icebergConfig)) {
+      server.addMetricsServlets(metricsSystem);
+    }
 
     ResourceConfig config = new ResourceConfig();
     config.packages(getIcebergRESTPackages(icebergConfig));
@@ -231,6 +234,10 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
 
     server.addCustomFilters(ICEBERG_SPEC);
+  }
+
+  static boolean shouldEnableMetrics(boolean auxiliaryMode, IcebergConfig icebergConfig) {
+    return !auxiliaryMode && icebergConfig.get(IcebergConfig.METRICS_ENABLED);
   }
 
   @Override

@@ -192,6 +192,7 @@ Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-ser
 | `gravitino.lance-rest.httpPort`           | Service port number        | 9101                  | No       |
 | `gravitino.lance-rest.host`               | Service hostname           | 0.0.0.0               | No       |
 | `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include stack traces | true | No |
+| `gravitino.lance-rest.metrics.enabled` | Whether standalone mode serves `/metrics` and `/prometheus/metrics`. Ignored in auxiliary mode, where metrics remain available on the Gravitino server endpoint. Enable only when the standalone service port is trusted. | false | No |
 
 :::tip
 In standalone deployments, you only need to configure `gravitino.lance-rest.gravitino-metalake`,

@@ -37,4 +37,16 @@ public class TestRESTService {
                 new IcebergConfig(Collections.singletonMap("includeErrorStackTrace", "false")))
             .isIncludeErrorStackTrace());
   }
+
+  @Test
+  public void testMetricsAreEnabledOnlyForConfiguredStandaloneMode() {
+    IcebergConfig disabledConfig = new IcebergConfig();
+    assertFalse(RESTService.shouldEnableMetrics(false, disabledConfig));
+    assertFalse(RESTService.shouldEnableMetrics(true, disabledConfig));
+
+    IcebergConfig enabledConfig =
+        new IcebergConfig(Collections.singletonMap(IcebergConfig.METRICS_ENABLED.getKey(), "true"));
+    assertTrue(RESTService.shouldEnableMetrics(false, enabledConfig));
+    assertFalse(RESTService.shouldEnableMetrics(true, enabledConfig));
+  }
 }
