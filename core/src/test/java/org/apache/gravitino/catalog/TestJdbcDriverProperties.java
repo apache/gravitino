@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server.web.rest;
+package org.apache.gravitino.catalog;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -34,7 +34,6 @@ public class TestJdbcDriverProperties {
             .put("jdbc-doris", "com.mysql.cj.jdbc.Driver")
             .put("jdbc-hologres", "org.postgresql.Driver")
             .put("jdbc-mysql", "com.mysql.cj.jdbc.Driver")
-            .put("jdbc-oceanbase", "com.mysql.cj.jdbc.Driver")
             .put("jdbc-postgresql", "org.postgresql.Driver")
             .put("jdbc-starrocks", "com.mysql.cj.jdbc.Driver")
             .build();
@@ -61,6 +60,24 @@ public class TestJdbcDriverProperties {
     Assertions.assertEquals(
         "com.mysql.cj.jdbc.Driver",
         JdbcDriverProperties.withDefaultDriver("lakehouse-iceberg", mysql).get("jdbc-driver"));
+  }
+
+  @Test
+  void testOceanBaseDriverFollowsJdbcUrl() {
+    Map<String, String> nativeUrl =
+        ImmutableMap.of("jdbc-url", "jdbc:oceanbase://localhost:2881/test");
+    Assertions.assertEquals(
+        "com.oceanbase.jdbc.Driver",
+        JdbcDriverProperties.withDefaultDriver("jdbc-oceanbase", nativeUrl).get("jdbc-driver"));
+
+    Map<String, String> mysqlUrl = ImmutableMap.of("jdbc-url", "jdbc:mysql://localhost:2881/test");
+    Assertions.assertEquals(
+        "com.mysql.cj.jdbc.Driver",
+        JdbcDriverProperties.withDefaultDriver("jdbc-oceanbase", mysqlUrl).get("jdbc-driver"));
+
+    Map<String, String> unknownUrl = ImmutableMap.of("jdbc-url", "jdbc:unknown://localhost/test");
+    Assertions.assertSame(
+        unknownUrl, JdbcDriverProperties.withDefaultDriver("jdbc-oceanbase", unknownUrl));
   }
 
   @Test

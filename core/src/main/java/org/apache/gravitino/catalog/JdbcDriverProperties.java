@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server.web.rest;
+package org.apache.gravitino.catalog;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
@@ -34,7 +34,6 @@ public final class JdbcDriverProperties {
           .put("jdbc-doris", "com.mysql.cj.jdbc.Driver")
           .put("jdbc-hologres", "org.postgresql.Driver")
           .put("jdbc-mysql", "com.mysql.cj.jdbc.Driver")
-          .put("jdbc-oceanbase", "com.mysql.cj.jdbc.Driver")
           .put("jdbc-postgresql", "org.postgresql.Driver")
           .put("jdbc-starrocks", "com.mysql.cj.jdbc.Driver")
           .build();
@@ -56,6 +55,18 @@ public final class JdbcDriverProperties {
     }
 
     String driver = PROVIDER_DRIVERS.get(provider.toLowerCase(Locale.ROOT));
+    if ("jdbc-oceanbase".equalsIgnoreCase(provider)) {
+      driver = null;
+      String url = properties == null ? null : properties.get("jdbc-url");
+      if (url != null) {
+        String normalizedUrl = url.trim().toLowerCase(Locale.ROOT);
+        if (normalizedUrl.startsWith("jdbc:oceanbase:")) {
+          driver = "com.oceanbase.jdbc.Driver";
+        } else if (normalizedUrl.startsWith("jdbc:mysql:")) {
+          driver = "com.mysql.cj.jdbc.Driver";
+        }
+      }
+    }
     if (driver == null && "lakehouse-iceberg".equalsIgnoreCase(provider) && properties != null) {
       if ("jdbc".equalsIgnoreCase(properties.get("catalog-backend"))) {
         String uri = properties.get("uri");

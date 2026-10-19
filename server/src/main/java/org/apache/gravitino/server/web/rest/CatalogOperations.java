@@ -168,8 +168,7 @@ public class CatalogOperations {
                     request.getType(),
                     request.getProvider(),
                     request.getComment(),
-                    JdbcDriverProperties.withDefaultDriver(
-                        request.getProvider(), request.getProperties()),
+                    request.getProperties(),
                     SecretBindingDTO.toSecretBindings(request.getSecretBindings()),
                     SecretReferenceDTO.toSecretReferences(request.getSecretReferences()));
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
@@ -215,8 +214,7 @@ public class CatalogOperations {
                 request.getType(),
                 request.getProvider(),
                 request.getComment(),
-                JdbcDriverProperties.withDefaultDriver(
-                    request.getProvider(), request.getProperties()));
+                request.getProperties());
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully test connection for catalog: {}.{}", metalake, request.getName());
