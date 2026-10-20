@@ -93,8 +93,9 @@ public class EventListenerManager {
     started = true;
   }
 
-  public void stop() {
-    eventListeners.stream().forEach(listener -> listener.stop());
+  public synchronized void stop() {
+    eventListeners.forEach(EventListenerPlugin::stop);
+    started = false;
   }
 
   public EventBus createEventBus() {

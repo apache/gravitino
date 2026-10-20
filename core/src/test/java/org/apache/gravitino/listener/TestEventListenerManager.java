@@ -350,31 +350,34 @@ public class TestEventListenerManager {
     eventListenerManager.addEventListener("shared2", sharedListener2);
     eventListenerManager.start();
     EventBus eventBus = eventListenerManager.createEventBus();
+    try {
+      List<EventListenerPlugin> listeners = eventBus.getEventListeners();
+      Assertions.assertEquals(3, listeners.size());
+      Assertions.assertEquals(
+          1, listeners.stream().filter(EventListenerPluginWrapper.class::isInstance).count());
+      Set<Integer> queueSizes =
+          listeners.stream()
+              .filter(AsyncQueueListener.class::isInstance)
+              .map(listener -> ((AsyncQueueListener) listener).getEventListeners().size())
+              .collect(Collectors.toSet());
+      Assertions.assertEquals(ImmutableSet.of(1, 2), queueSizes);
 
-    List<EventListenerPlugin> listeners = eventBus.getEventListeners();
-    Assertions.assertEquals(3, listeners.size());
-    Assertions.assertEquals(
-        1, listeners.stream().filter(EventListenerPluginWrapper.class::isInstance).count());
-    Set<Integer> queueSizes =
-        listeners.stream()
-            .filter(AsyncQueueListener.class::isInstance)
-            .map(listener -> ((AsyncQueueListener) listener).getEventListeners().size())
-            .collect(Collectors.toSet());
-    Assertions.assertEquals(ImmutableSet.of(1, 2), queueSizes);
+      eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
 
-    eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
-
-    Assertions.assertEquals(
-        ImmutableList.of(Thread.currentThread().getName()), syncListener.awaitPostEventThreads());
-    Assertions.assertEquals(
-        ImmutableList.of("async-queue-listener-isolated"),
-        isolatedListener.awaitPostEventThreads());
-    Assertions.assertEquals(
-        ImmutableList.of("async-queue-listener-default"), sharedListener1.awaitPostEventThreads());
-    Assertions.assertEquals(
-        ImmutableList.of("async-queue-listener-default"), sharedListener2.awaitPostEventThreads());
-
-    eventListenerManager.stop();
+      Assertions.assertEquals(
+          ImmutableList.of(Thread.currentThread().getName()), syncListener.awaitPostEventThreads());
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-isolated"),
+          isolatedListener.awaitPostEventThreads());
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-default"),
+          sharedListener1.awaitPostEventThreads());
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-default"),
+          sharedListener2.awaitPostEventThreads());
+    } finally {
+      eventListenerManager.stop();
+    }
   }
 
   @Test
@@ -388,22 +391,24 @@ public class TestEventListenerManager {
         new ThreadRecordingEventListener(Mode.ASYNC_ISOLATED);
     ThreadRecordingEventListener sharedListener =
         new ThreadRecordingEventListener(Mode.ASYNC_SHARED);
-    eventListenerManager.addEventListener("isolated", isolatedListener);
-    eventListenerManager.addEventListener("shared", sharedListener);
-    Assertions.assertTrue(isolatedListener.started.get());
-    Assertions.assertTrue(sharedListener.started.get());
+    try {
+      eventListenerManager.addEventListener("isolated", isolatedListener);
+      eventListenerManager.addEventListener("shared", sharedListener);
+      Assertions.assertTrue(isolatedListener.started.get());
+      Assertions.assertTrue(sharedListener.started.get());
 
-    // The shared listener joins the queue created for the configured shared listeners.
-    Assertions.assertEquals(2, eventBus.getEventListeners().size());
+      // The shared listener joins the queue created for the configured shared listeners.
+      Assertions.assertEquals(2, eventBus.getEventListeners().size());
 
-    eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
-    Assertions.assertEquals(
-        ImmutableList.of("async-queue-listener-isolated"),
-        isolatedListener.awaitPostEventThreads());
-    Assertions.assertEquals(
-        ImmutableList.of("async-queue-listener-default"), sharedListener.awaitPostEventThreads());
-
-    eventListenerManager.stop();
+      eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-isolated"),
+          isolatedListener.awaitPostEventThreads());
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-default"), sharedListener.awaitPostEventThreads());
+    } finally {
+      eventListenerManager.stop();
+    }
   }
 
   @Test

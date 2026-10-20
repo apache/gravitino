@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
@@ -44,6 +45,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(AsyncQueueListener.class);
   private static final String NAME_PREFIX = "async-queue-listener-";
   private static final float HIGH_WATERMARK_RATIO = 0.9f;
+  private static final long POLL_INTERVAL_MS = 100;
 
   private final List<EventListenerPlugin> eventListeners;
   private final BlockingQueue<BaseEvent> queue;
@@ -101,11 +103,17 @@ public class AsyncQueueListener implements EventListenerPlugin {
       LOG.debug("{} had already stopped", asyncQueueListenerName);
       return;
     }
-    asyncProcessor.interrupt();
     try {
+      // Give the dispatcher thread time to drain the queued events. It exits by itself once the
+      // queue is empty, and is interrupted if it does not finish in time.
       asyncProcessor.join(dispatcherJoinSeconds * 1000L);
+      if (asyncProcessor.isAlive()) {
+        asyncProcessor.interrupt();
+        asyncProcessor.join(dispatcherJoinSeconds * 1000L);
+      }
     } catch (InterruptedException e) {
       LOG.warn("{} interrupt async processor failed.", asyncQueueListenerName, e);
+      Thread.currentThread().interrupt();
     }
     eventListeners.forEach(listenerPlugin -> listenerPlugin.stop());
   }
@@ -122,7 +130,14 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private void processEvents() {
     while (!Thread.currentThread().isInterrupted()) {
       try {
-        BaseEvent baseEvent = queue.take();
+        BaseEvent baseEvent = queue.poll(POLL_INTERVAL_MS, TimeUnit.MILLISECONDS);
+        if (baseEvent == null) {
+          if (stopped.get()) {
+            // The listener is stopped and all the queued events are processed.
+            break;
+          }
+          continue;
+        }
         if (baseEvent instanceof PreEvent) {
           this.eventListeners.forEach(listener -> listener.onPreEvent((PreEvent) baseEvent));
         } else if (baseEvent instanceof Event) {

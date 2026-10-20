@@ -26,6 +26,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -115,6 +116,82 @@ class TestAsyncQueueListener {
     listener.stop();
 
     verify(innerListener, times(1)).stop();
+  }
+
+  @Test
+  void testStopDrainsQueuedEvents() {
+    blockingAppender.releaseFirstLog.countDown();
+    AtomicInteger processedEvents = new AtomicInteger();
+    EventListenerPlugin slowListener =
+        new EventListenerPlugin() {
+          @Override
+          public void init(Map<String, String> properties) {}
+
+          @Override
+          public void start() {}
+
+          @Override
+          public void stop() {}
+
+          @Override
+          public void onPostEvent(Event event) {
+            try {
+              Thread.sleep(50);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              return;
+            }
+            processedEvents.incrementAndGet();
+          }
+        };
+    AsyncQueueListener listener = new AsyncQueueListener(List.of(slowListener), "test", 10, 10);
+    listener.start();
+
+    Event event = mock(Event.class);
+    for (int i = 0; i < 5; i++) {
+      listener.onPostEvent(event);
+    }
+    listener.stop();
+
+    assertEquals(5, processedEvents.get());
+  }
+
+  @Test
+  void testStopInterruptsDispatcherThatDoesNotFinishInTime() throws Exception {
+    blockingAppender.releaseFirstLog.countDown();
+    CountDownLatch neverReleased = new CountDownLatch(1);
+    CountDownLatch entered = new CountDownLatch(1);
+    EventListenerPlugin blockedListener =
+        new EventListenerPlugin() {
+          @Override
+          public void init(Map<String, String> properties) {}
+
+          @Override
+          public void start() {}
+
+          @Override
+          public void stop() {}
+
+          @Override
+          public void onPostEvent(Event event) {
+            entered.countDown();
+            try {
+              neverReleased.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+        };
+    AsyncQueueListener listener = new AsyncQueueListener(List.of(blockedListener), "test", 10, 1);
+    listener.start();
+    listener.onPostEvent(mock(Event.class));
+    assertTrue(entered.await(30, TimeUnit.SECONDS));
+
+    long startNanos = System.nanoTime();
+    listener.stop();
+
+    // One join timeout to drain, then the dispatcher is interrupted and exits.
+    assertTrue(TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startNanos) < 10);
   }
 
   private static class BlockingAppender extends AbstractAppender {
