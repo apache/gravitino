@@ -23,12 +23,57 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestJdbcPropertiesConverter {
   private final JdbcPropertiesConverter jdbcPropertiesConverter =
       JdbcPropertiesConverter.getInstance();
 
   @Test
+<<<<<<< HEAD
+=======
+  void testGetNoTablePropertiesInstance() {
+    JdbcPropertiesConverter instance = JdbcPropertiesConverter.getNoTablePropertiesInstance();
+    Assertions.assertNotNull(instance);
+    Assertions.assertSame(instance, JdbcPropertiesConverter.getNoTablePropertiesInstance());
+    Assertions.assertNotSame(instance, JdbcPropertiesConverter.getInstance());
+
+    Map<String, String> emptyProps = instance.toGravitinoTableProperties(ImmutableMap.of());
+    Assertions.assertTrue(emptyProps.isEmpty());
+
+    Map<String, String> ownerProps =
+        instance.toGravitinoTableProperties(ImmutableMap.of("owner", "alice"));
+    Assertions.assertTrue(ownerProps.isEmpty());
+
+    Map<String, String> upperOwnerProps =
+        instance.toGravitinoTableProperties(ImmutableMap.of("OWNER", "bob"));
+    Assertions.assertTrue(upperOwnerProps.isEmpty());
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> instance.toGravitinoTableProperties(ImmutableMap.of("someKey", "value")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"owner", "OWNER"})
+  void testSparkOwnershipIsNotForwardedAsATableOption(String ownerKey) {
+    Map<String, String> properties =
+        ImmutableMap.of(ownerKey, "alice", "engine", "InnoDB", "unknown-key", "value");
+
+    Map<String, String> converted = jdbcPropertiesConverter.toGravitinoTableProperties(properties);
+
+    Assertions.assertEquals(ImmutableMap.of("engine", "InnoDB", "unknown-key", "value"), converted);
+    // Keep caller-owned input intact and forward unknown user keys for server-side validation.
+    Assertions.assertEquals("alice", properties.get(ownerKey));
+    Assertions.assertTrue(
+        jdbcPropertiesConverter
+            .toGravitinoTableProperties(ImmutableMap.of(ownerKey, "alice"))
+            .isEmpty());
+  }
+
+  @Test
+>>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
   void testCatalogProperties() {
     String url = "jdbc-url";
     String user = "user1";

@@ -41,6 +41,7 @@ When using Gravitino with Trino, pass the Trino MySQL connector configuration us
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the MySQL catalog has the following properties:
 
+<<<<<<< HEAD
 | Configuration item      | Description                                                                                            | Default value | Required |
 |-------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|
 | `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                    | (none)        | Yes      |
@@ -50,6 +51,18 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                         | `2`           | No       |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                        | `10`          | No       |
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.      | `30000`       | No       |
+=======
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                                                                                                      | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.                                                                                   | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name.                                                                                                                                                                      | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password.                                                                                                                                                                       | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned; takes precedence over `gravitino.bypass.maxWaitMillis`.                                                    | `30000`       | No       |
+>>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
 
 :::caution
 Gravitino does not package the MySQL JDBC driver, because MySQL Connector/J is
@@ -222,7 +235,9 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 :::
 
 :::caution
-- Doesn't support remove table properties. You can only add or modify properties, not delete properties.
+For MySQL table options, use the Gravitino property names listed below. Unknown properties, including SQL option names such as `ENGINE` or `ROW_FORMAT`, are rejected. Use the Gravitino property name `engine` instead. Metadata keys shared by every entity, such as the credential-vending settings, are accepted but not applied to MySQL tables.
+
+These properties can only be specified when creating a table; they cannot be changed or removed afterwards. Values are validated against their declared types before DDL is executed.
 :::
 
 | Property Name           | Description                                                                                                                                              | Default Value | Required | Reserved | Immutable |

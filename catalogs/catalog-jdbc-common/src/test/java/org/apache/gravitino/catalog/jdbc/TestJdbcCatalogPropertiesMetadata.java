@@ -20,7 +20,10 @@ package org.apache.gravitino.catalog.jdbc;
 
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -32,10 +35,23 @@ import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.catalog.jdbc.utils.TestDataSourceValidation.UnsupportedValidationDriver;
+import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+>>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+<<<<<<< HEAD
+=======
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+>>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
 
 public class TestJdbcCatalogPropertiesMetadata {
 
@@ -59,6 +75,87 @@ public class TestJdbcCatalogPropertiesMetadata {
     Assertions.assertFalse(
         buildCatalog(ImmutableMap.of(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false"))
             .shouldValidateOnCreate());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "none,none,none,30000",
+    "1250,none,none,1250",
+    "none,2300,none,2300",
+    "1250,2300,none,1250",
+    "none,none,3400,3400",
+    "1250,none,3400,1250"
+  })
+  void testPoolMaxWaitReachesCatalogDataSource(
+      String canonical, String bypass, String dbcpBypass, long expected) throws Exception {
+    Map<String, String> properties = poolWaitProperties();
+    if (!"none".equals(canonical)) {
+      properties.put(JdbcConfig.POOL_MAX_WAIT_MS.getKey(), canonical);
+    }
+    if (!"none".equals(bypass)) {
+      properties.put("gravitino.bypass." + JdbcConfig.POOL_MAX_WAIT_MS.getKey(), bypass);
+    }
+    if (!"none".equals(dbcpBypass)) {
+      // The DBCP-native key documented as the bypass example in the JDBC catalog docs.
+      properties.put("gravitino.bypass.maxWaitMillis", dbcpBypass);
+    }
+    JdbcCatalogPropertiesMetadata metadata = new JdbcCatalogPropertiesMetadata();
+    Assertions.assertTrue(metadata.containsProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    Assertions.assertFalse(metadata.isHiddenProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    Assertions.assertFalse(metadata.isImmutableProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    try (JdbcCatalogOperations operations = poolWaitOperations()) {
+      operations.initialize(properties, poolWaitCatalogInfo(properties), new TestJdbcCatalog());
+      BasicDataSource pool = (BasicDataSource) FieldUtils.readField(operations, "dataSource", true);
+      Assertions.assertEquals(expected, pool.getMaxWaitDuration().toMillis());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "-1", "not-a-number"})
+  void testInvalidPoolMaxWaitIsRejected(String value) {
+    Map<String, String> properties = poolWaitProperties();
+    properties.put(JdbcConfig.POOL_MAX_WAIT_MS.getKey(), value);
+    try (JdbcCatalogOperations operations = poolWaitOperations()) {
+      Assertions.assertThrows(
+          GravitinoRuntimeException.class,
+          () ->
+              operations.initialize(
+                  properties, poolWaitCatalogInfo(properties), new TestJdbcCatalog()));
+    }
+  }
+
+  private static Map<String, String> poolWaitProperties() {
+    return new HashMap<>(
+        Map.of(
+            JdbcConfig.JDBC_URL.getKey(),
+            "jdbc:sqlite::memory:",
+            JdbcConfig.JDBC_DRIVER.getKey(),
+            "org.sqlite.JDBC",
+            JdbcConfig.USERNAME.getKey(),
+            "user",
+            JdbcConfig.PASSWORD.getKey(),
+            "password"));
+  }
+
+  private static CatalogInfo poolWaitCatalogInfo(Map<String, String> properties) {
+    return new CatalogInfo(
+        1L,
+        "jdbc_catalog",
+        Catalog.Type.RELATIONAL,
+        "jdbc-test",
+        "test",
+        properties,
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build(),
+        Namespace.of("metalake"));
+  }
+
+  private static JdbcCatalogOperations poolWaitOperations() {
+    return new JdbcCatalogOperations(
+        new SqliteExceptionConverter(),
+        new SqliteTypeConverter(),
+        new SqliteDatabaseOperations(":memory:"),
+        new SqliteTableOperations(),
+        new SqliteColumnDefaultValueConverter());
   }
 
   private static JdbcCatalog buildCatalog(Map<String, String> extraProperties) {

@@ -46,6 +46,11 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
           JdbcConfig.PASSWORD.getKey(),
           JdbcConfig.POOL_MIN_SIZE.getKey(),
           JdbcConfig.POOL_MAX_SIZE.getKey(),
+<<<<<<< HEAD
+=======
+          JdbcConfig.POOL_MAX_IDLE.getKey(),
+          JdbcConfig.POOL_MAX_WAIT_MS.getKey(),
+>>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
           JdbcConfig.TEST_ON_BORROW.getKey(),
           JdbcConfig.CONNECT_TIMEOUT_MS.getKey(),
           JdbcConfig.VERIFY_ON_CREATE.getKey());
@@ -107,6 +112,23 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
                 false /* hidden */,
                 false /* reserved */),
+<<<<<<< HEAD
+=======
+            integerPropertyEntry(
+                JdbcConfig.POOL_MAX_IDLE.getKey(),
+                JdbcConfig.POOL_MAX_IDLE.getDoc(),
+                false /* required */,
+                false /* immutable */,
+                JdbcConfig.POOL_MAX_IDLE.getDefaultValue(),
+                false /* hidden */,
+                false /* reserved */),
+            longOptionalPropertyEntry(
+                JdbcConfig.POOL_MAX_WAIT_MS.getKey(),
+                JdbcConfig.POOL_MAX_WAIT_MS.getDoc(),
+                false /* immutable */,
+                JdbcConfig.POOL_MAX_WAIT_MS.getDefaultValue(),
+                false /* hidden */),
+>>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
             booleanPropertyEntry(
                 JdbcConfig.TEST_ON_BORROW.getKey(),
                 JdbcConfig.TEST_ON_BORROW.getDoc(),

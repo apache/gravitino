@@ -121,12 +121,25 @@ public class DataSourceUtils {
     // Set each time a connection is taken out from the connection pool, a test statement will be
     // executed to confirm whether the connection is valid.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
+<<<<<<< HEAD
     basicDataSource.setValidationQuery(POOL_TEST_QUERY);
     basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
     // Apply the driver-aware connect timeout as a DBCP connection property (not a pool key, so the
     // pool stays lazy). It bounds a single connection and takes effect on the first real connection
     // — i.e. create-time verification — so an unreachable backend fails fast instead of hanging.
     // Operator-set values are preserved.
+=======
+    // Same precedence as maxIdle: keep a maxWaitMillis supplied through the DBCP bypass unless the
+    // canonical setting is explicitly configured.
+    if (jdbcConfig.getAllConfig().containsKey(JdbcConfig.POOL_MAX_WAIT_MS.getKey())
+        || !jdbcConfig.getAllConfig().containsKey("maxWaitMillis")) {
+      basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
+    }
+    // Apply the driver-aware connect/socket timeout as DBCP connection properties (not pool keys,
+    // so no collision with UNSAFE_POOL_PROPERTIES and the pool stays lazy). These bound a single
+    // connection and take effect on the first real connection — i.e. create-time verification — so
+    // an unreachable backend fails fast instead of hanging. Operator-set values are preserved.
+>>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
     JdbcConnectionTimeouts.connectionProperties(jdbcConfig, jdbcUrl)
         .forEach(basicDataSource::addConnectionProperty);
     return basicDataSource;
