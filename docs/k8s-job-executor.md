@@ -45,24 +45,30 @@ configuration:
 | `environments`              | `spark.kubernetes.driverEnv.<name>` and `spark.executorEnv.<name>` in `spec.sparkConf` |
 | `jars`, `files`, `archives` | Appended to `spark.jars`, `spark.files`, and `spark.archives` in `spec.sparkConf`      |
 
-The Spark configurations of a job come from three places, each overriding the ones before it:
+The Spark configurations of a job come from these places, each overriding the ones before it:
 
 1. The server-level defaults, set with the `gravitino.jobExecutor.k8s.spark.conf.` prefix.
 2. The `environments` of the job template.
 3. The `configs` of the job template.
+4. For a built-in Iceberg job, its `spark_conf` parameter, see [Built-In Jobs](#built-in-jobs).
+
+A blank value in the `configs` of a job template or in `spark_conf` leaves the configuration unset,
+so it doesn't override a server-level default. This is what an optional placeholder without a value
+becomes. Any other value replaces the default; a list such as `spark.jars` isn't merged with it.
 
 The job executor then adjusts the result:
 
-- `spark.master` and `spark.submit.deployMode` are removed, as the operator decides them. The
-  operator runs Spark in cluster mode only, so a job whose `spark.submit.deployMode` is another
-  mode, such as `client`, is rejected.
+- The operator decides the master and the deploy mode, so `spark.master` and
+  `spark.submit.deployMode` are removed. A job whose `spark.master` isn't a Kubernetes master, that
+  is one starting with `k8s://`, such as `local[*]`, is rejected, and so is one whose
+  `spark.submit.deployMode` is another mode than `cluster`, such as `client`.
 - `spark.kubernetes.container.image` and `spark.kubernetes.authenticate.driver.serviceAccountName`
   take the values of `spark.image` and `spark.serviceAccount` of the job executor if neither the
   job template nor a server-level default sets them. A job template can therefore run with its
   own image and service account.
-- `spark.kubernetes.namespace` is the namespace that the `configs` of the job template set, or else
-  `namespace` of the job executor. A server-level default of it with the `spark.conf.` prefix is
-  ignored: set `namespace` instead.
+- `spark.kubernetes.namespace` is the namespace that the job sets, in the `configs` of its template
+  or in `spark_conf`, or else `namespace` of the job executor. A server-level default of it with the
+  `spark.conf.` prefix is ignored: set `namespace` instead.
 
 The `SparkApplication` is named `<namePrefix>-<job ID>`, for example
 `gravitino-job-688822913391439376`, and carries the labels `app.kubernetes.io/managed-by=gravitino`
@@ -78,7 +84,7 @@ Gravitino doesn't fetch the resources of a job. It passes their URIs on to Spark
 in the cluster. The `executable`, `jars`, `files`, and `archives` of a template must therefore be
 URIs that the driver and executor pods can reach, such as `local://` for a file in the Spark image,
 `https://`, `s3a://`, or `hdfs://`. So must every entry of `spark.jars`, `spark.files`, and
-`spark.archives`, whether a job template or a server-level default sets them. A run with a path on
+`spark.archives`, whether a job template, `spark_conf`, or a server-level default sets them. A run with a path on
 the Gravitino server, that is a path without a scheme or with the `file` scheme, is rejected.
 
 The built-in job templates are the exception. Their `executable` is the path of the built-in jobs
@@ -91,13 +97,28 @@ The built-in job templates set the resources of the driver and the executors in 
 `configs`, from placeholders. Size a built-in job with its job configuration, for example
 `spark_executor_instances`, `spark_executor_cores`, `spark_executor_memory`, and
 `spark_driver_memory`, not with server-level defaults: the `configs` of a template override them.
-The `spark_master` parameter has no effect, as `spark.master` is removed.
+Leave `spark_master` empty, its default: any other value than a Kubernetes master is rejected.
 
-The `spark_conf` parameter of a built-in job is applied by the driver after it starts. Setting
-`spark.jars` there has no effect, and setting `spark.master` there runs the job in local mode inside
-the driver pod. Set such configurations as server-level defaults instead, which apply to every
-Spark configuration that the built-in templates don't set, such as `spark.jars`, the scheduler
-configurations, or volumes.
+The `spark_conf` parameter of the built-in Iceberg jobs, a flat JSON map of Spark configurations, is
+set in the `SparkApplication` when the job is submitted, over all the other Spark configurations of
+the job. So configurations that Spark reads when it starts the driver take effect, such as
+`spark.jars`, `spark.jars.packages`, `spark.driver.*`, and `spark.kubernetes.driver.*`. For example,
+a job configuration can add the Iceberg Spark runtime to a Spark image without it:
+
+```json
+{
+  "spark_conf": "{\"spark.jars\":\"https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.11.0/iceberg-spark-runtime-3.5_2.12-1.11.0.jar\"}"
+}
+```
+
+- `spark.master` and `spark.submit.deployMode` in `spark_conf` are ignored, with a warning in the
+  server log.
+- `spark.kubernetes.namespace` in `spark_conf` chooses the namespace of the job.
+- The driver applies `spark_conf` again when it starts, as it does with every job executor.
+
+Configurations that every job needs, such as the Iceberg Spark runtime, the scheduler
+configurations, or volumes, can also be set once as server-level defaults, or built into the
+[Spark image](#spark-image).
 
 ### Rejected Runs
 
@@ -105,7 +126,9 @@ A run is rejected, and no job is created, when:
 
 - The job template is a shell template.
 - A resource of the job is a path on the Gravitino server, see [Job Resources](#job-resources).
-- `spark.submit.deployMode` is another mode than `cluster`.
+- `spark.master` isn't a Kubernetes master, or `spark.submit.deployMode` is another mode than
+  `cluster`, see [Job Execution](#job-execution).
+- The `spark_conf` parameter of a built-in Iceberg job isn't a flat JSON map.
 - `spark.kubernetes.namespace` isn't a valid namespace name, or an environment variable name is
   invalid, see [Environment Variables](#environment-variables).
 - Kubernetes rejects the `SparkApplication`, for example because the namespace doesn't exist, the
@@ -219,8 +242,8 @@ Spark configurations of the template, a job can, for example:
   its output, which the job API returns.
 
 The same applies to a job template that passes its job configuration on to Spark. The `spark_conf`
-parameter of the built-in jobs does: anyone who can run a built-in job can set the Spark
-configurations of its pods, such as the volumes of its executors.
+parameter of the built-in Iceberg jobs does: anyone who can run one of them can set any Spark
+configuration of its pods, such as their volumes, service account, or namespace.
 
 To limit what jobs can do:
 
@@ -255,8 +278,9 @@ USER spark
 ```
 
 An image without the Iceberg Spark runtime also works if every job gets the runtime through a
-server-level default. The driver of every job then downloads the runtime when it starts. For
-example:
+server-level default, or through the `spark_conf` of a built-in Iceberg job, see
+[Built-In Jobs](#built-in-jobs). The driver of every job then downloads the runtime when it starts.
+For example:
 
 ```text
 gravitino.jobExecutor.k8s.spark.conf.spark.jars = https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.11.0/iceberg-spark-runtime-3.5_2.12-1.11.0.jar
@@ -486,6 +510,12 @@ and its value is the Secret and the key in it:
 - The Secret name can be a placeholder, such as `{{secret}}:token`, to choose the Secret for each
   run.
 
+Like `environments`, the values of the `spark_conf` parameter of a built-in Iceberg job, such as
+catalog credentials, are readable in the `sparkConf` and the `driverArgs` of the `SparkApplication`.
+Don't put sensitive values there. Pass them as environment variables from a Secret where the job
+reads them from its environment, for example the AWS credentials, which the AWS SDK reads from
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+
 ## Job Output and Times
 
 The output of a job is the log of its driver pod, read from Kubernetes on every request:
@@ -539,8 +569,6 @@ The job executor keeps no job state on the Gravitino server:
   and a cancelled job loses its output right away.
 - Unfinished jobs fail if Gravitino is down for longer than `spark.ttlAfterStopInMs` after they stop.
 - The job executor doesn't limit the number of unfinished jobs, see [Queueing](#queueing).
-- Setting `spark.jars` or `spark.master` in the `spark_conf` parameter of a built-in job doesn't
-  work, see [Built-In Jobs](#built-in-jobs).
 
 ## Run a Built-In Job on a Local Cluster
 
