@@ -57,6 +57,11 @@ public class TestStarRocksUtils {
     result = StarRocksUtils.generatePropertiesSql(properties);
     assertEquals(" PROPERTIES (\n\"key\"=\"value\"\n)", result);
 
+    properties = Collections.singletonMap("key\"name", "owner's \"comment\" C:\\tmp; --");
+    result = StarRocksUtils.generatePropertiesSql(properties);
+    assertEquals(
+        " PROPERTIES (\n\"key\"\"name\"=\"owner's \"\"comment\"\" C:\\\\tmp; --\"\n)", result);
+
     // Test when properties has multiple entries
     properties = new HashMap<>();
     properties.put("key1", "value1");
@@ -95,6 +100,20 @@ public class TestStarRocksUtils {
     result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
     assertEquals("value1", result.get("property1"));
     assertEquals("comment", result.get("comment"));
+
+    // Escaped SHOW CREATE output (doubled quotes and backslashes, as generatePropertiesSql
+    // emits) round-trips back to the original key/value text.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n"
+            + "\"key\"\"name\" = \"owner's \"\"comment\"\" D:\\\\data; --\"\n)";
+    result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner's \"comment\" D:\\data; --", result.get("key\"name"));
+
+    // Backslash-style escaping (\" and \\) is unescaped too.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n" + "\"plain\" = \"owner\\\\s \\\"comment\\\"\"\n)";
+    result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner\\s \"comment\"", result.get("plain"));
   }
 
   @Test

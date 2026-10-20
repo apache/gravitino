@@ -1015,7 +1015,9 @@ public class DorisTableOperations extends JdbcTableOperations {
             .map(
                 setProperty ->
                     String.format(
-                        "\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
+                        "\"%s\" = \"%s\"",
+                        escapeSqlLiteral(setProperty.getProperty(), '"'),
+                        escapeSqlLiteral(setProperty.getValue(), '"')))
             .collect(Collectors.joining(",\n"));
     return "set (" + properties + ")";
   }

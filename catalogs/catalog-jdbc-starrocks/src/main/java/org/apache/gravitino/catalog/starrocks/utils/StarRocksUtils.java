@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.starrocks.utils;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.unescapeSqlLiteral;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.sql.ResultSet;
@@ -102,7 +105,13 @@ public class StarRocksUtils {
     StringBuilder sqlBuilder = new StringBuilder(" PROPERTIES (\n");
     sqlBuilder.append(
         properties.entrySet().stream()
-            .map(entry -> "\"" + entry.getKey() + "\"=\"" + entry.getValue() + "\"")
+            .map(
+                entry ->
+                    "\""
+                        + escapeSqlLiteral(entry.getKey(), '"')
+                        + "\"=\""
+                        + escapeSqlLiteral(entry.getValue(), '"')
+                        + "\"")
             .collect(Collectors.joining(",\n")));
     sqlBuilder.append("\n)");
     return sqlBuilder.toString();
@@ -124,8 +133,10 @@ public class StarRocksUtils {
       if (isProperties) {
         final Matcher matcherProperties = patternProperties.matcher(line);
         if (matcherProperties.find()) {
-          final String key = matcherProperties.group(1).trim();
-          String value = matcherProperties.group(2).trim();
+          // generatePropertiesSql escapes keys and values for double-quoted literals, and SHOW
+          // CREATE echoes them escaped; unescape both so callers observe the original text.
+          final String key = unescapeSqlLiteral(matcherProperties.group(1).trim(), '"');
+          String value = unescapeSqlLiteral(matcherProperties.group(2).trim(), '"');
           properties.put(key, value);
         }
       }
