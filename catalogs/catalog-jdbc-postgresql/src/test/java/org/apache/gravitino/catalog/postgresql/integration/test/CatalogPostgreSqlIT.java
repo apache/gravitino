@@ -48,6 +48,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.postgresql.integration.test.service.PostgreSqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -84,6 +85,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
@@ -1648,6 +1652,53 @@ public class CatalogPostgreSqlIT extends BaseIT {
     // PostgreSQL array elements are always nullable
     Assertions.assertEquals(
         Types.ListType.of(Types.IntegerType.get(), true), loadedTable.columns()[2].dataType());
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(booleans = {false, true})
+  void testDeleteConstraintBackedIndexes(Boolean ifExists) {
+    NameIdentifier ident =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("test_delete_indexes"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        ident,
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), null, false, false, null),
+          Column.of("code", Types.IntegerType.get(), null, false, false, null)
+        },
+        null,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.primary("delete_pk", new String[][] {{"id"}}),
+          Indexes.unique("delete_uk", new String[][] {{"code"}})
+        });
+
+    TableUpdateRequest.DeleteTableIndexRequest primary =
+        new TableUpdateRequest.DeleteTableIndexRequest("delete_pk", ifExists);
+    TableUpdateRequest.DeleteTableIndexRequest unique =
+        new TableUpdateRequest.DeleteTableIndexRequest("delete_uk", ifExists);
+    Table updated = tableCatalog.alterTable(ident, primary.tableChange());
+    Assertions.assertEquals(1, updated.index().length);
+    Assertions.assertEquals("delete_uk", updated.index()[0].name());
+
+    updated = tableCatalog.alterTable(ident, unique.tableChange());
+    Assertions.assertEquals(0, updated.index().length);
+    Assertions.assertEquals(0, tableCatalog.loadTable(ident).index().length);
+
+    // IF EXISTS applies to the constraint, including after both indexes have been removed.
+    tableCatalog.alterTable(
+        ident,
+        TableChange.deleteIndex("delete_pk", true),
+        TableChange.deleteIndex("delete_uk", true));
+    RuntimeException missing =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> tableCatalog.alterTable(ident, TableChange.deleteIndex("delete_pk", false)));
+    Assertions.assertTrue(missing.getMessage().contains("delete_pk"), missing.getMessage());
   }
 
   @Test
