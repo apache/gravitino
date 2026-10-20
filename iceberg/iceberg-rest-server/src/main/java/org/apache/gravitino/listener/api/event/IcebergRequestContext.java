@@ -23,9 +23,9 @@ import com.google.common.collect.ImmutableMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RequestContext;
 
 /**
  * The general request context information for Iceberg REST operations.
@@ -97,14 +97,14 @@ public class IcebergRequestContext {
   }
 
   private static String resolveClientAddress(HttpServletRequest request) {
-    // X-Forwarded-For is trusted unconditionally; callers in environments where the server is
-    // reachable directly (not only via a trusted proxy) should be aware that this header can be
-    // spoofed by clients.
-    String xForwardedFor = request.getHeader("X-Forwarded-For");
-    if (StringUtils.isNotBlank(xForwardedFor)) {
-      return xForwardedFor.split(",")[0].trim();
+    // RequestContextFilter, installed ahead of every Iceberg REST endpoint, has already resolved
+    // the client address with the server's trusted-proxy rules. Without it, use the TCP peer
+    // address: X-Forwarded-For cannot be trusted here because the trusted proxies are unknown.
+    String contextAddress = RequestContext.getRemoteAddress();
+    if (contextAddress != null) {
+      return contextAddress;
     }
-    return request.getRemoteHost();
+    return request.getRemoteAddr();
   }
 
   /**
@@ -126,9 +126,11 @@ public class IcebergRequestContext {
   }
 
   /**
-   * Returns the hostname of the HTTP client.
+   * Returns the address of the HTTP client, resolved with the server's trusted-proxy rules (see
+   * {@code trustedProxies} in the Jetty server configuration). Despite the method name, this is an
+   * IP address, never a resolved host name.
    *
-   * @return The remote host name.
+   * @return The remote client address.
    */
   public String remoteHostName() {
     return remoteHostName;

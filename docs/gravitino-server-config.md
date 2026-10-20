@@ -180,6 +180,7 @@ empty string or list; `(none)` means it has no default at all.
 | `gravitino.server.webserver.requestHeaderSize`       | Maximum size in bytes of an HTTP request header.                                                                                                                                             | `131072`                                |
 | `gravitino.server.webserver.responseHeaderSize`      | Maximum size in bytes of an HTTP response header.                                                                                                                                            | `131072`                                |
 | `gravitino.server.webserver.customFilters`           | Comma-separated list of servlet filter class names to apply to the API.                                                                                                                      | (empty)                                 |
+| `gravitino.server.webserver.trustedProxies`          | Comma-separated list of IP addresses or CIDR blocks (IPv4 or IPv6) of reverse proxies whose `X-Forwarded-For` header is trusted when recording the client address. Host names are not allowed. Since 1.3.2. | (empty)                                 |
 | `gravitino.server.rest.extensionPackages`            | Comma-separated list of packages to scan for additional REST resources.                                                                                                                      | (empty)                                 |
 | `gravitino.server.visibleConfigs`                    | Comma-separated list of extra properties to expose on the unauthenticated `GET /configs` endpoint, on top of the fixed set it always returns. Additive, so each entry widens what is public. | (empty)                                 |
 | `gravitino.server.bulk.maxItems`                     | Maximum number of items allowed in a single bulk request.                                                                                                                                    | `100`                                   |
@@ -188,6 +189,24 @@ empty string or list; `(none)` means it has no default at all.
 Filters named in `customFilters` must be standard `javax.servlet` filters. Pass parameters to a
 filter with properties of the form
 `gravitino.server.webserver.{filter_class_name}.param.{param_name} = {value}`.
+
+`trustedProxies` controls the client address recorded in audit events. A caller can set
+`X-Forwarded-For` to any value, so the server honors it only when the TCP peer is a trusted proxy.
+In that case the server reads every `X-Forwarded-For` header from right to left, skips trusted
+proxies, and records the first address that is not one. Entries to the left of that address were
+supplied by the client and are ignored. If an entry is not an IP address, the server stops and
+records the last trusted hop. When `trustedProxies` is empty, the default, `X-Forwarded-For` is
+ignored and the TCP peer address is recorded. An entry that is not an IP address or CIDR block
+fails server startup.
+
+If Gravitino runs behind a load balancer, ingress controller, or other reverse proxy, list their
+addresses here. Otherwise the audit log records the proxy address for every request. List only
+the proxies themselves: trusting a range that untrusted clients can connect from, such as a whole
+Kubernetes pod CIDR, lets those clients choose the recorded address again.
+
+```properties
+gravitino.server.webserver.trustedProxies = 10.0.0.10, 10.0.1.0/24, fd00:10::/64
+```
 
 `GET /configs` backs the Web UI, so it answers without authentication and always returns
 `gravitino.authenticators`, `gravitino.authorization.enable`, and `gravitino.schema.separator`.

@@ -22,6 +22,7 @@ package org.apache.gravitino.server.web;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -67,31 +68,46 @@ public class TestRequestContextFilter {
   }
 
   @Test
-  public void testXForwardedForSingleEntry() throws IOException, ServletException {
-    HttpServletRequest req = mock(HttpServletRequest.class);
+  public void testXForwardedForIgnoredByDefault() throws IOException, ServletException {
+    HttpServletRequest req = mockRequestWithForwardedFor("10.0.0.1", "203.0.113.5");
     HttpServletResponse resp = mock(HttpServletResponse.class);
-    when(req.getHeader("X-Forwarded-For")).thenReturn("203.0.113.5");
-    when(req.getRemoteAddr()).thenReturn("10.0.0.1");
 
     AtomicReference<String> captured = new AtomicReference<>();
     FilterChain chain = (request, response) -> captured.set(RequestContext.getRemoteAddress());
 
     filter.doFilter(req, resp, chain);
 
-    Assertions.assertEquals("203.0.113.5", captured.get());
+    Assertions.assertEquals("10.0.0.1", captured.get());
   }
 
   @Test
-  public void testXForwardedForMultipleEntriesUsesFirst() throws IOException, ServletException {
-    HttpServletRequest req = mock(HttpServletRequest.class);
+  public void testXForwardedForIgnoredFromUntrustedPeer() throws IOException, ServletException {
+    RequestContextFilter trustingFilter =
+        new RequestContextFilter(null, new ClientAddressResolver(ImmutableList.of("10.0.0.0/8")));
+    HttpServletRequest req = mockRequestWithForwardedFor("198.51.100.9", "203.0.113.5");
     HttpServletResponse resp = mock(HttpServletResponse.class);
-    when(req.getHeader("X-Forwarded-For")).thenReturn("203.0.113.5, 10.1.1.1, 10.2.2.2");
-    when(req.getRemoteAddr()).thenReturn("10.0.0.1");
 
     AtomicReference<String> captured = new AtomicReference<>();
     FilterChain chain = (request, response) -> captured.set(RequestContext.getRemoteAddress());
 
-    filter.doFilter(req, resp, chain);
+    trustingFilter.doFilter(req, resp, chain);
+
+    Assertions.assertEquals("198.51.100.9", captured.get());
+  }
+
+  @Test
+  public void testXForwardedForFromTrustedProxyUsesRightMostUntrusted()
+      throws IOException, ServletException {
+    RequestContextFilter trustingFilter =
+        new RequestContextFilter(null, new ClientAddressResolver(ImmutableList.of("10.0.0.0/8")));
+    HttpServletRequest req =
+        mockRequestWithForwardedFor("10.0.0.1", "198.51.100.7, 203.0.113.5, 10.1.1.1, 10.2.2.2");
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+
+    AtomicReference<String> captured = new AtomicReference<>();
+    FilterChain chain = (request, response) -> captured.set(RequestContext.getRemoteAddress());
+
+    trustingFilter.doFilter(req, resp, chain);
 
     Assertions.assertEquals("203.0.113.5", captured.get());
   }
@@ -315,5 +331,15 @@ public class TestRequestContextFilter {
 
     Assertions.assertTrue(capturedParams.get().isEmpty());
     Assertions.assertEquals("1.2.3.4", capturedAddress.get());
+  }
+
+  private static HttpServletRequest mockRequestWithForwardedFor(
+      String remoteAddr, String xForwardedFor) {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(xForwardedFor);
+    when(req.getHeaders("X-Forwarded-For"))
+        .thenReturn(Collections.enumeration(Collections.singletonList(xForwardedFor)));
+    when(req.getRemoteAddr()).thenReturn(remoteAddr);
+    return req;
   }
 }
