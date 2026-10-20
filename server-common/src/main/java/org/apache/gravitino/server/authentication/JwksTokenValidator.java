@@ -171,7 +171,6 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     } catch (ExpiredJWTException e) {
       throw new TokenExpiredException(e, "Authentication token is expired");
     } catch (UnauthorizedException e) {
-      // Preserve principal-mapper / claim authorization failures as-is (e.g. disabled user).
       throw e;
     } catch (Exception e) {
       LOG.warn(
