@@ -89,6 +89,7 @@ public class RangerFilesetIT extends BaseIT {
   private GravitinoMetalake metalake;
   private Catalog catalog;
   @FixtureContainer private RangerContainer ranger;
+  private static HiveContainer hiveRanger;
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -105,7 +106,7 @@ public class RangerFilesetIT extends BaseIT {
     super.startIntegrationTest();
 
     RangerITEnv.init(ranger, metalakeName, false);
-    RangerITEnv.startHiveRangerContainer();
+    hiveRanger = RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =
         String.format("http://%s:%d", ranger.getContainerIpAddress(), RANGER_SERVER_PORT);
@@ -601,7 +602,7 @@ public class RangerFilesetIT extends BaseIT {
       defaultBaseLocation =
           String.format(
               "hdfs://%s:%d/user/hadoop/%s",
-              containerSuite.getHiveRangerContainer().getContainerIpAddress(),
+              hiveRanger.getContainerIpAddress(),
               HiveContainer.HDFS_DEFAULTFS_PORT,
               schemaName.toLowerCase());
     }

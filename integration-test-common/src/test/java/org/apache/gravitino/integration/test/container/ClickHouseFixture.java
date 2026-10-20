@@ -31,8 +31,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * Declares that a test class needs a ClickHouse server, or the three-node ClickHouse cluster with
  * {@code nodes = 3}, with the test's database created on it. Test and lifecycle methods receive it
  * as a {@link ClickHouseContainer} parameter, and fields marked {@link FixtureContainer} receive it
- * too. For the cluster, that is the first node; {@link
- * ContainerSuite#getClickHouseClusterContainers()} returns every node.
+ * too. For the cluster, that is the first node; a {@link ClickHouseCluster} field or parameter
+ * receives every node.
  *
  * <pre>{@code
  * @ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT)

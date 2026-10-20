@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
@@ -26,6 +25,9 @@ import java.util.Map;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.HiveStorage;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.apache.gravitino.integration.test.container.LocalStackFixture;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,65 +36,39 @@ import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @LocalStackFixture
+@HiveFixture(version = HiveVersion.HIVE3, storage = HiveStorage.S3)
 public class CatalogHiveS3IT extends CatalogHive3IT {
 
   private static final String S3_BUCKET_NAME = "my-test-bucket";
   @FixtureContainer private GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
-  private static final String S3_ACCESS_KEY = "S3_ACCESS_KEY";
-  private static final String S3_SECRET_KEY = "S3_SECRET_KEY";
-  private static final String S3_ENDPOINT = "S3_ENDPOINT";
-
   private String getS3Endpoint;
-  private String accessKey;
-  private String secretKey;
 
   @Override
   protected void startNecessaryContainer() {
     hmsCatalog = "hive";
 
-    // The container is ready once its health check passes. LocalStack does not enforce IAM, so
-    // the shared test keys work without creating a user.
+    // The container is ready once its health check passes.
     gravitinoLocalStackContainer.createBucket(S3_BUCKET_NAME);
     gravitinoLocalStackContainer.makeBucketPublic(S3_BUCKET_NAME);
-    accessKey = GravitinoLocalStackContainer.ACCESS_KEY;
-    secretKey = GravitinoLocalStackContainer.SECRET_KEY;
 
     getS3Endpoint =
-        String.format("http://%s:%d", gravitinoLocalStackContainer.getContainerIpAddress(), 4566);
-
-    Map<String, String> hiveContainerEnv =
-        ImmutableMap.of(
-            S3_ACCESS_KEY,
-            accessKey,
-            S3_SECRET_KEY,
-            secretKey,
-            S3_ENDPOINT,
-            getS3Endpoint,
-            HiveContainer.HIVE_RUNTIME_VERSION,
-            HiveContainer.HIVE3);
-
-    containerSuite.startHiveContainerWithS3(hiveContainerEnv);
+        String.format(
+            "http://%s:%d",
+            gravitinoLocalStackContainer.getContainerIpAddress(),
+            GravitinoLocalStackContainer.PORT);
 
     hiveMetastoreUris =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  protected HiveContainer hiveContainer() {
-    return containerSuite.getHiveContainerWithS3();
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
   }
 
   @Override
   protected void initFileSystem() throws IOException {
     // Use S3a file system
     Configuration conf = new Configuration();
-    conf.set("fs.s3a.access.key", accessKey);
-    conf.set("fs.s3a.secret.key", secretKey);
+    conf.set("fs.s3a.access.key", GravitinoLocalStackContainer.ACCESS_KEY);
+    conf.set("fs.s3a.secret.key", GravitinoLocalStackContainer.SECRET_KEY);
     conf.set("fs.s3a.endpoint", getS3Endpoint);
     conf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem");
     conf.set(
@@ -113,10 +89,9 @@ public class CatalogHiveS3IT extends CatalogHive3IT {
                 "spark.sql.warehouse.dir",
                 String.format(
                     "hdfs://%s:%d/user/hive/warehouse",
-                    containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
-                    HiveContainer.HDFS_DEFAULTFS_PORT))
-            .config("spark.hadoop.fs.s3a.access.key", accessKey)
-            .config("spark.hadoop.fs.s3a.secret.key", secretKey)
+                    hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT))
+            .config("spark.hadoop.fs.s3a.access.key", GravitinoLocalStackContainer.ACCESS_KEY)
+            .config("spark.hadoop.fs.s3a.secret.key", GravitinoLocalStackContainer.SECRET_KEY)
             .config("spark.hadoop.fs.s3a.endpoint", getS3Endpoint)
             .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
             .config("spark.hadoop.fs.s3a.path.style.access", "true")

@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+
 /**
  * What a test asks for: one kind of container in one configuration.
  *
@@ -34,6 +38,85 @@ public interface ContainerSpec<C extends BaseContainer> {
    * @return the container type
    */
   Class<C> containerType();
+
+  /**
+   * Returns whether a field or parameter of the given type can receive this spec's container. By
+   * default it can when the type is the container type or a supertype of it; a spec may offer more
+   * types, such as a view of several containers.
+   *
+   * @param wanted the type of the field or parameter
+   * @return whether this spec supplies that type
+   */
+  default boolean supplies(Class<?> wanted) {
+    return wanted.isAssignableFrom(containerType());
+  }
+
+  /**
+   * Returns what a field or parameter of a type this spec {@linkplain #supplies(Class) supplies}
+   * receives for the running container.
+   *
+   * @param wanted the type of the field or parameter
+   * @param container the running container
+   * @return the container itself by default
+   */
+  default Object injectAs(Class<?> wanted, C container) {
+    return container;
+  }
+
+  /**
+   * Returns the specs whose containers must run before this one starts, such as the Ranger server a
+   * Ranger-enabled Hive reports to. {@link #startWithDependencies} starts them first, as shared
+   * run-wide containers, so they outlive this container whatever its scope. Inside {@link
+   * #getOrStart} the spec reads a dependency's running container with {@code
+   * dependency.getOrStart(suite)}, which returns the one already started.
+   *
+   * @return the direct dependencies; none by default
+   */
+  default List<ContainerSpec<?>> dependencies() {
+    return List.of();
+  }
+
+  /**
+   * Starts every dependency of {@code spec}, deepest first, and then returns its running shared
+   * container.
+   *
+   * @param spec the spec to start
+   * @param suite the shared container suite
+   * @param <C> the container type
+   * @return the running container
+   * @throws IllegalStateException if the dependencies form a cycle
+   */
+  static <C extends BaseContainer> C startWithDependencies(
+      ContainerSpec<C> spec, ContainerSuite suite) {
+    startDependencies(spec, suite);
+    return spec.getOrStart(suite);
+  }
+
+  /**
+   * Starts every dependency of {@code spec}, deepest first, but not {@code spec} itself; for
+   * private containers, whose own start happens elsewhere.
+   *
+   * @param spec the spec whose dependencies to start
+   * @param suite the shared container suite
+   * @throws IllegalStateException if the dependencies form a cycle
+   */
+  static void startDependencies(ContainerSpec<?> spec, ContainerSuite suite) {
+    startDependencies(spec, suite, new ArrayDeque<>());
+  }
+
+  private static void startDependencies(
+      ContainerSpec<?> spec, ContainerSuite suite, Deque<ContainerSpec<?>> path) {
+    if (path.contains(spec)) {
+      path.addLast(spec);
+      throw new IllegalStateException("Container dependencies form a cycle: " + path);
+    }
+    path.addLast(spec);
+    for (ContainerSpec<?> dependency : spec.dependencies()) {
+      startDependencies(dependency, suite, path);
+      dependency.getOrStart(suite);
+    }
+    path.removeLast();
+  }
 
   /**
    * Returns the running container for this spec, starting it on first use.

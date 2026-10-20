@@ -18,12 +18,13 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import com.google.common.collect.ImmutableMap;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture(version = HiveVersion.HIVE3)
 public class CatalogHive3IT extends CatalogHive2IT {
 
   private HiveServer2Sql hiveSql;
@@ -53,19 +55,14 @@ public class CatalogHive3IT extends CatalogHive2IT {
   @Override
   protected void startNecessaryContainer() {
     hmsCatalog = "hive";
-    containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
-
     hiveMetastoreUris =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
   }
 
   /** Returns the Hive container used by this test suite. */
   protected HiveContainer hiveContainer() {
-    return containerSuite.getHiveContainer();
+    return hive;
   }
 
   /** Hive 3.x metastores support NOT NULL and DEFAULT constraints, which must round-trip to HMS. */

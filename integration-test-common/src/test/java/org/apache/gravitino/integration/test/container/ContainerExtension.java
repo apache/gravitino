@@ -189,7 +189,7 @@ public class ContainerExtension
         if (!methodScoped && testInstance != null && field.get(testInstance) != null) {
           continue;
         }
-        field.set(testInstance, container(declaration, context));
+        field.set(testInstance, inject(declaration, field.getType(), context));
         injected(context).add(declaration.spec());
       } catch (IllegalAccessException e) {
         throw new ExtensionConfigurationException("Cannot set field " + field.getName(), e);
@@ -216,7 +216,7 @@ public class ContainerExtension
       return Optional.empty();
     }
     Class<?> containerType = found.get(0).spec().containerType();
-    if (!field.getType().isAssignableFrom(containerType)) {
+    if (!found.get(0).spec().supplies(field.getType())) {
       throw new ExtensionConfigurationException(
           String.format(
               "%s: field %s of type %s cannot hold a %s",
@@ -241,7 +241,14 @@ public class ContainerExtension
             context.getRequiredTestClass(),
             "parameter " + parameter.getParameter().getName());
     injected(context).add(declaration.spec());
-    return container(declaration, context);
+    return inject(declaration, parameter.getParameter().getType(), context);
+  }
+
+  // The running container, as the type the field or parameter asks for.
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static Object inject(Declaration declaration, Class<?> wanted, ExtensionContext context) {
+    ContainerSpec spec = declaration.spec();
+    return spec.injectAs(wanted, container(declaration, context));
   }
 
   private static Declaration declarationFor(Class<?> wanted, Class<?> testClass, String target) {
@@ -261,7 +268,7 @@ public class ContainerExtension
   private static BaseContainer container(Declaration declaration, ExtensionContext context) {
     ContainerSpec<?> spec = declaration.spec();
     if (declaration.scope() == Scope.RUN) {
-      return spec.getOrStart(ContainerSuite.getInstance());
+      return ContainerSpec.startWithDependencies(spec, ContainerSuite.getInstance());
     }
     ExtensionContext owner =
         declaration.scope() == Scope.CLASS ? classContext(context) : methodContext(context, spec);
@@ -269,7 +276,10 @@ public class ContainerExtension
         .getStore(Namespace.create(ContainerExtension.class, spec))
         .computeIfAbsent(
             PRIVATE_CONTAINER,
-            key -> spec.startPrivate(ContainerSuite.getInstance()),
+            key -> {
+              ContainerSpec.startDependencies(spec, ContainerSuite.getInstance());
+              return spec.startPrivate(ContainerSuite.getInstance());
+            },
             BaseContainer.class);
   }
 
@@ -302,7 +312,7 @@ public class ContainerExtension
   private static List<Declaration> matching(Class<?> wanted, Class<?> testClass) {
     List<Declaration> matches = new ArrayList<>();
     for (Declaration declaration : declarations(testClass)) {
-      if (wanted.isAssignableFrom(declaration.spec().containerType())) {
+      if (declaration.spec().supplies(wanted)) {
         matches.add(declaration);
       }
     }

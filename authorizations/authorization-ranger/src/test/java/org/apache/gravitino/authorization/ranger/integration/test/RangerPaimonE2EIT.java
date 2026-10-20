@@ -66,13 +66,12 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
     super.startIntegrationTest();
 
     RangerITEnv.init(ranger, RangerBaseE2EIT.metalakeName, true);
-    RangerITEnv.startHiveRangerContainer();
+    hiveRanger = RangerITEnv.startHiveRangerContainer();
 
     HIVE_METASTORE_URIS =
         String.format(
             "thrift://%s:%d",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            hiveRanger.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     generateRangerSparkSecurityXML("authorization-ranger");
 
@@ -87,8 +86,7 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
                 "spark.sql.catalog.paimon.warehouse",
                 String.format(
                     "hdfs://%s:%d/user/hive/warehouse",
-                    containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-                    HiveContainer.HDFS_DEFAULTFS_PORT))
+                    hiveRanger.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT))
             .config("spark.sql.catalog.paimon.cache-enabled", "false")
             .config(
                 "spark.sql.extensions",
@@ -189,8 +187,7 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
             "warehouse",
             String.format(
                 "hdfs://%s:%d/user/hive/warehouse",
-                containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT),
+                hiveRanger.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT),
             AUTHORIZATION_PROVIDER,
             "ranger",
             RangerAuthorizationProperties.RANGER_SERVICE_TYPE,

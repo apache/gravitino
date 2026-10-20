@@ -43,6 +43,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.container.RangerFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -110,6 +111,9 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   protected static final String SQL_DROP_TABLE = String.format("DROP TABLE %s", tableName);
 
   @FixtureContainer protected RangerContainer ranger;
+
+  // The Ranger-enabled Hive; subclasses start it after RangerITEnv.init().
+  protected static HiveContainer hiveRanger;
 
   protected static void generateRangerSparkSecurityXML(String modeName) throws IOException {
     String templatePath =

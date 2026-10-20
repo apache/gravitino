@@ -52,9 +52,9 @@ import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHou
 import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.ClickHouseCluster;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
 import org.apache.gravitino.integration.test.container.ClickHouseFixture;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -85,7 +85,6 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @TestInstance(Lifecycle.PER_CLASS)
 @ClickHouseFixture(nodes = 3, database = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT)
 public class CatalogClickHouseClusterIT extends BaseIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-clickhouse";
 
   private final String metalakeName = GravitinoITUtils.genRandomName("ck_cluster_metalake");
@@ -107,13 +106,15 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   private GravitinoMetalake metalake;
   private Catalog catalog;
   private ClickHouseService clickHouseService;
-  @FixtureContainer private ClickHouseContainer clickHouseClusterContainer;
+  @FixtureContainer private ClickHouseCluster cluster;
+  private ClickHouseContainer clickHouseClusterContainer;
   private List<ClickHouseContainer> clickHouseClusterContainers;
   private final TestDatabaseName TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT;
 
   @BeforeAll
   public void startup() {
-    clickHouseClusterContainers = containerSuite.getClickHouseClusterContainers();
+    clickHouseClusterContainers = cluster.nodes();
+    clickHouseClusterContainer = cluster.first();
     Assertions.assertEquals(3, clickHouseClusterContainers.size());
 
     clickHouseService = new ClickHouseService(clickHouseClusterContainer, TEST_DB_NAME);

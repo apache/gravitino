@@ -58,6 +58,13 @@ public @interface HiveFixture {
   HiveAuth auth() default HiveAuth.NONE;
 
   /**
+   * Returns where Hive keeps table data besides its own HDFS.
+   *
+   * @return the storage; HDFS only by default
+   */
+  HiveStorage storage() default HiveStorage.HDFS;
+
+  /**
    * Returns how long the Hive container lives. Use {@link Scope#CLASS} or {@link Scope#METHOD} for
    * tests that change Hive in ways later tests would see, such as adding Kerberos principals.
    *

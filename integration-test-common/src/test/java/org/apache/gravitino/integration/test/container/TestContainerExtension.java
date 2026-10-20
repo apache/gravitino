@@ -153,6 +153,20 @@ public class TestContainerExtension {
   }
 
   @Test
+  void testClickHouseClusterOnlySuppliedForThreeNodes() {
+    ClickHouseSpec single =
+        new ClickHouseSpec(1, TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT);
+    ClickHouseSpec cluster =
+        new ClickHouseSpec(3, TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT);
+
+    Assertions.assertTrue(single.supplies(ClickHouseContainer.class));
+    Assertions.assertFalse(single.supplies(ClickHouseCluster.class));
+    Assertions.assertTrue(cluster.supplies(ClickHouseContainer.class));
+    Assertions.assertTrue(cluster.supplies(ClickHouseCluster.class));
+    Assertions.assertTrue(cluster.supplies(BaseContainer.class));
+  }
+
+  @Test
   void testFinalFieldFailsClearly() {
     run(FinalFieldFixture.class)
         .testEvents()

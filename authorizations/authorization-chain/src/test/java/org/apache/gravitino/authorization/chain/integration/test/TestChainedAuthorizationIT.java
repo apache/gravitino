@@ -81,21 +81,19 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
 
     super.startIntegrationTest();
     RangerITEnv.init(ranger, RangerBaseE2EIT.metalakeName, false);
-    RangerITEnv.startHiveRangerContainer();
+    hiveRanger = RangerITEnv.startHiveRangerContainer();
 
     HIVE_METASTORE_URIS =
         String.format(
             "thrift://%s:%d",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            hiveRanger.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     generateRangerSparkSecurityXML("authorization-chain");
 
     DEFAULT_FS =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hiveRanger.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
     BaseIT.runInEnv(
         "HADOOP_USER_NAME",
         "test123",

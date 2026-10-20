@@ -18,15 +18,17 @@
  */
 package org.apache.gravitino.integration.test.container;
 
-/**
- * How clients authenticate to the Hive a {@link HiveFixture} runs.
- *
- * <p>Ranger is not here yet: it needs a Ranger container started first, which arrives with a Ranger
- * dependency spec.
- */
+/** How clients authenticate to the Hive a {@link HiveFixture} runs. */
 public enum HiveAuth {
   /** No authentication. */
   NONE,
   /** Kerberos, from the Kerberos Hive image with its own KDC. */
-  KERBEROS
+  KERBEROS,
+  /**
+   * Ranger plugins for Hive and HDFS that report to the run's Ranger server, under the repositories
+   * {@link RangerContainer#HIVE_REPOSITORY} and {@link RangerContainer#HDFS_REPOSITORY}. Hive3
+   * only. Starts the Ranger server first, and starts lazily: a test asks for it after creating the
+   * Ranger services.
+   */
+  RANGER
 }

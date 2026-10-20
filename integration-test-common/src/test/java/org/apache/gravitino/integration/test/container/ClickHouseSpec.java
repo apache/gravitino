@@ -26,6 +26,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 
@@ -82,6 +83,26 @@ public record ClickHouseSpec(int nodes, TestDatabaseName database)
   // ContainerSuite reads the template from a file path, and the resource may sit inside a jar.
   // Copied on first use, not in a static initializer, so loading this class never touches the
   // disk; a failed copy is not cached and the next start tries again.
+  // The cluster keeps its replication metadata in ZooKeeper.
+  @Override
+  public List<ContainerSpec<?>> dependencies() {
+    return nodes == CLUSTER_NODES ? List.of(new ZooKeeperSpec()) : List.of();
+  }
+
+  @Override
+  public boolean supplies(Class<?> wanted) {
+    return ContainerSpec.super.supplies(wanted)
+        || (nodes == CLUSTER_NODES && wanted == ClickHouseCluster.class);
+  }
+
+  @Override
+  public Object injectAs(Class<?> wanted, ClickHouseContainer container) {
+    if (wanted == ClickHouseCluster.class) {
+      return new ClickHouseCluster(ContainerSuite.getInstance().getClickHouseClusterContainers());
+    }
+    return container;
+  }
+
   private static Path copyRemoteServersTemplate() {
     try (InputStream template =
         Objects.requireNonNull(

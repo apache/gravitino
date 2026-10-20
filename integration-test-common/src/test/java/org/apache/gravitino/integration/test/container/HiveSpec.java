@@ -18,18 +18,58 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * A Hive server of one version and authentication mode.
+ * A Hive server of one version, authentication mode and storage.
  *
  * <p>Plain and Kerberos Hive run side by side, but each holds one version at a time: asking for a
  * different version stops the running Hive of that mode and starts the requested one (see {@code
  * ContainerSlot}). Tests of one version therefore share a container, and a version switch costs a
  * restart, as with direct {@link ContainerSuite} calls. A private Hive ({@link Scope#CLASS} or
- * {@link Scope#METHOD}) leaves the shared one alone.
+ * {@link Scope#METHOD}) leaves the shared one alone. A Hive with cloud {@link HiveStorage} is a
+ * third container, one storage and version at a time.
  */
-public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerSpec<HiveContainer> {
+public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
+    implements ContainerSpec<HiveContainer> {
+
+  private static final String GCS_ACCOUNT_FILE_IN_CONTAINER = "/tmp/gcs-service-account.json";
+
+  /**
+   * Checks the combination.
+   *
+   * @throws IllegalArgumentException if Ranger is asked for with a Hive other than Hive3, or cloud
+   *     storage with authentication
+   */
+  public HiveSpec {
+    if (auth == HiveAuth.RANGER && version != HiveVersion.HIVE3) {
+      throw new IllegalArgumentException("Ranger Hive runs Hive3 only, not " + version);
+    }
+    if (storage != HiveStorage.HDFS && auth != HiveAuth.NONE) {
+      throw new IllegalArgumentException(
+          "Hive with " + storage + " storage supports no authentication, not " + auth);
+    }
+  }
+
+  /**
+   * A Hive that keeps its tables in its own HDFS.
+   *
+   * @param version the Hive version
+   * @param auth the authentication mode
+   */
+  public HiveSpec(HiveVersion version, HiveAuth auth) {
+    this(version, auth, HiveStorage.HDFS);
+  }
+
+  @Override
+  public List<ContainerSpec<?>> dependencies() {
+    if (auth == HiveAuth.RANGER) {
+      return List.of(new RangerSpec());
+    }
+    return storage == HiveStorage.S3 ? List.of(new LocalStackSpec()) : List.of();
+  }
 
   @Override
   public Class<HiveContainer> containerType() {
@@ -38,6 +78,9 @@ public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerS
 
   @Override
   public HiveContainer getOrStart(ContainerSuite suite) {
+    if (storage != HiveStorage.HDFS) {
+      return suite.startStorageHiveContainer(storage, storageEnv(suite), storageFiles());
+    }
     return switch (auth) {
       case NONE -> {
         suite.startHiveContainer(env());
@@ -47,7 +90,61 @@ public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerS
         suite.startKerberosHiveContainer(env());
         yield suite.getKerberosHiveContainer();
       }
+      case RANGER -> {
+        suite.startHiveRangerContainer(rangerEnv(new RangerSpec().getOrStart(suite)));
+        yield suite.getHiveRangerContainer();
+      }
     };
+  }
+
+  private Map<String, String> storageEnv(ContainerSuite suite) {
+    ImmutableMap.Builder<String, String> env = ImmutableMap.<String, String>builder().putAll(env());
+    switch (storage) {
+      case S3 -> {
+        GravitinoLocalStackContainer localStack = new LocalStackSpec().getOrStart(suite);
+        env.put("S3_ACCESS_KEY", GravitinoLocalStackContainer.ACCESS_KEY)
+            .put("S3_SECRET_KEY", GravitinoLocalStackContainer.SECRET_KEY)
+            .put(
+                "S3_ENDPOINT",
+                String.format(
+                    "http://%s:%d",
+                    localStack.getContainerIpAddress(), GravitinoLocalStackContainer.PORT));
+      }
+      case GCS -> env.put("SERVICE_ACCOUNT_FILE", GCS_ACCOUNT_FILE_IN_CONTAINER);
+      case ABS -> env.put("ABS_ACCOUNT_NAME", requiredEnv("ABS_ACCOUNT_NAME"))
+          .put("ABS_ACCOUNT_KEY", requiredEnv("ABS_ACCOUNT_KEY"));
+      case HDFS -> {}
+    }
+    return env.build();
+  }
+
+  private Map<String, String> storageFiles() {
+    return storage == HiveStorage.GCS
+        ? Map.of(GCS_ACCOUNT_FILE_IN_CONTAINER, requiredEnv("GCS_SERVICE_ACCOUNT_JSON_PATH"))
+        : Map.of();
+  }
+
+  private static String requiredEnv(String name) {
+    String value = System.getenv(name);
+    if (value == null || value.isEmpty()) {
+      throw new IllegalStateException(name + " must be set for this Hive storage");
+    }
+    return value;
+  }
+
+  private Map<String, String> rangerEnv(RangerContainer ranger) {
+    return ImmutableMap.<String, String>builder()
+        .putAll(env())
+        .put(
+            RangerContainer.DOCKER_ENV_RANGER_SERVER_URL,
+            String.format(
+                "http://%s:%d", ranger.getContainerIpAddress(), RangerContainer.RANGER_SERVER_PORT))
+        .put(
+            RangerContainer.DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME, RangerContainer.HIVE_REPOSITORY)
+        .put(
+            RangerContainer.DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME, RangerContainer.HDFS_REPOSITORY)
+        .put(HiveContainer.HADOOP_USER_NAME, RangerContainer.HADOOP_USER)
+        .build();
   }
 
   // Keeps the shared Hive's host name: the Kerberos image derives its principals from it. On macOS
@@ -55,6 +152,10 @@ public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerS
   // containers by IP; on Linux CI there is no shared network.
   @Override
   public HiveContainer startPrivate(ContainerSuite suite) {
+    if (storage != HiveStorage.HDFS) {
+      throw new UnsupportedOperationException(
+          "scope CLASS/METHOD is not supported for Hive with " + storage + " storage yet");
+    }
     return suite.startPrivate(network -> builder().withNetwork(network).build());
   }
 
@@ -62,6 +163,8 @@ public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerS
     return switch (auth) {
       case NONE -> ContainerSuite.hiveBuilder(env());
       case KERBEROS -> ContainerSuite.kerberosHiveBuilder(env());
+      case RANGER -> throw new UnsupportedOperationException(
+          "scope CLASS/METHOD is not supported for Ranger Hive yet");
     };
   }
 
@@ -72,12 +175,14 @@ public record HiveSpec(HiveVersion version, HiveAuth auth) implements ContainerS
   static final class Factory implements ContainerFixture.SpecFactory<HiveFixture> {
     @Override
     public Startup startupFor(HiveFixture fixture) {
-      return fixture.startup();
+      // Ranger's services must exist before a Ranger-enabled Hive reports to them, and tests
+      // create them in @BeforeAll, so that Hive starts when a test first asks for it.
+      return fixture.auth() == HiveAuth.RANGER ? Startup.LAZY : fixture.startup();
     }
 
     @Override
     public HiveSpec specFor(HiveFixture fixture) {
-      return new HiveSpec(fixture.version(), fixture.auth());
+      return new HiveSpec(fixture.version(), fixture.auth(), fixture.storage());
     }
 
     @Override

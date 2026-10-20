@@ -40,8 +40,12 @@ import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
+import org.apache.gravitino.integration.test.container.ContainerSpec;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveSpec;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
 import org.apache.ranger.RangerClient;
@@ -60,14 +64,14 @@ public class RangerITEnv {
   private static final Logger LOG = LoggerFactory.getLogger(RangerITEnv.class);
   protected static final String RANGER_TRINO_REPO_NAME = "trinoDev";
   private static final String RANGER_TRINO_TYPE = "trino";
-  public static final String RANGER_HIVE_REPO_NAME = "hiveDev";
+  public static final String RANGER_HIVE_REPO_NAME = RangerContainer.HIVE_REPOSITORY;
   private static final String RANGER_HIVE_TYPE = "hive";
-  public static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
+  public static final String RANGER_HDFS_REPO_NAME = RangerContainer.HDFS_REPOSITORY;
   public static final String METALAKE_ID = "1000";
   public static final String CATALOG_ID = "1001";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   public static RangerClient rangerClient;
-  public static final String HADOOP_USER_NAME = "gravitino";
+  public static final String HADOOP_USER_NAME = RangerContainer.HADOOP_USER;
   private static volatile boolean initRangerService = false;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -189,22 +193,16 @@ public class RangerITEnv {
     }
   }
 
-  public static void startHiveRangerContainer() {
-    containerSuite.startHiveRangerContainer(
-        new HashMap<>(
-            ImmutableMap.of(
-                HiveContainer.HIVE_RUNTIME_VERSION,
-                HiveContainer.HIVE3,
-                RangerContainer.DOCKER_ENV_RANGER_SERVER_URL,
-                String.format(
-                    "http://%s:%d",
-                    rangerContainer.getContainerIpAddress(), RangerContainer.RANGER_SERVER_PORT),
-                RangerContainer.DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME,
-                RangerITEnv.RANGER_HIVE_REPO_NAME,
-                RangerContainer.DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME,
-                RangerITEnv.RANGER_HDFS_REPO_NAME,
-                HiveContainer.HADOOP_USER_NAME,
-                HADOOP_USER_NAME)));
+  /**
+   * Starts the Ranger-enabled Hive after {@link #init} has set up the Ranger services, and returns
+   * it. Goes through the same spec as {@code @HiveFixture(version = HIVE3, auth = RANGER)}, so
+   * every class shares one Ranger Hive.
+   *
+   * @return the running Ranger-enabled Hive
+   */
+  public static HiveContainer startHiveRangerContainer() {
+    return ContainerSpec.startWithDependencies(
+        new HiveSpec(HiveVersion.HIVE3, HiveAuth.RANGER), containerSuite);
   }
 
   /** Currently we only test Ranger Hive, So wo Allow anyone to visit HDFS */

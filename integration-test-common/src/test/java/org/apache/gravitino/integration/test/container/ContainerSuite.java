@@ -116,7 +116,9 @@ public class ContainerSuite {
    * container with S3 is Hive3 container and the Hive container is Hive2 container. There is
    * something wrong with the hive2 container to access the S3.
    */
-  private static volatile HiveContainer hiveContainerWithS3;
+  // A Hive whose tables live in cloud storage, keyed by storage and version; one at a time.
+  private static final ContainerSlot<String, HiveContainer> storageHiveContainer =
+      new ContainerSlot<>();
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -171,25 +173,28 @@ public class ContainerSuite {
     }
   }
 
-  public void startHiveContainerWithS3(Map<String, String> env) {
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    builder.putAll(env);
-    builder.put("HADOOP_USER_NAME", "anonymous");
-    if (hiveContainerWithS3 == null) {
-      synchronized (ContainerSuite.class) {
-        if (hiveContainerWithS3 == null) {
-          initIfNecessary();
-          // Start Hive container
-          HiveContainer.Builder hiveBuilder =
-              HiveContainer.builder()
-                  .withHostName("gravitino-ci-hive")
-                  .withEnvVars(builder.build())
-                  .withNetwork(network);
-          HiveContainer container = closer.register(hiveBuilder.build());
-          start(container);
-          hiveContainerWithS3 = container;
-        }
-      }
+  /**
+   * Starts, or returns the running, Hive whose tables live in the given cloud storage. Only one
+   * runs at a time: asking for another storage or version replaces it.
+   *
+   * @param storage the storage, other than {@link HiveStorage#HDFS}
+   * @param env the container environment, including {@link HiveContainer#HIVE_RUNTIME_VERSION}
+   * @param filesToMount host files to mount, keyed by container path
+   * @return the running Hive
+   */
+  public HiveContainer startStorageHiveContainer(
+      HiveStorage storage, Map<String, String> env, Map<String, String> filesToMount) {
+    synchronized (ContainerSuite.class) {
+      return storageHiveContainer.getOrStart(
+          storage + "/" + hiveVersion(env),
+          () -> {
+            initIfNecessary();
+            HiveContainer container =
+                closer.register(
+                    hiveBuilder(env).withFilesToMount(filesToMount).withNetwork(network).build());
+            start(container);
+            return container;
+          });
     }
   }
 
@@ -760,10 +765,6 @@ public class ContainerSuite {
     return rustFSContainer;
   }
 
-  public HiveContainer getHiveContainerWithS3() {
-    return hiveContainerWithS3;
-  }
-
   public KafkaContainer getKafkaContainer() {
     return kafkaContainer;
   }
@@ -1113,7 +1114,7 @@ public class ContainerSuite {
     gravitinoLocalStackContainer = null;
     rustFSContainer = null;
     motoContainer = null;
-    hiveContainerWithS3 = null;
+    storageHiveContainer.clear();
   }
 
   private static Map<String, String> resolveClickHouseTestFiles() {

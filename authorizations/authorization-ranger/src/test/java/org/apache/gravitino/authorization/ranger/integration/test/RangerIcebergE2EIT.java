@@ -67,13 +67,12 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     super.startIntegrationTest();
 
     RangerITEnv.init(ranger, RangerBaseE2EIT.metalakeName, true);
-    RangerITEnv.startHiveRangerContainer();
+    hiveRanger = RangerITEnv.startHiveRangerContainer();
 
     HIVE_METASTORE_URIS =
         String.format(
             "thrift://%s:%d",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            hiveRanger.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     generateRangerSparkSecurityXML("authorization-ranger");
 
@@ -168,8 +167,7 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
         IcebergConstants.WAREHOUSE,
         String.format(
             "hdfs://%s:%d/user/hive/warehouse",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT));
+            hiveRanger.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
     properties.put(IMPERSONATION_ENABLE, "true");
     properties.put(AUTHORIZATION_PROVIDER, "ranger");
     properties.put(RangerAuthorizationProperties.RANGER_SERVICE_TYPE, "HadoopSQL");
