@@ -43,4 +43,12 @@ public class TestPostgreSqlColumnDefaultValueConverter {
     Assertions.assertEquals(
         Literals.stringLiteral(""), converter.toGravitino(type, "''::text", false, true));
   }
+
+  @Test
+  void testEmptyBpcharLiteralIsUnescaped() {
+    JdbcTypeConverter.JdbcTypeBean type =
+        new JdbcTypeConverter.JdbcTypeBean(PostgreSqlTypeConverter.BPCHAR);
+    Assertions.assertEquals(
+        Literals.stringLiteral(""), converter.toGravitino(type, "''::bpchar", false, true));
+  }
 }
