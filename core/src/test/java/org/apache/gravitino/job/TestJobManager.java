@@ -2090,6 +2090,8 @@ public class TestJobManager {
 
     Assertions.assertTrue(failingDir.exists());
     Assertions.assertFalse(otherDir.exists());
+    verify(entityStore, times(1)).delete(failingIdent, Entity.EntityType.JOB);
+    verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
   }
 
   @Test

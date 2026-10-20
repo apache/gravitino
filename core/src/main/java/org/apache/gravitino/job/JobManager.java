@@ -42,6 +42,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -749,44 +750,12 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   void pullAndUpdateJobStatus() {
-    // An exception escaping this scheduled task would cancel all its later runs, so a failure is
-    // logged and only skips the metalake or the job it affects.
-    List<String> metalakes;
-    try {
-      metalakes = MetalakeManager.listInUseMetalakes(entityStore);
-    } catch (RuntimeException e) {
-      LOG.error("Failed to list the in-use metalakes to pull the job status", e);
-      return;
-    }
-
-    for (String metalake : metalakes) {
-      try {
-        pullAndUpdateJobStatus(metalake);
-      } catch (RuntimeException e) {
-        LOG.error("Failed to pull the job status under metalake {}", metalake, e);
-      }
-    }
+    forEachInUseMetalake("pull the job status", this::pullAndUpdateJobStatus);
   }
 
   @VisibleForTesting
   void cleanUpStagingDirs() {
-    // An exception escaping this scheduled task would cancel all its later runs, so a failure is
-    // logged and only skips the metalake or the job it affects.
-    List<String> metalakes;
-    try {
-      metalakes = MetalakeManager.listInUseMetalakes(entityStore);
-    } catch (RuntimeException e) {
-      LOG.error("Failed to list the in-use metalakes to clean up the job staging directories", e);
-      return;
-    }
-
-    for (String metalake : metalakes) {
-      try {
-        cleanUpStagingDirs(metalake);
-      } catch (RuntimeException e) {
-        LOG.error("Failed to clean up the job staging directories under metalake {}", metalake, e);
-      }
-    }
+    forEachInUseMetalake("clean up the job staging directories", this::cleanUpStagingDirs);
   }
 
   @VisibleForTesting
@@ -1016,9 +985,29 @@ public class JobManager implements JobOperationDispatcher {
     return newValue.orElse(currentValue);
   }
 
+  // Runs a scheduled task on every in-use metalake. An exception escaping a scheduled task would
+  // cancel all its later runs, so a failure is logged and only skips the metalake it affects.
+  private void forEachInUseMetalake(String task, Consumer<String> action) {
+    List<String> metalakes;
+    try {
+      metalakes = MetalakeManager.listInUseMetalakes(entityStore);
+    } catch (RuntimeException e) {
+      LOG.error("Failed to list the in-use metalakes to {}", task, e);
+      return;
+    }
+
+    for (String metalake : metalakes) {
+      try {
+        action.accept(metalake);
+      } catch (RuntimeException e) {
+        LOG.error("Failed to {} under metalake {}", task, metalake, e);
+      }
+    }
+  }
+
   private void pullAndUpdateJobStatus(String metalake) {
-    // This unnecessary list all the jobs, we need to improve the code to only list the active
-    // jobs.
+    // This unnecessarily lists all the jobs, we need to improve the code to only list the
+    // active jobs.
     List<JobEntity> activeJobs =
         listJobs(metalake, Optional.empty()).stream()
             .filter(
