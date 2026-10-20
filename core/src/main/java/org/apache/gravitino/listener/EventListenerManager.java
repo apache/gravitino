@@ -23,10 +23,9 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
@@ -59,7 +58,10 @@ public class EventListenerManager {
 
   private int queueCapacity;
   private int dispatcherJoinSeconds;
-  private List<EventListenerPlugin> eventListeners;
+  // Copy-on-write lists, so listeners added after start() are safe to iterate concurrently.
+  private final List<EventListenerPlugin> eventListeners = new CopyOnWriteArrayList<>();
+  private final List<EventListenerPlugin> sharedQueueListeners = new CopyOnWriteArrayList<>();
+  private volatile boolean started = false;
 
   public void init(Map<String, String> properties) {
     EventListenerConfig config = new EventListenerConfig(properties);
@@ -83,11 +85,12 @@ public class EventListenerManager {
                       throw new IllegalStateException(
                           "Duplicate event listener name detected: " + existingValue);
                     }));
-    this.eventListeners = assembleEventListeners(userEventListenerPlugins);
+    userEventListenerPlugins.forEach(this::assembleEventListener);
   }
 
-  public void start() {
-    eventListeners.stream().forEach(listener -> listener.start());
+  public synchronized void start() {
+    eventListeners.forEach(EventListenerPlugin::start);
+    started = true;
   }
 
   public void stop() {
@@ -98,46 +101,53 @@ public class EventListenerManager {
     return new EventBus(eventListeners);
   }
 
-  public void addEventListener(String listenerName, EventListenerPlugin listener) {
-    eventListeners.add(new EventListenerPluginWrapper(listenerName, listener));
+  /**
+   * Registers an event listener that is created in code rather than loaded from the configuration.
+   * The listener is dispatched according to its {@link EventListenerPlugin#mode()}, the same as the
+   * configured listeners. If the manager has already started, the listener is started here.
+   *
+   * @param listenerName The name of the listener.
+   * @param listener The listener to register.
+   */
+  public synchronized void addEventListener(String listenerName, EventListenerPlugin listener) {
+    assembleEventListener(listenerName, listener);
   }
 
-  private List<EventListenerPlugin> assembleEventListeners(
-      Map<String, EventListenerPlugin> userEventListeners) {
-    List<EventListenerPlugin> sharedQueueListeners = new ArrayList<>();
-
-    List<EventListenerPlugin> listeners =
-        userEventListeners.entrySet().stream()
-            .map(
-                entrySet -> {
-                  String listenerName = entrySet.getKey();
-                  EventListenerPlugin listener = entrySet.getValue();
-                  switch (listener.mode()) {
-                    case SYNC:
-                      return new EventListenerPluginWrapper(listenerName, listener);
-                    case ASYNC_ISOLATED:
-                      return new AsyncQueueListener(
-                          ImmutableList.of(new EventListenerPluginWrapper(listenerName, listener)),
-                          listenerName,
-                          queueCapacity,
-                          dispatcherJoinSeconds);
-                    case ASYNC_SHARED:
-                      sharedQueueListeners.add(
-                          new EventListenerPluginWrapper(listenerName, listener));
-                      return null;
-                    default:
-                      throw new RuntimeException("Unexpected listener mode:" + listener.mode());
-                  }
-                })
-            .filter(Objects::nonNull)
-            .collect(Collectors.toList());
-
-    if (!sharedQueueListeners.isEmpty()) {
-      listeners.add(
-          new AsyncQueueListener(
-              sharedQueueListeners, "default", queueCapacity, dispatcherJoinSeconds));
+  private void assembleEventListener(String listenerName, EventListenerPlugin listener) {
+    EventListenerPluginWrapper wrapper = new EventListenerPluginWrapper(listenerName, listener);
+    switch (listener.mode()) {
+      case SYNC:
+        addAndStartIfNeeded(eventListeners, wrapper);
+        break;
+      case ASYNC_ISOLATED:
+        addAndStartIfNeeded(
+            eventListeners,
+            new AsyncQueueListener(
+                ImmutableList.of(wrapper), listenerName, queueCapacity, dispatcherJoinSeconds));
+        break;
+      case ASYNC_SHARED:
+        if (!sharedQueueListeners.isEmpty()) {
+          addAndStartIfNeeded(sharedQueueListeners, wrapper);
+        } else {
+          // Starting the shared queue starts the wrapper as well.
+          sharedQueueListeners.add(wrapper);
+          addAndStartIfNeeded(
+              eventListeners,
+              new AsyncQueueListener(
+                  sharedQueueListeners, "default", queueCapacity, dispatcherJoinSeconds));
+        }
+        break;
+      default:
+        throw new RuntimeException("Unexpected listener mode:" + listener.mode());
     }
-    return listeners;
+  }
+
+  private void addAndStartIfNeeded(
+      List<EventListenerPlugin> listeners, EventListenerPlugin listener) {
+    if (started) {
+      listener.start();
+    }
+    listeners.add(listener);
   }
 
   private EventListenerPlugin loadUserEventListenerPlugin(

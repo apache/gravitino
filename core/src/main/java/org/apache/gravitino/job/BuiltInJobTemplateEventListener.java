@@ -39,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
@@ -139,7 +140,14 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
           return;
         }
 
-        reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
+        // This listener runs on an async dispatcher thread, which has no caller principal. Run as
+        // the user who created the metalake, so the templates record that user as the creator.
+        PrincipalUtils.doAs(
+            new UserPrincipal(event.user()),
+            () -> {
+              reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
+              return null;
+            });
         LOG.info("Registered built-in job templates for metalake: {}", metalakeName);
       } catch (Exception e) {
         LOG.error("Failed to register built-in job templates for metalake: {}", metalakeName, e);

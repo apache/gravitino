@@ -22,6 +22,8 @@ package org.apache.gravitino.listener;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -30,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -98,6 +101,20 @@ class TestAsyncQueueListener {
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
     }
+  }
+
+  @Test
+  void testStopIsIdempotent() {
+    // Do not block the WARN log the dispatcher thread writes when it is interrupted.
+    blockingAppender.releaseFirstLog.countDown();
+    EventListenerPlugin innerListener = mock(EventListenerPlugin.class);
+    AsyncQueueListener listener = new AsyncQueueListener(List.of(innerListener), "test", 1, 1);
+    listener.start();
+
+    listener.stop();
+    listener.stop();
+
+    verify(innerListener, times(1)).stop();
   }
 
   private static class BlockingAppender extends AbstractAppender {

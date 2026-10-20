@@ -65,6 +65,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -143,8 +144,10 @@ public class TestBuiltInJobTemplateEventListener {
 
       listener.onPostEvent(event);
 
-      // Verify registerJobTemplate was called
-      verify(jobManager, times(1)).registerJobTemplate(eq(metalakeName), any());
+      // Verify registerJobTemplate was called, with the metalake creator as the template creator
+      ArgumentCaptor<JobTemplateEntity> captor = ArgumentCaptor.forClass(JobTemplateEntity.class);
+      verify(jobManager, times(1)).registerJobTemplate(eq(metalakeName), captor.capture());
+      Assertions.assertEquals("user", captor.getValue().auditInfo().creator());
     }
   }
 

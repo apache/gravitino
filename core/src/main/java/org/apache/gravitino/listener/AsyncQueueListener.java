@@ -20,7 +20,6 @@
 package org.apache.gravitino.listener;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -97,8 +96,11 @@ public class AsyncQueueListener implements EventListenerPlugin {
 
   @Override
   public void stop() {
-    Preconditions.checkState(!stopped.get(), asyncQueueListenerName + " had already stopped");
-    stopped.compareAndSet(false, true);
+    // Stop can be called more than once, e.g. by the server shutdown hook after an explicit stop.
+    if (!stopped.compareAndSet(false, true)) {
+      LOG.debug("{} had already stopped", asyncQueueListenerName);
+      return;
+    }
     asyncProcessor.interrupt();
     try {
       asyncProcessor.join(dispatcherJoinSeconds * 1000L);
