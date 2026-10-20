@@ -183,6 +183,8 @@ Doris enforces the following constraints (violations are rejected by the Doris s
 - The auto-increment column must be `BIGINT NOT NULL` with no `DEFAULT` value.
 - Each table can have at most one auto-increment column.
 
+An auto-increment column can only be defined when the table is created. Gravitino rejects adding one with `alterTable`.
+
 :::note
 Gravitino currently supports creating `UNIQUE KEY` tables via the `UNIQUE_KEY` index type. To create a `DUPLICATE KEY` table, omit key indexes from the table definition — Doris defaults to the DUPLICATE model when no key is specified.
 :::

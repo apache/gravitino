@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.maintenance.storage.service;
 
+import static org.apache.gravitino.maintenance.storage.TableMaintenanceActionTestUtils.expireClaim;
+
 import java.util.Optional;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -79,23 +81,22 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long tableId = 11L;
     long policyId = 21L;
-    long timeoutMs = 200L;
+    long timeoutMs = TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS;
 
     Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(first.isPresent());
     Assertions.assertEquals(0L, actions.getById(first.get().id()).finishedAt());
     Assertions.assertTrue(actions.tryAcquireInFlight(tableId, policyId, timeoutMs).isEmpty());
 
-    Thread.sleep(timeoutMs + 50L);
+    OccupancyClaim expired = expireClaim(first.get(), timeoutMs);
 
     Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
     Assertions.assertEquals(first.get().id(), reclaimed.get().id());
-    Assertions.assertTrue(reclaimed.get().createdAt() >= first.get().createdAt());
+    Assertions.assertTrue(reclaimed.get().createdAt() > expired.createdAt());
     Assertions.assertEquals(0L, actions.getById(reclaimed.get().id()).finishedAt());
 
-    Assertions.assertThrows(
-        IllegalStateException.class, () -> actions.bindJobId(first.get(), 1001L));
+    Assertions.assertThrows(IllegalStateException.class, () -> actions.bindJobId(expired, 1001L));
     actions.bindJobId(reclaimed.get(), 1002L);
     Assertions.assertEquals(1002L, actions.getById(reclaimed.get().id()).jobId());
   }

@@ -197,17 +197,35 @@ public class IdpUserGroupManager implements Closeable {
   }
 
   /**
+   * Changes the password for a built-in IdP user after verifying the old password.
+   *
+   * @param username The username.
+   * @param newPassword The new plaintext password.
+   * @param oldPassword The caller's current plaintext password.
+   * @return {@code true} if the password was updated
+   * @throws NotFoundException if the user does not exist
+   * @throws IllegalArgumentException if {@code oldPassword} does not match the stored hash
+   */
+  public boolean changePassword(String username, String newPassword, String oldPassword) {
+    IdpUser user = USER_SERVICE.getIdpUser(username);
+    if (user.passwordHash() == null || !passwordHasher.verify(oldPassword, user.passwordHash())) {
+      throw new IllegalArgumentException("\"oldPassword\" does not match the stored password");
+    }
+    return changePassword(username, newPassword);
+  }
+
+  /**
    * Enables or disables a built-in IdP user.
    *
    * @param username The username.
    * @param enabled Whether the user should be enabled.
    * @return {@code true} if the enabled flag was updated
    * @throws NotFoundException if the user does not exist
-   * @throws IllegalArgumentException if {@code enabled} is {@code false} and the username is a
-   *     configured service admin
+   * @throws IllegalArgumentException if the username is a configured service admin
    */
   public boolean updateEnabled(String username, boolean enabled) {
-    checkCanDisableUser(username, enabled);
+    Preconditions.checkArgument(
+        !isServiceAdmin(username), "Cannot update the enabled flag of service admin %s", username);
     return USER_SERVICE.updateIdpUserEnabled(username, enabled);
   }
 

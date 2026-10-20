@@ -80,6 +80,7 @@ dependencies {
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.junit.platform.testkit)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
@@ -170,6 +171,12 @@ fun registerCoreTestTask(
       }
     }
   }
+}
+
+// Nested fixture classes TestBackendTestExtension runs through EngineTestKit; Gradle's class scan
+// would run them directly too. Keep in sync with TestBackendTestExtension.FIXTURE.
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform { excludeTags("gravitino-test-fixture") }
 }
 
 registerCoreTestTask("coreUnitTest")
