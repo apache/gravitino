@@ -37,7 +37,6 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
-import org.apache.spark.SparkConf;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
@@ -67,7 +66,7 @@ public class TestBaseCatalogFunctions {
   @BeforeAll
   static void initCatalogManager() {
     GravitinoClient gravitinoClient = mock(GravitinoClient.class);
-    GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> gravitinoClient);
+    GravitinoCatalogManager.create("user", () -> gravitinoClient);
   }
 
   @AfterAll
