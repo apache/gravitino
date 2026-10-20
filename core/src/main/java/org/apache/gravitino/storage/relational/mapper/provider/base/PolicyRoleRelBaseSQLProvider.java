@@ -51,9 +51,9 @@ public class PolicyRoleRelBaseSQLProvider {
         + " ORDER BY pm.policy_name";
   }
 
-  /** Returns SQL for inserting one reference if the active pair does not exist. */
-  public String insertIfAbsent(@Param("relation") PolicyRoleRelPO relation) {
-    return "INSERT IGNORE INTO "
+  /** Returns SQL for inserting one reference. */
+  public String insert(@Param("relation") PolicyRoleRelPO relation) {
+    return "INSERT INTO "
         + POLICY_ROLE_RELATION_TABLE_NAME
         + " (policy_id, role_name, current_version, last_version, deleted_at)"
         + " VALUES (#{relation.policyId}, #{relation.roleName},"

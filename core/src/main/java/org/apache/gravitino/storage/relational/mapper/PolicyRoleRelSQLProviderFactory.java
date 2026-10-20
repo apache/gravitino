@@ -59,9 +59,9 @@ public class PolicyRoleRelSQLProviderFactory {
     return getProvider().listByRoleName(metalakeName, roleName);
   }
 
-  /** Delegates an insert-if-absent operation. */
-  public static String insertIfAbsent(@Param("relation") PolicyRoleRelPO relation) {
-    return getProvider().insertIfAbsent(relation);
+  /** Delegates an insert operation. */
+  public static String insert(@Param("relation") PolicyRoleRelPO relation) {
+    return getProvider().insert(relation);
   }
 
   /** Delegates a reference soft delete. */

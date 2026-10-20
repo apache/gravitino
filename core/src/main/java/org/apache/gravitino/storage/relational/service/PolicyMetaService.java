@@ -437,8 +437,7 @@ public class PolicyMetaService {
       if (currentRoles.contains(added.getRoleName())) {
         continue;
       }
-      SessionUtils.doWithoutCommit(
-          PolicyRoleRelMapper.class, mapper -> mapper.insertIfAbsent(added));
+      SessionUtils.doWithoutCommit(PolicyRoleRelMapper.class, mapper -> mapper.insert(added));
     }
   }
 

@@ -298,11 +298,12 @@ public class MetalakeMetaService {
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
-                    PolicyRoleRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
                     PolicyMetaMapper.class,
                     mapper -> mapper.softDeletePolicyMetasByMetalakeId(metalakeId)),
+            // Must follow the policy delete, which waits for an in-flight policy update to commit.
+            () ->
+                SessionUtils.doWithoutCommit(
+                    PolicyRoleRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyVersionMapper.class,
