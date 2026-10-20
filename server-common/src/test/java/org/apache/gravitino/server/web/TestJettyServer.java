@@ -39,6 +39,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.rest.RESTUtils;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.junit.jupiter.api.AfterEach;
@@ -106,6 +107,32 @@ public class TestJettyServer {
   }
 
   @Test
+  public void testMetricsEndpointsAreNotRegisteredByDefault() throws IOException {
+    int port = startServer();
+
+    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+      assertEquals(HttpServletResponse.SC_NOT_FOUND, requestStatus(port, pathSpec));
+    }
+  }
+
+  @Test
+  public void testMetricsEndpointsCanBeRegisteredExplicitly() throws IOException {
+    int port = RESTUtils.findAvailablePort(5000, 6000);
+    Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HOST, "127.0.0.1");
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+    jettyServer.initialize(JettyServerConfig.fromConfig(config), "test", false);
+    try (MetricsSystem metricsSystem = new MetricsSystem()) {
+      jettyServer.addMetricsServlets(metricsSystem);
+      jettyServer.start();
+
+      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+        assertEquals(HttpServletResponse.SC_OK, requestStatus(port, pathSpec));
+      }
+    }
+  }
+
+  @Test
   public void testErrorPageIncludesStackTraceByDefault() throws IOException {
     String errorPage = requestFailingServlet(new Config(false) {});
 
@@ -164,6 +191,26 @@ public class TestJettyServer {
           new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8)) {
         return CharStreams.toString(errorBody);
       }
+    } finally {
+      connection.disconnect();
+    }
+  }
+
+  private int startServer() throws IOException {
+    int port = RESTUtils.findAvailablePort(5000, 6000);
+    Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HOST, "127.0.0.1");
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+    jettyServer.initialize(JettyServerConfig.fromConfig(config), "test", false);
+    jettyServer.start();
+    return port;
+  }
+
+  private int requestStatus(int port, String path) throws IOException {
+    HttpURLConnection connection =
+        (HttpURLConnection) new URL("http://127.0.0.1:" + port + path).openConnection();
+    try {
+      return connection.getResponseCode();
     } finally {
       connection.disconnect();
     }
