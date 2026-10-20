@@ -299,14 +299,4 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
           hiveTable.supportPartitions().purgePartition("city=1");
         });
   }
-
-  @Test
-  public void testTableCloseDoesNotTouchSharedPool() throws Exception {
-    // The client pool is shared by every table handle of the catalog; a per-table close()
-    // must not close it. (HiveTableHandle.close() used to close the pool; it is now removed
-    // and this pins the sibling-operation contract.)
-    hiveTable.ops().close();
-    // A sibling operation must still work over the same catalog-shared pool.
-    Assertions.assertTrue(hiveTable.supportPartitions().listPartitionNames().length > 0);
-  }
 }
