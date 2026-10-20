@@ -37,14 +37,21 @@ import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -64,6 +71,12 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -71,6 +84,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.lance.Dataset;
+import org.lance.WriteParams;
 import org.mockito.Mockito;
 
 public class TestGenericCatalogOperations {
@@ -143,6 +161,136 @@ public class TestGenericCatalogOperations {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     ops = new GenericCatalogOperations(store, idGenerator);
+  }
+
+  @TempDir private Path lanceDataDir;
+
+  /** Registered tables must be persisted as external whatever the caller passed. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {"NULL", "false", "true"},
+      nullValues = "NULL")
+  void testRegisterPropertiesAreExternal(String external) {
+    GenericCatalogOperations lanceOps = initializedOps();
+    NameIdentifier schemaIdent = createSchema();
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "registered");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                "lance.register",
+                "true",
+                Table.PROPERTY_LOCATION,
+                lanceDataDir.resolve("existing").toString()));
+    properties.putAll(
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    Map<String, String> original = Map.copyOf(properties);
+
+    Table created =
+        lanceOps.createTable(
+            ident,
+            new Column[0],
+            null,
+            properties,
+            new Transform[0],
+            null,
+            new SortOrder[0],
+            new Index[0]);
+
+    Assertions.assertEquals("true", created.properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals(original, properties);
+    Assertions.assertTrue(lanceOps.dropTable(ident));
+  }
+
+  /** Legacy registrations preserve real data on drop and schema cascade; purge deletes it. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {
+        "NULL,drop",
+        "false,drop",
+        "NULL,purge",
+        "false,purge",
+        "NULL,cascade",
+        "false,cascade"
+      },
+      nullValues = "NULL")
+  void testLegacyRegisteredLanceOwnership(String external, String operation) throws Exception {
+    GenericCatalogOperations lanceOps = initializedOps();
+    NameIdentifier schemaIdent = createSchema();
+    String location = lanceDataDir.resolve("legacy").toString();
+    // Arrow Schema and Gravitino Schema share a simple name in this test class.
+    try (Dataset ignored =
+        Dataset.write()
+            .schema(
+                new org.apache.arrow.vector.types.pojo.Schema(
+                    List.of(Field.nullable("id", new ArrowType.Int(32, true)))))
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .execute()) {
+      // The dataset predates its catalog registration.
+    }
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "legacy");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                "lance.register",
+                "true",
+                Table.PROPERTY_LOCATION,
+                location));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    TableEntity entity =
+        TableEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    store.put(entity, false);
+
+    if ("purge".equals(operation)) {
+      Assertions.assertTrue(lanceOps.purgeTable(ident));
+    } else if ("cascade".equals(operation)) {
+      Assertions.assertTrue(lanceOps.dropSchema(schemaIdent, true));
+    } else {
+      Assertions.assertTrue(lanceOps.dropTable(ident));
+    }
+
+    Assertions.assertFalse(lanceOps.tableExists(ident));
+    if ("purge".equals(operation)) {
+      Assertions.assertFalse(Files.exists(lanceDataDir.resolve("legacy/_versions")));
+    } else {
+      try (Dataset dataset = Dataset.open().uri(location).build()) {
+        Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+      }
+    }
+  }
+
+  private static GenericCatalogOperations initializedOps() {
+    GenericCatalogOperations initialized = new GenericCatalogOperations(store, idGenerator);
+    initialized.initialize(ImmutableMap.of(), null /* CatalogInfo, unused */, new GenericCatalog());
+    return initialized;
+  }
+
+  private NameIdentifier createSchema() {
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, randomSchemaName());
+    ops.createSchema(
+        schemaIdent,
+        null,
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+    return schemaIdent;
   }
 
   @AfterAll

@@ -36,6 +36,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +49,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.meta.AuditInfo;
@@ -66,9 +69,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.Dataset;
 import org.lance.Version;
+import org.lance.WriteParams;
 import org.lance.index.IndexOptions;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
@@ -88,6 +93,145 @@ public class TestLanceTableOperations {
     schemaOps = mock(ManagedSchemaOperations.class);
     idGenerator = mock(IdGenerator.class);
     lanceTableOps = spy(new LanceTableOperations(store, schemaOps, idGenerator));
+  }
+
+  /** Registered tables persist external ownership and retain the existing dataset on drop. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {"NULL", "false", "true"},
+      nullValues = "NULL")
+  void testRegisterPersistsExternalAndDropPreservesDataset(String external) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "registered");
+    String location = tempDir.resolve("registered").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    when(idGenerator.nextId()).thenReturn(10L);
+    try (Dataset ignored = writeDataset(location)) {
+      // Seed a dataset owned by the caller before registering it.
+    }
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(LANCE_TABLE_REGISTER, "true");
+    properties.putAll(StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(1L), null));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    Map<String, String> original = Map.copyOf(properties);
+    AtomicReference<TableEntity> stored = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              stored.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(store)
+        .put(any(TableEntity.class), eq(false));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> stored.get());
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+
+    Table created =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    columns,
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertEquals("true", created.properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals("true", stored.get().properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals(
+        "true", lanceTableOps.loadTable(ident).properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals(original, properties);
+    Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    verify(store).delete(ident, Entity.EntityType.TABLE);
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  /** Legacy registration flags also protect drop and overwrite, while purge remains destructive. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {
+        "NULL,drop",
+        "false,drop",
+        "true,drop",
+        "NULL,purge",
+        "false,purge",
+        "true,purge",
+        "NULL,overwrite",
+        "false,overwrite"
+      },
+      nullValues = "NULL")
+  void testLegacyRegistrationRemoval(String external, String operation) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "legacy");
+    String location = tempDir.resolve("legacy").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    when(idGenerator.nextId()).thenReturn(10L);
+    try (Dataset ignored = writeDataset(location)) {
+      // A historical registration must never transfer ownership to Gravitino implicitly.
+    }
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_REGISTER,
+                "true"));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    AtomicReference<TableEntity> stored =
+        new AtomicReference<>(tableEntity(ident, List.of(), properties));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> stored.get());
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    if ("overwrite".equals(operation)) {
+      Map<String, String> replacement = Maps.newHashMap(properties);
+      replacement.put(LANCE_CREATION_MODE, "OVERWRITE");
+      replacement.putAll(StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(2L), null));
+      Mockito.doAnswer(
+              invocation -> {
+                stored.set(invocation.getArgument(0));
+                return null;
+              })
+          .when(store)
+          .put(any(TableEntity.class), eq(false));
+      Table replaced =
+          PrincipalUtils.doAs(
+              new UserPrincipal("tester"),
+              () ->
+                  lanceTableOps.createTable(
+                      ident,
+                      columns,
+                      null,
+                      replacement,
+                      new Transform[0],
+                      null,
+                      new SortOrder[0],
+                      new Index[0]));
+      Assertions.assertEquals("true", replaced.properties().get(Table.PROPERTY_EXTERNAL));
+    } else if ("purge".equals(operation)) {
+      Assertions.assertTrue(lanceTableOps.purgeTable(ident));
+    } else {
+      Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    }
+    verify(store).delete(ident, Entity.EntityType.TABLE);
+    if ("purge".equals(operation)) {
+      Assertions.assertFalse(Files.exists(Paths.get(location, "_versions")));
+    } else {
+      try (Dataset dataset = Dataset.open().uri(location).build()) {
+        Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+      }
+    }
   }
 
   @Test
@@ -1148,5 +1292,13 @@ public class TestLanceTableOperations {
               storedTable.set(updated);
               return updated;
             });
+  }
+
+  private static Dataset writeDataset(String location) {
+    return Dataset.write()
+        .schema(new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true)))))
+        .uri(location)
+        .mode(WriteParams.WriteMode.CREATE)
+        .execute();
   }
 }
