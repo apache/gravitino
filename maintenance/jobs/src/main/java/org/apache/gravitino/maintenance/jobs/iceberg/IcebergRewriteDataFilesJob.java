@@ -39,7 +39,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-data-files";
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v3";
 
   // Valid strategy values for Iceberg rewrite_data_files procedure
   private static final String STRATEGY_BINPACK = "binpack";

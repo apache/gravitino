@@ -50,7 +50,13 @@ public final class IcebergSparkConfigUtils {
   /** Build default Spark template configs for Iceberg jobs. */
   public static Map<String, String> buildTemplateSparkConfigs() {
     Map<String, String> configs = new HashMap<>();
-    configs.put("spark.master", "{{spark_master:-local[*]}}");
+    // An empty value leaves the Spark configuration unset: spark-submit then runs the job with
+    // its default master, local[*], and the k8s job executor keeps its own default.
+    configs.put("spark.master", "{{spark_master:-}}");
+    // Submit-time configurations, which a job run can only set through the job template, since
+    // spark-submit resolves them before the driver starts.
+    configs.put("spark.jars", "{{spark_jars:-}}");
+    configs.put("spark.jars.packages", "{{spark_jars_packages:-}}");
     configs.put("spark.executor.instances", "{{spark_executor_instances:-1}}");
     configs.put("spark.executor.cores", "{{spark_executor_cores:-1}}");
     configs.put("spark.executor.memory", "{{spark_executor_memory:-1g}}");

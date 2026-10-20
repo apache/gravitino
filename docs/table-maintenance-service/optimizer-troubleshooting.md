@@ -64,11 +64,12 @@ These are the hard ones, because success and "the policy decided not to act" loo
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-**`submit-update-stats-job` fails with JDBC metrics errors** — when `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the JDBC driver has to be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the same thing:
+**`submit-update-stats-job` fails with JDBC metrics errors** — when `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the JDBC driver has to be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the same thing. Add the driver through the `spark_jars` key of `jobConf`, or through `spark.jars` in
+the `--spark-conf` of `submit-update-stats-job`, which passes it as `spark_jars`:
 
 ```json
 {
-  "spark.jars": "/path/to/postgresql-42.7.4.jar"
+  "spark_jars": "/path/to/postgresql-42.7.4.jar"
 }
 ```
 
@@ -79,13 +80,17 @@ Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jo
 classpath after `SparkSession` starts and exit with a non-zero status when the Iceberg Spark
 runtime is absent. The templates configure Iceberg classes but leave `jars` empty, and
 `gravitino-jobs` does not bundle `iceberg-spark-runtime`. A stock Spark install is not enough.
-Put a version-matched Iceberg Spark runtime on the job classpath, for example:
+Put a version-matched Iceberg Spark runtime on the job classpath, for example through the
+`spark_jars` key of `jobConf`:
 
 ```json
 {
-  "spark.jars": "/path/to/iceberg-spark-runtime-3.5_2.12-1.11.0.jar"
+  "spark_jars": "/path/to/iceberg-spark-runtime-3.5_2.12-1.11.0.jar"
 }
 ```
+
+`spark.jars` inside `spark_conf` doesn't add it: the driver applies `spark_conf` only after
+spark-submit has built its classpath.
 
 Use the Spark, Scala, and Iceberg versions that match your cluster. See
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).

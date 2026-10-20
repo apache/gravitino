@@ -24,11 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergJobUtils {
@@ -88,7 +90,7 @@ public class TestIcebergJobUtils {
                     "Iceberg Spark session extensions"));
     assertTrue(ex.getMessage().contains("Missing Iceberg Spark session extensions"));
     assertTrue(ex.getMessage().contains("iceberg-spark-runtime"));
-    assertTrue(ex.getMessage().contains("spark.jars"));
+    assertTrue(ex.getMessage().contains("spark_jars"));
   }
 
   @Test
@@ -98,5 +100,32 @@ public class TestIcebergJobUtils {
             IllegalArgumentException.class,
             () -> IcebergJobUtils.parseCustomSparkConfigs("{not_json}"));
     assertTrue(ex.getMessage().contains("--spark-conf"));
+  }
+
+  @Test
+  public void testFilterCustomSparkConfigsDropsSubmittedMasterAndDeployMode() {
+    Map<String, String> configs =
+        ImmutableMap.of(
+            "spark.master", "local[*]",
+            "spark.submit.deployMode", "client",
+            "spark.jars", "/opt/iceberg-spark-runtime.jar",
+            "spark.sql.shuffle.partitions", "200");
+    SparkConf submitted =
+        new SparkConf(false)
+            .set("spark.master", "k8s://https://kubernetes.default.svc")
+            .set("spark.submit.deployMode", "cluster");
+
+    // spark.jars is kept, as the driver still adds it for the executors.
+    assertEquals(
+        ImmutableMap.of(
+            "spark.jars", "/opt/iceberg-spark-runtime.jar", "spark.sql.shuffle.partitions", "200"),
+        IcebergJobUtils.filterCustomSparkConfigs(configs, submitted));
+  }
+
+  @Test
+  public void testFilterCustomSparkConfigsKeepsMasterNotSubmitted() {
+    // A job run without spark-submit, e.g. in a test, has no master unless it sets one.
+    Map<String, String> configs = ImmutableMap.of("spark.master", "local[1]");
+    assertEquals(configs, IcebergJobUtils.filterCustomSparkConfigs(configs, new SparkConf(false)));
   }
 }

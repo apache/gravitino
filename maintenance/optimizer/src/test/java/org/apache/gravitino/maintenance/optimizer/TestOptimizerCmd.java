@@ -497,7 +497,10 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[0].contains("jobTemplate=builtin-iceberg-update-stats"));
     Assertions.assertTrue(output[0].contains("update_mode=stats"));
     Assertions.assertTrue(output[0].contains("table_identifier=ab.t1"));
-    Assertions.assertTrue(output[0].contains("spark_master=local[*]"));
+    // Without a configured value, the submit-time configurations are left to the job executor.
+    Assertions.assertTrue(output[0].contains("spark_master=, "));
+    Assertions.assertTrue(output[0].contains("spark_jars=, "));
+    Assertions.assertTrue(output[0].contains("spark_jars_packages=, "));
     Assertions.assertTrue(output[0].contains("catalog_type=rest"));
     Assertions.assertTrue(output[0].contains("catalog_uri=http://localhost:9001/iceberg"));
     Assertions.assertTrue(output[0].contains("warehouse_location=/tmp/warehouse"));
@@ -554,13 +557,20 @@ class TestOptimizerCmd {
                 + "\"spark.sql.catalog.rest.type\":\"rest\","
                 + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
                 + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
-                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}",
+                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\","
+                + "\"spark.master\":\"local[2]\","
+                + "\"spark.jars\":\"/tmp/iceberg-spark-runtime.jar\","
+                + "\"spark.jars.packages\":\"org.example:lib:1.0\"}",
             "--dry-run",
             "--conf-path",
             confPath.toString());
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("custom-metrics-updater"));
     Assertions.assertTrue(output[0].contains("spark.sql.catalog.rest"));
+    // The submit-time configurations of spark_conf are passed as the template parameters.
+    Assertions.assertTrue(output[0].contains("spark_master=local[2]"));
+    Assertions.assertTrue(output[0].contains("spark_jars=/tmp/iceberg-spark-runtime.jar"));
+    Assertions.assertTrue(output[0].contains("spark_jars_packages=org.example:lib:1.0"));
   }
 
   @Test

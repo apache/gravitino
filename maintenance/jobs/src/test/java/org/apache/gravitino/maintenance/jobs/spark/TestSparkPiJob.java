@@ -93,7 +93,9 @@ public class TestSparkPiJob {
     assertTrue(configs.containsKey("spark.driver.memory"));
 
     // Verify placeholders
-    assertEquals("{{spark_master:-local[*]}}", configs.get("spark.master"));
+    assertEquals("{{spark_master:-}}", configs.get("spark.master"));
+    assertEquals("{{spark_jars:-}}", configs.get("spark.jars"));
+    assertEquals("{{spark_jars_packages:-}}", configs.get("spark.jars.packages"));
     assertEquals("{{spark_executor_instances:-1}}", configs.get("spark.executor.instances"));
     assertEquals("{{spark_executor_cores:-1}}", configs.get("spark.executor.cores"));
     assertEquals("{{spark_executor_memory:-1g}}", configs.get("spark.executor.memory"));
@@ -110,7 +112,7 @@ public class TestSparkPiJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v2", version);
+    assertEquals("v3", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 

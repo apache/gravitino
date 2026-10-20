@@ -80,6 +80,7 @@ public final class SparkApplicationUtils {
   private static final String SPARK_MASTER = "spark.master";
   private static final String SPARK_DEPLOY_MODE = "spark.submit.deployMode";
   private static final String CLUSTER_DEPLOY_MODE = "cluster";
+  private static final String K8S_MASTER_PREFIX = "k8s://";
   private static final String SPARK_IMAGE = "spark.kubernetes.container.image";
   private static final String SPARK_DRIVER_SERVICE_ACCOUNT =
       "spark.kubernetes.authenticate.driver.serviceAccountName";
@@ -111,7 +112,12 @@ public final class SparkApplicationUtils {
    * through the Spark configurations {@code spark.kubernetes.driverEnv.*} and {@code
    * spark.executorEnv.*}, which means their values are visible in the SparkApplication and in its
    * pods. They override the default Spark configurations of the job executor, and the Spark
-   * configurations of the job template override them.
+   * configurations of the job template override them, except those with a blank value, which are
+   * left unset.
+   *
+   * <p>The operator decides the master and the deploy mode, so a job whose {@code spark.master}
+   * isn't a Kubernetes master, or whose {@code spark.submit.deployMode} isn't {@code cluster}, is
+   * rejected.
    *
    * @param context the context of the job run
    * @param template the runtime job template, whose resources are the URIs given in the template
@@ -136,7 +142,16 @@ public final class SparkApplicationUtils {
               sparkConf.put(SPARK_DRIVER_ENV_PREFIX + name, value);
               sparkConf.put(SPARK_EXECUTOR_ENV_PREFIX + name, value);
             });
-    sparkConf.putAll(template.configs());
+    // A blank value leaves a Spark configuration unset, as it is what an optional template
+    // parameter such as {{spark_jars:-}} becomes, so it doesn't override the executor default.
+    template
+        .configs()
+        .forEach(
+            (key, value) -> {
+              if (StringUtils.isNotBlank(value)) {
+                sparkConf.put(key, value);
+              }
+            });
     // The operator only supports cluster mode, so a job that asks for client mode is rejected
     // rather than silently run in cluster mode.
     String deployMode = StringUtils.trimToNull(sparkConf.get(SPARK_DEPLOY_MODE));
@@ -146,6 +161,17 @@ public final class SparkApplicationUtils {
               "%s is set to %s by job template %s or by the k8s job executor configurations, but"
                   + " the k8s job executor only runs Spark jobs in %s mode",
               SPARK_DEPLOY_MODE, deployMode, template.name(), CLUSTER_DEPLOY_MODE));
+    }
+    // Likewise, a job that asks for another master, such as local[*], is rejected rather than
+    // silently run on Kubernetes.
+    String master = StringUtils.trimToNull(sparkConf.get(SPARK_MASTER));
+    if (master != null && !master.startsWith(K8S_MASTER_PREFIX)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s is set to %s by job template %s or by the k8s job executor configurations, but"
+                  + " the k8s job executor only runs Spark jobs on Kubernetes. Leave %s unset,"
+                  + " for a built-in job by leaving the spark_master parameter empty",
+              SPARK_MASTER, master, template.name(), SPARK_MASTER));
     }
     // The operator decides the master and the deploy mode.
     sparkConf.remove(SPARK_MASTER);

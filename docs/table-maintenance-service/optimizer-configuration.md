@@ -50,7 +50,7 @@ gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
 # Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
-gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
+gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS":"file:///"}
 ```
 
 When the Gravitino server has authentication enabled, `builtin-iceberg-update-stats` needs
@@ -111,7 +111,8 @@ and the defaults of each template.
 
 Built-in Iceberg templates also need an Iceberg Spark runtime on the Spark classpath. They do not
 ship that JAR or fill template `jars`, so include it yourself — for example
-`"spark.jars":"/path/to/iceberg-spark-runtime-....jar"` inside `spark_conf`. Match the artifact to
+`"spark_jars":"/path/to/iceberg-spark-runtime-....jar"` in `jobConf`. `spark.jars` inside
+`spark_conf` doesn't work, as the driver applies `spark_conf` only after it starts. Match the artifact to
 your Spark, Scala, and Iceberg versions. Details are under
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 

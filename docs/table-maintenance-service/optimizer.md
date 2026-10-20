@@ -89,8 +89,8 @@ Each step ends with a check. If a check fails, stop there, since every step depe
   `IcebergSparkSessionExtensions` and `SparkCatalog`, but `gravitino-jobs` does not ship the
   Iceberg Spark runtime and the templates leave `jars` empty so your Spark and Iceberg versions
   stay under your control. A stock Spark distribution is not enough. Put a matching
-  `iceberg-spark-runtime-*` JAR on the job classpath — for example with `spark.jars` in
-  `spark_conf`, or by installing it into your Spark environment. Pick the artifact that matches
+  `iceberg-spark-runtime-*` JAR on the job classpath — for example with the `spark_jars` key of
+  `jobConf`, or by installing it into your Spark environment. Pick the artifact that matches
   your Spark, Scala, and Iceberg versions. The jobs module is built and tested against Spark 3.5.x
   and Iceberg 1.11.0 (for example
   `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`). Without it, the job fails after

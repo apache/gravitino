@@ -18,13 +18,20 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Shared utility methods for Iceberg maintenance jobs.
@@ -34,12 +41,29 @@ import org.apache.spark.sql.SparkSession;
  */
 public final class IcebergJobUtils {
 
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergJobUtils.class);
+
   private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
   /**
    * Matches a job template placeholder that no job configuration value replaced, e.g. {@code
    * {{use_caching}}}.
    */
   private static final Pattern UNRESOLVED_PLACEHOLDER_PATTERN = Pattern.compile("^\\{\\{[^{}]*}}$");
+
+  /**
+   * The Spark configurations that spark-submit decides. Set in the custom Spark configurations of a
+   * job, which the driver applies, they would override the submitted value, e.g. run a job in local
+   * mode inside the driver pod of a cluster.
+   */
+  private static final Set<String> SUBMIT_DECIDED_CONFIGS =
+      ImmutableSet.of("spark.master", "spark.submit.deployMode");
+
+  /**
+   * The Spark configurations that only spark-submit resolves, by the template parameters of the
+   * built-in jobs that set them.
+   */
+  private static final Map<String, String> SUBMIT_TIME_CONFIG_PARAMETERS =
+      ImmutableMap.of("spark.jars", "spark_jars", "spark.jars.packages", "spark_jars_packages");
 
   private IcebergJobUtils() {}
 
@@ -173,7 +197,55 @@ public final class IcebergJobUtils {
    * @throws IllegalArgumentException if JSON parsing fails
    */
   public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, "spark-conf");
+    return filterCustomSparkConfigs(
+        IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, "spark-conf"));
+  }
+
+  /**
+   * Filter the custom Spark configurations of a job, which the driver applies when it creates the
+   * SparkSession, against the configurations spark-submit has already set for the driver.
+   *
+   * <p>{@code spark.master} and {@code spark.submit.deployMode} are dropped if spark-submit has set
+   * them, as the job would otherwise run with another master than it was submitted to. A warning is
+   * logged for {@code spark.jars} and {@code spark.jars.packages}, which only spark-submit resolves
+   * for the driver, and which the job template parameters {@code spark_jars} and {@code
+   * spark_jars_packages} set.
+   *
+   * @param configs the custom Spark configurations
+   * @return the custom Spark configurations to apply
+   */
+  public static Map<String, String> filterCustomSparkConfigs(Map<String, String> configs) {
+    return filterCustomSparkConfigs(configs, new SparkConf());
+  }
+
+  @VisibleForTesting
+  static Map<String, String> filterCustomSparkConfigs(
+      Map<String, String> configs, SparkConf submittedConf) {
+    Map<String, String> filtered = new LinkedHashMap<>();
+    configs.forEach(
+        (key, value) -> {
+          if (SUBMIT_DECIDED_CONFIGS.contains(key) && submittedConf.contains(key)) {
+            LOG.warn(
+                "Ignored {}={} of the custom Spark configurations, as the job is submitted with"
+                    + " {}={}. Set it when submitting the job instead, for a built-in job by the"
+                    + " spark_master parameter.",
+                key,
+                value,
+                key,
+                submittedConf.get(key));
+            return;
+          }
+          if (SUBMIT_TIME_CONFIG_PARAMETERS.containsKey(key)) {
+            LOG.warn(
+                "{} of the custom Spark configurations doesn't add to the classpath of the driver,"
+                    + " which spark-submit resolves. Set it by the {} parameter of a built-in job"
+                    + " instead.",
+                key,
+                SUBMIT_TIME_CONFIG_PARAMETERS.get(key));
+          }
+          filtered.put(key, value);
+        });
+    return ImmutableMap.copyOf(filtered);
   }
 
   /**
@@ -181,8 +253,7 @@ public final class IcebergJobUtils {
    *
    * <p>Built-in templates configure {@code IcebergSparkSessionExtensions} and {@code SparkCatalog},
    * but Spark only warns when those classes are missing and continues without Iceberg support. Call
-   * this after {@code SparkSession} creation (so {@code spark.jars} from {@code spark_conf} is
-   * visible) and fail the job when the runtime is absent.
+   * this after {@code SparkSession} creation and fail the job when the runtime is absent.
    *
    * @throws IllegalStateException when required Iceberg Spark classes cannot be loaded
    */
@@ -233,9 +304,11 @@ public final class IcebergJobUtils {
       throw new IllegalStateException(
           String.format(
               "Missing %s (%s). Built-in Iceberg jobs need iceberg-spark-runtime on the Spark "
-                  + "classpath (for example via spark.jars in spark_conf, or installed into the "
-                  + "Spark environment). A stock Spark distribution does not include it. Match "
-                  + "the artifact to your Spark, Scala, and Iceberg versions.",
+                  + "classpath, for example via the spark_jars or spark_jars_packages parameter "
+                  + "of the job, or installed into the Spark environment. spark.jars in "
+                  + "spark_conf doesn't add it, as the driver applies spark_conf only after it "
+                  + "starts. A stock Spark distribution does not include it. Match the artifact "
+                  + "to your Spark, Scala, and Iceberg versions.",
               description, className),
           first);
     }

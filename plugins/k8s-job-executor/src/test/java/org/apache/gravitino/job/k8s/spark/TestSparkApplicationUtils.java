@@ -68,6 +68,72 @@ public class TestSparkApplicationUtils {
   }
 
   @Test
+  public void testRejectNonKubernetesMaster() {
+    for (String master : new String[] {"local[*]", " local ", "yarn", "spark://host:7077"}) {
+      SparkJobTemplate template =
+          newTemplate("s3a://bucket/app.jar", ImmutableMap.of("spark.master", master));
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+      Assertions.assertTrue(e.getMessage().contains(master.trim()), e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("spark_master"), e.getMessage());
+    }
+
+    // Nor set by the executor configurations.
+    K8sJobExecutorConfigs localMaster =
+        newConfigs(ImmutableMap.of("spark.conf.spark.master", "local[2]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            SparkApplicationUtils.buildSparkApplication(
+                CONTEXT, newTemplate("s3a://bucket/app.jar", ImmutableMap.of()), localMaster));
+  }
+
+  @Test
+  public void testIgnoreBlankMaster() {
+    // A blank master, as the built-in templates set by default, is left to the operator.
+    Map<String, Object> spec =
+        getSpec(
+            newTemplate(
+                "s3a://bucket/app.jar",
+                ImmutableMap.of("spark.master", " ", "spark.submit.deployMode", "")),
+            configs);
+    @SuppressWarnings("unchecked")
+    Map<String, String> sparkConf = (Map<String, String>) spec.get("sparkConf");
+    Assertions.assertFalse(sparkConf.containsKey("spark.master"));
+    Assertions.assertFalse(sparkConf.containsKey("spark.submit.deployMode"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testBlankConfigsKeepExecutorDefaults() {
+    K8sJobExecutorConfigs withDefaults =
+        newConfigs(
+            ImmutableMap.of(
+                "spark.conf.spark.jars", "https://repo/iceberg-spark-runtime.jar",
+                "spark.conf.spark.jars.packages", "org.example:lib:1.0"));
+    SparkJobTemplate template =
+        newTemplate(
+            "s3a://bucket/app.jar",
+            ImmutableMap.of(
+                "spark.jars", "", "spark.jars.packages", " ", "spark.executor.memory", ""));
+
+    Map<String, String> sparkConf =
+        (Map<String, String>) getSpec(template, withDefaults).get("sparkConf");
+    Assertions.assertEquals("https://repo/iceberg-spark-runtime.jar", sparkConf.get("spark.jars"));
+    Assertions.assertEquals("org.example:lib:1.0", sparkConf.get("spark.jars.packages"));
+    Assertions.assertFalse(sparkConf.containsKey("spark.executor.memory"));
+
+    // A value set by the job overrides the executor default.
+    SparkJobTemplate withJars =
+        newTemplate(
+            "s3a://bucket/app.jar", ImmutableMap.of("spark.jars", "https://repo/other.jar"));
+    sparkConf = (Map<String, String>) getSpec(withJars, withDefaults).get("sparkConf");
+    Assertions.assertEquals("https://repo/other.jar", sparkConf.get("spark.jars"));
+  }
+
+  @Test
   @SuppressWarnings("unchecked")
   public void testBuildSparkApplication() {
     SparkJobTemplate template =
@@ -81,7 +147,7 @@ public class TestSparkApplicationUtils {
             .withArchives(ImmutableList.of("hdfs://nn/env.tgz#env"))
             .withConfigs(
                 ImmutableMap.of(
-                    "spark.master", "local[*]",
+                    "spark.master", "k8s://https://kubernetes.default.svc",
                     "spark.submit.deployMode", "cluster",
                     "spark.executor.instances", "2",
                     "spark.jars", "https://repo/other.jar"))
