@@ -40,8 +40,8 @@ public final class HivePartition implements IdentityPartition {
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
 
-  // The characters Hive's FileUtils.escapePathName escapes in partition names on non-Windows
-  // hosts. Hive classes are not visible to this class in a deployed server, so the rule is copied.
+  // The characters Hive's FileUtils.escapePathName escapes in partition names. Hive classes are
+  // not visible to this class in a deployed server, so the rule is copied.
   private static final BitSet CHARS_TO_ESCAPE = new BitSet(128);
 
   static {
