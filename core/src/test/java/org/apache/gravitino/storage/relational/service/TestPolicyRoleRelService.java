@@ -20,12 +20,14 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -102,6 +104,24 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testFailedReferenceWriteRollsBackThePolicy() throws IOException, SQLException {
+    createAndInsertMakeLake(METALAKE);
+    String oversizedRoleName = "r".repeat(129);
+    PolicyEntity policy =
+        accessControlPolicy("reader", Collections.singletonList(oversizedRoleName));
+
+    Assertions.assertThrows(RuntimeException.class, () -> backend.insert(policy, false));
+
+    Assertions.assertEquals(
+        0L, count("SELECT COUNT(*) FROM policy_meta WHERE policy_id = ?", policy.id()));
+    Assertions.assertEquals(
+        0L, count("SELECT COUNT(*) FROM policy_version_info WHERE policy_id = ?", policy.id()));
+    Assertions.assertEquals(
+        0L,
+        count("SELECT COUNT(*) FROM policy_role_relation_meta WHERE policy_id = ?", policy.id()));
+  }
+
+  @TestTemplate
   public void testDuplicateRoleNamesCollapseToOneReference() throws IOException {
     createAndInsertMakeLake(METALAKE);
     PolicyEntity policy = accessControlPolicy("reader", Arrays.asList("analyst", "analyst"));
@@ -125,19 +145,18 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testPolicyDeleteClearsReferences() throws IOException {
+  public void testPolicyDeleteClearsReferences() throws IOException, SQLException {
     createAndInsertMakeLake(METALAKE);
     PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
     backend.insert(policy, false);
 
     Assertions.assertTrue(backend.delete(policy.nameIdentifier(), Entity.EntityType.POLICY, false));
 
-    Assertions.assertEquals(Collections.emptyList(), rolesOf(policy.id()));
-    Assertions.assertEquals(Collections.emptyList(), policiesReferencing("analyst"));
+    Assertions.assertEquals(0L, activeReferenceCount(policy.id()));
   }
 
   @TestTemplate
-  public void testMetalakeDeleteClearsOnlyItsOwnReferences() throws IOException {
+  public void testMetalakeDeleteClearsOnlyItsOwnReferences() throws IOException, SQLException {
     createAndInsertMakeLake(METALAKE);
     String otherMetalake = METALAKE + "_other";
     createAndInsertMakeLake(otherMetalake);
@@ -163,8 +182,59 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
     Assertions.assertTrue(
         backend.delete(NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE, true));
 
-    Assertions.assertEquals(Collections.emptyList(), rolesOf(policy.id()));
-    Assertions.assertEquals(Collections.singletonList("analyst"), rolesOf(otherPolicy.id()));
+    Assertions.assertEquals(0L, activeReferenceCount(policy.id()));
+    Assertions.assertEquals(1L, activeReferenceCount(otherPolicy.id()));
+  }
+
+  @TestTemplate
+  public void testMetalakeDeleteClearsReferencesOfAnInFlightPolicyUpdate() throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
+    backend.insert(policy, false);
+
+    AtomicReference<Throwable> deleteFailure = new AtomicReference<>();
+    Thread deleter =
+        new Thread(
+            () -> {
+              try {
+                backend.delete(NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE, true);
+              } catch (Throwable t) {
+                deleteFailure.set(t);
+              }
+            });
+
+    // Stand in for a policy update that holds the policy row and adds a reference mid-delete.
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false);
+        Connection updater = sqlSession.getConnection()) {
+      updater.setAutoCommit(false);
+      updater.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+      try (PreparedStatement lock =
+          updater.prepareStatement(
+              "SELECT policy_id FROM policy_meta WHERE policy_id = ? FOR UPDATE")) {
+        lock.setLong(1, policy.id());
+        lock.executeQuery().close();
+      }
+
+      deleter.start();
+      Thread.sleep(400);
+      Assertions.assertTrue(deleter.isAlive(), "The metalake delete should wait on the policy row");
+
+      try (PreparedStatement insert =
+          updater.prepareStatement(
+              "INSERT INTO policy_role_relation_meta"
+                  + " (policy_id, role_name, current_version, last_version, deleted_at)"
+                  + " VALUES (?, 'auditor', 1, 1, 0)")) {
+        insert.setLong(1, policy.id());
+        insert.executeUpdate();
+      }
+      updater.commit();
+    }
+
+    deleter.join(30_000);
+    Assertions.assertFalse(deleter.isAlive());
+    Assertions.assertNull(deleteFailure.get());
+    Assertions.assertEquals(0L, activeReferenceCount(policy.id()));
   }
 
   @TestTemplate
@@ -251,6 +321,25 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
                 "SELECT COUNT(*) FROM policy_role_relation_meta WHERE deleted_at > 0")) {
       Assertions.assertTrue(resultSet.next());
       return resultSet.getLong(1);
+    }
+  }
+
+  private long activeReferenceCount(long policyId) throws SQLException {
+    return count(
+        "SELECT COUNT(*) FROM policy_role_relation_meta WHERE policy_id = ? AND deleted_at = 0",
+        policyId);
+  }
+
+  private long count(String sql, long policyId) throws SQLException {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setLong(1, policyId);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        Assertions.assertTrue(resultSet.next());
+        return resultSet.getLong(1);
+      }
     }
   }
 }

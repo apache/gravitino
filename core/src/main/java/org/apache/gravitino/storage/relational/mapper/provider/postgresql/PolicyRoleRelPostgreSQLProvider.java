@@ -22,21 +22,10 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyRoleRelMapper
 
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyRoleRelBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.PolicyRoleRelPO;
 import org.apache.ibatis.annotations.Param;
 
 /** PostgreSQL SQL provider for policy-to-role references. */
 public class PolicyRoleRelPostgreSQLProvider extends PolicyRoleRelBaseSQLProvider {
-
-  @Override
-  public String insertIfAbsent(@Param("relation") PolicyRoleRelPO relation) {
-    return "INSERT INTO "
-        + POLICY_ROLE_RELATION_TABLE_NAME
-        + " (policy_id, role_name, current_version, last_version, deleted_at)"
-        + " VALUES (#{relation.policyId}, #{relation.roleName},"
-        + " #{relation.currentVersion}, #{relation.lastVersion}, #{relation.deletedAt})"
-        + " ON CONFLICT (policy_id, role_name, deleted_at) DO NOTHING";
-  }
 
   @Override
   public String deleteByLegacyTimeline(

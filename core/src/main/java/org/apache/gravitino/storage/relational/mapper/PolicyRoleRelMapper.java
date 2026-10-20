@@ -52,13 +52,13 @@ public interface PolicyRoleRelMapper {
       @Param("metalakeName") String metalakeName, @Param("roleName") String roleName);
 
   /**
-   * Inserts a reference if the active pair does not exist.
+   * Inserts a reference.
    *
    * @param relation The reference to insert.
    * @return The number of inserted rows.
    */
-  @InsertProvider(type = PolicyRoleRelSQLProviderFactory.class, method = "insertIfAbsent")
-  int insertIfAbsent(@Param("relation") PolicyRoleRelPO relation);
+  @InsertProvider(type = PolicyRoleRelSQLProviderFactory.class, method = "insert")
+  int insert(@Param("relation") PolicyRoleRelPO relation);
 
   /**
    * Soft-deletes one active reference and advances its optimistic-concurrency version.
