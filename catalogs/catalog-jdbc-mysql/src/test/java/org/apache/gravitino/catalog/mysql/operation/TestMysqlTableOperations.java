@@ -54,6 +54,8 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestMysqlTableOperations extends TestMysql {
@@ -1277,5 +1279,59 @@ public class TestMysqlTableOperations extends TestMysql {
     Assertions.assertNull(
         operationsWithOldDriver.calculateDatetimePrecision("TIME", 16, 0),
         "TIME type should return null for unsupported driver version");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"O'Brien", "quote\\' and \\new\\path; \"double\"", "ends with \\"})
+  void testStringDefaultValueRoundTrips(String defaultValue) {
+    String tableName = RandomNameUtils.genRandomName("mysql_default_round_trip");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withDefaultValue(Literals.varcharLiteral(255, defaultValue))
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        new JdbcColumn[] {column},
+        null,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[0].defaultValue());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME.toString(),
+          tableName,
+          TableChange.addColumn(
+              new String[] {"col2"},
+              VARCHAR,
+              null,
+              TableChange.ColumnPosition.defaultPos(),
+              true,
+              false,
+              Literals.varcharLiteral(255, defaultValue)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[1].defaultValue());
+
+      String updated = defaultValue + " updated";
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME.toString(),
+          tableName,
+          TableChange.updateColumnDefaultValue(
+              new String[] {"col1"}, Literals.varcharLiteral(255, updated)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, updated), table.columns()[0].defaultValue());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
+    }
   }
 }

@@ -206,4 +206,20 @@ public class TestHologresColumnDefaultValueConverter {
     String result = converter.fromGravitino(DEFAULT_VALUE_NOT_SET);
     Assertions.assertNull(result);
   }
+
+  @Test
+  public void testStringLiteralDoublesQuotesOnly() {
+    Assertions.assertEquals(
+        "'O''Brien \\path'", converter.fromGravitino(Literals.stringLiteral("O'Brien \\path")));
+  }
+
+  @Test
+  public void testQuotedTextLiteralIsUnescaped() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("text");
+    Assertions.assertEquals(
+        Literals.stringLiteral("O'Brien'::x \\path"),
+        converter.toGravitino(type, "'O''Brien''::x \\path'::text", false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral(""), converter.toGravitino(type, "''::text", false, true));
+  }
 }

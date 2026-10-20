@@ -1530,6 +1530,73 @@ public class TestDorisTableOperationsSqlGeneration {
     return dataSource;
   }
 
+  @Test
+  public void testCreateTableStringDefaultUsesVersionLiteralForm() throws Exception {
+    String singleQuoted = "'O''Brien \\\\ \"x\"'";
+    String doubleQuoted = "\"O'Brien \\\\ \\\"x\\\"\"";
+    Map<String, String> expectedDefaults = new LinkedHashMap<>();
+    expectedDefaults.put("doris-1.2.7-1-Unknown", singleQuoted);
+    expectedDefaults.put("doris-2.1.0-rc11-1", doubleQuoted);
+    expectedDefaults.put("doris-3.0.6.2-rc01-910c4249c5", doubleQuoted);
+    expectedDefaults.put("doris-4.0.6-release-a851eab4", doubleQuoted);
+    for (Map.Entry<String, String> entry : expectedDefaults.entrySet()) {
+      String version = entry.getKey();
+      String expectedDefault = entry.getValue();
+      TestableDorisTableOperations ops = new TestableDorisTableOperations();
+      DataSource versionDataSource = mockVersionDataSource(version);
+      ops.setDataSource(versionDataSource);
+      JdbcColumn[] columns = {
+        JdbcColumn.builder().withName("id").withType(Types.IntegerType.get()).build(),
+        JdbcColumn.builder()
+            .withName("owner")
+            .withType(Types.VarCharType.of(64))
+            .withDefaultValue(Literals.varcharLiteral(64, "O'Brien \\ \"x\""))
+            .build()
+      };
+
+      String sql =
+          ops.generateCreateTableSql(
+              "test_table",
+              columns,
+              null,
+              Collections.singletonMap(REPLICATION_FACTOR, "1"),
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.hash(1, NamedReference.field("id")),
+              Indexes.EMPTY_INDEXES);
+
+      Assertions.assertTrue(sql.contains("DEFAULT " + expectedDefault + " "), sql);
+      Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
+    }
+  }
+
+  @Test
+  public void testCreateTablePlainStringDefaultSkipsVersionLookup() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource versionDataSource = Mockito.mock(DataSource.class);
+    ops.setDataSource(versionDataSource);
+    JdbcColumn[] columns = {
+      JdbcColumn.builder().withName("id").withType(Types.IntegerType.get()).build(),
+      JdbcColumn.builder()
+          .withName("owner")
+          .withType(Types.VarCharType.of(64))
+          .withDefaultValue(Literals.varcharLiteral(64, "plain"))
+          .build()
+    };
+
+    String sql =
+        ops.generateCreateTableSql(
+            "test_table",
+            columns,
+            null,
+            Collections.singletonMap(REPLICATION_FACTOR, "1"),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.hash(1, NamedReference.field("id")),
+            Indexes.EMPTY_INDEXES);
+
+    Assertions.assertTrue(sql.contains("DEFAULT 'plain' "), sql);
+    Mockito.verifyNoInteractions(versionDataSource);
+  }
+
   private static DataSource mockVersionDataSource(String dorisVersion) throws Exception {
     // FRONTENDS() exposes the Doris version instead of the MySQL protocol version.
     DataSource dataSource = Mockito.mock(DataSource.class);

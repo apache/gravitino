@@ -169,6 +169,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // Doris auto-increment requires 2.1.0+. Validate before delegating to base class.
     validateAutoIncrementVersion(columns);
+    boolean useDoubleQuotedStringDefaults = useDoubleQuotedCreateTableStringDefaults(columns);
 
     validateIncrementCol(columns, indexes);
     validateDistribution(distribution, columns);
@@ -188,7 +189,7 @@ public class DorisTableOperations extends JdbcTableOperations {
                       .append(BACK_QUOTE)
                       .append(column.name())
                       .append(BACK_QUOTE);
-                  appendColumnDefinition(column, columnsSql);
+                  appendColumnDefinition(column, columnsSql, useDoubleQuotedStringDefaults);
                   return columnsSql.toString();
                 })
             .collect(Collectors.joining(",\n")));
@@ -331,6 +332,27 @@ public class DorisTableOperations extends JdbcTableOperations {
       throw new UnsupportedOperationException(
           "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
     }
+  }
+
+  /**
+   * Returns whether CREATE TABLE string defaults must use Doris double-quoted literals. The Doris
+   * version is looked up only when a string default contains a quote or backslash, since plain
+   * strings render the same in both forms.
+   */
+  private boolean useDoubleQuotedCreateTableStringDefaults(JdbcColumn[] columns) {
+    boolean needsVersion =
+        Arrays.stream(columns)
+            .map(Column::defaultValue)
+            .filter(DorisColumnDefaultValueConverter::isNonNullStringLiteral)
+            .map(defaultValue -> String.valueOf(((Literal<?>) defaultValue).value()))
+            .anyMatch(
+                value ->
+                    value.indexOf('\'') >= 0
+                        || value.indexOf('"') >= 0
+                        || value.indexOf('\\') >= 0);
+    return needsVersion
+        && isVersionAtLeast(
+            getDorisVersion("CREATE TABLE default literal compatibility check"), 2, 1, 0);
   }
 
   private String getDorisVersion(String purpose) {
@@ -1235,6 +1257,11 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+    return appendColumnDefinition(column, sqlBuilder, false);
+  }
+
+  private StringBuilder appendColumnDefinition(
+      JdbcColumn column, StringBuilder sqlBuilder, boolean useDoubleQuotedStringDefault) {
     // Add data type
     sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
 
@@ -1246,7 +1273,11 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
 
     // Add DEFAULT value if specified
-    appendDefaultValue(column, sqlBuilder);
+    if (useDoubleQuotedStringDefault) {
+      appendCreateTableDefaultValue(column, sqlBuilder);
+    } else {
+      appendDefaultValue(column, sqlBuilder);
+    }
 
     // Add column auto_increment if specified
     if (column.autoIncrement()) {
@@ -1258,6 +1289,19 @@ public class DorisTableOperations extends JdbcTableOperations {
       sqlBuilder.append("COMMENT '").append(escapeSqlLiteral(column.comment(), '\'')).append("' ");
     }
     return sqlBuilder;
+  }
+
+  private void appendCreateTableDefaultValue(JdbcColumn column, StringBuilder sqlBuilder) {
+    if (DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      return;
+    }
+    Preconditions.checkState(
+        columnDefaultValueConverter instanceof DorisColumnDefaultValueConverter,
+        "DorisColumnDefaultValueConverter is required for Doris CREATE TABLE");
+    String defaultValue =
+        ((DorisColumnDefaultValueConverter) columnDefaultValueConverter)
+            .fromGravitinoForCreateTable(column.defaultValue(), true);
+    sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
   }
 
   static String addIndexDefinition(TableChange.AddIndex addIndex) {
