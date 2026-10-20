@@ -19,15 +19,13 @@
 package org.apache.gravitino.catalog.oceanbase.operation;
 
 import java.util.Collections;
-<<<<<<< HEAD
-=======
 import java.util.List;
 import java.util.stream.Stream;
->>>>>>> 409d1c401 ([#13943] fix(oceanbase): Escape table and column comments (#13944))
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.catalog.jdbc.utils.ConnectionCountingDataSource;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -48,6 +46,11 @@ public class TestOceanBaseTableOperationsSqlGeneration {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new OceanBaseTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+    }
+
+    private TestableOceanBaseTableOperations(ConnectionCountingDataSource connections) {
+      this();
+      dataSource = connections.dataSource();
     }
 
     public String createTableSql(String tableName, JdbcColumn[] columns) {
@@ -115,6 +118,34 @@ public class TestOceanBaseTableOperationsSqlGeneration {
 
     Assertions.assertTrue(sql.contains("MODIFY COLUMN `col1`"), sql);
     Assertions.assertTrue(sql.contains("COMMENT '" + escaped + "' "), sql);
+  }
+
+  @Test
+  void testPurgeIsRejectedWithoutExecutingSql() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations(connections);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> ops.purge("database", "test_table"));
+
+    Assertions.assertEquals(
+        "OceanBase does not support purge table in Gravitino, please use drop table",
+        exception.getMessage());
+    Assertions.assertTrue(connections.executedSql().isEmpty());
+    Assertions.assertEquals(0, connections.totalBorrows());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  void testDropStillExecutesDropTable() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations(connections);
+
+    Assertions.assertTrue(ops.drop("database", "test_table"));
+
+    Assertions.assertEquals(List.of("DROP TABLE `test_table`"), connections.executedSql());
+    Assertions.assertEquals(0, connections.borrowed());
   }
 
   @Test

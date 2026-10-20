@@ -197,7 +197,8 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    return String.format("TRUNCATE TABLE `%s`", tableName);
+    throw new UnsupportedOperationException(
+        "OceanBase does not support purge table in Gravitino, please use drop table");
   }
 
   /**

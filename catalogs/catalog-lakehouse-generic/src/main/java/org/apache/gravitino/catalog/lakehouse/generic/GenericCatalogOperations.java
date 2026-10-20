@@ -56,6 +56,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -233,6 +234,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
+    properties = LancePropertiesUtils.normalizeTableProperties(properties);
     String tableLocation = calculateTableLocation(schema, ident, properties);
 
     String format = properties.getOrDefault(Table.PROPERTY_TABLE_FORMAT, null);
