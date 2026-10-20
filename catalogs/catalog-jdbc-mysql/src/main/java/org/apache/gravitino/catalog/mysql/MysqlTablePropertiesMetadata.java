@@ -113,7 +113,10 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
     properties.forEach(
         (key, value) -> {
           Preconditions.checkArgument(
-              containsProperty(key), "Unsupported MySQL table property: %s", key);
+              containsProperty(key),
+              "Unsupported MySQL table property: %s. Supported properties: %s",
+              key,
+              String.join(", ", GRAVITINO_CONFIG_TO_MYSQL.keySet()));
           if (GRAVITINO_CONFIG_TO_MYSQL.containsKey(key)) {
             // A null value represents RemoveProperty in JdbcCatalogOperations. Non-SQL metadata,
             // such as the internal identifier and credential settings, must not become options.

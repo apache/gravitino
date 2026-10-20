@@ -589,7 +589,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
     Map<String, String> logicalProperties =
         TABLE_PROPERTIES_METADATA.convertFromJdbcProperties(Collections.singletonMap(key, value));
     Preconditions.checkArgument(
-        !logicalProperties.isEmpty(), "Unsupported MySQL table option: %s", key);
+        !logicalProperties.isEmpty(),
+        "Unsupported MySQL table option: %s. Supported options: %s",
+        key,
+        String.join(", ", MysqlTablePropertiesMetadata.GRAVITINO_CONFIG_TO_MYSQL.values()));
     String encoded =
         TABLE_PROPERTIES_METADATA.transformToJdbcProperties(logicalProperties).get(key);
     Preconditions.checkArgument(encoded != null, "MySQL table option %s cannot be null", key);

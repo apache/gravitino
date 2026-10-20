@@ -74,15 +74,26 @@ public class TestJdbcCatalogPropertiesMetadata {
   }
 
   @ParameterizedTest
-  @CsvSource({"none,none,30000", "1250,none,1250", "none,2300,2300", "1250,2300,1250"})
-  void testPoolMaxWaitReachesCatalogDataSource(String canonical, String bypass, long expected)
-      throws Exception {
+  @CsvSource({
+    "none,none,none,30000",
+    "1250,none,none,1250",
+    "none,2300,none,2300",
+    "1250,2300,none,1250",
+    "none,none,3400,3400",
+    "1250,none,3400,1250"
+  })
+  void testPoolMaxWaitReachesCatalogDataSource(
+      String canonical, String bypass, String dbcpBypass, long expected) throws Exception {
     Map<String, String> properties = poolWaitProperties();
     if (!"none".equals(canonical)) {
       properties.put(JdbcConfig.POOL_MAX_WAIT_MS.getKey(), canonical);
     }
     if (!"none".equals(bypass)) {
       properties.put("gravitino.bypass." + JdbcConfig.POOL_MAX_WAIT_MS.getKey(), bypass);
+    }
+    if (!"none".equals(dbcpBypass)) {
+      // The DBCP-native key documented as the bypass example in the JDBC catalog docs.
+      properties.put("gravitino.bypass.maxWaitMillis", dbcpBypass);
     }
     JdbcCatalogPropertiesMetadata metadata = new JdbcCatalogPropertiesMetadata();
     Assertions.assertTrue(metadata.containsProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));

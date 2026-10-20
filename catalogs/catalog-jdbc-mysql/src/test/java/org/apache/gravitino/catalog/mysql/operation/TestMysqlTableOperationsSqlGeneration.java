@@ -109,6 +109,28 @@ public class TestMysqlTableOperationsSqlGeneration {
   }
 
   @Test
+  void testUnsupportedSqlOptionNamesSupportedOptions() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(Types.IntegerType.get()).build();
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.generateCreateTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Map.of("ROW_FORMAT", "DYNAMIC"),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    Assertions.assertTrue(
+        error.getMessage().contains("Supported options: AUTO_INCREMENT, ENGINE"),
+        error.getMessage());
+  }
+
+  @Test
   void testSupportedSqlOptionsAreNormalized() {
     TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
     JdbcColumn column =

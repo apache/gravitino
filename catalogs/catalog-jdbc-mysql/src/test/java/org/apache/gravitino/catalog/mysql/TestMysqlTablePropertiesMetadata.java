@@ -66,6 +66,9 @@ class TestMysqlTablePropertiesMetadata {
           Assertions.assertThrows(
               IllegalArgumentException.class, () -> create(operations, Map.of(key, "MEMORY")));
       Assertions.assertTrue(create.getMessage().contains(key));
+      Assertions.assertTrue(
+          create.getMessage().contains("Supported properties: auto-increment-offset, engine"),
+          create.getMessage());
       IllegalArgumentException alter =
           Assertions.assertThrows(
               IllegalArgumentException.class,
