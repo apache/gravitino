@@ -182,12 +182,10 @@ Notes:
 - For `stats` or `all`, `--updater-options` must include `gravitino_uri` and `metalake`.
 - If `--updater-options` includes external JDBC metrics settings
   (`gravitino.optimizer.jdbcMetrics.*`), ensure the JDBC driver JAR is available to Spark
-  runtime classpath (for example via `spark.jars` in `--spark-conf`, which the command passes as
-  the `spark_jars` parameter of the job).
+  runtime classpath of the driver: with the k8s job executor, for example via `spark.jars` in
+  `--spark-conf`; with the local job executor, by installing it into `SPARK_HOME/jars`, as the
+  driver applies `--spark-conf` only after it starts.
 - `--spark-conf` and `--updater-options` are flat JSON maps.
-- `spark.master`, `spark.jars`, and `spark.jars.packages` in `--spark-conf` are passed as the
-  `spark_master`, `spark_jars`, and `spark_jars_packages` parameters of the job, as spark-submit
-  has to resolve them. A `jobSubmitterConfig` key of the same parameter name takes precedence.
 
 ## List Table Metrics
 
@@ -258,8 +256,9 @@ These templates set Iceberg Spark session and catalog classes, but they do not l
 runtime in `jars`. `gravitino-jobs` also excludes that runtime from its shaded JAR, so the version
 that runs with your Spark cluster is yours to supply. Provide a matching
 `iceberg-spark-runtime-<sparkMajor>_<scala>` JAR on the Spark classpath used by the job executor —
-commonly through the `spark_jars` or `spark_jars_packages` key of `jobConf`, or by installing it
-into `SPARK_HOME`. Setting `spark.jars` in `spark_conf` doesn't work, as the driver applies
+commonly by installing it into `SPARK_HOME` or the Spark image, or, with the k8s job executor,
+through `spark.jars` in `spark_conf`, which the k8s job executor sets when it submits the job.
+With the local job executor, `spark.jars` in `spark_conf` doesn't add it, as the driver applies
 `spark_conf` only after spark-submit has built its classpath. Align the
 artifact with the Spark, Scala, and Iceberg versions you actually run. A reference coordinate used
 in Gravitino's own jobs tests is `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`.
@@ -273,7 +272,7 @@ missing keys. An empty string is a value, not an omission: it overrides the defa
 
 | Job template                         | Required keys                                                                           | Optional keys and defaults                                                                                         |
 |--------------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (empty), `spark_jars` (empty), `spark_jars_packages` (empty), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
+| Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (empty), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
 | `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                   |
 | `builtin-iceberg-rewrite-data-files`  | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                    |
 | `builtin-iceberg-expire-snapshots`    | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                            |
@@ -283,13 +282,10 @@ missing keys. An empty string is a value, not an omission: it overrides the defa
 `where_clause` has no default on purpose: an empty where clause compacts every data file in the
 table, so it must be asked for explicitly.
 
-`spark_master`, `spark_jars`, and `spark_jars_packages` set `spark.master`, `spark.jars`, and
-`spark.jars.packages` when the job is submitted, which is the only time spark-submit reads them.
-Left empty, a configuration isn't set: the local job executor then runs the job with the
-spark-submit default master `local[*]`, and the k8s job executor keeps its own defaults. The
-driver applies `spark_conf` only after it starts, so `spark.master` and `spark.submit.deployMode`
-in `spark_conf` are ignored once spark-submit has set them, and `spark.jars` and
-`spark.jars.packages` there don't reach the driver classpath.
+An empty `spark_master` leaves the master to the job executor: the local job executor runs the job
+with the spark-submit default `local[*]`, and the k8s job executor rejects any other master than a
+Kubernetes one. `spark.master` and `spark.submit.deployMode` in `spark_conf` are ignored, as the job
+is submitted with them already set.
 
 ## Update Statistics
 

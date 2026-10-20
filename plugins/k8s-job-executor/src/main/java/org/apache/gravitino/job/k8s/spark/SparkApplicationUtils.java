@@ -18,8 +18,12 @@
  */
 package org.apache.gravitino.job.k8s.spark;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
 import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
@@ -28,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -90,6 +95,15 @@ public final class SparkApplicationUtils {
   private static final String SPARK_DRIVER_ENV_PREFIX = "spark.kubernetes.driverEnv.";
   private static final String SPARK_EXECUTOR_ENV_PREFIX = "spark.executorEnv.";
 
+  // The argument of a built-in job that carries the Spark configurations of the job run.
+  private static final String BUILTIN_SPARK_CONF_ARGUMENT = "--spark-conf";
+
+  // The configurations that spark-submit decides, which a built-in job ignores in its spark_conf.
+  private static final Set<String> SUBMIT_DECIDED_CONFIGS =
+      ImmutableSet.of(SPARK_MASTER, SPARK_DEPLOY_MODE);
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
   // The environment variable names that Spark passes to the executors: Spark 3.5 drops any other
   // spark.executorEnv.* key with only a warning, while the driver would still get it. Kubernetes
   // without the relaxed environment variable validation accepts the same names, except '.' and
@@ -112,8 +126,9 @@ public final class SparkApplicationUtils {
    * through the Spark configurations {@code spark.kubernetes.driverEnv.*} and {@code
    * spark.executorEnv.*}, which means their values are visible in the SparkApplication and in its
    * pods. They override the default Spark configurations of the job executor, and the Spark
-   * configurations of the job template override them, except those with a blank value, which are
-   * left unset.
+   * configurations of the job override them, except those with a blank value, which are left unset.
+   * The Spark configurations of a built-in job include those of its {@code spark_conf} parameter,
+   * so that the configurations that spark-submit reads, such as {@code spark.jars}, take effect.
    *
    * <p>The operator decides the master and the deploy mode, so a job whose {@code spark.master}
    * isn't a Kubernetes master, or whose {@code spark.submit.deployMode} isn't {@code cluster}, is
@@ -142,16 +157,8 @@ public final class SparkApplicationUtils {
               sparkConf.put(SPARK_DRIVER_ENV_PREFIX + name, value);
               sparkConf.put(SPARK_EXECUTOR_ENV_PREFIX + name, value);
             });
-    // A blank value leaves a Spark configuration unset, as it is what an optional template
-    // parameter such as {{spark_jars:-}} becomes, so it doesn't override the executor default.
-    template
-        .configs()
-        .forEach(
-            (key, value) -> {
-              if (StringUtils.isNotBlank(value)) {
-                sparkConf.put(key, value);
-              }
-            });
+    Map<String, String> jobSparkConf = getJobSparkConf(context, template);
+    sparkConf.putAll(jobSparkConf);
     // The operator only supports cluster mode, so a job that asks for client mode is rejected
     // rather than silently run in cluster mode.
     String deployMode = StringUtils.trimToNull(sparkConf.get(SPARK_DEPLOY_MODE));
@@ -180,7 +187,7 @@ public final class SparkApplicationUtils {
     putIfBlank(sparkConf, SPARK_DRIVER_SERVICE_ACCOUNT, configs.sparkServiceAccount());
     // Only a job chooses its namespace this way. A default set in the Spark configurations of
     // the executor would silently shadow the namespace of the executor configurations.
-    String namespace = StringUtils.trimToNull(template.configs().get(SPARK_NAMESPACE));
+    String namespace = StringUtils.trimToNull(jobSparkConf.get(SPARK_NAMESPACE));
     if (namespace == null) {
       namespace = configs.namespace();
     } else if (!K8sJobResourceUtils.isValidNamespace(namespace)) {
@@ -240,6 +247,91 @@ public final class SparkApplicationUtils {
             .build();
     app.setAdditionalProperty("spec", spec);
     return app;
+  }
+
+  /**
+   * Returns the Spark configurations that a job sets itself, which override the default Spark
+   * configurations of the job executor.
+   *
+   * <p>They are the configurations of the job template, and for a built-in job also those of its
+   * {@code spark_conf} parameter, which override them. The driver of a built-in job applies its
+   * {@code spark_conf} only once it starts, too late for the configurations that spark-submit
+   * reads, such as {@code spark.jars}, so they are set in the SparkApplication as well. {@code
+   * spark.master} and {@code spark.submit.deployMode} there are ignored, as the driver also ignores
+   * them. A blank value leaves a configuration unset, as it is what an optional template parameter
+   * becomes, so it doesn't override the default of the job executor.
+   */
+  private static Map<String, String> getJobSparkConf(
+      JobContext context, SparkJobTemplate template) {
+    Map<String, String> jobSparkConf = new TreeMap<>();
+    template
+        .configs()
+        .forEach(
+            (key, value) -> {
+              if (StringUtils.isNotBlank(value)) {
+                jobSparkConf.put(key, value);
+              }
+            });
+    if (!template.name().startsWith(JobTemplateProvider.BUILTIN_NAME_PREFIX)) {
+      return jobSparkConf;
+    }
+
+    getBuiltinSparkConf(template)
+        .forEach(
+            (key, value) -> {
+              if (SUBMIT_DECIDED_CONFIGS.contains(key)) {
+                LOG.warn(
+                    "Ignored {}={} in spark_conf of job {} of built-in job template {}, as the"
+                        + " Spark operator decides it",
+                    key,
+                    value,
+                    context.jobId(),
+                    template.name());
+              } else if (StringUtils.isNotBlank(value)) {
+                jobSparkConf.put(key, value);
+              }
+            });
+    return jobSparkConf;
+  }
+
+  private static Map<String, String> getBuiltinSparkConf(SparkJobTemplate template) {
+    List<String> arguments = template.arguments();
+    int index = arguments.indexOf(BUILTIN_SPARK_CONF_ARGUMENT);
+    if (index < 0 || index + 1 >= arguments.size()) {
+      return ImmutableMap.of();
+    }
+    String json = arguments.get(index + 1);
+    if (StringUtils.isBlank(json)) {
+      return ImmutableMap.of();
+    }
+
+    Map<String, Object> parsed;
+    try {
+      parsed = MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
+    } catch (JsonProcessingException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "spark_conf of built-in job template %s isn't a JSON map: %s",
+              template.name(), e.getOriginalMessage()),
+          e);
+    }
+    // Parsed the way the built-in jobs parse it: a flat map whose null values are empty.
+    if (parsed == null) {
+      return ImmutableMap.of();
+    }
+    Map<String, String> sparkConf = new LinkedHashMap<>();
+    parsed.forEach(
+        (key, value) -> {
+          if (value instanceof Map || value instanceof List) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "spark_conf of built-in job template %s must be a flat JSON map, but %s has"
+                        + " a non-scalar value",
+                    template.name(), key));
+          }
+          sparkConf.put(key, value == null ? "" : value.toString());
+        });
+    return ImmutableMap.copyOf(sparkConf);
   }
 
   private static String getExecutableUri(

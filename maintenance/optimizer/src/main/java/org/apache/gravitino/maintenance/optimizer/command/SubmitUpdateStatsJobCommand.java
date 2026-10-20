@@ -52,8 +52,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String DEFAULT_SPARK_EXECUTOR_MEMORY = "1g";
   private static final String DEFAULT_SPARK_DRIVER_MEMORY = "1g";
   private static final String SPARK_MASTER_KEY = "spark.master";
-  private static final String SPARK_JARS_KEY = "spark.jars";
-  private static final String SPARK_JARS_PACKAGES_KEY = "spark.jars.packages";
   private static final String SPARK_EXECUTOR_INSTANCES_KEY = "spark.executor.instances";
   private static final String SPARK_EXECUTOR_CORES_KEY = "spark.executor.cores";
   private static final String SPARK_EXECUTOR_MEMORY_KEY = "spark.executor.memory";
@@ -334,19 +332,11 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     Map<String, String> placeholders = new LinkedHashMap<>();
     String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
 
-    // The submit-time configurations are empty unless set, which leaves them to the job executor:
-    // the driver applies spark_conf only after spark-submit has resolved them.
+    // An empty master leaves it to the job executor: spark-submit defaults to local[*], and the
+    // k8s job executor lets the operator decide it.
     placeholders.put(
         "spark_master",
         firstNonBlank(submitterConfigs.get("spark_master"), sparkConfigs.get(SPARK_MASTER_KEY)));
-    placeholders.put(
-        "spark_jars",
-        firstNonBlank(submitterConfigs.get("spark_jars"), sparkConfigs.get(SPARK_JARS_KEY)));
-    placeholders.put(
-        "spark_jars_packages",
-        firstNonBlank(
-            submitterConfigs.get("spark_jars_packages"),
-            sparkConfigs.get(SPARK_JARS_PACKAGES_KEY)));
     placeholders.put(
         "spark_executor_instances",
         firstNonBlank(

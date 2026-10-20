@@ -90,7 +90,7 @@ public class TestIcebergJobUtils {
                     "Iceberg Spark session extensions"));
     assertTrue(ex.getMessage().contains("Missing Iceberg Spark session extensions"));
     assertTrue(ex.getMessage().contains("iceberg-spark-runtime"));
-    assertTrue(ex.getMessage().contains("spark_jars"));
+    assertTrue(ex.getMessage().contains("spark.jars"));
   }
 
   @Test
@@ -115,7 +115,6 @@ public class TestIcebergJobUtils {
             .set("spark.master", "k8s://https://kubernetes.default.svc")
             .set("spark.submit.deployMode", "cluster");
 
-    // spark.jars is kept, as the driver still adds it for the executors.
     assertEquals(
         ImmutableMap.of(
             "spark.jars", "/opt/iceberg-spark-runtime.jar", "spark.sql.shuffle.partitions", "200"),

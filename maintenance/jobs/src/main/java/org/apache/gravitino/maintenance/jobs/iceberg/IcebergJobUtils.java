@@ -58,13 +58,6 @@ public final class IcebergJobUtils {
   private static final Set<String> SUBMIT_DECIDED_CONFIGS =
       ImmutableSet.of("spark.master", "spark.submit.deployMode");
 
-  /**
-   * The Spark configurations that only spark-submit resolves, by the template parameters of the
-   * built-in jobs that set them.
-   */
-  private static final Map<String, String> SUBMIT_TIME_CONFIG_PARAMETERS =
-      ImmutableMap.of("spark.jars", "spark_jars", "spark.jars.packages", "spark_jars_packages");
-
   private IcebergJobUtils() {}
 
   /**
@@ -206,10 +199,7 @@ public final class IcebergJobUtils {
    * SparkSession, against the configurations spark-submit has already set for the driver.
    *
    * <p>{@code spark.master} and {@code spark.submit.deployMode} are dropped if spark-submit has set
-   * them, as the job would otherwise run with another master than it was submitted to. A warning is
-   * logged for {@code spark.jars} and {@code spark.jars.packages}, which only spark-submit resolves
-   * for the driver, and which the job template parameters {@code spark_jars} and {@code
-   * spark_jars_packages} set.
+   * them, as the job would otherwise run with another master than it was submitted to.
    *
    * @param configs the custom Spark configurations
    * @return the custom Spark configurations to apply
@@ -234,14 +224,6 @@ public final class IcebergJobUtils {
                 key,
                 submittedConf.get(key));
             return;
-          }
-          if (SUBMIT_TIME_CONFIG_PARAMETERS.containsKey(key)) {
-            LOG.warn(
-                "{} of the custom Spark configurations doesn't add to the classpath of the driver,"
-                    + " which spark-submit resolves. Set it by the {} parameter of a built-in job"
-                    + " instead.",
-                key,
-                SUBMIT_TIME_CONFIG_PARAMETERS.get(key));
           }
           filtered.put(key, value);
         });
@@ -304,11 +286,12 @@ public final class IcebergJobUtils {
       throw new IllegalStateException(
           String.format(
               "Missing %s (%s). Built-in Iceberg jobs need iceberg-spark-runtime on the Spark "
-                  + "classpath, for example via the spark_jars or spark_jars_packages parameter "
-                  + "of the job, or installed into the Spark environment. spark.jars in "
-                  + "spark_conf doesn't add it, as the driver applies spark_conf only after it "
-                  + "starts. A stock Spark distribution does not include it. Match the artifact "
-                  + "to your Spark, Scala, and Iceberg versions.",
+                  + "classpath, for example installed into the Spark environment or the Spark "
+                  + "image. With the k8s job executor, spark.jars in spark_conf or in "
+                  + "gravitino.jobExecutor.k8s.spark.conf.* adds it too. With the local job "
+                  + "executor, spark.jars in spark_conf doesn't, as the driver applies spark_conf "
+                  + "only after it starts. A stock Spark distribution does not include it. Match "
+                  + "the artifact to your Spark, Scala, and Iceberg versions.",
               description, className),
           first);
     }

@@ -47,12 +47,10 @@ public class TestIcebergSparkConfigUtils {
   }
 
   @Test
-  public void testBuildTemplateSparkConfigsLeavesSubmitTimeConfigsUnsetByDefault() {
+  public void testBuildTemplateSparkConfigsLeavesMasterUnsetByDefault() {
     Map<String, String> configs = IcebergSparkConfigUtils.buildTemplateSparkConfigs();
 
     assertEquals("{{spark_master:-}}", configs.get("spark.master"));
-    assertEquals("{{spark_jars:-}}", configs.get("spark.jars"));
-    assertEquals("{{spark_jars_packages:-}}", configs.get("spark.jars.packages"));
   }
 
   @Test

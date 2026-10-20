@@ -97,8 +97,6 @@ public class SparkPiJob implements BuiltInJob {
     // An empty value leaves the Spark configuration unset, see
     // IcebergSparkConfigUtils#buildTemplateSparkConfigs.
     configs.put("spark.master", "{{spark_master:-}}");
-    configs.put("spark.jars", "{{spark_jars:-}}");
-    configs.put("spark.jars.packages", "{{spark_jars_packages:-}}");
     configs.put("spark.executor.instances", "{{spark_executor_instances:-1}}");
     configs.put("spark.executor.cores", "{{spark_executor_cores:-1}}");
     configs.put("spark.executor.memory", "{{spark_executor_memory:-1g}}");
