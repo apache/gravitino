@@ -23,8 +23,13 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +63,18 @@ public class HiveContainer extends BaseContainer {
 
   private static final String HIVE_LOG_PATH = "/tmp/root/";
   private static final String HDFS_LOG_PATH = "/usr/local/hadoop/logs/";
+  // The image ships Hadoop 3 (NameNode web port 9870) for hive3 and Hadoop 2 (50070) for hive2.
+  private static final int[] NAMENODE_HTTP_PORTS = {9870, 50070};
+  private static final String WAREHOUSE_DIR = "/user/hive/warehouse";
+  // The image's core-site.xml, which its start script copies into the Hadoop configuration.
+  private static final String HADOOP_CONF_TO_COPY = "/tmp/hadoop-conf/core-site.xml";
+  // The Hive images' entrypoint.
+  private static final String IMAGE_START = "/usr/local/sbin/start.sh";
+  // The image's core-site.xml already lets these users impersonate.
+  private static final Set<String> USERS_ALLOWED_TO_IMPERSONATE =
+      ImmutableSet.of("root", "hive", "gravitino");
+
+  private final boolean kerberosEnabled;
 
   public static Builder builder() {
     return new Builder();
@@ -70,12 +87,23 @@ public class HiveContainer extends BaseContainer {
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
-      Optional<Network> network) {
+      Optional<Network> network,
+      boolean kerberosEnabled) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+    this.kerberosEnabled = kerberosEnabled;
   }
 
   public String getHostName() {
     return hostName;
+  }
+
+  /**
+   * Returns the user the container's Hadoop and Hive processes run as: {@code HADOOP_USER_NAME}
+   * when the test sets it, else root. Clients that write to HDFS should act as this user so they
+   * get the same ownership as the old {@code docker exec hive} calls.
+   */
+  public String getHadoopUser() {
+    return container.getEnvMap().getOrDefault(HADOOP_USER_NAME, "root");
   }
 
   @Override
@@ -86,8 +114,40 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   public void start() {
+    if (!kerberosEnabled) {
+      allowHadoopUserToImpersonate();
+    }
     super.start();
     Preconditions.check("Hive container startup failed!", checkContainerStatus(15));
+  }
+
+  /**
+   * Lets the Hadoop user, which every process in the container runs as, impersonate users.
+   *
+   * <p>HiveServer2 runs each JDBC statement as the session user (doAs), so it impersonates even
+   * when that user is itself; the image only allows that for {@code hive}, {@code root} and {@code
+   * gravitino}. The rule goes into the configuration the launch script copies in, before the
+   * NameNode starts.
+   */
+  private void allowHadoopUserToImpersonate() {
+    String user = getHadoopUser();
+    if (USERS_ALLOWED_TO_IMPERSONATE.contains(user)) {
+      return;
+    }
+    String rule =
+        format(
+            "<property><name>hadoop.proxyuser.%1$s.hosts</name><value>*</value></property>"
+                + "<property><name>hadoop.proxyuser.%1$s.groups</name><value>*</value></property>",
+            user);
+    // Fail the start, rather than let JDBC sessions fail later, if a new image changes the file.
+    String script =
+        format(
+            "sed -i 's|</configuration>|%1$s</configuration>|' %2$s"
+                + " && grep -q 'hadoop.proxyuser.%3$s.hosts' %2$s"
+                + " || { echo 'Cannot add the proxy-user rule to %2$s' >&2; exit 1; }",
+            rule, HADOOP_CONF_TO_COPY, user);
+    container.withCreateContainerCmdModifier(
+        cmd -> cmd.withEntrypoint("/bin/bash", "-c", script + " && exec /bin/bash " + IMAGE_START));
   }
 
   @Override
@@ -127,6 +187,100 @@ public class HiveContainer extends BaseContainer {
     LOG.info("Hive report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
   }
 
+  @Override
+  protected boolean checkContainerStatus(int retryLimit) {
+    if (kerberosEnabled) {
+      awaitReadyWithHiveCli();
+      awaitPort(HIVE_METASTORE_PORT, "Hive Metastore");
+    } else {
+      awaitReadyOverHttp();
+      awaitPort(HIVE_METASTORE_PORT, "Hive Metastore");
+      // Tests run HiveQL over JDBC; Kerberos Hive tests still use the CLI.
+      awaitPort(HIVE_SERVICE_PORT, "HiveServer2");
+    }
+    return true;
+  }
+
+  /**
+   * Waits for HDFS through the NameNode's JMX and creates the warehouse directory through WebHDFS.
+   * The Hive CLI checks this replaces each boot a JVM with an embedded metastore, which costs
+   * several seconds per call; the metastore port check that follows covers Hive itself.
+   */
+  private void awaitReadyOverHttp() {
+    String containerIp = getContainerIpAddress();
+    int[] namenodePort = new int[1];
+    await()
+        .atMost(150, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
+        .pollInterval(500, TimeUnit.MILLISECONDS)
+        .until(
+            () -> {
+              for (int port : NAMENODE_HTTP_PORTS) {
+                String jmx =
+                    httpRequest(
+                        "GET",
+                        format(
+                            "http://%s:%d/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState",
+                            containerIp, port));
+                if (jmx != null && jmx.matches("(?s).*\"NumLiveDataNodes\"\\s*:\\s*[1-9].*")) {
+                  namenodePort[0] = port;
+                  return true;
+                }
+              }
+              return false;
+            });
+
+    // `CREATE TABLE` through the Hive CLI used to create this directory as the Hadoop user; tests
+    // that write to the default database expect it to exist.
+    await()
+        .atMost(60, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
+        .pollInterval(500, TimeUnit.MILLISECONDS)
+        .until(
+            () -> {
+              String response =
+                  httpRequest(
+                      "PUT",
+                      format(
+                          "http://%s:%d/webhdfs/v1%s?op=MKDIRS&user.name=%s",
+                          containerIp, namenodePort[0], WAREHOUSE_DIR, getHadoopUser()));
+              return response != null && response.contains("true");
+            });
+    LOG.info("Hive container startup success!");
+  }
+
+  /** Returns the response body, or null when the request fails or returns a non-2xx status. */
+  private static String httpRequest(String method, String url) {
+    HttpURLConnection connection = null;
+    try {
+      connection = (HttpURLConnection) new URL(url).openConnection();
+      connection.setRequestMethod(method);
+      connection.setConnectTimeout(2000);
+      connection.setReadTimeout(5000);
+      int status = connection.getResponseCode();
+      if (status / 100 != 2) {
+        String error = "";
+        if (connection.getErrorStream() != null) {
+          try (InputStream body = connection.getErrorStream()) {
+            error = new String(body.readAllBytes(), StandardCharsets.UTF_8);
+          }
+        }
+        LOG.debug("{} {} returned HTTP {}: {}", method, url, status, error);
+        return null;
+      }
+      try (InputStream body = connection.getInputStream()) {
+        return new String(body.readAllBytes(), StandardCharsets.UTF_8);
+      }
+    } catch (IOException e) {
+      LOG.debug("{} {} failed: {}", method, url, e.toString());
+      return null;
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
+  }
+
   // Ready means HDFS has a live data node and the Hive CLI can list databases.
   private void awaitHiveCli() {
     await()
@@ -157,8 +311,7 @@ public class HiveContainer extends BaseContainer {
             });
   }
 
-  @Override
-  protected boolean checkContainerStatus(int retryLimit) {
+  private void awaitReadyWithHiveCli() {
     try {
       awaitHiveCli();
     } catch (RuntimeException e) {
@@ -194,9 +347,11 @@ public class HiveContainer extends BaseContainer {
               }
               return false;
             });
+  }
 
+  private void awaitPort(int port, String service) {
     String containerIp = getContainerIpAddress();
-    // The metastore opens its port only after the SQL checks above; under CI load that can take
+    // The metastore opens its port only after its schema is set up; under CI load that can take
     // well over 10 seconds, so give it the same kind of budget as the other stages.
     await()
         .atMost(60, TimeUnit.SECONDS)
@@ -205,20 +360,13 @@ public class HiveContainer extends BaseContainer {
         .until(
             () -> {
               try (Socket socket = new Socket()) {
-                socket.connect(
-                    new InetSocketAddress(containerIp, HiveContainer.HIVE_METASTORE_PORT), 3000);
+                socket.connect(new InetSocketAddress(containerIp, port), 3000);
                 return true;
               } catch (Exception e) {
-                LOG.warn(
-                    "Can't connect to Hive Metastore:[{}:{}]",
-                    containerIp,
-                    HiveContainer.HIVE_METASTORE_PORT,
-                    e);
+                LOG.warn("Can't connect to {}:[{}:{}]", service, containerIp, port, e);
               }
               return false;
             });
-
-    return true;
   }
 
   public static class Builder extends BaseContainer.Builder<Builder, HiveContainer> {
@@ -240,7 +388,14 @@ public class HiveContainer extends BaseContainer {
     @Override
     public HiveContainer build() {
       return new HiveContainer(
-          generateImageName(), hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+          generateImageName(),
+          hostName,
+          exposePorts,
+          extraHosts,
+          filesToMount,
+          envVars,
+          network,
+          kerberosEnabled);
     }
   }
 }
