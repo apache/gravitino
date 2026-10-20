@@ -152,6 +152,22 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
+  public void testChangePasswordWithOldPassword() throws IOException {
+    manager.addUser("testChangeWithOld", VALID_PASSWORD);
+
+    Assertions.assertTrue(
+        manager.changePassword("testChangeWithOld", NEW_VALID_PASSWORD, VALID_PASSWORD));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.changePassword("testChangeWithOld", VALID_PASSWORD, "wrong-old-password"));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+  }
+
+  @Test
   public void testUpdateEnabled() throws IOException {
     manager.addUser("testEnabled", VALID_PASSWORD);
     Assertions.assertTrue(manager.getUser("testEnabled").enabled());
@@ -176,16 +192,25 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testCannotDisableServiceAdmin() throws IOException {
+  public void testCannotUpdateEnabledOfServiceAdmin() throws IOException {
     loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminDisable");
     manager.addUser("svcAdminDisable", VALID_PASSWORD);
 
-    IllegalArgumentException exception =
+    IllegalArgumentException disableException =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", false));
-    Assertions.assertEquals("Cannot disable service admin svcAdminDisable", exception.getMessage());
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        disableException.getMessage());
     Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
-    Assertions.assertTrue(manager.updateEnabled("svcAdminDisable", true));
+
+    IllegalArgumentException enableException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", true));
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        enableException.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
   }
 
   @Test

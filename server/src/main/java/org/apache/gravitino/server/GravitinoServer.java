@@ -96,8 +96,8 @@ public class GravitinoServer extends ResourceConfig {
   // audit-on-failure coverage. VersioningFilter is intentionally not applied to these: it
   // negotiates Gravitino's "application/vnd.gravitino.vN+json" media type for the Jersey-managed
   // REST surface, and none of these servlets are part of it or read that header. /metrics and
-  // /prometheus/metrics are registered by JettyServer#initialize() itself (see server-common's
-  // JettyServer), outside GravitinoServer's own control entirely. See GH-12760.
+  // /prometheus/metrics are registered directly on JettyServer's servlet context, outside the
+  // Jersey-managed REST surface. See GH-12760.
   private static final ImmutableList<String> ROOT_MOUNTED_PATHS =
       ImmutableList.<String>builder()
           .add("/configs")
@@ -133,6 +133,7 @@ public class GravitinoServer extends ResourceConfig {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
     server.initialize(jettyServerConfig, SERVER_NAME);
+    server.addMetricsServlets(gravitinoEnv.metricsSystem());
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 

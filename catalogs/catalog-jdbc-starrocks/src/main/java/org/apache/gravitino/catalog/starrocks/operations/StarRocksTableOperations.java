@@ -99,6 +99,12 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       Distribution distribution,
       Index[] indexes) {
 
+    if (ArrayUtils.isNotEmpty(indexes)) {
+      throw new UnsupportedOperationException(
+          "StarRocks catalog does not support creating table indexes. "
+              + "Remove indexes from the create table request.");
+    }
+
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append(String.format("CREATE TABLE `%s` ( \n", tableName));
     // Add columns
@@ -300,14 +306,8 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    // never called, as implemented generatePurgeTableSql(String databaseName, String tableName)
     throw new UnsupportedOperationException(
         "StarRocks does not support purge table in Gravitino, please use drop table");
-  }
-
-  @Override
-  protected String generatePurgeTableSql(String databaseName, String tableName) {
-    return String.format("TRUNCATE TABLE `%s`.`%s`", databaseName, tableName);
   }
 
   @Override
