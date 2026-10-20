@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.starrocks.utils;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.sql.ResultSet;
@@ -239,7 +241,8 @@ public class StarRocksUtils {
     if (Literals.NULL.equals(upper)) {
       partitionValues = "LESS THAN MAXVALUE";
     } else {
-      partitionValues = String.format("LESS THAN (\"%s\")", upper.value());
+      partitionValues =
+          String.format("LESS THAN (\"%s\")", escapeSqlLiteral(String.valueOf(upper.value()), '"'));
     }
     return partitionValues;
   }
@@ -254,10 +257,10 @@ public class StarRocksUtils {
             String.format(
                 "(%s)",
                 Arrays.stream(part)
-                    .map(p -> "\"" + p.value() + "\"")
+                    .map(p -> "\"" + escapeSqlLiteral(String.valueOf(p.value()), '"') + "\"")
                     .collect(Collectors.joining(",")));
       } else {
-        values = String.format("\"%s\"", part[0].value());
+        values = String.format("\"%s\"", escapeSqlLiteral(String.valueOf(part[0].value()), '"'));
       }
       listValues.add(values);
     }
