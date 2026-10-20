@@ -104,16 +104,23 @@ public class TestClientAddressResolver {
   @Test
   public void testIpv6() {
     ClientAddressResolver resolver = new ClientAddressResolver(ImmutableList.of("fd00::/8", "::1"));
+    // Jetty reports an IPv6 peer in brackets and uncompressed.
     Assertions.assertEquals(
-        "2001:db8::1", resolver.resolve(request("fd12:3456::1", "2001:db8:0:0:0:0:0:1")));
+        "2001:db8::1",
+        resolver.resolve(request("[fd12:3456:0:0:0:0:0:1]", "2001:db8:0:0:0:0:0:1")));
     Assertions.assertEquals(
-        "2001:db8::1", resolver.resolve(request("0:0:0:0:0:0:0:1", "2001:db8::1, fd00::2")));
-    Assertions.assertEquals("fe80::1", resolver.resolve(request("fe80::1", "2001:db8::1")));
+        "2001:db8::1", resolver.resolve(request("[0:0:0:0:0:0:0:1]", "2001:db8::1, fd00::2")));
+    Assertions.assertEquals(
+        "[fe80:0:0:0:0:0:0:1]", resolver.resolve(request("[fe80:0:0:0:0:0:0:1]", "2001:db8::1")));
+    // The unbracketed form is accepted too.
+    Assertions.assertEquals("2001:db8::1", resolver.resolve(request("::1", "2001:db8::1")));
   }
 
   @Test
   public void testIpv6ZoneIdOnPeerIsIgnored() {
     ClientAddressResolver resolver = new ClientAddressResolver(ImmutableList.of("fe80::/10"));
+    Assertions.assertEquals(
+        "2001:db8::1", resolver.resolve(request("[fe80:0:0:0:0:0:0:1%1]", "2001:db8::1")));
     Assertions.assertEquals(
         "2001:db8::1", resolver.resolve(request("fe80::1%eth0", "2001:db8::1")));
   }
@@ -123,6 +130,8 @@ public class TestClientAddressResolver {
     // An IPv4 proxy entry matches the IPv4-mapped IPv6 form a dual-stack socket reports.
     Assertions.assertEquals(
         "203.0.113.5", TRUST_PRIVATE_V4.resolve(request("::ffff:10.0.0.1", "203.0.113.5")));
+    Assertions.assertEquals(
+        "203.0.113.5", TRUST_PRIVATE_V4.resolve(request("[::ffff:10.0.0.1]", "203.0.113.5")));
 
     // An IPv4-mapped IPv6 CIDR matches the plain IPv4 form.
     ClientAddressResolver mapped =
@@ -191,6 +200,8 @@ public class TestClientAddressResolver {
     Assertions.assertEquals(
         "some-host", TRUST_PRIVATE_V4.resolve(request("some-host", "203.0.113.5")));
     Assertions.assertNull(TRUST_PRIVATE_V4.resolve(request(null, "203.0.113.5")));
+    Assertions.assertEquals("[", TRUST_PRIVATE_V4.resolve(request("[", "203.0.113.5")));
+    Assertions.assertEquals("[]", TRUST_PRIVATE_V4.resolve(request("[]", "203.0.113.5")));
   }
 
   @Test

@@ -379,7 +379,7 @@ public final class JettyServerConfig {
 
   private final Config internalConfig;
 
-  private JettyServerConfig(Map<String, String> configs) {
+  private JettyServerConfig(Map<String, String> configs, String keyPrefix) {
     this.internalConfig = new Config(false) {};
     internalConfig.loadFromMap(configs, t -> true);
 
@@ -461,22 +461,31 @@ public final class JettyServerConfig {
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           String.format(
-              "Invalid value for %s: %s. Each entry must be an IP address or a CIDR block",
-              TRUSTED_PROXIES.getKey(), e.getMessage()),
+              "Invalid value for %s%s: %s. Each entry must be an IP address or a CIDR block",
+              keyPrefix, TRUSTED_PROXIES.getKey(), e.getMessage()),
           e);
     }
   }
 
   public static JettyServerConfig fromConfig(Config config, String prefix) {
-    Map<String, String> configs = config.getConfigsWithPrefix(prefix);
-    if (config instanceof OverwriteDefaultConfig) {
-      configs = overwriteJettyDefaultConfig(configs, (OverwriteDefaultConfig) config);
-    }
-    return new JettyServerConfig(configs);
+    return fromConfig(config, prefix, prefix);
   }
 
   public static JettyServerConfig fromConfig(Config config) {
     return fromConfig(config, "");
+  }
+
+  /**
+   * Creates the Jetty server configuration of an auxiliary service whose configuration keys have
+   * already had the service prefix removed, such as an Iceberg or Lance REST service configuration.
+   *
+   * @param config the service configuration, with keys relative to {@code servicePrefix}
+   * @param servicePrefix the prefix the keys have in the configuration file, for example {@code
+   *     gravitino.iceberg-rest.}; only used to name the full key in error messages
+   * @return the Jetty server configuration
+   */
+  public static JettyServerConfig fromServiceConfig(Config config, String servicePrefix) {
+    return fromConfig(config, "", servicePrefix);
   }
 
   public String getHost() {
@@ -667,6 +676,14 @@ public final class JettyServerConfig {
       return Collections.emptySet();
     }
     return Sets.newHashSet(context.getServerSocketFactory().getSupportedCipherSuites());
+  }
+
+  private static JettyServerConfig fromConfig(Config config, String prefix, String keyPrefix) {
+    Map<String, String> configs = config.getConfigsWithPrefix(prefix);
+    if (config instanceof OverwriteDefaultConfig) {
+      configs = overwriteJettyDefaultConfig(configs, (OverwriteDefaultConfig) config);
+    }
+    return new JettyServerConfig(configs, keyPrefix);
   }
 
   private static Map<String, String> overwriteJettyDefaultConfig(

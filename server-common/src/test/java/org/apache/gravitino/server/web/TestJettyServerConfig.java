@@ -158,4 +158,38 @@ public class TestJettyServerConfig {
       Assertions.assertTrue(e.getMessage().contains(invalid), e.getMessage());
     }
   }
+
+  @Test
+  public void testInvalidTrustedProxyErrorNamesFullKey() {
+    String serverKey = JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX + "trustedProxies";
+    Config serverConfig = new Config(false) {};
+    serverConfig.loadFromMap(ImmutableMap.of(serverKey, "proxy.example.com"), k -> true);
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                JettyServerConfig.fromConfig(
+                    serverConfig, JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX));
+    Assertions.assertTrue(e.getMessage().contains(serverKey), e.getMessage());
+
+    // An auxiliary service configuration has its prefix stripped already.
+    Config serviceConfig = new Config(false) {};
+    serviceConfig.loadFromMap(ImmutableMap.of("trustedProxies", "10.0.0.0/33"), k -> true);
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JettyServerConfig.fromServiceConfig(serviceConfig, "gravitino.iceberg-rest."));
+    Assertions.assertTrue(
+        e.getMessage().contains("gravitino.iceberg-rest.trustedProxies"), e.getMessage());
+  }
+
+  @Test
+  public void testFromServiceConfigReadsUnprefixedKeys() {
+    Config serviceConfig = new Config(false) {};
+    serviceConfig.loadFromMap(ImmutableMap.of("trustedProxies", "10.0.0.1"), k -> true);
+    Assertions.assertEquals(
+        Arrays.asList("10.0.0.1"),
+        JettyServerConfig.fromServiceConfig(serviceConfig, "gravitino.lance-rest.")
+            .getTrustedProxies());
+  }
 }

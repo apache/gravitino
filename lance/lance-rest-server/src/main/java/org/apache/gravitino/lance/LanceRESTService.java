@@ -78,7 +78,8 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
     LanceConfig lanceConfig = new LanceConfig(new HashMap<>(properties));
-    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
+    JettyServerConfig serverConfig =
+        JettyServerConfig.fromServiceConfig(lanceConfig, LanceConfig.LANCE_CONFIG_PREFIX);
     LanceExceptionMapper.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
 
     server = new LanceJettyServer();

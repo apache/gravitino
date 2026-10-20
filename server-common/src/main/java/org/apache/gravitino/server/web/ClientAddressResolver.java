@@ -198,6 +198,10 @@ public final class ClientAddressResolver {
       return Optional.empty();
     }
     String host = text.trim();
+    // Jetty reports an IPv6 peer in brackets, such as "[0:0:0:0:0:0:0:1]".
+    if (host.length() > 1 && host.charAt(0) == '[' && host.charAt(host.length() - 1) == ']') {
+      host = host.substring(1, host.length() - 1);
+    }
     // Strip an IPv6 zone ID, such as "fe80::1%eth0"; it never identifies a different host.
     int zone = host.indexOf('%');
     if (zone >= 0) {

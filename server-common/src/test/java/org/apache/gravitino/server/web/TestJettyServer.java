@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 
@@ -31,8 +32,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import javax.servlet.http.HttpServlet;
@@ -41,6 +45,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.utils.RequestContext;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -174,6 +179,74 @@ public class TestJettyServer {
     }
   }
 
+  /**
+   * Sends real requests over IPv4 and IPv6 loopback, so the peer address comes from Jetty itself
+   * (which brackets IPv6 peers) rather than from a mock.
+   */
+  @Test
+  public void testTrustedProxyResolvesClientAddressOverRealConnections() throws IOException {
+    int port = startServerWithClientAddressEcho("127.0.0.1, ::1");
+
+    assertEquals("1.2.3.4", requestClientAddress("127.0.0.1", port, "9.9.9.9, 1.2.3.4"));
+    assertEquals("127.0.0.1", requestClientAddress("127.0.0.1", port, null));
+    assumeTrue(isIpv6LoopbackReachable(port), "IPv6 loopback is not available");
+    assertEquals("1.2.3.4", requestClientAddress("[::1]", port, "9.9.9.9, 1.2.3.4"));
+  }
+
+  @Test
+  public void testForwardedForIgnoredByDefaultOverRealConnection() throws IOException {
+    int port = startServerWithClientAddressEcho(null);
+
+    assertEquals("127.0.0.1", requestClientAddress("127.0.0.1", port, "1.2.3.4"));
+  }
+
+  /**
+   * Starts the server with {@link RequestContextFilter} wired to the configured resolver, as the
+   * real servers do, and a servlet that echoes the resolved client address.
+   */
+  private int startServerWithClientAddressEcho(String trustedProxies) throws IOException {
+    int port = RESTUtils.findAvailablePort(5000, 6000);
+    Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+    if (trustedProxies != null) {
+      config.set(JettyServerConfig.TRUSTED_PROXIES, Arrays.asList(trustedProxies.split(",")));
+    }
+    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
+    jettyServer.initialize(serverConfig, "test", false);
+    jettyServer.addServlet(new ClientAddressEchoServlet(), "/echo");
+    jettyServer.addFilter(
+        new RequestContextFilter(null, serverConfig.getClientAddressResolver()), "/echo");
+    jettyServer.start();
+    return port;
+  }
+
+  private String requestClientAddress(String host, int port, String xForwardedFor)
+      throws IOException {
+    HttpURLConnection connection =
+        (HttpURLConnection) new URL("http://" + host + ":" + port + "/echo").openConnection();
+    try {
+      if (xForwardedFor != null) {
+        connection.setRequestProperty(ClientAddressResolver.X_FORWARDED_FOR, xForwardedFor);
+      }
+      assertEquals(HttpServletResponse.SC_OK, connection.getResponseCode());
+      try (Reader body =
+          new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)) {
+        return CharStreams.toString(body);
+      }
+    } finally {
+      connection.disconnect();
+    }
+  }
+
+  private static boolean isIpv6LoopbackReachable(int port) {
+    try (Socket socket = new Socket()) {
+      socket.connect(new InetSocketAddress("::1", port), 1000);
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
   /** Starts the server with a servlet that throws, and returns Jetty's error page for it. */
   private String requestFailingServlet(Config config) throws IOException {
     int port = RESTUtils.findAvailablePort(5000, 6000);
@@ -213,6 +286,15 @@ public class TestJettyServer {
       return connection.getResponseCode();
     } finally {
       connection.disconnect();
+    }
+  }
+
+  private static class ClientAddressEchoServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+      response.setContentType("text/plain");
+      response.getWriter().write(RequestContext.getRemoteAddress());
     }
   }
 
