@@ -372,14 +372,19 @@ public class JobManager implements JobOperationDispatcher {
           } catch (EntityAlreadyExistsException e) {
             // If the EntityAlreadyExistsException is thrown, it means the new name already exists.
             // So there should be a rename change, and the new name should be present.
+            String conflictName =
+                newName.orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "Job template already exists without a rename change", e));
             throw new JobTemplateAlreadyExistsException(
                 e,
                 "Failed to rename job template %s to %s under metalake %s, a job template named "
                     + "%s already exists",
                 jobTemplateName,
-                newName.orElse(jobTemplateName),
+                conflictName,
                 metalake,
-                newName.orElse(jobTemplateName));
+                conflictName);
           }
         });
   }

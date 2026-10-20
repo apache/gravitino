@@ -292,6 +292,15 @@ public class TestJobManager {
             + metalake
             + ", a job template named existing_job already exists",
         failure.getMessage());
+
+    // Without a rename change, a conflict is an invariant violation, not a name conflict.
+    IllegalStateException unexpected =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                jobManager.alterJobTemplate(
+                    metalake, "shell_job", JobTemplateChange.updateComment("new comment")));
+    Assertions.assertSame(exists, unexpected.getCause());
   }
 
   @Test
