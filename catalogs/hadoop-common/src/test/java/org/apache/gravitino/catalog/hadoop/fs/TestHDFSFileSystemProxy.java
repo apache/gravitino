@@ -19,63 +19,63 @@
 
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.ImmutableMap;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.io.File;
+import java.util.Map;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.junit.jupiter.api.Assertions;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Tests for {@link HDFSFileSystemProxy} close lifecycle. */
 public class TestHDFSFileSystemProxy {
 
-  /**
-   * The private close() hook must stop a present Kerberos client exactly once and make a second
-   * close a no-op. On the unfixed tree the hook was empty, so the ticket-refresh executor of every
-   * Kerberos-authenticated proxy leaked for the JVM's lifetime.
-   */
   @Test
-  public void testCloseStopsKerberosClientOnce() throws Exception {
-    HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(new Path("file:///"), ImmutableMap.of());
+  public void testClosingFileSystemStopsKerberosTicketRefresh() throws Exception {
+    KerberosClient client = mock(KerberosClient.class);
+    when(client.login(anyString())).thenReturn(UserGroupInformation.createRemoteUser("test"));
+    KerberosClient.Builder builder = mock(KerberosClient.Builder.class, Mockito.RETURNS_SELF);
+    when(builder.build()).thenReturn(client);
+    Map<String, String> config =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY, "kerberos",
+            KerberosConfig.PRINCIPAL_KEY, "test@EXAMPLE.COM",
+            KerberosConfig.KEY_TAB_URI_KEY, "file:///tmp/test.keytab");
 
-    AtomicInteger closes = new AtomicInteger();
-    KerberosClient client = Mockito.mock(KerberosClient.class);
-    Mockito.doAnswer(inv -> closes.incrementAndGet()).when(client).close();
-    setField(proxy, "kerberosClient", client);
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      clients.when(() -> KerberosClient.builder(anyString(), any())).thenReturn(builder);
+      authUtils
+          .when(
+              () ->
+                  KerberosAuthUtils.saveKeytabFromUri(
+                      anyString(), any(), anyInt(), anyBoolean(), any()))
+          .thenReturn(new File("test.keytab"));
 
-    Method close = HDFSFileSystemProxy.class.getDeclaredMethod("close");
-    close.setAccessible(true);
-    close.invoke(proxy);
-    close.invoke(proxy);
+      FileSystem fs = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy();
+      verify(client, never()).close();
 
-    Assertions.assertEquals(1, closes.get(), "Kerberos client must be closed exactly once");
-    Assertions.assertNull(
-        getField(proxy, "kerberosClient"), "Second close must find nothing to close");
-  }
-
-  private static void setField(Object target, String name, Object value) throws Exception {
-    Field field = findField(target.getClass(), name);
-    field.setAccessible(true);
-    field.set(target, value);
-  }
-
-  private static Object getField(Object target, String name) throws Exception {
-    Field field = findField(target.getClass(), name);
-    field.setAccessible(true);
-    return field.get(target);
-  }
-
-  private static Field findField(Class<?> clazz, String name) throws NoSuchFieldException {
-    for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
-      try {
-        return c.getDeclaredField(name);
-      } catch (NoSuchFieldException e) {
-        // continue up the hierarchy
-      }
+      // Closing the FileSystem stops the ticket refresh that login started, and only once.
+      fs.close();
+      fs.close();
+      verify(client, times(1)).close();
     }
-    throw new NoSuchFieldException(name);
   }
 }

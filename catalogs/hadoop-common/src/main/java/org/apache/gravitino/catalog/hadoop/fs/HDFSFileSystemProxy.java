@@ -53,11 +53,10 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
 
   private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
 
-  @Nullable private KerberosClient kerberosClient;
-
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
+  @Nullable private KerberosClient kerberosClient;
   protected UserGroupInformation initUgi;
   private FileSystem fs;
   private Configuration configuration;
