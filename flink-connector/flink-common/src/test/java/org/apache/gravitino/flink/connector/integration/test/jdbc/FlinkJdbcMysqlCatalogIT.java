@@ -58,6 +58,11 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
   }
 
   @Override
+  protected boolean supportsCustomTableProperties() {
+    return false;
+  }
+
+  @Override
   protected String defaultDatabaseName() {
     return MYSQL_CATALOG_MYSQL_IT.name();
   }
