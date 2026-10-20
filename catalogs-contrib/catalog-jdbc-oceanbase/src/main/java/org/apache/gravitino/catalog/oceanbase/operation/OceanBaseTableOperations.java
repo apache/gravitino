@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.oceanbase.operation;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -108,7 +109,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT='").append(comment).append("'");
+      sqlBuilder.append(" COMMENT='").append(escapeSqlLiteral(comment, '\'')).append("'");
     }
 
     // Add table properties
@@ -196,7 +197,8 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    return String.format("TRUNCATE TABLE `%s`", tableName);
+    throw new UnsupportedOperationException(
+        "OceanBase does not support purge table in Gravitino, please use drop table");
   }
 
   /**
@@ -313,7 +315,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add("COMMENT '" + newComment + "'");
+      alterSql.add("COMMENT '" + escapeSqlLiteral(newComment, '\'') + "'");
     }
 
     if (!setProperties.isEmpty()) {
@@ -478,7 +480,10 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     }
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
+      columnDefinition
+          .append("COMMENT '")
+          .append(escapeSqlLiteral(addColumn.getComment(), '\''))
+          .append("' ");
     }
 
     // Append default value if available
@@ -649,7 +654,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
-      sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
+      sqlBuilder.append("COMMENT '").append(escapeSqlLiteral(column.comment(), '\'')).append("' ");
     }
     return sqlBuilder;
   }

@@ -10,6 +10,12 @@ license: "This software is licensed under the Apache License version 2."
 
 Apache Gravitino Metrics builds upon the [Dropwizard Metrics](https://metrics.dropwizard.io/). It exports these metrics through both JMX and an HTTP server, supporting JSON and Prometheus formats. Retrieve them via HTTP requests, as illustrated below:
 
+The Gravitino server exposes both HTTP endpoints. Standalone Iceberg REST and Lance REST servers
+disable these endpoints by default; set `gravitino.iceberg-rest.metrics.enabled=true` or
+`gravitino.lance-rest.metrics.enabled=true` to enable them. These settings apply only when the
+service runs standalone. In auxiliary mode, scrape metrics from the Gravitino server endpoint.
+Standalone metrics endpoints are unauthenticated, so enable them only on a trusted network.
+
 ```shell
 // Use Gravitino Server address or Iceberg REST server address to replace 127.0.0.1:8090
 // Get metrics in JSON format

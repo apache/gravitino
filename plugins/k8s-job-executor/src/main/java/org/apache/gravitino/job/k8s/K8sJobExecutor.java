@@ -142,10 +142,12 @@ public class K8sJobExecutor implements JobExecutor {
                     && isUnreachable((KubernetesClientException) e),
             clock::millis);
     LOG.info(
-        "Initialized the k8s job executor for cluster {} at {}, default namespace {}",
+        "Initialized the k8s job executor for cluster {} at {}, default namespace {}, built-in"
+            + " jobs jar {}",
         configs.cluster(),
         client.getMasterUrl(),
-        configs.namespace());
+        configs.namespace(),
+        configs.sparkBuiltinJobsJar());
   }
 
   @Override

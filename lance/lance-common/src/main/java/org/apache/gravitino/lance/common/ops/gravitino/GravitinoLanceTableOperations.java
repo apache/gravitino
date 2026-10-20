@@ -289,10 +289,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     // dropTable would delete the underlying Lance data, violating the deregister contract
     // ("It will not delete the underlying lance data"). The TableCatalog interface does not
     // expose a metadata-only removal path, so we fail fast rather than risk silent data loss.
-    boolean external =
-        Optional.ofNullable(properties.get(Table.PROPERTY_EXTERNAL))
-            .map(Boolean::parseBoolean)
-            .orElse(false);
+    boolean external = LancePropertiesUtils.isExternalTable(properties);
     if (!external) {
       throw new UnsupportedOperationException(
           "deregisterTable only supports external tables, but table " + tableId + " is managed");
