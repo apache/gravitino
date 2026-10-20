@@ -119,6 +119,17 @@ public interface ContainerSpec<C extends BaseContainer> {
   }
 
   /**
+   * Returns this spec completed with what the test instance provides, such as the Gravitino
+   * server's port. The extension calls it just before it starts the container.
+   *
+   * @param testInstance the test instance
+   * @return this spec by default
+   */
+  default ContainerSpec<C> forTestInstance(Object testInstance) {
+    return this;
+  }
+
+  /**
    * Returns the running container for this spec, starting it on first use.
    *
    * <p>{@link ContainerSuite} keeps the container for the whole run, so tests that use fixtures and

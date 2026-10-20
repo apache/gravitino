@@ -85,7 +85,8 @@ public class ContainerSuite {
   // Enable the Ranger plugin in the Hive container
   private static volatile HiveContainer hiveRangerContainer;
   private static volatile TrinoContainer trinoContainer;
-  private static volatile TrinoITContainers trinoITContainers;
+  // One cluster per Gravitino server: a test class with another server replaces it.
+  private static final ContainerSlot<TrinoSpec, TrinoCluster> trinoCluster = new ContainerSlot<>();
   private static volatile RangerContainer rangerContainer;
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
@@ -773,12 +774,31 @@ public class ContainerSuite {
     return trinoContainer;
   }
 
-  public static TrinoITContainers getTrinoITContainers() {
-    if (trinoITContainers == null) {
-      trinoITContainers = new TrinoITContainers();
-      closer.register(trinoITContainers);
+  /**
+   * Starts, or returns the running, Trino cluster for the spec. A spec for another Gravitino server
+   * or shape replaces the running cluster.
+   *
+   * @param spec the cluster to run, with the Gravitino server port set
+   * @return the running cluster
+   */
+  public TrinoCluster startTrinoCluster(TrinoSpec spec) {
+    synchronized (ContainerSuite.class) {
+      return trinoCluster.getOrStart(
+          spec,
+          () -> {
+            initIfNecessary();
+            TrinoCluster cluster =
+                closer.register(
+                    TrinoCluster.builder()
+                        .withTrinoVersion(spec.version())
+                        .withWorkers(spec.workers())
+                        .withHiveRuntimeVersion(spec.hive().runtimeVersion())
+                        .withGravitinoServerPort(spec.gravitinoServerPort())
+                        .build());
+            start(cluster);
+            return cluster;
+          });
     }
-    return trinoITContainers;
   }
 
   public HiveContainer getHiveContainer() {
@@ -1096,7 +1116,7 @@ public class ContainerSuite {
     hiveContainer.clear();
     hiveRangerContainer = null;
     trinoContainer = null;
-    trinoITContainers = null;
+    trinoCluster.clear();
     rangerContainer = null;
     kafkaContainer = null;
     dorisContainer = null;

@@ -266,7 +266,11 @@ public class ContainerExtension
   // so JUnit closes it with that context. Stores inherit from parent contexts, so a CLASS container
   // also resolves inside the class's tests.
   private static BaseContainer container(Declaration declaration, ExtensionContext context) {
-    ContainerSpec<?> spec = declaration.spec();
+    ContainerSpec<?> spec =
+        context
+            .getTestInstance()
+            .<ContainerSpec<?>>map(instance -> declaration.spec().forTestInstance(instance))
+            .orElse(declaration.spec());
     if (declaration.scope() == Scope.RUN) {
       return ContainerSpec.startWithDependencies(spec, ContainerSuite.getInstance());
     }
