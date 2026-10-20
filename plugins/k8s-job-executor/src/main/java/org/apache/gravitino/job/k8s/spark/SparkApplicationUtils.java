@@ -99,6 +99,8 @@ public final class SparkApplicationUtils {
   private static final String BUILTIN_SPARK_CONF_ARGUMENT = "--spark-conf";
 
   // The configurations that spark-submit decides, which a built-in job ignores in its spark_conf.
+  // Keep this and SPARK_KUBERNETES_PREFIX aligned with IcebergJobUtils of the built-in jobs, whose
+  // driver ignores the same configurations of spark_conf; the jobs jar can't depend on this plugin.
   private static final Set<String> SUBMIT_DECIDED_CONFIGS =
       ImmutableSet.of(SPARK_MASTER, SPARK_DEPLOY_MODE);
 
@@ -178,12 +180,16 @@ public final class SparkApplicationUtils {
     // silently run on Kubernetes.
     String master = StringUtils.trimToNull(sparkConf.get(SPARK_MASTER));
     if (master != null && !master.startsWith(K8S_MASTER_PREFIX)) {
+      String hint =
+          template.name().startsWith(JobTemplateProvider.BUILTIN_NAME_PREFIX)
+              ? " For a built-in job template, leave the spark_master parameter empty."
+              : "";
       throw new IllegalArgumentException(
           String.format(
               "%s is set to %s by job template %s or by the k8s job executor configurations, but"
-                  + " the k8s job executor only runs Spark jobs on Kubernetes. Leave %s unset,"
-                  + " for a built-in job by leaving the spark_master parameter empty",
-              SPARK_MASTER, master, template.name(), SPARK_MASTER));
+                  + " the k8s job executor only runs Spark jobs on Kubernetes. Leave %s unset in"
+                  + " the job template and in the k8s job executor configurations.%s",
+              SPARK_MASTER, master, template.name(), SPARK_MASTER, hint));
     }
     // The operator decides the master and the deploy mode.
     sparkConf.remove(SPARK_MASTER);

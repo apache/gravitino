@@ -54,6 +54,11 @@ public final class IcebergJobUtils {
    * The Spark configurations that spark-submit decides. Set in the custom Spark configurations of a
    * job, which the driver applies, they would override the submitted value, e.g. run a job in local
    * mode inside the driver pod of a cluster.
+   *
+   * <p>Keep this and {@link #SPARK_KUBERNETES_PREFIX} aligned with the k8s job executor's {@code
+   * SparkApplicationUtils}, which ignores the same configurations of spark_conf when it submits a
+   * built-in job. The jobs jar runs in the driver without the executor plugin, so the rules can't
+   * be shared as code.
    */
   private static final Set<String> SUBMIT_DECIDED_CONFIGS =
       ImmutableSet.of("spark.master", "spark.submit.deployMode");

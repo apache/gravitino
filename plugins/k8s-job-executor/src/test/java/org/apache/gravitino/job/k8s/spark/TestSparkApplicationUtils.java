@@ -78,8 +78,21 @@ public class TestSparkApplicationUtils {
               IllegalArgumentException.class,
               () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
       Assertions.assertTrue(e.getMessage().contains(master.trim()), e.getMessage());
-      Assertions.assertTrue(e.getMessage().contains("spark_master"), e.getMessage());
+      // The spark_master parameter only exists in the built-in job templates.
+      Assertions.assertFalse(e.getMessage().contains("spark_master"), e.getMessage());
     }
+
+    SparkJobTemplate builtin =
+        newTemplateBuilder()
+            .withName("builtin-sparkpi")
+            .withConfigs(ImmutableMap.of("spark.master", "local[*]"))
+            .build();
+    IllegalArgumentException builtinError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, builtin, configs));
+    Assertions.assertTrue(
+        builtinError.getMessage().contains("spark_master"), builtinError.getMessage());
 
     // Nor set by the executor configurations.
     K8sJobExecutorConfigs localMaster =
