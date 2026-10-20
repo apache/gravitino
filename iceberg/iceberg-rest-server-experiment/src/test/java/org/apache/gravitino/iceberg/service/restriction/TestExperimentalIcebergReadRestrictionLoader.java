@@ -19,21 +19,29 @@
 package org.apache.gravitino.iceberg.service.restriction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.BoundLiteralPredicate;
 import org.apache.iceberg.rest.restrictions.ReadRestrictions;
@@ -124,6 +132,65 @@ public class TestExperimentalIcebergReadRestrictionLoader {
                 ExperimentalIcebergReadRestrictionLoader.resolve(
                     policies, Collections.emptyMap(), SCHEMA, context("alice")));
     assertTrue(exception.getMessage().contains("Conflicting row-filter"));
+  }
+
+  @Test
+  void testRejectsAllowAllAlongsideDistinctRowFilter() {
+    PolicyEntity[] policies =
+        new PolicyEntity[] {
+          rowPolicy(1, "allow", "filter := true"),
+          rowPolicy(2, "us", "filter := col(\"region\") == \"US\"")
+        };
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ExperimentalIcebergReadRestrictionLoader.resolve(
+                    policies, Collections.emptyMap(), SCHEMA, context("alice")));
+    assertTrue(exception.getMessage().contains("Conflicting row-filter"));
+  }
+
+  @Test
+  void testLoadErrorDoesNotExposePolicyContent() {
+    PolicyEntity[] policies =
+        new PolicyEntity[] {
+          rowPolicy(1, "secret_policy", "filter := col(\"secret_column\") == \"secret_value\"")
+        };
+
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                ExperimentalIcebergReadRestrictionLoader.resolveForLoad(
+                    policies, Collections.emptyMap(), SCHEMA, context("alice")));
+    assertEquals(
+        "Unable to resolve read restrictions for the requested table", exception.getMessage());
+    assertNull(exception.getCause());
+  }
+
+  @Test
+  void testInconsistentIdentityDoesNotBecomeNonMembership() throws Exception {
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    when(dispatcher.getGroup(METALAKE, "auditors")).thenReturn(mock(Group.class));
+
+    Optional<Boolean> nonMember =
+        PrincipalUtils.doAs(
+            new UserPrincipal("alice"),
+            () ->
+                new ExperimentalIcebergReadRestrictionLoader.IdentityBindingContext(
+                        "alice", METALAKE, dispatcher)
+                    .groupMembership("auditors"));
+    Optional<Boolean> inconsistent =
+        PrincipalUtils.doAs(
+            new UserPrincipal("bob"),
+            () ->
+                new ExperimentalIcebergReadRestrictionLoader.IdentityBindingContext(
+                        "alice", METALAKE, dispatcher)
+                    .groupMembership("auditors"));
+
+    assertEquals(Optional.of(false), nonMember);
+    assertFalse(inconsistent.isPresent());
   }
 
   @Test

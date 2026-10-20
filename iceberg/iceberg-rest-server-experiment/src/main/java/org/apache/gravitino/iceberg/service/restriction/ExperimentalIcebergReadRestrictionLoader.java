@@ -56,10 +56,14 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.restrictions.ReadRestrictions;
 import org.apache.iceberg.rest.restrictions.ReadRestrictionsParser;
 import org.apache.iceberg.types.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Loads tag-selected Gravitino policies into experimental Iceberg read restrictions. */
 public final class ExperimentalIcebergReadRestrictionLoader
     implements IcebergReadRestrictionLoader {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ExperimentalIcebergReadRestrictionLoader.class);
 
   /** Creates the service-loaded read-restriction loader. */
   public ExperimentalIcebergReadRestrictionLoader() {}
@@ -102,7 +106,8 @@ public final class ExperimentalIcebergReadRestrictionLoader
     IdentityBindingContext bindingContext =
         new IdentityBindingContext(
             context.userName(), metalake, environment.internalAccessControlDispatcher());
-    ReadRestrictions restrictions = resolve(rowPolicies, maskPolicies, schema, bindingContext);
+    ReadRestrictions restrictions =
+        resolveForLoad(rowPolicies, maskPolicies, schema, bindingContext);
     if (restrictions.isEmpty()) {
       return Result.of(response, Optional.empty());
     }
@@ -139,6 +144,20 @@ public final class ExperimentalIcebergReadRestrictionLoader
     return IcebergReadRestrictionConverter.convert(rowFilter, columnMasks, schema, bindingContext);
   }
 
+  static ReadRestrictions resolveForLoad(
+      PolicyEntity[] tablePolicies,
+      Map<Integer, PolicyEntity[]> columnPolicies,
+      Schema schema,
+      IcebergReadRestrictionConverter.BindingContext bindingContext) {
+    try {
+      return resolve(tablePolicies, columnPolicies, schema, bindingContext);
+    } catch (RuntimeException exception) {
+      LOG.error("Failed to resolve Iceberg read restrictions", exception);
+      throw new IllegalStateException(
+          "Unable to resolve read restrictions for the requested table");
+    }
+  }
+
   private static Optional<RowFilter> resolveRowFilter(
       PolicyEntity[] policies,
       Schema schema,
@@ -154,9 +173,7 @@ public final class ExperimentalIcebergReadRestrictionLoader
       ReadRestrictions resolved =
           IcebergReadRestrictionConverter.convert(
               Optional.of(program), Collections.emptyMap(), schema, bindingContext);
-      if (!resolved.isEmpty()) {
-        distinct.putIfAbsent(ReadRestrictionsParser.toJson(resolved), program);
-      }
+      distinct.putIfAbsent(ReadRestrictionsParser.toJson(resolved), program);
     }
     if (distinct.size() > 1) {
       throw new IllegalArgumentException(
@@ -198,15 +215,15 @@ public final class ExperimentalIcebergReadRestrictionLoader
     return resolvedMasks;
   }
 
-  private static final class IdentityBindingContext
+  static final class IdentityBindingContext
       implements IcebergReadRestrictionConverter.BindingContext {
     private final String userName;
     private final String metalake;
     private final AccessControlDispatcher accessControlDispatcher;
-    private final Set<String> groups;
+    private final Optional<Set<String>> groups;
     private final Map<String, Optional<Boolean>> memberships = new HashMap<>();
 
-    private IdentityBindingContext(
+    IdentityBindingContext(
         String userName, String metalake, AccessControlDispatcher accessControlDispatcher) {
       this.userName = userName;
       this.metalake = metalake;
@@ -225,12 +242,14 @@ public final class ExperimentalIcebergReadRestrictionLoader
     }
 
     private Optional<Boolean> resolveGroupMembership(String group) {
-      if (accessControlDispatcher == null) {
+      if (!groups.isPresent() || accessControlDispatcher == null) {
         return Optional.empty();
       }
       try {
-        accessControlDispatcher.getGroup(metalake, group);
-        return Optional.of(groups.contains(group));
+        if (accessControlDispatcher.getGroup(metalake, group) == null) {
+          return Optional.empty();
+        }
+        return Optional.of(groups.get().contains(group));
       } catch (NoSuchGroupException exception) {
         return Optional.empty();
       } catch (RuntimeException exception) {
@@ -238,16 +257,16 @@ public final class ExperimentalIcebergReadRestrictionLoader
       }
     }
 
-    private static Set<String> snapshotGroups(String userName) {
+    private static Optional<Set<String>> snapshotGroups(String userName) {
       Principal principal = PrincipalUtils.getCurrentPrincipal();
       if (!(principal instanceof UserPrincipal) || !userName.equals(principal.getName())) {
-        return Collections.emptySet();
+        return Optional.empty();
       }
       Set<String> result = new HashSet<>();
       for (UserGroup group : ((UserPrincipal) principal).getGroups()) {
         result.add(group.getGroupName());
       }
-      return Collections.unmodifiableSet(result);
+      return Optional.of(Collections.unmodifiableSet(result));
     }
   }
 }
