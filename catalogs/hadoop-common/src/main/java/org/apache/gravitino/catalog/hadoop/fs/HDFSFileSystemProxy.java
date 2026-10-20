@@ -173,7 +173,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
             });
   }
 
-  private void close() {
+  private synchronized void close() {
     if (kerberosClient != null) {
       try {
         kerberosClient.close();
