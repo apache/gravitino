@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
@@ -45,12 +46,16 @@ import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manager for built-in IdP users and groups. It mirrors {@link
  * org.apache.gravitino.authorization.UserGroupManager} but operates on global IdP metadata.
  */
 public class IdpUserGroupManager implements Closeable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IdpUserGroupManager.class);
 
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
@@ -116,7 +121,15 @@ public class IdpUserGroupManager implements Closeable {
     IdpCredentialValidator.validatePassword(initialAdminPassword);
     String passwordHash = passwordHasher.hash(initialAdminPassword);
     for (String serviceAdmin : missingServiceAdmins) {
-      USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash, true));
+      try {
+        USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash, true));
+      } catch (AlreadyExistsException e) {
+        // Another node may have created the same service admin between the existence check and
+        // insert. Treat the unique-constraint conflict as success so bootstrap stays idempotent.
+        LOG.info(
+            "Configured service admin {} already exists; skipping create during bootstrap",
+            serviceAdmin);
+      }
     }
   }
 
