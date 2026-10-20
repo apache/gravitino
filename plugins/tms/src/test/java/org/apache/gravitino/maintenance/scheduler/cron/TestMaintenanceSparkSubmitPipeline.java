@@ -25,16 +25,19 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
+import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.AuditInfo;
@@ -125,6 +128,61 @@ class TestMaintenanceSparkSubmitPipeline {
 
     verify(actions).deleteById(8L);
     verify(actions, never()).bindJobId(any(), anyLong());
+  }
+
+  @Test
+  void testBatchSubmitOneSparkJobPerTable() {
+    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    when(submitter.runJob(eq("metalake"), eq("builtin-iceberg-expire-snapshots"), anyMap()))
+        .thenReturn(555L, 556L);
+    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
+    OccupancyClaim claimA = new OccupancyClaim(1L, 10L);
+    OccupancyClaim claimB = new OccupancyClaim(2L, 20L);
+    when(actions.tryAcquireInFlight(10L, POLICY_ID, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(claimA));
+    when(actions.tryAcquireInFlight(11L, POLICY_ID, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(claimB));
+
+    PolicyEntity snapshotPolicy =
+        PolicyEntity.builder()
+            .withId(POLICY_ID)
+            .withName("snap")
+            .withNamespace(NamespaceUtil.ofPolicy("metalake"))
+            .withPolicyType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
+            .withEnabled(true)
+            .withContent(PolicyContents.icebergSnapshotExpiration())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    new MaintenanceSparkSubmitPipeline(
+            mockLookup(snapshotPolicy),
+            mockGate(false),
+            actions,
+            submitter,
+            new Config(false) {},
+            CLAIM_TIMEOUT_MS,
+            ids ->
+                List.of(
+                    new ResolvedTableRef(10L, "iceberg", "db.t1"),
+                    new ResolvedTableRef(11L, "iceberg", "db.t2")))
+        .submit(CronJobIds.forBatch(0L, POLICY_ID), new CronJobData(List.of(10L, 11L)));
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(submitter, times(2))
+        .runJob(eq("metalake"), eq("builtin-iceberg-expire-snapshots"), confCaptor.capture());
+    List<Map<String, String>> confs = confCaptor.getAllValues();
+    Assertions.assertEquals("iceberg", confs.get(0).get("catalog_name"));
+    Assertions.assertEquals("db.t1", confs.get(0).get("table_identifier"));
+    Assertions.assertEquals("10", confs.get(0).get("tms_table_id"));
+    Assertions.assertEquals("iceberg", confs.get(1).get("catalog_name"));
+    Assertions.assertEquals("db.t2", confs.get(1).get("table_identifier"));
+    Assertions.assertEquals("11", confs.get(1).get("tms_table_id"));
+    Assertions.assertNull(confs.get(0).get("table_identifiers"));
+    Assertions.assertEquals(Long.toString(POLICY_ID), confs.get(0).get("tms_policy_id"));
+    verify(actions).bindJobId(claimA, 555L);
+    verify(actions).bindJobId(claimB, 556L);
   }
 
   @Test
