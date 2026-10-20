@@ -327,7 +327,7 @@ public final class JettyServerConfig {
                   + "that is not a trusted proxy is used as the client address. Empty by "
                   + "default, which means X-Forwarded-For is ignored and the address of the TCP "
                   + "peer is used")
-          .version(ConfigConstants.VERSION_1_3_2)
+          .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .toSequence()
           .createWithDefault(Collections.emptyList());

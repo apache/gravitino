@@ -13,12 +13,9 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 ### Audit client address behind a reverse proxy
 
-This change also ships in Gravitino 1.3.2.
-
-- Gravitino 1.3.0 and 1.3.1 recorded the first `X-Forwarded-For` entry as the audit client
-  address for every request, so any caller could choose the address the audit log shows. The
-  server now ignores `X-Forwarded-For` unless the request comes from a proxy listed in
-  `trustedProxies`.
+- Gravitino 1.3 used the first `X-Forwarded-For` entry as the audit client address whenever
+  the header was present. The server now ignores `X-Forwarded-For` unless the request comes from
+  a proxy listed in `trustedProxies`.
 - If the Gravitino server, the Iceberg REST service, or the Lance REST service runs behind a load
   balancer, ingress controller, or other reverse proxy, set
   `gravitino.server.webserver.trustedProxies`, `gravitino.iceberg-rest.trustedProxies`, or

@@ -138,7 +138,7 @@ To enable the Lance REST service within Gravitino server, configure the followin
 | `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
 | `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       |
 | `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include server-side stack traces in `detail`. Set this to `false` in new deployments | true | No |
-| `gravitino.lance-rest.trustedProxies`     | Comma-separated IP addresses or CIDR blocks of reverse proxies whose `X-Forwarded-For` is trusted for audit client addresses. Since 1.3.2 | (none) | No |
+| `gravitino.lance-rest.trustedProxies`     | Comma-separated IP addresses or CIDR blocks of reverse proxies whose `X-Forwarded-For` is trusted for audit client addresses | (none) | No |
 | `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      |
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI. Not required in auxiliary mode.                        | http://localhost:8090   | No       |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      |
