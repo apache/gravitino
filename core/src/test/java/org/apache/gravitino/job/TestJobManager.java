@@ -72,6 +72,7 @@ import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
@@ -1975,6 +1976,120 @@ public class TestJobManager {
     Assertions.assertFalse(conflictedDir.exists());
     verify(entityStore, times(2)).delete(conflictedIdent, Entity.EntityType.JOB);
     verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
+  }
+
+  /** A failure to list the metalakes is logged and does not stop later status polls. */
+  @Test
+  public void testPullJobStatusContinuesAfterFailingToListMetalakes() throws IOException {
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenThrow(new RuntimeException("Failed to list in-use metalakes"))
+        .thenReturn(ImmutableList.of(metalake));
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    stubEntityStoreUpdateToApply(job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+    verify(jobExecutor, never()).getJobExecutionInfo(any());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(job).status());
+  }
+
+  /** A metalake disabled after being listed as in use only skips the status poll of itself. */
+  @Test
+  public void testPullJobStatusContinuesAfterFailingOnOneMetalake() throws IOException {
+    String disabledMetalake = "disabled_metalake";
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(disabledMetalake, metalake));
+    doThrow(new MetalakeNotInUseException("Metalake %s is not in use", disabledMetalake))
+        .when(jobManager)
+        .listJobs(disabledMetalake, Optional.empty());
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    stubEntityStoreUpdateToApply(job, job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(job, job).status());
+  }
+
+  /** A failure to list the metalakes is logged and does not stop later cleanup runs. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterFailingToListMetalakes() throws IOException {
+    JobEntity job = expiredJob();
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenThrow(new RuntimeException("Failed to list in-use metalakes"))
+        .thenReturn(ImmutableList.of(metalake));
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
+    when(entityStore.delete(jobIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File jobDir = jobManager.jobStagingDir(job.id());
+    Assertions.assertTrue(jobDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+    Assertions.assertTrue(jobDir.exists());
+    verify(entityStore, never()).delete(any(), any());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+    Assertions.assertFalse(jobDir.exists());
+    verify(entityStore, times(1)).delete(jobIdent, Entity.EntityType.JOB);
+  }
+
+  /** A store failure while listing the jobs of one metalake only skips the cleanup of itself. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterFailingOnOneMetalake() throws IOException {
+    String failingMetalake = "failing_metalake";
+    JobEntity job = expiredJob();
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(failingMetalake, metalake));
+    doThrow(new RuntimeException(new IOException("store error")))
+        .when(jobManager)
+        .listJobs(failingMetalake, Optional.empty());
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
+    when(entityStore.delete(jobIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File jobDir = jobManager.jobStagingDir(job.id());
+    Assertions.assertTrue(jobDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(jobDir.exists());
+    verify(entityStore, times(1)).delete(jobIdent, Entity.EntityType.JOB);
+  }
+
+  /** An unexpected failure deleting one expired job does not stop the cleanup of the others. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterFailingToDeleteJob() throws IOException {
+    JobEntity failing = expiredJob();
+    JobEntity other = expiredJob();
+    doReturn(ImmutableList.of(failing, other))
+        .when(jobManager)
+        .listJobs(metalake, Optional.empty());
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+    NameIdentifier failingIdent = NameIdentifierUtil.ofJob(metalake, failing.name());
+    NameIdentifier otherIdent = NameIdentifierUtil.ofJob(metalake, other.name());
+    when(entityStore.delete(failingIdent, Entity.EntityType.JOB))
+        .thenThrow(new RuntimeException("store error"));
+    when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File failingDir = jobManager.jobStagingDir(failing.id());
+    File otherDir = jobManager.jobStagingDir(other.id());
+    Assertions.assertTrue(failingDir.mkdirs());
+    Assertions.assertTrue(otherDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertTrue(failingDir.exists());
+    Assertions.assertFalse(otherDir.exists());
   }
 
   @Test
