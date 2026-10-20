@@ -29,7 +29,6 @@ public class PolicyRoleRelPO {
   private Long policyId;
   private String policyName;
   private String roleName;
-  private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
@@ -54,7 +53,6 @@ public class PolicyRoleRelPO {
         && Objects.equal(policyId, that.policyId)
         && Objects.equal(policyName, that.policyName)
         && Objects.equal(roleName, that.roleName)
-        && Objects.equal(auditInfo, that.auditInfo)
         && Objects.equal(currentVersion, that.currentVersion)
         && Objects.equal(lastVersion, that.lastVersion)
         && Objects.equal(deletedAt, that.deletedAt);
@@ -63,7 +61,7 @@ public class PolicyRoleRelPO {
   @Override
   public int hashCode() {
     return Objects.hashCode(
-        id, policyId, policyName, roleName, auditInfo, currentVersion, lastVersion, deletedAt);
+        id, policyId, policyName, roleName, currentVersion, lastVersion, deletedAt);
   }
 
   /** Builder for {@link PolicyRoleRelPO}. */
@@ -89,12 +87,6 @@ public class PolicyRoleRelPO {
     /** Sets the referenced role name. */
     public Builder withRoleName(String roleName) {
       relation.roleName = roleName;
-      return this;
-    }
-
-    /** Sets the audit information JSON. */
-    public Builder withAuditInfo(String auditInfo) {
-      relation.auditInfo = auditInfo;
       return this;
     }
 
@@ -124,7 +116,6 @@ public class PolicyRoleRelPO {
     public PolicyRoleRelPO build() {
       Preconditions.checkArgument(relation.policyId != null, "Policy id is required");
       Preconditions.checkArgument(relation.roleName != null, "Role name is required");
-      Preconditions.checkArgument(relation.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(relation.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(relation.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(relation.deletedAt != null, "Deleted at is required");
