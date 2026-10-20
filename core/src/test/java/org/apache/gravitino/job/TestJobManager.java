@@ -276,6 +276,25 @@ public class TestJobManager {
   }
 
   @Test
+  public void testAlterJobTemplateRenameToExistingName() throws IOException {
+    EntityAlreadyExistsException exists = new EntityAlreadyExistsException("Name already exists");
+    doThrow(exists).when(entityStore).update(any(), any(), any(), any());
+
+    JobTemplateAlreadyExistsException failure =
+        Assertions.assertThrows(
+            JobTemplateAlreadyExistsException.class,
+            () ->
+                jobManager.alterJobTemplate(
+                    metalake, "shell_job", JobTemplateChange.rename("existing_job")));
+    Assertions.assertSame(exists, failure.getCause());
+    Assertions.assertEquals(
+        "Failed to rename job template shell_job to existing_job under metalake "
+            + metalake
+            + ", a job template named existing_job already exists",
+        failure.getMessage());
+  }
+
+  @Test
   public void testListJobTemplates() throws IOException {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
