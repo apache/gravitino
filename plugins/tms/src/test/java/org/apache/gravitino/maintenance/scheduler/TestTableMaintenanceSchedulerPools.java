@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.scheduler;
 
 import javax.sql.DataSource;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -47,9 +48,13 @@ class TestTableMaintenanceSchedulerPools extends TestJDBCBackend {
             .getEnvironment()
             .getDataSource();
     pools = new TableMaintenanceSchedulerPools();
+    Config gravitinoConfig = new Config(false) {};
     Assertions.assertDoesNotThrow(
         () ->
-            pools.start(dataSource, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10)));
+            pools.start(
+                dataSource,
+                TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10),
+                gravitinoConfig));
     Assertions.assertDoesNotThrow(pools::stop);
   }
 }

@@ -73,7 +73,7 @@ public class TableMaintenanceRESTFeature implements Feature {
 
     DataSource dataSource = resolveEntityStoreDataSource();
     TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();
-    pools.start(dataSource, TableMaintenanceConfig.from(config));
+    pools.start(dataSource, TableMaintenanceConfig.from(config), config);
     if (!SCHEDULER_POOLS.compareAndSet(null, pools)) {
       pools.stop();
       LOG.warn("Table maintenance scheduler pools were started concurrently; discarded duplicate");

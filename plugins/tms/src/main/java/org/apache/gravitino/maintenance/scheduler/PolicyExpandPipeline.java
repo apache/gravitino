@@ -19,9 +19,12 @@
 package org.apache.gravitino.maintenance.scheduler;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -35,6 +38,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Does not submit Spark. Returns the next expand due time, or empty when the expand row should
  * be removed (missing / disabled / blank trigger / non-maintenance).
+ *
+ * <p>Before writing a cron-job row, skips tables that are in-flight or still inside {@code
+ * minIntervalMs} cooldown (policy content → server conf → code default).
  */
 public final class PolicyExpandPipeline {
 
@@ -43,22 +49,30 @@ public final class PolicyExpandPipeline {
   private final PolicyLookup policyLookup;
   private final PolicyTableEnumerator tableEnumerator;
   private final CronJobScheduler cronJobScheduler;
+  private final ExpandOccupancyGate occupancyGate;
+  private final Config config;
   private final int enqueueBatchSize;
 
   /**
    * @param policyLookup loads the policy for the expand instance id
    * @param tableEnumerator lists attached table ids
    * @param cronJobScheduler writes cron-job rows
+   * @param occupancyGate in-flight / minInterval gate
+   * @param config gravitino server config for per-type minInterval fallbacks
    * @param enqueueBatchSize max cron-jobs per expand pick
    */
   public PolicyExpandPipeline(
       PolicyLookup policyLookup,
       PolicyTableEnumerator tableEnumerator,
       CronJobScheduler cronJobScheduler,
+      ExpandOccupancyGate occupancyGate,
+      Config config,
       int enqueueBatchSize) {
     this.policyLookup = policyLookup;
     this.tableEnumerator = tableEnumerator;
     this.cronJobScheduler = cronJobScheduler;
+    this.occupancyGate = occupancyGate;
+    this.config = config;
     this.enqueueBatchSize = enqueueBatchSize;
   }
 
@@ -102,15 +116,41 @@ public final class PolicyExpandPipeline {
       return Optional.empty();
     }
 
-    List<Long> tableIds = tableEnumerator.listTableIds(policy, enqueueBatchSize);
-    int scheduled = cronJobScheduler.enqueueDueNow(policyId, tableIds, enqueueBatchSize);
+    long minIntervalMs =
+        MaintenanceMinIntervalConfigs.resolve(
+            config, policy.policyType(), policyMinIntervalMs(policy.content()));
+    List<Long> candidates = tableEnumerator.listTableIds(policy, enqueueBatchSize);
+    List<Long> toEnqueue = filterEnqueueable(policyId, candidates, minIntervalMs);
+    int scheduled = cronJobScheduler.enqueueDueNow(policyId, toEnqueue, enqueueBatchSize);
     LOG.info(
-        "Expanded policy {}: enqueued {}/{} cron-jobs; next expand due {}",
+        "Expanded policy {}: enqueued {}/{} cron-jobs (candidates={}, minIntervalMs={}); next expand due {}",
         policyId,
         scheduled,
-        tableIds.size(),
+        toEnqueue.size(),
+        candidates.size(),
+        minIntervalMs,
         nextDue);
     return Optional.of(nextDue);
+  }
+
+  private List<Long> filterEnqueueable(long policyId, List<Long> tableIds, long minIntervalMs) {
+    if (tableIds.isEmpty()) {
+      return List.of();
+    }
+    long nowMs = System.currentTimeMillis();
+    List<Long> allowed = new ArrayList<>(tableIds.size());
+    for (Long tableId : tableIds) {
+      if (occupancyGate.shouldSkip(tableId, policyId, minIntervalMs, nowMs)) {
+        LOG.debug(
+            "Skip cron-job enqueue for table {} policy {} (in-flight or within minIntervalMs={})",
+            tableId,
+            policyId,
+            minIntervalMs);
+        continue;
+      }
+      allowed.add(tableId);
+    }
+    return allowed;
   }
 
   private static boolean isMaintenance(@Nullable PolicyContent content) {
@@ -132,5 +172,13 @@ public final class PolicyExpandPipeline {
       return null;
     }
     return ((ExecutablePolicyContent) content).executionSpec().timeTrigger();
+  }
+
+  @Nullable
+  private static Long policyMinIntervalMs(@Nullable PolicyContent content) {
+    if (!(content instanceof ExecutablePolicyContent)) {
+      return null;
+    }
+    return ((ExecutablePolicyContent) content).executionSpec().minIntervalMs();
   }
 }

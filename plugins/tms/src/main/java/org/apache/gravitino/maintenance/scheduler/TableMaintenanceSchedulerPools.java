@@ -30,7 +30,10 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
+import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,16 +90,22 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
    *
    * @param dataSource relational JDBC pool shared with the entity store
    * @param config maintenance scheduler settings
+   * @param gravitinoConfig server config for {@code minIntervalMs} fallbacks
    */
-  public void start(DataSource dataSource, TableMaintenanceConfig config) {
+  public void start(DataSource dataSource, TableMaintenanceConfig config, Config gravitinoConfig) {
     Preconditions.checkState(schedulers.isEmpty(), "scheduler pools already started");
     Preconditions.checkNotNull(dataSource, "dataSource must not be null");
+    Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig must not be null");
 
     PolicyExpandPipeline pipeline =
         new PolicyExpandPipeline(
             new RelationalPolicyLookup(),
             new NearestPolicyTableEnumerator(),
             new RelationalCronJobScheduler(dataSource),
+            new OccupancyGate(
+                    TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs())
+                ::shouldSkip,
+            gravitinoConfig,
             config.expandEnqueueBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);
 
