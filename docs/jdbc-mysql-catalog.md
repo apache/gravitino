@@ -214,7 +214,7 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 :::
 
 :::caution
-For MySQL table options, use the Gravitino property names listed below. Unknown properties, including SQL option names such as `ENGINE` or `ROW_FORMAT`, are rejected. Use the Gravitino property name `engine` instead.
+For MySQL table options, use the Gravitino property names listed below. Unknown properties, including SQL option names such as `ENGINE` or `ROW_FORMAT`, are rejected. Use the Gravitino property name `engine` instead. Metadata keys shared by every entity, such as the credential-vending settings, are accepted but not applied to MySQL tables.
 
 These properties can only be specified when creating a table; they cannot be changed or removed afterwards. Values are validated against their declared types before DDL is executed.
 :::
