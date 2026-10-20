@@ -89,9 +89,21 @@ public final class PolicyExpandPipeline {
       return Optional.empty();
     }
 
+    // Resolve next due before any cron-job writes so a bad crontab cannot leave orphans.
+    final Instant nextDue;
+    try {
+      nextDue = PolicyExpandCrons.nextExecution(timeTrigger);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Removing expand row for policy {} with invalid timeTrigger {}: {}",
+          policyId,
+          timeTrigger,
+          e.toString());
+      return Optional.empty();
+    }
+
     List<Long> tableIds = tableEnumerator.listTableIds(policy, enqueueBatchSize);
     int scheduled = cronJobScheduler.enqueueDueNow(policyId, tableIds, enqueueBatchSize);
-    Instant nextDue = PolicyExpandCrons.nextExecution(timeTrigger);
     LOG.info(
         "Expanded policy {}: enqueued {}/{} cron-jobs; next expand due {}",
         policyId,

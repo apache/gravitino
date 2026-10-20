@@ -41,8 +41,9 @@ import org.slf4j.LoggerFactory;
  * <p>db-scheduler requires a dedicated {@code tableName} per Scheduler instance for multi-pool
  * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
- * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows. Cron and
- * commit submit handlers remain no-ops until follow-up PRs.
+ * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows. The cron
+ * pool deletes each one-shot row after the pick (Spark submit is still deferred). Commit submit
+ * remains a no-op until a follow-up PR.
  */
 public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
@@ -94,7 +95,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     PolicyExpandPipeline pipeline =
         new PolicyExpandPipeline(
             new RelationalPolicyLookup(),
-            new TagBoundPolicyTableEnumerator(),
+            new NearestPolicyTableEnumerator(),
             new RelationalCronJobScheduler(dataSource),
             config.expandEnqueueBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);
@@ -188,12 +189,19 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
   /**
-   * Cron-pool task definition. Submit logic is still a no-op; expand only inserts the row.
+   * Cron-pool task definition. Spark submit is still deferred; the completion handler removes the
+   * one-shot row so a later expand pick can {@code scheduleIfNotExists} again (§5.2.2).
    *
    * @return the {@code cron-job} task
    */
   public static Task<Void> cronJobTask() {
-    return noopTask(CRON_JOB);
+    return Tasks.custom(CRON_JOB, Void.class)
+        .execute(
+            (taskInstance, executionContext) -> {
+              LOG.debug(
+                  "TMS cron-job callback for instance {} (submit deferred)", taskInstance.getId());
+              return (executionComplete, executionOperations) -> executionOperations.remove();
+            });
   }
 
   /**

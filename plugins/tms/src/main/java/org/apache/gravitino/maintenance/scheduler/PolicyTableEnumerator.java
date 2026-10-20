@@ -24,8 +24,8 @@ import org.apache.gravitino.meta.PolicyEntity;
 /**
  * Lists table entity ids that a maintenance policy should expand into cron jobs.
  *
- * <p>This release enumerates tables directly associated through the policy's tags. Hierarchical
- * nearest-policy expansion is out of scope.
+ * <p>Implementations expand tag-bound catalog/schema/table attachments and keep tables for which
+ * the policy is the nearest winner of its {@link org.apache.gravitino.policy.Policy.BuiltInType}.
  */
 @FunctionalInterface
 public interface PolicyTableEnumerator {

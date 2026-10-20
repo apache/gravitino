@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.maintenance.scheduler;
 
+import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -64,5 +67,48 @@ class TestCronJobScheduler extends TestJDBCBackend {
                 TaskInstanceId.of(
                     TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(3L, 7L)))
             .isEmpty());
+  }
+
+  @TestTemplate
+  void testCronJobTaskRemovesRowAfterPick() throws Exception {
+    DataSource dataSource =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .getConfiguration()
+            .getEnvironment()
+            .getDataSource();
+    CronJobScheduler enqueue = new RelationalCronJobScheduler(dataSource);
+    Assertions.assertEquals(1, enqueue.enqueueDueNow(9L, List.of(99L), 1));
+
+    TaskInstanceId instanceId =
+        TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(99L, 9L));
+    SchedulerClient client =
+        SchedulerClient.Builder.create(dataSource, TableMaintenanceSchedulerPools.cronJobTask())
+            .tableName(TableMaintenanceSchedulerPools.CRON_TASKS_TABLE)
+            .build();
+    Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
+
+    Scheduler cronPool =
+        Scheduler.create(dataSource, TableMaintenanceSchedulerPools.cronJobTask())
+            .threads(1)
+            .pollingInterval(Duration.ofMillis(100))
+            .tableName(TableMaintenanceSchedulerPools.CRON_TASKS_TABLE)
+            .commitWhenAutocommitDisabled(true)
+            .build();
+    cronPool.start();
+    try {
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      while (client.getScheduledExecution(instanceId).isPresent()) {
+        Assertions.assertTrue(
+            System.nanoTime() < deadline, "cron-job row was not removed after pick");
+        Thread.sleep(100L);
+      }
+    } finally {
+      cronPool.stop();
+    }
+
+    // After remove, expand can schedule the same instance id again.
+    Assertions.assertEquals(1, enqueue.enqueueDueNow(9L, List.of(99L), 1));
+    Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
   }
 }

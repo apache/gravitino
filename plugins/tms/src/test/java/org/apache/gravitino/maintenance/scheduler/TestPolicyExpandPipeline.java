@@ -81,6 +81,19 @@ class TestPolicyExpandPipeline {
   }
 
   @Test
+  void testInvalidTimeTriggerRemovesExpandRowWithoutEnqueue() {
+    PolicyLookup lookup = mock(PolicyLookup.class);
+    when(lookup.findById(4L)).thenReturn(Optional.of(policy(true, "not-a-cron")));
+    PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
+    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    PolicyExpandPipeline pipeline = new PolicyExpandPipeline(lookup, tables, cronJobs, 100);
+
+    Assertions.assertTrue(pipeline.expand(4L).isEmpty());
+    verify(tables, never()).listTableIds(any(), anyInt());
+    verify(cronJobs, never()).enqueueDueNow(anyLong(), any(), anyInt());
+  }
+
+  @Test
   void testExpandEnqueuesCronJobsAndReturnsNextDue() {
     PolicyEntity policy = policy(true, CRON);
     PolicyLookup lookup = mock(PolicyLookup.class);
