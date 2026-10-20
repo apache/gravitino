@@ -98,10 +98,10 @@ Each step ends with a check. If a check fails, stop there, since every step depe
   Spark starts with an error naming the missing Iceberg classes. See
   [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 - With the [Kubernetes job executor](../k8s-job-executor.md), the jobs run in Spark pods: put the
-  Iceberg Spark runtime in the Spark image or in
-  `gravitino.jobExecutor.k8s.spark.conf.spark.jars` rather than in `spark_conf`, leave
-  `spark.master` out of `spark_conf`, and use catalog URIs, warehouse locations, and a
-  `gravitino_uri` in `updater_options` that the pods can reach, not `localhost`. See
+  Iceberg Spark runtime in the Spark image, in `gravitino.jobExecutor.k8s.spark.conf.spark.jars`,
+  or in `spark.jars` of `spark_conf`; leave `spark_master` empty, as the examples' `local[2]` is
+  rejected; and use catalog URIs, warehouse locations, and a `gravitino_uri` in `updater_options`
+  that the pods can reach, not `localhost`. See
   [Built-In Jobs](../k8s-job-executor.md#built-in-jobs).
 - `gravitino.job.statusPullIntervalInMs` lowered to `10000` and the server restarted. The default is five minutes, which makes every status check in this walkthrough feel broken.
 
