@@ -19,23 +19,30 @@
 package org.apache.gravitino.maintenance.scheduler;
 
 import java.util.List;
+import org.apache.gravitino.policy.Policy;
 
 /**
  * Inserts one-shot {@code cron-job} rows into the cron-pool db-scheduler table.
  *
  * <p>Existing instance ids should be left untouched so a repeated expand pick does not reset an
- * already-queued submit.
+ * already-queued submit. Snapshot-expiry winners attached at schema/catalog may be merged into
+ * {@code batch:{batch_key}:{policy_id}} rows (§5.2.2).
  */
 @FunctionalInterface
 public interface CronJobScheduler {
 
   /**
-   * Enqueues due-now cron jobs for the given table ids.
+   * Enqueues due-now cron jobs for the given expand candidates.
    *
+   * @param policyType maintenance built-in type
    * @param policyId policy id encoded in each instance id
-   * @param tableIds table entity ids to enqueue
-   * @param batchSize max rows intended per expand pick (caller may already truncate)
-   * @return number of newly scheduled rows
+   * @param candidates enqueueable tables with winner levels
+   * @param batchSize max tables considered for this expand pick (caller may already truncate)
+   * @return number of newly scheduled cron-job rows
    */
-  int enqueueDueNow(long policyId, List<Long> tableIds, int batchSize);
+  int enqueueDueNow(
+      Policy.BuiltInType policyType,
+      long policyId,
+      List<ExpandTableCandidate> candidates,
+      int batchSize);
 }

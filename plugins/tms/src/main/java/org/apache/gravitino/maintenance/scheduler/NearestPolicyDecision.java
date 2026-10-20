@@ -37,30 +37,33 @@ final class NearestPolicyDecision {
 
   private final Kind kind;
   @Nullable private final Long winnerPolicyId;
+  @Nullable private final MetadataObject winnerLevel;
   @Nullable private final MetadataObject conflictLevel;
   private final List<Long> conflictingPolicyIds;
 
   private NearestPolicyDecision(
       Kind kind,
       @Nullable Long winnerPolicyId,
+      @Nullable MetadataObject winnerLevel,
       @Nullable MetadataObject conflictLevel,
       List<Long> conflictingPolicyIds) {
     this.kind = kind;
     this.winnerPolicyId = winnerPolicyId;
+    this.winnerLevel = winnerLevel;
     this.conflictLevel = conflictLevel;
     this.conflictingPolicyIds = conflictingPolicyIds;
   }
 
-  static NearestPolicyDecision winner(long policyId) {
-    return new NearestPolicyDecision(Kind.WINNER, policyId, null, List.of());
+  static NearestPolicyDecision winner(long policyId, MetadataObject level) {
+    return new NearestPolicyDecision(Kind.WINNER, policyId, level, null, List.of());
   }
 
   static NearestPolicyDecision none() {
-    return new NearestPolicyDecision(Kind.NONE, null, null, List.of());
+    return new NearestPolicyDecision(Kind.NONE, null, null, null, List.of());
   }
 
   static NearestPolicyDecision conflict(MetadataObject level, List<Long> policyIds) {
-    return new NearestPolicyDecision(Kind.CONFLICT, null, level, List.copyOf(policyIds));
+    return new NearestPolicyDecision(Kind.CONFLICT, null, null, level, List.copyOf(policyIds));
   }
 
   Kind kind() {
@@ -69,6 +72,11 @@ final class NearestPolicyDecision {
 
   Optional<Long> winnerPolicyId() {
     return Optional.ofNullable(winnerPolicyId);
+  }
+
+  @Nullable
+  MetadataObject winnerLevel() {
+    return winnerLevel;
   }
 
   @Nullable

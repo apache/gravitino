@@ -95,6 +95,7 @@ class TestNearestMaintenancePolicyResolver {
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
     Assertions.assertEquals(NearestPolicyDecision.Kind.WINNER, decision.kind());
     Assertions.assertEquals(java.util.Optional.of(10L), decision.winnerPolicyId());
+    Assertions.assertEquals(TABLE, decision.winnerLevel());
   }
 
   @Test
@@ -116,6 +117,7 @@ class TestNearestMaintenancePolicyResolver {
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
     Assertions.assertEquals(NearestPolicyDecision.Kind.WINNER, decision.kind());
     Assertions.assertEquals(java.util.Optional.of(20L), decision.winnerPolicyId());
+    Assertions.assertEquals(CATALOG, decision.winnerLevel());
   }
 
   @Test

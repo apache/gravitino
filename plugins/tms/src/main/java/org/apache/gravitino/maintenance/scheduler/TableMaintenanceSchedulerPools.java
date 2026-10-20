@@ -161,7 +161,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
       TableMaintenanceConfig config,
       int threads,
       String tableName,
-      Task<Void> task) {
+      Task<?> task) {
     return Scheduler.create(dataSource, task)
         .threads(threads)
         .pollingInterval(Duration.ofMillis(config.pollingIntervalMs()))
@@ -203,12 +203,14 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
    *
    * @return the {@code cron-job} task
    */
-  public static Task<Void> cronJobTask() {
-    return Tasks.custom(CRON_JOB, Void.class)
+  public static Task<CronJobData> cronJobTask() {
+    return Tasks.custom(CRON_JOB, CronJobData.class)
         .execute(
             (taskInstance, executionContext) -> {
               LOG.debug(
-                  "TMS cron-job callback for instance {} (submit deferred)", taskInstance.getId());
+                  "TMS cron-job callback for instance {} tables {} (submit deferred)",
+                  taskInstance.getId(),
+                  taskInstance.getData() == null ? List.of() : taskInstance.getData().tableIds());
               return (executionComplete, executionOperations) -> executionOperations.remove();
             });
   }

@@ -115,7 +115,10 @@ class TestNearestPolicyTableEnumerator {
         .thenReturn(List.of(policyFromTag(tag, policy)));
     stubEmptyParents(table);
 
-    Assertions.assertEquals(List.of(100L), enumerator.listTableIds(policy, 10, allowAll(), 0L));
+    List<ExpandTableCandidate> got = enumerator.listTableIds(policy, 10, allowAll(), 0L);
+    Assertions.assertEquals(1, got.size());
+    Assertions.assertEquals(100L, got.get(0).tableId());
+    Assertions.assertEquals(MetadataObject.Type.TABLE, got.get(0).winnerLevel());
   }
 
   @Test
@@ -207,8 +210,10 @@ class TestNearestPolicyTableEnumerator {
             eq(MetadataObjectUtil.toEntityIdent(METALAKE, catalog)),
             eq(Entity.EntityType.CATALOG));
 
-    Assertions.assertEquals(
-        List.of(101L), enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L));
+    List<ExpandTableCandidate> got = enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L);
+    Assertions.assertEquals(1, got.size());
+    Assertions.assertEquals(101L, got.get(0).tableId());
+    Assertions.assertEquals(MetadataObject.Type.SCHEMA, got.get(0).winnerLevel());
   }
 
   @Test
@@ -273,7 +278,9 @@ class TestNearestPolicyTableEnumerator {
 
     // First two winners are cooling down; limit=1 must keep scanning to t3.
     ExpandOccupancyGate gate = (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
-    Assertions.assertEquals(List.of(102L), enumerator.listTableIds(policy, 1, gate, 60_000L));
+    List<ExpandTableCandidate> got = enumerator.listTableIds(policy, 1, gate, 60_000L);
+    Assertions.assertEquals(1, got.size());
+    Assertions.assertEquals(102L, got.get(0).tableId());
   }
 
   @Test
@@ -314,7 +321,7 @@ class TestNearestPolicyTableEnumerator {
             eq(Entity.EntityType.TAG)))
         .thenReturn(List.of(policyFromTag(tagA, policy), policyFromTag(tagB, other)));
 
-    Assertions.assertEquals(List.of(), enumerator.listTableIds(policy, 10, allowAll(), 0L));
+    Assertions.assertTrue(enumerator.listTableIds(policy, 10, allowAll(), 0L).isEmpty());
   }
 
   private static ExpandOccupancyGate allowAll() {

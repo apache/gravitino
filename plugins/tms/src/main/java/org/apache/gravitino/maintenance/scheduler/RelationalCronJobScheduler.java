@@ -28,8 +28,10 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
+import org.apache.gravitino.policy.Policy;
 
 /**
  * Schedules {@code cron-job} rows through a db-scheduler client on the entity-store DataSource.
@@ -49,26 +51,67 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
   }
 
   @Override
-  public int enqueueDueNow(long policyId, List<Long> tableIds, int batchSize) {
-    if (tableIds == null || tableIds.isEmpty()) {
+  public int enqueueDueNow(
+      Policy.BuiltInType policyType,
+      long policyId,
+      List<ExpandTableCandidate> candidates,
+      int batchSize) {
+    if (candidates == null || candidates.isEmpty()) {
       return 0;
     }
+    int limit = Math.min(candidates.size(), Math.max(1, batchSize));
+    List<ExpandTableCandidate> slice = candidates.subList(0, limit);
+
     SchedulerClient client =
         SchedulerClient.Builder.create(
                 autocommitDataSource(dataSource), TableMaintenanceSchedulerPools.cronJobTask())
             .tableName(TableMaintenanceSchedulerPools.CRON_TASKS_TABLE)
             .build();
     Instant due = Instant.now();
-    int limit = Math.min(tableIds.size(), Math.max(1, batchSize));
+
+    if (policyType == Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION) {
+      return enqueueSnapshotExpiry(client, policyId, slice, due);
+    }
     int scheduled = 0;
-    for (int i = 0; i < limit; i++) {
-      String id = CronJobIds.forTable(tableIds.get(i), policyId);
-      if (client.scheduleIfNotExists(
-          new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id), due)) {
+    for (ExpandTableCandidate candidate : slice) {
+      if (scheduleTable(client, policyId, candidate.tableId(), due)) {
         scheduled++;
       }
     }
     return scheduled;
+  }
+
+  private static int enqueueSnapshotExpiry(
+      SchedulerClient client, long policyId, List<ExpandTableCandidate> slice, Instant due) {
+    List<Long> batchable = new ArrayList<>();
+    int scheduled = 0;
+    for (ExpandTableCandidate candidate : slice) {
+      if (candidate.batchableForSnapshotExpiry()) {
+        batchable.add(candidate.tableId());
+      } else if (scheduleTable(client, policyId, candidate.tableId(), due)) {
+        scheduled++;
+      }
+    }
+    if (!batchable.isEmpty() && scheduleBatch(client, policyId, batchable, due)) {
+      scheduled++;
+    }
+    return scheduled;
+  }
+
+  private static boolean scheduleTable(
+      SchedulerClient client, long policyId, long tableId, Instant due) {
+    String id = CronJobIds.forTable(tableId, policyId);
+    CronJobData data = new CronJobData(List.of(tableId));
+    return client.scheduleIfNotExists(
+        new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, data), due);
+  }
+
+  private static boolean scheduleBatch(
+      SchedulerClient client, long policyId, List<Long> tableIds, Instant due) {
+    String id = CronJobIds.forBatch(policyId, tableIds);
+    CronJobData data = new CronJobData(tableIds);
+    return client.scheduleIfNotExists(
+        new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, data), due);
   }
 
   private static DataSource autocommitDataSource(DataSource delegate) {
