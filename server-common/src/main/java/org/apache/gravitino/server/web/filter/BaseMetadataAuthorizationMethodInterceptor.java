@@ -197,6 +197,18 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   }
 
   /**
+   * Returns whether authorization may be delegated for this operation.
+   *
+   * @param method invoked protocol method
+   * @param nameIdentifierMap identifiers resolved from the request
+   * @return {@code true} if the local authorization pipeline may be skipped
+   */
+  protected boolean shouldSkipAuthorization(
+      Method method, Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    return shouldSkipAuthorization(nameIdentifierMap);
+  }
+
+  /**
    * Hook for requests that must validate the current user and active roles but do not have a
    * metadata object on which to evaluate an expression. A protocol root-list request is a typical
    * example: its returned children are filtered separately.
@@ -240,7 +252,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         AuthorizationTarget target =
             resolveAuthorizationTarget(method, expressionAnnotation, parameters, args);
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = target.nameIdentifiers();
-        boolean skipStandardCheck = shouldSkipAuthorization(nameIdentifierMap);
+        boolean skipStandardCheck = shouldSkipAuthorization(method, nameIdentifierMap);
 
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
         AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
@@ -328,6 +340,9 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         // A skipped standard check authorized nothing that list filtering could reuse.
         scope.bindIfRead(
             method, skipStandardCheck ? null : metalakeIdent, authorizationRequestContext);
+      } else {
+        throw new ForbiddenException(
+            "Authorization expression is missing for operation '%s'", method.getName());
       }
     } catch (Exception ex) {
       if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {

@@ -307,10 +307,21 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   public void testOperationFailureUsesProtocolMapper() throws Throwable {
     IllegalStateException failure = new IllegalStateException("operation failed");
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    TestInvocation invocation = invocation("unannotated", null);
+    TestInvocation invocation = invocation("operationFails", null);
     when(invocation.proceed()).thenThrow(failure);
 
     assertSame(failure, interceptor.invoke(invocation));
+  }
+
+  @Test
+  public void testMissingAuthorizationExpressionIsDenied() throws Throwable {
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    TestInvocation invocation = invocation("unannotated", "authorized");
+
+    ForbiddenException response =
+        assertInstanceOf(ForbiddenException.class, interceptor.invoke(invocation));
+    assertTrue(response.getMessage().contains("unannotated"));
+    verify(invocation, never()).proceed();
   }
 
   /** Entry authorization, parent checks and worker filtering share one user lookup. */
@@ -541,6 +552,11 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     }
 
     private String unannotated() {
+      return "unused";
+    }
+
+    @AuthorizationExpression(expression = "true")
+    private String operationFails() {
       return "unused";
     }
   }
