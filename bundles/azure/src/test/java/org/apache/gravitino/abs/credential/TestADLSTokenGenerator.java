@@ -168,6 +168,23 @@ class TestADLSTokenGenerator {
     }
   }
 
+  @Test
+  void rejectsBlobHostLocationsBeforeVendingSas() throws Exception {
+    String path = "wasbs://container@account.blob.core.windows.net/warehouse/table";
+    try (ADLSTokenGenerator generator = new TestableADLSTokenGenerator()) {
+      generator.initialize(createProperties());
+      PathBasedCredentialContext context =
+          new PathBasedCredentialContext(
+              "test-user", Collections.emptySet(), Collections.singleton(path));
+
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> generator.generate(context));
+
+      assertTrue(exception.getMessage().contains("abfs or abfss"));
+      assertTrue(exception.getMessage().contains(path));
+    }
+  }
+
   private static Map<String, String> createProperties() {
     Map<String, String> properties = new HashMap<>();
     properties.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, "account");
