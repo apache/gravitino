@@ -33,7 +33,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -210,7 +209,7 @@ public class StarRocksUtils {
   public static String extractTableCommentFromSql(String createTableSql) {
     Matcher matcher = TABLE_COMMENT_PATTERN.matcher(createTableSql.trim());
     if (matcher.find()) {
-      return JdbcConnectorUtils.unescapeSqlLiteral(matcher.group(1), '"');
+      return unescapeSqlLiteral(matcher.group(1), '"');
     }
     return "";
   }
@@ -250,7 +249,8 @@ public class StarRocksUtils {
     if (Literals.NULL.equals(upper)) {
       partitionValues = "LESS THAN MAXVALUE";
     } else {
-      partitionValues = String.format("LESS THAN (\"%s\")", upper.value());
+      partitionValues =
+          String.format("LESS THAN (\"%s\")", escapeSqlLiteral(String.valueOf(upper.value()), '"'));
     }
     return partitionValues;
   }
@@ -265,10 +265,10 @@ public class StarRocksUtils {
             String.format(
                 "(%s)",
                 Arrays.stream(part)
-                    .map(p -> "\"" + p.value() + "\"")
+                    .map(p -> "\"" + escapeSqlLiteral(String.valueOf(p.value()), '"') + "\"")
                     .collect(Collectors.joining(",")));
       } else {
-        values = String.format("\"%s\"", part[0].value());
+        values = String.format("\"%s\"", escapeSqlLiteral(String.valueOf(part[0].value()), '"'));
       }
       listValues.add(values);
     }
