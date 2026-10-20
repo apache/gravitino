@@ -1553,4 +1553,19 @@ public class TestDorisTableOperationsSqlGeneration {
         TableChange.deleteColumn(fieldName, false),
         TableChange.updateColumnType(fieldName, Types.LongType.get()));
   }
+
+  @Test
+  public void testSetPropertyEscapesKeyAndValue() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.setProperty("key\"name", "owner's \"comment\" C:\\tmp\"); --"),
+            TableChange.setProperty("plain", "value"));
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\n"
+            + "set (\"key\"\"name\" = \"owner's \"\"comment\"\" C:\\\\tmp\"\"); --\",\n"
+            + "\"plain\" = \"value\");",
+        sql);
+  }
 }
