@@ -19,15 +19,17 @@
 
 package org.apache.gravitino.audit;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
 import lombok.Getter;
 
 public class DummyAuditWriter implements AuditLogWriter {
   private Formatter formatter;
 
-  @Getter private final List<DummyAuditLog> auditLogs = new CopyOnWriteArrayList<>();
+  @Getter
+  private final List<DummyAuditLog> auditLogs = Collections.synchronizedList(new ArrayList<>());
 
   @Override
   public Formatter getFormatter() {

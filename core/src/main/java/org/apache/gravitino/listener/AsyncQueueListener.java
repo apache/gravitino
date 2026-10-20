@@ -45,7 +45,8 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(AsyncQueueListener.class);
   private static final String NAME_PREFIX = "async-queue-listener-";
   private static final float HIGH_WATERMARK_RATIO = 0.9f;
-  private static final long POLL_INTERVAL_MS = 100;
+  // Queued by stop() behind the pending events. The dispatcher thread exits when it takes it.
+  private static final BaseEvent STOP_SIGNAL = new BaseEvent(null, null) {};
 
   private final List<EventListenerPlugin> eventListeners;
   private final BlockingQueue<BaseEvent> queue;
@@ -103,13 +104,24 @@ public class AsyncQueueListener implements EventListenerPlugin {
       LOG.debug("{} had already stopped", asyncQueueListenerName);
       return;
     }
+    long joinMillis = TimeUnit.SECONDS.toMillis(dispatcherJoinSeconds);
+    long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(joinMillis);
     try {
-      // Give the dispatcher thread time to drain the queued events. It exits by itself once the
-      // queue is empty, and is interrupted if it does not finish in time.
-      asyncProcessor.join(dispatcherJoinSeconds * 1000L);
+      // Give the dispatcher thread time to drain the queued events, then interrupt it if it does
+      // not finish in time.
+      if (asyncProcessor.isAlive()
+          && queue.offer(STOP_SIGNAL, remainingMillis(deadlineNanos), TimeUnit.MILLISECONDS)) {
+        asyncProcessor.join(remainingMillis(deadlineNanos));
+      }
       if (asyncProcessor.isAlive()) {
         asyncProcessor.interrupt();
-        asyncProcessor.join(dispatcherJoinSeconds * 1000L);
+        asyncProcessor.join(joinMillis);
+      }
+      if (asyncProcessor.isAlive()) {
+        LOG.warn(
+            "{} event dispatcher thread is still running after it was interrupted, stop the "
+                + "listeners anyway.",
+            asyncQueueListenerName);
       }
     } catch (InterruptedException e) {
       LOG.warn("{} interrupt async processor failed.", asyncQueueListenerName, e);
@@ -130,13 +142,9 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private void processEvents() {
     while (!Thread.currentThread().isInterrupted()) {
       try {
-        BaseEvent baseEvent = queue.poll(POLL_INTERVAL_MS, TimeUnit.MILLISECONDS);
-        if (baseEvent == null) {
-          if (stopped.get()) {
-            // The listener is stopped and all the queued events are processed.
-            break;
-          }
-          continue;
+        BaseEvent baseEvent = queue.take();
+        if (baseEvent == STOP_SIGNAL) {
+          break;
         }
         if (baseEvent instanceof PreEvent) {
           this.eventListeners.forEach(listener -> listener.onPreEvent((PreEvent) baseEvent));
@@ -155,10 +163,15 @@ public class AsyncQueueListener implements EventListenerPlugin {
 
     if (!queue.isEmpty()) {
       LOG.warn(
-          "{} drop {} events since dispatch thread is interrupted",
+          "{} drop {} events since dispatch thread is stopped",
           asyncQueueListenerName,
           queue.size());
     }
+  }
+
+  // Never returns 0, since Thread.join(0) waits forever.
+  private static long remainingMillis(long deadlineNanos) {
+    return Math.max(1, TimeUnit.NANOSECONDS.toMillis(deadlineNanos - System.nanoTime()));
   }
 
   private void logDropEventsIfNecessary() {
