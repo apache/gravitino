@@ -33,6 +33,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -1149,18 +1150,20 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @Test
   void testLoadTableETagIncludesReadRestrictionSeed() {
-    Optional<javax.ws.rs.core.EntityTag> unrestricted =
-        IcebergTableOperations.generateETag("s3://bucket/metadata.json", "all", "");
-    Optional<javax.ws.rs.core.EntityTag> firstRestriction =
+    Optional<EntityTag> unrestricted =
+        IcebergTableOperations.generateETag("s3://bucket/metadata.json", "all", Optional.empty());
+    Optional<EntityTag> firstRestriction =
         IcebergTableOperations.generateETag(
-            "s3://bucket/metadata.json", "all", "{\"row-filter\":\"first\"}");
-    Optional<javax.ws.rs.core.EntityTag> secondRestriction =
+            "s3://bucket/metadata.json", "all", Optional.of("{\"row-filter\":\"first\"}"));
+    Optional<EntityTag> secondRestriction =
         IcebergTableOperations.generateETag(
-            "s3://bucket/metadata.json", "all", "{\"row-filter\":\"second\"}");
+            "s3://bucket/metadata.json", "all", Optional.of("{\"row-filter\":\"second\"}"));
 
     Assertions.assertTrue(unrestricted.isPresent());
     Assertions.assertTrue(firstRestriction.isPresent());
     Assertions.assertTrue(secondRestriction.isPresent());
+    Assertions.assertEquals(
+        IcebergTableOperations.generateETag("s3://bucket/metadata.json", "all"), unrestricted);
     Assertions.assertNotEquals(unrestricted, firstRestriction);
     Assertions.assertNotEquals(firstRestriction, secondRestriction);
   }

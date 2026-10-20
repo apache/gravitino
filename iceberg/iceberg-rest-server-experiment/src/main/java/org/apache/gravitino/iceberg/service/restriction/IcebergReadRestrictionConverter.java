@@ -474,7 +474,7 @@ public final class IcebergReadRestrictionConverter {
   private static Float exactFloat(SourceValue source) {
     BigDecimal decimal = (BigDecimal) source.value();
     float value = decimal.floatValue();
-    if (!Float.isFinite(value) || new BigDecimal(Float.toString(value)).compareTo(decimal) != 0) {
+    if (!Float.isFinite(value) || new BigDecimal((double) value).compareTo(decimal) != 0) {
       throw invalidLiteral(source, Types.FloatType.get(), null);
     }
     return source.negativeZero() ? -0.0F : value;
@@ -483,7 +483,7 @@ public final class IcebergReadRestrictionConverter {
   private static Double exactDouble(SourceValue source) {
     BigDecimal decimal = (BigDecimal) source.value();
     double value = decimal.doubleValue();
-    if (!Double.isFinite(value) || BigDecimal.valueOf(value).compareTo(decimal) != 0) {
+    if (!Double.isFinite(value) || new BigDecimal(value).compareTo(decimal) != 0) {
       throw invalidLiteral(source, Types.DoubleType.get(), null);
     }
     return source.negativeZero() ? -0.0D : value;

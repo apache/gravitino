@@ -693,7 +693,7 @@ public class IcebergTableOperations {
 
   @VisibleForTesting
   static Optional<EntityTag> generateETag(
-      String metadataLocation, String snapshots, String representationSeed) {
+      String metadataLocation, String snapshots, Optional<String> representationSeed) {
     return IcebergRESTUtils.generateETag(metadataLocation, snapshots, representationSeed);
   }
 

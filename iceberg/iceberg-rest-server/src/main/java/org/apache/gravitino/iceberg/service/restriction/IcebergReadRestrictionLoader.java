@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.restriction;
 
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -73,9 +74,9 @@ public interface IcebergReadRestrictionLoader {
   /** Result of resolving read restrictions for one load-table response. */
   final class Result {
     private final LoadTableResponse response;
-    private final String etagSeed;
+    private final Optional<String> etagSeed;
 
-    private Result(LoadTableResponse response, String etagSeed) {
+    private Result(LoadTableResponse response, Optional<String> etagSeed) {
       this.response = Objects.requireNonNull(response, "response cannot be null");
       this.etagSeed = Objects.requireNonNull(etagSeed, "etagSeed cannot be null");
     }
@@ -84,10 +85,10 @@ public interface IcebergReadRestrictionLoader {
      * Creates a result.
      *
      * @param response resolved load-table response
-     * @param etagSeed canonical seed for response state not represented by table metadata
+     * @param etagSeed optional canonical seed for response state not represented by table metadata
      * @return a new result
      */
-    public static Result of(LoadTableResponse response, String etagSeed) {
+    public static Result of(LoadTableResponse response, Optional<String> etagSeed) {
       return new Result(response, etagSeed);
     }
 
@@ -99,9 +100,9 @@ public interface IcebergReadRestrictionLoader {
     }
 
     /**
-     * @return canonical ETag representation seed, or an empty string when unrestricted
+     * @return canonical ETag representation seed, or empty when unrestricted
      */
-    public String etagSeed() {
+    public Optional<String> etagSeed() {
       return etagSeed;
     }
   }
@@ -120,7 +121,7 @@ public interface IcebergReadRestrictionLoader {
               IcebergRequestContext context,
               TableIdentifier tableIdentifier,
               LoadTableResponse response) {
-            return Result.of(response, "");
+            return Result.of(response, Optional.empty());
           }
         };
 

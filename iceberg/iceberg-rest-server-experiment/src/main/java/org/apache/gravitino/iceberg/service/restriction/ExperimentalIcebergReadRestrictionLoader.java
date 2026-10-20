@@ -70,7 +70,7 @@ public final class ExperimentalIcebergReadRestrictionLoader
     GravitinoEnv environment = GravitinoEnv.getInstance();
     PolicyDispatcher policyDispatcher = environment.internalPolicyDispatcher();
     if (policyDispatcher == null) {
-      return Result.of(response, "");
+      return Result.of(response, Optional.empty());
     }
 
     String metalake = IcebergRESTServerContext.getInstance().metalakeName();
@@ -104,7 +104,7 @@ public final class ExperimentalIcebergReadRestrictionLoader
             context.userName(), metalake, environment.internalAccessControlDispatcher());
     ReadRestrictions restrictions = resolve(rowPolicies, maskPolicies, schema, bindingContext);
     if (restrictions.isEmpty()) {
-      return Result.of(response, "");
+      return Result.of(response, Optional.empty());
     }
 
     LoadTableResponse.Builder builder =
@@ -125,7 +125,7 @@ public final class ExperimentalIcebergReadRestrictionLoader
     }
 
     String signature = ReadRestrictionsParser.toJson(restrictions);
-    return Result.of(builder.build(), signature);
+    return Result.of(builder.build(), Optional.of(signature));
   }
 
   static ReadRestrictions resolve(

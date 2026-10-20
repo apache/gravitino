@@ -31,6 +31,7 @@ import java.util.Optional;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.iceberg.Schema;
@@ -165,10 +166,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   }
 
   private static PolicyEntity policy(
-      long id,
-      String name,
-      Policy.BuiltInType type,
-      org.apache.gravitino.policy.PolicyContent content) {
+      long id, String name, Policy.BuiltInType type, PolicyContent content) {
     return PolicyEntity.builder()
         .withId(id)
         .withName(name)

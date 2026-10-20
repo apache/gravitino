@@ -396,7 +396,7 @@ public class IcebergRESTUtils {
    * @return the generated ETag
    */
   public static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
-    return generateETag(metadataLocation, snapshots, "");
+    return generateETag(metadataLocation, snapshots, Optional.empty());
   }
 
   /**
@@ -405,11 +405,11 @@ public class IcebergRESTUtils {
    *
    * @param metadataLocation the metadata file location
    * @param snapshots the snapshots query parameter value
-   * @param representationSeed canonical seed for response state outside table metadata
+   * @param representationSeed optional canonical seed for response state outside table metadata
    * @return the generated ETag
    */
   public static Optional<EntityTag> generateETag(
-      String metadataLocation, String snapshots, String representationSeed) {
+      String metadataLocation, String snapshots, Optional<String> representationSeed) {
     if (StringUtils.isBlank(metadataLocation)) {
       return Optional.empty();
     }
@@ -417,9 +417,9 @@ public class IcebergRESTUtils {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       digest.update(metadataLocation.getBytes(StandardCharsets.UTF_8));
       digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
-      if (StringUtils.isNotEmpty(representationSeed)) {
+      if (representationSeed.isPresent()) {
         digest.update((byte) 0);
-        digest.update(representationSeed.getBytes(StandardCharsets.UTF_8));
+        digest.update(representationSeed.get().getBytes(StandardCharsets.UTF_8));
       }
       byte[] hash = digest.digest();
       StringBuilder hexString = new StringBuilder();

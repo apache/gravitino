@@ -128,12 +128,15 @@ public class TestIcebergReadRestrictionConverter {
             + " and col(\"event_date\") == \"2026-10-12\""
             + " and col(\"event_time\") == \"12:34:56.123456\""
             + " and col(\"event_ts\") == \"2026-10-12T12:34:56.123456\""
-            + " and col(\"score\") == 0.5";
+            + " and col(\"score\") == 0.5"
+            + " and col(\"double_score\") == 0.5";
 
     ReadRestrictions restrictions = convertFilter(source, context("alice"));
 
     assertNotNull(restrictions.rowFilter());
     assertTrue(Binder.isBound(restrictions.rowFilter()));
+    String json = ReadRestrictionsParser.toJson(restrictions);
+    assertNotNull(ReadRestrictionsParser.fromJson(json, SCHEMA).rowFilter());
   }
 
   @Test
@@ -147,6 +150,12 @@ public class TestIcebergReadRestrictionConverter {
     assertThrows(
         IllegalArgumentException.class,
         () -> convertFilter("filter := col(\"score\") == 16777217", context("alice")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> convertFilter("filter := col(\"score\") <= 0.1", context("alice")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> convertFilter("filter := col(\"double_score\") <= 0.1", context("alice")));
     assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -271,13 +280,15 @@ public class TestIcebergReadRestrictionConverter {
       ColumnMask mask =
           RestrictedRegoExpressionParserFacade.parseColumnMask(
               "mask := action(\"" + entry.getKey() + "\")");
-      IcebergFunction<?, ?> function =
-          convertMasks(Collections.singletonMap(entry.getValue(), mask), context("alice"))
-              .columnProjections()
-              .get(0);
+      ReadRestrictions restrictions =
+          convertMasks(Collections.singletonMap(entry.getValue(), mask), context("alice"));
+      IcebergFunction<?, ?> function = restrictions.columnProjections().get(0);
 
       assertEquals(entry.getKey(), function.name());
       assertEquals(entry.getValue().intValue(), function.fieldId());
+      String json = ReadRestrictionsParser.toJson(restrictions);
+      assertEquals(
+          json, ReadRestrictionsParser.toJson(ReadRestrictionsParser.fromJson(json, SCHEMA)));
     }
   }
 
