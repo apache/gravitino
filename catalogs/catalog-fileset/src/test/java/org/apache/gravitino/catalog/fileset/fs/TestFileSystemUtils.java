@@ -20,10 +20,12 @@
 package org.apache.gravitino.catalog.fileset.fs;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -55,23 +57,6 @@ public class TestFileSystemUtils {
     Assertions.assertEquals("v2", configuration.get("fs.s3a.impl"));
     Assertions.assertEquals("v3", configuration.get("fs.s3a.endpoint"));
     Assertions.assertEquals("v4", configuration.get("gravitino.bypass.fs.s3a.endpoint"));
-  }
-
-  @Test
-  void testCreateConfigurationPlainKeyWinsOverBypass() {
-    // The documented contract (pinned by testToHadoopConfigMap case 3) is plain-beats-bypass;
-    // the two-arg createConfiguration must honor it deterministically, and must strip only a
-    // bypass PREFIX (keys merely containing the bypass string stay verbatim).
-    Map<String, String> confMap =
-        ImmutableMap.of(
-            "fs.s3a.endpoint", "v3",
-            "gravitino.bypass.fs.s3a.endpoint", "v4",
-            "a.gravitino.bypass.b", "v5");
-    Configuration configuration =
-        FileSystemUtils.createCompatibleConfiguration(FileSystemProvider.GRAVITINO_BYPASS, confMap);
-    Assertions.assertEquals("v3", configuration.get("fs.s3a.endpoint"), "plain key must win");
-    Assertions.assertEquals(
-        "v5", configuration.get("a.gravitino.bypass.b"), "mid-key occurrences stay verbatim");
   }
 
   private static Stream<Arguments> mapArguments() {
@@ -123,5 +108,43 @@ public class TestFileSystemUtils {
                 "gravitino.bypass.fs.s3a.endpoint", "v4"),
             ImmutableMap.of("fs.s3a.endpoint", "v1", "fs.s3a.impl", "v2"),
             ImmutableMap.of("s3a-endpoint", "fs.s3a.endpoint")));
+  }
+
+  @Test
+  void testBypassValueOverridesInjectedHdfsDefault() {
+    // The ipc timeout default is injected for HDFS; a user value set with the bypass prefix must
+    // win however many other properties the map holds.
+    for (int fillers = 0; fillers <= 200; fillers++) {
+      Map<String, String> config = fillerProperties(fillers);
+      config.put(FileSystemProvider.GRAVITINO_BYPASS + "ipc.client.connect.timeout", "60000");
+      Configuration configuration =
+          FileSystemUtils.createCompatibleConfiguration(
+              FileSystemProvider.GRAVITINO_BYPASS,
+              HDFSFileSystemProvider.additionalHDFSConfig(config));
+      Assertions.assertEquals(
+          "60000", configuration.get("ipc.client.connect.timeout"), "fillers: " + fillers);
+    }
+  }
+
+  @Test
+  void testPlainKeyWinsOverBypassTwin() {
+    for (int fillers = 0; fillers <= 200; fillers++) {
+      Map<String, String> config = fillerProperties(fillers);
+      config.put("ipc.client.connect.timeout", "plain");
+      config.put(FileSystemProvider.GRAVITINO_BYPASS + "ipc.client.connect.timeout", "bypass");
+      Configuration configuration =
+          FileSystemUtils.createCompatibleConfiguration(
+              FileSystemProvider.GRAVITINO_BYPASS, config);
+      Assertions.assertEquals(
+          "plain", configuration.get("ipc.client.connect.timeout"), "fillers: " + fillers);
+    }
+  }
+
+  private static Map<String, String> fillerProperties(int count) {
+    Map<String, String> config = new HashMap<>();
+    for (int i = 0; i < count; i++) {
+      config.put("filler.key." + i, "v" + i);
+    }
+    return config;
   }
 }

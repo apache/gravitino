@@ -115,7 +115,7 @@ public class FileSystemUtils {
     config.forEach(
         (k, v) -> {
           if (k.startsWith(GRAVITINO_BYPASS)) {
-            String key = k.substring(GRAVITINO_BYPASS.length());
+            String key = k.replace(GRAVITINO_BYPASS, "");
             result.put(key, v);
           }
         });
@@ -211,11 +211,8 @@ public class FileSystemUtils {
       writer.writeStartDocument();
       writer.writeStartElement(CONFIG_ROOT);
 
-      // Two ordered passes make the precedence deterministic when the map holds both a plain
-      // key and its bypass twin: Hadoop Configuration is last-entry-wins within one resource,
-      // so writing bypass keys first and plain keys last pins plain-wins-bypass, matching
-      // toHadoopConfigMap's documented contract. The prefix strip (not a mid-key replace)
-      // leaves unrelated keys containing the prefix verbatim.
+      // Configuration keeps the last value of a key within one resource. Write the bypass keys
+      // first so that a plain key wins over its bypass twin, as in toHadoopConfigMap.
       config.entrySet().stream()
           .filter(e -> StringUtils.isNotBlank(bypass) && e.getKey().startsWith(bypass))
           .forEach(e -> writeProperty(writer, e.getKey().substring(bypass.length()), e.getValue()));
