@@ -86,6 +86,15 @@ public final class SparkApplicationUtils {
   private static final String SPARK_JARS = "spark.jars";
   private static final String SPARK_FILES = "spark.files";
   private static final String SPARK_ARCHIVES = "spark.archives";
+  private static final String SPARK_DRIVER_ENV_PREFIX = "spark.kubernetes.driverEnv.";
+  private static final String SPARK_EXECUTOR_ENV_PREFIX = "spark.executorEnv.";
+
+  // The environment variable names that Spark passes to the executors: Spark 3.5 drops any other
+  // spark.executorEnv.* key with only a warning, while the driver would still get it. Kubernetes
+  // without the relaxed environment variable validation accepts the same names, except '.' and
+  // the names starting with '..', which are rejected separately.
+  private static final Pattern ENVIRONMENT_NAME_PATTERN =
+      Pattern.compile("[-._a-zA-Z][-._a-zA-Z0-9]*");
 
   private static final Pattern URI_USER_INFO = Pattern.compile("(?<=://)[^/?#@]*@");
 
@@ -98,6 +107,12 @@ public final class SparkApplicationUtils {
    * the Gravitino server, runs the jar of {@link K8sJobExecutorConfigs#SPARK_BUILTIN_JOBS_JAR}
    * instead.
    *
+   * <p>The environment variables of the job template are set for the driver and the executors
+   * through the Spark configurations {@code spark.kubernetes.driverEnv.*} and {@code
+   * spark.executorEnv.*}, which means their values are visible in the SparkApplication and in its
+   * pods. They override the default Spark configurations of the job executor, and the Spark
+   * configurations of the job template override them.
+   *
    * @param context the context of the job run
    * @param template the runtime job template, whose resources are the URIs given in the template
    * @param configs the job executor configurations
@@ -106,15 +121,6 @@ public final class SparkApplicationUtils {
    */
   public static GenericKubernetesResource buildSparkApplication(
       JobContext context, SparkJobTemplate template, K8sJobExecutorConfigs configs) {
-    if (!template.environments().isEmpty()) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Job template %s sets environment variables %s, which the k8s job executor doesn't"
-                  + " support yet. Pass them as Spark configurations instead, for example"
-                  + " spark.kubernetes.driverEnv.<name> and spark.executorEnv.<name>",
-              template.name(), template.environments().keySet()));
-    }
-
     String executable = getExecutableUri(context, template, configs);
     checkClusterReachable(executable);
     template.jars().forEach(SparkApplicationUtils::checkClusterReachable);
@@ -122,6 +128,14 @@ public final class SparkApplicationUtils {
     template.archives().forEach(SparkApplicationUtils::checkClusterReachable);
 
     Map<String, String> sparkConf = new TreeMap<>(configs.sparkConf());
+    template
+        .environments()
+        .forEach(
+            (name, value) -> {
+              checkEnvironmentName(template, name);
+              sparkConf.put(SPARK_DRIVER_ENV_PREFIX + name, value);
+              sparkConf.put(SPARK_EXECUTOR_ENV_PREFIX + name, value);
+            });
     sparkConf.putAll(template.configs());
     // The operator only supports cluster mode, so a job that asks for client mode is rejected
     // rather than silently run in cluster mode.
@@ -222,6 +236,20 @@ public final class SparkApplicationUtils {
       return configs.sparkBuiltinJobsJar();
     }
     return template.executable();
+  }
+
+  private static void checkEnvironmentName(SparkJobTemplate template, String name) {
+    // Checked here, as an invalid name would otherwise only miss the executors, or fail the job
+    // when the operator creates the driver pod.
+    if (!ENVIRONMENT_NAME_PATTERN.matcher(name).matches()
+        || ".".equals(name)
+        || name.startsWith("..")) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Environment variable name '%s' of job template %s is invalid: it must match %s,"
+                  + " must not be '.' and must not start with '..'",
+              name, template.name(), ENVIRONMENT_NAME_PATTERN.pattern()));
+    }
   }
 
   /**
