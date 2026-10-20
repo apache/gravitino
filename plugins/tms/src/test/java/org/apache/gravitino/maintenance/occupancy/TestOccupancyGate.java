@@ -38,7 +38,7 @@ import org.junit.jupiter.api.TestTemplate;
 class TestOccupancyGate extends TestJDBCBackend {
 
   @TestTemplate
-  void testInFlightReadsJobMetaServiceWithoutBackfillingFinishedAt() throws IOException {
+  void testInFlightReclaimsTerminalBoundJobFinishedAt() throws IOException {
     String metalakeName = "tms_occ_ml";
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, "cat");
@@ -95,7 +95,7 @@ class TestOccupancyGate extends TestJDBCBackend {
                         .build());
 
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
-    Assertions.assertEquals(0L, actions.getByJobId(started.id()).finishedAt());
+    Assertions.assertEquals(finishedAt, actions.getByJobId(started.id()).finishedAt());
     Assertions.assertTrue(
         gate.withinMinInterval(table.id(), policyId, 3_600_000L, finishedAt + 1_000L));
     Assertions.assertFalse(
@@ -127,7 +127,7 @@ class TestOccupancyGate extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testSoftSlotBlocksNewAcquireUntilMarkFinished() throws IOException {
+  void testTerminalBoundJobIsReclaimedSoSlotCanBeAcquiredAgain() throws IOException {
     String metalakeName = "tms_occ_ml3";
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, "cat");
@@ -159,13 +159,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     actions.bindJobId(stale, succeeded.id());
     Assertions.assertEquals(0L, actions.getByJobId(succeeded.id()).finishedAt());
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () ->
-            actions.insertInFlight(
-                table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS));
-
-    actions.markFinished(succeeded.id(), 200L, finishedAt);
+    Assertions.assertEquals(finishedAt, actions.getByJobId(succeeded.id()).finishedAt());
     Assertions.assertEquals(0, actions.listInFlight(table.id(), policyId).size());
 
     JobEntity started =

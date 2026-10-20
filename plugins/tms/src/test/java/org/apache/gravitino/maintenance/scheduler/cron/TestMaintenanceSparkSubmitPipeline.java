@@ -98,7 +98,8 @@ class TestMaintenanceSparkSubmitPipeline {
   @Test
   void testSuccessfulSubmitBindsJobId() {
     MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
-    when(submitter.runJob(eq("metalake"), eq("builtin-iceberg-rewrite-data-files"), anyMap()))
+    when(submitter.runJob(
+            eq("metalake"), eq(MaintenanceJobTemplates.TMS_ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
         .thenReturn(999L);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     OccupancyClaim claim = new OccupancyClaim(7L, 1_000L);
@@ -133,7 +134,8 @@ class TestMaintenanceSparkSubmitPipeline {
   @Test
   void testBatchSubmitOneSparkJobPerTable() {
     MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
-    when(submitter.runJob(eq("metalake"), eq("builtin-iceberg-expire-snapshots"), anyMap()))
+    when(submitter.runJob(
+            eq("metalake"), eq(MaintenanceJobTemplates.TMS_ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
         .thenReturn(555L, 556L);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     OccupancyClaim claimA = new OccupancyClaim(1L, 10L);
@@ -171,11 +173,15 @@ class TestMaintenanceSparkSubmitPipeline {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
     verify(submitter, times(2))
-        .runJob(eq("metalake"), eq("builtin-iceberg-expire-snapshots"), confCaptor.capture());
+        .runJob(
+            eq("metalake"),
+            eq(MaintenanceJobTemplates.TMS_ICEBERG_MAINTENANCE_TEMPLATE),
+            confCaptor.capture());
     List<Map<String, String>> confs = confCaptor.getAllValues();
     Assertions.assertEquals("iceberg", confs.get(0).get("catalog_name"));
     Assertions.assertEquals("db.t1", confs.get(0).get("table_identifier"));
     Assertions.assertEquals("10", confs.get(0).get("tms_table_id"));
+    Assertions.assertEquals("expire_snapshots", confs.get(0).get("maintenance_type"));
     Assertions.assertEquals("iceberg", confs.get(1).get("catalog_name"));
     Assertions.assertEquals("db.t2", confs.get(1).get("table_identifier"));
     Assertions.assertEquals("11", confs.get(1).get("tms_table_id"));
@@ -211,18 +217,28 @@ class TestMaintenanceSparkSubmitPipeline {
             Map.of("gravitino_uri", "http://localhost:8090"));
 
     new MaintenanceSparkSubmitPipeline(
-            mockLookup(policy), mockGate(false), actions, submitter, config, CLAIM_TIMEOUT_MS)
+            mockLookup(policy),
+            mockGate(false),
+            actions,
+            submitter,
+            config,
+            CLAIM_TIMEOUT_MS,
+            ids -> List.of(new ResolvedTableRef(TABLE_ID, "iceberg", "db.t")))
         .submit(INSTANCE);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
     verify(submitter)
-        .runJob(eq("metalake"), eq("builtin-iceberg-rewrite-data-files"), confCaptor.capture());
+        .runJob(
+            eq("metalake"),
+            eq(MaintenanceJobTemplates.TMS_ICEBERG_MAINTENANCE_TEMPLATE),
+            confCaptor.capture());
     Map<String, String> conf = confCaptor.getValue();
     Assertions.assertEquals("iceberg", conf.get("catalog_name"));
     Assertions.assertEquals("db.t", conf.get("table_identifier"));
     Assertions.assertEquals("basic", conf.get("rest.auth.type"));
     Assertions.assertEquals(Long.toString(TABLE_ID), conf.get("tms_table_id"));
+    Assertions.assertEquals("rewrite_data_files", conf.get("maintenance_type"));
     Assertions.assertEquals(Long.toString(POLICY_ID), conf.get("tms_policy_id"));
     Assertions.assertTrue(conf.containsKey("updater_options"));
     Assertions.assertTrue(conf.get("updater_options").contains("auth_type"));
@@ -234,7 +250,13 @@ class TestMaintenanceSparkSubmitPipeline {
       TableMaintenanceActionMetaService actions,
       MaintenanceJobSubmitter submitter) {
     return new MaintenanceSparkSubmitPipeline(
-        lookup, gate, actions, submitter, new Config(false) {}, CLAIM_TIMEOUT_MS);
+        lookup,
+        gate,
+        actions,
+        submitter,
+        new Config(false) {},
+        CLAIM_TIMEOUT_MS,
+        ids -> List.of(new ResolvedTableRef(TABLE_ID, "iceberg", "db.t")));
   }
 
   private static ExpandOccupancyGate mockGate(boolean shouldSkip) {

@@ -101,9 +101,11 @@ dependencies {
 }
 
 tasks {
+  // Keep dependency jars out of build/libs so consumers of this project's jar do not race with
+  // copyDepends (Gradle configuration-cache / implicit dependency validation).
   val copyDepends by registering(Copy::class) {
     from(configurations.runtimeClasspath)
-    into("build/libs")
+    into("build/runtime-libs")
   }
   jar {
     finalizedBy(copyDepends)
@@ -112,6 +114,7 @@ tasks {
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
     from("build/libs")
+    from("build/runtime-libs")
     into("$rootDir/distribution/package/optimizer/libs")
   }
 

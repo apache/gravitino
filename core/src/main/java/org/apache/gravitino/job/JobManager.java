@@ -35,6 +35,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -519,9 +520,13 @@ public class JobManager implements JobOperationDispatcher {
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values. Its
     // resources are kept as URIs, the job executor decides how to handle them.
+    // Inject gravitino_job_id after checkJobConf so templates may use {{gravitino_job_id:-}}
+    // without every caller passing it (TMS cron Spark action callbacks need it).
+    Map<String, String> resolvedConf = new HashMap<>(jobConf);
+    resolvedConf.put("gravitino_job_id", Long.toString(jobId));
     JobTemplate jobTemplate;
     try {
-      jobTemplate = jobTemplateResolver.resolve(jobConf);
+      jobTemplate = jobTemplateResolver.resolve(resolvedConf);
     } catch (RuntimeException e) {
       deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw e;

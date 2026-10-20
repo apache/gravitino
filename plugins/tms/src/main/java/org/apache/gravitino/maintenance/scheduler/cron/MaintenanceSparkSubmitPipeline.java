@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Single-table {@code table:...} rows submit one Spark job. Snapshot-expiry {@code batch:...}
  * rows are one cron task carrying multiple table ids; the pipeline claims each eligible table and
- * submits one single-table Spark job per table (builtin expire-snapshots template unchanged).
+ * submits one single-table Spark job per table via {@code builtin-tms-iceberg-maintenance}.
  *
  * <p>Does not sample metrics (that runs inside Spark). The caller always deletes the one-shot
  * {@code cron-job} row after this method returns.
@@ -187,6 +187,16 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
 
+    List<ResolvedTableRef> resolved = tableRefResolver.apply(List.of(tableId));
+    if (resolved.isEmpty()) {
+      LOG.warn(
+          "Skipping cron-job submit for table {} policy {}: could not resolve table identifier",
+          tableId,
+          policyId);
+      return;
+    }
+    ResolvedTableRef ref = resolved.get(0);
+
     Optional<OccupancyClaim> claim =
         actionMetaService.tryAcquireInFlight(tableId, policyId, claimTimeoutMs);
     if (claim.isEmpty()) {
@@ -198,6 +208,8 @@ public final class MaintenanceSparkSubmitPipeline {
     }
 
     Map<String, String> jobConf = buildJobConf(policy);
+    jobConf.put("catalog_name", ref.catalogName());
+    jobConf.put("table_identifier", ref.tableIdentifier());
     jobConf.put(TMS_TABLE_ID_KEY, Long.toString(tableId));
     runAndBind(policy, templateName.get(), jobConf, claim.get(), tableId);
   }
@@ -329,6 +341,8 @@ public final class MaintenanceSparkSubmitPipeline {
 
     Map<String, String> jobConf = new LinkedHashMap<>(jobOptions);
     jobConf.put(TMS_POLICY_ID_KEY, Long.toString(policy.id()));
+    MaintenanceJobTemplates.maintenanceType(policy.policyType())
+        .ifPresent(type -> jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPE_KEY, type));
     if (!updaterOptions.isEmpty()) {
       try {
         jobConf.put(

@@ -28,6 +28,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.web.rest.TableMaintenanceActionOperations;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
 import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
@@ -37,12 +38,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Jersey feature that starts table maintenance db-scheduler pools when the extension package is
- * enabled (§7.1).
+ * Jersey feature that starts table maintenance db-scheduler pools and registers Spark action
+ * callback REST when the extension package is enabled (§7.1 / §5.2.2).
  *
- * <p>TMS does not register public REST resources in this change; the feature only owns server
- * lifecycle for in-process scheduling. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs
- * during Jetty shutdown before {@code GravitinoEnv} closes the entity-store {@code DataSource}.
+ * <p>Pools stop on Jersey {@code DESTROY_FINISHED}, which runs during Jetty shutdown before {@code
+ * GravitinoEnv} closes the entity-store {@code DataSource}.
  *
  * <p>After {@link #stopSchedulers()}, a later {@link #configure} may start pools again and
  * re-register the destroy listener (needed for tests / embedded restarts in the same JVM).
@@ -83,6 +83,7 @@ public class TableMaintenanceRESTFeature implements Feature {
     // Register only after a successful CAS so a later configure-after-stop can attach a listener
     // again on the new FeatureContext (listener is scoped to the Jersey Application).
     context.register(new SchedulerShutdownListener());
+    context.register(TableMaintenanceActionOperations.class);
     LOG.info("Table maintenance scheduler pools are running");
     return true;
   }

@@ -36,6 +36,10 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.dto.requests.MaintenanceActionFinishRequest;
+import org.apache.gravitino.dto.requests.MaintenanceActionSampleRequest;
+import org.apache.gravitino.dto.responses.BaseResponse;
+import org.apache.gravitino.dto.responses.MaintenanceActionSampleResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -70,6 +74,7 @@ import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.policy.PolicyTagAssociation;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.Tag;
@@ -762,6 +767,53 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public PolicyTagAssociation[] listTagAssociationsForPolicy(String policyName) {
     return getMetalake().listTagAssociationsForPolicy(policyName);
+  }
+
+  /**
+   * Reports an in-job S0 sample for a TMS cron maintenance action (§5.2.2).
+   *
+   * @param jobId Gravitino job run id
+   * @param request sample payload
+   * @return gate outcome
+   */
+  public MaintenanceActionSampleResponse reportMaintenanceSample(
+      long jobId, MaintenanceActionSampleRequest request) {
+    Preconditions.checkArgument(request != null, "request must not be null");
+    request.validate();
+    MaintenanceActionSampleResponse response =
+        restClient()
+            .post(
+                String.format(
+                    "api/metalakes/%s/maintenance/actions/%d/sample",
+                    RESTUtils.encodeString(metalakeName), jobId),
+                request,
+                MaintenanceActionSampleResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.restErrorHandler());
+    response.validate();
+    return response;
+  }
+
+  /**
+   * Finishes a TMS cron maintenance action, optionally persisting S1 metrics (§5.2.2).
+   *
+   * @param jobId Gravitino job run id
+   * @param request finish payload
+   */
+  public void finishMaintenanceAction(long jobId, MaintenanceActionFinishRequest request) {
+    Preconditions.checkArgument(request != null, "request must not be null");
+    request.validate();
+    BaseResponse response =
+        restClient()
+            .post(
+                String.format(
+                    "api/metalakes/%s/maintenance/actions/%d/finish",
+                    RESTUtils.encodeString(metalakeName), jobId),
+                request,
+                BaseResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.restErrorHandler());
+    response.validate();
   }
 
   /** Builder class for constructing a GravitinoClient. */

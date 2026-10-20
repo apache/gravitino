@@ -19,34 +19,56 @@
 package org.apache.gravitino.maintenance.scheduler.cron;
 
 import java.util.Optional;
-import org.apache.gravitino.policy.IcebergDataCompactionContent;
-import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
-import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
-import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.Policy;
 
-/** Maps maintenance {@link Policy.BuiltInType} to built-in Spark job template names. */
+/**
+ * Maps maintenance {@link Policy.BuiltInType} to the TMS cron Spark job template and procedure
+ * kind.
+ *
+ * <p>Cron always submits {@link #TMS_ICEBERG_MAINTENANCE_TEMPLATE}; standalone {@code
+ * builtin-iceberg-*} templates remain for CLI / optimizer.
+ */
 public final class MaintenanceJobTemplates {
+
+  /**
+   * Built-in template registered by {@code TmsIcebergMaintenanceJob} in the jobs module. Kept as a
+   * string here so {@code plugins/tms} does not depend on {@code maintenance/jobs}.
+   */
+  public static final String TMS_ICEBERG_MAINTENANCE_TEMPLATE = "builtin-tms-iceberg-maintenance";
+
+  /** JobConf key for procedure dispatch inside the TMS template. */
+  public static final String MAINTENANCE_TYPE_KEY = "maintenance_type";
 
   private MaintenanceJobTemplates() {}
 
   /**
    * @param builtInType maintenance policy type
-   * @return built-in job template name when known
+   * @return TMS cron job template name when known
    */
   public static Optional<String> templateName(Policy.BuiltInType builtInType) {
+    if (maintenanceType(builtInType).isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(TMS_ICEBERG_MAINTENANCE_TEMPLATE);
+  }
+
+  /**
+   * @param builtInType maintenance policy type
+   * @return wire value for {@link #MAINTENANCE_TYPE_KEY}
+   */
+  public static Optional<String> maintenanceType(Policy.BuiltInType builtInType) {
     if (builtInType == null) {
       return Optional.empty();
     }
     switch (builtInType) {
       case ICEBERG_COMPACTION:
-        return Optional.of(IcebergDataCompactionContent.JOB_TEMPLATE_NAME_VALUE);
+        return Optional.of("rewrite_data_files");
       case ICEBERG_REWRITE_MANIFESTS:
-        return Optional.of(IcebergRewriteManifestsContent.JOB_TEMPLATE_NAME_VALUE);
+        return Optional.of("rewrite_manifests");
       case ICEBERG_SNAPSHOT_EXPIRATION:
-        return Optional.of(IcebergSnapshotExpirationContent.JOB_TEMPLATE_NAME_VALUE);
+        return Optional.of("expire_snapshots");
       case ICEBERG_ORPHAN_FILE_REMOVAL:
-        return Optional.of(IcebergOrphanFileRemovalContent.JOB_TEMPLATE_NAME_VALUE);
+        return Optional.of("remove_orphan_files");
       default:
         return Optional.empty();
     }

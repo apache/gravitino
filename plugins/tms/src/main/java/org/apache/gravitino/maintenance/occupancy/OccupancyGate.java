@@ -29,6 +29,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
+import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -43,7 +44,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  *
  * <p>Unbound rows ({@code job_id} null, {@code finished_at = 0}) are a short claim: occupied while
  * still within TTL on the <strong>database</strong> clock (same timeline as acquire/reclaim). Bound
- * rows consult {@link JobMetaService} and do <strong>not</strong> backfill {@code finished_at}.
+ * rows consult {@link JobMetaService}; when that job is already terminal, {@link
+ * #reclaimTerminalBound} persists a best-effort S1 metrics stub (when snapshot id is known) and
+ * marks {@code finished_at} so the soft slot can be claimed again.
  */
 public final class OccupancyGate {
 
@@ -51,6 +54,7 @@ public final class OccupancyGate {
       EnumSet.of(JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING);
 
   private final TableMaintenanceActionMetaService actionMetaService;
+  private final TableSnapshotMetricsMetaService metricsMetaService;
   private final long claimTimeoutMs;
 
   /**
@@ -58,8 +62,23 @@ public final class OccupancyGate {
    * @param claimTimeoutMs unbound claim TTL
    */
   public OccupancyGate(TableMaintenanceActionMetaService actionMetaService, long claimTimeoutMs) {
+    this(actionMetaService, TableSnapshotMetricsMetaService.getInstance(), claimTimeoutMs);
+  }
+
+  /**
+   * Visible for tests.
+   *
+   * @param actionMetaService maintenance action DAO
+   * @param metricsMetaService snapshot metrics DAO
+   * @param claimTimeoutMs unbound claim TTL
+   */
+  OccupancyGate(
+      TableMaintenanceActionMetaService actionMetaService,
+      TableSnapshotMetricsMetaService metricsMetaService,
+      long claimTimeoutMs) {
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
+    this.metricsMetaService = Preconditions.checkNotNull(metricsMetaService);
     this.claimTimeoutMs = claimTimeoutMs;
   }
 
@@ -81,6 +100,7 @@ public final class OccupancyGate {
    * @return true when any open row is a live unbound claim or an active Gravitino job
    */
   public boolean isInFlight(long tableId, long policyId) {
+    reclaimTerminalBound(tableId, policyId);
     if (actionMetaService.hasLiveUnboundClaim(tableId, policyId, claimTimeoutMs)) {
       return true;
     }
@@ -94,6 +114,47 @@ public final class OccupancyGate {
       }
     }
     return false;
+  }
+
+  /**
+   * Job-terminal reconciler failsafe (§5.2.2): when Spark finish callback was missed, insert a stub
+   * S1 metrics row if a snapshot id is known, then mark the action finished.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   */
+  public void reclaimTerminalBound(long tableId, long policyId) {
+    for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
+      if (open.jobId() == null) {
+        continue;
+      }
+      JobEntity job = loadJob(open.jobId(), tableId);
+      if (job == null || ACTIVE.contains(job.status())) {
+        continue;
+      }
+      long finishedAt =
+          job.finishedAt() != null && job.finishedAt() > 0
+              ? job.finishedAt()
+              : System.currentTimeMillis();
+      Long afterSnapshotId =
+          open.afterSnapshotId() != null ? open.afterSnapshotId() : open.beforeSnapshotId();
+      if (afterSnapshotId != null) {
+        try {
+          metricsMetaService.insertMetrics(
+              tableId,
+              policyId,
+              afterSnapshotId,
+              "{\"source\":\"terminal_reconcile\",\"snapshotId\":" + afterSnapshotId + "}");
+        } catch (RuntimeException ignored) {
+          // Metrics are best-effort; still finish the action row.
+        }
+      }
+      try {
+        actionMetaService.markFinished(open.jobId(), afterSnapshotId, finishedAt);
+      } catch (RuntimeException e) {
+        // Another node may have finished the row; ignore and continue.
+      }
+    }
   }
 
   /**
