@@ -23,8 +23,12 @@ import com.github.kagkarlsson.scheduler.task.Task;
 import com.github.kagkarlsson.scheduler.task.helper.Tasks;
 import com.google.common.base.Preconditions;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import javax.sql.DataSource;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.slf4j.Logger;
@@ -37,12 +41,22 @@ import org.slf4j.LoggerFactory;
  * <p>db-scheduler requires a dedicated {@code tableName} per Scheduler instance for multi-pool
  * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
- * <p>Task handlers are intentionally minimal in this change; submit and occupancy logic land in
- * follow-up PRs.
+ * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows. Cron and
+ * commit submit handlers remain no-ops until follow-up PRs.
  */
 public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableMaintenanceSchedulerPools.class);
+
+  /**
+   * Expand pipeline supplier used by {@link #policyExpandTask()}. Tests may replace it; production
+   * {@link #start} installs the relational implementation.
+   */
+  private static final AtomicReference<Supplier<PolicyExpandPipeline>> EXPAND_PIPELINE =
+      new AtomicReference<>(
+          () -> {
+            throw new IllegalStateException("policy-expand pipeline is not configured");
+          });
 
   /** Expand-pool db-scheduler table. */
   public static final String EXPAND_TASKS_TABLE = "scheduled_expand_tasks";
@@ -77,16 +91,20 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     Preconditions.checkState(schedulers.isEmpty(), "scheduler pools already started");
     Preconditions.checkNotNull(dataSource, "dataSource must not be null");
 
+    PolicyExpandPipeline pipeline =
+        new PolicyExpandPipeline(
+            new RelationalPolicyLookup(),
+            new TagBoundPolicyTableEnumerator(),
+            new RelationalCronJobScheduler(dataSource),
+            config.expandEnqueueBatchSize());
+    EXPAND_PIPELINE.set(() -> pipeline);
+
     List<Scheduler> built =
         List.of(
             buildScheduler(
-                dataSource,
-                config,
-                config.expandThreads(),
-                EXPAND_TASKS_TABLE,
-                noopTask(POLICY_EXPAND)),
+                dataSource, config, config.expandThreads(), EXPAND_TASKS_TABLE, policyExpandTask()),
             buildScheduler(
-                dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, noopTask(CRON_JOB)),
+                dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, cronJobTask()),
             buildScheduler(
                 dataSource,
                 config,
@@ -116,6 +134,10 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
       }
     }
     schedulers.clear();
+    EXPAND_PIPELINE.set(
+        () -> {
+          throw new IllegalStateException("policy-expand pipeline is not configured");
+        });
     LOG.info("Stopped table maintenance scheduler pools");
   }
 
@@ -136,8 +158,51 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         .heartbeatInterval(Duration.ofMillis(config.heartbeatIntervalMs()))
         .missedHeartbeatsLimit(config.missedHeartbeatsLimit())
         .tableName(tableName)
+        .commitWhenAutocommitDisabled(true)
         .registerShutdownHook()
         .build();
+  }
+
+  /**
+   * Expand-pool task definition used by the running expand scheduler.
+   *
+   * <p>On each due pick the handler expands the policy into {@code cron-job} rows and reschedules
+   * (or removes) the expand lease.
+   *
+   * @return the {@code policy-expand} task
+   */
+  public static Task<Void> policyExpandTask() {
+    return Tasks.custom(POLICY_EXPAND, Void.class)
+        .execute(
+            (taskInstance, executionContext) -> {
+              long policyId = Long.parseLong(taskInstance.getId());
+              Optional<Instant> nextDue = EXPAND_PIPELINE.get().get().expand(policyId);
+              return (executionComplete, executionOperations) -> {
+                if (nextDue.isEmpty()) {
+                  executionOperations.remove();
+                } else {
+                  executionOperations.reschedule(executionComplete, nextDue.get());
+                }
+              };
+            });
+  }
+
+  /**
+   * Cron-pool task definition. Submit logic is still a no-op; expand only inserts the row.
+   *
+   * @return the {@code cron-job} task
+   */
+  public static Task<Void> cronJobTask() {
+    return noopTask(CRON_JOB);
+  }
+
+  /**
+   * Replaces the expand pipeline supplier. Intended for unit tests.
+   *
+   * @param pipelineSupplier supplies the pipeline used by {@link #policyExpandTask()}
+   */
+  static void setExpandPipelineForTest(Supplier<PolicyExpandPipeline> pipelineSupplier) {
+    EXPAND_PIPELINE.set(pipelineSupplier);
   }
 
   private static Task<Void> noopTask(String taskName) {
