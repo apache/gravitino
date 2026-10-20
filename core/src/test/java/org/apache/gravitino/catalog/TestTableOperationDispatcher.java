@@ -33,6 +33,8 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -75,6 +77,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -1058,6 +1061,54 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Map<String, Long> afterDropAndAdd = columnIds(tableIdent);
     Assertions.assertNotEquals(afterSwap.get("b"), afterDropAndAdd.get("b"));
     Assertions.assertEquals(ids.get("b"), afterDropAndAdd.get("c"));
+  }
+
+  @Test
+  void testLoadRetainsSnapshotOnlyForTableUpdateConflict() throws IOException {
+    reset(entityStore);
+    Namespace namespace = Namespace.of(metalake, catalog, "schema_load_conflict");
+    NameIdentifier ident = NameIdentifier.of(namespace, "table_load_conflict");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(namespace.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    Column[] columns = {
+      TestColumn.builder().withName("c1").withPosition(0).withType(Types.IntegerType.get()).build()
+    };
+    tableOperationDispatcher.createTable(
+        ident, columns, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"), new Transform[0]);
+    TableEntity snapshot = entityStore.get(ident, TABLE, TableEntity.class);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) testCatalog.ops())
+        .alterTable(ident, TableChange.renameColumn(new String[] {"c1"}, "c1_new"));
+    try {
+      doThrow(new IOException(TableMetaService.UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + ident))
+          .when(entityStore)
+          .update(any(), any(), any(), any());
+      EntityCombinedTable loaded = (EntityCombinedTable) tableOperationDispatcher.loadTable(ident);
+      Assertions.assertEquals(snapshot, loaded.tableFromGravitino());
+      Assertions.assertEquals("c1_new", loaded.columns()[0].name());
+      verify(entityStore, times(1)).update(any(), any(), any(), any());
+      Assertions.assertEquals(snapshot, entityStore.get(ident, TABLE, TableEntity.class));
+
+      reset(entityStore);
+      doThrow(new IOException("Storage unavailable"))
+          .when(entityStore)
+          .update(any(), any(), any(), any());
+      Assertions.assertNull(
+          ((EntityCombinedTable) tableOperationDispatcher.loadTable(ident)).tableFromGravitino());
+
+      reset(entityStore);
+      doThrow(
+              new IOException(
+                  TableMetaService.UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + "another_table"))
+          .when(entityStore)
+          .update(any(), any(), any(), any());
+      Assertions.assertNull(
+          ((EntityCombinedTable) tableOperationDispatcher.loadTable(ident)).tableFromGravitino());
+    } finally {
+      reset(entityStore);
+    }
   }
 
   @Test

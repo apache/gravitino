@@ -210,14 +210,19 @@ public class TableMetaService {
                   SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
                       mapper -> ops.updatePO(mapper, newTablePO, oldTablePO))),
-          () ->
+          () -> {
+            // A concurrent update may have won. Its version payload must not be overwritten by
+            // this stale update when the conditional table-meta update affected no rows.
+            if (updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
                   TableVersionMapper.class,
                   mapper -> {
                     mapper.softDeleteTableVersionByTableIdAndVersion(
                         oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
                     mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
-                  }),
+                  });
+            }
+          },
           () -> {
             if (updateResult.get() > 0) {
               TableColumnMetaService.getInstance()
