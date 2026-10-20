@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.scheduler.cron;
 
 import java.util.Objects;
 import java.util.Optional;

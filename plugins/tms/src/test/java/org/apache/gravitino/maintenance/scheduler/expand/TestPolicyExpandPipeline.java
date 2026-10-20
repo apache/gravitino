@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.scheduler.expand;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -33,6 +33,9 @@ import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
+import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
+import org.apache.gravitino.maintenance.scheduler.cron.CronJobScheduler;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;

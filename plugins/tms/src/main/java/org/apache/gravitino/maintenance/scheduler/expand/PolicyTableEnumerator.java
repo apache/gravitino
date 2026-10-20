@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.scheduler.expand;
 
 import java.util.List;
+import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**

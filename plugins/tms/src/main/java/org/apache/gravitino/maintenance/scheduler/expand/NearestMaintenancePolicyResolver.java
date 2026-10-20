@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.scheduler.expand;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

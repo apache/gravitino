@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.scheduler.expand;
 
 import java.time.Instant;
 import java.util.List;
@@ -25,6 +25,9 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
+import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
+import org.apache.gravitino.maintenance.scheduler.cron.CronJobScheduler;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;

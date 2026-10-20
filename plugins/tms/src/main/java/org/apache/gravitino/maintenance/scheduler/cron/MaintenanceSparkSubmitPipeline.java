@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.scheduler.cron;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
@@ -29,6 +29,8 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
+import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.PolicyEntity;

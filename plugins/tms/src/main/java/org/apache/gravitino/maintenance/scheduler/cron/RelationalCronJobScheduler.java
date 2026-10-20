@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.scheduler.cron;
 
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstance;
@@ -30,6 +30,7 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.time.Instant;
 import java.util.List;
 import javax.sql.DataSource;
+import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 
 /**
  * Schedules {@code cron-job} rows through a db-scheduler client on the entity-store DataSource.
