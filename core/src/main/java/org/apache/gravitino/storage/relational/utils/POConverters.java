@@ -1632,25 +1632,19 @@ public class POConverters {
       return ImmutableList.of();
     }
 
-    try {
-      String auditInfo = JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo());
-      ImmutableList.Builder<PolicyRoleRelPO> relations = ImmutableList.builder();
-      for (String roleName :
-          new LinkedHashSet<>(((AccessControlContent) content).applicableRoles())) {
-        relations.add(
-            PolicyRoleRelPO.builder()
-                .withPolicyId(policyId)
-                .withRoleName(roleName)
-                .withAuditInfo(auditInfo)
-                .withCurrentVersion(INIT_VERSION)
-                .withLastVersion(INIT_VERSION)
-                .withDeletedAt(DEFAULT_DELETED_AT)
-                .build());
-      }
-      return relations.build();
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to serialize json object:", e);
+    ImmutableList.Builder<PolicyRoleRelPO> relations = ImmutableList.builder();
+    for (String roleName :
+        new LinkedHashSet<>(((AccessControlContent) content).applicableRoles())) {
+      relations.add(
+          PolicyRoleRelPO.builder()
+              .withPolicyId(policyId)
+              .withRoleName(roleName)
+              .withCurrentVersion(INIT_VERSION)
+              .withLastVersion(INIT_VERSION)
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .build());
     }
+    return relations.build();
   }
 
   public static OwnerRelPO initializeOwnerRelPOsWithVersion(

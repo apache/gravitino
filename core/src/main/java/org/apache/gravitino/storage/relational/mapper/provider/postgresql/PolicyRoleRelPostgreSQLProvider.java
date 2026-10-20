@@ -32,8 +32,8 @@ public class PolicyRoleRelPostgreSQLProvider extends PolicyRoleRelBaseSQLProvide
   public String insertIfAbsent(@Param("relation") PolicyRoleRelPO relation) {
     return "INSERT INTO "
         + POLICY_ROLE_RELATION_TABLE_NAME
-        + " (policy_id, role_name, audit_info, current_version, last_version, deleted_at)"
-        + " VALUES (#{relation.policyId}, #{relation.roleName}, #{relation.auditInfo},"
+        + " (policy_id, role_name, current_version, last_version, deleted_at)"
+        + " VALUES (#{relation.policyId}, #{relation.roleName},"
         + " #{relation.currentVersion}, #{relation.lastVersion}, #{relation.deletedAt})"
         + " ON CONFLICT (policy_id, role_name, deleted_at) DO NOTHING";
   }

@@ -55,8 +55,8 @@ public class PolicyRoleRelBaseSQLProvider {
   public String insertIfAbsent(@Param("relation") PolicyRoleRelPO relation) {
     return "INSERT IGNORE INTO "
         + POLICY_ROLE_RELATION_TABLE_NAME
-        + " (policy_id, role_name, audit_info, current_version, last_version, deleted_at)"
-        + " VALUES (#{relation.policyId}, #{relation.roleName}, #{relation.auditInfo},"
+        + " (policy_id, role_name, current_version, last_version, deleted_at)"
+        + " VALUES (#{relation.policyId}, #{relation.roleName},"
         + " #{relation.currentVersion}, #{relation.lastVersion}, #{relation.deletedAt})";
   }
 
@@ -112,7 +112,7 @@ public class PolicyRoleRelBaseSQLProvider {
 
   private String selectColumns() {
     return "SELECT prr.id AS id, prr.policy_id AS policyId, pm.policy_name AS policyName,"
-        + " prr.role_name AS roleName, prr.audit_info AS auditInfo,"
+        + " prr.role_name AS roleName,"
         + " prr.current_version AS currentVersion, prr.last_version AS lastVersion,"
         + " prr.deleted_at AS deletedAt";
   }
