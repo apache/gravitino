@@ -177,6 +177,24 @@ public class IdpUserGroupManager implements Closeable {
   }
 
   /**
+   * Changes the password for a built-in IdP user after verifying the old password.
+   *
+   * @param username The username.
+   * @param newPassword The new plaintext password.
+   * @param oldPassword The caller's current plaintext password.
+   * @return {@code true} if the password was updated
+   * @throws NotFoundException if the user does not exist
+   * @throws IllegalArgumentException if {@code oldPassword} does not match the stored hash
+   */
+  public boolean changePassword(String username, String newPassword, String oldPassword) {
+    IdpUser user = USER_SERVICE.getIdpUser(username);
+    if (user.passwordHash() == null || !passwordHasher.verify(oldPassword, user.passwordHash())) {
+      throw new IllegalArgumentException("\"oldPassword\" does not match the stored password");
+    }
+    return changePassword(username, newPassword);
+  }
+
+  /**
    * Adds a built-in IdP group.
    *
    * @param groupName The group name.

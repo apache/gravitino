@@ -459,16 +459,18 @@ http://localhost:8090/api/idp/users/alice
 ```
 
 
-#### 9.1.4 Reset a local user password
+#### 9.1.4 Change a local user password
 
-`PUT /api/idp/users/{user}` — administrator-only reset (`password` only; no `oldPassword`). Usernames
-must not contain `:`. Password length is 12–64 characters.
+`PUT /api/idp/users/{user}/password` — service admins may reset any user's password with
+`newPassword` only (must omit `oldPassword`). Authenticated non-admin users may change only their
+own password and must also send `oldPassword`. Usernames must not contain `:`. Password length is
+12–64 characters.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "password": "Passw0rd-For-Gravitino-Alice-V2"
-}' http://localhost:8090/api/idp/users/alice
+  "newPassword": "Passw0rd-For-Gravitino-Alice-V2"
+}' http://localhost:8090/api/idp/users/alice/password
 ```
 
 #### 9.1.5 Get a local group

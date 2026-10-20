@@ -58,6 +58,9 @@ paths:
   /idp/users/{user}:
     $ref: "./idp.yaml#/paths/~1idp~1users~1%7Buser%7D"
 
+  /idp/users/{user}/password:
+    $ref: "./idp.yaml#/paths/~1idp~1users~1%7Buser%7D~1password"
+
   /idp/groups:
     $ref: "./idp.yaml#/paths/~1idp~1groups"
 
