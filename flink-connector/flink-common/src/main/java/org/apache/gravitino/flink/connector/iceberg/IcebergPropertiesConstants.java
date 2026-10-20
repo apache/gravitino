@@ -52,4 +52,8 @@ public class IcebergPropertiesConstants {
 
   @VisibleForTesting
   public static final String ICEBERG_CATALOG_BACKEND_REST = CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
+
+  public static final String GRAVITINO_ICEBERG_DATA_ACCESS = IcebergConstants.DATA_ACCESS;
+
+  public static final String ICEBERG_DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
 }
