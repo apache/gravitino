@@ -44,15 +44,20 @@ import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Lists tables for which {@code policy} is the nearest maintenance policy of its type.
  *
  * <p>Walks {@code policy → tags → metadata objects}, expands catalog/schema attachments to tables,
  * then keeps a table only when {@link NearestMaintenancePolicyResolver} selects this policy id
- * (design: nearest attachment wins per {@link Policy.BuiltInType}).
+ * (design: nearest attachment wins per {@link Policy.BuiltInType}). Same-level conflicts skip the
+ * table (fail-closed) and are logged.
  */
 public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator {
+
+  private static final Logger LOG = LoggerFactory.getLogger(NearestPolicyTableEnumerator.class);
 
   private final PolicyTagRelService policyTagRelService;
   private final TagMetaService tagMetaService;
@@ -243,7 +248,18 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     if (tableId <= 0 || !seenTables.add(tableId)) {
       return;
     }
-    if (nearest.winningPolicyId(metalake, tableObject, policyType).orElse(-1L) == policyId) {
+    NearestPolicyDecision decision = nearest.resolve(metalake, tableObject, policyType);
+    if (decision.kind() == NearestPolicyDecision.Kind.CONFLICT) {
+      LOG.error(
+          "Skip table {} for maintenance type {}: ambiguous policies {} on nearest level {} ({})",
+          tableObject.fullName(),
+          policyType,
+          decision.conflictingPolicyIds(),
+          decision.conflictLevel() == null ? "?" : decision.conflictLevel().type(),
+          decision.conflictLevel() == null ? "?" : decision.conflictLevel().fullName());
+      return;
+    }
+    if (decision.winnerPolicyId().orElse(-1L) == policyId) {
       winners.add(tableId);
     }
   }

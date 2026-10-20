@@ -25,7 +25,6 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -92,9 +91,10 @@ class TestNearestMaintenancePolicyResolver {
             eq(Entity.EntityType.TAG)))
         .thenReturn(List.of(relation(catalogTag, catalogPolicy)));
 
-    Optional<Long> winner =
-        resolver.winningPolicyId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(Optional.of(10L), winner);
+    NearestPolicyDecision decision =
+        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
+    Assertions.assertEquals(NearestPolicyDecision.Kind.WINNER, decision.kind());
+    Assertions.assertEquals(java.util.Optional.of(10L), decision.winnerPolicyId());
   }
 
   @Test
@@ -112,9 +112,10 @@ class TestNearestMaintenancePolicyResolver {
             eq(Entity.EntityType.TAG)))
         .thenReturn(List.of(relation(catalogTag, catalogPolicy)));
 
-    Optional<Long> winner =
-        resolver.winningPolicyId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(Optional.of(20L), winner);
+    NearestPolicyDecision decision =
+        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
+    Assertions.assertEquals(NearestPolicyDecision.Kind.WINNER, decision.kind());
+    Assertions.assertEquals(java.util.Optional.of(20L), decision.winnerPolicyId());
   }
 
   @Test
@@ -123,8 +124,35 @@ class TestNearestMaintenancePolicyResolver {
     stubDirectTags(SCHEMA, List.of());
     stubDirectTags(CATALOG, List.of());
 
-    Assertions.assertTrue(
-        resolver.winningPolicyId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION).isEmpty());
+    NearestPolicyDecision decision =
+        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
+    Assertions.assertEquals(NearestPolicyDecision.Kind.NONE, decision.kind());
+  }
+
+  @Test
+  void testSameLevelConflict() throws Exception {
+    PolicyEntity p1 = policy(10L, "compaction-a");
+    PolicyEntity p2 = policy(11L, "compaction-b");
+    TagEntity tagA = tag(1L, "t-a");
+    TagEntity tagB = tag(2L, "t-b");
+
+    stubDirectTags(TABLE, List.of(tagA, tagB));
+
+    when(relationOperations.batchListEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
+            eq(
+                List.of(
+                    NameIdentifierUtil.ofTag(METALAKE, "t-a"),
+                    NameIdentifierUtil.ofTag(METALAKE, "t-b"))),
+            eq(Entity.EntityType.TAG)))
+        .thenReturn(List.of(relation(tagA, p1), relation(tagB, p2)));
+
+    NearestPolicyDecision decision =
+        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
+    Assertions.assertEquals(NearestPolicyDecision.Kind.CONFLICT, decision.kind());
+    Assertions.assertEquals(TABLE, decision.conflictLevel());
+    Assertions.assertEquals(List.of(10L, 11L), decision.conflictingPolicyIds());
+    Assertions.assertTrue(decision.winnerPolicyId().isEmpty());
   }
 
   private void stubDirectTags(MetadataObject object, List<TagEntity> tags) throws Exception {

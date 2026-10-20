@@ -210,6 +210,47 @@ class TestNearestPolicyTableEnumerator {
     Assertions.assertEquals(List.of(101L), enumerator.listTableIds(catalogPolicy, 10));
   }
 
+  @Test
+  void testSameLevelConflictSkipsTable() throws Exception {
+    PolicyEntity policy = policy(10L, "compaction");
+    PolicyEntity other = policy(11L, "compaction-other");
+    TagEntity tagA = tag(1L, "t-a");
+    TagEntity tagB = tag(2L, "t-b");
+
+    when(policyTagRelService.listRelations(
+            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
+            eq(Entity.EntityType.POLICY)))
+        .thenReturn(List.of(policyTagEdge(policy, tagA)));
+    when(tagMetaService.listAssociatedMetadataObjectsForTag(tagA.nameIdentifier()))
+        .thenReturn(
+            List.of(
+                GenericEntity.builder()
+                    .withId(100L)
+                    .withName("catalog.schema.t1")
+                    .withEntityType(Entity.EntityType.TABLE)
+                    .build()));
+
+    MetadataObject table =
+        MetadataObjects.of(
+            java.util.Arrays.asList("catalog", "schema", "t1"), MetadataObject.Type.TABLE);
+    doReturn(List.of(tagA, tagB))
+        .when(relationOperations)
+        .listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+            eq(MetadataObjectUtil.toEntityIdent(METALAKE, table)),
+            eq(Entity.EntityType.TABLE));
+    when(relationOperations.batchListEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
+            eq(
+                List.of(
+                    NameIdentifierUtil.ofTag(METALAKE, "t-a"),
+                    NameIdentifierUtil.ofTag(METALAKE, "t-b"))),
+            eq(Entity.EntityType.TAG)))
+        .thenReturn(List.of(policyFromTag(tagA, policy), policyFromTag(tagB, other)));
+
+    Assertions.assertEquals(List.of(), enumerator.listTableIds(policy, 10));
+  }
+
   private void stubEmptyParents(MetadataObject table) throws Exception {
     for (MetadataObject parent : MetadataObjectUtil.getParentMetadataObjects(table)) {
       doReturn(List.of())

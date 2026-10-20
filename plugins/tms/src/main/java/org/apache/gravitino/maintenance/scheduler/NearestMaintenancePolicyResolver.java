@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -52,9 +51,8 @@ import org.slf4j.LoggerFactory;
  * Picks the nearest maintenance policy of a given {@link Policy.BuiltInType} for a table.
  *
  * <p>Walks the table then its ancestors (nearest first). At each level, policies selected by tags
- * <em>directly</em> assigned to that object are considered. The first non-empty level wins; if
- * several policies of the same type match at that level, the smallest policy id is chosen for
- * stability.
+ * <em>directly</em> assigned to that object are considered. The first non-empty level decides: one
+ * match is the winner; two or more same-type matches are a conflict (fail-closed).
  */
 final class NearestMaintenancePolicyResolver {
 
@@ -70,20 +68,24 @@ final class NearestMaintenancePolicyResolver {
    * @param metalake metalake name
    * @param table table metadata object
    * @param policyType maintenance built-in type
-   * @return winning policy id when at least one matching policy exists on the inheritance chain
+   * @return winner, none, or same-level conflict
    */
-  Optional<Long> winningPolicyId(
+  NearestPolicyDecision resolve(
       String metalake, MetadataObject table, Policy.BuiltInType policyType) {
     List<MetadataObject> chain = new ArrayList<>();
     chain.add(table);
     chain.addAll(MetadataObjectUtil.getParentMetadataObjects(table));
     for (MetadataObject object : chain) {
       TreeSet<Long> atLevel = matchingPolicyIds(metalake, object, policyType);
-      if (!atLevel.isEmpty()) {
-        return Optional.of(atLevel.first());
+      if (atLevel.isEmpty()) {
+        continue;
       }
+      if (atLevel.size() > 1) {
+        return NearestPolicyDecision.conflict(object, new ArrayList<>(atLevel));
+      }
+      return NearestPolicyDecision.winner(atLevel.first());
     }
-    return Optional.empty();
+    return NearestPolicyDecision.none();
   }
 
   private TreeSet<Long> matchingPolicyIds(
