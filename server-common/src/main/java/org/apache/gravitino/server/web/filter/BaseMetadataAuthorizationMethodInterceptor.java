@@ -19,12 +19,14 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import javax.ws.rs.HttpMethod;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.ActiveRoles;
@@ -341,8 +343,12 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         scope.bindIfRead(
             method, skipStandardCheck ? null : metalakeIdent, authorizationRequestContext);
       } else {
-        throw new ForbiddenException(
-            "Authorization expression is missing for operation '%s'", method.getName());
+        for (Annotation annotation : method.getAnnotations()) {
+          if (annotation.annotationType().isAnnotationPresent(HttpMethod.class)) {
+            throw new ForbiddenException(
+                "Authorization expression is missing for operation '%s'", method.getName());
+          }
+        }
       }
     } catch (Exception ex) {
       if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {

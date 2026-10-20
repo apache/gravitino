@@ -324,6 +324,14 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     verify(invocation, never()).proceed();
   }
 
+  @Test
+  public void testUnannotatedHelperProceeds() throws Throwable {
+    TestInvocation invocation = invocation("helper", "helper result");
+
+    assertEquals("helper result", new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation));
+    verify(invocation).proceed();
+  }
+
   /** Entry authorization, parent checks and worker filtering share one user lookup. */
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
@@ -551,7 +559,12 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
       return "unused";
     }
 
+    @GET
     private String unannotated() {
+      return "unused";
+    }
+
+    private String helper() {
       return "unused";
     }
 
