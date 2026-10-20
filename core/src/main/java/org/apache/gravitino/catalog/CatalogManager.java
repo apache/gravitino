@@ -1672,11 +1672,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return builder.withAuditInfo(newInfo);
   }
 
-  private Map<String, String> buildCatalogConf(String provider, Map<String, String> properties) {
+  Map<String, String> buildCatalogConf(String provider, Map<String, String> properties) {
     Map<String, String> newProperties = Optional.ofNullable(properties).orElse(Maps.newHashMap());
     // load catalog-related configuration from catalog-specific configuration file
     Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);
-    return mergeConf(newProperties, catalogSpecificConfig);
+    return JdbcDriverProperties.withDefaultDriver(
+        provider, mergeConf(newProperties, catalogSpecificConfig));
   }
 
   private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
