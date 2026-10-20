@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.oceanbase.operation;
 
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
@@ -618,7 +616,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
