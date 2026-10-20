@@ -172,7 +172,7 @@ public class AuthorizationExpressionConverter {
     return expression.replaceAll(
         AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         """
-              ( entityType == 'CATALOG' && (%s)) ||
+              (( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
               ( entityType == 'TABLE' && (%s)) ||
               ( entityType == 'VIEW' && (%s)) ||
@@ -187,7 +187,7 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
               ( entityType == 'COLUMN' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s)) ||
-              ( entityType == 'SEMANTIC_MODEL' && (%s))
+              ( entityType == 'SEMANTIC_MODEL' && (%s)))
               """
             .formatted(
                 LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
@@ -339,9 +339,9 @@ public class AuthorizationExpressionConverter {
                 + "&& !(ANY(DENY_CREATE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
-            "ANY_SELECT_SEMANTIC_MODEL",
-            "((ANY(SELECT_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)) "
-                + "&& !(ANY(DENY_SELECT_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)))");
+            "ANY_USE_SEMANTIC_MODEL",
+            "((ANY(USE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)) "
+                + "&& !(ANY(DENY_USE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)))");
     expression =
         expression.replaceAll(
             "ANY_MODIFY_SEMANTIC_MODEL",

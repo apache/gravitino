@@ -21,10 +21,12 @@ package org.apache.gravitino.listener.api.info;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobEntity;
@@ -138,6 +140,53 @@ public class TestJobInfo {
     JobInfo jobInfo = JobInfo.fromJobEntity(jobEntity);
 
     Assertions.assertEquals(resolvedTemplate, jobInfo.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testFromJobEntityMasksSensitiveRuntimeJobTemplateFields() throws Exception {
+    JobTemplate resolvedTemplate =
+        SparkJobTemplate.builder()
+            .withName("test-job-template")
+            .withComment("resolved")
+            .withExecutable("local:///app.jar")
+            .withClassName("org.example.App")
+            .withArguments(
+                Lists.newArrayList(
+                    "--updater-options",
+                    "{\"gravitino_uri\":\"http://localhost\",\"password\":\"nested-pw\"}",
+                    "--spark-conf",
+                    "{\"spark.executor.memory\":\"1g\",\"jdbc.password\":\"jdbc-pw\"}"))
+            .withEnvironments(ImmutableMap.of("AUTH_PASSWORD", "env-secret", "CATALOG", "iceberg"))
+            .build();
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    String runtimeJobTemplateJson =
+        JsonUtils.anyFieldMapper()
+            .writeValueAsString(
+                DTOConverters.toDTO(resolvedTemplate, DTOConverters.toDTO(auditInfo)));
+
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(auditInfo)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .build();
+
+    JobInfo jobInfo = JobInfo.fromJobEntity(jobEntity);
+    JobTemplate masked = jobInfo.runtimeJobTemplate();
+    Assertions.assertNotNull(masked);
+    Assertions.assertEquals("env-secret", masked.environments().get("AUTH_PASSWORD"));
+    Assertions.assertFalse(masked.arguments().get(1).contains("nested-pw"));
+    Assertions.assertTrue(masked.arguments().get(1).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertFalse(masked.arguments().get(3).contains("jdbc-pw"));
+    Assertions.assertTrue(masked.arguments().get(3).contains("1g"));
+    Assertions.assertTrue(jobEntity.runtimeJobTemplate().contains("nested-pw"));
   }
 
   @Test

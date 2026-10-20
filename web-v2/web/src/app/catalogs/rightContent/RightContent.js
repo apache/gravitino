@@ -67,6 +67,11 @@ const ViewDetailsPage = dynamic(() => import('./entitiesContent/ViewDetailsPage'
   ssr: false
 })
 
+const SemanticModelDetailsPage = dynamic(() => import('./entitiesContent/SemanticModelDetailsPage'), {
+  loading: () => <Loading height={'200px'} />,
+  ssr: false
+})
+
 const RightContent = () => {
   const searchParams = useSearchParams()
 
@@ -76,10 +81,12 @@ const RightContent = () => {
   const schema = searchParams.get('schema')
   const functionName = searchParams.get('function')
   const viewName = searchParams.get('view')
+  const semanticModelName = searchParams.get('semanticModel')
 
   const entity =
     functionName ||
     viewName ||
+    semanticModelName ||
     searchParams.get('table') ||
     searchParams.get('fileset') ||
     searchParams.get('topic') ||
@@ -101,6 +108,9 @@ const RightContent = () => {
       }
       if (viewName) {
         return <ViewDetailsPage />
+      }
+      if (semanticModelName) {
+        return <SemanticModelDetailsPage key={searchParams.toString()} />
       }
       switch (catalogType) {
         case 'relational':
@@ -150,9 +160,9 @@ const RightContent = () => {
   }
 
   return (
-    <div className='p-6' ref={ref}>
+    <div className={semanticModelName ? 'flex h-full min-h-0 flex-col overflow-auto px-6 py-4' : 'p-6'} ref={ref}>
       <Breadcrumb
-        className='mb-4'
+        className={semanticModelName ? 'mb-2 shrink-0' : 'mb-4 shrink-0'}
         separator='>'
         items={[
           {
@@ -242,7 +252,7 @@ const RightContent = () => {
                       className='inline-block min-w-10 truncate'
                       style={{ maxWidth: `calc((${width}px - 160px)/4)` }}
                     >
-                      {decodeURIComponent(entity)}
+                      {entity}
                     </Link>
                   ) : (
                     <span
@@ -250,7 +260,7 @@ const RightContent = () => {
                       className='inline-block min-w-10 truncate'
                       style={{ maxWidth: `calc((${width}px - 160px)/4)` }}
                     >
-                      {decodeURIComponent(entity)}
+                      {entity}
                     </span>
                   )
                 }

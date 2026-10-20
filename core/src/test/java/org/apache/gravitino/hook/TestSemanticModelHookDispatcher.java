@@ -48,6 +48,7 @@ import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -94,6 +95,35 @@ public class TestSemanticModelHookDispatcher {
       FieldUtils.writeField(env, "ownerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(env, "catalogManager", originalCatalogManager, true);
     }
+  }
+
+  @Test
+  public void testImportUsesItsOwnHookAndSetsCreatorAsOwner() {
+    SemanticModelDispatcher dispatcher = Mockito.mock(SemanticModelDispatcher.class);
+    SemanticModelDefinition definition = Mockito.mock(SemanticModelDefinition.class);
+    SemanticModel imported = Mockito.mock(SemanticModel.class);
+    ImmutableMap<String, String> properties = ImmutableMap.of("domain", "sales");
+    Mockito.when(dispatcher.importSemanticModel(IDENT, "comment", definition, properties))
+        .thenReturn(imported);
+    OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    SemanticModelHookDispatcher hook =
+        new SemanticModelHookDispatcher(dispatcher, () -> ownerDispatcher);
+
+    assertSame(imported, hook.importSemanticModel(IDENT, "comment", definition, properties));
+
+    InOrder order = Mockito.inOrder(dispatcher, ownerDispatcher);
+    order.verify(dispatcher).importSemanticModel(IDENT, "comment", definition, properties);
+    ArgumentCaptor<MetadataObject> object = ArgumentCaptor.forClass(MetadataObject.class);
+    order
+        .verify(ownerDispatcher)
+        .setOwner(
+            eq("metalake1"),
+            object.capture(),
+            eq(AuthConstants.ANONYMOUS_USER),
+            eq(Owner.Type.USER));
+    assertEquals("catalog1.schema1.sales_model", object.getValue().fullName());
+    assertEquals(MetadataObject.Type.SEMANTIC_MODEL, object.getValue().type());
+    Mockito.verifyNoMoreInteractions(dispatcher, ownerDispatcher);
   }
 
   @Test

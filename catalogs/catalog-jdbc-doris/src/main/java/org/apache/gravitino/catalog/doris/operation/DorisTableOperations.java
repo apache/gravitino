@@ -1002,7 +1002,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       TableChange.UpdateColumnComment updateColumnComment) {
     String newComment = updateColumnComment.getNewComment();
     if (updateColumnComment.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Doris does not support nested column names.");
+      throw new IllegalArgumentException("Doris does not support nested column names.");
     }
     String col = updateColumnComment.fieldName()[0];
 
@@ -1014,9 +1014,18 @@ public class DorisTableOperations extends JdbcTableOperations {
       TableChange.AddColumn addColumn, Optional<String> dorisVersion) {
     String dataType = typeConverter.fromGravitino(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Doris does not support nested column names.");
+      throw new IllegalArgumentException("Doris does not support nested column names.");
     }
     String col = addColumn.fieldName()[0];
+    // Doris 2.1.5+ and 3.0.1+ reject ADD COLUMN ... AUTO_INCREMENT. Earlier 2.1.x and 3.0.0 accept
+    // it and record the flag, but never generate values for the added column.
+    if (addColumn.isAutoIncrement()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Doris does not support adding auto-increment column `%s`; "
+                  + "define auto-increment columns when creating the table",
+              col));
+    }
 
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
@@ -1118,7 +1127,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   private String updateColumnPositionFieldDefinition(
       TableChange.UpdateColumnPosition updateColumnPosition, JdbcTable jdbcTable) {
     if (updateColumnPosition.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Doris does not support nested column names.");
+      throw new IllegalArgumentException("Doris does not support nested column names.");
     }
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
@@ -1146,7 +1155,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   private String deleteColumnFieldDefinition(
       TableChange.DeleteColumn deleteColumn, JdbcTable jdbcTable) {
     if (deleteColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Doris does not support nested column names.");
+      throw new IllegalArgumentException("Doris does not support nested column names.");
     }
     String col = deleteColumn.fieldName()[0];
     boolean colExists = true;
@@ -1170,7 +1179,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       JdbcTable jdbcTable,
       Optional<String> dorisVersion) {
     if (updateColumnType.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Doris does not support nested column names.");
+      throw new IllegalArgumentException("Doris does not support nested column names.");
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);

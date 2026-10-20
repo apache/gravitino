@@ -209,6 +209,17 @@ public enum OperationType {
   ASSOCIATE_POLICIES_FOR_METADATA_OBJECT,
   GET_POLICY_FOR_METADATA_OBJECT,
 
+  // Semantic Model operations
+  CREATE_SEMANTIC_MODEL,
+  ALTER_SEMANTIC_MODEL,
+  DROP_SEMANTIC_MODEL,
+  LOAD_SEMANTIC_MODEL,
+  LIST_SEMANTIC_MODEL,
+  /** Import a Semantic Model from an Ossie document. */
+  IMPORT_SEMANTIC_MODEL,
+  /** Export a Semantic Model as an Ossie document. */
+  EXPORT_SEMANTIC_MODEL,
+
   // Function operations
   REGISTER_FUNCTION,
   GET_FUNCTION,

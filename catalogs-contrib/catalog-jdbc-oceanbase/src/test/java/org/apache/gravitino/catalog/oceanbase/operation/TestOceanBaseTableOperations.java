@@ -45,6 +45,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestOceanBaseTableOperations extends TestOceanBase {
@@ -54,6 +56,58 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
   @BeforeAll
   public static void setUp() {
     DATABASE_OPERATIONS.create(TEST_DB_NAME, null, new HashMap<>());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"customer's id", "quote\\' and \\new\\path\\; \"double\"\n中文"})
+  void testCommentRoundTrips(String comment) {
+    String tableName = RandomNameUtils.genRandomName("comment_round_trip");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withComment(comment)
+            .build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          tableName,
+          new JdbcColumn[] {column},
+          comment,
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(comment, table.comment());
+      Assertions.assertEquals(comment, table.columns()[0].comment());
+
+      String updated = comment + " updated";
+      TABLE_OPERATIONS.alterTable(TEST_DB_NAME, tableName, TableChange.updateComment(updated));
+      Assertions.assertEquals(updated, TABLE_OPERATIONS.load(TEST_DB_NAME, tableName).comment());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME, tableName, TableChange.addColumn(new String[] {"col2"}, VARCHAR, comment));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(comment, table.columns()[1].comment());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME, tableName, TableChange.updateColumnComment(new String[] {"col1"}, updated));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(updated, table.columns()[0].comment());
+
+      // Rebuilding a column definition must also preserve an existing escaped comment.
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(512)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(updated, table.columns()[0].comment());
+      Assertions.assertEquals(updated, table.comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
   }
 
   @Test

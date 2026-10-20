@@ -55,6 +55,27 @@ public class EntityChangeLogSQLProviderFactory {
     return getProvider().selectEntityChanges(lastConsumedId, maxRows);
   }
 
+  /**
+   * Reads a page of recent rows at or behind the incremental cursor using the database clock.
+   * Timestamp and ID together preserve page boundaries when timestamps are equal.
+   *
+   * @param afterCreatedAt exclusive timestamp/ID page cursor timestamp
+   * @param afterId exclusive timestamp/ID page cursor ID
+   * @param upperId inclusive incremental high-water ID captured at the start of the sweep
+   * @param windowMs maximum recorded created_at age in milliseconds
+   * @param maxRows maximum rows in this page
+   * @return recent records ordered by recorded created_at timestamp and ID
+   */
+  public static String selectRecentEntityChanges(
+      @Param("afterCreatedAt") long afterCreatedAt,
+      @Param("afterId") long afterId,
+      @Param("upperId") long upperId,
+      @Param("windowMs") long windowMs,
+      @Param("maxRows") int maxRows) {
+    return getProvider()
+        .selectRecentEntityChanges(afterCreatedAt, afterId, upperId, windowMs, maxRows);
+  }
+
   public static String selectMaxChangeId() {
     return getProvider().selectMaxChangeId();
   }

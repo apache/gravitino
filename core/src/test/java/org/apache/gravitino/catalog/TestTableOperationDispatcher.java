@@ -878,6 +878,37 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testImportTablePropagatesOptimisticLockConflict() throws IOException {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(metalake, catalog, "schema_import_occ", "table_import_occ");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableIdent.namespace().levels()), "comment", props);
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    entityStore.delete(tableIdent, TABLE);
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), eq(TABLE), any());
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .put(any(TableEntity.class), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> tableOperationDispatcher.loadTable(tableIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
   public void testPurgeTablePropagatesOptimisticLockConflict() throws IOException {
     NameIdentifier tableIdent =
         NameIdentifier.of(metalake, catalog, "schema_purge_occ", "table_purge_occ");

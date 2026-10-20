@@ -26,7 +26,15 @@ import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.RangePartition;
 
-/** Interface for tables that support partitions. */
+/**
+ * Interface for tables that support partitions.
+ *
+ * <p>Gravitino does not serialize calls to this interface: methods may be invoked concurrently,
+ * including for the same table, from one server or from several. Implementations must preserve
+ * partition consistency under concurrent calls, including partition-name uniqueness and safe add,
+ * drop and purge operations. Concurrent table changes must also be handled by the implementation or
+ * its underlying storage.
+ */
 @Evolving
 public interface SupportsPartitions {
 

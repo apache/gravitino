@@ -193,6 +193,60 @@ public class TestIcebergRestOAuthConfig {
     Assertions.assertTrue(exception.getMessage().contains("oauth2-server-uri"));
   }
 
+  @Test
+  void testDerivesIcebergBasicConfig() {
+    SparkConf sparkConf = basicSparkConf("alice", "secret");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, Collections.emptyMap());
+
+    Assertions.assertEquals("basic", result.get(IcebergRestOAuthConfig.AUTH_TYPE));
+    Assertions.assertEquals("alice", result.get(IcebergRestOAuthConfig.BASIC_USERNAME));
+    Assertions.assertEquals("secret", result.get(IcebergRestOAuthConfig.BASIC_PASSWORD));
+  }
+
+  @Test
+  void testExplicitConfigTakesPrecedenceOverReusedBasic() {
+    SparkConf sparkConf = basicSparkConf("alice", "secret");
+    Map<String, String> explicit =
+        ImmutableMap.of("rest.auth.basic.username", "admin", "rest.auth.basic.password", "pwd");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+
+    Assertions.assertEquals(explicit, result);
+  }
+
+  @Test
+  void testExplicitTokenSkipsBasicReuse() {
+    SparkConf sparkConf = basicSparkConf("alice", "secret");
+    Map<String, String> explicit = ImmutableMap.of("token", "bearer-token");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+
+    Assertions.assertEquals(explicit, result);
+  }
+
+  @Test
+  void testBasicReuseFailsWhenCredentialsAreIncomplete() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "basic");
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME, "alice");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergRestOAuthConfig.resolve(sparkConf, Collections.emptyMap()));
+
+    Assertions.assertTrue(exception.getMessage().contains("basic.password"));
+  }
+
+  private SparkConf basicSparkConf(String username, String password) {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "basic");
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME, username);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_BASIC_PASSWORD, password);
+    return sparkConf;
+  }
+
   private SparkConf oauthSparkConf(String serverUri, String tokenPath) {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "oauth2");

@@ -102,13 +102,29 @@ The server-level `gravitino.fetchFile.blockUnsafeRemoteUri` configuration contro
 
 #### Auxiliary Service
 
-| Configuration item                 | Description                                                                                                                                                                                                                            | Default value | Required |
-|------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                      | (none)        | Yes      |
-| `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service; includes the directory containing jars and configuration. It supports both absolute and relative paths, for example, `iceberg-rest-server/libs, iceberg-rest-server/conf` | (none)        | Yes      |
+| Configuration item                 | Description                                                                                                                                                                                                                                                                                                                                 | Default value | Required |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                                                                                                                           | (none)        | Yes      |
+| `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service. Use `iceberg-rest-server/libs, iceberg-rest-server/conf` for the regular Iceberg dependencies or `iceberg-rest-server-experiment/libs, iceberg-rest-server-experiment/conf` for the experimental dependencies. It supports both absolute and relative paths. | (none)        | Yes      |
 
 These settings apply only to `gravitino.conf`.
 Do not add them to the standalone server configuration.
+
+The auxiliary service name and all Iceberg REST configuration keys remain the same when using the
+experimental dependencies. Only select the experimental classpath:
+
+```properties
+gravitino.auxService.names = iceberg-rest
+gravitino.iceberg-rest.classpath = iceberg-rest-server-experiment/libs, iceberg-rest-server-experiment/conf
+```
+
+The selected directory is prepended to the Iceberg REST auxiliary service classpath. Only one of
+the regular and experimental directories can be active at a time. The selection takes effect when
+Iceberg classes are absent from the Gravitino server's base classpath; the binary distribution is
+packaged this way. The service logs the loaded Iceberg version and code source during startup so
+the effective runtime can be verified. The experimental directory uses the Datastrato Iceberg
+distribution published under the `com.datastrato` Maven group. Its version is pinned by
+`datastrato-iceberg` in `gradle/libs.versions.toml`, independently of the regular Iceberg version.
 
 #### HTTP Server
 
@@ -123,7 +139,8 @@ Do not add them to the standalone server configuration.
 | `gravitino.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                        | `30000`                                                                      | No       |
 | `gravitino.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                          | `131072`                                                                     | No       |
 | `gravitino.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                         | `131072`                                                                     | No       |
-| `gravitino.iceberg-rest.includeErrorStackTrace`  | Whether error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details. | `true`                                                                       | No       |
+| `gravitino.iceberg-rest.includeErrorStackTrace`  | Whether error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details.                                | `true`                                                                       | No       |
+| `gravitino.iceberg-rest.metrics.enabled`         | Whether standalone mode serves metrics endpoints. Ignored in auxiliary mode; use the Gravitino server endpoint there. Enable only on a trusted network.                                       | `false`                                                                      | No       |
 | `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                              | (none)                                                                       | No       |
 | `gravitino.iceberg-rest.advertised-uri`          | The public endpoint reported to clients that discover the service through the Gravitino server. Must be an absolute `http`/`https` URI with a host and no query or fragment.                  | (none)                                                                       | No       |
 

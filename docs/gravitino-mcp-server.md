@@ -138,7 +138,60 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `get_partition`                     | Retrieve a partition's metadata. Only for catalogs with a partition API.       | `partition`     |
 | `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`          |
 | `load_view`                         | Retrieve a view's metadata. Only for catalogs supporting views.                | `view`          |
+| `list_of_semantic_models`           | List the Semantic Models the caller can access in a schema.                    | `semantic_model` |
+| `load_semantic_model`               | Load a Semantic Model's metadata and definition.                               | `semantic_model` |
+| `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
+| `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
+| `drop_semantic_model`               | Drop a Semantic Model's metadata.                                             | `semantic_model` |
 
+### Semantic Models
+
+Semantic Model tools manage schema-scoped semantic metadata through the Gravitino REST API.
+For concepts and source requirements, see [Semantic Models](./semantic-models.md). For governance
+and Ossie import/export, see [Manage Semantic Model Metadata](./manage-semantic-model-metadata-using-gravitino.md).
+Use the `semantic_model` tag with `--include-tool-tags` to expose these five tools.
+They use the same per-call `metalake` selection and authentication as other tools;
+Gravitino filters listings and enforces authorization, including access to referenced source tables.
+Names used in REST paths must be non-empty and cannot be `.` or `..`, which HTTP clients
+normalize as path navigation. Names must also satisfy the server's naming rules.
+
+For example, call `create_semantic_model` with the following arguments after the
+`sales.mart.orders` source table exists in the selected metalake:
+
+```json
+{
+  "metalake": "prod",
+  "catalog_name": "sales",
+  "schema_name": "mart",
+  "name": "sales_model",
+  "definition": {
+    "datasets": [
+      {
+        "name": "orders",
+        "source": {"namespace": ["sales", "mart"], "name": "orders"},
+        "fields": []
+      }
+    ]
+  },
+  "comment": "Governed sales definitions",
+  "properties": {"domain": "sales"}
+}
+```
+
+`definition` uses the native REST format with camelCase field names. It requires a
+non-empty `datasets` array and supports optional `relationships`, `metrics`,
+`aiContext`, and `customExtensions` fields.
+`comment` and `properties` are optional. Load, create, and alter return the model object
+with its definition, properties, and audit information.
+
+`alter_semantic_model` accepts `catalog_name`, `schema_name`, `semantic_model_name`, and
+an ordered, non-empty `updates` array. Supported `@type` values are `rename`,
+`updateComment`, `setProperty`, `removeProperty`, and `replaceDefinition`. For example,
+`[{"@type": "updateComment", "newComment": null}]` clears the comment.
+`replaceDefinition` requires the complete native definition and revalidates source access.
+
+`drop_semantic_model` takes the model's catalog, schema, and name and returns a JSON boolean
+indicating whether it was dropped. It removes semantic metadata without deleting source tables or data.
 
 ## Configuration
 
