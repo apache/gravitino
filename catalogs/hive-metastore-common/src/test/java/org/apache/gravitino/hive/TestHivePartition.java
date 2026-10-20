@@ -92,6 +92,24 @@ public class TestHivePartition {
     Assertions.assertEquals(ImmutableList.of("a/b"), filter);
   }
 
+  /** The copied escape rule must match Hive's for every character. */
+  @Test
+  public void testEscapingMatchesHiveFileUtils() {
+    for (char c = 0; c < Character.MAX_VALUE; c++) {
+      String value = "a" + c + "b";
+      String escaped = HivePartition.escapePathName(value);
+      Assertions.assertEquals(FileUtils.escapePathName(value), escaped, "char: " + (int) c);
+      Assertions.assertEquals(value, HivePartition.unescapePathName(escaped), "char: " + (int) c);
+    }
+  }
+
+  @Test
+  public void testDropPathFilterUnescapesFieldNames() {
+    Assertions.assertEquals(
+        ImmutableList.of("v"),
+        HivePartition.extractPartitionValues(ImmutableList.of("p:1"), "p%3A1=v"));
+  }
+
   private static List<String> parsedValues(HivePartition partition) {
     return HivePartition.extractPartitionValues(partition.name());
   }
