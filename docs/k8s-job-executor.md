@@ -66,8 +66,8 @@ The job executor then adjusts the result:
   take the values of `spark.image` and `spark.serviceAccount` of the job executor if neither the
   job template nor a server-level default sets them. A job template can therefore run with its
   own image and service account.
-- `spark.kubernetes.namespace` is the namespace that the job sets, in the `configs` of its template
-  or in `spark_conf`, or else `namespace` of the job executor. A server-level default of it with the
+- `spark.kubernetes.namespace` is the namespace that the `configs` of the job template set, or else
+  `namespace` of the job executor. A server-level default of it with the
   `spark.conf.` prefix is ignored: set `namespace` instead.
 
 The `SparkApplication` is named `<namePrefix>-<job ID>`, for example
@@ -84,8 +84,9 @@ Gravitino doesn't fetch the resources of a job. It passes their URIs on to Spark
 in the cluster. The `executable`, `jars`, `files`, and `archives` of a template must therefore be
 URIs that the driver and executor pods can reach, such as `local://` for a file in the Spark image,
 `https://`, `s3a://`, or `hdfs://`. So must every entry of `spark.jars`, `spark.files`, and
-`spark.archives`, whether a job template, `spark_conf`, or a server-level default sets them. A run with a path on
-the Gravitino server, that is a path without a scheme or with the `file` scheme, is rejected.
+`spark.archives`, whether a job template, `spark_conf`, or a server-level default sets them. A run
+with a path on the Gravitino server, that is a path without a scheme or with the `file` scheme, is
+rejected.
 
 The built-in job templates are the exception. Their `executable` is the path of the built-in jobs
 jar on the Gravitino server, and the job executor replaces it with `spark.builtinJobsJar`, by default
@@ -102,8 +103,8 @@ Leave `spark_master` empty, its default: any other value than a Kubernetes maste
 The `spark_conf` parameter of the built-in Iceberg jobs, a flat JSON map of Spark configurations, is
 set in the `SparkApplication` when the job is submitted, over all the other Spark configurations of
 the job. So configurations that Spark reads when it starts the driver take effect, such as
-`spark.jars`, `spark.jars.packages`, `spark.driver.*`, and `spark.kubernetes.driver.*`. For example,
-a job configuration can add the Iceberg Spark runtime to a Spark image without it:
+`spark.jars`, `spark.jars.packages`, and `spark.driver.*`. For example, a job configuration can add
+the Iceberg Spark runtime to a Spark image without it:
 
 ```json
 {
@@ -113,8 +114,12 @@ a job configuration can add the Iceberg Spark runtime to a Spark image without i
 
 - `spark.master` and `spark.submit.deployMode` in `spark_conf` are ignored, with a warning in the
   server log.
-- `spark.kubernetes.namespace` in `spark_conf` chooses the namespace of the job.
-- The driver applies `spark_conf` again when it starts, as it does with every job executor.
+- The `spark.kubernetes.*` configurations in `spark_conf`, such as the namespace, the image, the
+  service account, Secrets, and volumes, are ignored, with a warning in the server log that leaves
+  out the value. Whoever can run a built-in job sets its `spark_conf`, so only the job executor
+  configurations and job templates may set them. The driver ignores them as well.
+- The driver applies the rest of `spark_conf` again when it starts, as it does with every job
+  executor.
 
 Configurations that every job needs, such as the Iceberg Spark runtime, the scheduler
 configurations, or volumes, can also be set once as server-level defaults, or built into the
@@ -241,9 +246,11 @@ Spark configurations of the template, a job can, for example:
 - Read any Secret of its namespace into an environment variable with `secretKeyRef`, and print it to
   its output, which the job API returns.
 
-The same applies to a job template that passes its job configuration on to Spark. The `spark_conf`
-parameter of the built-in Iceberg jobs does: anyone who can run one of them can set any Spark
-configuration of its pods, such as their volumes, service account, or namespace.
+The same applies to a job template that passes its job configuration on to these Spark
+configurations, for example through a placeholder. The `spark_conf` parameter of the built-in
+Iceberg jobs can't set the `spark.kubernetes.*` configurations, see [Built-In Jobs](#built-in-jobs),
+but anyone who can run one of these jobs can set its other Spark configurations, such as
+`spark.jars`, which adds code to the job.
 
 To limit what jobs can do:
 
