@@ -19,7 +19,6 @@
 package org.apache.gravitino.maintenance.scheduler;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -39,8 +38,8 @@ import org.slf4j.LoggerFactory;
  * <p>Does not submit Spark. Returns the next expand due time, or empty when the expand row should
  * be removed (missing / disabled / blank trigger / non-maintenance).
  *
- * <p>Before writing a cron-job row, skips tables that are in-flight or still inside {@code
- * minIntervalMs} cooldown (policy content → server conf → code default).
+ * <p>Enumeration fills up to {@code enqueueBatchSize} tables that pass nearest-policy and {@code
+ * minIntervalMs} / in-flight gating (policy content → server conf → code default).
  */
 public final class PolicyExpandPipeline {
 
@@ -119,38 +118,17 @@ public final class PolicyExpandPipeline {
     long minIntervalMs =
         MaintenanceMinIntervalConfigs.resolve(
             config, policy.policyType(), policyMinIntervalMs(policy.content()));
-    List<Long> candidates = tableEnumerator.listTableIds(policy, enqueueBatchSize);
-    List<Long> toEnqueue = filterEnqueueable(policyId, candidates, minIntervalMs);
+    List<Long> toEnqueue =
+        tableEnumerator.listTableIds(policy, enqueueBatchSize, occupancyGate, minIntervalMs);
     int scheduled = cronJobScheduler.enqueueDueNow(policyId, toEnqueue, enqueueBatchSize);
     LOG.info(
-        "Expanded policy {}: enqueued {}/{} cron-jobs (candidates={}, minIntervalMs={}); next expand due {}",
+        "Expanded policy {}: enqueued {}/{} cron-jobs (minIntervalMs={}); next expand due {}",
         policyId,
         scheduled,
         toEnqueue.size(),
-        candidates.size(),
         minIntervalMs,
         nextDue);
     return Optional.of(nextDue);
-  }
-
-  private List<Long> filterEnqueueable(long policyId, List<Long> tableIds, long minIntervalMs) {
-    if (tableIds.isEmpty()) {
-      return List.of();
-    }
-    long nowMs = System.currentTimeMillis();
-    List<Long> allowed = new ArrayList<>(tableIds.size());
-    for (Long tableId : tableIds) {
-      if (occupancyGate.shouldSkip(tableId, policyId, minIntervalMs, nowMs)) {
-        LOG.debug(
-            "Skip cron-job enqueue for table {} policy {} (in-flight or within minIntervalMs={})",
-            tableId,
-            policyId,
-            minIntervalMs);
-        continue;
-      }
-      allowed.add(tableId);
-    }
-    return allowed;
   }
 
   private static boolean isMaintenance(@Nullable PolicyContent content) {

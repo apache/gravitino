@@ -51,9 +51,9 @@ import org.slf4j.LoggerFactory;
  * Lists tables for which {@code policy} is the nearest maintenance policy of its type.
  *
  * <p>Walks {@code policy → tags → metadata objects}, expands catalog/schema attachments to tables,
- * then keeps a table only when {@link NearestMaintenancePolicyResolver} selects this policy id
- * (design: nearest attachment wins per {@link Policy.BuiltInType}). Same-level conflicts skip the
- * table (fail-closed) and are logged.
+ * then keeps a table only when {@link NearestMaintenancePolicyResolver} selects this policy id and
+ * {@link ExpandOccupancyGate} allows enqueue. Scanning continues until {@code limit} enqueueable
+ * tables are found (cooldown / in-flight winners do not consume the batch budget).
  */
 public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator {
 
@@ -96,7 +96,8 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   @Override
-  public List<Long> listTableIds(PolicyEntity policy, int limit) {
+  public List<Long> listTableIds(
+      PolicyEntity policy, int limit, ExpandOccupancyGate occupancyGate, long minIntervalMs) {
     if (limit <= 0) {
       return List.of();
     }
@@ -109,7 +110,20 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     NearestMaintenancePolicyResolver nearest =
         new NearestMaintenancePolicyResolver(entityStoreSupplier.get());
     Set<Long> seenTables = new LinkedHashSet<>();
-    Set<Long> winners = new LinkedHashSet<>();
+    Set<Long> enqueueable = new LinkedHashSet<>();
+    long nowMs = System.currentTimeMillis();
+    ScanContext ctx =
+        new ScanContext(
+            metalake,
+            policy.id(),
+            policyType,
+            nearest,
+            occupancyGate,
+            minIntervalMs,
+            nowMs,
+            seenTables,
+            enqueueable,
+            limit);
 
     for (RelationalEntity<?> edge : tagEdges) {
       Object target = edge.targetEntity();
@@ -124,25 +138,16 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         throw new UncheckedIOException("Failed to list objects for tag " + tag.nameIdentifier(), e);
       }
       for (GenericEntity object : objects) {
-        if (winners.size() >= limit) {
-          return new ArrayList<>(winners);
+        if (enqueueable.size() >= limit) {
+          return new ArrayList<>(enqueueable);
         }
-        collectCandidates(
-            metalake, object, policy.id(), policyType, nearest, seenTables, winners, limit);
+        collectCandidates(object, ctx);
       }
     }
-    return new ArrayList<>(winners);
+    return new ArrayList<>(enqueueable);
   }
 
-  private void collectCandidates(
-      String metalake,
-      GenericEntity object,
-      long policyId,
-      Policy.BuiltInType policyType,
-      NearestMaintenancePolicyResolver nearest,
-      Set<Long> seenTables,
-      Set<Long> winners,
-      int limit) {
+  private void collectCandidates(GenericEntity object, ScanContext ctx) {
     MetadataObject.Type objectType;
     try {
       objectType = MetadataObject.Type.valueOf(object.type().name());
@@ -164,103 +169,113 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         if (object.id() == null) {
           return;
         }
-        considerTable(
-            object.id(),
-            metadataObject,
-            metalake,
-            policyId,
-            policyType,
-            nearest,
-            seenTables,
-            winners);
+        considerTable(object.id(), metadataObject, ctx);
         break;
       case SCHEMA:
-        expandSchema(
-            metalake, metadataObject, policyId, policyType, nearest, seenTables, winners, limit);
+        expandSchema(metadataObject, ctx);
         break;
       case CATALOG:
-        expandCatalog(
-            metalake, metadataObject, policyId, policyType, nearest, seenTables, winners, limit);
+        expandCatalog(metadataObject, ctx);
         break;
       default:
         break;
     }
   }
 
-  private void expandCatalog(
-      String metalake,
-      MetadataObject catalog,
-      long policyId,
-      Policy.BuiltInType policyType,
-      NearestMaintenancePolicyResolver nearest,
-      Set<Long> seenTables,
-      Set<Long> winners,
-      int limit) {
+  private void expandCatalog(MetadataObject catalog, ScanContext ctx) {
     List<SchemaEntity> schemas =
-        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalake, catalog.name()));
+        schemaMetaService.listSchemasByNamespace(
+            NamespaceUtil.ofSchema(ctx.metalake, catalog.name()));
     for (SchemaEntity schema : schemas) {
-      if (winners.size() >= limit) {
+      if (ctx.enqueueable.size() >= ctx.limit) {
         return;
       }
       MetadataObject schemaObject =
           MetadataObjects.of(catalog.name(), schema.name(), MetadataObject.Type.SCHEMA);
-      expandSchema(
-          metalake, schemaObject, policyId, policyType, nearest, seenTables, winners, limit);
+      expandSchema(schemaObject, ctx);
     }
   }
 
-  private void expandSchema(
-      String metalake,
-      MetadataObject schema,
-      long policyId,
-      Policy.BuiltInType policyType,
-      NearestMaintenancePolicyResolver nearest,
-      Set<Long> seenTables,
-      Set<Long> winners,
-      int limit) {
+  private void expandSchema(MetadataObject schema, ScanContext ctx) {
     String catalogName = schema.parent();
     if (catalogName == null) {
       return;
     }
     List<TableEntity> tables =
         tableMetaService.listTablesByNamespace(
-            NamespaceUtil.ofTable(metalake, catalogName, schema.name()));
+            NamespaceUtil.ofTable(ctx.metalake, catalogName, schema.name()));
     for (TableEntity table : tables) {
-      if (winners.size() >= limit) {
+      if (ctx.enqueueable.size() >= ctx.limit) {
         return;
       }
       MetadataObject tableObject =
           NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE);
-      considerTable(
-          table.id(), tableObject, metalake, policyId, policyType, nearest, seenTables, winners);
+      considerTable(table.id(), tableObject, ctx);
     }
   }
 
-  private static void considerTable(
-      long tableId,
-      MetadataObject tableObject,
-      String metalake,
-      long policyId,
-      Policy.BuiltInType policyType,
-      NearestMaintenancePolicyResolver nearest,
-      Set<Long> seenTables,
-      Set<Long> winners) {
-    if (tableId <= 0 || !seenTables.add(tableId)) {
+  private static void considerTable(long tableId, MetadataObject tableObject, ScanContext ctx) {
+    if (tableId <= 0 || !ctx.seenTables.add(tableId)) {
       return;
     }
-    NearestPolicyDecision decision = nearest.resolve(metalake, tableObject, policyType);
+    NearestPolicyDecision decision = ctx.nearest.resolve(ctx.metalake, tableObject, ctx.policyType);
     if (decision.kind() == NearestPolicyDecision.Kind.CONFLICT) {
       LOG.error(
           "Skip table {} for maintenance type {}: ambiguous policies {} on nearest level {} ({})",
           tableObject.fullName(),
-          policyType,
+          ctx.policyType,
           decision.conflictingPolicyIds(),
           decision.conflictLevel() == null ? "?" : decision.conflictLevel().type(),
           decision.conflictLevel() == null ? "?" : decision.conflictLevel().fullName());
       return;
     }
-    if (decision.winnerPolicyId().orElse(-1L) == policyId) {
-      winners.add(tableId);
+    if (decision.winnerPolicyId().orElse(-1L) != ctx.policyId) {
+      return;
+    }
+    if (ctx.occupancyGate.shouldSkip(tableId, ctx.policyId, ctx.minIntervalMs, ctx.nowMs)) {
+      LOG.debug(
+          "Skip cron-job enqueue for table {} policy {} (in-flight or within minIntervalMs={})",
+          tableId,
+          ctx.policyId,
+          ctx.minIntervalMs);
+      return;
+    }
+    ctx.enqueueable.add(tableId);
+  }
+
+  private static final class ScanContext {
+    private final String metalake;
+    private final long policyId;
+    private final Policy.BuiltInType policyType;
+    private final NearestMaintenancePolicyResolver nearest;
+    private final ExpandOccupancyGate occupancyGate;
+    private final long minIntervalMs;
+    private final long nowMs;
+    private final Set<Long> seenTables;
+    private final Set<Long> enqueueable;
+    private final int limit;
+
+    private ScanContext(
+        String metalake,
+        long policyId,
+        Policy.BuiltInType policyType,
+        NearestMaintenancePolicyResolver nearest,
+        ExpandOccupancyGate occupancyGate,
+        long minIntervalMs,
+        long nowMs,
+        Set<Long> seenTables,
+        Set<Long> enqueueable,
+        int limit) {
+      this.metalake = metalake;
+      this.policyId = policyId;
+      this.policyType = policyType;
+      this.nearest = nearest;
+      this.occupancyGate = occupancyGate;
+      this.minIntervalMs = minIntervalMs;
+      this.nowMs = nowMs;
+      this.seenTables = seenTables;
+      this.enqueueable = enqueueable;
+      this.limit = limit;
     }
   }
 }

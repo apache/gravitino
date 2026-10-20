@@ -115,7 +115,7 @@ class TestNearestPolicyTableEnumerator {
         .thenReturn(List.of(policyFromTag(tag, policy)));
     stubEmptyParents(table);
 
-    Assertions.assertEquals(List.of(100L), enumerator.listTableIds(policy, 10));
+    Assertions.assertEquals(List.of(100L), enumerator.listTableIds(policy, 10, allowAll(), 0L));
   }
 
   @Test
@@ -207,7 +207,73 @@ class TestNearestPolicyTableEnumerator {
             eq(MetadataObjectUtil.toEntityIdent(METALAKE, catalog)),
             eq(Entity.EntityType.CATALOG));
 
-    Assertions.assertEquals(List.of(101L), enumerator.listTableIds(catalogPolicy, 10));
+    Assertions.assertEquals(
+        List.of(101L), enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L));
+  }
+
+  @Test
+  void testFillsBatchSkippingCooldownWinners() throws Exception {
+    PolicyEntity policy = policy(10L, "compaction");
+    TagEntity tag = tag(1L, "maint");
+    when(policyTagRelService.listRelations(
+            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
+            eq(Entity.EntityType.POLICY)))
+        .thenReturn(List.of(policyTagEdge(policy, tag)));
+    when(tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier()))
+        .thenReturn(
+            List.of(
+                GenericEntity.builder()
+                    .withId(1L)
+                    .withName("catalog.schema")
+                    .withEntityType(Entity.EntityType.SCHEMA)
+                    .build()));
+
+    TableEntity t1 =
+        TableEntity.builder()
+            .withId(100L)
+            .withName("t1")
+            .withNamespace(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))
+            .withAuditInfo(audit())
+            .build();
+    TableEntity t2 =
+        TableEntity.builder()
+            .withId(101L)
+            .withName("t2")
+            .withNamespace(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))
+            .withAuditInfo(audit())
+            .build();
+    TableEntity t3 =
+        TableEntity.builder()
+            .withId(102L)
+            .withName("t3")
+            .withNamespace(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))
+            .withAuditInfo(audit())
+            .build();
+    when(tableMetaService.listTablesByNamespace(
+            eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
+        .thenReturn(List.of(t1, t2, t3));
+
+    for (String name : List.of("t1", "t2", "t3")) {
+      MetadataObject table =
+          MetadataObjects.of(
+              java.util.Arrays.asList("catalog", "schema", name), MetadataObject.Type.TABLE);
+      doReturn(List.of(tag))
+          .when(relationOperations)
+          .listEntitiesByRelation(
+              eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              eq(MetadataObjectUtil.toEntityIdent(METALAKE, table)),
+              eq(Entity.EntityType.TABLE));
+      stubEmptyParents(table);
+    }
+    when(relationOperations.batchListEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
+            eq(List.of(NameIdentifierUtil.ofTag(METALAKE, "maint"))),
+            eq(Entity.EntityType.TAG)))
+        .thenReturn(List.of(policyFromTag(tag, policy)));
+
+    // First two winners are cooling down; limit=1 must keep scanning to t3.
+    ExpandOccupancyGate gate = (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
+    Assertions.assertEquals(List.of(102L), enumerator.listTableIds(policy, 1, gate, 60_000L));
   }
 
   @Test
@@ -248,7 +314,11 @@ class TestNearestPolicyTableEnumerator {
             eq(Entity.EntityType.TAG)))
         .thenReturn(List.of(policyFromTag(tagA, policy), policyFromTag(tagB, other)));
 
-    Assertions.assertEquals(List.of(), enumerator.listTableIds(policy, 10));
+    Assertions.assertEquals(List.of(), enumerator.listTableIds(policy, 10, allowAll(), 0L));
+  }
+
+  private static ExpandOccupancyGate allowAll() {
+    return (tableId, policyId, minIntervalMs, nowMs) -> false;
   }
 
   private void stubEmptyParents(MetadataObject table) throws Exception {

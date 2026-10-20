@@ -26,14 +26,22 @@ import org.apache.gravitino.meta.PolicyEntity;
  *
  * <p>Implementations expand tag-bound catalog/schema/table attachments and keep tables for which
  * the policy is the nearest winner of its {@link org.apache.gravitino.policy.Policy.BuiltInType}.
+ * {@code limit} is the max number of <em>enqueueable</em> tables after occupancy / cooldown
+ * gating—not merely the first N winners.
  */
 @FunctionalInterface
 public interface PolicyTableEnumerator {
 
   /**
+   * Lists up to {@code limit} table ids that are nearest-policy winners and pass {@code
+   * occupancyGate}.
+   *
    * @param policy loaded policy
-   * @param limit maximum table ids to return
-   * @return distinct table entity ids, size at most {@code limit}
+   * @param limit maximum enqueueable table ids to return
+   * @param occupancyGate skip in-flight / cooldown tables while scanning
+   * @param minIntervalMs resolved cooldown for {@link ExpandOccupancyGate#shouldSkip}
+   * @return distinct enqueueable table entity ids, size at most {@code limit}
    */
-  List<Long> listTableIds(PolicyEntity policy, int limit);
+  List<Long> listTableIds(
+      PolicyEntity policy, int limit, ExpandOccupancyGate occupancyGate, long minIntervalMs);
 }

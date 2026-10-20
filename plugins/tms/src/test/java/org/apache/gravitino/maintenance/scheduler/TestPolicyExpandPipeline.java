@@ -30,7 +30,6 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
@@ -93,19 +92,25 @@ class TestPolicyExpandPipeline {
         pipeline(mockLookup(4L, policy(true, "not-a-cron", null)), tables, cronJobs, allowAll());
 
     Assertions.assertTrue(pipeline.expand(4L).isEmpty());
-    verify(tables, never()).listTableIds(any(), anyInt());
+    verify(tables, never()).listTableIds(any(), anyInt(), any(), anyLong());
     verify(cronJobs, never()).enqueueDueNow(anyLong(), any(), anyInt());
   }
 
   @Test
   void testExpandEnqueuesCronJobsAndReturnsNextDue() {
     PolicyEntity policy = policy(true, CRON, null);
+    ExpandOccupancyGate gate = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
-    when(tables.listTableIds(eq(policy), eq(2))).thenReturn(List.of(10L, 11L));
+    when(tables.listTableIds(
+            eq(policy),
+            eq(2),
+            eq(gate),
+            eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
+        .thenReturn(List.of(10L, 11L));
     CronJobScheduler cronJobs = mock(CronJobScheduler.class);
     when(cronJobs.enqueueDueNow(eq(42L), eq(List.of(10L, 11L)), eq(2))).thenReturn(2);
     PolicyExpandPipeline expandPipeline =
-        pipeline(mockLookup(42L, policy), tables, cronJobs, allowAll(), 2);
+        pipeline(mockLookup(42L, policy), tables, cronJobs, gate, 2);
 
     Optional<Instant> next = expandPipeline.expand(42L);
     Assertions.assertTrue(next.isPresent());
@@ -114,43 +119,44 @@ class TestPolicyExpandPipeline {
   }
 
   @Test
-  void testSkipsTablesWithinMinInterval() {
+  void testPassesResolvedMinIntervalToEnumerator() {
     PolicyEntity policy = policy(true, CRON, 60_000L);
+    ExpandOccupancyGate gate = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
-    when(tables.listTableIds(eq(policy), eq(10))).thenReturn(List.of(10L, 11L, 12L));
+    when(tables.listTableIds(eq(policy), eq(10), eq(gate), eq(60_000L))).thenReturn(List.of(11L));
     CronJobScheduler cronJobs = mock(CronJobScheduler.class);
     when(cronJobs.enqueueDueNow(eq(42L), eq(List.of(11L)), eq(10))).thenReturn(1);
-
-    ExpandOccupancyGate gate =
-        (tableId, policyId, minIntervalMs, nowMs) ->
-            tableId == 10L || tableId == 12L || minIntervalMs != 60_000L;
 
     PolicyExpandPipeline expandPipeline =
         pipeline(mockLookup(42L, policy), tables, cronJobs, gate, 10);
     Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
+    verify(tables).listTableIds(eq(policy), eq(10), eq(gate), eq(60_000L));
     verify(cronJobs).enqueueDueNow(42L, List.of(11L), 10);
   }
 
   @Test
   void testUsesServerDefaultMinIntervalWhenPolicyOmits() {
     PolicyEntity policy = policy(true, CRON, null);
+    ExpandOccupancyGate gate = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
-    when(tables.listTableIds(eq(policy), eq(10))).thenReturn(List.of(10L));
+    when(tables.listTableIds(
+            eq(policy),
+            eq(10),
+            eq(gate),
+            eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
+        .thenReturn(List.of(10L));
     CronJobScheduler cronJobs = mock(CronJobScheduler.class);
     when(cronJobs.enqueueDueNow(eq(42L), eq(List.of(10L)), eq(10))).thenReturn(1);
-
-    AtomicReference<Long> seenInterval = new AtomicReference<>();
-    ExpandOccupancyGate gate =
-        (tableId, policyId, minIntervalMs, nowMs) -> {
-          seenInterval.set(minIntervalMs);
-          return false;
-        };
 
     PolicyExpandPipeline expandPipeline =
         pipeline(mockLookup(42L, policy), tables, cronJobs, gate, 10);
     Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
-    Assertions.assertEquals(
-        MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS, seenInterval.get());
+    verify(tables)
+        .listTableIds(
+            eq(policy),
+            eq(10),
+            eq(gate),
+            eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS));
   }
 
   private static PolicyExpandPipeline pipeline(
