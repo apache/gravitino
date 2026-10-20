@@ -18,12 +18,18 @@
  */
 package org.apache.gravitino.maintenance.scheduler;
 
+import java.util.Objects;
+import java.util.Optional;
+import javax.annotation.Nullable;
+
 /**
- * Builds db-scheduler instance ids for one-shot {@code cron-job} rows (§5.2.2).
+ * Builds and parses db-scheduler instance ids for one-shot {@code cron-job} rows (§5.2.2).
  *
  * <p>Most types use {@code table:{table_id}:{policy_id}}.
  */
 public final class CronJobIds {
+
+  private static final String TABLE_PREFIX = "table:";
 
   private CronJobIds() {}
 
@@ -33,6 +39,81 @@ public final class CronJobIds {
    * @return cron-job instance id
    */
   public static String forTable(long tableId, long policyId) {
-    return "table:" + tableId + ":" + policyId;
+    return TABLE_PREFIX + tableId + ":" + policyId;
+  }
+
+  /**
+   * Parses a single-table cron-job instance id.
+   *
+   * @param instanceId db-scheduler task instance id
+   * @return table and policy ids when the id matches {@code table:{tableId}:{policyId}}
+   */
+  public static Optional<TablePolicyIds> parseTable(String instanceId) {
+    if (instanceId == null || !instanceId.startsWith(TABLE_PREFIX)) {
+      return Optional.empty();
+    }
+    String rest = instanceId.substring(TABLE_PREFIX.length());
+    int sep = rest.indexOf(':');
+    if (sep <= 0 || sep == rest.length() - 1) {
+      return Optional.empty();
+    }
+    try {
+      long tableId = Long.parseLong(rest.substring(0, sep));
+      long policyId = Long.parseLong(rest.substring(sep + 1));
+      return Optional.of(new TablePolicyIds(tableId, policyId));
+    } catch (NumberFormatException e) {
+      return Optional.empty();
+    }
+  }
+
+  /** Parsed {@code table:{tableId}:{policyId}} ids. */
+  public static final class TablePolicyIds {
+    private final long tableId;
+    private final long policyId;
+
+    /**
+     * @param tableId table entity id
+     * @param policyId policy entity id
+     */
+    public TablePolicyIds(long tableId, long policyId) {
+      this.tableId = tableId;
+      this.policyId = policyId;
+    }
+
+    /**
+     * @return table entity id
+     */
+    public long tableId() {
+      return tableId;
+    }
+
+    /**
+     * @return policy entity id
+     */
+    public long policyId() {
+      return policyId;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof TablePolicyIds)) {
+        return false;
+      }
+      TablePolicyIds that = (TablePolicyIds) o;
+      return tableId == that.tableId && policyId == that.policyId;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(tableId, policyId);
+    }
+
+    @Override
+    public String toString() {
+      return forTable(tableId, policyId);
+    }
   }
 }

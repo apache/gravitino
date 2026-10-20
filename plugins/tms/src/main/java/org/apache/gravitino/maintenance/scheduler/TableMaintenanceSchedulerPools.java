@@ -45,8 +45,8 @@ import org.slf4j.LoggerFactory;
  * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
  * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows. The cron
- * pool deletes each one-shot row after the pick (Spark submit is still deferred). Commit submit
- * remains a no-op until a follow-up PR.
+ * pool runs OccupancyGate → soft-slot claim → {@code runJob} → bind, then deletes the one-shot row.
+ * Commit submit remains a no-op until a follow-up PR.
  */
 public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
@@ -60,6 +60,16 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
       new AtomicReference<>(
           () -> {
             throw new IllegalStateException("policy-expand pipeline is not configured");
+          });
+
+  /**
+   * Cron submit pipeline supplier used by {@link #cronJobTask()}. Tests may replace it; production
+   * {@link #start} installs the relational implementation.
+   */
+  private static final AtomicReference<Supplier<MaintenanceSparkSubmitPipeline>> CRON_SUBMIT =
+      new AtomicReference<>(
+          () -> {
+            throw new IllegalStateException("cron-job submit pipeline is not configured");
           });
 
   /** Expand-pool db-scheduler table. */
@@ -97,17 +107,27 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     Preconditions.checkNotNull(dataSource, "dataSource must not be null");
     Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig must not be null");
 
+    OccupancyGate occupancyGate =
+        new OccupancyGate(TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
     PolicyExpandPipeline pipeline =
         new PolicyExpandPipeline(
             new RelationalPolicyLookup(),
             new NearestPolicyTableEnumerator(),
             new RelationalCronJobScheduler(dataSource),
-            new OccupancyGate(
-                    TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs())
-                ::shouldSkip,
+            occupancyGate::shouldSkip,
             gravitinoConfig,
             config.expandEnqueueBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);
+
+    MaintenanceSparkSubmitPipeline cronSubmit =
+        new MaintenanceSparkSubmitPipeline(
+            new RelationalPolicyLookup(),
+            occupancyGate::shouldSkip,
+            TableMaintenanceActionMetaService.getInstance(),
+            MaintenanceJobSubmitter.fromEnv(),
+            gravitinoConfig,
+            config.claimTimeoutMs());
+    CRON_SUBMIT.set(() -> cronSubmit);
 
     List<Scheduler> built =
         List.of(
@@ -147,6 +167,10 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     EXPAND_PIPELINE.set(
         () -> {
           throw new IllegalStateException("policy-expand pipeline is not configured");
+        });
+    CRON_SUBMIT.set(
+        () -> {
+          throw new IllegalStateException("cron-job submit pipeline is not configured");
         });
     LOG.info("Stopped table maintenance scheduler pools");
   }
@@ -198,7 +222,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
   /**
-   * Cron-pool task definition. Spark submit is still deferred; the completion handler removes the
+   * Cron-pool task definition. Runs OccupancyGate → claim → {@code runJob} → bind, then removes the
    * one-shot row so a later expand pick can {@code scheduleIfNotExists} again (§5.2.2).
    *
    * @return the {@code cron-job} task
@@ -207,8 +231,14 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     return Tasks.custom(CRON_JOB, Void.class)
         .execute(
             (taskInstance, executionContext) -> {
-              LOG.debug(
-                  "TMS cron-job callback for instance {} (submit deferred)", taskInstance.getId());
+              try {
+                CRON_SUBMIT.get().get().submit(taskInstance.getId());
+              } catch (RuntimeException e) {
+                LOG.warn(
+                    "TMS cron-job submit failed for instance {}; removing one-shot row",
+                    taskInstance.getId(),
+                    e);
+              }
               return (executionComplete, executionOperations) -> executionOperations.remove();
             });
   }
@@ -220,6 +250,16 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
    */
   static void setExpandPipelineForTest(Supplier<PolicyExpandPipeline> pipelineSupplier) {
     EXPAND_PIPELINE.set(pipelineSupplier);
+  }
+
+  /**
+   * Replaces the cron submit pipeline supplier. Intended for unit tests.
+   *
+   * @param pipelineSupplier supplies the pipeline used by {@link #cronJobTask()}
+   */
+  static void setCronSubmitPipelineForTest(
+      Supplier<MaintenanceSparkSubmitPipeline> pipelineSupplier) {
+    CRON_SUBMIT.set(pipelineSupplier);
   }
 
   private static Task<Void> noopTask(String taskName) {
