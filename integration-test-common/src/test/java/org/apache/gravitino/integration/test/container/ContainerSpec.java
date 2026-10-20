@@ -141,15 +141,27 @@ public interface ContainerSpec<C extends BaseContainer> {
   C getOrStart(ContainerSuite suite);
 
   /**
+   * Returns whether {@link #startPrivate} can start a container for this spec, so that a fixture
+   * asking for {@link Scope#CLASS} or {@link Scope#METHOD} fails when its class is found rather
+   * than when the container starts.
+   *
+   * @return false unless the spec overrides {@link #startPrivate}
+   */
+  default boolean supportsPrivate() {
+    return false;
+  }
+
+  /**
    * Starts a new container for this spec that only the caller uses, for fixtures with {@link
    * Scope#CLASS} or {@link Scope#METHOD}. The caller closes it; it never replaces the shared
    * container.
    *
    * @param suite the shared container suite, which starts the container on its network
+   * @param durability whether the container keeps its durability work
    * @return the running private container
    * @throws UnsupportedOperationException if this spec has no private containers yet
    */
-  default C startPrivate(ContainerSuite suite) {
+  default C startPrivate(ContainerSuite suite, Durability durability) {
     throw new UnsupportedOperationException(
         "scope CLASS/METHOD is not supported for " + getClass().getSimpleName() + " yet");
   }

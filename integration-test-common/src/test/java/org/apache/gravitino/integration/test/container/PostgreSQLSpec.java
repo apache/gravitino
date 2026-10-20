@@ -47,6 +47,11 @@ public record PostgreSQLSpec(PGImageName version, TestDatabaseName database)
 
   static final class Factory implements ContainerFixture.SpecFactory<PostgreSQLFixture> {
     @Override
+    public Durability durabilityFor(PostgreSQLFixture fixture) {
+      return fixture.durability();
+    }
+
+    @Override
     public Startup startupFor(PostgreSQLFixture fixture) {
       return fixture.startup();
     }

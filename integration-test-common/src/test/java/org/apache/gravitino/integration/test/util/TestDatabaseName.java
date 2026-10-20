@@ -63,6 +63,9 @@ public enum TestDatabaseName {
   /** Represents the MySQL database used for testing catalog credential integration. */
   MYSQL_CATALOG_CREDENTIAL_IT,
 
+  /** Represents the MySQL database Ranger admin keeps its policies in. */
+  MYSQL_RANGER,
+
   /**
    * Represents the first MySQL-backed database used by
    * lakehouse.iceberg.integration.test.IcebergClassLoaderPoolIT to verify ClassLoader isolation and

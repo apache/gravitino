@@ -32,6 +32,7 @@ import java.util.Set;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.utility.DockerImageName;
 
@@ -50,7 +51,6 @@ public class PostgreSQLContainer extends DatabaseContainer {
 
   protected PostgreSQLContainer(
       String image,
-      Durability durability,
       String hostName,
       Set<Integer> ports,
       Map<String, String> extraHosts,
@@ -65,7 +65,6 @@ public class PostgreSQLContainer extends DatabaseContainer {
             .withPassword(PASSWORD)
             // getJdbcUrl() names no database, so connections use the one named after the user.
             .withDatabaseName(USER_NAME),
-        durability,
         hostName,
         ports,
         extraHosts,
@@ -74,7 +73,14 @@ public class PostgreSQLContainer extends DatabaseContainer {
         network);
     // Same path as the tmpfs mount, so a newer image cannot place the data elsewhere.
     db.withEnv("PGDATA", DATA_DIR);
-    applyDurability(
+    // The module starts the server with fsync=off; a durable container keeps the image's settings,
+    // and applyDisposableData sets the disposable ones.
+    db.withCommand("postgres");
+  }
+
+  @Override
+  protected void applyDisposableData(GenericContainer<?> container) {
+    keepDataInMemory(
         DATA_DIR,
         "postgres",
         "-c",
@@ -140,8 +146,11 @@ public class PostgreSQLContainer extends DatabaseContainer {
 
     @Override
     public PostgreSQLContainer build() {
-      return new PostgreSQLContainer(
-          image, durability, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+      PostgreSQLContainer container =
+          new PostgreSQLContainer(
+              image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+      container.setDurability(durability);
+      return container;
     }
   }
 }

@@ -39,7 +39,9 @@ import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.utility.MountableFile;
 
 public class HiveContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(HiveContainer.class);
@@ -103,6 +105,18 @@ public class HiveContainer extends BaseContainer {
    */
   public String getHadoopUser() {
     return container.getEnvMap().getOrDefault(HADOOP_USER_NAME, "root");
+  }
+
+  // HDFS has no setting to skip syncing, so its NameNode and DataNode directories go on tmpfs: both
+  // run as root with the default hadoop.tmp.dir, /tmp/hadoop-root. Not all of /tmp, which holds the
+  // image's check-status.sh. The metastore MySQL keeps its data on disk and skips syncing instead.
+  @Override
+  protected void applyDisposableData(GenericContainer<?> container) {
+    container
+        .withTmpFs(Map.of("/tmp/hadoop-root", DISPOSABLE_DATA_TMPFS))
+        .withCopyFileToContainer(
+            MountableFile.forClasspathResource("disposable/hive-metastore-mysql.cnf"),
+            "/etc/mysql/conf.d/zz-gravitino-disposable.cnf");
   }
 
   @Override

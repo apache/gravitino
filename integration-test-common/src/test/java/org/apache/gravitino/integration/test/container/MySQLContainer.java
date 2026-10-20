@@ -32,6 +32,7 @@ import java.util.Set;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.utility.DockerImageName;
 
@@ -53,23 +54,19 @@ public class MySQLContainer extends DatabaseContainer {
 
   protected MySQLContainer(
       String image,
-      Durability durability,
       String hostName,
       Set<Integer> ports,
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
-    super(
-        module(image, durability),
-        durability,
-        hostName,
-        ports,
-        extraHosts,
-        filesToMount,
-        envVars,
-        network);
-    applyDurability(DATA_DIR);
+    super(module(image), hostName, ports, extraHosts, filesToMount, envVars, network);
+  }
+
+  @Override
+  protected void applyDisposableData(GenericContainer<?> container) {
+    keepDataInMemory(DATA_DIR);
+    ((org.testcontainers.mysql.MySQLContainer) db).withConfigurationOverride(DISPOSABLE_CONFIG);
   }
 
   @Override
@@ -84,6 +81,23 @@ public class MySQLContainer extends DatabaseContainer {
     logDurability(
         List.of("datadir", "innodb_flush_log_at_trx_commit", "log_bin", "innodb_doublewrite"),
         "SELECT @@datadir, @@innodb_flush_log_at_trx_commit, @@log_bin, @@innodb_doublewrite");
+  }
+
+  /**
+   * Runs the statements as the root user, in order.
+   *
+   * @param statements the SQL statements
+   * @throws IllegalStateException if a statement fails
+   */
+  public void execute(List<String> statements) {
+    try (Connection connection = db.createConnection("");
+        Statement statement = connection.createStatement()) {
+      for (String sql : statements) {
+        statement.execute(sql);
+      }
+    } catch (SQLException e) {
+      throw new IllegalStateException("Failed to run SQL on MySQL", e);
+    }
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
@@ -128,8 +142,7 @@ public class MySQLContainer extends DatabaseContainer {
     return DriverManager.getDriver(getJdbcUrl(testDatabaseName)).getClass().getName();
   }
 
-  private static org.testcontainers.mysql.MySQLContainer module(
-      String image, Durability durability) {
+  private static org.testcontainers.mysql.MySQLContainer module(String image) {
     // The image may be a mirror or a custom tag; the module only needs a MySQL server.
     return new org.testcontainers.mysql.MySQLContainer(
             DockerImageName.parse(image).asCompatibleSubstituteFor("mysql"))
@@ -139,10 +152,9 @@ public class MySQLContainer extends DatabaseContainer {
         // tests create, so name MySQL's own system database instead.
         .withDatabaseName("mysql")
         // The 2.x module mounts no default config, so the server runs on the image defaults plus
-        // ours, exactly as with 1.x, where this override replaced the bundled one. It carries the
-        // disposable settings too.
-        .withConfigurationOverride(
-            durability == Durability.DISPOSABLE ? DISPOSABLE_CONFIG : DEFAULT_CONFIG)
+        // ours, exactly as with 1.x, where this override replaced the bundled one. A disposable
+        // container swaps in DISPOSABLE_CONFIG at start.
+        .withConfigurationOverride(DEFAULT_CONFIG)
         // The module's readiness check queries the database and ignores BaseContainer's startup
         // timeout, so it gets the same budget here.
         .withStartupTimeoutSeconds(300);
@@ -159,8 +171,11 @@ public class MySQLContainer extends DatabaseContainer {
 
     @Override
     public MySQLContainer build() {
-      return new MySQLContainer(
-          image, durability, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+      MySQLContainer container =
+          new MySQLContainer(
+              image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+      container.setDurability(durability);
+      return container;
     }
   }
 }

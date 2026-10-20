@@ -55,6 +55,11 @@ public record MySQLSpec(MySQLVersion version, TestDatabaseName database)
 
   static final class Factory implements ContainerFixture.SpecFactory<MySQLFixture> {
     @Override
+    public Durability durabilityFor(MySQLFixture fixture) {
+      return fixture.durability();
+    }
+
+    @Override
     public Startup startupFor(MySQLFixture fixture) {
       return fixture.startup();
     }

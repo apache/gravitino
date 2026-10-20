@@ -85,7 +85,7 @@ public class ContainerExtension
   private final CloseContainerExtension suiteCloser = new CloseContainerExtension();
 
   /** A fixture on the test class: what it asks for and how long its container lives. */
-  record Declaration(ContainerSpec<?> spec, Scope scope, Startup startup) {}
+  record Declaration(ContainerSpec<?> spec, Scope scope, Startup startup, Durability durability) {}
 
   @Override
   public void beforeAll(ExtensionContext context) {
@@ -282,7 +282,12 @@ public class ContainerExtension
             PRIVATE_CONTAINER,
             key -> {
               ContainerSpec.startDependencies(spec, ContainerSuite.getInstance());
-              return spec.startPrivate(ContainerSuite.getInstance());
+              return spec.startPrivate(
+                  ContainerSuite.getInstance(),
+                  // -PdurableTestContainers makes every container durable.
+                  Durability.runDefault() == Durability.DURABLE
+                      ? Durability.DURABLE
+                      : declaration.durability());
             },
             BaseContainer.class);
   }
@@ -357,7 +362,32 @@ public class ContainerExtension
       throw new IllegalStateException(
           "Cannot create the spec factory " + fixture.value().getName(), e);
     }
-    return new Declaration(
-        factory.specFor(annotation), factory.scopeFor(annotation), factory.startupFor(annotation));
+    Declaration declaration =
+        new Declaration(
+            factory.specFor(annotation),
+            factory.scopeFor(annotation),
+            factory.startupFor(annotation),
+            factory.durabilityFor(annotation));
+    if (declaration.scope() != Scope.RUN && !declaration.spec().supportsPrivate()) {
+      throw new ExtensionConfigurationException(
+          String.format(
+              "@%s does not support scope = Scope.%s yet; today only @HiveFixture with HDFS"
+                  + " storage and no Ranger has containers of its own",
+              annotation.annotationType().getSimpleName(), declaration.scope()));
+    }
+    // A shared container is disposable for every class; durable data needs a container of its own.
+    if (declaration.durability() == Durability.DURABLE
+        && declaration.scope() == Scope.RUN
+        && Durability.runDefault() == Durability.DISPOSABLE) {
+      throw new ExtensionConfigurationException(
+          String.format(
+              declaration.spec().supportsPrivate()
+                  ? "@%s(durability = DURABLE) needs a container of its own: add scope ="
+                      + " Scope.CLASS or Scope.METHOD"
+                  : "@%s(durability = DURABLE) needs a container of its own, which only"
+                      + " @HiveFixture with HDFS storage supports today",
+              annotation.annotationType().getSimpleName()));
+    }
+    return declaration;
   }
 }

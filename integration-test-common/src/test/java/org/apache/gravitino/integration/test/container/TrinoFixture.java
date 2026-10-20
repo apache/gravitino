@@ -77,4 +77,13 @@ public @interface TrinoFixture {
    * @return lazily by default, since the Gravitino server must run first
    */
   Startup startup() default Startup.LAZY;
+
+  /**
+   * Returns whether the container keeps its durability work. A durable container is private to the
+   * class or test, which only {@link HiveFixture} with HDFS storage supports today; this fixture
+   * fails fast if asked for one.
+   *
+   * @return disposable by default: data on {@code tmpfs} and no syncing, where the service allows
+   */
+  Durability durability() default Durability.DISPOSABLE;
 }

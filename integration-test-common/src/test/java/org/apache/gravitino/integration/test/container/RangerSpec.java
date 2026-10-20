@@ -18,8 +18,20 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import java.util.List;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
+
 /** The Ranger admin server. There is one configuration, so the spec has no fields. */
 public record RangerSpec() implements ContainerSpec<RangerContainer> {
+
+  /** The MySQL database Ranger keeps its policies in. */
+  static final MySQLSpec DATABASE =
+      new MySQLSpec(MySQLVersion.MYSQL_8_0, TestDatabaseName.MYSQL_RANGER);
+
+  @Override
+  public List<ContainerSpec<?>> dependencies() {
+    return List.of(DATABASE);
+  }
 
   @Override
   public Class<RangerContainer> containerType() {
@@ -33,6 +45,11 @@ public record RangerSpec() implements ContainerSpec<RangerContainer> {
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<RangerFixture> {
+    @Override
+    public Durability durabilityFor(RangerFixture fixture) {
+      return fixture.durability();
+    }
+
     @Override
     public Startup startupFor(RangerFixture fixture) {
       return fixture.startup();

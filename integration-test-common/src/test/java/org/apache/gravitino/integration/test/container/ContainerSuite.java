@@ -50,7 +50,6 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
-import org.apache.gravitino.integration.test.container.DatabaseContainer.Durability;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -401,7 +400,6 @@ public class ContainerSuite {
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
                   .withHostName("gravitino-ci-mysql")
-                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
                   .withNetwork(network);
 
@@ -426,7 +424,6 @@ public class ContainerSuite {
               MySQLContainer.builder()
                   .withImage(TestImages.MYSQL_5_7)
                   .withHostName("gravitino-ci-mysql-v5")
-                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
                   .withNetwork(network);
 
@@ -451,7 +448,6 @@ public class ContainerSuite {
               PostgreSQLContainer.builder()
                   .withImage(pgImageName.toString())
                   .withHostName(PostgreSQLContainer.HOST_NAME)
-                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
                   .withNetwork(network);
 
@@ -814,8 +810,12 @@ public class ContainerSuite {
       synchronized (ContainerSuite.class) {
         if (rangerContainer == null) {
           initIfNecessary();
-          // Start Ranger container
-          RangerContainer.Builder rangerBuilder = RangerContainer.builder().withNetwork(network);
+          // Ranger keeps its policies in the run's MySQL, which also gets disposable data.
+          MySQLContainer mysql = RangerSpec.DATABASE.getOrStart(this);
+          RangerContainer.Builder rangerBuilder =
+              RangerContainer.builder()
+                  .withNetwork(network)
+                  .withDatabase(mysql, RangerSpec.DATABASE.database());
           RangerContainer container = closer.register(rangerBuilder.build());
           try {
             start(container);

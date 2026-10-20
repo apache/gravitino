@@ -45,4 +45,13 @@ public @interface LocalStackFixture {
    * @return the startup mode; before {@code @BeforeAll} by default
    */
   Startup startup() default Startup.EAGER;
+
+  /**
+   * Returns whether the container keeps its durability work. A durable container is private to the
+   * class or test, which only {@link HiveFixture} with HDFS storage supports today; this fixture
+   * fails fast if asked for one.
+   *
+   * @return disposable by default: data on {@code tmpfs} and no syncing, where the service allows
+   */
+  Durability durability() default Durability.DISPOSABLE;
 }

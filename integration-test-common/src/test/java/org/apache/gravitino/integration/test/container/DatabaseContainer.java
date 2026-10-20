@@ -44,40 +44,12 @@ import org.testcontainers.containers.wait.strategy.WaitStrategy;
 public abstract class DatabaseContainer extends BaseContainer {
   private static final Logger LOG = LoggerFactory.getLogger(DatabaseContainer.class);
 
-  /**
-   * System property a test task sets to {@code true} when its database data may be lost; {@link
-   * Durability#fromSystemProperty()} then returns {@link Durability#DISPOSABLE}.
-   */
-  public static final String DISPOSABLE_DATA_PROPERTY = "gravitino.test.db.disposableData";
-
-  /**
-   * {@code tmpfs} mount for a disposable data directory. 2 GB is a ceiling; the mount only takes
-   * what the database writes.
-   */
-  private static final String DISPOSABLE_DATA_TMPFS = "rw,size=2g";
-
-  /** How much of its durability work a database container keeps. */
-  public enum Durability {
-    /** Durable settings: the server's own defaults and our config for it. */
-    DEFAULT,
-    /** Data in memory ({@code tmpfs}) and commits not synced to disk. */
-    DISPOSABLE;
-
-    /** Returns {@link #DISPOSABLE} when {@link #DISPOSABLE_DATA_PROPERTY} is set in this JVM. */
-    public static Durability fromSystemProperty() {
-      return Boolean.getBoolean(DISPOSABLE_DATA_PROPERTY) ? DISPOSABLE : DEFAULT;
-    }
-  }
-
   /** The Testcontainers module; the same object as {@link #container}. */
   protected final JdbcDatabaseContainer<?> db;
-
-  private final Durability durability;
 
   /** Wraps {@code db}, which must not be started yet. */
   protected DatabaseContainer(
       JdbcDatabaseContainer<?> db,
-      Durability durability,
       String hostName,
       Set<Integer> ports,
       Map<String, String> extraHosts,
@@ -86,24 +58,20 @@ public abstract class DatabaseContainer extends BaseContainer {
       Optional<Network> network) {
     super(db, hostName, ports, extraHosts, filesToMount, envVars, network);
     this.db = db;
-    this.durability = durability;
   }
 
   /**
    * Keeps the data directory on {@code tmpfs}, and starts the server with {@code command} if one is
-   * given, when this container is {@link Durability#DISPOSABLE}. Callers also pin the server's data
-   * directory to {@code dataDir}, so a newer image cannot place the data outside the mount.
+   * given; for {@link #applyDisposableData} overrides. Callers also pin the server's data directory
+   * to {@code dataDir}, so a newer image cannot place the data outside the mount.
    */
-  protected void applyDurability(String dataDir, String... command) {
-    if (durability == Durability.DISPOSABLE) {
-      db.withTmpFs(Map.of(dataDir, DISPOSABLE_DATA_TMPFS));
-      if (command.length > 0) {
-        db.withCommand(command);
-      }
+  protected void keepDataInMemory(String dataDir, String... command) {
+    db.withTmpFs(Map.of(dataDir, DISPOSABLE_DATA_TMPFS));
+    if (command.length > 0) {
+      db.withCommand(command);
     }
   }
 
-  /** The user tests connect as. */
   // A Testcontainers JDBC module has its own readiness check: PostgreSQL's waits for a log line,
   // which a port wait would replace; MySQL's queries the database.
   @Override
@@ -112,6 +80,7 @@ public abstract class DatabaseContainer extends BaseContainer {
     return null;
   }
 
+  /** The user tests connect as. */
   public String getUsername() {
     return db.getUsername();
   }
@@ -154,7 +123,7 @@ public abstract class DatabaseContainer extends BaseContainer {
         IntStream.range(0, names.size())
             .mapToObj(i -> names.get(i) + "=" + values[i])
             .collect(Collectors.joining(", "));
-    if (durability == Durability.DEFAULT) {
+    if (durability() == Durability.DURABLE) {
       LOG.info("{}: lower durability disabled, so tests run slower: {}", name, report);
       return;
     }
@@ -176,9 +145,9 @@ public abstract class DatabaseContainer extends BaseContainer {
   protected abstract static class Builder<
           SELF extends Builder<SELF, CONTAINER>, CONTAINER extends DatabaseContainer>
       extends BaseContainer.Builder<SELF, CONTAINER> {
-    protected Durability durability = Durability.DEFAULT;
+    protected Durability durability = Durability.runDefault();
 
-    /** Sets the durability; {@link Durability#DEFAULT} when not set. */
+    /** Sets the durability; {@link Durability#runDefault()} when not set. */
     public SELF withDurability(Durability durability) {
       this.durability = durability;
       return self;

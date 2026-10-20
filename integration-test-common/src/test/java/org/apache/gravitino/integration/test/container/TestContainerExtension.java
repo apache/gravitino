@@ -167,6 +167,42 @@ public class TestContainerExtension {
   }
 
   @Test
+  void testDurableFixtureGetsADurablePrivateContainer() {
+    run(DurableClassFixture.class)
+        .testEvents()
+        .assertStatistics(stats -> stats.succeeded(1).failed(0));
+
+    Assertions.assertEquals(List.of("startPrivate first durable"), LOG);
+  }
+
+  @Test
+  void testDurableSharedFixtureFailsClearly() {
+    run(DurableSharedFixture.class)
+        .allEvents()
+        .assertThatEvents()
+        .haveAtLeast(
+            1,
+            event(
+                finishedWithFailure(
+                    instanceOf(ExtensionConfigurationException.class),
+                    message(m -> m.contains("needs a container of its own")))));
+    Assertions.assertTrue(PRIVATE.isEmpty());
+  }
+
+  @Test
+  void testUnsupportedPrivateScopeFailsWhenTheClassIsFound() {
+    run(S3HiveClassScopeFixture.class)
+        .allEvents()
+        .assertThatEvents()
+        .haveAtLeast(
+            1,
+            event(
+                finishedWithFailure(
+                    instanceOf(ExtensionConfigurationException.class),
+                    message(m -> m.contains("does not support scope = Scope.CLASS")))));
+  }
+
+  @Test
   void testFinalFieldFailsClearly() {
     run(FinalFieldFixture.class)
         .testEvents()
@@ -288,7 +324,8 @@ public class TestContainerExtension {
     UnsupportedOperationException e =
         Assertions.assertThrows(
             UnsupportedOperationException.class,
-            () -> new KafkaSpec().startPrivate(ContainerSuite.getInstance()));
+            () ->
+                new KafkaSpec().startPrivate(ContainerSuite.getInstance(), Durability.DISPOSABLE));
 
     Assertions.assertEquals(
         "scope CLASS/METHOD is not supported for KafkaSpec yet", e.getMessage());
@@ -321,8 +358,14 @@ public class TestContainerExtension {
     }
 
     @Override
-    public FakeContainer startPrivate(ContainerSuite suite) {
-      LOG.add("startPrivate " + name);
+    public boolean supportsPrivate() {
+
+      return true;
+    }
+
+    @Override
+    public FakeContainer startPrivate(ContainerSuite suite, Durability durability) {
+      LOG.add("startPrivate " + name + (durability == Durability.DURABLE ? " durable" : ""));
       FakeContainer container = Mockito.mock(FakeContainer.class);
       PRIVATE.add(container);
       return container;
@@ -364,6 +407,11 @@ public class TestContainerExtension {
     public Startup startupFor(FakeFirstFixture fixture) {
       return fixture.startup();
     }
+
+    @Override
+    public Durability durabilityFor(FakeFirstFixture fixture) {
+      return fixture.durability();
+    }
   }
 
   static final class OtherFactory implements ContainerFixture.SpecFactory<FakeOtherFixture> {
@@ -390,6 +438,8 @@ public class TestContainerExtension {
     Scope scope() default Scope.RUN;
 
     Startup startup() default Startup.EAGER;
+
+    Durability durability() default Durability.DISPOSABLE;
   }
 
   @Target({ElementType.TYPE, ElementType.FIELD})
@@ -569,6 +619,22 @@ public class TestContainerExtension {
     void test() {}
   }
 
+  @Tag(FIXTURE)
+  @FakeFirstFixture(durability = Durability.DURABLE, scope = Scope.CLASS)
+  static class DurableClassFixture {
+    @Test
+    void test(FakeContainer container) {
+      Assertions.assertSame(PRIVATE.get(0), container);
+    }
+  }
+
+  @Tag(FIXTURE)
+  @FakeFirstFixture(durability = Durability.DURABLE)
+  static class DurableSharedFixture {
+    @Test
+    void test(FakeContainer container) {}
+  }
+
   @FakeFirstFixture
   abstract static class FixtureBase {}
 
@@ -600,6 +666,13 @@ public class TestContainerExtension {
   @Tag(FIXTURE)
   @KafkaFixture
   static class KafkaFixtureOnly {}
+
+  @Tag(FIXTURE)
+  @HiveFixture(storage = HiveStorage.S3, scope = Scope.CLASS)
+  static class S3HiveClassScopeFixture {
+    @Test
+    void test() {}
+  }
 
   @Tag(FIXTURE)
   @HiveFixture(version = HiveVersion.HIVE3, auth = HiveAuth.KERBEROS)

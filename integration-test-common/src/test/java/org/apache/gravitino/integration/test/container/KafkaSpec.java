@@ -34,6 +34,11 @@ public record KafkaSpec() implements ContainerSpec<KafkaContainer> {
 
   static final class Factory implements ContainerFixture.SpecFactory<KafkaFixture> {
     @Override
+    public Durability durabilityFor(KafkaFixture fixture) {
+      return fixture.durability();
+    }
+
+    @Override
     public Startup startupFor(KafkaFixture fixture) {
       return fixture.startup();
     }

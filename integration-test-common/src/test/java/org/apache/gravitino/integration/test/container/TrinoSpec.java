@@ -56,6 +56,11 @@ public record TrinoSpec(int version, int workers, HiveVersion hive, int gravitin
 
   static final class Factory implements ContainerFixture.SpecFactory<TrinoFixture> {
     @Override
+    public Durability durabilityFor(TrinoFixture fixture) {
+      return fixture.durability();
+    }
+
+    @Override
     public TrinoSpec specFor(TrinoFixture fixture) {
       return new TrinoSpec(fixture.version(), fixture.workers(), fixture.hive(), NO_PORT);
     }

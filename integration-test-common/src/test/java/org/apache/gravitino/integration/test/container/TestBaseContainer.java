@@ -24,7 +24,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -94,6 +96,58 @@ public class TestBaseContainer {
     Assertions.assertSame(own, supplied.currentWaitStrategy());
     // GenericContainer forwards withStartupTimeout to the current wait strategy.
     Assertions.assertNull(own.startupTimeout, "the module's own startup timeout was overridden");
+  }
+
+  @Test
+  void testContainersAreDisposableUnlessTheRunAsksForDurable() {
+    String previous = System.getProperty(Durability.DURABLE_CONTAINERS_PROPERTY);
+    try {
+      System.clearProperty(Durability.DURABLE_CONTAINERS_PROPERTY);
+      Assertions.assertEquals(Durability.DISPOSABLE, HiveContainer.builder().build().durability());
+
+      System.setProperty(Durability.DURABLE_CONTAINERS_PROPERTY, "true");
+      Assertions.assertEquals(Durability.DURABLE, HiveContainer.builder().build().durability());
+    } finally {
+      if (previous == null) {
+        System.clearProperty(Durability.DURABLE_CONTAINERS_PROPERTY);
+      } else {
+        System.setProperty(Durability.DURABLE_CONTAINERS_PROPERTY, previous);
+      }
+    }
+  }
+
+  @Test
+  // The copied-file map is deprecated but is the only public view of files to copy.
+  @SuppressWarnings("deprecation")
+  void testDisposableRecipes() {
+    HiveContainer hive = HiveContainer.builder().build();
+    hive.applyDisposableData(hive.getContainer());
+    ZooKeeperContainer zooKeeper = ZooKeeperContainer.builder().build();
+    zooKeeper.applyDisposableData(zooKeeper.getContainer());
+    MySQLContainer mysql = MySQLContainer.builder().build();
+    mysql.applyDisposableData(mysql.getContainer());
+
+    Assertions.assertEquals(
+        Set.of("/tmp/hadoop-root"), hive.getContainer().getTmpFsMapping().keySet());
+    Assertions.assertTrue(
+        hive.getContainer()
+            .getCopyToFileContainerPathMap()
+            .containsValue("/etc/mysql/conf.d/zz-gravitino-disposable.cnf"));
+    Assertions.assertEquals(
+        "forceSync=no", zooKeeper.getContainer().getEnvMap().get("ZOO_CFG_EXTRA"));
+    Assertions.assertTrue(mysql.getContainer().getTmpFsMapping().containsKey("/var/lib/mysql"));
+  }
+
+  @Test
+  void testDurablePostgreSQLKeepsFsync() {
+    PostgreSQLContainer durable = PostgreSQLContainer.builder().build();
+    PostgreSQLContainer disposable = PostgreSQLContainer.builder().build();
+    disposable.applyDisposableData(disposable.getContainer());
+
+    Assertions.assertFalse(
+        Arrays.asList(durable.getContainer().getCommandParts()).contains("fsync=off"));
+    Assertions.assertTrue(
+        Arrays.asList(disposable.getContainer().getCommandParts()).contains("fsync=off"));
   }
 
   /** Records the startup timeout it is given and never waits. */

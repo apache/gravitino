@@ -76,5 +76,16 @@ public @interface ContainerFixture {
     default Startup startupFor(A fixture) {
       return Startup.EAGER;
     }
+
+    /**
+     * Returns whether the fixture's container keeps its durability work.
+     *
+     * @param fixture the fixture annotation on the test class
+     * @return the durability; {@link Durability#runDefault()} unless the fixture has a durability
+     *     attribute
+     */
+    default Durability durabilityFor(A fixture) {
+      return Durability.runDefault();
+    }
   }
 }

@@ -34,6 +34,11 @@ public record ZooKeeperSpec() implements ContainerSpec<ZooKeeperContainer> {
 
   static final class Factory implements ContainerFixture.SpecFactory<ZooKeeperFixture> {
     @Override
+    public Durability durabilityFor(ZooKeeperFixture fixture) {
+      return fixture.durability();
+    }
+
+    @Override
     public Startup startupFor(ZooKeeperFixture fixture) {
       return fixture.startup();
     }

@@ -77,6 +77,7 @@ public class TestContainerSpecDependencies {
         new HiveSpec(HiveVersion.HIVE3, HiveAuth.NONE, HiveStorage.S3).dependencies());
     Assertions.assertEquals(
         List.of(), new HiveSpec(HiveVersion.HIVE2, HiveAuth.NONE).dependencies());
+    Assertions.assertEquals(List.of(RangerSpec.DATABASE), new RangerSpec().dependencies());
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new HiveSpec(HiveVersion.HIVE2, HiveAuth.RANGER));

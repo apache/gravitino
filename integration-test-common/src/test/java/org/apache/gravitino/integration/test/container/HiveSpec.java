@@ -151,12 +151,22 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
   // the shared network then has two containers with one alias, which is fine because tests reach
   // containers by IP; on Linux CI there is no shared network.
   @Override
-  public HiveContainer startPrivate(ContainerSuite suite) {
+  public boolean supportsPrivate() {
+    return storage == HiveStorage.HDFS && auth != HiveAuth.RANGER;
+  }
+
+  @Override
+  public HiveContainer startPrivate(ContainerSuite suite, Durability durability) {
     if (storage != HiveStorage.HDFS) {
       throw new UnsupportedOperationException(
           "scope CLASS/METHOD is not supported for Hive with " + storage + " storage yet");
     }
-    return suite.startPrivate(network -> builder().withNetwork(network).build());
+    return suite.startPrivate(
+        network -> {
+          HiveContainer container = builder().withNetwork(network).build();
+          container.setDurability(durability);
+          return container;
+        });
   }
 
   private HiveContainer.Builder builder() {
@@ -173,6 +183,11 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<HiveFixture> {
+    @Override
+    public Durability durabilityFor(HiveFixture fixture) {
+      return fixture.durability();
+    }
+
     @Override
     public Startup startupFor(HiveFixture fixture) {
       // Ranger's services must exist before a Ranger-enabled Hive reports to them, and tests

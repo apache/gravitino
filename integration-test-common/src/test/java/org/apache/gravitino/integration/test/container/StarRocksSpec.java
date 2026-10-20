@@ -34,6 +34,11 @@ public record StarRocksSpec() implements ContainerSpec<StarRocksContainer> {
 
   static final class Factory implements ContainerFixture.SpecFactory<StarRocksFixture> {
     @Override
+    public Durability durabilityFor(StarRocksFixture fixture) {
+      return fixture.durability();
+    }
+
+    @Override
     public Startup startupFor(StarRocksFixture fixture) {
       return fixture.startup();
     }

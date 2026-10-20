@@ -34,6 +34,11 @@ public record MotoSpec() implements ContainerSpec<GravitinoMotoContainer> {
 
   static final class Factory implements ContainerFixture.SpecFactory<MotoFixture> {
     @Override
+    public Durability durabilityFor(MotoFixture fixture) {
+      return fixture.durability();
+    }
+
+    @Override
     public Startup startupFor(MotoFixture fixture) {
       return fixture.startup();
     }

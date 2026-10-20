@@ -1656,6 +1656,15 @@ gradle.projectsEvaluated {
       }
     }
 
+    // Test containers skip durability work (data on tmpfs, no fsync) unless a fixture asks for
+    // durable data. -PdurableTestContainers makes every container durable, for example to inspect
+    // a container's data after a failure. Read by Durability.runDefault().
+    if (project.hasProperty("durableTestContainers")) {
+      tasks.withType<Test>().configureEach {
+        systemProperty("gravitino.test.durableContainers", "true")
+      }
+    }
+
     tasks.withType<Jar>().configureEach {
       mustRunAfter(cleanDistributionPackageTask)
     }

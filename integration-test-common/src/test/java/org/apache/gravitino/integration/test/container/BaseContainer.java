@@ -70,9 +70,19 @@ public abstract class BaseContainer implements Startable {
   // Network of the container
   private final Optional<Network> network;
 
+  /**
+   * {@code tmpfs} mount options for a disposable data directory; the mount only takes what is
+   * written.
+   */
+  protected static final String DISPOSABLE_DATA_TMPFS = "rw,size=2g";
+
   protected final GenericContainer<?> container;
 
   private volatile long lastContainerStartMs;
+
+  private volatile Durability durability = Durability.runDefault();
+
+  private boolean disposableDataApplied;
 
   /**
    * Builds the container from an image name. Used by Gravitino's own images, which have no official
@@ -175,6 +185,33 @@ public abstract class BaseContainer implements Startable {
   }
 
   /**
+   * Sets whether this container keeps its durability work. Takes effect at {@link #start()}.
+   *
+   * @param durability the durability; {@link Durability#runDefault()} until set
+   */
+  public void setDurability(Durability durability) {
+    this.durability = requireNonNull(durability, "durability is null");
+  }
+
+  /**
+   * Returns whether this container keeps its durability work.
+   *
+   * @return the durability
+   */
+  public Durability durability() {
+    return durability;
+  }
+
+  /**
+   * Makes the container skip durability work, such as putting its data directories on {@code tmpfs}
+   * or turning off fsync. {@link #start()} calls it once when the container is {@link
+   * Durability#DISPOSABLE}. The default does nothing; a service with its own storage overrides it.
+   *
+   * @param container the container to configure
+   */
+  protected void applyDisposableData(GenericContainer<?> container) {}
+
+  /**
    * Returns how to tell that the container is ready. The default waits for the exposed ports to
    * listen. Override it to return a service-specific strategy, or return {@code null} to keep the
    * startup check, wait strategy and timeout the supplied container already has, as an official
@@ -225,6 +262,10 @@ public abstract class BaseContainer implements Startable {
 
   @Override
   public void start() {
+    if (durability == Durability.DISPOSABLE && !disposableDataApplied) {
+      applyDisposableData(container);
+      disposableDataApplied = true;
+    }
     long startNanos = System.nanoTime();
     try {
       container.start();
