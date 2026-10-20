@@ -21,6 +21,9 @@ existing deployments. For database backup, schema scripts, and rollback commands
   `gravitino.server.webserver.trustedProxies`, `gravitino.iceberg-rest.trustedProxies`, or
   `gravitino.lance-rest.trustedProxies` to the proxy addresses. Without it, the audit log records
   the proxy address instead of the client address.
+- IPv6 client addresses in audit events are now recorded in compressed form without brackets,
+  for example `::1` instead of `[0:0:0:0:0:0:0:1]`. Update log queries or parsers that match the
+  old form.
 - List only the proxies. Trusting a range that untrusted clients can also connect from, such as a
   whole Kubernetes pod CIDR, lets those clients choose the recorded address again. See
   [HTTP Server](./gravitino-server-config.md#http-server).

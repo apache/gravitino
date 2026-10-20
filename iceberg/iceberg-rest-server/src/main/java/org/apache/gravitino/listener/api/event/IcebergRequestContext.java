@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
 
@@ -99,12 +100,13 @@ public class IcebergRequestContext {
   private static String resolveClientAddress(HttpServletRequest request) {
     // RequestContextFilter, installed ahead of every Iceberg REST endpoint, has already resolved
     // the client address with the server's trusted-proxy rules. Without it, use the TCP peer
-    // address: X-Forwarded-For cannot be trusted here because the trusted proxies are unknown.
+    // address, in the same canonical form: X-Forwarded-For cannot be trusted here because the
+    // trusted proxies are unknown.
     String contextAddress = RequestContext.getRemoteAddress();
     if (contextAddress != null) {
       return contextAddress;
     }
-    return request.getRemoteAddr();
+    return ClientAddressResolver.noTrustedProxies().resolve(request);
   }
 
   /**

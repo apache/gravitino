@@ -159,6 +159,13 @@ class TestIcebergRequestContext {
   }
 
   @Test
+  void testFallbackPeerAddressIsCanonical() {
+    HttpServletRequest request = requestWithoutHeader();
+    when(request.getRemoteAddr()).thenReturn("[0:0:0:0:0:0:0:1]");
+    Assertions.assertEquals("::1", new IcebergRequestContext(request, "cat").remoteHostName());
+  }
+
+  @Test
   void testRemoteAddressFallsBackToPeerAndIgnoresForwardedFor() {
     HttpServletRequest request = requestWithHeader("X-Forwarded-For", "198.51.100.7");
     Assertions.assertEquals(

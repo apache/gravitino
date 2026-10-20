@@ -55,8 +55,10 @@ import org.apache.commons.lang3.StringUtils;
  * </ol>
  *
  * <p>Ports and IPv6 brackets ({@code 203.0.113.5:4711}, {@code [2001:db8::1]:4711}) are stripped
- * from {@code X-Forwarded-For} entries, and addresses taken from the header are returned in
- * canonical form.
+ * from {@code X-Forwarded-For} entries. Every returned address, the TCP peer included, is in
+ * canonical form: IPv6 compressed as in RFC 5952 and without brackets or a zone ID (Jetty reports
+ * {@code [0:0:0:0:0:0:0:1]}, this returns {@code ::1}), and an IPv4-mapped IPv6 address as plain
+ * IPv4. A peer address that is not an IP literal is returned unchanged.
  *
  * <p>With no trusted proxies configured (the default), {@code X-Forwarded-For} is never honored and
  * the TCP peer address is always returned.
@@ -107,16 +109,19 @@ public final class ClientAddressResolver {
    * Resolves the client address of the given request. See the class doc for the rules.
    *
    * @param request the HTTP request
-   * @return the client address; the TCP peer address when {@code X-Forwarded-For} is not honored
+   * @return the client address in canonical form; the TCP peer address when {@code X-Forwarded-For}
+   *     is not honored
    */
   public String resolve(HttpServletRequest request) {
     String remoteAddr = request.getRemoteAddr();
-    if (trustedProxies.isEmpty() || !isTrusted(parseAddress(remoteAddr))) {
-      return remoteAddr;
+    Optional<InetAddress> peer = parseAddress(remoteAddr);
+    String peerAddress = peer.map(InetAddresses::toAddrString).orElse(remoteAddr);
+    if (trustedProxies.isEmpty() || !isTrusted(peer)) {
+      return peerAddress;
     }
 
     List<String> entries = forwardedForEntries(request);
-    String lastTrustedHop = remoteAddr;
+    String lastTrustedHop = peerAddress;
     for (int i = entries.size() - 1; i >= 0; i--) {
       Optional<InetAddress> address = parseForwardedEntry(entries.get(i));
       if (!address.isPresent()) {

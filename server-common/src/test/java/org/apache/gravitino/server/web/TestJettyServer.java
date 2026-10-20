@@ -191,6 +191,8 @@ public class TestJettyServer {
     assertEquals("127.0.0.1", requestClientAddress("127.0.0.1", port, null));
     assumeTrue(isIpv6LoopbackReachable(port), "IPv6 loopback is not available");
     assertEquals("1.2.3.4", requestClientAddress("[::1]", port, "9.9.9.9, 1.2.3.4"));
+    // Jetty reports the peer as "[0:0:0:0:0:0:0:1]"; the recorded form is canonical.
+    assertEquals("::1", requestClientAddress("[::1]", port, null));
   }
 
   @Test

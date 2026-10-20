@@ -196,8 +196,9 @@ In that case the server reads every `X-Forwarded-For` header from right to left,
 proxies, and records the first address that is not one. Entries to the left of that address were
 supplied by the client and are ignored. If an entry is not an IP address, the server stops and
 records the last trusted hop. When `trustedProxies` is empty, the default, `X-Forwarded-For` is
-ignored and the TCP peer address is recorded. An entry that is not an IP address or CIDR block
-fails server startup.
+ignored and the TCP peer address is recorded. Recorded addresses are in canonical form, with IPv6
+compressed and without brackets, for example `::1`. An entry that is not an IP address or CIDR
+block fails server startup.
 
 If Gravitino runs behind a load balancer, ingress controller, or other reverse proxy, list their
 addresses here. Otherwise the audit log records the proxy address for every request. List only

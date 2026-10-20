@@ -111,9 +111,27 @@ public class TestClientAddressResolver {
     Assertions.assertEquals(
         "2001:db8::1", resolver.resolve(request("[0:0:0:0:0:0:0:1]", "2001:db8::1, fd00::2")));
     Assertions.assertEquals(
-        "[fe80:0:0:0:0:0:0:1]", resolver.resolve(request("[fe80:0:0:0:0:0:0:1]", "2001:db8::1")));
+        "fe80::1", resolver.resolve(request("[fe80:0:0:0:0:0:0:1]", "2001:db8::1")));
     // The unbracketed form is accepted too.
     Assertions.assertEquals("2001:db8::1", resolver.resolve(request("::1", "2001:db8::1")));
+  }
+
+  @Test
+  public void testPeerAddressIsCanonical() {
+    // Without trusted proxies too, so the audit log never mixes forms of the same address.
+    ClientAddressResolver none = ClientAddressResolver.noTrustedProxies();
+    Assertions.assertEquals("::1", none.resolve(request("[0:0:0:0:0:0:0:1]", "203.0.113.5")));
+    Assertions.assertEquals("::1", none.resolve(request("0:0:0:0:0:0:0:1")));
+    Assertions.assertEquals("fe80::1", none.resolve(request("[fe80:0:0:0:0:0:0:1%1]")));
+    Assertions.assertEquals("10.0.0.1", none.resolve(request("::ffff:10.0.0.1")));
+    Assertions.assertEquals("10.0.0.1", none.resolve(request("10.0.0.1")));
+    // Untrusted peer and trusted peer without X-Forwarded-For.
+    Assertions.assertEquals(
+        "2001:db8::5", TRUST_PRIVATE_V4.resolve(request("[2001:db8:0:0:0:0:0:5]", "1.2.3.4")));
+    ClientAddressResolver trustLoopback = new ClientAddressResolver(ImmutableList.of("::1"));
+    Assertions.assertEquals("::1", trustLoopback.resolve(request("[0:0:0:0:0:0:0:1]")));
+    Assertions.assertEquals(
+        "::1", trustLoopback.resolve(request("[0:0:0:0:0:0:0:1]", "203.0.113.5, unknown")));
   }
 
   @Test
