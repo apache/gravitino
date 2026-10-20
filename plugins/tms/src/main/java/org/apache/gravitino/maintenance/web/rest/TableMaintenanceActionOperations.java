@@ -20,12 +20,15 @@ package org.apache.gravitino.maintenance.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.annotations.VisibleForTesting;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
@@ -33,6 +36,7 @@ import org.apache.gravitino.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.dto.requests.MaintenanceActionSampleRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.MaintenanceActionSampleResponse;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.maintenance.injob.InJobGateOutcome;
 import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobPipeline;
 import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobSampler;
@@ -52,6 +56,16 @@ import org.slf4j.LoggerFactory;
  * S1 metrics (§5.2.2).
  */
 @Path("metalakes/{metalake}/maintenance/actions")
+@Consumes({
+  MediaType.APPLICATION_JSON,
+  MediaType.APPLICATION_JSON + "; charset=UTF-8",
+  "application/vnd.gravitino.v1+json",
+  "application/vnd.gravitino.v1+json; charset=UTF-8"
+})
+@Produces({
+  MediaType.APPLICATION_JSON + "; charset=UTF-8",
+  "application/vnd.gravitino.v1+json; charset=UTF-8"
+})
 public class TableMaintenanceActionOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableMaintenanceActionOperations.class);
@@ -69,6 +83,7 @@ public class TableMaintenanceActionOperations {
         TableSnapshotMetricsMetaService.getInstance());
   }
 
+  @VisibleForTesting
   TableMaintenanceActionOperations(
       TableMaintenanceInJobPipeline pipeline,
       TableMaintenanceActionMetaService actionMetaService,
@@ -86,7 +101,6 @@ public class TableMaintenanceActionOperations {
    */
   @POST
   @Path("{jobId}/sample")
-  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "tms-action-sample." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "tms-action-sample", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::RUN_JOB")
@@ -99,7 +113,15 @@ public class TableMaintenanceActionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            if (request == null) {
+              throw new IllegalArgumentException("Request body cannot be null");
+            }
             request.validate();
+            TableMaintenanceActionPO action = actionMetaService.getByJobId(jobId);
+            if (action == null) {
+              throw new NoSuchEntityException("no maintenance action for job_id=%s", jobId);
+            }
+            requireActionMatchesRequest(action, request.getTableId(), request.getPolicyId());
             InJobGateOutcome outcome =
                 pipeline.gateCronJob(
                     jobId,
@@ -123,8 +145,7 @@ public class TableMaintenanceActionOperations {
                     outcome.headSnapshotId()));
           });
     } catch (Exception e) {
-      LOG.warn("Failed TMS action sample for job {} metalake {}", jobId, metalake, e);
-      return Utils.internalError(e.getMessage(), e);
+      return MaintenanceActionExceptionHandler.handle("sample", jobId, metalake, e);
     }
   }
 
@@ -134,7 +155,6 @@ public class TableMaintenanceActionOperations {
    */
   @POST
   @Path("{jobId}/finish")
-  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "tms-action-finish." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "tms-action-finish", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::RUN_JOB")
@@ -147,10 +167,13 @@ public class TableMaintenanceActionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            if (request == null) {
+              throw new IllegalArgumentException("Request body cannot be null");
+            }
             request.validate();
             TableMaintenanceActionPO action = actionMetaService.getByJobId(jobId);
             if (action == null) {
-              throw new IllegalStateException("no maintenance action for job_id=" + jobId);
+              throw new NoSuchEntityException("no maintenance action for job_id=%s", jobId);
             }
             if (request.getAfterSnapshotId() != null
                 && StringUtils.isNotBlank(request.getMetricsJson())) {
@@ -170,8 +193,22 @@ public class TableMaintenanceActionOperations {
             return Utils.ok(new BaseResponse());
           });
     } catch (Exception e) {
-      LOG.warn("Failed TMS action finish for job {} metalake {}", jobId, metalake, e);
-      return Utils.internalError(e.getMessage(), e);
+      return MaintenanceActionExceptionHandler.handle("finish", jobId, metalake, e);
+    }
+  }
+
+  @VisibleForTesting
+  void setHttpRequest(HttpServletRequest httpRequest) {
+    this.httpRequest = httpRequest;
+  }
+
+  private static void requireActionMatchesRequest(
+      TableMaintenanceActionPO action, long tableId, long policyId) {
+    if (!action.tableId().equals(tableId) || !action.policyId().equals(policyId)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "request tableId/policyId (%s/%s) do not match action for job_id=%s (%s/%s)",
+              tableId, policyId, action.jobId(), action.tableId(), action.policyId()));
     }
   }
 }

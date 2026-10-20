@@ -33,10 +33,20 @@ For in-process Table Maintenance Service (TMS), client credentials are **cluster
 the prefixes below in `gravitino.conf`. Do not store passwords, OAuth secrets, or keytab paths in policy
 content. Values may be plaintext or secret-manager references when the deployment supports them.
 
-At `runJob`, `gravitino.maintenance.gravitinoAuth.*` overlays policy `updaterOptions`, and
-`gravitino.maintenance.ircAuth.*` overlays policy `jobOptions`. Auth wins on duplicate keys. The
-live scheduler submit call site is wired in a follow-up; `MaintenanceAuthConfigs` exposes the load
-and overlay helpers (`overlayUpdaterOptions` / `overlayJobOptions`) for that path.
+At cron `runJob`, `gravitino.maintenance.gravitinoAuth.*` overlays policy `updaterOptions` (serialized
+into `updater_options` for Spark → Gravitino callbacks), and `gravitino.maintenance.ircAuth.*`
+overlays policy `jobOptions`. Auth wins on duplicate keys. Non-template IRC keys are then packed
+into `spark_conf` as `spark.sql.catalog.<catalog>.*` so Spark Iceberg REST catalogs can authenticate.
+
+Cron also injects callback identity into `updater_options` when missing from the policy:
+
+- `metalake` — from the policy namespace
+- `gravitino_uri` — from `gravitino.maintenance.gravitinoUri` (policy `updaterOptions.gravitino_uri`
+  may override). Submit fails closed if neither source provides a URI.
+
+```properties
+gravitino.maintenance.gravitinoUri = http://localhost:8090
+```
 
 #### Gravitino client auth (`gravitino.maintenance.gravitinoAuth.`) — fixed schema
 

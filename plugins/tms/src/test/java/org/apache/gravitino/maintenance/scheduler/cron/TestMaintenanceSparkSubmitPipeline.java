@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
 import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceTableRefs.ResolvedTableRef;
@@ -56,6 +57,7 @@ class TestMaintenanceSparkSubmitPipeline {
   private static final long POLICY_ID = 202L;
   private static final String INSTANCE = CronJobIds.forTable(TABLE_ID, POLICY_ID);
   private static final long CLAIM_TIMEOUT_MS = 60_000L;
+  private static final String GRAVITINO_URI = "http://localhost:8090";
 
   @Test
   void testUnparseableInstanceSkipsSubmit() {
@@ -129,6 +131,30 @@ class TestMaintenanceSparkSubmitPipeline {
 
     verify(actions).deleteById(8L);
     verify(actions, never()).bindJobId(any(), anyLong());
+    verify(submitter, never()).cancelJob(anyString(), anyLong());
+  }
+
+  @Test
+  void testBindFailureCancelsJobAndReleasesClaim() {
+    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    when(submitter.runJob(
+            eq("metalake"), eq(MaintenanceJobTemplates.TMS_ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
+        .thenReturn(777L);
+    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
+    OccupancyClaim claim = new OccupancyClaim(9L, 3_000L);
+    when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(claim));
+    org.mockito.Mockito.doThrow(new RuntimeException("bind failed"))
+        .when(actions)
+        .bindJobId(claim, 777L);
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            pipeline(mockLookup(policy(true)), mockGate(false), actions, submitter)
+                .submit(INSTANCE));
+
+    verify(submitter).cancelJob("metalake", 777L);
+    verify(actions).deleteById(9L);
   }
 
   @Test
@@ -162,7 +188,7 @@ class TestMaintenanceSparkSubmitPipeline {
             mockGate(false),
             actions,
             submitter,
-            new Config(false) {},
+            configWithUri(),
             CLAIM_TIMEOUT_MS,
             ids ->
                 List.of(
@@ -199,9 +225,11 @@ class TestMaintenanceSparkSubmitPipeline {
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(new OccupancyClaim(1L, 1L)));
 
-    Config config = new Config(false) {};
+    Config config = configWithUri();
     config.loadFromMap(
         Map.of(
+            MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_URI.getKey(),
+            GRAVITINO_URI,
             "gravitino.maintenance.ircAuth.rest.auth.type",
             "basic",
             "gravitino.maintenance.gravitinoAuth.authType",
@@ -211,10 +239,7 @@ class TestMaintenanceSparkSubmitPipeline {
         t -> true);
 
     PolicyEntity policy =
-        policy(
-            true,
-            Map.of("catalog_name", "iceberg", "table_identifier", "db.t"),
-            Map.of("gravitino_uri", "http://localhost:8090"));
+        policy(true, Map.of("catalog_name", "iceberg", "table_identifier", "db.t"), Map.of());
 
     new MaintenanceSparkSubmitPipeline(
             mockLookup(policy),
@@ -236,12 +261,21 @@ class TestMaintenanceSparkSubmitPipeline {
     Map<String, String> conf = confCaptor.getValue();
     Assertions.assertEquals("iceberg", conf.get("catalog_name"));
     Assertions.assertEquals("db.t", conf.get("table_identifier"));
-    Assertions.assertEquals("basic", conf.get("rest.auth.type"));
+    Assertions.assertNull(conf.get("rest.auth.type"));
+    Assertions.assertTrue(conf.containsKey("spark_conf"));
+    Assertions.assertTrue(
+        conf.get("spark_conf").contains("spark.sql.catalog.iceberg.rest.auth.type"));
+    Assertions.assertTrue(conf.get("spark_conf").contains("basic"));
+    Assertions.assertEquals("binpack", conf.get("strategy"));
+    Assertions.assertNull(conf.get("where_clause"));
     Assertions.assertEquals(Long.toString(TABLE_ID), conf.get("tms_table_id"));
     Assertions.assertEquals("rewrite_data_files", conf.get("maintenance_type"));
     Assertions.assertEquals(Long.toString(POLICY_ID), conf.get("tms_policy_id"));
     Assertions.assertTrue(conf.containsKey("updater_options"));
     Assertions.assertTrue(conf.get("updater_options").contains("auth_type"));
+    Assertions.assertTrue(conf.get("updater_options").contains("\"metalake\":\"metalake\""));
+    Assertions.assertTrue(
+        conf.get("updater_options").contains("\"gravitino_uri\":\"" + GRAVITINO_URI + "\""));
   }
 
   private static MaintenanceSparkSubmitPipeline pipeline(
@@ -254,9 +288,17 @@ class TestMaintenanceSparkSubmitPipeline {
         gate,
         actions,
         submitter,
-        new Config(false) {},
+        configWithUri(),
         CLAIM_TIMEOUT_MS,
         ids -> List.of(new ResolvedTableRef(TABLE_ID, "iceberg", "db.t")));
+  }
+
+  private static Config configWithUri() {
+    Config config = new Config(false) {};
+    config.loadFromMap(
+        Map.of(MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_URI.getKey(), GRAVITINO_URI),
+        t -> true);
+    return config;
   }
 
   private static ExpandOccupancyGate mockGate(boolean shouldSkip) {

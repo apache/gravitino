@@ -503,12 +503,20 @@ public class JobManager implements JobOperationDispatcher {
     // Check if the job template exists, will throw NoSuchJobTemplateException if it does not exist.
     JobTemplateEntity jobTemplateEntity = getJobTemplate(metalake, jobTemplateName);
 
+    // Allocate job id first so gravitino_job_id can satisfy required template placeholders
+    // ({{gravitino_job_id}}) during checkJobConf / resolve without every caller passing it.
+    long jobId = idGenerator.nextId();
+    Map<String, String> resolvedConf = new HashMap<>();
+    if (jobConf != null) {
+      resolvedConf.putAll(jobConf);
+    }
+    resolvedConf.put("gravitino_job_id", Long.toString(jobId));
+
     // Reject a job with missing parameters before creating anything for it.
     JobTemplateResolver jobTemplateResolver = new JobTemplateResolver(jobTemplateEntity);
-    jobTemplateResolver.checkJobConf(jobConf);
+    jobTemplateResolver.checkJobConf(resolvedConf);
 
     // Create staging directory.
-    long jobId = idGenerator.nextId();
     File jobStagingDir = jobStagingDir(jobId);
     try {
       Files.createDirectories(jobStagingDir.toPath());
@@ -520,10 +528,6 @@ public class JobManager implements JobOperationDispatcher {
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values. Its
     // resources are kept as URIs, the job executor decides how to handle them.
-    // Inject gravitino_job_id after checkJobConf so templates may use {{gravitino_job_id:-}}
-    // without every caller passing it (TMS cron Spark action callbacks need it).
-    Map<String, String> resolvedConf = new HashMap<>(jobConf);
-    resolvedConf.put("gravitino_job_id", Long.toString(jobId));
     JobTemplate jobTemplate;
     try {
       jobTemplate = jobTemplateResolver.resolve(resolvedConf);

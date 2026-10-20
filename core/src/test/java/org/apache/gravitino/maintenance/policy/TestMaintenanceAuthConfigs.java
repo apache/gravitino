@@ -41,6 +41,9 @@ class TestMaintenanceAuthConfigs {
     Assertions.assertEquals(
         "gravitino.maintenance.gravitinoAuth.oauthServerUri",
         MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_OAUTH_SERVER_URI.getKey());
+    Assertions.assertEquals(
+        "gravitino.maintenance.gravitinoUri",
+        MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_URI.getKey());
   }
 
   @Test

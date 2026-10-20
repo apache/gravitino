@@ -1,0 +1,203 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/maintenance/actions/{jobId}/sample:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/jobId"
+    post:
+      tags:
+        - maintenance
+      summary: Report TMS maintenance S0 sample and gate
+      operationId: reportMaintenanceActionSample
+      description: |
+        Spark callback for cron maintenance (§5.2.2): persists S0 metrics and before_snapshot_id,
+        then returns whether the job should continue (drift / recommender gate).
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceActionSampleRequest"
+            examples:
+              MaintenanceActionSampleRequest:
+                $ref: "#/components/examples/MaintenanceActionSampleRequest"
+      responses:
+        "200":
+          description: Gate outcome after persisting the sample
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceActionSampleResponse"
+              examples:
+                MaintenanceActionSampleResponse:
+                  $ref: "#/components/examples/MaintenanceActionSampleResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or maintenance action does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/maintenance/actions/{jobId}/finish:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/jobId"
+    post:
+      tags:
+        - maintenance
+      summary: Finish TMS maintenance action
+      operationId: finishMaintenanceAction
+      description: |
+        Spark callback for cron maintenance (§5.2.2): optionally persists S1 metrics, then marks
+        the table_maintenance_action row finished.
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceActionFinishRequest"
+            examples:
+              MaintenanceActionFinishRequest:
+                $ref: "#/components/examples/MaintenanceActionFinishRequest"
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or maintenance action does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  parameters:
+    jobId:
+      name: jobId
+      in: path
+      description: Gravitino job run id (numeric)
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  schemas:
+    MaintenanceActionSampleRequest:
+      type: object
+      required:
+        - tableId
+        - policyId
+        - sampledSnapshotId
+        - headSnapshotId
+        - metricsJson
+      properties:
+        tableId:
+          type: integer
+          format: int64
+          description: Table entity id
+        policyId:
+          type: integer
+          format: int64
+          description: Policy entity id
+        sampledSnapshotId:
+          type: integer
+          format: int64
+          description: Iceberg snapshot id at sample time (S0)
+        headSnapshotId:
+          type: integer
+          format: int64
+          description: Iceberg HEAD snapshot id observed after the sample work
+        metricsJson:
+          type: string
+          description: Serialized metrics JSON for table_snapshot_metrics
+
+    MaintenanceActionFinishRequest:
+      type: object
+      properties:
+        afterSnapshotId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Iceberg HEAD after work (or S0 when skipped)
+        metricsJson:
+          type: string
+          nullable: true
+          description: Optional S1 metrics JSON
+
+    MaintenanceActionSampleResponse:
+      type: object
+      required:
+        - code
+        - continueMaintenance
+        - sampledSnapshotId
+        - headSnapshotId
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        continueMaintenance:
+          type: boolean
+          description: Whether the Spark job should run maintenance work
+        stopReason:
+          type: string
+          nullable: true
+          description: SNAPSHOT_DRIFT or RECOMMENDER_SKIP when stopping
+        sampledSnapshotId:
+          type: integer
+          format: int64
+        headSnapshotId:
+          type: integer
+          format: int64
+
+  examples:
+    MaintenanceActionSampleRequest:
+      value: {
+        "tableId": 1001,
+        "policyId": 2002,
+        "sampledSnapshotId": 9001,
+        "headSnapshotId": 9001,
+        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5,\"custom-delete-file-number\":3}"
+      }
+
+    MaintenanceActionFinishRequest:
+      value: {
+        "afterSnapshotId": 9002,
+        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9002}"
+      }
+
+    MaintenanceActionSampleResponse:
+      value: {
+        "code": 0,
+        "continueMaintenance": true,
+        "stopReason": null,
+        "sampledSnapshotId": 9001,
+        "headSnapshotId": 9001
+      }

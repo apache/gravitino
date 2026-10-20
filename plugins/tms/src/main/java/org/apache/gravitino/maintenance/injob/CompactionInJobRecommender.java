@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
 import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
@@ -37,9 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * In-job recommender for Iceberg compaction. Loads policy content and evaluates {@code
- * trigger-expr} via {@link CompactionTriggerEvaluator} (same QL path as the optimizer strategy
- * handler).
+ * In-job recommender for Iceberg compaction. Evaluates {@code trigger-expr} via {@link
+ * CompactionTriggerEvaluator} (same QL path as the optimizer strategy handler).
  */
 public final class CompactionInJobRecommender implements InJobRecommender {
 
@@ -53,7 +53,7 @@ public final class CompactionInJobRecommender implements InJobRecommender {
   }
 
   /**
-   * @param policyLookup loads policy content by id
+   * @param policyLookup loads policy content by id when the caller did not supply a policy entity
    */
   public CompactionInJobRecommender(PolicyLookup policyLookup) {
     this.policyLookup = Preconditions.checkNotNull(policyLookup);
@@ -62,20 +62,20 @@ public final class CompactionInJobRecommender implements InJobRecommender {
   @Override
   public RecommendDecision recommend(
       long tableId, long policyId, long sampledSnapshotId, String metricsJson) {
-    Optional<PolicyEntity> loaded = policyLookup.findById(policyId);
-    if (loaded.isEmpty()) {
-      LOG.warn("Compaction recommend skip: policy {} not found (table={})", policyId, tableId);
+    return recommend(tableId, policyId, sampledSnapshotId, metricsJson, null);
+  }
+
+  @Override
+  public RecommendDecision recommend(
+      long tableId,
+      long policyId,
+      long sampledSnapshotId,
+      String metricsJson,
+      @Nullable PolicyEntity policy) {
+    IcebergDataCompactionContent compaction = resolveCompactionContent(tableId, policyId, policy);
+    if (compaction == null) {
       return RecommendDecision.SKIP;
     }
-    PolicyContent content = loaded.get().content();
-    if (!(content instanceof IcebergDataCompactionContent)) {
-      LOG.warn(
-          "Compaction recommend skip: policy {} is not IcebergDataCompactionContent (table={})",
-          policyId,
-          tableId);
-      return RecommendDecision.SKIP;
-    }
-    IcebergDataCompactionContent compaction = (IcebergDataCompactionContent) content;
     Map<String, Object> metrics = parseMetricValues(metricsJson);
     if (metrics.isEmpty()
         || !metrics.containsKey(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)
@@ -95,6 +95,30 @@ public final class CompactionInJobRecommender implements InJobRecommender {
         metrics,
         maintain ? "MAINTAIN" : "SKIP");
     return maintain ? RecommendDecision.MAINTAIN : RecommendDecision.SKIP;
+  }
+
+  @Nullable
+  private IcebergDataCompactionContent resolveCompactionContent(
+      long tableId, long policyId, @Nullable PolicyEntity policy) {
+    PolicyContent content;
+    if (policy != null) {
+      content = policy.content();
+    } else {
+      Optional<PolicyEntity> loaded = policyLookup.findById(policyId);
+      if (loaded.isEmpty()) {
+        LOG.warn("Compaction recommend skip: policy {} not found (table={})", policyId, tableId);
+        return null;
+      }
+      content = loaded.get().content();
+    }
+    if (!(content instanceof IcebergDataCompactionContent)) {
+      LOG.warn(
+          "Compaction recommend skip: policy {} is not IcebergDataCompactionContent (table={})",
+          policyId,
+          tableId);
+      return null;
+    }
+    return (IcebergDataCompactionContent) content;
   }
 
   private static Map<String, Object> parseMetricValues(String metricsJson) {

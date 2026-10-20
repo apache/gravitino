@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Dispatches in-job recommenders by policy type. Compaction uses threshold evaluation; other
- * maintenance types keep {@link AlwaysMaintainInJobRecommender} until type-specific content lands.
+ * maintenance types evaluate policy {@code trigger-expr} (orphan {@code true}, expire/manifest
+ * placeholders {@code false}).
  */
 public final class TypeDispatchingInJobRecommender implements InJobRecommender {
 
@@ -38,28 +39,28 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
 
   private final PolicyLookup policyLookup;
   private final InJobRecommender compactionRecommender;
-  private final InJobRecommender defaultRecommender;
+  private final InJobRecommender triggerExprRecommender;
 
   /** Production wiring. */
   public TypeDispatchingInJobRecommender() {
     this(
         new RelationalPolicyLookup(),
         new CompactionInJobRecommender(),
-        AlwaysMaintainInJobRecommender.INSTANCE);
+        new TriggerExprInJobRecommender());
   }
 
   /**
    * @param policyLookup policy loader
    * @param compactionRecommender compaction thresholds
-   * @param defaultRecommender fallback for non-compaction types
+   * @param triggerExprRecommender trigger-expr evaluation for non-compaction types
    */
   public TypeDispatchingInJobRecommender(
       PolicyLookup policyLookup,
       InJobRecommender compactionRecommender,
-      InJobRecommender defaultRecommender) {
+      InJobRecommender triggerExprRecommender) {
     this.policyLookup = Preconditions.checkNotNull(policyLookup);
     this.compactionRecommender = Preconditions.checkNotNull(compactionRecommender);
-    this.defaultRecommender = Preconditions.checkNotNull(defaultRecommender);
+    this.triggerExprRecommender = Preconditions.checkNotNull(triggerExprRecommender);
   }
 
   @Override
@@ -73,8 +74,10 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
     PolicyEntity policy = loaded.get();
     if (policy.policyType() == Policy.BuiltInType.ICEBERG_COMPACTION
         || policy.content() instanceof IcebergDataCompactionContent) {
-      return compactionRecommender.recommend(tableId, policyId, sampledSnapshotId, metricsJson);
+      return compactionRecommender.recommend(
+          tableId, policyId, sampledSnapshotId, metricsJson, policy);
     }
-    return defaultRecommender.recommend(tableId, policyId, sampledSnapshotId, metricsJson);
+    return triggerExprRecommender.recommend(
+        tableId, policyId, sampledSnapshotId, metricsJson, policy);
   }
 }

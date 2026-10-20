@@ -19,10 +19,10 @@
 package org.apache.gravitino.maintenance.injob;
 
 /**
- * Default cron in-job recommender: always maintain.
+ * In-job recommender that always returns {@link RecommendDecision#MAINTAIN}.
  *
- * <p>Cron expand already selected the table; the in-job gate still records {@code S0} and checks
- * snapshot drift. Type-specific threshold recommenders can replace this later.
+ * <p>Kept for tests and injectable overrides. Production dispatch uses {@link
+ * CompactionInJobRecommender} and {@link TriggerExprInJobRecommender}.
  */
 public final class AlwaysMaintainInJobRecommender implements InJobRecommender {
 

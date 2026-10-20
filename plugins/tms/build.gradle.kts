@@ -29,7 +29,7 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
-  implementation(project(":maintenance:optimizer"))
+  implementation(project(":maintenance:optimizer-api"))
   implementation(project(":server-common"))
 
   implementation(libs.bundles.jersey)

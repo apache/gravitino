@@ -43,8 +43,8 @@ import org.apache.gravitino.config.ConfigEntry;
  *
  * <p>{@link #IRC_AUTH_PREFIX} is an <strong>open</strong> passthrough for Spark / Iceberg REST
  * properties (for example {@code rest.auth.type}); any non-empty suffix under the prefix is loaded
- * and overlaid onto policy {@code jobOptions}. Auth wins on duplicate keys. Live {@code runJob}
- * wiring is a follow-up.
+ * and overlaid onto policy {@code jobOptions}. Auth wins on duplicate keys. Cron {@code runJob}
+ * packs those IRC keys into {@code spark_conf} as {@code spark.sql.catalog.<catalog>.*}.
  */
 public final class MaintenanceAuthConfigs {
 
@@ -57,6 +57,19 @@ public final class MaintenanceAuthConfigs {
    * rest.auth.type}.
    */
   public static final String IRC_AUTH_PREFIX = "gravitino.maintenance.ircAuth.";
+
+  /**
+   * Cluster-static base URI Spark jobs use for TMS sample/finish callbacks ({@code
+   * updater_options.gravitino_uri}). Policy {@code updaterOptions} may override.
+   */
+  public static final ConfigEntry<Optional<String>> GRAVITINO_MAINTENANCE_GRAVITINO_URI =
+      new ConfigBuilder("gravitino.maintenance.gravitinoUri")
+          .doc(
+              "Base URI for Spark → Gravitino TMS callbacks (sample/finish). Injected into cron "
+                  + "updater_options when the policy does not set gravitino_uri.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .createWithOptional();
 
   /** Auth mode: {@code none}, {@code simple}, {@code basic}, or {@code oauth}. */
   public static final String AUTH_TYPE_SUFFIX = "authType";

@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.MaintenanceActionClient;
 import org.apache.gravitino.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.dto.requests.MaintenanceActionSampleRequest;
 import org.apache.gravitino.dto.responses.MaintenanceActionSampleResponse;
@@ -63,12 +64,8 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
   private static final Logger LOG = LoggerFactory.getLogger(TmsIcebergMaintenanceJob.class);
 
-  /**
-   * Built-in template name submitted by TMS cron. Must match {@code
-   * MaintenanceJobTemplates.TMS_ICEBERG_MAINTENANCE_TEMPLATE} in the TMS plugin.
-   */
-  public static final String NAME =
-      JobTemplateProvider.BUILTIN_NAME_PREFIX + "tms-iceberg-maintenance";
+  /** Built-in template name submitted by TMS cron. */
+  public static final String NAME = JobTemplateProvider.BUILTIN_TMS_ICEBERG_MAINTENANCE;
 
   /** JobConf / CLI key for the maintenance kind ({@code maintenance_type}). */
   public static final String MAINTENANCE_TYPE_KEY = "maintenance_type";
@@ -181,16 +178,19 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
     SparkSession spark = sparkBuilder.getOrCreate();
     IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
     GravitinoClient client = null;
+    MaintenanceActionClient actionClient = null;
     Long afterSnapshotId = null;
     String finishMetrics = null;
+    boolean shouldFinish = false;
     try {
       client = openClient(updaterOptions);
+      actionClient = client.maintenanceActionClient();
       SnapshotSample s0 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
       afterSnapshotId = s0.snapshotId;
       finishMetrics = s0.metricsJson;
 
       MaintenanceActionSampleResponse gate =
-          client.reportMaintenanceSample(
+          actionClient.reportSample(
               jobId,
               new MaintenanceActionSampleRequest(
                   tableId, policyId, s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
@@ -206,13 +206,18 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         afterSnapshotId = s1.snapshotId;
         finishMetrics = s1.metricsJson;
       }
+      // Finish only on a clean exit (including gate-stop). Procedure failures leave the action
+      // open so OccupancyGate can reclaim when the Gravitino job becomes terminal.
+      shouldFinish = true;
       return 0;
     } catch (Exception e) {
       LOG.error("TMS Iceberg maintenance failed for job {} type={}", jobId, type.wireName, e);
       return 1;
     } finally {
       if (client != null) {
-        finishQuietly(client, jobId, afterSnapshotId, finishMetrics);
+        if (shouldFinish && actionClient != null) {
+          finishQuietly(actionClient, jobId, afterSnapshotId, finishMetrics);
+        }
         try {
           client.close();
         } catch (Exception closeError) {
@@ -308,6 +313,7 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   @VisibleForTesting
   static SnapshotSample sampleSnapshot(
       SparkSession spark, String catalogName, String tableIdentifier, MaintenanceType type) {
+    // Capture S0 first, then collect metrics (may take time), then re-read HEAD for the drift gate.
     long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
     Map<String, Object> payload = new HashMap<>();
     payload.put("maintenanceType", type.wireName());
@@ -315,16 +321,36 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
     if (type == MaintenanceType.REWRITE_DATA_FILES) {
       payload.putAll(collectCompactionMetrics(spark, catalogName, tableIdentifier));
     }
-    return new SnapshotSample(snapshotId, snapshotId, toMetricsJson(payload));
+    long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
+    return new SnapshotSample(snapshotId, headSnapshotId, toMetricsJson(payload));
   }
 
   /**
-   * Table-level compaction metrics from the Iceberg files metadata table (same formulas as {@link
-   * IcebergUpdateStatsAndMetricsJob}).
+   * Compaction metrics from the Iceberg files metadata table (same formulas as {@link
+   * IcebergUpdateStatsAndMetricsJob}). For partitioned tables, uses max partition MSE and sum of
+   * delete-file counts so any hot partition can trip {@code trigger-expr}.
    */
   @VisibleForTesting
   static Map<String, Object> collectCompactionMetrics(
       SparkSession spark, String catalogName, String tableIdentifier) {
+    boolean partitioned =
+        IcebergUpdateStatsAndMetricsJob.isPartitionedTable(spark, catalogName, tableIdentifier);
+    if (partitioned) {
+      String sql =
+          IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql(catalogName, tableIdentifier);
+      Row[] rows = (Row[]) spark.sql(sql).collect();
+      Map<String, Object> metrics = new HashMap<>();
+      double maxMse = 0D;
+      long deleteFiles = 0L;
+      for (Row row : rows) {
+        maxMse = Math.max(maxMse, numberAsDouble(row, "data-file-mse"));
+        deleteFiles += numberAsLong(row, "delete-file-number");
+      }
+      metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, maxMse);
+      metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, deleteFiles);
+      return metrics;
+    }
+
     String sql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql(catalogName, tableIdentifier);
     Row[] rows = (Row[]) spark.sql(sql).collect();
     if (rows.length == 0) {
@@ -392,13 +418,12 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   }
 
   private static void finishQuietly(
-      GravitinoClient client,
+      MaintenanceActionClient actionClient,
       long jobId,
       @Nullable Long afterSnapshotId,
       @Nullable String metricsJson) {
     try {
-      client.finishMaintenanceAction(
-          jobId, new MaintenanceActionFinishRequest(afterSnapshotId, metricsJson));
+      actionClient.finish(jobId, new MaintenanceActionFinishRequest(afterSnapshotId, metricsJson));
     } catch (Exception e) {
       LOG.warn("Best-effort TMS finish failed for job {} (control plane will reclaim)", jobId, e);
     }

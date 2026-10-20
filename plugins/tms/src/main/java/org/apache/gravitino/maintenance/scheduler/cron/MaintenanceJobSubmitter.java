@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.scheduler.cron;
 
 import java.util.Map;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.JobEntity;
 
 /**
@@ -27,7 +28,6 @@ import org.apache.gravitino.meta.JobEntity;
  *
  * <p>Production wiring uses {@link GravitinoEnv#jobOperationDispatcher()}; tests inject a fake.
  */
-@FunctionalInterface
 public interface MaintenanceJobSubmitter {
 
   /**
@@ -41,15 +41,33 @@ public interface MaintenanceJobSubmitter {
   long runJob(String metalake, String jobTemplateName, Map<String, String> jobConf);
 
   /**
+   * Best-effort cancel after a successful {@link #runJob} when occupancy bind fails.
+   *
+   * @param metalake metalake name
+   * @param jobId numeric Gravitino job run id
+   */
+  void cancelJob(String metalake, long jobId);
+
+  /**
    * @return submitter that delegates to {@link GravitinoEnv#jobOperationDispatcher()}
    */
   static MaintenanceJobSubmitter fromEnv() {
-    return (metalake, jobTemplateName, jobConf) -> {
-      JobEntity job =
-          GravitinoEnv.getInstance()
-              .jobOperationDispatcher()
-              .runJob(metalake, jobTemplateName, jobConf);
-      return job.id();
+    return new MaintenanceJobSubmitter() {
+      @Override
+      public long runJob(String metalake, String jobTemplateName, Map<String, String> jobConf) {
+        JobEntity job =
+            GravitinoEnv.getInstance()
+                .jobOperationDispatcher()
+                .runJob(metalake, jobTemplateName, jobConf);
+        return job.id();
+      }
+
+      @Override
+      public void cancelJob(String metalake, long jobId) {
+        GravitinoEnv.getInstance()
+            .jobOperationDispatcher()
+            .cancelJob(metalake, JobHandle.JOB_ID_PREFIX + jobId);
+      }
     };
   }
 }

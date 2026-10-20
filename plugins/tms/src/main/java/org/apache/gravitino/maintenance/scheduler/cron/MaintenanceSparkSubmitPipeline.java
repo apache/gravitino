@@ -18,18 +18,14 @@
  */
 package org.apache.gravitino.maintenance.scheduler.cron;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
 import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
@@ -41,7 +37,6 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
-import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +69,7 @@ public final class MaintenanceSparkSubmitPipeline {
   private final TableMaintenanceActionMetaService actionMetaService;
   private final MaintenanceJobSubmitter jobSubmitter;
   private final Config gravitinoConfig;
+  private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
   private final Function<List<Long>, List<ResolvedTableRef>> tableRefResolver;
 
@@ -120,6 +116,7 @@ public final class MaintenanceSparkSubmitPipeline {
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
     this.jobSubmitter = Preconditions.checkNotNull(jobSubmitter);
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
+    this.jobConfBuilder = new MaintenanceJobConfBuilder(gravitinoConfig);
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.claimTimeoutMs = claimTimeoutMs;
     this.tableRefResolver = Preconditions.checkNotNull(tableRefResolver);
@@ -207,7 +204,7 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
 
-    Map<String, String> jobConf = buildJobConf(policy);
+    Map<String, String> jobConf = jobConfBuilder.build(policy, ref.catalogName());
     jobConf.put("catalog_name", ref.catalogName());
     jobConf.put("table_identifier", ref.tableIdentifier());
     jobConf.put(TMS_TABLE_ID_KEY, Long.toString(tableId));
@@ -279,7 +276,7 @@ public final class MaintenanceSparkSubmitPipeline {
         continue;
       }
 
-      Map<String, String> jobConf = buildJobConf(policy);
+      Map<String, String> jobConf = jobConfBuilder.build(policy, ref.catalogName());
       jobConf.put("catalog_name", ref.catalogName());
       jobConf.put("table_identifier", ref.tableIdentifier());
       jobConf.put(TMS_TABLE_ID_KEY, Long.toString(ref.tableId()));
@@ -294,8 +291,9 @@ public final class MaintenanceSparkSubmitPipeline {
       OccupancyClaim claim,
       long tableId) {
     String metalake = policy.namespace().level(0);
+    Long jobId = null;
     try {
-      long jobId = jobSubmitter.runJob(metalake, templateName, jobConf);
+      jobId = jobSubmitter.runJob(metalake, templateName, jobConf);
       actionMetaService.bindJobId(claim, jobId);
       LOG.info(
           "Submitted cron-job for table {} policy {} as job {} (template={})",
@@ -304,6 +302,9 @@ public final class MaintenanceSparkSubmitPipeline {
           jobId,
           templateName);
     } catch (RuntimeException e) {
+      if (jobId != null) {
+        cancelJobQuietly(metalake, jobId);
+      }
       releaseClaimQuietly(claim);
       LOG.warn(
           "Failed cron-job submit for table {} policy {} (template={}): {}",
@@ -311,6 +312,18 @@ public final class MaintenanceSparkSubmitPipeline {
           policy.id(),
           templateName,
           e.toString());
+    }
+  }
+
+  private void cancelJobQuietly(String metalake, long jobId) {
+    try {
+      jobSubmitter.cancelJob(metalake, jobId);
+    } catch (RuntimeException cancelError) {
+      LOG.warn(
+          "Failed to cancel orphaned cron Spark job {} under metalake {} after bind failure",
+          jobId,
+          metalake,
+          cancelError);
     }
   }
 
@@ -330,29 +343,6 @@ public final class MaintenanceSparkSubmitPipeline {
       return Optional.empty();
     }
     return Optional.of(policy);
-  }
-
-  private Map<String, String> buildJobConf(PolicyEntity policy) {
-    PolicyExecutionSpec spec = executionSpec(policy.content());
-    Map<String, String> jobOptions =
-        MaintenanceAuthConfigs.overlayJobOptions(gravitinoConfig, spec.jobOptions());
-    Map<String, String> updaterOptions =
-        MaintenanceAuthConfigs.overlayUpdaterOptions(gravitinoConfig, spec.updaterOptions());
-
-    Map<String, String> jobConf = new LinkedHashMap<>(jobOptions);
-    jobConf.put(TMS_POLICY_ID_KEY, Long.toString(policy.id()));
-    MaintenanceJobTemplates.maintenanceType(policy.policyType())
-        .ifPresent(type -> jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPE_KEY, type));
-    if (!updaterOptions.isEmpty()) {
-      try {
-        jobConf.put(
-            UPDATER_OPTIONS_JOB_CONF_KEY,
-            JsonUtils.anyFieldMapper().writeValueAsString(updaterOptions));
-      } catch (JsonProcessingException e) {
-        throw new IllegalStateException("Failed to serialize updater_options for runJob", e);
-      }
-    }
-    return jobConf;
   }
 
   private void releaseClaimQuietly(OccupancyClaim claim) {
@@ -380,13 +370,6 @@ public final class MaintenanceSparkSubmitPipeline {
       }
     }
     return false;
-  }
-
-  private static PolicyExecutionSpec executionSpec(@Nullable PolicyContent content) {
-    if (content instanceof ExecutablePolicyContent) {
-      return ((ExecutablePolicyContent) content).executionSpec();
-    }
-    return PolicyExecutionSpec.empty();
   }
 
   @Nullable

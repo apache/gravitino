@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.scheduler.cron;
 
 import java.util.Optional;
+import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.policy.Policy;
 
 /**
@@ -31,10 +32,11 @@ import org.apache.gravitino.policy.Policy;
 public final class MaintenanceJobTemplates {
 
   /**
-   * Built-in template registered by {@code TmsIcebergMaintenanceJob} in the jobs module. Kept as a
-   * string here so {@code plugins/tms} does not depend on {@code maintenance/jobs}.
+   * Built-in template registered by {@code TmsIcebergMaintenanceJob} in the jobs module. Uses the
+   * shared {@link JobTemplateProvider} constant so the name cannot drift from the jobs module.
    */
-  public static final String TMS_ICEBERG_MAINTENANCE_TEMPLATE = "builtin-tms-iceberg-maintenance";
+  public static final String TMS_ICEBERG_MAINTENANCE_TEMPLATE =
+      JobTemplateProvider.BUILTIN_TMS_ICEBERG_MAINTENANCE;
 
   /** JobConf key for procedure dispatch inside the TMS template. */
   public static final String MAINTENANCE_TYPE_KEY = "maintenance_type";
