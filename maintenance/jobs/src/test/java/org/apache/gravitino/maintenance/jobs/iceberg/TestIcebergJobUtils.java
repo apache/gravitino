@@ -127,4 +127,17 @@ public class TestIcebergJobUtils {
     Map<String, String> configs = ImmutableMap.of("spark.master", "local[1]");
     assertEquals(configs, IcebergJobUtils.filterCustomSparkConfigs(configs, new SparkConf(false)));
   }
+
+  @Test
+  public void testFilterCustomSparkConfigsDropsKubernetesAndBlankConfigs() {
+    Map<String, String> configs =
+        ImmutableMap.of(
+            "spark.kubernetes.executor.secretKeyRef.TOKEN", "secret:token",
+            "spark.kubernetes.container.image", "other:1.0",
+            "spark.sql.shuffle.partitions", "",
+            "spark.executor.memory", "2g");
+    assertEquals(
+        ImmutableMap.of("spark.executor.memory", "2g"),
+        IcebergJobUtils.filterCustomSparkConfigs(configs, new SparkConf(false)));
+  }
 }

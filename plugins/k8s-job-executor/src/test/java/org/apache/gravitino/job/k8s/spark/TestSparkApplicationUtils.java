@@ -606,7 +606,7 @@ public class TestSparkApplicationUtils {
                 "jobs",
                 "spark.conf.spark.jars",
                 "https://repo/iceberg-spark-runtime.jar"));
-    for (String json : new String[] {"", " ", "{}", "null", "{\"spark.jars\":\" \"}"}) {
+    for (String json : new String[] {"", " ", "{}", "{\"spark.jars\":\" \"}"}) {
       SparkJobTemplate template =
           newTemplateBuilder()
               .withName("builtin-iceberg-expire-snapshots")
@@ -618,24 +618,49 @@ public class TestSparkApplicationUtils {
           "https://repo/iceberg-spark-runtime.jar", sparkConf.get("spark.jars"), json);
       Assertions.assertEquals("jobs", sparkConf.get("spark.kubernetes.namespace"), json);
     }
+  }
 
-    // A namespace in spark_conf chooses the namespace, like one in the template.
-    SparkJobTemplate withNamespace =
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSparkConfOfBuiltinJobIgnoresKubernetesConfigs() {
+    String json =
+        "{\"spark.kubernetes.namespace\":\"kube-system\","
+            + "\"spark.kubernetes.authenticate.driver.serviceAccountName\":\"admin\","
+            + "\"spark.kubernetes.container.image\":\"evil:1.0\","
+            + "\"spark.kubernetes.driver.secretKeyRef.TOKEN\":\"secret:token\","
+            + "\"spark.executor.memory\":\"2g\"}";
+    SparkJobTemplate template =
         newTemplateBuilder()
             .withName("builtin-iceberg-expire-snapshots")
-            .withArguments(
-                ImmutableList.of("--spark-conf", "{\"spark.kubernetes.namespace\":\"team-a\"}"))
+            .withArguments(ImmutableList.of("--spark-conf", json))
             .build();
+
     GenericKubernetesResource app =
-        SparkApplicationUtils.buildSparkApplication(CONTEXT, withNamespace, withDefaults);
-    Assertions.assertEquals("team-a", app.getMetadata().getNamespace());
+        SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs);
+
+    Assertions.assertEquals("default", app.getMetadata().getNamespace());
+    Map<String, String> sparkConf =
+        (Map<String, String>)
+            ((Map<String, Object>) app.getAdditionalProperties().get("spec")).get("sparkConf");
+    Assertions.assertEquals("default", sparkConf.get("spark.kubernetes.namespace"));
+    Assertions.assertEquals(
+        "spark", sparkConf.get("spark.kubernetes.authenticate.driver.serviceAccountName"));
+    Assertions.assertEquals(
+        "gravitino-spark:3.5.9", sparkConf.get("spark.kubernetes.container.image"));
+    Assertions.assertFalse(sparkConf.containsKey("spark.kubernetes.driver.secretKeyRef.TOKEN"));
+    Assertions.assertEquals("2g", sparkConf.get("spark.executor.memory"));
   }
 
   @Test
   public void testRejectInvalidSparkConfOfBuiltinJob() {
     for (String json :
         new String[] {
-          "{bad}", "[\"a\"]", "{\"spark.jars\":[\"a.jar\"]}", "{\"k\":{\"x\":\"y\"}}"
+          "{bad}",
+          "null",
+          "\"a\"",
+          "[\"a\"]",
+          "{\"spark.jars\":[\"a.jar\"]}",
+          "{\"k\":{\"x\":\"y\"}}"
         }) {
       SparkJobTemplate template =
           newTemplateBuilder()

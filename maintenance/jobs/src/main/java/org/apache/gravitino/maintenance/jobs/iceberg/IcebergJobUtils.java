@@ -58,6 +58,13 @@ public final class IcebergJobUtils {
   private static final Set<String> SUBMIT_DECIDED_CONFIGS =
       ImmutableSet.of("spark.master", "spark.submit.deployMode");
 
+  /**
+   * The prefix of the Kubernetes configurations, which a job run may not set in its custom Spark
+   * configurations: the driver creates the executor pods from them, with their image, service
+   * account, Secrets, and volumes. Only the job executor configurations and job templates set them.
+   */
+  private static final String SPARK_KUBERNETES_PREFIX = "spark.kubernetes.";
+
   private IcebergJobUtils() {}
 
   /**
@@ -199,7 +206,9 @@ public final class IcebergJobUtils {
    * SparkSession, against the configurations spark-submit has already set for the driver.
    *
    * <p>{@code spark.master} and {@code spark.submit.deployMode} are dropped if spark-submit has set
-   * them, as the job would otherwise run with another master than it was submitted to.
+   * them, as the job would otherwise run with another master than it was submitted to. The {@code
+   * spark.kubernetes.*} configurations are dropped, as whoever runs a job sets them here, while the
+   * driver creates the executor pods from them. A blank value leaves a configuration unset.
    *
    * @param configs the custom Spark configurations
    * @return the custom Spark configurations to apply
@@ -214,6 +223,19 @@ public final class IcebergJobUtils {
     Map<String, String> filtered = new LinkedHashMap<>();
     configs.forEach(
         (key, value) -> {
+          // A blank value leaves a configuration unset, as the k8s job executor does.
+          if (value == null || value.trim().isEmpty()) {
+            return;
+          }
+          if (key.startsWith(SPARK_KUBERNETES_PREFIX)) {
+            // The value isn't logged, as it may name a Secret.
+            LOG.warn(
+                "Ignored {} of the custom Spark configurations, as only the job executor"
+                    + " configurations and job templates may set {}*",
+                key,
+                SPARK_KUBERNETES_PREFIX);
+            return;
+          }
           if (SUBMIT_DECIDED_CONFIGS.contains(key) && submittedConf.contains(key)) {
             LOG.warn(
                 "Ignored {}={} of the custom Spark configurations, as the job is submitted with"

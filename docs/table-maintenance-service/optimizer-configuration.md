@@ -89,7 +89,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "table_identifier": "db.t1",
   "update_mode": "all",
   "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
-  "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
+  "spark_conf": "{\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
   "spark_master": "local[2]",
   "spark_executor_instances": "1",
   "spark_executor_cores": "1",

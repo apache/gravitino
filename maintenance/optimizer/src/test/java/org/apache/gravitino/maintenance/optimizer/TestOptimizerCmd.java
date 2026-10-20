@@ -563,8 +563,8 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("custom-metrics-updater"));
     Assertions.assertTrue(output[0].contains("spark.sql.catalog.rest"));
-    // The master of spark_conf is passed as the spark_master parameter.
-    Assertions.assertTrue(output[0].contains("spark_master=local[2]"));
+    // The master of spark_conf isn't passed as the spark_master parameter.
+    Assertions.assertTrue(output[0].contains("spark_master=, "));
   }
 
   @Test

@@ -231,7 +231,7 @@ Examples:
 SUMMARY: statistics totalRecords=3 tableRecords=2 partitionRecords=1 jobRecords=0
 DRY-RUN: strategy=iceberg-data-compaction identifier=rest_catalog.db.t1 score=95 jobTemplate=builtin-iceberg-rewrite-data-files jobOptions={catalog_name=rest_catalog, table_identifier=db.t1}
 SUBMIT: strategy=iceberg-data-compaction identifier=rest_catalog.db.t1 score=95 jobTemplate=builtin-iceberg-rewrite-data-files jobOptions={catalog_name=rest_catalog, table_identifier=db.t1} jobId=1f54c6d3-4e27-4cc8-bdfa-b05ecf59a4c2
-DRY-RUN: identifier=rest_catalog.db.t1 jobTemplate=builtin-iceberg-update-stats jobConfig={catalog_name=rest_catalog, table_identifier=db.t1, update_mode=all, updater_options={"gravitino_uri":"http://localhost:8090","metalake":"test"}, spark_conf={"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}}
+DRY-RUN: identifier=rest_catalog.db.t1 jobTemplate=builtin-iceberg-update-stats jobConfig={catalog_name=rest_catalog, table_identifier=db.t1, update_mode=all, updater_options={"gravitino_uri":"http://localhost:8090","metalake":"test"}, spark_conf={"spark.hadoop.fs.defaultFS":"file:///"}}
 SUMMARY: submit-update-stats-job total=1 submitted=1 dryRun=false
 MetricsResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, metrics={row_count=[{timestamp=1735689600, value=100}]}}
 EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, evaluation=true, evaluatorName=gravitino-metrics-evaluator, actionTimeSeconds=1735689600, rangeSeconds=86400, beforeMetrics={row_count=[MetricSample{timestampSeconds=1735686000, value=120}]}, afterMetrics={row_count=[MetricSample{timestampSeconds=1735689600, value=100}]}}
@@ -285,7 +285,9 @@ table, so it must be asked for explicitly.
 An empty `spark_master` leaves the master to the job executor: the local job executor runs the job
 with the spark-submit default `local[*]`, and the k8s job executor rejects any other master than a
 Kubernetes one. `spark.master` and `spark.submit.deployMode` in `spark_conf` are ignored, as the job
-is submitted with them already set.
+is submitted with them already set. So are the `spark.kubernetes.*` configurations in `spark_conf`,
+such as the namespace, the image, the service account, Secrets, and volumes: whoever runs a job sets
+`spark_conf`, so only the job executor configurations and job templates may set them.
 
 ## Update Statistics
 

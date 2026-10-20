@@ -223,7 +223,7 @@ update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+
       "table_identifier": "db.t1",
       "update_mode": "all",
       "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\"}",
-      "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
+      "spark_conf": "{\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
       "spark_master": "local[2]",
       "spark_executor_instances": "1",
       "spark_executor_cores": "1",
@@ -271,7 +271,7 @@ gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
 # Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
-gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
+gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS":"file:///"}
 EOF_CONF
 ```
 

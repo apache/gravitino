@@ -51,7 +51,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String DEFAULT_SPARK_EXECUTOR_CORES = "1";
   private static final String DEFAULT_SPARK_EXECUTOR_MEMORY = "1g";
   private static final String DEFAULT_SPARK_DRIVER_MEMORY = "1g";
-  private static final String SPARK_MASTER_KEY = "spark.master";
   private static final String SPARK_EXECUTOR_INSTANCES_KEY = "spark.executor.instances";
   private static final String SPARK_EXECUTOR_CORES_KEY = "spark.executor.cores";
   private static final String SPARK_EXECUTOR_MEMORY_KEY = "spark.executor.memory";
@@ -333,10 +332,9 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
 
     // An empty master leaves it to the job executor: spark-submit defaults to local[*], and the
-    // k8s job executor lets the operator decide it.
-    placeholders.put(
-        "spark_master",
-        firstNonBlank(submitterConfigs.get("spark_master"), sparkConfigs.get(SPARK_MASTER_KEY)));
+    // k8s job executor lets the operator decide it. spark.master in spark_conf isn't used, as the
+    // job ignores it there too.
+    placeholders.put("spark_master", firstNonBlank(submitterConfigs.get("spark_master")));
     placeholders.put(
         "spark_executor_instances",
         firstNonBlank(

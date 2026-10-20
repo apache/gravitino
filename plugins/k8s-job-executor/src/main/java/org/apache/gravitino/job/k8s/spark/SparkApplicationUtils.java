@@ -102,6 +102,11 @@ public final class SparkApplicationUtils {
   private static final Set<String> SUBMIT_DECIDED_CONFIGS =
       ImmutableSet.of(SPARK_MASTER, SPARK_DEPLOY_MODE);
 
+  // The prefix of the Kubernetes configurations, such as the namespace, the image, the service
+  // account, Secrets, and volumes. Whoever can run a built-in job sets its spark_conf, so only the
+  // job executor configurations and job templates may set them.
+  private static final String SPARK_KUBERNETES_PREFIX = "spark.kubernetes.";
+
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   // The environment variable names that Spark passes to the executors: Spark 3.5 drops any other
@@ -258,8 +263,10 @@ public final class SparkApplicationUtils {
    * {@code spark_conf} only once it starts, too late for the configurations that spark-submit
    * reads, such as {@code spark.jars}, so they are set in the SparkApplication as well. {@code
    * spark.master} and {@code spark.submit.deployMode} there are ignored, as the driver also ignores
-   * them. A blank value leaves a configuration unset, as it is what an optional template parameter
-   * becomes, so it doesn't override the default of the job executor.
+   * them, and so are the {@code spark.kubernetes.*} configurations, which only the job executor
+   * configurations and job templates may set: whoever can run a built-in job sets its {@code
+   * spark_conf}. A blank value leaves a configuration unset, as it is what an optional template
+   * parameter becomes, so it doesn't override the default of the job executor.
    */
   private static Map<String, String> getJobSparkConf(
       JobContext context, SparkJobTemplate template) {
@@ -279,6 +286,9 @@ public final class SparkApplicationUtils {
     getBuiltinSparkConf(template)
         .forEach(
             (key, value) -> {
+              if (StringUtils.isBlank(value)) {
+                return;
+              }
               if (SUBMIT_DECIDED_CONFIGS.contains(key)) {
                 LOG.warn(
                     "Ignored {}={} in spark_conf of job {} of built-in job template {}, as the"
@@ -287,7 +297,16 @@ public final class SparkApplicationUtils {
                     value,
                     context.jobId(),
                     template.name());
-              } else if (StringUtils.isNotBlank(value)) {
+              } else if (key.startsWith(SPARK_KUBERNETES_PREFIX)) {
+                // The value isn't logged, as it may name a Secret.
+                LOG.warn(
+                    "Ignored {} in spark_conf of job {} of built-in job template {}, as only the"
+                        + " k8s job executor configurations and job templates may set {}*",
+                    key,
+                    context.jobId(),
+                    template.name(),
+                    SPARK_KUBERNETES_PREFIX);
+              } else {
                 jobSparkConf.put(key, value);
               }
             });
@@ -296,6 +315,8 @@ public final class SparkApplicationUtils {
 
   private static Map<String, String> getBuiltinSparkConf(SparkJobTemplate template) {
     List<String> arguments = template.arguments();
+    // A built-in template has the argument once. A value of another argument that equals it would
+    // be followed by a value that isn't JSON, which rejects the job rather than skipping a check.
     int index = arguments.indexOf(BUILTIN_SPARK_CONF_ARGUMENT);
     if (index < 0 || index + 1 >= arguments.size()) {
       return ImmutableMap.of();
@@ -315,10 +336,13 @@ public final class SparkApplicationUtils {
               template.name(), e.getOriginalMessage()),
           e);
     }
-    // Parsed the way the built-in jobs parse it: a flat map whose null values are empty.
+    // The built-in jobs reject a JSON null as well.
     if (parsed == null) {
-      return ImmutableMap.of();
+      throw new IllegalArgumentException(
+          String.format(
+              "spark_conf of built-in job template %s isn't a JSON map: null", template.name()));
     }
+    // Parsed the way the built-in jobs parse it: a flat map whose null values are empty.
     Map<String, String> sparkConf = new LinkedHashMap<>();
     parsed.forEach(
         (key, value) -> {
