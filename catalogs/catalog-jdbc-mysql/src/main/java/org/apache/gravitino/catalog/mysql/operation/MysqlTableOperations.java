@@ -49,6 +49,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -65,6 +66,8 @@ import org.apache.gravitino.rel.types.Types;
 /** Table operations for MySQL. */
 public class MysqlTableOperations extends JdbcTableOperations {
 
+  private static final MysqlTablePropertiesMetadata TABLE_PROPERTIES_METADATA =
+      new MysqlTablePropertiesMetadata();
   private static final String BACK_QUOTE = "`";
   private static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
@@ -134,7 +137,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     if (MapUtils.isNotEmpty(properties)) {
       sqlBuilder.append(
           properties.entrySet().stream()
-              .map(entry -> String.format("%s = %s", entry.getKey(), entry.getValue()))
+              .map(entry -> generateTableProperty(entry.getKey(), entry.getValue()))
               .collect(Collectors.joining(",\n", "\n", "")));
     }
 
@@ -578,9 +581,22 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
     return setProperties.stream()
         .map(
-            setProperty ->
-                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
+            setProperty -> generateTableProperty(setProperty.getProperty(), setProperty.getValue()))
         .collect(Collectors.joining(",\n"));
+  }
+
+  private String generateTableProperty(String key, String value) {
+    Map<String, String> logicalProperties =
+        TABLE_PROPERTIES_METADATA.convertFromJdbcProperties(Collections.singletonMap(key, value));
+    Preconditions.checkArgument(
+        !logicalProperties.isEmpty(),
+        "Unsupported MySQL table option: %s. Supported options: %s",
+        key,
+        String.join(", ", MysqlTablePropertiesMetadata.GRAVITINO_CONFIG_TO_MYSQL.values()));
+    String encoded =
+        TABLE_PROPERTIES_METADATA.transformToJdbcProperties(logicalProperties).get(key);
+    Preconditions.checkArgument(encoded != null, "MySQL table option %s cannot be null", key);
+    return key + " = " + encoded;
   }
 
   private String updateColumnCommentFieldDefinition(
