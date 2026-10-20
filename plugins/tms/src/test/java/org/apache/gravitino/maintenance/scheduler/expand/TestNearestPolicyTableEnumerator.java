@@ -116,7 +116,8 @@ class TestNearestPolicyTableEnumerator {
         .thenReturn(List.of(policyFromTag(tag, policy)));
     stubEmptyParents(table);
 
-    Assertions.assertEquals(List.of(100L), enumerator.listTableIds(policy, 10, allowAll(), 0L));
+    Assertions.assertEquals(
+        List.of(100L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
   }
 
   @Test
@@ -209,7 +210,7 @@ class TestNearestPolicyTableEnumerator {
             eq(Entity.EntityType.CATALOG));
 
     Assertions.assertEquals(
-        List.of(101L), enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L));
+        List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L)));
   }
 
   @Test
@@ -274,7 +275,8 @@ class TestNearestPolicyTableEnumerator {
 
     // First two winners are cooling down; limit=1 must keep scanning to t3.
     ExpandOccupancyGate gate = (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
-    Assertions.assertEquals(List.of(102L), enumerator.listTableIds(policy, 1, gate, 60_000L));
+    Assertions.assertEquals(
+        List.of(102L), tableIds(enumerator.listTableIds(policy, 1, gate, 60_000L)));
   }
 
   @Test
@@ -315,7 +317,12 @@ class TestNearestPolicyTableEnumerator {
             eq(Entity.EntityType.TAG)))
         .thenReturn(List.of(policyFromTag(tagA, policy), policyFromTag(tagB, other)));
 
-    Assertions.assertEquals(List.of(), enumerator.listTableIds(policy, 10, allowAll(), 0L));
+    Assertions.assertEquals(
+        List.of(), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
+  }
+
+  private static List<Long> tableIds(List<ExpandTableCandidate> candidates) {
+    return candidates.stream().map(ExpandTableCandidate::tableId).toList();
   }
 
   private static ExpandOccupancyGate allowAll() {

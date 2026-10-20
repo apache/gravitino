@@ -33,8 +33,10 @@ import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.cron.CronJobData;
 import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceSparkSubmitPipeline;
+import org.apache.gravitino.maintenance.scheduler.cron.PendingCronExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.cron.RelationalCronJobScheduler;
 import org.apache.gravitino.maintenance.scheduler.expand.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.scheduler.expand.PolicyExpandPipeline;
@@ -114,12 +116,14 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
     OccupancyGate occupancyGate =
         new OccupancyGate(TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
+    ExpandOccupancyGate expandGate =
+        new PendingCronExpandOccupancyGate(occupancyGate::shouldSkip, dataSource);
     PolicyExpandPipeline pipeline =
         new PolicyExpandPipeline(
             new RelationalPolicyLookup(),
             new NearestPolicyTableEnumerator(),
             new RelationalCronJobScheduler(dataSource),
-            occupancyGate::shouldSkip,
+            expandGate,
             gravitinoConfig,
             config.expandEnqueueBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);
@@ -190,7 +194,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
       TableMaintenanceConfig config,
       int threads,
       String tableName,
-      Task<Void> task) {
+      Task<?> task) {
     return Scheduler.create(dataSource, task)
         .threads(threads)
         .pollingInterval(Duration.ofMillis(config.pollingIntervalMs()))
@@ -232,12 +236,12 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
    *
    * @return the {@code cron-job} task
    */
-  public static Task<Void> cronJobTask() {
-    return Tasks.custom(CRON_JOB, Void.class)
+  public static Task<CronJobData> cronJobTask() {
+    return Tasks.custom(CRON_JOB, CronJobData.class)
         .execute(
             (taskInstance, executionContext) -> {
               try {
-                CRON_SUBMIT.get().get().submit(taskInstance.getId());
+                CRON_SUBMIT.get().get().submit(taskInstance.getId(), taskInstance.getData());
               } catch (RuntimeException e) {
                 LOG.warn(
                     "TMS cron-job submit failed for instance {}; removing one-shot row",

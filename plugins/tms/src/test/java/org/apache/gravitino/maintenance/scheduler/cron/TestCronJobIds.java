@@ -35,11 +35,24 @@ class TestCronJobIds {
   }
 
   @Test
+  void testForBatchAndParseRoundTrip() {
+    Assertions.assertEquals("batch:0:9", CronJobIds.forBatch(0L, 9L));
+    Assertions.assertEquals("batch:12:9", CronJobIds.forBatch(12L, 9L));
+    Optional<CronJobIds.BatchPolicyIds> parsed = CronJobIds.parseBatch("batch:12:9");
+    Assertions.assertTrue(parsed.isPresent());
+    Assertions.assertEquals(12L, parsed.get().batchId());
+    Assertions.assertEquals(9L, parsed.get().policyId());
+  }
+
+  @Test
   void testParseRejectsInvalid() {
     Assertions.assertTrue(CronJobIds.parseTable(null).isEmpty());
     Assertions.assertTrue(CronJobIds.parseTable("batch:1:2").isEmpty());
     Assertions.assertTrue(CronJobIds.parseTable("table:").isEmpty());
     Assertions.assertTrue(CronJobIds.parseTable("table:1").isEmpty());
     Assertions.assertTrue(CronJobIds.parseTable("table:a:2").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseBatch(null).isEmpty());
+    Assertions.assertTrue(CronJobIds.parseBatch("table:1:2").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseBatch("batch:pending:9").isEmpty());
   }
 }

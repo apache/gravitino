@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.scheduler.cron;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -93,19 +94,37 @@ public final class MaintenanceSparkSubmitPipeline {
   }
 
   /**
-   * Runs one cron-job pick for {@code instanceId} ({@code table:{tableId}:{policyId}}).
+   * Runs one cron-job pick for {@code instanceId}.
+   *
+   * <p>{@code table:{tableId}:{policyId}} submits one table. {@code batch:{batchId}:{policyId}}
+   * submits each table id from {@code task_data} under the same policy (control-plane loop until a
+   * multi-table Spark template is wired).
    *
    * @param instanceId db-scheduler cron-job instance id
+   * @param data task payload; required for {@code batch:...} rows
    */
-  public void submit(String instanceId) {
-    Optional<CronJobIds.TablePolicyIds> parsed = CronJobIds.parseTable(instanceId);
-    if (parsed.isEmpty()) {
-      LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
+  public void submit(String instanceId, @Nullable CronJobData data) {
+    Optional<CronJobIds.TablePolicyIds> tableIds = CronJobIds.parseTable(instanceId);
+    if (tableIds.isPresent()) {
+      submitOne(tableIds.get().tableId(), tableIds.get().policyId());
       return;
     }
-    long tableId = parsed.get().tableId();
-    long policyId = parsed.get().policyId();
+    Optional<CronJobIds.BatchPolicyIds> batchIds = CronJobIds.parseBatch(instanceId);
+    if (batchIds.isPresent()) {
+      List<Long> tables = data == null ? List.of() : data.tableIds();
+      if (tables.isEmpty()) {
+        LOG.warn("Skipping cron-job submit for batch {} with empty task_data", instanceId);
+        return;
+      }
+      for (Long tableId : tables) {
+        submitOne(tableId, batchIds.get().policyId());
+      }
+      return;
+    }
+    LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
+  }
 
+  private void submitOne(long tableId, long policyId) {
     Optional<PolicyEntity> loaded = policyLookup.findById(policyId);
     if (loaded.isEmpty()) {
       LOG.info("Skipping cron-job submit for missing policy {} (table {})", policyId, tableId);
@@ -173,6 +192,15 @@ public final class MaintenanceSparkSubmitPipeline {
           templateName.get(),
           e.toString());
     }
+  }
+
+  /**
+   * Backward-compatible entry for tests that only pass the instance id.
+   *
+   * @param instanceId db-scheduler cron-job instance id
+   */
+  public void submit(String instanceId) {
+    submit(instanceId, null);
   }
 
   private Map<String, String> buildJobConf(PolicyEntity policy, long tableId, long policyId) {

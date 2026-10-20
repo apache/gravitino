@@ -121,14 +121,16 @@ public final class PolicyExpandPipeline {
     long minIntervalMs =
         MaintenanceMinIntervalConfigs.resolve(
             config, policy.policyType(), policyMinIntervalMs(policy.content()));
-    List<Long> toEnqueue =
+    List<ExpandTableCandidate> toEnqueue =
         tableEnumerator.listTableIds(policy, enqueueBatchSize, occupancyGate, minIntervalMs);
-    int scheduled = cronJobScheduler.enqueueDueNow(policyId, toEnqueue, enqueueBatchSize);
+    int scheduled =
+        cronJobScheduler.enqueueDueNow(policy.policyType(), policyId, toEnqueue, enqueueBatchSize);
     LOG.info(
-        "Expanded policy {}: enqueued {}/{} cron-jobs (minIntervalMs={}); next expand due {}",
+        "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}, minIntervalMs={}); next expand due {}",
         policyId,
         scheduled,
         toEnqueue.size(),
+        policy.policyType(),
         minIntervalMs,
         nextDue);
     return Optional.of(nextDue);

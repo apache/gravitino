@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
@@ -56,7 +57,7 @@ class TestPolicyExpandPipeline {
         pipeline(mockLookupEmpty(1L), mock(PolicyTableEnumerator.class), cronJobs, allowAll());
 
     Assertions.assertTrue(pipeline.expand(1L).isEmpty());
-    verify(cronJobs, never()).enqueueDueNow(anyLong(), any(), anyInt());
+    verify(cronJobs, never()).enqueueDueNow(any(), anyLong(), any(), anyInt());
   }
 
   @Test
@@ -70,7 +71,7 @@ class TestPolicyExpandPipeline {
             allowAll());
 
     Assertions.assertTrue(pipeline.expand(2L).isEmpty());
-    verify(cronJobs, never()).enqueueDueNow(anyLong(), any(), anyInt());
+    verify(cronJobs, never()).enqueueDueNow(any(), anyLong(), any(), anyInt());
   }
 
   @Test
@@ -84,7 +85,7 @@ class TestPolicyExpandPipeline {
             allowAll());
 
     Assertions.assertTrue(pipeline.expand(3L).isEmpty());
-    verify(cronJobs, never()).enqueueDueNow(anyLong(), any(), anyInt());
+    verify(cronJobs, never()).enqueueDueNow(any(), anyLong(), any(), anyInt());
   }
 
   @Test
@@ -96,7 +97,7 @@ class TestPolicyExpandPipeline {
 
     Assertions.assertTrue(pipeline.expand(4L).isEmpty());
     verify(tables, never()).listTableIds(any(), anyInt(), any(), anyLong());
-    verify(cronJobs, never()).enqueueDueNow(anyLong(), any(), anyInt());
+    verify(cronJobs, never()).enqueueDueNow(any(), anyLong(), any(), anyInt());
   }
 
   @Test
@@ -109,16 +110,19 @@ class TestPolicyExpandPipeline {
             eq(2),
             eq(gate),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
-        .thenReturn(List.of(10L, 11L));
+        .thenReturn(List.of(c(10L), c(11L)));
     CronJobScheduler cronJobs = mock(CronJobScheduler.class);
-    when(cronJobs.enqueueDueNow(eq(42L), eq(List.of(10L, 11L)), eq(2))).thenReturn(2);
+    when(cronJobs.enqueueDueNow(
+            eq(Policy.BuiltInType.ICEBERG_COMPACTION), eq(42L), eq(List.of(c(10L), c(11L))), eq(2)))
+        .thenReturn(2);
     PolicyExpandPipeline expandPipeline =
         pipeline(mockLookup(42L, policy), tables, cronJobs, gate, 2);
 
     Optional<Instant> next = expandPipeline.expand(42L);
     Assertions.assertTrue(next.isPresent());
     Assertions.assertTrue(next.get().isAfter(Instant.now().minusSeconds(1)));
-    verify(cronJobs).enqueueDueNow(42L, List.of(10L, 11L), 2);
+    verify(cronJobs)
+        .enqueueDueNow(Policy.BuiltInType.ICEBERG_COMPACTION, 42L, List.of(c(10L), c(11L)), 2);
   }
 
   @Test
@@ -126,15 +130,18 @@ class TestPolicyExpandPipeline {
     PolicyEntity policy = policy(true, CRON, 60_000L);
     ExpandOccupancyGate gate = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
-    when(tables.listTableIds(eq(policy), eq(10), eq(gate), eq(60_000L))).thenReturn(List.of(11L));
+    when(tables.listTableIds(eq(policy), eq(10), eq(gate), eq(60_000L)))
+        .thenReturn(List.of(c(11L)));
     CronJobScheduler cronJobs = mock(CronJobScheduler.class);
-    when(cronJobs.enqueueDueNow(eq(42L), eq(List.of(11L)), eq(10))).thenReturn(1);
+    when(cronJobs.enqueueDueNow(
+            eq(Policy.BuiltInType.ICEBERG_COMPACTION), eq(42L), eq(List.of(c(11L))), eq(10)))
+        .thenReturn(1);
 
     PolicyExpandPipeline expandPipeline =
         pipeline(mockLookup(42L, policy), tables, cronJobs, gate, 10);
     Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
     verify(tables).listTableIds(eq(policy), eq(10), eq(gate), eq(60_000L));
-    verify(cronJobs).enqueueDueNow(42L, List.of(11L), 10);
+    verify(cronJobs).enqueueDueNow(Policy.BuiltInType.ICEBERG_COMPACTION, 42L, List.of(c(11L)), 10);
   }
 
   @Test
@@ -147,9 +154,11 @@ class TestPolicyExpandPipeline {
             eq(10),
             eq(gate),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
-        .thenReturn(List.of(10L));
+        .thenReturn(List.of(c(10L)));
     CronJobScheduler cronJobs = mock(CronJobScheduler.class);
-    when(cronJobs.enqueueDueNow(eq(42L), eq(List.of(10L)), eq(10))).thenReturn(1);
+    when(cronJobs.enqueueDueNow(
+            eq(Policy.BuiltInType.ICEBERG_COMPACTION), eq(42L), eq(List.of(c(10L))), eq(10)))
+        .thenReturn(1);
 
     PolicyExpandPipeline expandPipeline =
         pipeline(mockLookup(42L, policy), tables, cronJobs, gate, 10);
@@ -178,6 +187,10 @@ class TestPolicyExpandPipeline {
       int batchSize) {
     return new PolicyExpandPipeline(
         lookup, tables, cronJobs, gate, new Config(false) {}, batchSize);
+  }
+
+  private static ExpandTableCandidate c(long tableId) {
+    return new ExpandTableCandidate(tableId, MetadataObject.Type.TABLE);
   }
 
   private static ExpandOccupancyGate allowAll() {

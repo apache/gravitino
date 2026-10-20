@@ -21,8 +21,10 @@ package org.apache.gravitino.maintenance.scheduler.expand;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
@@ -97,7 +99,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   @Override
-  public List<Long> listTableIds(
+  public List<ExpandTableCandidate> listTableIds(
       PolicyEntity policy, int limit, ExpandOccupancyGate occupancyGate, long minIntervalMs) {
     if (limit <= 0) {
       return List.of();
@@ -111,7 +113,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     NearestMaintenancePolicyResolver nearest =
         new NearestMaintenancePolicyResolver(entityStoreSupplier.get());
     Set<Long> seenTables = new LinkedHashSet<>();
-    Set<Long> enqueueable = new LinkedHashSet<>();
+    Map<Long, ExpandTableCandidate> enqueueable = new LinkedHashMap<>();
     long nowMs = System.currentTimeMillis();
     ScanContext ctx =
         new ScanContext(
@@ -140,12 +142,12 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       }
       for (GenericEntity object : objects) {
         if (enqueueable.size() >= limit) {
-          return new ArrayList<>(enqueueable);
+          return new ArrayList<>(enqueueable.values());
         }
         collectCandidates(object, ctx);
       }
     }
-    return new ArrayList<>(enqueueable);
+    return new ArrayList<>(enqueueable.values());
   }
 
   private void collectCandidates(GenericEntity object, ScanContext ctx) {
@@ -233,6 +235,10 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     if (decision.winnerPolicyId().orElse(-1L) != ctx.policyId) {
       return;
     }
+    MetadataObject winnerLevel = decision.winnerLevel();
+    if (winnerLevel == null) {
+      return;
+    }
     if (ctx.occupancyGate.shouldSkip(tableId, ctx.policyId, ctx.minIntervalMs, ctx.nowMs)) {
       LOG.debug(
           "Skip cron-job enqueue for table {} policy {} (in-flight or within minIntervalMs={})",
@@ -241,7 +247,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
           ctx.minIntervalMs);
       return;
     }
-    ctx.enqueueable.add(tableId);
+    ctx.enqueueable.put(tableId, new ExpandTableCandidate(tableId, winnerLevel.type()));
   }
 
   private static final class ScanContext {
@@ -253,7 +259,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     private final long minIntervalMs;
     private final long nowMs;
     private final Set<Long> seenTables;
-    private final Set<Long> enqueueable;
+    private final Map<Long, ExpandTableCandidate> enqueueable;
     private final int limit;
 
     private ScanContext(
@@ -265,7 +271,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         long minIntervalMs,
         long nowMs,
         Set<Long> seenTables,
-        Set<Long> enqueueable,
+        Map<Long, ExpandTableCandidate> enqueueable,
         int limit) {
       this.metalake = metalake;
       this.policyId = policyId;

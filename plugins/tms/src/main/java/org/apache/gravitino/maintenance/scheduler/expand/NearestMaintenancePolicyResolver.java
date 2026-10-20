@@ -83,7 +83,7 @@ final class NearestMaintenancePolicyResolver {
       if (atLevel.size() > 1) {
         return NearestPolicyDecision.conflict(object, new ArrayList<>(atLevel));
       }
-      return NearestPolicyDecision.winner(atLevel.first());
+      return NearestPolicyDecision.winner(atLevel.first(), object);
     }
     return NearestPolicyDecision.none();
   }

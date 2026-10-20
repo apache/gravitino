@@ -21,7 +21,9 @@ package org.apache.gravitino.maintenance.scheduler;
 /**
  * Gate used by expand before inserting a {@code cron-job} row.
  *
- * <p>Production wires {@link org.apache.gravitino.maintenance.occupancy.OccupancyGate#shouldSkip}.
+ * <p>Production expand wires {@link org.apache.gravitino.maintenance.occupancy.OccupancyGate}
+ * behind {@link org.apache.gravitino.maintenance.scheduler.cron.PendingCronExpandOccupancyGate} so
+ * queued {@code cron-job} rows also skip.
  */
 @FunctionalInterface
 public interface ExpandOccupancyGate {
