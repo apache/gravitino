@@ -110,8 +110,10 @@ public final class ClientAddressResolver {
    *
    * @param request the HTTP request
    * @return the client address in canonical form; the TCP peer address when {@code X-Forwarded-For}
-   *     is not honored
+   *     is not honored; {@code null} only when the container reports no peer address and {@code
+   *     X-Forwarded-For} is not honored
    */
+  @Nullable
   public String resolve(HttpServletRequest request) {
     String remoteAddr = request.getRemoteAddr();
     Optional<InetAddress> peer = parseAddress(remoteAddr);

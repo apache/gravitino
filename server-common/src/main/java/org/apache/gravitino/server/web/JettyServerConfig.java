@@ -460,10 +460,7 @@ public final class JettyServerConfig {
       this.clientAddressResolver = new ClientAddressResolver(trustedProxies);
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
-          String.format(
-              "Invalid value for %s%s: %s. Each entry must be an IP address or a CIDR block",
-              keyPrefix, TRUSTED_PROXIES.getKey(), e.getMessage()),
-          e);
+          String.format("%s%s: %s", keyPrefix, TRUSTED_PROXIES.getKey(), e.getMessage()), e);
     }
   }
 
@@ -632,7 +629,7 @@ public final class JettyServerConfig {
   }
 
   /**
-   * Returns the configured trusted proxies, as written in the configuration.
+   * Returns the configured trusted proxies, each entry trimmed and blank entries dropped.
    *
    * @return the trusted proxy IP addresses and CIDR blocks; empty when none are configured
    */
