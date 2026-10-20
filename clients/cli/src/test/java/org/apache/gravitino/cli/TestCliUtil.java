@@ -37,6 +37,9 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
@@ -256,6 +259,22 @@ public class TestCliUtil {
     when(mockFileset.storageLocation()).thenReturn(location);
 
     return mockFileset;
+  }
+
+  public static Function getMockFunction(
+      String name,
+      String comment,
+      FunctionType funcType,
+      boolean isDeterministic,
+      FunctionDefinition[] definitions) {
+    Function mockFunction = mock(Function.class);
+    when(mockFunction.name()).thenReturn(name);
+    when(mockFunction.comment()).thenReturn(comment);
+    when(mockFunction.functionType()).thenReturn(funcType);
+    when(mockFunction.deterministic()).thenReturn(isDeterministic);
+    when(mockFunction.definitions()).thenReturn(definitions);
+
+    return mockFunction;
   }
 
   /**
