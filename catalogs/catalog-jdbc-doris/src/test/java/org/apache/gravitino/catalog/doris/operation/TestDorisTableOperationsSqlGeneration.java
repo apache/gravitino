@@ -251,6 +251,30 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testAddAutoIncrementColumnIsRejected() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.addColumn(
+                        new String[] {"id"},
+                        Types.LongType.get(),
+                        null,
+                        TableChange.ColumnPosition.defaultPos(),
+                        false,
+                        true)));
+
+    Assertions.assertEquals(
+        "Doris does not support adding auto-increment column `id`; "
+            + "define auto-increment columns when creating the table",
+        exception.getMessage());
+  }
+
+  @Test
   public void testAddColumnDefaultValuesInGeneratedSql() {
     TestableDorisTableOperations ops = new TestableDorisTableOperations();
 
