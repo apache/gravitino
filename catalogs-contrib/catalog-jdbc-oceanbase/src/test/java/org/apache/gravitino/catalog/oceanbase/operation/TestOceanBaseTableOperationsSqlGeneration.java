@@ -19,9 +19,11 @@
 package org.apache.gravitino.catalog.oceanbase.operation;
 
 import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.catalog.jdbc.utils.ConnectionCountingDataSource;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -40,6 +42,11 @@ public class TestOceanBaseTableOperationsSqlGeneration {
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
     }
 
+    private TestableOceanBaseTableOperations(ConnectionCountingDataSource connections) {
+      this();
+      dataSource = connections.dataSource();
+    }
+
     public String createTableSql(String tableName, JdbcColumn[] columns) {
       return generateCreateTableSql(
           tableName,
@@ -50,6 +57,34 @@ public class TestOceanBaseTableOperationsSqlGeneration {
           Distributions.NONE,
           Indexes.EMPTY_INDEXES);
     }
+  }
+
+  @Test
+  void testPurgeIsRejectedWithoutExecutingSql() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations(connections);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> ops.purge("database", "test_table"));
+
+    Assertions.assertEquals(
+        "OceanBase does not support purge table in Gravitino, please use drop table",
+        exception.getMessage());
+    Assertions.assertTrue(connections.executedSql().isEmpty());
+    Assertions.assertEquals(0, connections.totalBorrows());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  void testDropStillExecutesDropTable() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations(connections);
+
+    Assertions.assertTrue(ops.drop("database", "test_table"));
+
+    Assertions.assertEquals(List.of("DROP TABLE `test_table`"), connections.executedSql());
+    Assertions.assertEquals(0, connections.borrowed());
   }
 
   @Test
