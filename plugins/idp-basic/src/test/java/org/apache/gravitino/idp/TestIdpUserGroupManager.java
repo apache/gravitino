@@ -135,6 +135,22 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
+  public void testChangePasswordWithOldPassword() throws IOException {
+    manager.addUser("testChangeWithOld", VALID_PASSWORD);
+
+    Assertions.assertTrue(
+        manager.changePassword("testChangeWithOld", NEW_VALID_PASSWORD, VALID_PASSWORD));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.changePassword("testChangeWithOld", VALID_PASSWORD, "wrong-old-password"));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+  }
+
+  @Test
   public void testAddGroup() throws IOException {
     IdpGroup group = manager.addGroup("testAddGroup");
     Assertions.assertEquals("testAddGroup", group.name());

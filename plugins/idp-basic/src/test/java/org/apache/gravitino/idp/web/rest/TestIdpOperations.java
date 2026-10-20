@@ -34,6 +34,12 @@ import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
@@ -53,7 +59,9 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -62,6 +70,21 @@ class TestIdpOperations extends JerseyTest {
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String VALID_PASSWORD = "Passw0rd-For-User";
   private static final IdpUserGroupManager MANAGER = mock(IdpUserGroupManager.class);
+
+  private static Config previousConfig;
+
+  @BeforeAll
+  static void installServiceAdminConfig() throws Exception {
+    previousConfig = GravitinoEnv.getInstance().config();
+    Config config = mock(Config.class);
+    when(config.get(Configs.SERVICE_ADMINS)).thenReturn(List.of("admin"));
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+  }
+
+  @AfterAll
+  static void restoreConfig() throws Exception {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+  }
 
   @BeforeEach
   void resetManager() {
@@ -79,6 +102,8 @@ class TestIdpOperations extends JerseyTest {
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteUser()).thenReturn(null);
+    when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
+        .thenReturn(new UserPrincipal("admin"));
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(IdpUserOperations.class);
@@ -133,8 +158,37 @@ class TestIdpOperations extends JerseyTest {
     when(MANAGER.removeUser("user1")).thenReturn(true);
 
     Assertions.assertEquals(
-        "user1", put("/idp/users/user1", req).readEntity(IdpUserResponse.class).getUser().name());
+        "user1",
+        put("/idp/users/user1/password", req).readEntity(IdpUserResponse.class).getUser().name());
     Assertions.assertTrue(delete("/idp/users/user1").readEntity(RemoveResponse.class).removed());
+  }
+
+  @Test
+  void testAdminSelfPasswordChangeRequiresOldPassword() {
+    ChangePasswordRequest missingOld = new ChangePasswordRequest(VALID_PASSWORD);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin/password", missingOld),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+
+    ChangePasswordRequest withOld = new ChangePasswordRequest(VALID_PASSWORD, "admin-old-pass12");
+    when(MANAGER.changePassword("admin", VALID_PASSWORD, "admin-old-pass12")).thenReturn(true);
+    when(MANAGER.getUser("admin")).thenReturn(buildUser("admin"));
+    Assertions.assertEquals(
+        "admin",
+        put("/idp/users/admin/password", withOld)
+            .readEntity(IdpUserResponse.class)
+            .getUser()
+            .name());
+  }
+
+  @Test
+  void testAdminResetRejectsOldPassword() {
+    ChangePasswordRequest req = new ChangePasswordRequest(VALID_PASSWORD, "other-old-pass12");
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/user1/password", req),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
   }
 
   @Test

@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.idp.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -36,23 +37,40 @@ import org.apache.gravitino.rest.RESTRequest;
 @Jacksonized
 public class ChangePasswordRequest implements RESTRequest {
 
-  @JsonProperty("password")
+  @JsonProperty("newPassword")
   @ToString.Exclude
-  private final String password;
+  private final String newPassword;
+
+  @JsonProperty("oldPassword")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @ToString.Exclude
+  private final String oldPassword;
 
   /** Default constructor for ChangePasswordRequest. (Used for Jackson deserialization.) */
   public ChangePasswordRequest() {
-    this(null);
+    this(null, null);
   }
 
   /**
-   * Creates a new ChangePasswordRequest.
+   * Creates a ChangePasswordRequest for an admin password reset (no old password).
    *
-   * @param password The new password of the built-in IdP user.
+   * @param newPassword The new password.
    */
-  public ChangePasswordRequest(String password) {
+  public ChangePasswordRequest(String newPassword) {
+    this(newPassword, null);
+  }
+
+  /**
+   * Creates a ChangePasswordRequest.
+   *
+   * @param newPassword The new password.
+   * @param oldPassword The caller's current password when changing their own password, or {@code
+   *     null} when a service admin resets another user's password.
+   */
+  public ChangePasswordRequest(String newPassword, String oldPassword) {
     super();
-    this.password = password;
+    this.newPassword = newPassword;
+    this.oldPassword = oldPassword;
   }
 
   /**
@@ -62,6 +80,6 @@ public class ChangePasswordRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    IdpCredentialValidator.validatePassword(password);
+    IdpCredentialValidator.validatePassword(newPassword, "newPassword");
   }
 }

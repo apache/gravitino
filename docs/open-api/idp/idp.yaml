@@ -106,11 +106,34 @@ paths:
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
+    delete:
+      tags:
+        - IDP
+      summary: Remove local user store user
+      description: Removes the specified local user store user.
+      operationId: removeIdpUser
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/users/{user}/password:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/user"
+
     put:
       tags:
         - IDP
       summary: Change local user store user password
-      description: Updates the password of the specified local user store user and returns the user object with unchanged group membership.
+      description: >
+        Changes the password of the specified local user store user and returns the user object.
+        Service admins may reset any user's password. Authenticated non-admin users may change only
+        their own password. Changing your own password requires `oldPassword` and verifies it
+        against the stored hash. A service admin resetting another user's password must omit
+        `oldPassword`.
       operationId: changeIdpUserPassword
       requestBody:
         required: true
@@ -119,8 +142,10 @@ paths:
             schema:
               $ref: "#/components/schemas/ChangePasswordRequest"
             examples:
-              ChangePasswordRequest:
-                $ref: "#/components/examples/ChangePasswordRequest"
+              ChangeUserPasswordRequest:
+                $ref: "#/components/examples/ChangeUserPasswordRequest"
+              ChangeOwnUserPasswordRequest:
+                $ref: "#/components/examples/ChangeOwnUserPasswordRequest"
       responses:
         "200":
           description: Returns the local user store user after the password change
@@ -151,20 +176,6 @@ paths:
               examples:
                 NotFoundException:
                   $ref: "#/components/examples/IdpUserUpdateNotFoundException"
-        "5xx":
-          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
-
-    delete:
-      tags:
-        - IDP
-      summary: Remove local user store user
-      description: Removes the specified local user store user.
-      operationId: removeIdpUser
-      responses:
-        "200":
-          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
-        "403":
-          $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -387,14 +398,21 @@ components:
     ChangePasswordRequest:
       type: object
       required:
-        - password
+        - newPassword
       properties:
-        password:
+        newPassword:
           type: string
           format: password
           minLength: 12
           maxLength: 64
           description: The new password of the local user store user.
+          writeOnly: true
+        oldPassword:
+          type: string
+          format: password
+          description: >
+            The caller's current password. Required when changing your own password; must be
+            omitted when a service admin resets another user's password.
           writeOnly: true
 
     AddGroupRequest:
@@ -460,9 +478,10 @@ components:
   responses:
     IdpForbiddenErrorResponse:
       description:
-        Forbidden - Only callers listed in `gravitino.authorization.serviceAdmins` may
-        manage local user store users and groups. Unauthenticated requests and authenticated
-        non-service-admin users receive this response.
+        Forbidden - Callers listed in `gravitino.authorization.serviceAdmins` may manage local
+        user store users and groups. Authenticated non-admin users may only `GET`
+        `/idp/users/{user}` or `PUT` `/idp/users/{user}/password` for their own username.
+        Unauthenticated requests and other non-admin IdP management calls receive this response.
       content:
         application/vnd.gravitino.v1+json:
           schema:
@@ -478,9 +497,15 @@ components:
         "password": "Passw0rd-1234"
       }
 
-    ChangePasswordRequest:
+    ChangeUserPasswordRequest:
       value: {
-        "password": "Passw0rd-5678"
+        "newPassword": "Passw0rd-5678"
+      }
+
+    ChangeOwnUserPasswordRequest:
+      value: {
+        "newPassword": "Passw0rd-5678",
+        "oldPassword": "Passw0rd-1234"
       }
 
     AddGroupRequest:
@@ -559,7 +584,7 @@ components:
       value: {
         "code": 1001,
         "type": "IllegalArgumentException",
-        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"password\" field is required and cannot be empty]"
+        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"newPassword\" field is required and cannot be empty]"
       }
 
     IdpAddGroupIllegalArgumentException:
