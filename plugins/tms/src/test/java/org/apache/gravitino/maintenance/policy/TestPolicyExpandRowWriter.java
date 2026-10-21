@@ -26,7 +26,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-class TestPolicyExpandScheduler extends TestJDBCBackend {
+class TestPolicyExpandRowWriter extends TestJDBCBackend {
 
   private static final String CRON = "0 0 2 * * ?";
   private static final String LATER_CRON = "0 30 4 * * ?";
@@ -34,8 +34,8 @@ class TestPolicyExpandScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSyncInsertsReschedulesAndRemovesTheExpandRow() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
-    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(dataSource);
+    PolicyExpandRowWriter writer = PolicyExpandRowWriter.joiningCurrentTransaction();
+    PolicyExpandRowWriter reader = PolicyExpandRowWriter.forReads(dataSource);
 
     SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, true, CRON));
     Instant firstDue = executionTime(reader, 42L);
@@ -58,8 +58,8 @@ class TestPolicyExpandScheduler extends TestJDBCBackend {
   @TestTemplate
   void testFailedTransactionRollsBackTheExpandRow() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
-    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(dataSource);
+    PolicyExpandRowWriter writer = PolicyExpandRowWriter.joiningCurrentTransaction();
+    PolicyExpandRowWriter reader = PolicyExpandRowWriter.forReads(dataSource);
 
     Assertions.assertThrows(
         IllegalStateException.class,
@@ -76,8 +76,8 @@ class TestPolicyExpandScheduler extends TestJDBCBackend {
   @TestTemplate
   void testInvalidCronFailsBeforeAnExpandRowIsWritten() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
-    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(dataSource);
+    PolicyExpandRowWriter writer = PolicyExpandRowWriter.joiningCurrentTransaction();
+    PolicyExpandRowWriter reader = PolicyExpandRowWriter.forReads(dataSource);
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -94,8 +94,8 @@ class TestPolicyExpandScheduler extends TestJDBCBackend {
         .getDataSource();
   }
 
-  private static Instant executionTime(PolicyExpandScheduler scheduler, long policyId) {
-    return scheduler
+  private static Instant executionTime(PolicyExpandRowWriter rowWriter, long policyId) {
+    return rowWriter
         .scheduledExecutionTime(policyId)
         .orElseThrow(() -> new AssertionError("missing expand row " + policyId));
   }

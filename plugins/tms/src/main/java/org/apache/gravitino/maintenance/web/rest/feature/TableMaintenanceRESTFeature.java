@@ -28,7 +28,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.policy.PolicyExpandLifecycleHook;
-import org.apache.gravitino.maintenance.policy.PolicyExpandScheduler;
+import org.apache.gravitino.maintenance.policy.PolicyExpandRowWriter;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.policy.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -122,7 +122,7 @@ public class TableMaintenanceRESTFeature implements Feature {
 
   private static void registerLifecycleHook() {
     PolicyExpandLifecycleHook hook =
-        new PolicyExpandLifecycleHook(PolicyExpandScheduler.joiningCurrentTransaction());
+        new PolicyExpandLifecycleHook(PolicyExpandRowWriter.joiningCurrentTransaction());
     PolicyLifecycleHooks.register(hook);
     LIFECYCLE_HOOK.set(hook);
   }

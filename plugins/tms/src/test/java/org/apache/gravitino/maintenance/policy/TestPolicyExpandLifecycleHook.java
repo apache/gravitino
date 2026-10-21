@@ -41,8 +41,8 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   @TestTemplate
   void testEnabledMaintenancePolicyIsScheduled() {
-    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
-    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
+    PolicyExpandRowWriter writer = PolicyExpandRowWriter.joiningCurrentTransaction();
+    PolicyExpandRowWriter reader = PolicyExpandRowWriter.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(42L, true, compaction(CRON))));
@@ -52,8 +52,8 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   @TestTemplate
   void testDisabledMaintenancePolicyRemovesTheRow() {
-    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
-    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
+    PolicyExpandRowWriter writer = PolicyExpandRowWriter.joiningCurrentTransaction();
+    PolicyExpandRowWriter reader = PolicyExpandRowWriter.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(7L, true, compaction(CRON))));
@@ -65,8 +65,8 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   @TestTemplate
   void testNonMaintenancePolicyRemovesAnyStrayRow() {
-    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
-    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
+    PolicyExpandRowWriter writer = PolicyExpandRowWriter.joiningCurrentTransaction();
+    PolicyExpandRowWriter reader = PolicyExpandRowWriter.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
     PolicyContent custom = PolicyContents.custom(Map.of(), Set.of(MetadataObject.Type.TABLE), null);
 
@@ -80,8 +80,8 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   @TestTemplate
   void testDeleteRemovesByPolicyId() {
-    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
-    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
+    PolicyExpandRowWriter writer = PolicyExpandRowWriter.joiningCurrentTransaction();
+    PolicyExpandRowWriter reader = PolicyExpandRowWriter.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> writer.sync(11L, true, CRON));

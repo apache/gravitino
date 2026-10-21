@@ -54,11 +54,11 @@ import org.apache.gravitino.storage.relational.session.SqlSessions;
  * not commit or close that connection, so the policy transaction and the expand row commit
  * together.
  */
-public final class PolicyExpandScheduler {
+public final class PolicyExpandRowWriter {
 
   private final DataSource dataSource;
 
-  private PolicyExpandScheduler(DataSource dataSource) {
+  private PolicyExpandRowWriter(DataSource dataSource) {
     this.dataSource = dataSource;
   }
 
@@ -66,23 +66,22 @@ public final class PolicyExpandScheduler {
    * Opens a client that writes on the current thread's open SQL session.
    *
    * <p>The db-scheduler client is created on each call, because building it borrows a connection.
-   * That connection is the open session, so this scheduler must be used inside a policy
-   * transaction.
+   * That connection is the open session, so this writer must be used inside a policy transaction.
    *
-   * @return scheduler that inserts, moves, and deletes expand rows in the caller's transaction
+   * @return writer that inserts, moves, and deletes expand rows in the caller's transaction
    */
-  public static PolicyExpandScheduler joiningCurrentTransaction() {
-    return new PolicyExpandScheduler(new SessionDataSource());
+  public static PolicyExpandRowWriter joiningCurrentTransaction() {
+    return new PolicyExpandRowWriter(new SessionDataSource());
   }
 
   /**
    * Opens a client that reads committed rows from the entity-store pool.
    *
    * @param dataSource relational JDBC pool shared with the entity store
-   * @return scheduler that can read expand rows after the policy transaction commits
+   * @return writer that can read expand rows after the policy transaction commits
    */
-  public static PolicyExpandScheduler forReads(DataSource dataSource) {
-    return new PolicyExpandScheduler(dataSource);
+  public static PolicyExpandRowWriter forReads(DataSource dataSource) {
+    return new PolicyExpandRowWriter(dataSource);
   }
 
   private SchedulerClient client() {

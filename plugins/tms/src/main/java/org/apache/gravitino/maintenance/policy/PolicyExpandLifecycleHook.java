@@ -34,13 +34,13 @@ import org.apache.gravitino.policy.PolicyLifecycleHook;
  */
 public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
 
-  private final PolicyExpandScheduler scheduler;
+  private final PolicyExpandRowWriter rowWriter;
 
   /**
-   * @param scheduler expand-row writer bound to the current SQL session
+   * @param rowWriter expand-row writer bound to the current SQL session
    */
-  public PolicyExpandLifecycleHook(PolicyExpandScheduler scheduler) {
-    this.scheduler = scheduler;
+  public PolicyExpandLifecycleHook(PolicyExpandRowWriter rowWriter) {
+    this.rowWriter = rowWriter;
   }
 
   @Override
@@ -55,15 +55,15 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
 
   @Override
   public void beforeRemove(long policyId) {
-    scheduler.remove(policyId);
+    rowWriter.remove(policyId);
   }
 
   private void syncExpandRow(PolicyEntity policy) {
     if (!isMaintenance(policy.content())) {
-      scheduler.remove(policy.id());
+      rowWriter.remove(policy.id());
       return;
     }
-    scheduler.sync(policy.id(), policy.enabled(), timeTrigger(policy.content()));
+    rowWriter.sync(policy.id(), policy.enabled(), timeTrigger(policy.content()));
   }
 
   private static boolean isMaintenance(@Nullable PolicyContent content) {
