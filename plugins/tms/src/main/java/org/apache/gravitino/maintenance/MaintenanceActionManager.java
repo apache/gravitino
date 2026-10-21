@@ -27,10 +27,11 @@ import org.apache.gravitino.maintenance.injob.InJobGateOutcome;
 import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobPipeline;
 import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobSampler;
 import org.apache.gravitino.maintenance.injob.TypeDispatchingInJobRecommender;
-import org.apache.gravitino.maintenance.storage.MetalakeNames;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +44,7 @@ import org.slf4j.LoggerFactory;
 public class MaintenanceActionManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceActionManager.class);
+  private static final PolicyMetaService POLICY_SERVICE = PolicyMetaService.getInstance();
 
   private final TableMaintenanceInJobPipeline pipeline;
   private final TableMaintenanceActionMetaService actionMetaService;
@@ -60,7 +62,7 @@ public class MaintenanceActionManager {
             new TableMaintenanceInJobSampler(), new TypeDispatchingInJobRecommender()),
         TableMaintenanceActionMetaService.getInstance(),
         TableSnapshotMetricsMetaService.getInstance(),
-        MetalakeNames::forTableId);
+        MaintenanceActionManager::metalakeNameForPolicy);
   }
 
   /**
@@ -69,7 +71,7 @@ public class MaintenanceActionManager {
    * @param pipeline in-job sample and gate pipeline
    * @param actionMetaService action rows
    * @param metricsMetaService snapshot metrics rows
-   * @param metalakeLookup resolves a table id to its metalake name
+   * @param metalakeLookup resolves a policy id to its metalake name
    */
   public MaintenanceActionManager(
       TableMaintenanceInJobPipeline pipeline,
@@ -167,14 +169,19 @@ public class MaintenanceActionManager {
   }
 
   private void requireActionInMetalake(TableMaintenanceActionPO action, String metalake) {
-    String actionMetalake = metalakeLookup.apply(action.tableId());
+    String actionMetalake = metalakeLookup.apply(action.policyId());
     if (actionMetalake == null) {
       throw new NoSuchEntityException(
-          "no metalake for table_id=%s (job_id=%s)", action.tableId(), action.jobId());
+          "no metalake for policy_id=%s (job_id=%s)", action.policyId(), action.jobId());
     }
     if (!actionMetalake.equals(metalake)) {
       throw new NoSuchEntityException(
           "no maintenance action for job_id=%s under metalake %s", action.jobId(), metalake);
     }
+  }
+
+  private static String metalakeNameForPolicy(long policyId) {
+    PolicyEntity policy = POLICY_SERVICE.getPolicyById(policyId);
+    return policy == null ? null : policy.namespace().level(0);
   }
 }
