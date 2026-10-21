@@ -122,7 +122,7 @@ Gravitino catalog property names with the prefix `flink.bypass.` are passed to F
 
 ### Credential Vending
 
-For a catalog with a `Hive` or `JDBC` backend, the Flink connector fetches catalog-level credentials from Gravitino once, when the catalog is opened, and never refreshes them. Only static credential providers, such as `s3-secret-key`, `oss-secret-key` and `azure-account-key`, are vended to Flink:
+Unless the catalog uses a `REST` backend with `data-access` set to `vended-credentials`, the Flink connector fetches catalog-level credentials from Gravitino once, when the catalog is opened, and never refreshes them. Only static credential providers, such as `s3-secret-key`, `oss-secret-key` and `azure-account-key`, are vended to Flink:
 
 - `s3-token`, `gcs-token`, `adls-token`, `oss-token` and `cos-token` vend no credential at catalog level. Flink logs a warning and Iceberg uses the credentials available on the Flink nodes, such as an instance profile.
 - `aws-irsa` is rejected when the catalog is loaded, because its credential expires and is never refreshed.

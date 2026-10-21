@@ -113,9 +113,7 @@ public abstract class GravitinoIcebergCatalog extends BaseCatalog {
         Catalog gravitinoCatalog = catalog();
         List<String> tokenProviders =
             checkCredentialProviders(
-                catalogName(),
-                mutableIcebergProperties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE),
-                gravitinoCatalog.properties());
+                catalogName(), mutableIcebergProperties, gravitinoCatalog.properties());
         if (!tokenProviders.isEmpty()) {
           LOG.warn(
               "Catalog '{}' uses credential providers {}, which vend no credential at catalog"
@@ -175,22 +173,27 @@ public abstract class GravitinoIcebergCatalog extends BaseCatalog {
     return (AbstractCatalog) catalog;
   }
 
-  // Non-REST backends only receive the catalog-level credentials fetched once in open(); a REST
-  // backend is exempt because the inner REST catalog obtains per-table, refreshable credentials
-  // itself. aws-irsa is rejected: its credential is injected but never refreshed, so it overrides
-  // the node's own credentials and then expires. Path-scoped token providers vend nothing at
-  // catalog level, which leaves the node's own credentials in effect, so they are only returned
-  // for the caller to warn about. The REST check uses the effective inner catalog-type, since an
-  // explicit catalog-type may differ from the persisted catalog-backend. When no provider list is
-  // set, the server infers gcs-token from gcs-service-account-file, which is not reflected in the
-  // catalog properties seen by the client, so the same inference is applied here.
+  // Without per-table vended credentials, the inner catalog only receives the catalog-level
+  // credentials fetched once in open(). A REST backend with vended credentials enabled is exempt
+  // because the inner REST catalog obtains per-table, refreshable credentials itself. aws-irsa is
+  // rejected: its credential is injected but never refreshed, so it overrides the node's own
+  // credentials and then expires. Path-scoped token providers vend nothing at catalog level, which
+  // leaves the node's own credentials in effect, so they are only returned for the caller to warn
+  // about. The REST check uses the effective inner catalog-type, since an explicit catalog-type may
+  // differ from the persisted catalog-backend. When no provider list is set, the server infers
+  // gcs-token from gcs-service-account-file, which is not reflected in the catalog properties seen
+  // by the client, so the same inference is applied here.
   @VisibleForTesting
   static List<String> checkCredentialProviders(
       String catalogName,
-      @Nullable String icebergCatalogType,
-      Map<String, String> gravitinoCatalogProperties) {
-    if (IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST.equalsIgnoreCase(
-        icebergCatalogType)) {
+      Map<String, String> icebergCatalogProperties,
+      @Nullable Map<String, String> gravitinoCatalogProperties) {
+    boolean restWithVendedCredentials =
+        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST.equalsIgnoreCase(
+                icebergCatalogProperties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE))
+            && IcebergPropertiesConstants.ICEBERG_DATA_ACCESS_VENDED_CREDENTIALS.equalsIgnoreCase(
+                icebergCatalogProperties.get(IcebergPropertiesConstants.ICEBERG_ACCESS_DELEGATION));
+    if (restWithVendedCredentials || gravitinoCatalogProperties == null) {
       return Collections.emptyList();
     }
     String providers = gravitinoCatalogProperties.get(CredentialConstants.CREDENTIAL_PROVIDERS);

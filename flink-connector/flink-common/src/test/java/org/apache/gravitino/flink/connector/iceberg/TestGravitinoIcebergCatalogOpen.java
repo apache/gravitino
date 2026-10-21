@@ -48,11 +48,15 @@ class TestGravitinoIcebergCatalogOpen {
           "aws-irsa");
 
   @Test
-  void testOpenAllowsAwsIrsaWhenEffectiveCatalogTypeIsRest() {
+  void testOpenAllowsAwsIrsaWhenEffectiveCatalogTypeIsRestWithVendedCredentials() {
     AbstractCatalog innerCatalog = mock(AbstractCatalog.class);
     TestableIcebergCatalog catalog =
         new TestableIcebergCatalog(
-            ImmutableMap.of(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, "rest"),
+            ImmutableMap.of(
+                IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
+                "rest",
+                IcebergPropertiesConstants.ICEBERG_ACCESS_DELEGATION,
+                IcebergPropertiesConstants.ICEBERG_DATA_ACCESS_VENDED_CREDENTIALS),
             mockGravitinoCatalog(HIVE_BACKEND_WITH_AWS_IRSA),
             innerCatalog);
 
@@ -65,6 +69,17 @@ class TestGravitinoIcebergCatalogOpen {
     TestableIcebergCatalog catalog =
         new TestableIcebergCatalog(
             ImmutableMap.of(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, "hive"),
+            mockGravitinoCatalog(HIVE_BACKEND_WITH_AWS_IRSA),
+            mock(AbstractCatalog.class));
+
+    assertThrows(CatalogException.class, catalog::open);
+  }
+
+  @Test
+  void testOpenRejectsAwsIrsaWhenRestBackendHasNoVendedCredentials() {
+    TestableIcebergCatalog catalog =
+        new TestableIcebergCatalog(
+            ImmutableMap.of(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, "rest"),
             mockGravitinoCatalog(HIVE_BACKEND_WITH_AWS_IRSA),
             mock(AbstractCatalog.class));
 
