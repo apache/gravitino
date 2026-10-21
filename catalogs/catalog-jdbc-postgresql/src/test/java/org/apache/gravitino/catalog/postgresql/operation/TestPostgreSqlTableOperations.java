@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -593,7 +594,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
             });
 
     Assertions.assertTrue(
-        StringUtils.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
+        Strings.CS.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
   }
 
   @Test
@@ -678,7 +679,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                   primaryIndex);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             gravitinoRuntimeException.getMessage(),
             "column \"no_exist_1\" named in key does not exist"));
   }
@@ -730,7 +731,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                 PostgreSqlTableOperations.appendIndexesSql(
                     new Index[] {primary, unique1, unique2}, stringBuilder));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in PostgreSQL"));
   }
