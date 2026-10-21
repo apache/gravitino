@@ -143,7 +143,8 @@ public final class SqlSessions {
         if (commit) {
           sqlSession.commit();
         } else if (rollback) {
-          // Force the JDBC rollback. A pre-commit hook can write on this connection without going
+          // Force the JDBC rollback. A policy lifecycle hook can write on this connection without
+          // going
           // through a mapped statement, and MyBatis skips rollback when the session looks clean.
           // Closing that session then turns auto-commit back on, which would commit the hook write.
           sqlSession.rollback(true);

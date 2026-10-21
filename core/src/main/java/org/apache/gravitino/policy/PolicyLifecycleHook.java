@@ -34,7 +34,7 @@ import org.apache.gravitino.meta.PolicyEntity;
  * lifecycle ({@link #beforeUpdate} / {@link #afterUpdate}), not persist. A create, or an overwrite
  * that inserts because no row was found, fires persist.
  */
-public interface PolicyPreCommitHook {
+public interface PolicyLifecycleHook {
 
   /**
    * About to insert the policy row in the current transaction.

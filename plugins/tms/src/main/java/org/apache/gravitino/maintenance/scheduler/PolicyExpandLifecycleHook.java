@@ -24,7 +24,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
-import org.apache.gravitino.policy.PolicyPreCommitHook;
+import org.apache.gravitino.policy.PolicyLifecycleHook;
 
 /**
  * Keeps the expand-pool row aligned with a maintenance policy inside the policy transaction.
@@ -33,14 +33,14 @@ import org.apache.gravitino.policy.PolicyPreCommitHook;
  * blank trigger, and a non-maintenance write remove the row. Delete removes the row by policy id.
  * An invalid cron throws, so the policy write rolls back with the expand change.
  */
-public final class PolicyExpandPreCommitHook implements PolicyPreCommitHook {
+public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
 
   private final PolicyExpandScheduler scheduler;
 
   /**
    * @param scheduler expand-row writer bound to the current SQL session
    */
-  public PolicyExpandPreCommitHook(PolicyExpandScheduler scheduler) {
+  public PolicyExpandLifecycleHook(PolicyExpandScheduler scheduler) {
     this.scheduler = scheduler;
   }
 

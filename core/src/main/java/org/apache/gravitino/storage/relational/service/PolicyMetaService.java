@@ -39,8 +39,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.policy.PolicyPreCommitHook;
-import org.apache.gravitino.policy.PolicyPreCommitHooks;
+import org.apache.gravitino.policy.PolicyLifecycleHook;
+import org.apache.gravitino.policy.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -346,7 +346,7 @@ public class PolicyMetaService {
 
   /**
    * Writes the policy row and its content snapshot without committing, and fires the matching
-   * pre-commit lifecycle hooks around the DML.
+   * lifecycle hooks around the DML.
    *
    * <p>A plain create (or an overwrite that finds no row) uses persist hooks. An overwrite that
    * replaces an existing row uses update hooks and passes the entity as stored — including the
@@ -567,42 +567,42 @@ public class PolicyMetaService {
   }
 
   private static void beforePersist(PolicyEntity policy) {
-    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
     if (hook != null) {
       hook.beforePersist(policy);
     }
   }
 
   private static void afterPersist(PolicyEntity policy) {
-    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
     if (hook != null) {
       hook.afterPersist(policy);
     }
   }
 
   private static void beforeUpdate(PolicyEntity policy) {
-    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
     if (hook != null) {
       hook.beforeUpdate(policy);
     }
   }
 
   private static void afterUpdate(PolicyEntity policy) {
-    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
     if (hook != null) {
       hook.afterUpdate(policy);
     }
   }
 
   private static void beforeRemove(long policyId) {
-    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
     if (hook != null) {
       hook.beforeRemove(policyId);
     }
   }
 
   private static void afterRemove(long policyId) {
-    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
     if (hook != null) {
       hook.afterRemove(policyId);
     }

@@ -27,10 +27,10 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.scheduler.PolicyExpandPreCommitHook;
+import org.apache.gravitino.maintenance.scheduler.PolicyExpandLifecycleHook;
 import org.apache.gravitino.maintenance.scheduler.PolicyExpandScheduler;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
-import org.apache.gravitino.policy.PolicyPreCommitHooks;
+import org.apache.gravitino.policy.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
 import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * enabled (§7.1).
  *
  * <p>TMS does not register public REST resources in this change; the feature only owns server
- * lifecycle for in-process scheduling. While the pools are running, a policy pre-commit hook writes
+ * lifecycle for in-process scheduling. While the pools are running, a policy lifecycle hook writes
  * the matching {@code policy-expand} row on the same transaction as create, alter, enable, disable,
  * and delete. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs during Jetty shutdown
  * before {@code GravitinoEnv} closes the entity-store {@code DataSource}.
@@ -63,7 +63,7 @@ public class TableMaintenanceRESTFeature implements Feature {
   private static final AtomicReference<TableMaintenanceSchedulerPools> SCHEDULER_POOLS =
       new AtomicReference<>();
 
-  private static final AtomicReference<PolicyExpandPreCommitHook> PRE_COMMIT_HOOK =
+  private static final AtomicReference<PolicyExpandLifecycleHook> LIFECYCLE_HOOK =
       new AtomicReference<>();
 
   @Override
@@ -89,9 +89,9 @@ public class TableMaintenanceRESTFeature implements Feature {
     }
 
     try {
-      registerPreCommitHook();
+      registerLifecycleHook();
     } catch (RuntimeException e) {
-      unregisterPreCommitHook();
+      unregisterLifecycleHook();
       SCHEDULER_POOLS.set(null);
       pools.stop();
       throw e;
@@ -107,12 +107,12 @@ public class TableMaintenanceRESTFeature implements Feature {
   /**
    * Stops scheduler pools. Invoked from Jersey destroy and tests.
    *
-   * <p>Unregisters the pre-commit hook first so later policy writes skip expand sync. In-flight
+   * <p>Unregisters the lifecycle hook first so later policy writes skip expand sync. In-flight
    * transactions that already passed the hook may still finish; any expand drift is corrected when
    * pools start again.
    */
   public static void stopSchedulers() {
-    unregisterPreCommitHook();
+    unregisterLifecycleHook();
     TableMaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);
     if (pools != null) {
       pools.stop();
@@ -120,17 +120,17 @@ public class TableMaintenanceRESTFeature implements Feature {
     }
   }
 
-  private static void registerPreCommitHook() {
-    PolicyExpandPreCommitHook hook =
-        new PolicyExpandPreCommitHook(PolicyExpandScheduler.joiningCurrentTransaction());
-    PolicyPreCommitHooks.register(hook);
-    PRE_COMMIT_HOOK.set(hook);
+  private static void registerLifecycleHook() {
+    PolicyExpandLifecycleHook hook =
+        new PolicyExpandLifecycleHook(PolicyExpandScheduler.joiningCurrentTransaction());
+    PolicyLifecycleHooks.register(hook);
+    LIFECYCLE_HOOK.set(hook);
   }
 
-  private static void unregisterPreCommitHook() {
-    PolicyExpandPreCommitHook hook = PRE_COMMIT_HOOK.getAndSet(null);
+  private static void unregisterLifecycleHook() {
+    PolicyExpandLifecycleHook hook = LIFECYCLE_HOOK.getAndSet(null);
     if (hook != null) {
-      PolicyPreCommitHooks.unregister(hook);
+      PolicyLifecycleHooks.unregister(hook);
     }
   }
 

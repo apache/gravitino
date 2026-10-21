@@ -21,12 +21,12 @@ package org.apache.gravitino.policy;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 
-/** Holds the optional {@link PolicyPreCommitHook} registered by an extension. */
-public final class PolicyPreCommitHooks {
+/** Holds the optional {@link PolicyLifecycleHook} registered by an extension. */
+public final class PolicyLifecycleHooks {
 
-  private static final AtomicReference<PolicyPreCommitHook> HOOK = new AtomicReference<>();
+  private static final AtomicReference<PolicyLifecycleHook> HOOK = new AtomicReference<>();
 
-  private PolicyPreCommitHooks() {}
+  private PolicyLifecycleHooks() {}
 
   /**
    * Installs the hook invoked at policy create / update / delete lifecycle points inside the open
@@ -35,9 +35,9 @@ public final class PolicyPreCommitHooks {
    * @param hook hook to run during policy create, update, and delete transactions
    * @throws IllegalStateException if a hook is already registered
    */
-  public static void register(PolicyPreCommitHook hook) {
+  public static void register(PolicyLifecycleHook hook) {
     if (!HOOK.compareAndSet(null, hook)) {
-      throw new IllegalStateException("A policy pre-commit hook is already registered");
+      throw new IllegalStateException("A policy lifecycle hook is already registered");
     }
   }
 
@@ -46,7 +46,7 @@ public final class PolicyPreCommitHooks {
    *
    * @param hook hook passed to {@link #register}
    */
-  public static void unregister(PolicyPreCommitHook hook) {
+  public static void unregister(PolicyLifecycleHook hook) {
     HOOK.compareAndSet(hook, null);
   }
 
@@ -54,7 +54,7 @@ public final class PolicyPreCommitHooks {
    * @return the registered hook, or {@code null} when no extension is participating
    */
   @Nullable
-  public static PolicyPreCommitHook get() {
+  public static PolicyLifecycleHook get() {
     return HOOK.get();
   }
 }

@@ -35,7 +35,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-class TestPolicyExpandPreCommitHook extends TestJDBCBackend {
+class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   private static final String CRON = "0 0 2 * * ?";
 
@@ -43,7 +43,7 @@ class TestPolicyExpandPreCommitHook extends TestJDBCBackend {
   void testEnabledMaintenancePolicyIsScheduled() {
     PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
     PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
-    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(writer);
+    PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(42L, true, compaction(CRON))));
 
@@ -54,7 +54,7 @@ class TestPolicyExpandPreCommitHook extends TestJDBCBackend {
   void testDisabledMaintenancePolicyRemovesTheRow() {
     PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
     PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
-    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(writer);
+    PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(7L, true, compaction(CRON))));
     Assertions.assertTrue(reader.scheduledExecutionTime(7L).isPresent());
@@ -67,7 +67,7 @@ class TestPolicyExpandPreCommitHook extends TestJDBCBackend {
   void testNonMaintenancePolicyRemovesAnyStrayRow() {
     PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
     PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
-    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(writer);
+    PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
     PolicyContent custom = PolicyContents.custom(Map.of(), Set.of(MetadataObject.Type.TABLE), null);
 
     SessionUtils.doMultipleWithCommit(() -> writer.sync(1L, true, CRON));
@@ -82,7 +82,7 @@ class TestPolicyExpandPreCommitHook extends TestJDBCBackend {
   void testDeleteRemovesByPolicyId() {
     PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
     PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
-    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(writer);
+    PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> writer.sync(11L, true, CRON));
     Assertions.assertTrue(reader.scheduledExecutionTime(11L).isPresent());

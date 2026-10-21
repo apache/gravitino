@@ -66,8 +66,8 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
-import org.apache.gravitino.policy.PolicyPreCommitHook;
-import org.apache.gravitino.policy.PolicyPreCommitHooks;
+import org.apache.gravitino.policy.PolicyLifecycleHook;
+import org.apache.gravitino.policy.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -97,16 +97,16 @@ public class TestPolicyMetaService extends TestJDBCBackend {
       PolicyContents.custom(ImmutableMap.of("filed1", 123), supportedObjectTypes, null);
 
   @TestTemplate
-  public void testPreCommitHookFailureRollsBackInsert() throws IOException {
+  public void testLifecycleHookFailureRollsBackInsert() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
-    PolicyPreCommitHook hook =
-        new PolicyPreCommitHook() {
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
           @Override
           public void afterPersist(PolicyEntity policy) {
             throw new IllegalArgumentException("bad cron");
           }
         };
-    PolicyPreCommitHooks.register(hook);
+    PolicyLifecycleHooks.register(hook);
     try {
       PolicyEntity policyEntity =
           PolicyEntity.builder()
@@ -129,12 +129,12 @@ public class TestPolicyMetaService extends TestJDBCBackend {
               policyMetaService.getPolicyByIdentifier(
                   NameIdentifierUtil.ofPolicy(metalake.name(), "hook-rollback")));
     } finally {
-      PolicyPreCommitHooks.unregister(hook);
+      PolicyLifecycleHooks.unregister(hook);
     }
   }
 
   @TestTemplate
-  public void testPreCommitHookFailureRollsBackUpdate() throws IOException {
+  public void testLifecycleHookFailureRollsBackUpdate() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     PolicyEntity policy =
@@ -145,14 +145,14 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     policyMetaService.insertPolicy(policy, false);
 
-    PolicyPreCommitHook hook =
-        new PolicyPreCommitHook() {
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
           @Override
           public void afterUpdate(PolicyEntity updated) {
             throw new IllegalArgumentException("bad cron on update");
           }
         };
-    PolicyPreCommitHooks.register(hook);
+    PolicyLifecycleHooks.register(hook);
     try {
       assertThrows(
           IllegalArgumentException.class,
@@ -164,12 +164,12 @@ public class TestPolicyMetaService extends TestJDBCBackend {
           policy.comment(),
           policyMetaService.getPolicyByIdentifier(policy.nameIdentifier()).comment());
     } finally {
-      PolicyPreCommitHooks.unregister(hook);
+      PolicyLifecycleHooks.unregister(hook);
     }
   }
 
   @TestTemplate
-  public void testPreCommitHookFailureRollsBackDelete() throws IOException {
+  public void testLifecycleHookFailureRollsBackDelete() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     PolicyEntity policy =
@@ -180,21 +180,21 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     policyMetaService.insertPolicy(policy, false);
 
-    PolicyPreCommitHook hook =
-        new PolicyPreCommitHook() {
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
           @Override
           public void beforeRemove(long policyId) {
             throw new IllegalArgumentException("bad cron on delete");
           }
         };
-    PolicyPreCommitHooks.register(hook);
+    PolicyLifecycleHooks.register(hook);
     try {
       assertThrows(
           IllegalArgumentException.class,
           () -> policyMetaService.deletePolicy(policy.nameIdentifier()));
       assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
     } finally {
-      PolicyPreCommitHooks.unregister(hook);
+      PolicyLifecycleHooks.unregister(hook);
     }
   }
 
@@ -211,8 +211,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.insertPolicy(existing, false);
 
     List<String> events = new ArrayList<>();
-    PolicyPreCommitHook hook =
-        new PolicyPreCommitHook() {
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
           @Override
           public void beforePersist(PolicyEntity policy) {
             events.add("beforePersist " + policy.id());
@@ -233,7 +233,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             events.add("afterUpdate " + policy.id());
           }
         };
-    PolicyPreCommitHooks.register(hook);
+    PolicyLifecycleHooks.register(hook);
     try {
       long incomingId = RandomIdGenerator.INSTANCE.nextId();
       PolicyEntity sameNameOtherId =
@@ -245,7 +245,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
           List.of("beforeUpdate " + existing.id(), "afterUpdate " + existing.id()), events);
       assertFalse(events.stream().anyMatch(e -> e.contains(String.valueOf(incomingId))));
     } finally {
-      PolicyPreCommitHooks.unregister(hook);
+      PolicyLifecycleHooks.unregister(hook);
     }
   }
 

@@ -25,35 +25,35 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-public class TestPolicyPreCommitHooks {
+public class TestPolicyLifecycleHooks {
 
-  private final PolicyPreCommitHook hook = new PolicyPreCommitHook() {};
+  private final PolicyLifecycleHook hook = new PolicyLifecycleHook() {};
 
   @AfterEach
   void tearDown() {
-    PolicyPreCommitHooks.unregister(hook);
+    PolicyLifecycleHooks.unregister(hook);
   }
 
   @Test
   void testRegisterAndUnregister() {
-    PolicyPreCommitHooks.register(hook);
-    assertSame(hook, PolicyPreCommitHooks.get());
-    PolicyPreCommitHooks.unregister(hook);
-    assertNull(PolicyPreCommitHooks.get());
+    PolicyLifecycleHooks.register(hook);
+    assertSame(hook, PolicyLifecycleHooks.get());
+    PolicyLifecycleHooks.unregister(hook);
+    assertNull(PolicyLifecycleHooks.get());
   }
 
   @Test
   void testDoubleRegisterRejected() {
-    PolicyPreCommitHooks.register(hook);
-    PolicyPreCommitHook other = new PolicyPreCommitHook() {};
-    assertThrows(IllegalStateException.class, () -> PolicyPreCommitHooks.register(other));
-    assertSame(hook, PolicyPreCommitHooks.get());
+    PolicyLifecycleHooks.register(hook);
+    PolicyLifecycleHook other = new PolicyLifecycleHook() {};
+    assertThrows(IllegalStateException.class, () -> PolicyLifecycleHooks.register(other));
+    assertSame(hook, PolicyLifecycleHooks.get());
   }
 
   @Test
   void testUnregisterWrongHookIsNoOp() {
-    PolicyPreCommitHooks.register(hook);
-    PolicyPreCommitHooks.unregister(new PolicyPreCommitHook() {});
-    assertSame(hook, PolicyPreCommitHooks.get());
+    PolicyLifecycleHooks.register(hook);
+    PolicyLifecycleHooks.unregister(new PolicyLifecycleHook() {});
+    assertSame(hook, PolicyLifecycleHooks.get());
   }
 }
