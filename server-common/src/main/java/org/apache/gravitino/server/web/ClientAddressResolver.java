@@ -51,7 +51,8 @@ import org.apache.commons.lang3.StringUtils;
  *       client. Entries left of it were supplied by the client and are not trusted.
  *   <li>If every entry is a trusted proxy, return the left-most one.
  *   <li>If an entry is malformed (not an IP literal, or {@code unknown}), stop and return the last
- *       trusted hop seen so far, which may be the TCP peer itself.
+ *       trusted hop seen so far, which may be the TCP peer itself. Empty list elements, such as the
+ *       one in {@code 203.0.113.5, , 10.2.2.2}, are ignored.
  * </ol>
  *
  * <p>Ports and IPv6 brackets ({@code 203.0.113.5:4711}, {@code [2001:db8::1]:4711}) are stripped
@@ -154,8 +155,12 @@ public final class ClientAddressResolver {
       if (header == null) {
         continue;
       }
-      for (String entry : header.split(",", -1)) {
-        entries.add(entry.trim());
+      for (String entry : header.split(",")) {
+        String trimmed = entry.trim();
+        // RFC 7230 section 7: empty list elements must be ignored, not treated as malformed.
+        if (!trimmed.isEmpty()) {
+          entries.add(trimmed);
+        }
       }
     }
     return entries.build();
@@ -258,13 +263,14 @@ public final class ClientAddressResolver {
       int prefix = maxBits;
       if (slash >= 0) {
         String prefixPart = text.substring(slash + 1).trim();
-        if (!StringUtils.isNumeric(prefixPart) || prefixPart.length() > 3) {
+        if (!StringUtils.isNumeric(prefixPart)) {
           throw invalid(text, "the prefix length must be a number");
         }
-        prefix = Integer.parseInt(prefixPart);
-        if (prefix > maxBits) {
+        // Check the length before parsing so a very long digit string cannot overflow.
+        if (prefixPart.length() > 3 || Integer.parseInt(prefixPart) > maxBits) {
           throw invalid(text, "the prefix length must be between 0 and " + maxBits);
         }
+        prefix = Integer.parseInt(prefixPart);
       }
       int prefixBits = writtenAsIpv4 ? prefix + IPV4_MAPPED_PREFIX_BITS : prefix;
       return new IpRange(mask(toIpv6Bytes(address), prefixBits), prefixBits);

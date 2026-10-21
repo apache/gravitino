@@ -201,7 +201,7 @@ public class TestClientAddressResolver {
         "10.2.2.2",
         TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "203.0.113.5, unknown, 10.2.2.2")));
     Assertions.assertEquals(
-        "10.2.2.2", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "203.0.113.5, , 10.2.2.2")));
+        "10.2.2.2", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "203.0.113.5, bad, 10.2.2.2")));
     Assertions.assertEquals(
         "10.0.0.1", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "203.0.113.5:http")));
     Assertions.assertEquals(
@@ -211,6 +211,20 @@ public class TestClientAddressResolver {
     Assertions.assertEquals("10.0.0.1", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "UNKNOWN")));
     // Host names are never resolved.
     Assertions.assertEquals("10.0.0.1", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "localhost")));
+  }
+
+  @Test
+  public void testEmptyListElementsAreIgnored() {
+    // RFC 7230 section 7: empty elements in a comma-separated list are ignored.
+    Assertions.assertEquals(
+        "203.0.113.5", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "203.0.113.5, , 10.2.2.2")));
+    Assertions.assertEquals(
+        "203.0.113.5", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "203.0.113.5,")));
+    Assertions.assertEquals(
+        "203.0.113.5", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", ",203.0.113.5,,")));
+    Assertions.assertEquals(
+        "203.0.113.5", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", "203.0.113.5", " ", "")));
+    Assertions.assertEquals("10.0.0.1", TRUST_PRIVATE_V4.resolve(request("10.0.0.1", " , ")));
   }
 
   @Test
@@ -249,6 +263,22 @@ public class TestClientAddressResolver {
               "Expected rejection of " + invalid);
       Assertions.assertTrue(e.getMessage().contains(invalid), e.getMessage());
     }
+  }
+
+  @Test
+  public void testOutOfRangePrefixReportsRange() {
+    for (String invalid : Arrays.asList("10.0.0.0/0128", "10.0.0.0/33", "fd00::/1290")) {
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> new ClientAddressResolver(ImmutableList.of(invalid)));
+      Assertions.assertTrue(e.getMessage().contains("must be between 0 and"), e.getMessage());
+    }
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new ClientAddressResolver(ImmutableList.of("10.0.0.0/abc")));
+    Assertions.assertTrue(e.getMessage().contains("must be a number"), e.getMessage());
   }
 
   @Test

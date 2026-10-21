@@ -166,6 +166,13 @@ class TestIcebergRequestContext {
   }
 
   @Test
+  void testMissingPeerAddressIsRecordedAsUnknown() {
+    HttpServletRequest request = requestWithoutHeader();
+    when(request.getRemoteAddr()).thenReturn(null);
+    Assertions.assertEquals("unknown", new IcebergRequestContext(request, "cat").remoteHostName());
+  }
+
+  @Test
   void testRemoteAddressFallsBackToPeerAndIgnoresForwardedFor() {
     HttpServletRequest request = requestWithHeader("X-Forwarded-For", "198.51.100.7");
     Assertions.assertEquals(

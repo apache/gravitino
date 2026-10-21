@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -38,6 +39,8 @@ public class IcebergRequestContext {
 
   /** Header that opts a drop purge request into asynchronous file cleanup. */
   public static final String ASYNC_PURGE_HEADER = "X-Gravitino-Async-Purge";
+
+  private static final String UNKNOWN_ADDRESS = "unknown";
 
   /**
    * @deprecated Kept only for backward-compatibility and will be removed in the next major release.
@@ -101,12 +104,13 @@ public class IcebergRequestContext {
     // RequestContextFilter, installed ahead of every Iceberg REST endpoint, has already resolved
     // the client address with the server's trusted-proxy rules. Without it, use the TCP peer
     // address, in the same canonical form: X-Forwarded-For cannot be trusted here because the
-    // trusted proxies are unknown.
+    // trusted proxies are unknown. A missing address is recorded as "unknown", as other events do.
     String contextAddress = RequestContext.getRemoteAddress();
-    if (contextAddress != null) {
-      return contextAddress;
-    }
-    return ClientAddressResolver.noTrustedProxies().resolve(request);
+    String address =
+        contextAddress != null
+            ? contextAddress
+            : ClientAddressResolver.noTrustedProxies().resolve(request);
+    return StringUtils.isBlank(address) ? UNKNOWN_ADDRESS : address;
   }
 
   /**
