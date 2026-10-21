@@ -241,7 +241,8 @@ jobs:
       - trino-multi-version
       - lance
       - multi-instance
-    if: always()
+    # Scheduled runs are skipped outside the upstream repository; do not report them as failures.
+    if: always() && (github.event_name != 'schedule' || github.repository == 'apache/gravitino')
     runs-on: ubuntu-latest
     steps:
       - name: Write summary

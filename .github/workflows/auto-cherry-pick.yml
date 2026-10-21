@@ -7,6 +7,8 @@ on:
 
 jobs:
   detect-cherry-pick-labels:
+    # Contributor forks run workflows for Fork CI; cherry-picks only apply upstream.
+    if: github.repository == 'apache/gravitino'
     runs-on: ubuntu-latest
     name: Detect cherry-pick labels from merged PR
     outputs:
