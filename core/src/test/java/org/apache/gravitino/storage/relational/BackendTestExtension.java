@@ -47,8 +47,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
-import org.junit.jupiter.api.extension.AfterAllCallback;
-import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -69,21 +67,23 @@ import org.slf4j.LoggerFactory;
  * <p>{@code SqlSessionFactoryHelper} is process-global, so only one backend can be live in a JVM.
  * The extension keeps it in a single slot and reuses it for the tests of one class, emptying it
  * before each test per the test's {@link DatabaseFixture}. It builds a new backend when the test
- * class or backend type changes and for every {@link ResetStrategy#FRESH_DATABASE} test, and closes
- * the class's backend when the class finishes.
+ * class or backend type changes and for every {@link ResetStrategy#FRESH_DATABASE} test.
+ *
+ * <p>JUnit closes each backend with the store that holds it: a shared backend lives in the test
+ * class's store and closes when the class finishes, a fresh one in the test's store and closes when
+ * the test finishes. The extension closes one by hand only to replace it or to discard it after a
+ * failed reset.
  *
  * <p>The slot is read and replaced without locking, so tests must run one at a time: the core
  * database lanes run in one JVM with JUnit parallel execution off.
  */
-public class BackendTestExtension
-    implements TestTemplateInvocationContextProvider, AfterAllCallback {
+public class BackendTestExtension implements TestTemplateInvocationContextProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(BackendTestExtension.class);
   private static final String DOCKER_TEST_FLAG = "dockerTest";
 
   private static final ExtensionContext.Namespace NAMESPACE =
       ExtensionContext.Namespace.create(BackendTestExtension.class);
-  // Root store: one slot serves every class, and JUnit closes a leftover when the run ends.
   private static final String CURRENT_BACKEND = "CURRENT_BACKEND";
 
   private final BackendFactory backendFactory;
@@ -96,20 +96,29 @@ public class BackendTestExtension
     this.backendFactory = backendFactory;
   }
 
-  @Override
-  public void afterAll(ExtensionContext context) throws Exception {
-    ExtensionContext.Store store = context.getRoot().getStore(NAMESPACE);
-    LiveBackend current = store.get(CURRENT_BACKEND, LiveBackend.class);
-    if (current != null && current.testClass == context.getRequiredTestClass()) {
-      closeCurrent(store);
+  // Store.get also reads the stores of enclosing contexts, but remove() only clears the context's
+  // own store, so walk up to the store that holds the backend. Removing it first leaves the slot
+  // empty even when close() fails.
+  private static void closeCurrent(ExtensionContext classContext) throws IOException {
+    for (ExtensionContext owner = classContext;
+        owner != null;
+        owner = owner.getParent().orElse(null)) {
+      LiveBackend current = owner.getStore(NAMESPACE).remove(CURRENT_BACKEND, LiveBackend.class);
+      if (current != null) {
+        current.close();
+        return;
+      }
     }
   }
 
-  private static void closeCurrent(ExtensionContext.Store store) throws IOException {
-    LiveBackend current = store.remove(CURRENT_BACKEND, LiveBackend.class);
-    if (current != null) {
-      current.close();
+  // Test template invocations and template methods are method contexts; the backend belongs to
+  // the class.
+  private static ExtensionContext classContext(ExtensionContext context) {
+    ExtensionContext current = context;
+    while (current.getTestMethod().isPresent()) {
+      current = current.getParent().orElseThrow();
     }
+    return current;
   }
 
   @Override
@@ -166,7 +175,7 @@ public class BackendTestExtension
     LiveBackend create(String backendType, Class<?> testClass) throws Exception;
   }
 
-  private class BackendSetupCallback implements BeforeEachCallback, AfterEachCallback {
+  private class BackendSetupCallback implements BeforeEachCallback {
     private final String backendType;
 
     private BackendSetupCallback(String backendType) {
@@ -175,28 +184,31 @@ public class BackendTestExtension
 
     @Override
     public void beforeEach(ExtensionContext context) throws Exception {
-      ExtensionContext.Store store = context.getRoot().getStore(NAMESPACE);
+      ExtensionContext classContext = classContext(context);
       Class<?> testClass = context.getRequiredTestClass();
       ResetStrategy resetStrategy = resetStrategy(context);
       boolean fresh = resetStrategy == ResetStrategy.FRESH_DATABASE;
-      LiveBackend current = store.get(CURRENT_BACKEND, LiveBackend.class);
+      // A fresh backend lives in the previous test's store, which JUnit has closed by now.
+      LiveBackend current =
+          classContext.getStore(NAMESPACE).get(CURRENT_BACKEND, LiveBackend.class);
       if (current != null
           && (fresh
               || current.testClass != testClass
               || !current.backendType.equals(backendType))) {
         // Only one backend can be live (see the class Javadoc), so the old one goes first.
-        closeCurrent(store);
+        closeCurrent(classContext);
         current = null;
       }
       if (current == null) {
         current = backendFactory.create(backendType, testClass);
-        store.put(CURRENT_BACKEND, current);
+        // JUnit closes the backend with the test (fresh) or the class (shared) that owns it.
+        (fresh ? context : classContext).getStore(NAMESPACE).put(CURRENT_BACKEND, current);
       }
       // Other core tests overwrite these globals, so point them back before every test.
       current.bindGravitinoEnv();
       if (!fresh) {
         // Runs before the test's own @BeforeEach, so its setup always starts from empty tables.
-        resetOrDiscard(store, current, resetStrategy);
+        resetOrDiscard(classContext, current, resetStrategy);
       }
 
       Object testInstance = context.getRequiredTestInstance();
@@ -206,23 +218,16 @@ public class BackendTestExtension
       }
     }
 
-    @Override
-    public void afterEach(ExtensionContext context) throws Exception {
-      if (resetStrategy(context) == ResetStrategy.FRESH_DATABASE) {
-        closeCurrent(context.getRoot().getStore(NAMESPACE));
-      }
-    }
-
     // A reset that fails (e.g. on a lock an earlier test left) would fail every later test the same
     // way, so drop the backend and let the next test build a clean one.
     private void resetOrDiscard(
-        ExtensionContext.Store store, LiveBackend current, ResetStrategy resetStrategy)
+        ExtensionContext classContext, LiveBackend current, ResetStrategy resetStrategy)
         throws Exception {
       try {
         current.reset(resetStrategy);
       } catch (Exception e) {
         try {
-          closeCurrent(store);
+          closeCurrent(classContext);
         } catch (IOException closeFailure) {
           e.addSuppressed(closeFailure);
         }
@@ -243,8 +248,8 @@ public class BackendTestExtension
   }
 
   /**
-   * Closes with the root store, in reverse insertion order, so before the containers {@code
-   * CloseContainerExtension} registered earlier.
+   * Closes with the class or test store that holds it, so always before the root store closes the
+   * containers {@code CloseContainerExtension} registered.
    */
   static class LiveBackend implements AutoCloseable {
     private final String backendType;
