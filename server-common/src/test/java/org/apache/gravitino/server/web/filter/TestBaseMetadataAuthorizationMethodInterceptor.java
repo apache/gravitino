@@ -36,6 +36,7 @@ import java.lang.reflect.Parameter;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
+import javax.ws.rs.GET;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -253,10 +254,29 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   public void testOperationFailureUsesProtocolMapper() throws Throwable {
     IllegalStateException failure = new IllegalStateException("operation failed");
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    TestInvocation invocation = invocation("unannotated", null);
+    TestInvocation invocation = invocation("operationFails", null);
     when(invocation.proceed()).thenThrow(failure);
 
     assertSame(failure, interceptor.invoke(invocation));
+  }
+
+  @Test
+  public void testMissingAuthorizationExpressionIsDenied() throws Throwable {
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    TestInvocation invocation = invocation("unannotated", "authorized");
+
+    ForbiddenException response =
+        assertInstanceOf(ForbiddenException.class, interceptor.invoke(invocation));
+    assertTrue(response.getMessage().contains("unannotated"));
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
+  public void testUnannotatedHelperProceeds() throws Throwable {
+    TestInvocation invocation = invocation("helper", "helper result");
+
+    assertEquals("helper result", new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation));
+    verify(invocation).proceed();
   }
 
   private static TestInvocation invocation(String methodName, Object result) throws Throwable {
@@ -361,7 +381,17 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
       return "unused";
     }
 
+    @GET
     private String unannotated() {
+      return "unused";
+    }
+
+    private String helper() {
+      return "unused";
+    }
+
+    @AuthorizationExpression(expression = "true")
+    private String operationFails() {
       return "unused";
     }
   }
