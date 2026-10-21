@@ -576,6 +576,46 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
   }
 
   @Test
+  public void testUpdateColumnDefaultValueKeepsAutoIncrement() {
+    String tableName = RandomNameUtils.genRandomName("auto_increment_table_");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("col_1")
+          .withType(Types.LongType.get())
+          .withAutoIncrement(true)
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("col_2")
+          .withType(Types.VarCharType.of(255))
+          .withNullable(false)
+          .build()
+    };
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_col_1", new String[][] {{"col_1"}})
+        };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        indexes);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnDefaultValue(new String[] {"col_1"}, Column.DEFAULT_VALUE_NOT_SET));
+
+    JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertTrue(loaded.columns()[0].autoIncrement());
+  }
+
+  @Test
   public void testCreateAndLoadTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_cl_table";
     String tableComment = "test_comment";
