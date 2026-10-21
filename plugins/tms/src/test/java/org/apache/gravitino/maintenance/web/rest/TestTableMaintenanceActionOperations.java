@@ -63,7 +63,7 @@ class TestTableMaintenanceActionOperations {
     pipeline = mock(TableMaintenanceInJobPipeline.class);
     actions = mock(TableMaintenanceActionMetaService.class);
     metrics = mock(TableSnapshotMetricsMetaService.class);
-    metalakeLookup = tableId -> METALAKE;
+    metalakeLookup = policyId -> METALAKE;
     ops = operations(metalakeLookup);
     ops.setHttpRequest(mock(HttpServletRequest.class));
   }
@@ -120,7 +120,7 @@ class TestTableMaintenanceActionOperations {
   @Test
   void testSampleWrongMetalakeReturns404() {
     when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
-    ops = operations(tableId -> "other-ml");
+    ops = operations(policyId -> "other-ml");
     ops.setHttpRequest(mock(HttpServletRequest.class));
 
     Response response =
