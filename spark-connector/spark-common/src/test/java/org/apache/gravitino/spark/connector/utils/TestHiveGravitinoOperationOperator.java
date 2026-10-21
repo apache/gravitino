@@ -1,0 +1,86 @@
+/*
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
+
+package org.apache.gravitino.spark.connector.utils;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import org.apache.gravitino.rel.SupportsPartitions;
+import org.apache.gravitino.rel.Table;
+import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.unsafe.types.UTF8String;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+/** Tests for {@link HiveGravitinoOperationOperator} partition-name building. */
+public class TestHiveGravitinoOperationOperator {
+
+  private static final StructType SCHEMA =
+      new StructType()
+          .add("dt", DataTypes.StringType, true)
+          .add("region", DataTypes.StringType, true);
+
+  private static final SupportsPartitions PARTS = mock(SupportsPartitions.class);
+
+  @Test
+  void testNullPartitionValueUsesHiveDefaultMarker() {
+    Table table = mock(Table.class);
+    when(table.supportPartitions()).thenReturn(PARTS);
+    ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
+    when(PARTS.dropPartition(name.capture())).thenReturn(true);
+
+    HiveGravitinoOperationOperator operator = new HiveGravitinoOperationOperator(table);
+    InternalRow ident = row("20240101", null);
+    operator.dropPartition(ident, SCHEMA);
+
+    // HMS stores null partition values as the default-partition marker; the read side maps the
+    // marker back to null, so the built name must carry the marker (not the literal "null").
+    assertEquals("dt=20240101/region=__HIVE_DEFAULT_PARTITION__", name.getValue());
+  }
+
+  @Test
+  void testSubsetAndReorderedNamesResolveByFieldName() {
+    Table table = mock(Table.class);
+    when(table.supportPartitions()).thenReturn(PARTS);
+    ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
+    when(PARTS.partitionExists(name.capture())).thenReturn(true);
+
+    HiveGravitinoOperationOperator operator = new HiveGravitinoOperationOperator(table);
+    // names=["region"] with ident holding a region value: the field must be resolved by NAME,
+    // not by the positional dt field (whose IntegerType getter would corrupt the string value).
+    // With a names subset, ident holds values for exactly those columns.
+    InternalRow ident = new GenericInternalRow(new Object[] {UTF8String.fromString("us")});
+    operator.partitionExists(new String[] {"region"}, ident, SCHEMA);
+
+    assertEquals("region=us", name.getValue());
+  }
+
+  private static InternalRow row(String dt, String region) {
+    return new GenericInternalRow(
+        new Object[] {
+          dt == null ? null : UTF8String.fromString(dt),
+          region == null ? null : UTF8String.fromString(region)
+        });
+  }
+}

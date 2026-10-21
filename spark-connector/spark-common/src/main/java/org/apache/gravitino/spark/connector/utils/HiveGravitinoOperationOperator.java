@@ -156,13 +156,19 @@ public class HiveGravitinoOperationOperator {
       String[] names, InternalRow ident, StructType partitionSchema) {
     StringBuilder partitionName = new StringBuilder();
     Preconditions.checkArgument(names != null, "Partition column names must not be null");
+    // The contract of SupportsPartitionManagement lets callers pass a subset (in any order) of
+    // the partition columns, with ident holding values for exactly those columns: resolve each
+    // field by NAME instead of position.
     for (int i = 0; i < names.length; i++) {
-      StructField structField = partitionSchema.apply(i);
+      StructField structField = partitionSchema.apply(names[i]);
       DataType dataType = structField.dataType();
+      String value = SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType);
+      // HMS stores a null partition value as the default-partition marker; the read side already
+      // maps the marker back to null, so emit the marker instead of the literal "null".
       partitionName.append(
           names[i]
               + PARTITION_VALUE_DELIMITER
-              + SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType));
+              + (value == null ? SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME : value));
       if (i < names.length - 1) {
         partitionName.append(PARTITION_NAME_DELIMITER);
       }
@@ -176,10 +182,11 @@ public class HiveGravitinoOperationOperator {
     for (int i = 0; i < numFields; i++) {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
+      String value = SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType);
       partitionName.append(
           structField.name()
               + PARTITION_VALUE_DELIMITER
-              + SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType));
+              + (value == null ? SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME : value));
       if (i < numFields - 1) {
         partitionName.append(PARTITION_NAME_DELIMITER);
       }
