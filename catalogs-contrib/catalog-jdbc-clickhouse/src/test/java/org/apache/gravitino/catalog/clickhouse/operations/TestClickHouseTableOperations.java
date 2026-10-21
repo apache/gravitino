@@ -2274,7 +2274,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
-  public void testAlterTableNullabilityValidationFails() {
+  public void testAlterTableNullabilityDropsNullDefault() {
     StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
     ops.initialize(
         null,
@@ -2284,15 +2284,14 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         new HashMap<>());
     ops.setTable(buildStubTableWithNullDefault());
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            ops.buildAlterSql(
-                "db",
-                "tbl",
-                new TableChange[] {
-                  TableChange.updateColumnNullability(new String[] {"c3"}, false)
-                }));
+    String sql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {TableChange.updateColumnNullability(new String[] {"c3"}, false)});
+    Assertions.assertTrue(sql.replaceAll("\\s+", " ").contains("MODIFY COLUMN `c3` String"), sql);
+    Assertions.assertFalse(sql.contains("Nullable"), sql);
+    Assertions.assertFalse(sql.contains("DEFAULT"), sql);
   }
 
   @Test

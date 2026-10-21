@@ -662,12 +662,24 @@ public abstract class JdbcTableOperations implements TableOperation {
     if (change.fieldName().length > 1) {
       throw new UnsupportedOperationException("Nested column names are not supported");
     }
-    String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    if (!change.nullable() && column.defaultValue().equals(Literals.NULL)) {
-      throw new IllegalArgumentException(
-          "column " + col + " with null default value cannot be changed to not null");
+    getJdbcColumnFromTable(table, change.fieldName()[0]);
+  }
+
+  /**
+   * Returns the default value to re-emit when a column definition is regenerated for a nullability
+   * change. A NULL default conflicts with NOT NULL, so it is dropped when the column becomes
+   * non-nullable.
+   *
+   * @param change the nullability change
+   * @param column the current column
+   * @return the default value for the regenerated column definition
+   */
+  protected static Expression defaultValueForNullabilityChange(
+      TableChange.UpdateColumnNullability change, JdbcColumn column) {
+    if (!change.nullable() && Literals.NULL.equals(column.defaultValue())) {
+      return DEFAULT_VALUE_NOT_SET;
     }
+    return column.defaultValue();
   }
 
   /**

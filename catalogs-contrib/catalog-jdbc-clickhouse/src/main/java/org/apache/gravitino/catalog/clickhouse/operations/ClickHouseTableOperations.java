@@ -1438,7 +1438,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     JdbcColumn updateColumn =
         JdbcColumn.builder()
             .withName(col)
-            .withDefaultValue(column.defaultValue())
+            .withDefaultValue(defaultValueForNullabilityChange(change, column))
             .withNullable(change.nullable())
             .withType(column.dataType())
             .withComment(column.comment())
