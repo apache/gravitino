@@ -108,6 +108,14 @@ public class JobManager implements JobOperationDispatcher {
 
   private static final long JOB_STATUS_PULL_MIN_INTERVAL_IN_MS = 60 * 1000L; // 1 minute
 
+  // A live owner of a node local job cancels it at its next status pull, and records it as
+  // CANCELLED at the pull after the process exits, so it answers a cancellation within about two
+  // pull intervals, as long as the process exits within one, e.g. it is killed forcibly within
+  // gravitino.jobExecutor.local.cancelForceKillDelayInMs. A job still CANCELLING after this many
+  // pull intervals is considered left behind by an owner that has exited. This assumes all servers
+  // use the same pull interval and have their clocks in sync.
+  private static final int CANCELLATION_TIMEOUT_IN_PULL_INTERVALS = 3;
+
   private final EntityStore entityStore;
 
   private final File stagingDir;
@@ -121,6 +129,8 @@ public class JobManager implements JobOperationDispatcher {
   private final int jobOutputMaxLines;
 
   private final int jobOutputMaxBytes;
+
+  private final long cancellationTimeoutInMs;
 
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
@@ -198,6 +208,8 @@ public class JobManager implements JobOperationDispatcher {
           jobStatusPullIntervalInMs,
           JOB_STATUS_PULL_MIN_INTERVAL_IN_MS);
     }
+    this.cancellationTimeoutInMs =
+        jobStatusPullIntervalInMs * CANCELLATION_TIMEOUT_IN_PULL_INTERVALS;
     this.statusPullExecutor =
         Executors.newSingleThreadScheduledExecutor(
             runnable -> {
@@ -770,18 +782,22 @@ public class JobManager implements JobOperationDispatcher {
                           || job.status() == JobHandle.Status.CANCELLING)
               .toList();
 
+      long now = System.currentTimeMillis();
       activeJobs.forEach(
           job -> {
-            // Only the job executor instance owning the job can query its status. The jobs
-            // owned by other servers are skipped, and the jobs left behind by a server that has
-            // exited are settled by cleanUpStagingDirs() once they expire.
-            if (!jobExecutor.ownsJob(job.jobExecutionId())) {
-              return;
-            }
             // An exception escaping this scheduled task would cancel all its later runs, so a
             // failure on one job must never stop the status pull of the others.
             try {
-              pullAndUpdateOwnedJobStatus(metalake, job);
+              // Only the job executor instance owning the job can query its status. The jobs
+              // owned by other servers are skipped, except a node local job whose cancellation
+              // its owner has not answered in time: the owner has likely exited, e.g. the server
+              // restarted, so nobody else would ever settle it. The other jobs left behind by a
+              // server that has exited are settled by cleanUpStagingDirs() once they expire.
+              if (jobExecutor.ownsJob(job.jobExecutionId())) {
+                pullAndUpdateOwnedJobStatus(metalake, job);
+              } else if (jobExecutor.isJobStateNodeLocal() && isCancellationUnanswered(job, now)) {
+                settleUnansweredCancellation(metalake, job, now);
+              }
             } catch (RuntimeException e) {
               LOG.error(
                   "Failed to update the status of job {} with execution id {} under metalake {}",
@@ -1408,6 +1424,39 @@ public class JobManager implements JobOperationDispatcher {
   private boolean isStaleActiveJob(JobEntity job, long now) {
     return !isFinishedStatus(job.status())
         && lastUpdatedTimeInMs(job) + jobStagingDirKeepTimeInMs < now;
+  }
+
+  private void settleUnansweredCancellation(String metalake, JobEntity job, long now) {
+    AtomicBoolean settled = new AtomicBoolean(false);
+    updateJobEntity(
+            metalake,
+            job,
+            latestJobEntity -> {
+              // The owner may have answered the cancellation since the listJobs() snapshot.
+              if (!isCancellationUnanswered(latestJobEntity, now)) {
+                return latestJobEntity;
+              }
+              settled.set(true);
+              return toUpdatedStatusJobEntity(
+                  latestJobEntity, JobExecutionInfo.of(JobHandle.Status.CANCELLED));
+            })
+        .filter(settledJob -> settled.get())
+        .ifPresent(
+            settledJob ->
+                LOG.warn(
+                    "Job {} with execution id {} under metalake {} has been cancelling for more "
+                        + "than {} ms without its owner answering, marking it as {}. This could be "
+                        + "due to the Gravitino server running the job having exited.",
+                    job.name(),
+                    job.jobExecutionId(),
+                    metalake,
+                    cancellationTimeoutInMs,
+                    settledJob.status()));
+  }
+
+  private boolean isCancellationUnanswered(JobEntity job, long now) {
+    return job.status() == JobHandle.Status.CANCELLING
+        && now - lastUpdatedTimeInMs(job) > cancellationTimeoutInMs;
   }
 
   private static long lastUpdatedTimeInMs(JobEntity job) {
