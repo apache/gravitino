@@ -18,8 +18,8 @@
 package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.apache.gravitino.client.integration.test.StatisticIT.TABLE_COMMENT;
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -87,7 +87,6 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createSchema(SCHEMA, "test", new HashMap<>());
     // try to load the schema as normal user, expect failure
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         RuntimeException.class,
         () -> {
           normalUserClient
@@ -95,7 +94,8 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadCatalog(CATALOG)
               .asSchemas()
               .loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -129,12 +129,12 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
     TableCatalog tableCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.createTable(
               NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
   }
 
   @AfterAll
@@ -157,11 +157,11 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     SupportsPartitions supportsPartitions = getTable1(tableCatalogNormalUser).supportPartitions();
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           supportsPartitions.addPartition(genPartition());
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     SupportsPartitions supportsPartitionsByAdmin = table1.supportPartitions();
     supportsPartitionsByAdmin.addPartition(genPartition());
   }
@@ -191,9 +191,9 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
         .revokePrivilegesFromRole(
             role, metadataObject, ImmutableSet.of(Privileges.SelectTable.allow()));
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
-        supportsPartitions::listPartitions);
+        supportsPartitions::listPartitions,
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     SupportsPartitions supportsPartitionsByAdmin = table1.supportPartitions();
     supportsPartitionsByAdmin.listPartitions();
     client
@@ -218,11 +218,11 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
         .revokePrivilegesFromRole(
             role, metadataObject, ImmutableSet.of(Privileges.SelectTable.allow()));
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           supportsPartitions.getPartition("col1=1");
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     SupportsPartitions supportsPartitionsByAdmin = table1.supportPartitions();
     supportsPartitionsByAdmin.getPartition("col1=1");
     client
@@ -242,11 +242,11 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
     SupportsPartitions supportsPartitions =
         tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1")).supportPartitions();
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           supportsPartitions.dropPartition("col1=1");
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     SupportsPartitions supportsPartitionsByAdmin = table1.supportPartitions();
     supportsPartitionsByAdmin.dropPartition("col1=1");
   }

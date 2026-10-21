@@ -279,7 +279,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testCreateTable() {
+  protected void testCreateTable() {
     // Choose a catalog
     reset();
 
@@ -345,7 +345,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testSelectModifyTableWithMetalakeLevelRole() {
+  protected void testSelectModifyTableWithMetalakeLevelRole() {
     // Choose a catalog
     reset();
 
@@ -430,7 +430,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testSelectModifyTableWithTableLevelRole() {
+  protected void testSelectModifyTableWithTableLevelRole() {
     // Choose a catalog
     reset();
 
@@ -496,7 +496,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testSelectOnlyTable() {
+  protected void testSelectOnlyTable() {
     // Choose a catalog
     reset();
 
@@ -603,7 +603,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testModifyOnlyTable() {
+  protected void testModifyOnlyTable() {
     // Choose a catalog
     reset();
 
@@ -686,7 +686,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testCreateAllPrivilegesRole() {
+  protected void testCreateAllPrivilegesRole() {
     // Choose a catalog
     reset();
 
@@ -735,7 +735,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testDeleteAndRecreateRole() {
+  protected void testDeleteAndRecreateRole() {
     // Choose a catalog
     reset();
 
@@ -801,7 +801,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testDeleteAndRecreateMetadataObject() {
+  protected void testDeleteAndRecreateMetadataObject() {
     // Choose a catalog
     reset();
 
@@ -872,7 +872,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testRenameMetadataObject() {
+  protected void testRenameMetadataObject() {
     // Choose a catalog
     reset();
 
@@ -910,7 +910,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testRenameMetadataObjectPrivilege() {
+  protected void testRenameMetadataObjectPrivilege() {
     // Choose a catalog
     reset();
 
@@ -959,7 +959,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testChangeOwner() {
+  protected void testChangeOwner() {
     // Choose a catalog
     reset();
 
@@ -1183,7 +1183,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     }
   }
 
-  void testDenyPrivileges() {
+  protected void testDenyPrivileges() {
     // Choose a catalog
     reset();
 
@@ -1248,7 +1248,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   // ISSUE-5892 Fix to grant privilege for the metalake
   @Test
-  void testGrantPrivilegesForMetalake() {
+  protected void testGrantPrivilegesForMetalake() {
     // Choose a catalog
     reset();
 

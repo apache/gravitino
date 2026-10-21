@@ -583,6 +583,7 @@ fun excludePackagesForSparkConnector(project: Project) {
 }
 
 val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
+val checkstyleVersion: String = libs.versions.checkstyle.get()
 
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
@@ -612,6 +613,17 @@ subprojects {
     // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.
     exclude(group = "log4j", module = "log4j")
   }
+
+  // Checkstyle carries only the import bans Spotless cannot express, such as JUnit 4.
+  apply(plugin = "checkstyle")
+  configure<CheckstyleExtension> {
+    toolVersion = checkstyleVersion
+    configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+    maxWarnings = 0
+  }
+  // The import bans need no type information; an empty classpath keeps checkstyle from building
+  // other modules' test jars.
+  tasks.withType<Checkstyle>().configureEach { classpath = files() }
 
   repositories {
     mavenCentral()
