@@ -89,11 +89,13 @@ args="${args# }"
 
 # Auto-map a testset to its dedicated docker compose container subset, unless
 # --test_containers was already given explicitly on the command line.
-declare -A TESTSET_CONTAINERS_MAP=(
-    ["jdbc-mysql"]="mysql"
-)
-if [ "$has_test_containers" = false ] && [ -n "${TESTSET_CONTAINERS_MAP[$test_set]:-}" ]; then
-    args="$args --test_containers=${TESTSET_CONTAINERS_MAP[$test_set]}"
+# A case statement, not an associative array: macOS ships bash 3.2, which has no `declare -A`.
+testset_containers=""
+case "$test_set" in
+    jdbc-mysql) testset_containers="mysql" ;;
+esac
+if [ "$has_test_containers" = false ] && [ -n "$testset_containers" ]; then
+    args="$args --test_containers=$testset_containers"
 fi
 
 TESTSETS_DIR="$GRAVITINO_ROOT_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets"
