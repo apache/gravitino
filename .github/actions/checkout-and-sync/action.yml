@@ -55,7 +55,7 @@ runs:
           exit 0
         fi
 
-        repository_response="$(curl --fail-with-body --silent --show-error \
+        repository_response="$(curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --retry-delay 5 \
           --header "Accept: application/vnd.github+json" \
           --header "Authorization: Bearer ${GH_TOKEN}" \
           --header "X-GitHub-Api-Version: 2022-11-28" \
@@ -72,7 +72,7 @@ runs:
         response="[]"
         match_count=0
         for attempt in 1 2 3; do
-          response="$(curl --fail-with-body --silent --show-error \
+          response="$(curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --retry-delay 5 \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer ${GH_TOKEN}" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
@@ -99,7 +99,7 @@ runs:
           # No pull request yet: guess the base as the upstream default branch or one of the
           # latest release branches, whichever the contributor branch is fewest commits ahead of.
           api() {
-            curl --fail-with-body --silent --show-error \
+            curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --retry-delay 5 \
               --header "Accept: application/vnd.github+json" \
               --header "Authorization: Bearer ${GH_TOKEN}" \
               --header "X-GitHub-Api-Version: 2022-11-28" \
@@ -113,7 +113,7 @@ runs:
           base_ref=""
           best_ahead=""
           for candidate in "${candidates[@]}"; do
-            ahead="$(api "/compare/${candidate}...${HEAD_REPOSITORY/\//:}:${HEAD_SHA}" | jq -r '.ahead_by')"
+            ahead="$(api "/compare/${candidate}...${HEAD_REPOSITORY/\//:}:${HEAD_SHA}?per_page=1" | jq -r '.ahead_by')"
             echo "${candidate}: contributor branch is ${ahead} commit(s) ahead"
             if [[ -z "${best_ahead}" || "${ahead}" -lt "${best_ahead}" ]]; then
               base_ref="${candidate}"
