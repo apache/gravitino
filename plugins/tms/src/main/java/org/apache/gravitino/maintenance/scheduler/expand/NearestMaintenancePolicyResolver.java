@@ -25,8 +25,10 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -73,8 +75,7 @@ public final class NearestMaintenancePolicyResolver {
    * @param policyType maintenance built-in type
    * @return winner, none, or same-level conflict
    */
-  public NearestPolicyDecision resolve(
-      String metalake, MetadataObject table, Policy.BuiltInType policyType) {
+  public Decision resolve(String metalake, MetadataObject table, Policy.BuiltInType policyType) {
     List<MetadataObject> chain = new ArrayList<>();
     chain.add(table);
     chain.addAll(MetadataObjectUtil.getParentMetadataObjects(table));
@@ -84,11 +85,11 @@ public final class NearestMaintenancePolicyResolver {
         continue;
       }
       if (atLevel.size() > 1) {
-        return NearestPolicyDecision.conflict(object, new ArrayList<>(atLevel));
+        return Decision.conflict(object, new ArrayList<>(atLevel));
       }
-      return NearestPolicyDecision.winner(atLevel.first(), object);
+      return Decision.winner(atLevel.first(), object);
     }
-    return NearestPolicyDecision.none();
+    return Decision.none();
   }
 
   private TreeSet<Long> matchingPolicyIds(
@@ -171,5 +172,87 @@ public final class NearestMaintenancePolicyResolver {
     }
     throw new IllegalArgumentException(
         "Unsupported policy association selector type: " + selector.type());
+  }
+
+  /** Result of nearest maintenance-policy resolution for one table and built-in type. */
+  public static final class Decision {
+
+    /** Outcome of nearest-policy resolution. */
+    public enum Kind {
+      /** Exactly one matching policy on the nearest non-empty level. */
+      WINNER,
+      /** No matching policy on the inheritance chain. */
+      NONE,
+      /** Two or more same-type policies on the nearest non-empty level. */
+      CONFLICT
+    }
+
+    private final Kind kind;
+    @Nullable private final Long winnerPolicyId;
+    @Nullable private final MetadataObject winnerLevel;
+    @Nullable private final MetadataObject conflictLevel;
+    private final List<Long> conflictingPolicyIds;
+
+    private Decision(
+        Kind kind,
+        @Nullable Long winnerPolicyId,
+        @Nullable MetadataObject winnerLevel,
+        @Nullable MetadataObject conflictLevel,
+        List<Long> conflictingPolicyIds) {
+      this.kind = kind;
+      this.winnerPolicyId = winnerPolicyId;
+      this.winnerLevel = winnerLevel;
+      this.conflictLevel = conflictLevel;
+      this.conflictingPolicyIds = conflictingPolicyIds;
+    }
+
+    static Decision winner(long policyId, MetadataObject level) {
+      return new Decision(Kind.WINNER, policyId, level, null, List.of());
+    }
+
+    static Decision none() {
+      return new Decision(Kind.NONE, null, null, null, List.of());
+    }
+
+    static Decision conflict(MetadataObject level, List<Long> policyIds) {
+      return new Decision(Kind.CONFLICT, null, null, level, List.copyOf(policyIds));
+    }
+
+    /**
+     * @return decision kind
+     */
+    public Kind kind() {
+      return kind;
+    }
+
+    /**
+     * @return winning policy id when {@link Kind#WINNER}
+     */
+    public Optional<Long> winnerPolicyId() {
+      return Optional.ofNullable(winnerPolicyId);
+    }
+
+    /**
+     * @return metadata level that produced the winner, or {@code null}
+     */
+    @Nullable
+    public MetadataObject winnerLevel() {
+      return winnerLevel;
+    }
+
+    /**
+     * @return metadata level that produced the conflict, or {@code null}
+     */
+    @Nullable
+    public MetadataObject conflictLevel() {
+      return conflictLevel;
+    }
+
+    /**
+     * @return conflicting policy ids when {@link Kind#CONFLICT}
+     */
+    public List<Long> conflictingPolicyIds() {
+      return conflictingPolicyIds;
+    }
   }
 }

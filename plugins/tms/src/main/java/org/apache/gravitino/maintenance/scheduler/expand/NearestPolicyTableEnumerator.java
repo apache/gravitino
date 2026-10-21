@@ -221,8 +221,9 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     if (tableId <= 0 || !ctx.seenTables.add(tableId)) {
       return;
     }
-    NearestPolicyDecision decision = ctx.nearest.resolve(ctx.metalake, tableObject, ctx.policyType);
-    if (decision.kind() == NearestPolicyDecision.Kind.CONFLICT) {
+    NearestMaintenancePolicyResolver.Decision decision =
+        ctx.nearest.resolve(ctx.metalake, tableObject, ctx.policyType);
+    if (decision.kind() == NearestMaintenancePolicyResolver.Decision.Kind.CONFLICT) {
       LOG.error(
           "Skip table {} for maintenance type {}: ambiguous policies {} on nearest level {} ({})",
           tableObject.fullName(),

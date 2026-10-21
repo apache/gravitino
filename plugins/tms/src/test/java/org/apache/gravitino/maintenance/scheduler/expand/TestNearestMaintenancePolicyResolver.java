@@ -91,9 +91,9 @@ class TestNearestMaintenancePolicyResolver {
             eq(Entity.EntityType.TAG)))
         .thenReturn(List.of(relation(catalogTag, catalogPolicy)));
 
-    NearestPolicyDecision decision =
+    NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(NearestPolicyDecision.Kind.WINNER, decision.kind());
+    Assertions.assertEquals(NearestMaintenancePolicyResolver.Decision.Kind.WINNER, decision.kind());
     Assertions.assertEquals(java.util.Optional.of(10L), decision.winnerPolicyId());
   }
 
@@ -112,9 +112,9 @@ class TestNearestMaintenancePolicyResolver {
             eq(Entity.EntityType.TAG)))
         .thenReturn(List.of(relation(catalogTag, catalogPolicy)));
 
-    NearestPolicyDecision decision =
+    NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(NearestPolicyDecision.Kind.WINNER, decision.kind());
+    Assertions.assertEquals(NearestMaintenancePolicyResolver.Decision.Kind.WINNER, decision.kind());
     Assertions.assertEquals(java.util.Optional.of(20L), decision.winnerPolicyId());
   }
 
@@ -124,9 +124,9 @@ class TestNearestMaintenancePolicyResolver {
     stubDirectTags(SCHEMA, List.of());
     stubDirectTags(CATALOG, List.of());
 
-    NearestPolicyDecision decision =
+    NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(NearestPolicyDecision.Kind.NONE, decision.kind());
+    Assertions.assertEquals(NearestMaintenancePolicyResolver.Decision.Kind.NONE, decision.kind());
   }
 
   @Test
@@ -147,9 +147,10 @@ class TestNearestMaintenancePolicyResolver {
             eq(Entity.EntityType.TAG)))
         .thenReturn(List.of(relation(tagA, p1), relation(tagB, p2)));
 
-    NearestPolicyDecision decision =
+    NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(NearestPolicyDecision.Kind.CONFLICT, decision.kind());
+    Assertions.assertEquals(
+        NearestMaintenancePolicyResolver.Decision.Kind.CONFLICT, decision.kind());
     Assertions.assertEquals(TABLE, decision.conflictLevel());
     Assertions.assertEquals(List.of(10L, 11L), decision.conflictingPolicyIds());
     Assertions.assertTrue(decision.winnerPolicyId().isEmpty());
