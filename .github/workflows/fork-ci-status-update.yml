@@ -19,7 +19,7 @@ name: Update Fork CI Status
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -61,6 +61,9 @@ jobs:
             // How long a completed check is still watched for a re-run of the fork workflow.
             // action_required is also set when the fork run had not started when the check was created.
             const WATCH = { action_required: 24 * HOUR, default: 7 * 24 * HOUR };
+            // Pull requests without a running check are checked at most this often, so sweeping
+            // every 5 minutes spends API calls mainly on the checks that are about to change.
+            const IDLE_INTERVAL = 15 * 60 * 1000;
             const FINAL = ['success', 'neutral', 'skipped'];
 
             const rateLimit = async () => (await github.rest.rateLimit.get()).data.resources.core;
@@ -129,6 +132,8 @@ jobs:
 
             const skippable = (pr, state) => {
               if (!state || state.sha !== pr.head.sha || state.updated_at !== pr.updated_at) return false;
+              if (state.kind === 'active') return false;
+              if (state.checked_at && now - Date.parse(state.checked_at) < IDLE_INTERVAL) return true;
               if (now - Date.parse(pr.updated_at) < RECENT_ACTIVITY) return false;
               if (state.kind === 'none' || state.kind === 'final') return true;
               if (state.kind === 'watch') {
@@ -139,7 +144,9 @@ jobs:
             };
 
             const syncPr = async pr => {
-              const state = { sha: pr.head.sha, updated_at: pr.updated_at, kind: 'none' };
+              const state = {
+                sha: pr.head.sha, updated_at: pr.updated_at, kind: 'none', checked_at: new Date(now).toISOString()
+              };
               next[pr.number] = state;
               if (!pr.head.repo) return 'none';
               const owner = pr.head.repo.owner.login;

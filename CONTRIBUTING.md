@@ -96,13 +96,13 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 
 1. Enable GitHub Actions in your fork (the **Actions** tab of your fork).
 2. Push your branch to your fork. The **Fork CI** workflow merges it onto the latest base branch and runs the test suites.
-3. Open the pull request. The pull request shows a **Fork CI** check that mirrors the result of the run in your fork, with links to any failed jobs. The final result can take up to about 15 minutes after the run finishes to appear on the pull request.
+3. Open the pull request. The pull request shows a **Fork CI** check that mirrors the result of the run in your fork, with links to any failed jobs. The final result can take up to about 5 minutes after the run finishes to appear on the pull request.
 
 If the check says that Fork CI is not available, enable Actions in your fork, merge or rebase your branch onto the latest base branch, and push again. To re-run flaky tests, re-run the failed jobs in your fork; reviewers cannot re-run them for you. Please fix failures before requesting a review.
 
 Known limitations of Fork CI:
 
-* The result reaches the pull request on the next scheduled status update, usually 10 to 15 minutes after the run in your fork finishes and occasionally up to about 45 minutes, because GitHub may delay scheduled workflows. Open the run in your fork to see the result sooner.
+* The result reaches the pull request on the next scheduled status update, usually within 5 to 10 minutes after the run in your fork finishes and occasionally later, because GitHub may delay scheduled workflows. A re-run of a finished fork run can take up to about 15 minutes to appear. Open the run in your fork to see the result sooner. Committers can update the checks right away by running the **Update Fork CI Status** workflow from the **Actions** tab of `apache/gravitino`.
 * A pull request that was last pushed before Fork CI was enabled has no **Fork CI** check, and cannot be merged until its branch is updated and pushed again.
 * Free GitHub accounts run a limited number of jobs at a time, so runs for several open pull requests in the same fork queue behind each other.
 * Pull requests to release branches (`branch-*`) still run CI in `apache/gravitino` until Fork CI is backported to those branches.
