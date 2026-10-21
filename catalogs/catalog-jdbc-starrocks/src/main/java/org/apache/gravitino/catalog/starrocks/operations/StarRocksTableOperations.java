@@ -474,29 +474,28 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
-    String dataType = typeConverter.fromGravitino(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("StarRocks does not support nested column names.");
     }
     String col = addColumn.fieldName()[0];
+    // StarRocks only allows AUTO_INCREMENT columns to be defined at table creation time
+    Preconditions.checkArgument(
+        !addColumn.isAutoIncrement(),
+        "StarRocks does not support adding an auto-increment column: %s",
+        col);
 
-    StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition
-        .append("ADD COLUMN ")
-        .append(BACK_QUOTE)
-        .append(col)
-        .append(BACK_QUOTE)
-        .append(SPACE)
-        .append(dataType)
-        .append(SPACE);
-
-    // Append comment if available
-    if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition
-          .append("COMMENT '")
-          .append(escapeSqlLiteral(addColumn.getComment(), '\''))
-          .append("' ");
-    }
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName(col)
+            .withType(addColumn.getDataType())
+            .withComment(addColumn.getComment())
+            .withNullable(addColumn.isNullable())
+            .withDefaultValue(addColumn.getDefaultValue())
+            .withAutoIncrement(false)
+            .build();
+    StringBuilder columnDefinition =
+        new StringBuilder("ADD COLUMN ").append(BACK_QUOTE).append(col).append(BACK_QUOTE);
+    appendColumnDefinition(column, columnDefinition);
 
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
