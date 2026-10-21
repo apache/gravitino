@@ -66,9 +66,12 @@ public class EffectiveTagResolver {
    * @return Effective tags in deterministic nearest-assignment order.
    */
   public TagEntity[] resolve(String metalake, MetadataObject metadataObject) {
-    return resolveWithSources(metalake, metadataObject).stream()
-        .map(ResolvedTag::tag)
-        .toArray(TagEntity[]::new);
+    ResolvedTag[] resolved = resolveWithSources(metalake, metadataObject);
+    TagEntity[] tags = new TagEntity[resolved.length];
+    for (int i = 0; i < resolved.length; i++) {
+      tags[i] = resolved[i].tag();
+    }
+    return tags;
   }
 
   /**
@@ -78,7 +81,7 @@ public class EffectiveTagResolver {
    * @param metadataObject The metadata object.
    * @return Effective tags with sources in deterministic nearest-assignment order.
    */
-  public List<ResolvedTag> resolveWithSources(String metalake, MetadataObject metadataObject) {
+  public ResolvedTag[] resolveWithSources(String metalake, MetadataObject metadataObject) {
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     List<MetadataObject> resolutionOrder = new ArrayList<>();
     resolutionOrder.add(metadataObject);
@@ -110,7 +113,7 @@ public class EffectiveTagResolver {
         throw new RuntimeException(e);
       }
     }
-    return new ArrayList<>(effectiveTags.values());
+    return effectiveTags.values().toArray(new ResolvedTag[0]);
   }
 
   /**
@@ -124,8 +127,10 @@ public class EffectiveTagResolver {
     private final MetadataObject source;
 
     /**
-     * @param tag effective tag entity, including assignment and inherited flag
-     * @param source metadata object that contributed this assignment
+     * Creates a resolved tag.
+     *
+     * @param tag The effective tag entity, including assignment and inherited flag.
+     * @param source The metadata object that contributed this assignment.
      */
     public ResolvedTag(TagEntity tag, MetadataObject source) {
       this.tag = Objects.requireNonNull(tag, "tag");
@@ -133,17 +138,43 @@ public class EffectiveTagResolver {
     }
 
     /**
-     * @return the effective tag entity
+     * Returns the effective tag entity.
+     *
+     * @return The effective tag entity.
      */
     public TagEntity tag() {
       return tag;
     }
 
     /**
-     * @return the metadata object that contributed this assignment
+     * Returns the metadata object that contributed this assignment.
+     *
+     * @return The contributing metadata object.
      */
     public MetadataObject source() {
       return source;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ResolvedTag)) {
+        return false;
+      }
+      ResolvedTag that = (ResolvedTag) o;
+      return Objects.equals(tag, that.tag) && Objects.equals(source, that.source);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(tag, source);
+    }
+
+    @Override
+    public String toString() {
+      return "ResolvedTag{tag=" + tag + ", source=" + source + '}';
     }
   }
 }

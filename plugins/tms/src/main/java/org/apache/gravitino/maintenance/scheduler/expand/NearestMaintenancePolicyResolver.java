@@ -62,7 +62,7 @@ public class NearestMaintenancePolicyResolver {
    * @return winner, none, or same-level conflict
    */
   public Decision resolve(String metalake, MetadataObject table, Policy.BuiltInType policyType) {
-    List<Match> matches = objectPolicyResolver.resolveMatches(metalake, table);
+    Match[] matches = objectPolicyResolver.resolveMatches(metalake, table);
     List<MetadataObject> chain = new ArrayList<>();
     chain.add(table);
     chain.addAll(MetadataObjectUtil.getParentMetadataObjects(table));

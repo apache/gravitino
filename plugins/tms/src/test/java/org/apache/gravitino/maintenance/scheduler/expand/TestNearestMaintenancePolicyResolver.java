@@ -62,9 +62,9 @@ class TestNearestMaintenancePolicyResolver {
     PolicyEntity catalogPolicy = policy(20L, "catalog-compaction");
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
         .thenReturn(
-            List.of(
-                new Match(tablePolicy, List.of(TABLE)),
-                new Match(catalogPolicy, List.of(CATALOG))));
+            new Match[] {
+              new Match(tablePolicy, List.of(TABLE)), new Match(catalogPolicy, List.of(CATALOG))
+            });
 
     NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
@@ -77,7 +77,7 @@ class TestNearestMaintenancePolicyResolver {
   void testFallsBackToAncestorWhenTableHasNoMatch() {
     PolicyEntity catalogPolicy = policy(20L, "catalog-compaction");
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
-        .thenReturn(List.of(new Match(catalogPolicy, List.of(CATALOG))));
+        .thenReturn(new Match[] {new Match(catalogPolicy, List.of(CATALOG))});
 
     NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
@@ -88,7 +88,7 @@ class TestNearestMaintenancePolicyResolver {
 
   @Test
   void testEmptyWhenNoMatchingType() {
-    when(objectPolicyResolver.resolveMatches(METALAKE, TABLE)).thenReturn(List.of());
+    when(objectPolicyResolver.resolveMatches(METALAKE, TABLE)).thenReturn(new Match[0]);
 
     NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
@@ -100,7 +100,7 @@ class TestNearestMaintenancePolicyResolver {
     PolicyEntity p1 = policy(10L, "compaction-a");
     PolicyEntity p2 = policy(11L, "compaction-b");
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
-        .thenReturn(List.of(new Match(p1, List.of(TABLE)), new Match(p2, List.of(TABLE))));
+        .thenReturn(new Match[] {new Match(p1, List.of(TABLE)), new Match(p2, List.of(TABLE))});
 
     NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
@@ -127,7 +127,7 @@ class TestNearestMaintenancePolicyResolver {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
-        .thenReturn(List.of(new Match(custom, List.of(TABLE))));
+        .thenReturn(new Match[] {new Match(custom, List.of(TABLE))});
 
     NearestMaintenancePolicyResolver.Decision decision =
         resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);

@@ -80,9 +80,12 @@ public class ObjectPolicyResolver {
    * @return Enabled policies selected by the object's effective tags.
    */
   public PolicyEntity[] resolve(String metalake, MetadataObject metadataObject) {
-    return resolveMatches(metalake, metadataObject).stream()
-        .map(Match::policy)
-        .toArray(PolicyEntity[]::new);
+    Match[] matches = resolveMatches(metalake, metadataObject);
+    PolicyEntity[] policies = new PolicyEntity[matches.length];
+    for (int i = 0; i < matches.length; i++) {
+      policies[i] = matches[i].policy();
+    }
+    return policies;
   }
 
   /**
@@ -95,15 +98,14 @@ public class ObjectPolicyResolver {
    * @param metadataObject The metadata object.
    * @return Matched enabled policies with contributing sources.
    */
-  public List<Match> resolveMatches(String metalake, MetadataObject metadataObject) {
-    List<ResolvedTag> effectiveTags =
-        effectiveTagResolver.resolveWithSources(metalake, metadataObject);
-    if (effectiveTags.isEmpty()) {
-      return List.of();
+  public Match[] resolveMatches(String metalake, MetadataObject metadataObject) {
+    ResolvedTag[] effectiveTags = effectiveTagResolver.resolveWithSources(metalake, metadataObject);
+    if (effectiveTags.length == 0) {
+      return new Match[0];
     }
 
     Map<String, ResolvedTag> tagsByName =
-        effectiveTags.stream()
+        Arrays.stream(effectiveTags)
             .collect(
                 Collectors.toMap(
                     resolvedTag -> resolvedTag.tag().name(),
@@ -153,7 +155,7 @@ public class ObjectPolicyResolver {
         .filter(MatchState::matched)
         .map(MatchState::toMatch)
         .filter(match -> match.policy().enabled())
-        .collect(Collectors.toList());
+        .toArray(Match[]::new);
   }
 
   private static boolean matches(PolicyAssociationSelector selector, TagAssignment assignment) {
@@ -178,8 +180,10 @@ public class ObjectPolicyResolver {
     private final List<MetadataObject> sources;
 
     /**
-     * @param policy matched enabled policy (inherited flag already applied)
-     * @param sources contributing metadata objects, nearest-first encounter order
+     * Creates a policy match.
+     *
+     * @param policy The matched enabled policy (inherited flag already applied).
+     * @param sources The contributing metadata objects, nearest-first encounter order.
      */
     public Match(PolicyEntity policy, List<MetadataObject> sources) {
       this.policy = Objects.requireNonNull(policy, "policy");
@@ -188,17 +192,43 @@ public class ObjectPolicyResolver {
     }
 
     /**
-     * @return the matched policy
+     * Returns the matched policy.
+     *
+     * @return The matched policy.
      */
     public PolicyEntity policy() {
       return policy;
     }
 
     /**
-     * @return metadata objects whose effective tag assignments caused this policy to match
+     * Returns metadata objects whose effective tag assignments caused this policy to match.
+     *
+     * @return The contributing metadata objects.
      */
     public List<MetadataObject> sources() {
       return sources;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof Match)) {
+        return false;
+      }
+      Match that = (Match) o;
+      return Objects.equals(policy, that.policy) && Objects.equals(sources, that.sources);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(policy, sources);
+    }
+
+    @Override
+    public String toString() {
+      return "Match{policy=" + policy + ", sources=" + sources + '}';
     }
   }
 

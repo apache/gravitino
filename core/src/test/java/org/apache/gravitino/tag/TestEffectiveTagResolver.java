@@ -26,7 +26,6 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -128,14 +127,13 @@ public class TestEffectiveTagResolver {
             Entity.EntityType.CATALOG))
         .thenReturn(Collections.singletonList(catalogDomain));
 
-    List<EffectiveTagResolver.ResolvedTag> effectiveTags =
-        resolver.resolveWithSources(METALAKE, TABLE);
+    EffectiveTagResolver.ResolvedTag[] effectiveTags = resolver.resolveWithSources(METALAKE, TABLE);
 
-    Assertions.assertEquals(1, effectiveTags.size());
-    Assertions.assertEquals(TABLE, effectiveTags.get(0).source());
+    Assertions.assertEquals(1, effectiveTags.length);
+    Assertions.assertEquals(TABLE, effectiveTags[0].source());
     Assertions.assertArrayEquals(
-        new String[] {"risk"}, effectiveTags.get(0).tag().assignment().orElseThrow().values());
-    Assertions.assertFalse(effectiveTags.get(0).tag().inherited().orElseThrow());
+        new String[] {"risk"}, effectiveTags[0].tag().assignment().orElseThrow().values());
+    Assertions.assertFalse(effectiveTags[0].tag().inherited().orElseThrow());
   }
 
   @Test
