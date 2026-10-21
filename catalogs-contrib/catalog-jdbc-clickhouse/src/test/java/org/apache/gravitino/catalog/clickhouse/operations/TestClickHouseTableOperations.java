@@ -2295,6 +2295,30 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  public void testAlterTableNullabilityWithDefaultValueInSameRequest() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTableWithNullDefault());
+
+    TableChange setDefault =
+        TableChange.updateColumnDefaultValue(new String[] {"c3"}, Literals.stringLiteral("abc"));
+    TableChange setNotNull = TableChange.updateColumnNullability(new String[] {"c3"}, false);
+    // Every regenerated column definition carries both the new default and NOT NULL, whichever
+    // order the changes come in.
+    for (TableChange[] changes :
+        new TableChange[][] {{setDefault, setNotNull}, {setNotNull, setDefault}}) {
+      String sql = ops.buildAlterSql("db", "tbl", changes);
+      Assertions.assertFalse(sql.contains("Nullable"), sql);
+      Assertions.assertEquals(2, StringUtils.countMatches(sql, "DEFAULT 'abc'"), sql);
+    }
+  }
+
+  @Test
   public void testAlterTableSetPropertyUnsupported() {
     StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
     ops.initialize(

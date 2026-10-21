@@ -673,20 +673,45 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   /**
-   * Returns the default value to re-emit when a column definition is regenerated for a nullability
-   * change. A NULL default conflicts with NOT NULL, so it is dropped when the column becomes
-   * non-nullable.
+   * Returns a copy of the column with the default value and nullability it has after all default
+   * value and nullability changes to it in the same alter request are applied. Dialects that
+   * regenerate the whole column definition for one change use it, so that the regenerated
+   * definition does not revert another change to the same column. A NULL default conflicts with NOT
+   * NULL, so it is dropped when the column ends up non-nullable.
    *
-   * @param change the nullability change
    * @param column the current column
-   * @return the default value for the regenerated column definition
+   * @param changes all changes in the alter request
+   * @return the column with the pending default value and nullability
    */
-  protected static Expression defaultValueForNullabilityChange(
-      TableChange.UpdateColumnNullability change, JdbcColumn column) {
-    if (!change.nullable() && Literals.NULL.equals(column.defaultValue())) {
-      return DEFAULT_VALUE_NOT_SET;
+  protected static JdbcColumn withPendingDefaultValueAndNullability(
+      JdbcColumn column, TableChange... changes) {
+    Expression defaultValue = column.defaultValue();
+    boolean nullable = column.nullable();
+    for (TableChange change : changes) {
+      if (!(change instanceof TableChange.ColumnChange)) {
+        continue;
+      }
+      String[] fieldName = ((TableChange.ColumnChange) change).fieldName();
+      if (fieldName.length != 1 || !fieldName[0].equals(column.name())) {
+        continue;
+      }
+      if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        defaultValue = ((TableChange.UpdateColumnDefaultValue) change).getNewDefaultValue();
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        nullable = ((TableChange.UpdateColumnNullability) change).nullable();
+      }
     }
-    return column.defaultValue();
+    if (!nullable && Literals.NULL.equals(defaultValue)) {
+      defaultValue = DEFAULT_VALUE_NOT_SET;
+    }
+    return JdbcColumn.builder()
+        .withName(column.name())
+        .withType(column.dataType())
+        .withComment(column.comment())
+        .withNullable(nullable)
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(defaultValue)
+        .build();
   }
 
   /**

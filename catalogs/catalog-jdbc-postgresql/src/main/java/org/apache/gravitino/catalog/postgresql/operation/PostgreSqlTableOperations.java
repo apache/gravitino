@@ -373,8 +373,11 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         JdbcColumn column = validateUpdateColumnNullable(updateColumnNullability, lazyLoadTable);
 
         alterSql.add(updateColumnNullabilityDefinition(updateColumnNullability, tableName));
-        // A NULL default conflicts with NOT NULL, so drop it when the column becomes non-nullable.
-        if (!updateColumnNullability.nullable() && Literals.NULL.equals(column.defaultValue())) {
+        // A NULL default conflicts with NOT NULL, so drop it when the column becomes non-nullable,
+        // unless the same request sets a new default value for the column.
+        JdbcColumn pendingColumn = withPendingDefaultValueAndNullability(column, changes);
+        if (Literals.NULL.equals(column.defaultValue())
+            && Column.DEFAULT_VALUE_NOT_SET.equals(pendingColumn.defaultValue())) {
           alterSql.add(
               ALTER_TABLE
                   + PG_QUOTE
