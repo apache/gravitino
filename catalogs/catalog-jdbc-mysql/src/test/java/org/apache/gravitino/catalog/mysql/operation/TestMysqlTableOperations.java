@@ -231,6 +231,47 @@ public class TestMysqlTableOperations extends TestMysql {
   }
 
   @Test
+  public void testUpdateColumnPositionWithSpecialReferenceColumn() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_position_table";
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build(),
+          JdbcColumn.builder().withName("status").withType(VARCHAR).build(),
+          JdbcColumn.builder().withName("order-id").withType(VARCHAR).build(),
+          JdbcColumn.builder().withName("key").withType(VARCHAR).build()
+        };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnPosition(
+            new String[] {"status"}, TableChange.ColumnPosition.after("order-id")));
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertArrayEquals(
+        new String[] {"id", "order-id", "status", "key"},
+        Arrays.stream(load.columns()).map(Column::name).toArray(String[]::new));
+
+    // A null position moves the column after the last column `key`, a reserved word.
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnPosition(new String[] {"id"}, null));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertArrayEquals(
+        new String[] {"order-id", "status", "key", "id"},
+        Arrays.stream(load.columns()).map(Column::name).toArray(String[]::new));
+  }
+
+  @Test
   public void testAlterTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_al_table";
     String tableComment = "test_comment";
