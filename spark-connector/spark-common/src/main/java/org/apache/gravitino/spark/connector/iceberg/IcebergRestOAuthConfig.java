@@ -29,7 +29,6 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
-import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin;
 import org.apache.spark.SparkConf;
 
 /**
@@ -89,9 +88,6 @@ class IcebergRestOAuthConfig {
             || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
     // An explicit legacy OAuth2 configuration already decides how IRC is authenticated.
     if (!hasExplicitLegacyOAuth2) {
-      if (AuthProperties.isToken(authType)) {
-        return applyBearerToken(sparkConf, result);
-      }
       // The Iceberg REST client has no SPNEGO support, so Kerberos can't be carried over.
       Preconditions.checkArgument(
           !AuthProperties.isKerberos(authType),
@@ -145,14 +141,6 @@ class IcebergRestOAuthConfig {
     config.put(AUTH_TYPE, AUTH_TYPE_BASIC);
     config.put(BASIC_USERNAME, username);
     config.put(BASIC_PASSWORD, password);
-    return config;
-  }
-
-  // Reuses the bearer token of the Gravitino client. The token is captured when the catalog is
-  // initialized, so it isn't refreshed when the token source changes afterwards.
-  private static Map<String, String> applyBearerToken(
-      SparkConf sparkConf, Map<String, String> config) {
-    config.put(TOKEN, GravitinoDriverPlugin.resolveToken(sparkConf));
     return config;
   }
 

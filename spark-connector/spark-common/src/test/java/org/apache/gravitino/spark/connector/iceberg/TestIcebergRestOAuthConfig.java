@@ -240,39 +240,6 @@ public class TestIcebergRestOAuthConfig {
   }
 
   @Test
-  void testDerivesIcebergTokenConfig() {
-    SparkConf sparkConf = new SparkConf(false);
-    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "token");
-    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, " bearer-token ");
-
-    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, Collections.emptyMap());
-
-    Assertions.assertEquals(ImmutableMap.of("token", "bearer-token"), result);
-  }
-
-  @Test
-  void testExplicitConfigTakesPrecedenceOverReusedToken() {
-    SparkConf sparkConf = new SparkConf(false);
-    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "token");
-    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "bearer-token");
-    Map<String, String> explicit = ImmutableMap.of("token", "irc-token");
-
-    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
-
-    Assertions.assertEquals(explicit, result);
-  }
-
-  @Test
-  void testTokenReuseFailsWhenTokenIsMissing() {
-    SparkConf sparkConf = new SparkConf(false);
-    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "token");
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergRestOAuthConfig.resolve(sparkConf, Collections.emptyMap()));
-  }
-
-  @Test
   void testKerberosFailsFast() {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "kerberos");
@@ -297,23 +264,19 @@ public class TestIcebergRestOAuthConfig {
   }
 
   @Test
-  void testExplicitLegacyOAuth2SkipsTokenAndKerberosHandling() {
+  void testExplicitLegacyOAuth2SkipsKerberosFailure() {
     Map<String, String> explicit =
         ImmutableMap.of(
             "credential",
             "irc:secret",
             "oauth2-server-uri",
             "https://identity.example.com/oauth/token");
-    for (String authType : new String[] {"token", "kerberos"}) {
-      SparkConf sparkConf = new SparkConf(false);
-      sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, authType);
-      sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "bearer-token");
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "kerberos");
 
-      Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
 
-      Assertions.assertFalse(result.containsKey(IcebergRestOAuthConfig.TOKEN));
-      Assertions.assertEquals("irc:secret", result.get(IcebergRestOAuthConfig.CREDENTIAL));
-    }
+    Assertions.assertEquals("irc:secret", result.get(IcebergRestOAuthConfig.CREDENTIAL));
   }
 
   private SparkConf basicSparkConf(String username, String password) {
