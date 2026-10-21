@@ -49,6 +49,8 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
@@ -61,6 +63,7 @@ import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecuto
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.ExceptionHandlers;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.FunctionOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
@@ -71,6 +74,7 @@ import org.apache.gravitino.server.web.rest.MetadataObjectSecretOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
+import org.apache.gravitino.server.web.rest.OperationType;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PartitionOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
@@ -85,6 +89,7 @@ import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -242,6 +247,27 @@ public class GravitinoInterceptionService implements InterceptionService {
             boolean authorizeResult;
             try {
               authorizeResult = executor.execute(authorizationRequestContext);
+            } catch (NoSuchTableException exception) {
+              NameIdentifier tableIdent = metadataContext.get(Entity.EntityType.TABLE);
+              if (tableIdent == null) {
+                throw exception;
+              }
+              return ExceptionHandlers.handleTableException(
+                  OperationType.LOAD,
+                  tableIdent.name(),
+                  NameIdentifierUtil.getSchemaIdentifier(tableIdent).name(),
+                  exception);
+            } catch (NoSuchViewException exception) {
+              NameIdentifier viewIdent = metadataContext.get(Entity.EntityType.VIEW);
+              if (viewIdent == null) {
+                throw exception;
+              }
+              // An authorized absence probe must terminate before the resource can load a view.
+              return ExceptionHandlers.handleViewException(
+                  OperationType.LOAD,
+                  viewIdent.name(),
+                  NameIdentifierUtil.getSchemaIdentifier(viewIdent).name(),
+                  exception);
             } catch (BadRequestException exception) {
               LOG.warn("Invalid authorization request", exception);
               return Utils.illegalArguments(exception.getMessage(), exception);

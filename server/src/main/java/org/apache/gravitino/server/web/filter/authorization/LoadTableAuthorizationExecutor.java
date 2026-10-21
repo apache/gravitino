@@ -87,8 +87,10 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
     }
 
     NameIdentifier tableIdentifier = metadataContext.get(Entity.EntityType.TABLE);
-    return tableIdentifier != null
-        && !GravitinoEnv.getInstance().internalTableDispatcher().tableExists(tableIdentifier);
+    if (tableIdentifier != null) {
+      GravitinoEnv.getInstance().internalTableDispatcher().loadTable(tableIdentifier);
+    }
+    return false;
   }
 
   private static boolean shouldCheckModifyTablePrivilege(
