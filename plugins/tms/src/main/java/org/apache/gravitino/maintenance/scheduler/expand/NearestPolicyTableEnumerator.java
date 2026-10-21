@@ -44,6 +44,7 @@ import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -52,10 +53,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Lists tables for which {@code policy} is the nearest maintenance policy of its type.
  *
- * <p>Walks {@code policy → tags → metadata objects}, expands catalog/schema attachments to tables,
- * then keeps a table only when {@link NearestMaintenancePolicyResolver} selects this policy id and
- * {@link ExpandOccupancyGate} allows enqueue. Scanning continues until {@code limit} enqueueable
- * tables are found (cooldown / in-flight winners do not consume the batch budget).
+ * <p>Walks {@code policy → tags → metadata objects}, expands catalog/schema attachments to tables
+ * (including tables in hierarchical descendant schemas), then keeps a table only when {@link
+ * NearestMaintenancePolicyResolver} selects this policy id and {@link ExpandOccupancyGate} allows
+ * enqueue. Scanning continues until {@code limit} enqueueable tables are found (cooldown /
+ * in-flight winners do not consume the batch budget).
  */
 public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator {
 
@@ -173,7 +175,8 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         considerTable(object.id(), metadataObject, ctx);
         break;
       case SCHEMA:
-        expandSchema(metadataObject, ctx);
+        // A tag on a parent schema also covers tables in child schemas such as {@code a:b}.
+        expandSchema(metadataObject, ctx, true);
         break;
       case CATALOG:
         expandCatalog(metadataObject, ctx);
@@ -193,18 +196,39 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       }
       MetadataObject schemaObject =
           MetadataObjects.of(catalog.name(), schema.name(), MetadataObject.Type.SCHEMA);
-      expandSchema(schemaObject, ctx);
+      // Catalog listing already includes every hierarchical schema name.
+      expandSchema(schemaObject, ctx, false);
     }
   }
 
-  private void expandSchema(MetadataObject schema, ScanContext ctx) {
+  private void expandSchema(MetadataObject schema, ScanContext ctx, boolean includeDescendants) {
     String catalogName = schema.parent();
-    if (catalogName == null) {
+    if (catalogName == null || schema.name() == null || schema.name().isBlank()) {
       return;
     }
+    expandTables(catalogName, schema.name(), ctx);
+    if (!includeDescendants || ctx.enqueueable.size() >= ctx.limit) {
+      return;
+    }
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    String descendantPrefix = schema.name() + separator;
+    List<SchemaEntity> schemas =
+        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(ctx.metalake, catalogName));
+    for (SchemaEntity descendant : schemas) {
+      if (ctx.enqueueable.size() >= ctx.limit) {
+        return;
+      }
+      if (descendant.name() == null || !descendant.name().startsWith(descendantPrefix)) {
+        continue;
+      }
+      expandTables(catalogName, descendant.name(), ctx);
+    }
+  }
+
+  private void expandTables(String catalogName, String schemaName, ScanContext ctx) {
     List<TableEntity> tables =
         tableMetaService.listTablesByNamespace(
-            NamespaceUtil.ofTable(ctx.metalake, catalogName, schema.name()));
+            NamespaceUtil.ofTable(ctx.metalake, catalogName, schemaName));
     for (TableEntity table : tables) {
       if (ctx.enqueueable.size() >= ctx.limit) {
         return;

@@ -183,7 +183,7 @@ public class ObjectPolicyResolver {
      * Creates a policy match.
      *
      * @param policy The matched enabled policy (inherited flag already applied).
-     * @param sources The contributing metadata objects, nearest-first encounter order.
+     * @param sources The contributing metadata objects.
      */
     public Match(PolicyEntity policy, List<MetadataObject> sources) {
       this.policy = Objects.requireNonNull(policy, "policy");
@@ -202,6 +202,8 @@ public class ObjectPolicyResolver {
 
     /**
      * Returns metadata objects whose effective tag assignments caused this policy to match.
+     *
+     * <p>The list order follows policy-tag relation enumeration. Callers should test membership.
      *
      * @return The contributing metadata objects.
      */

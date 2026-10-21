@@ -34,6 +34,7 @@ import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -75,6 +76,7 @@ class TestNearestPolicyTableEnumerator {
             schemaMetaService,
             tableMetaService,
             () -> nearest);
+    when(schemaMetaService.listSchemasByNamespace(any())).thenReturn(List.of());
   }
 
   @Test
@@ -157,6 +159,52 @@ class TestNearestPolicyTableEnumerator {
 
     Assertions.assertEquals(
         List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L)));
+  }
+
+  @Test
+  void testSchemaExpansionIncludesHierarchicalDescendantTables() throws Exception {
+    PolicyEntity policy = policy(10L, "compaction");
+    TagEntity tag = tag(1L, "maint");
+    when(policyTagRelService.listRelations(
+            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
+            eq(Entity.EntityType.POLICY)))
+        .thenReturn(List.of(policyTagEdge(policy, tag)));
+    when(tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier()))
+        .thenReturn(
+            List.of(
+                GenericEntity.builder()
+                    .withId(1L)
+                    .withName("catalog.a")
+                    .withEntityType(Entity.EntityType.SCHEMA)
+                    .build()));
+
+    when(schemaMetaService.listSchemasByNamespace(eq(NamespaceUtil.ofSchema(METALAKE, "catalog"))))
+        .thenReturn(
+            List.of(schema(2L, "a"), schema(3L, "a:b"), schema(4L, "ab"), schema(5L, "other")));
+    when(tableMetaService.listTablesByNamespace(
+            eq(NamespaceUtil.ofTable(METALAKE, "catalog", "a"))))
+        .thenReturn(List.of());
+    TableEntity childTable =
+        TableEntity.builder()
+            .withId(200L)
+            .withName("t1")
+            .withNamespace(NamespaceUtil.ofTable(METALAKE, "catalog", "a:b"))
+            .withAuditInfo(audit())
+            .build();
+    when(tableMetaService.listTablesByNamespace(
+            eq(NamespaceUtil.ofTable(METALAKE, "catalog", "a:b"))))
+        .thenReturn(List.of(childTable));
+
+    MetadataObject table =
+        MetadataObjects.of(
+            java.util.Arrays.asList("catalog", "a:b", "t1"), MetadataObject.Type.TABLE);
+    MetadataObject parentSchema =
+        MetadataObjects.of(java.util.Arrays.asList("catalog", "a"), MetadataObject.Type.SCHEMA);
+    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, parentSchema));
+
+    Assertions.assertEquals(
+        List.of(200L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
   }
 
   @Test
@@ -291,6 +339,15 @@ class TestNearestPolicyTableEnumerator {
                 null,
                 null,
                 null))
+        .withAuditInfo(audit())
+        .build();
+  }
+
+  private static SchemaEntity schema(long id, String name) {
+    return SchemaEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofSchema(METALAKE, "catalog"))
         .withAuditInfo(audit())
         .build();
   }
