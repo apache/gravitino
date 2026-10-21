@@ -62,6 +62,7 @@ import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
@@ -985,22 +986,27 @@ public class JobManager implements JobOperationDispatcher {
     return newValue.orElse(currentValue);
   }
 
-  // Runs a scheduled task on every in-use metalake. An exception escaping a scheduled task would
-  // cancel all its later runs, so a failure is logged and only skips the metalake it affects.
+  // Runs a scheduled task on every in-use metalake. Anything escaping a scheduled task, including
+  // an Error such as a LinkageError from a job executor plugin, would cancel all its later runs,
+  // so a failure is logged and only skips the metalake it affects.
   private void forEachInUseMetalake(String task, Consumer<String> action) {
     List<String> metalakes;
     try {
       metalakes = MetalakeManager.listInUseMetalakes(entityStore);
-    } catch (RuntimeException e) {
-      LOG.error("Failed to list the in-use metalakes to {}", task, e);
+    } catch (Throwable t) {
+      LOG.error("Failed to list the in-use metalakes to {}", task, t);
       return;
     }
 
     for (String metalake : metalakes) {
       try {
         action.accept(metalake);
-      } catch (RuntimeException e) {
-        LOG.error("Failed to {} under metalake {}", task, metalake, e);
+      } catch (MetalakeNotInUseException | NoSuchMetalakeException e) {
+        // The metalake was disabled or dropped after it was listed as in use, which is an expected
+        // race, so it is logged without the stack trace.
+        LOG.warn("Skipped to {} under metalake {}: {}", task, metalake, e.getMessage());
+      } catch (Throwable t) {
+        LOG.error("Failed to {} under metalake {}", task, metalake, t);
       }
     }
   }
@@ -1028,13 +1034,13 @@ public class JobManager implements JobOperationDispatcher {
               return;
             }
             pullAndUpdateOwnedJobStatus(metalake, job);
-          } catch (RuntimeException e) {
+          } catch (Throwable t) {
             LOG.error(
                 "Failed to update the status of job {} with execution id {} under metalake {}",
                 job.name(),
                 job.jobExecutionId(),
                 metalake,
-                e);
+                t);
           }
         });
   }

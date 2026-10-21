@@ -2019,6 +2019,46 @@ public class TestJobManager {
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(job, job).status());
   }
 
+  /** An Error on one metalake, such as a LinkageError from a plugin, only skips that metalake. */
+  @Test
+  public void testPullJobStatusContinuesAfterErrorOnOneMetalake() throws IOException {
+    String brokenMetalake = "broken_metalake";
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(brokenMetalake, metalake));
+    doThrow(new NoClassDefFoundError("org/example/MissingClass"))
+        .when(jobManager)
+        .listJobs(brokenMetalake, Optional.empty());
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    stubEntityStoreUpdateToApply(job, job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(job, job).status());
+  }
+
+  /** A failure checking the owner of one job does not stop the status pull of the others. */
+  @Test
+  public void testPullJobStatusContinuesAfterFailingToCheckJobOwner() throws IOException {
+    JobEntity failingJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    JobEntity otherJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    mockListActiveJobs(failingJob, otherJob);
+    when(jobExecutor.ownsJob(failingJob.jobExecutionId()))
+        .thenThrow(new AbstractMethodError("ownsJob"));
+    when(jobExecutor.getJobExecutionInfo(otherJob.jobExecutionId()))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    stubEntityStoreUpdateToApply(otherJob, otherJob);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    verify(jobExecutor, never()).getJobExecutionInfo(failingJob.jobExecutionId());
+    Assertions.assertEquals(
+        JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(otherJob, otherJob).status());
+  }
+
   /** A failure to list the metalakes is logged and does not stop later cleanup runs. */
   @Test
   public void testCleanUpStagingDirsContinuesAfterFailingToListMetalakes() throws IOException {
