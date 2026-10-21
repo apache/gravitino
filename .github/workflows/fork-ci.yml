@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-slim
     outputs:
       applicable: ${{ steps.resolve.outputs.applicable }}
-      valid: ${{ steps.resolve.outputs.valid }}
+      valid: ${{ steps.resolve.outputs.valid == 'true' || steps.merge.outputs.valid == 'true' }}
     steps:
       - name: Resolve repository and pull request
         id: resolve
@@ -108,53 +108,75 @@ jobs:
             exit 0
           fi
 
-          if [[ "${match_count}" == "0" ]]; then
-            # No pull request yet: test against the upstream default branch so the
-            # run is still useful and is mirrored once the pull request is opened.
-            default_branch="$(curl --fail-with-body --silent --show-error \
+          api() {
+            curl --fail-with-body --silent --show-error \
               --header "Accept: application/vnd.github+json" \
               --header "Authorization: Bearer ${GH_TOKEN}" \
               --header "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/apache/gravitino" | jq -r '.default_branch')"
-            echo "::notice::No open apache/gravitino pull request for ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA}; each suite tests against ${default_branch} or the release branch the commit is closest to. The result is mirrored once the pull request is opened."
-            echo "base_ref=${default_branch}" >> "${GITHUB_OUTPUT}"
-            echo "valid=true" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
+              "https://api.github.com/repos/apache/gravitino$1"
+          }
 
-          if [[ "${match_count}" != "1" ]]; then
+          if [[ "${match_count}" == "0" ]]; then
+            # No pull request yet: pick the base the same way checkout-and-sync does, the
+            # upstream default branch or one of the latest release branches, whichever the
+            # commit is fewest commits ahead of. The result is mirrored once the pull request
+            # is opened.
+            candidates=("$(api "" | jq -r '.default_branch')")
+            while IFS= read -r branch; do
+              candidates+=("${branch}")
+            done < <(api "/branches?per_page=100" \
+              | jq -r '.[].name | select(test("^branch-[0-9]+\\.[0-9]+$"))' | sort -V | tail -n 3)
+            base_ref=""
+            best_ahead=""
+            for candidate in "${candidates[@]}"; do
+              ahead="$(api "/compare/${candidate}...${HEAD_REPOSITORY/\//:}:${HEAD_SHA}" | jq -r '.ahead_by')"
+              if [[ -z "${best_ahead}" || "${ahead}" -lt "${best_ahead}" ]]; then
+                base_ref="${candidate}"
+                best_ahead="${ahead}"
+              fi
+            done
+            echo "::notice::No open apache/gravitino pull request for ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA}; testing against ${base_ref}. The result is mirrored once the pull request is opened."
+          elif [[ "${match_count}" == "1" ]]; then
+            base_ref="$(jq -r '.[0].base.ref' <<< "${matches}")"
+            echo "Testing ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA} for apache/gravitino#$(jq -r '.[0].number' <<< "${matches}") against ${base_ref}."
+          else
             echo "::error::Expected one open apache/gravitino pull request for ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA}, found ${match_count}."
             exit 0
           fi
 
-          pr_number="$(jq -r '.[0].number' <<< "${matches}")"
-          base_ref="$(jq -r '.[0].base.ref' <<< "${matches}")"
-          echo "Testing ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA} for apache/gravitino#${pr_number} against ${base_ref}."
+          echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
+          echo "sync=true" >> "${GITHUB_OUTPUT}"
 
-          # Report a merge conflict once here instead of failing every suite on checkout.
-          # GitHub computes mergeability in the background, so wait briefly for it.
-          mergeable="null"
-          for attempt in $(seq 1 6); do
-            mergeable="$(curl --fail-with-body --silent --show-error \
-              --header "Accept: application/vnd.github+json" \
-              --header "Authorization: Bearer ${GH_TOKEN}" \
-              --header "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/apache/gravitino/pulls/${pr_number}" | jq -r '.mergeable')"
-            if [[ "${mergeable}" != "null" ]]; then
-              break
-            fi
-            sleep 5
-          done
-          if [[ "${mergeable}" == "false" ]]; then
-            echo "::error::apache/gravitino#${pr_number} has merge conflicts with ${base_ref}. Merge or rebase onto the latest ${base_ref} and push again."
-            exit 0
+      # Report a merge conflict once here and skip the suites, instead of starting every
+      # suite only for its checkout to fail on the same conflict.
+      - name: Check that the commit merges into the base branch
+        id: merge
+        if: steps.resolve.outputs.sync == 'true'
+        env:
+          BASE_REF: ${{ steps.resolve.outputs.base_ref }}
+          HEAD_REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          git init --quiet merge-check
+          cd merge-check
+          git fetch --quiet --no-tags https://github.com/apache/gravitino.git \
+            "+refs/heads/${BASE_REF}:refs/remotes/upstream/${BASE_REF}"
+          git fetch --quiet --no-tags "https://github.com/${HEAD_REPOSITORY}.git" "${HEAD_SHA}"
+          if conflicts="$(git merge-tree --write-tree --name-only --no-messages \
+            "refs/remotes/upstream/${BASE_REF}" "${HEAD_SHA}")"; then
+            echo "valid=true" >> "${GITHUB_OUTPUT}"
+          else
+            # The first line is the merged tree; the rest are the conflicting files.
+            tail -n +2 <<< "${conflicts}" | sed 's/^/Conflict: /'
+            echo "::error::${HEAD_SHA} does not merge cleanly into ${BASE_REF}, so the suites were skipped. Merge or rebase onto the latest ${BASE_REF} and push again."
           fi
 
-          echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
-          echo "valid=true" >> "${GITHUB_OUTPUT}"
-
       - name: Reject an unmatched Apache fork branch
-        if: steps.resolve.outputs.applicable == 'true' && steps.resolve.outputs.valid != 'true'
+        if: >-
+          steps.resolve.outputs.applicable == 'true' &&
+          steps.resolve.outputs.valid != 'true' && steps.merge.outputs.valid != 'true'
         run: exit 1
 
   build:
