@@ -205,13 +205,25 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
       throw new NamespaceNotFoundException(
           "Catalog not found: " + catalogName, CommonUtil.formatCurrentStackTrace(), catalogName);
     }
+    validateLakehouseCatalog(catalogName, catalog);
+    return catalog;
+  }
+
+  /**
+   * Rejects a catalog that is not a lakehouse catalog. Lance only exposes lakehouse catalogs as
+   * namespaces, so any other catalog is reported as a missing namespace.
+   *
+   * @param catalogName the catalog name used in the error
+   * @param catalog the loaded catalog
+   * @throws NamespaceNotFoundException if the catalog is not a lakehouse catalog
+   */
+  void validateLakehouseCatalog(String catalogName, Catalog catalog) {
     if (!isLakehouseCatalog(catalog)) {
       throw new NamespaceNotFoundException(
           "Catalog is not a lakehouse catalog: " + catalogName,
           CommonUtil.formatCurrentStackTrace(),
           catalogName);
     }
-    return catalog;
   }
 
   String[] listSchemas(Catalog catalog) throws NoSuchCatalogException {
