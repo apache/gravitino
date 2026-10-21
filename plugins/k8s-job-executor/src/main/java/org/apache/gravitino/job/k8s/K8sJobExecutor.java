@@ -535,10 +535,18 @@ public class K8sJobExecutor implements JobExecutor {
         LOG.info("Deleted the SparkApplication of job {}, whose submission failed", jobId);
       }
     } catch (RuntimeException e) {
+      // Gravitino doesn't sweep the resources of unknown jobs, so tell how to delete it by hand.
       LOG.warn(
-          "Failed to clean up the SparkApplication {} of job {}, whose submission failed",
-          id,
+          "Failed to clean up the SparkApplication {}/{} of job {}, whose submission failed. It may"
+              + " run although Gravitino has no record of it. If it exists with the label {}={},"
+              + " delete it with: kubectl delete sparkapplication -n {} {}",
+          id.namespace(),
+          id.name(),
           jobId,
+          K8sJobResourceUtils.LABEL_JOB_ID,
+          jobId,
+          id.namespace(),
+          id.name(),
           e);
     }
   }
