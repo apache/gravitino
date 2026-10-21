@@ -296,6 +296,20 @@ public class TestStarRocksTableOperationsSqlGeneration {
   }
 
   @Test
+  void testSetPropertyEscapesKeyAndValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.setProperty(
+                "dynamic_partition.key\"name", "owner's \"comment\" C:\\tmp\"); --"));
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\n"
+            + "set ( \"dynamic_partition.key\"\"name\" = \"owner's \"\"comment\"\" C:\\\\tmp\"\"); --\" );",
+        sql);
+  }
+
+  @Test
   public void testAddColumnWithNotNullAndDefaultValue() {
     TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
 

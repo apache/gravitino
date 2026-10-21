@@ -22,6 +22,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Maps;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,6 +64,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestDorisTableOperations extends TestDoris {
@@ -764,5 +770,50 @@ public class TestDorisTableOperations extends TestDoris {
         3,
         operationsWithOldDriver.calculateDatetimePrecision("DATETIME(3)", 0, 0),
         "DATETIME(3) should return 3 even with unsupported driver version");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "O'Brien",
+        "quote\\' and \\new\\path; \"double\"",
+        "owner's a\"\"b \"value\"\\path",
+        "ends with \\"
+      })
+  void testCreateTableStringDefaultIsStoredVerbatim(String defaultValue) throws SQLException {
+    String tableName = GravitinoITUtils.genRandomName("doris_default_round_trip");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build(),
+      JdbcColumn.builder()
+          .withName("col1")
+          .withType(VARCHAR_255)
+          .withNullable(true)
+          .withDefaultValue(Literals.varcharLiteral(255, defaultValue))
+          .build()
+    };
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns,
+        null,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("id")),
+        Indexes.EMPTY_INDEXES);
+    try {
+      try (Connection connection = DATA_SOURCE.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.executeUpdate(
+            String.format("INSERT INTO `%s`.`%s` (id) VALUES (1)", databaseName, tableName));
+        try (ResultSet result =
+            statement.executeQuery(
+                String.format("SELECT col1 FROM `%s`.`%s`", databaseName, tableName))) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(defaultValue, result.getString(1));
+        }
+      }
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
   }
 }

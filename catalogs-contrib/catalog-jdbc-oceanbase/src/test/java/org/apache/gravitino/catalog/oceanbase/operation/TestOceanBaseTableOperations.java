@@ -1295,4 +1295,58 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
     Assertions.assertEquals("Updated comment", table.columns()[0].comment());
   }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"O'Brien", "quote\\' and \\new\\path; \"double\"", "ends with \\"})
+  void testStringDefaultValueRoundTrips(String defaultValue) {
+    String tableName = RandomNameUtils.genRandomName("oceanbase_default_round_trip");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withDefaultValue(Literals.varcharLiteral(255, defaultValue))
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        new JdbcColumn[] {column},
+        null,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[0].defaultValue());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.addColumn(
+              new String[] {"col2"},
+              VARCHAR,
+              null,
+              TableChange.ColumnPosition.defaultPos(),
+              true,
+              false,
+              Literals.varcharLiteral(255, defaultValue)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[1].defaultValue());
+
+      String updated = defaultValue + " updated";
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnDefaultValue(
+              new String[] {"col1"}, Literals.varcharLiteral(255, updated)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, updated), table.columns()[0].defaultValue());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
+  }
 }
