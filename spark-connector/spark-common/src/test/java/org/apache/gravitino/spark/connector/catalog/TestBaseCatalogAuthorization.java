@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -28,7 +30,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
@@ -44,7 +45,6 @@ import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,11 +78,6 @@ public class TestBaseCatalogAuthorization {
     catalog = new TestCatalog(gravitinoCatalog, sparkCatalog);
   }
 
-  @AfterEach
-  void clearDeniedTables() {
-    AuthorizationTable.clear();
-  }
-
   @Test
   void testLoadTablePassesSelectTablePrivilege() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
@@ -110,12 +105,28 @@ public class TestBaseCatalogAuthorization {
 
     Table result = catalog.loadTable(identifier);
 
-    // The underlying Spark table is never loaded for a denied table; a placeholder is returned and
-    // the required privileges are collected for RequiredPrivilegesCheck to report during analysis.
+    // The underlying Spark table is never loaded for a denied table; a placeholder carrying the
+    // failure is returned for RequiredPrivilegesCheck to find in the analyzed plan.
     assertTrue(result instanceof AuthorizationTable);
-    Optional<ForbiddenException> failure = AuthorizationTable.drainFailure();
-    assertTrue(failure.isPresent());
-    assertTrue(failure.get().getMessage().contains("table_a: SELECT_TABLE"));
+    AuthorizationTable deniedTable = (AuthorizationTable) result;
+    assertEquals("null.schema.table_a", deniedTable.tableIdentifier());
+    assertEquals(ImmutableSet.of(Privilege.Name.SELECT_TABLE), deniedTable.requiredPrivileges());
+  }
+
+  @Test
+  void testDeniedWriteFailsWithOriginalError() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    ForbiddenException original = new ForbiddenException("denied write");
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.MODIFY_TABLE))))
+        .thenThrow(original);
+
+    ForbiddenException thrown =
+        assertThrows(ForbiddenException.class, () -> catalog.loadForWriting(identifier));
+
+    // The write path targets a single table: fail immediately with the original error.
+    assertEquals("denied write", thrown.getMessage());
   }
 
   @Test
