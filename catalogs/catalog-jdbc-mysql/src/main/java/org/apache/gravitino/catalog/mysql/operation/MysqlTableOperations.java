@@ -775,6 +775,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withType(column.dataType())
             .withNullable(column.nullable())
             .withComment(column.comment())
+            .withAutoIncrement(column.autoIncrement())
             .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
