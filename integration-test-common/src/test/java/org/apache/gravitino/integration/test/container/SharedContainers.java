@@ -21,13 +21,13 @@ package org.apache.gravitino.integration.test.container;
 import static org.apache.gravitino.integration.test.container.RangerContainer.DOCKER_ENV_RANGER_SERVER_URL;
 
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.RemoveNetworkCmd;
 import com.github.dockerjava.api.model.Info;
 import com.github.dockerjava.api.model.Network.Ipam.Config;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -52,9 +52,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
-import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
@@ -81,7 +79,6 @@ class SharedContainers {
   static final String CONTAINER_NETWORK_SUBNET = "10.20.30.0/28";
   private static final String CONTAINER_NETWORK_GATEWAY = "10.20.30.1";
   private static final String CONTAINER_NETWORK_IPRANGE = "10.20.30.0/28";
-  private static final String NETWORK_NAME = "gravitino-ci-network";
   private static final int CLICKHOUSE_CLUSTER_SIZE = 3;
   private static final String CLICKHOUSE_CLUSTER_HOST_PREFIX = "gravitino-ci-clickhouse-cluster-";
   private static final String CLICKHOUSE_TEST_IMAGE_ENV = "GRAVITINO_CLICKHOUSE_TEST_IMAGE";
@@ -140,6 +137,7 @@ class SharedContainers {
             DockerClient dockerClient = DockerClientFactory.instance().client();
             Info info = dockerClient.infoCmd().exec();
             LOG.info("Docker info: {}", info);
+            LOG.info("Test container run id: {}", RunNames.runId());
 
             if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
               network = createDockerNetwork();
@@ -440,12 +438,6 @@ class SharedContainers {
   }
 
   void startOceanBaseContainer() {
-    // create dir /tmp/obdata by CommandExecutor
-    Object o =
-        CommandExecutor.executeCommandLocalHost(
-            "mkdir -p /tmp/obdata", false, ProcessData.TypesOfData.STREAMS_MERGED);
-    LOG.info("Command mkdir -p /tmp/obdata output:\n{}", o);
-
     if (oceanBaseContainer == null) {
       synchronized (SharedContainers.class) {
         if (oceanBaseContainer == null) {
@@ -468,8 +460,7 @@ class SharedContainers {
                           "OB_MEMORY_LIMIT",
                           "6G"))
                   .withNetwork(network)
-                  .withFilesToMount(
-                      ImmutableMap.<String, String>builder().put("/tmp/obdata", "/root/ob").build())
+                  .withFilesToMount(ImmutableMap.of(oceanBaseDataDir(), "/root/ob"))
                   .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
           OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
           start(container);
@@ -921,17 +912,10 @@ class SharedContainers {
 
   private static Network createDockerNetwork() {
     DockerClient dockerClient = DockerClientFactory.instance().client();
+    String name = RunNames.networkName("ci-network");
 
-    // Remove the `gravitino-ci-network` if it exists
-    boolean networkExists =
-        dockerClient.listNetworksCmd().withNameFilter(NETWORK_NAME).exec().stream()
-            .anyMatch(network -> network.getName().equals(NETWORK_NAME));
-    if (networkExists) {
-      RemoveNetworkCmd removeNetworkCmd = dockerClient.removeNetworkCmd(NETWORK_NAME);
-      removeNetworkCmd.exec();
-    }
-
-    // Check if the subnet of the network conflicts with `gravitino-ci-network`
+    // The subnet is fixed by mac-docker-connector, so a second run on this host, or any other
+    // network in that range, fails here instead of removing a network some other run may use.
     List<com.github.dockerjava.api.model.Network> networks = dockerClient.listNetworksCmd().exec();
 
     for (com.github.dockerjava.api.model.Network network : networks) {
@@ -943,19 +927,23 @@ class SharedContainers {
         try {
           if (ipRangesOverlap(ipamConfig.getSubnet(), CONTAINER_NETWORK_SUBNET)) {
             LOG.error(
-                "The Docker of the network {} subnet {} conflicts with the `gravitino-ci-network` {}, "
-                    + "You can either remove {} network from Docker, or modify the `SharedContainers.CONTAINER_NETWORK_SUBNET` variable",
+                "The Docker network {} subnet {} conflicts with the subnet {} of {}. It may belong to"
+                    + " another Gravitino test run on this host; wait for that run, remove {} from"
+                    + " Docker, or modify the `SharedContainers.CONTAINER_NETWORK_SUBNET` variable",
                 network.getName(),
                 ipamConfig.getSubnet(),
                 CONTAINER_NETWORK_SUBNET,
+                name,
                 network.getName());
             throw new RuntimeException(
                 "The Docker of the network "
                     + network.getName()
                     + " subnet "
                     + ipamConfig.getSubnet()
-                    + " conflicts with the `gravitino-ci-network` "
-                    + CONTAINER_NETWORK_SUBNET);
+                    + " conflicts with the subnet "
+                    + CONTAINER_NETWORK_SUBNET
+                    + " of "
+                    + name);
           }
         } catch (Exception e) {
           throw new RuntimeException(e);
@@ -967,16 +955,28 @@ class SharedContainers {
     ipamConfig
         .withSubnet(CONTAINER_NETWORK_SUBNET)
         .withGateway(CONTAINER_NETWORK_GATEWAY)
-        .withIpRange(CONTAINER_NETWORK_IPRANGE)
-        .setNetworkID("gravitino-ci-network");
+        .withIpRange(CONTAINER_NETWORK_IPRANGE);
 
     return closer.register(
         Network.builder()
             .createNetworkCmdModifier(
                 cmd ->
-                    cmd.withIpam(
-                        new com.github.dockerjava.api.model.Network.Ipam().withConfig(ipamConfig)))
+                    cmd.withName(name)
+                        .withIpam(
+                            new com.github.dockerjava.api.model.Network.Ipam()
+                                .withConfig(ipamConfig)))
             .build());
+  }
+
+  // Per run, not a shared /tmp/obdata: the directory is copied into the container at start.
+  private static String oceanBaseDataDir() {
+    try {
+      Path dir = Files.createTempDirectory("gravitino-obdata-" + RunNames.runId() + "-");
+      dir.toFile().deleteOnExit();
+      return dir.toString();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to create the OceanBase data directory", e);
+    }
   }
 
   static boolean ipRangesOverlap(String cidr1, String cidr2) throws Exception {

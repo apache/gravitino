@@ -172,7 +172,14 @@ public abstract class BaseContainer implements Startable {
     // can look up the corresponding IP address by host name.
     // This method fixes an error that occurs when HDFS looks up hostnames from DNS.
     extraHosts.forEach((hostName, ipAddress) -> container.withExtraHost(hostName, ipAddress));
-    container.withCreateContainerCmdModifier(c -> c.withHostName(hostName));
+    // A per-run name instead of Docker's generated one, whose underscore breaks Hadoop's reverse
+    // lookups and which does not say which run owns the container.
+    String name = RunNames.containerName(hostName);
+    container.withCreateContainerCmdModifier(
+        c -> {
+          c.withHostName(hostName);
+          c.withName(name);
+        });
     network.ifPresent(net -> container.withNetwork(net).withNetworkAliases(hostName));
 
     WaitStrategy waitStrategy = waitStrategy();

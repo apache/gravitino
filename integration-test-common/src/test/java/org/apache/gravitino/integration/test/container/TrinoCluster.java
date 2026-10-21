@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.testcontainers.containers.GenericContainer;
@@ -334,7 +333,12 @@ public final class TrinoCluster extends BaseContainer {
       }
 
       Network shared = SharedContainers.getInstance().getNetwork();
-      Network ownNetwork = shared == null ? Network.newNetwork() : null;
+      Network ownNetwork =
+          shared == null
+              ? Network.builder()
+                  .createNetworkCmdModifier(cmd -> cmd.withName(RunNames.networkName("trino")))
+                  .build()
+              : null;
       Optional<Network> network = Optional.of(shared != null ? shared : ownNetwork);
 
       List<BaseContainer> serviceList = new ArrayList<>();
@@ -521,10 +525,10 @@ public final class TrinoCluster extends BaseContainer {
         Map<String, String> env,
         Optional<Network> network) {
       super(container, hostName, ImmutableSet.of(), extraHosts, ImmutableMap.of(), env, network);
-      // Docker answers a reverse lookup of a container's IP with its name, and Hadoop clients in
-      // Trino canonicalize hdfs://<ip> through that lookup. Generated names contain an underscore,
-      // which is not valid in a hostname, so name each container like the old Compose setup did.
-      String name = "trino-ci-" + hostName + "-" + UUID.randomUUID().toString().substring(0, 8);
+      // BaseContainer already gives a per-run name; this one also says the container belongs to
+      // the Trino cluster, apart from the run's shared Hive or MySQL.
+      String name =
+          RunNames.containerName(hostName.startsWith("trino") ? hostName : "trino-" + hostName);
       this.container.withCreateContainerCmdModifier(cmd -> cmd.withName(name));
     }
 

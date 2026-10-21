@@ -139,7 +139,7 @@ public class DorisContainer extends BaseContainer {
     }
 
     ComposeContainer compose =
-        new ComposeContainer(composeFiles())
+        new ComposeContainer(RunNames.composeIdentifier("doris"), composeFiles())
             .withEnv("GRAVITINO_CI_DORIS_DOCKER_IMAGE", image)
             .withEnv("GRAVITINO_CI_DORIS_FE_IMAGE", feImage)
             .withEnv("GRAVITINO_CI_DORIS_BE_IMAGE", beImage)

@@ -67,6 +67,8 @@ public class TestBaseContainer {
     Mockito.when(cmd.getHostConfig()).thenReturn(hostConfig);
     supplied.getCreateContainerCmdModifiers().forEach(modifier -> modifier.modify(cmd));
     Mockito.verify(cmd).withHostName(HOST_NAME);
+    Mockito.verify(cmd)
+        .withName(Mockito.startsWith("gravitino-test-host-" + RunNames.runId() + "-"));
     Assertions.assertEquals(
         "20000 40000", hostConfig.getSysctls().get("net.ipv4.ip_local_port_range"));
   }

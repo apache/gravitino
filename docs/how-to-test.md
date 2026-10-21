@@ -152,6 +152,8 @@ public class CatalogHiveIT extends AbstractIT {
 }
 ```
 
+Two Gradle runs, for example in two worktrees, can share one Docker host. Each test JVM picks a run id and names its containers, networks and Doris Compose projects `gravitino-<service>-<runId>-<n>`, uses mapped host ports, and keeps its OceanBase data directory in a per-run temporary directory, so the runs do not collide. Host names and network aliases inside a network stay fixed, because images such as the Kerberos Hive derive their principals from their host name. One thing stays shared: on macOS with `NEED_CREATE_DOCKER_NETWORK=true`, the network must use the subnet that `mac-docker-connector` routes, so a second run on that host fails fast with a subnet conflict instead of removing the first run's network. On CI, `docker container prune -f` before each container start also removes stopped containers of any run on the host.
+
 ## Run All Integration Tests
 
 :::note
