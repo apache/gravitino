@@ -34,6 +34,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -95,6 +98,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
@@ -157,6 +161,41 @@ public class TestCatalogManager {
       catalogManager.close();
       catalogManager = null;
     }
+  }
+
+  @Test
+  void testJdbcDriverDefaultAfterProviderConfigMerge(@TempDir Path catalogPackage)
+      throws IOException {
+    Path conf = Files.createDirectories(catalogPackage.resolve("conf"));
+    Path configFile = conf.resolve("jdbc-oceanbase.conf");
+    Files.write(configFile, "jdbc-driver=configured.Driver\n".getBytes(StandardCharsets.UTF_8));
+    Map<String, String> request =
+        ImmutableMap.of(
+            Catalog.PROPERTY_PACKAGE,
+            catalogPackage.toString(),
+            "jdbc-url",
+            "jdbc:oceanbase://localhost:2881/test");
+
+    Assertions.assertEquals(
+        "configured.Driver",
+        catalogManager.buildCatalogConf("jdbc-oceanbase", request).get("jdbc-driver"));
+
+    Map<String, String> explicit = Maps.newHashMap(request);
+    explicit.put("jdbc-driver", "request.Driver");
+    Assertions.assertEquals(
+        "request.Driver",
+        catalogManager.buildCatalogConf("jdbc-oceanbase", explicit).get("jdbc-driver"));
+
+    Files.write(
+        configFile,
+        "jdbc-url=jdbc:oceanbase://localhost:2881/test\n".getBytes(StandardCharsets.UTF_8));
+    Assertions.assertEquals(
+        "com.oceanbase.jdbc.Driver",
+        catalogManager
+            .buildCatalogConf(
+                "jdbc-oceanbase",
+                ImmutableMap.of(Catalog.PROPERTY_PACKAGE, catalogPackage.toString()))
+            .get("jdbc-driver"));
   }
 
   @Test
