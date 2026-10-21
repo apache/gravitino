@@ -674,6 +674,24 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp4.getCode());
     Assertions.assertEquals(NoSuchJobTemplateException.class.getSimpleName(), errorResp4.getType());
 
+    // Test throw JobTemplateAlreadyExistsException
+    doThrow(new JobTemplateAlreadyExistsException("mock error"))
+        .when(jobOperationDispatcher)
+        .alterJobTemplate(any(), any(), any());
+
+    Response respExists =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), respExists.getStatus());
+    ErrorResponse errorRespExists = respExists.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorRespExists.getCode());
+    Assertions.assertEquals(
+        JobTemplateAlreadyExistsException.class.getSimpleName(), errorRespExists.getType());
+
     // Test throw UnsupportedOperationException
     doThrow(new UnsupportedOperationException("mock error"))
         .when(jobOperationDispatcher)

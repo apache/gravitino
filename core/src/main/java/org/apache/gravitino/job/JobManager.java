@@ -339,7 +339,8 @@ public class JobManager implements JobOperationDispatcher {
   @Override
   public JobTemplateEntity alterJobTemplate(
       String metalake, String jobTemplateName, JobTemplateChange... changes)
-      throws NoSuchJobTemplateException, IllegalArgumentException {
+      throws NoSuchJobTemplateException, JobTemplateAlreadyExistsException,
+          IllegalArgumentException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
     Optional<String> newName =
@@ -371,12 +372,19 @@ public class JobManager implements JobOperationDispatcher {
           } catch (EntityAlreadyExistsException e) {
             // If the EntityAlreadyExistsException is thrown, it means the new name already exists.
             // So there should be a rename change, and the new name should be present.
-            throw new RuntimeException(
-                String.format(
-                    "Failed to rename job template from %s to %s under metalake %s, the new name "
-                        + "already exists",
-                    jobTemplateName, newName, metalake),
-                e);
+            String conflictName =
+                newName.orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "Job template already exists without a rename change", e));
+            throw new JobTemplateAlreadyExistsException(
+                e,
+                "Failed to rename job template %s to %s under metalake %s, a job template named "
+                    + "%s already exists",
+                jobTemplateName,
+                conflictName,
+                metalake,
+                conflictName);
           }
         });
   }
