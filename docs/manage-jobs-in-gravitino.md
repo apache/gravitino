@@ -441,7 +441,7 @@ only tracks the jobs it runs itself:
   `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
   `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
   directory.
-- To clear such a job sooner, cancel it. If the job is still `CANCELLING` three times
+- To clear such a job sooner, cancel it. If the job is still `CANCELLING` more than three times
   `gravitino.job.statusPullIntervalInMs` after the cancel request, the server running it is
   considered gone, and another server marks the job as `CANCELLED` when it pulls job statuses. Its
   job template can then be deleted.
