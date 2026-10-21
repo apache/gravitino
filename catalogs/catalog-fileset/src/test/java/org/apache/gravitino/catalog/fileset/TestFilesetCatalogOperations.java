@@ -1425,7 +1425,7 @@ public class TestFilesetCatalogOperations {
           GravitinoEnv.getInstance(), "entityStore", new RelationalEntityStore(), true);
       try (FilesetCatalogOperations filesetCatalogOperations = new FilesetCatalogOperations()) {
         Map<String, String> map = ImmutableMap.of("default-filesystem", "file:///");
-        filesetCatalogOperations.initialize(map, null, hasPropertyMetadata);
+        filesetCatalogOperations.initialize(map, randomCatalogInfo(), hasPropertyMetadata);
         for (int i = 0; i < paths.length; i++) {
           Path actual = filesetCatalogOperations.formalizePath(new Path(paths[i]), map);
           Assertions.assertEquals(expected[i], actual.toString());
