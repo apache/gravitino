@@ -21,6 +21,7 @@ package org.apache.gravitino.integration.test.util;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -30,6 +31,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 
 /**
  * Changes HDFS paths on the Kerberos Hive container from the test JVM, in place of {@code docker
@@ -44,6 +46,13 @@ import org.apache.hadoop.security.UserGroupInformation;
  */
 public final class KerberosHdfs {
   private static final String REALM = "HADOOPKRB";
+  private static final String KRB5_CONF = "java.security.krb5.conf";
+  static final String KRB5_CONFIG_CLASS = "sun.security.krb5.Config";
+  private static final String AUTHENTICATION = "hadoop.security.authentication";
+  // The image's own rule: every two-part principal is the HDFS superuser. Set on the client so a
+  // login does not depend on the default realm Hadoop has cached from an earlier krb5.conf.
+  private static final String AUTH_TO_LOCAL =
+      "RULE:[2:$1@$0](.*@" + REALM + ")s/.*/hadoop/\nDEFAULT";
 
   private final URI defaultFs;
   private final String principal;
@@ -84,6 +93,59 @@ public final class KerberosHdfs {
             kerberosHive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT),
         kerberosHive.getHostName(),
         keytabPath);
+  }
+
+  /**
+   * Returns the container's {@code /etc/krb5.conf} pointed at a KDC the test JVM can reach. The
+   * image names {@code localhost}; tests reach the container by its address.
+   *
+   * @param krb5Conf the content of the container's {@code /etc/krb5.conf}
+   * @param kdcHost the container's address
+   * @return the content to use in the test JVM
+   */
+  public static String reachableKrb5Conf(String krb5Conf, String kdcHost) {
+    return krb5Conf
+        .replace("kdc = localhost:88", "kdc = " + kdcHost + ":88")
+        .replace("admin_server = localhost", "admin_server = " + kdcHost + ":749");
+  }
+
+  /**
+   * Runs {@code action} with the JVM's Kerberos configuration read from {@code krb5ConfPath}, for
+   * callers that run before a test sets up its own, such as a container's readiness check.
+   *
+   * <p>The configuration is JVM-wide and cached: the JDK parses krb5.conf once into {@code
+   * sun.security.krb5.Config} and Hadoop caches the default realm in {@link KerberosName}. Tests
+   * that set {@code java.security.krb5.conf} later rely on those caches still being empty or
+   * holding their own values, so afterwards both caches are put back as they were (not reloaded),
+   * the previous property is restored and, if UGI security was off, UGI is switched back to simple
+   * authentication.
+   *
+   * @param krb5ConfPath a krb5.conf that reaches the container's KDC
+   * @param action what to run, such as calls on a {@link KerberosHdfs}
+   */
+  public static void withKrb5Conf(String krb5ConfPath, Runnable action) {
+    String previous = System.getProperty(KRB5_CONF);
+    boolean securityWasEnabled = UserGroupInformation.isSecurityEnabled();
+    Object previousKrb5Config = readStatic(KRB5_CONFIG_CLASS, "singleton");
+    Object previousDefaultRealm = readStatic(KerberosName.class.getName(), "defaultRealm");
+    System.setProperty(KRB5_CONF, krb5ConfPath);
+    refreshKrb5Config();
+    try {
+      action.run();
+    } finally {
+      if (previous == null) {
+        System.clearProperty(KRB5_CONF);
+      } else {
+        System.setProperty(KRB5_CONF, previous);
+      }
+      if (!securityWasEnabled) {
+        Configuration simple = new Configuration();
+        simple.set(AUTHENTICATION, "simple");
+        UserGroupInformation.setConfiguration(simple);
+      }
+      writeStatic(KRB5_CONFIG_CLASS, "singleton", previousKrb5Config);
+      writeStatic(KerberosName.class.getName(), "defaultRealm", previousDefaultRealm);
+    }
   }
 
   /**
@@ -157,6 +219,40 @@ public final class KerberosHdfs {
     }
   }
 
+  // The JDK reads krb5.conf once; tests refresh it the same way after changing the property.
+  private static void refreshKrb5Config() {
+    try {
+      Class.forName(KRB5_CONFIG_CLASS).getMethod("refresh").invoke(null);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException("Cannot reload the Kerberos configuration", e);
+    }
+  }
+
+  // Package-private for TestKerberosHdfs. The build opens sun.security.krb5 to test JVMs.
+  static Object readStatic(String className, String fieldName) {
+    try {
+      Field field = Class.forName(className).getDeclaredField(fieldName);
+      field.setAccessible(true);
+      return field.get(null);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException("Cannot read " + className + "." + fieldName, e);
+    }
+  }
+
+  private static void writeStatic(String className, String fieldName, Object value) {
+    try {
+      Class<?> type = Class.forName(className);
+      Field field = type.getDeclaredField(fieldName);
+      field.setAccessible(true);
+      // Config.getInstance and KerberosName.getDefaultRealm fill these under the class lock.
+      synchronized (type) {
+        field.set(null, value);
+      }
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException("Cannot restore " + className + "." + fieldName, e);
+    }
+  }
+
   private interface FileSystemAction<T> {
     T apply(FileSystem fs) throws IOException;
   }
@@ -164,7 +260,8 @@ public final class KerberosHdfs {
   private <T> T run(FileSystemAction<T> action) {
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultFs.toString());
-    conf.set("hadoop.security.authentication", "kerberos");
+    conf.set(AUTHENTICATION, "kerberos");
+    conf.set("hadoop.security.auth_to_local", AUTH_TO_LOCAL);
     conf.set("dfs.namenode.kerberos.principal", nameNodePrincipal);
     conf.setBoolean("fs.hdfs.impl.disable.cache", true);
     try {

@@ -29,15 +29,21 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
+import org.apache.gravitino.integration.test.util.KerberosHdfs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -64,6 +70,8 @@ public class HiveContainer extends BaseContainer {
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
   public static final int HIVE_SERVICE_PORT = 10000;
+  // The Kerberos image's second metastore, from its hive-site1.xml.
+  private static final int SECOND_HIVE_METASTORE_PORT = 19083;
 
   private static final String HIVE_LOG_PATH = "/tmp/root/";
   private static final String HDFS_LOG_PATH = "/usr/local/hadoop/logs/";
@@ -186,30 +194,23 @@ public class HiveContainer extends BaseContainer {
   }
 
   private void copyHiveLog() {
+    String destPath = System.getenv("IT_PROJECT_DIR");
+    if (destPath == null || destPath.isEmpty()) {
+      return;
+    }
+    LOG.info("Copy Hive log file to {}", destPath);
     try {
-      String destPath = System.getenv("IT_PROJECT_DIR");
-      LOG.info("Copy Hive log file to {}", destPath);
-
-      String hiveLogJarPath = "/hive.tar";
-      String HdfsLogJarPath = "/hdfs.tar";
-
-      // Pack the jar files
-      container.execInContainer("tar", "cf", hiveLogJarPath, HIVE_LOG_PATH);
-      container.execInContainer("tar", "cf", HdfsLogJarPath, HDFS_LOG_PATH);
-
-      container.copyFileFromContainer(hiveLogJarPath, destPath + File.separator + "hive.tar");
-      container.copyFileFromContainer(HdfsLogJarPath, destPath + File.separator + "hdfs.tar");
+      ContainerLogs.copyArchive(
+          container,
+          Paths.get(destPath, ContainerLogs.fileName("hive.tar", container)),
+          HIVE_LOG_PATH);
+      ContainerLogs.copyArchive(
+          container,
+          Paths.get(destPath, ContainerLogs.fileName("hdfs.tar", container)),
+          HDFS_LOG_PATH);
     } catch (Exception e) {
       LOG.warn("Can't copy Hive log for:", e);
     }
-  }
-
-  private void outputHiveStatus() {
-    Container.ExecResult execResult = executeInContainer("hdfs", "dfsadmin", "-report");
-    LOG.info("HDFS report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
-
-    execResult = executeInContainer("hive", "-e", "\"select 1;\"");
-    LOG.info("Hive report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
   }
 
   /**
@@ -226,25 +227,7 @@ public class HiveContainer extends BaseContainer {
     AtomicInteger namenodePort = new AtomicInteger();
     return new WaitAllStrategy()
         .withStrategy(Wait.forListeningPort())
-        .withStrategy(
-            new ProbeWaitStrategy(
-                    "HDFS to report a live DataNode",
-                    target -> {
-                      for (int port : NAMENODE_HTTP_PORTS) {
-                        String jmx =
-                            httpRequest(
-                                "GET",
-                                format(
-                                    "http://%s:%d/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState",
-                                    ipAddress(target.getContainerInfo()), port));
-                        if (hasLiveDataNode(jmx)) {
-                          namenodePort.set(port);
-                          return true;
-                        }
-                      }
-                      return false;
-                    })
-                .withPollInterval(Duration.ofMillis(500)))
+        .withStrategy(liveDataNode(namenodePort))
         // `CREATE TABLE` through the Hive CLI used to create this directory as the Hadoop user;
         // tests that write to the default database expect it to exist.
         .withStrategy(
@@ -264,48 +247,110 @@ public class HiveContainer extends BaseContainer {
                     })
                 .withPollInterval(Duration.ofMillis(500)))
         .withStrategy(portProbe(HIVE_METASTORE_PORT, "Hive Metastore"))
-        // Tests run HiveQL over JDBC; Kerberos Hive tests still use the CLI.
+        // Tests run HiveQL over JDBC.
         .withStrategy(portProbe(HIVE_SERVICE_PORT, "HiveServer2"));
   }
 
   /**
-   * Waits for the image's check-status.sh and a {@code CREATE TABLE} through the Hive CLI, then for
-   * the metastore port. Kerberos Hive keeps the CLI: over HTTP the NameNode wants SPNEGO, and the
-   * CLI table creates the warehouse directory as the image's own Kerberos user, with the
-   * permissions tests such as HiveUserAuthenticationIT rely on.
+   * Waits for HDFS through the NameNode's JMX, creates the warehouse directory through a Kerberos
+   * HDFS client and waits for both metastores' ports.
+   *
+   * <p>The image leaves the NameNode's web server on simple authentication (no {@code
+   * hadoop.http.authentication.type} or filter initializer in its core-site.xml); only WebHDFS
+   * wants SPNEGO, so JMX answers as it does without Kerberos.
+   *
+   * <p>The Hive CLI's {@code CREATE TABLE} used to create the warehouse as the image's {@code
+   * hive/<host>} principal. The client logs in as that principal from the container's keytab, so
+   * the directory gets the same owner ({@code hadoop}, the image's mapping of two-part principals),
+   * the group it inherits from {@code /} and mode 755, which keeps it closed to other users as
+   * HiveUserAuthenticationIT expects.
+   *
+   * <p>The metastores are checked by port. The test classpath has no Hive metastore client, and a
+   * metastore only listens once it has logged in from its keytab and opened its database.
    */
   private WaitStrategy kerberosReadiness() {
-    String createTableSQL =
-        "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
-            + "salary String, destination String) ";
     return new WaitAllStrategy()
         .withStrategy(Wait.forListeningPort())
+        .withStrategy(liveDataNode(new AtomicInteger()))
         .withStrategy(
             new ProbeWaitStrategy(
-                    "HDFS and the Hive CLI to pass check-status.sh",
-                    target -> succeeds(target, "bash", "/tmp/check-status.sh"))
-                // Each report runs two more CLIs, so only print it once Hive has run out of time.
-                .withTimeoutReport(target -> outputHiveStatus()))
-        .withStrategy(
-            new ProbeWaitStrategy(
-                "the Hive CLI to create default.employee",
-                target -> succeeds(target, "hive", "-e", createTableSQL)))
-        .withStrategy(portProbe(HIVE_METASTORE_PORT, "Hive Metastore"));
+                    "Kerberos HDFS to create " + WAREHOUSE_DIR, this::createKerberosWarehouse)
+                .withPollInterval(Duration.ofSeconds(2)))
+        .withStrategy(portProbe(HIVE_METASTORE_PORT, "Hive Metastore"))
+        // MultipleHMSUserAuthenticationIT connects to the image's second metastore.
+        .withStrategy(portProbe(SECOND_HIVE_METASTORE_PORT, "the second Hive Metastore"));
   }
 
-  private static boolean succeeds(WaitStrategyTarget target, String... commandAndArgs)
+  // The keytab and krb5.conf exist before the NameNode starts, so they are there once it is live.
+  private boolean createKerberosWarehouse(WaitStrategyTarget target)
       throws IOException, InterruptedException {
-    Container.ExecResult result = target.execInContainer(commandAndArgs);
-    if (result.getExitCode() != 0) {
-      LOG.info(
-          "Command [{}] exited with {}, stdout: {}, stderr: {}",
-          String.join(" ", commandAndArgs),
-          result.getExitCode(),
-          result.getStdout(),
-          result.getStderr());
+    if (!hasHdfsClient()) {
+      // Such a module only reaches HDFS through the metastore, which writes as the superuser.
+      LOG.warn("No HDFS client on the test classpath; not creating {}", WAREHOUSE_DIR);
+      return true;
+    }
+    Path dir = Files.createTempDirectory("kerberos-hive-");
+    try {
+      String keytab = dir.resolve("admin.keytab").toString();
+      target.copyFileFromContainer("/etc/admin.keytab", keytab);
+      String ip = ipAddress(target.getContainerInfo());
+      String krb5Conf =
+          target.copyFileFromContainer(
+              "/etc/krb5.conf", in -> new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      Path krb5ConfPath =
+          Files.writeString(dir.resolve("krb5.conf"), KerberosHdfs.reachableKrb5Conf(krb5Conf, ip));
+      KerberosHdfs hdfs =
+          new KerberosHdfs(format("hdfs://%s:%d", ip, HDFS_DEFAULTFS_PORT), hostName, keytab);
+      KerberosHdfs.withKrb5Conf(
+          krb5ConfPath.toString(),
+          () -> {
+            hdfs.mkdirs(WAREHOUSE_DIR);
+            hdfs.setPermission(WAREHOUSE_DIR, "755", false);
+          });
+      return true;
+    } finally {
+      try (Stream<Path> files = Files.walk(dir)) {
+        files.sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
+      }
+    }
+  }
+
+  private static boolean hasHdfsClient() {
+    try {
+      Class.forName("org.apache.hadoop.hdfs.DistributedFileSystem");
+      return true;
+    } catch (ClassNotFoundException e) {
       return false;
     }
-    return true;
+  }
+
+  // Polls the NameNode's JMX on either web port and remembers the one that answered. Logs the
+  // last response if no DataNode registers in time.
+  private static WaitStrategy liveDataNode(AtomicInteger namenodePort) {
+    AtomicReference<String> lastResponse = new AtomicReference<>();
+    return new ProbeWaitStrategy(
+            "HDFS to report a live DataNode",
+            target -> {
+              for (int port : NAMENODE_HTTP_PORTS) {
+                String jmx =
+                    httpRequest(
+                        "GET",
+                        format(
+                            "http://%s:%d/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState",
+                            ipAddress(target.getContainerInfo()), port));
+                if (jmx != null) {
+                  lastResponse.set(jmx);
+                }
+                if (hasLiveDataNode(jmx)) {
+                  namenodePort.set(port);
+                  return true;
+                }
+              }
+              return false;
+            })
+        .withPollInterval(Duration.ofMillis(500))
+        .withTimeoutReport(
+            target -> LOG.info("Last NameNode FSNamesystemState: {}", lastResponse.get()));
   }
 
   private static WaitStrategy portProbe(int port, String service) {

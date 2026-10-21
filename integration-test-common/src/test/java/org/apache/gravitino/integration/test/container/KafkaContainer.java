@@ -34,7 +34,6 @@ import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
-import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
@@ -82,13 +81,14 @@ public class KafkaContainer extends BaseContainer {
   private void copyKafkaLogs() {
     try {
       String destPath = System.getenv("IT_PROJECT_DIR");
+      if (destPath == null || destPath.isEmpty() || !container.isRunning()) {
+        return;
+      }
       LOG.info("Copy Kafka logs file from {} to {}", KAFKA_LOGS_DIR, destPath);
-
-      String kafkaLogJarPath = "/home/appuser/kafka-logs.tar";
-
-      GenericContainer<?> kafkaContainer = getContainer();
-      kafkaContainer.execInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
-      kafkaContainer.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
+      ContainerLogs.copyArchive(
+          container,
+          Paths.get(destPath, ContainerLogs.fileName("kafka-logs.tar", container)),
+          KAFKA_LOGS_DIR);
     } catch (Exception e) {
       LOG.error("Failed to package Kafka logs", e);
     }

@@ -328,11 +328,15 @@ public final class TrinoCluster extends BaseContainer {
     for (BaseContainer service : services) {
       if (HIVE_HOST.equals(service.hostName)) {
         try {
-          service.executeInContainer(
-              "tar", "czf", "/tmp/hive-logs.tgz", "/usr/local/hadoop/logs", "/tmp/root");
-          copyQuietly(service, "/tmp/hive-logs.tgz", logDir.resolve("hive-logs.tgz"));
-        } catch (RuntimeException e) {
-          LOG.warn("Could not pack the Hive logs for CI", e);
+          if (service.getContainer().isRunning()) {
+            ContainerLogs.copyArchive(
+                service.getContainer(),
+                logDir.resolve("hive-logs.tgz"),
+                "/usr/local/hadoop/logs",
+                "/tmp/root");
+          }
+        } catch (IOException | RuntimeException e) {
+          LOG.warn("Could not copy the Hive logs for CI", e);
         }
       }
     }

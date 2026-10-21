@@ -27,6 +27,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +60,73 @@ public class TestKerberosHdfs {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new KerberosHdfs("hdfs://h:9000", "host", null));
     Assertions.assertDoesNotThrow(() -> new KerberosHdfs("hdfs://h:9000", "host", "/k"));
+  }
+
+  @Test
+  void testReachableKrb5ConfPointsAtTheContainer() {
+    String conf =
+        "[realms]\n HADOOPKRB = {\n  kdc = localhost:88\n  admin_server = localhost\n }\n";
+
+    Assertions.assertEquals(
+        "[realms]\n HADOOPKRB = {\n  kdc = 172.18.0.2:88\n  admin_server = 172.18.0.2:749\n }\n",
+        KerberosHdfs.reachableKrb5Conf(conf, "172.18.0.2"));
+  }
+
+  @Test
+  void testWithKrb5ConfRestoresTheJvmSettings() throws IOException {
+    String key = "java.security.krb5.conf";
+    String before = System.getProperty(key);
+    java.nio.file.Path krb5Conf =
+        Files.writeString(
+            tempDir.resolve("krb5.conf"), "[libdefaults]\n default_realm = HADOOPKRB\n");
+    try {
+      System.clearProperty(key);
+      List<String> seen = new ArrayList<>();
+
+      KerberosHdfs.withKrb5Conf(krb5Conf.toString(), () -> seen.add(System.getProperty(key)));
+
+      Assertions.assertEquals(List.of(krb5Conf.toString()), seen);
+      Assertions.assertNull(System.getProperty(key));
+      Assertions.assertFalse(UserGroupInformation.isSecurityEnabled());
+    } finally {
+      if (before != null) {
+        System.setProperty(key, before);
+      }
+    }
+  }
+
+  // HDFSKerberosIT sets java.security.krb5.conf after the readiness check and does not reload the
+  // JDK's cached configuration, so the check must leave the caches as it found them.
+  @Test
+  void testWithKrb5ConfLeavesTheKerberosCachesAsTheyWere() throws IOException {
+    String key = "java.security.krb5.conf";
+    String before = System.getProperty(key);
+    java.nio.file.Path krb5Conf =
+        Files.writeString(
+            tempDir.resolve("krb5.conf"), "[libdefaults]\n default_realm = HADOOPKRB\n");
+    try {
+      System.clearProperty(key);
+      Object config = KerberosHdfs.readStatic(KerberosHdfs.KRB5_CONFIG_CLASS, "singleton");
+      Object realm = KerberosHdfs.readStatic(KerberosName.class.getName(), "defaultRealm");
+      List<String> seen = new ArrayList<>();
+
+      KerberosHdfs.withKrb5Conf(
+          krb5Conf.toString(),
+          () -> {
+            KerberosName.resetDefaultRealm();
+            seen.add(KerberosName.getDefaultRealm());
+          });
+
+      Assertions.assertEquals(List.of("HADOOPKRB"), seen);
+      Assertions.assertSame(
+          config, KerberosHdfs.readStatic(KerberosHdfs.KRB5_CONFIG_CLASS, "singleton"));
+      Assertions.assertSame(
+          realm, KerberosHdfs.readStatic(KerberosName.class.getName(), "defaultRealm"));
+    } finally {
+      if (before != null) {
+        System.setProperty(key, before);
+      }
+    }
   }
 
   @Test

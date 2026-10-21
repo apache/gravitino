@@ -22,6 +22,7 @@ import static java.lang.String.format;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -217,9 +218,10 @@ public class DorisContainer extends BaseContainer {
       throws Exception {
     Optional<ContainerState> container = composeContainer.getContainerByServiceName(serviceName);
     if (container.isPresent()) {
-      String tarPath = "/" + tarName + ".tar";
-      container.get().execInContainer("tar", "cf", tarPath, logPath);
-      container.get().copyFileFromContainer(tarPath, destPath + File.separator + tarName + ".tar");
+      ContainerLogs.copyArchive(
+          container.get(),
+          Paths.get(destPath, ContainerLogs.fileName(tarName + ".tar", container.get())),
+          logPath);
     } else {
       LOG.warn("Doris {} container not found, skipping log copy", serviceName);
     }

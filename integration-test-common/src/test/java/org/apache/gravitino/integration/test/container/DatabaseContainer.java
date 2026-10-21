@@ -22,6 +22,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,7 +32,6 @@ import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.WaitStrategy;
@@ -127,18 +127,37 @@ public abstract class DatabaseContainer extends BaseContainer {
       LOG.info("{}: lower durability disabled, so tests run slower: {}", name, report);
       return;
     }
-    Container.ExecResult stat = executeInContainer("stat", "-f", "-c", "%T", values[0]);
-    String fileSystem =
-        stat.getExitCode() == 0 ? stat.getStdout().trim() : "an unknown file system";
-    if ("tmpfs".equals(fileSystem)) {
+    Map<String, String> tmpfs = db.getContainerInfo().getHostConfig().getTmpFs();
+    if (isOnTmpfs(values[0], tmpfs == null ? Set.of() : tmpfs.keySet())) {
       LOG.info("{}: lower durability enabled, data on tmpfs: {}", name, report);
     } else {
       LOG.warn(
-          "{}: lower durability enabled, but data is on {}, not tmpfs, so tests run slower: {}",
+          "{}: lower durability enabled, but data is not on tmpfs, so tests run slower: {}",
           name,
-          fileSystem,
           report);
     }
+  }
+
+  /**
+   * Returns whether {@code dataDir} is one of the container's {@code tmpfs} mounts or below one.
+   * The mounts come from the container's configuration, so the check runs nothing in the container.
+   *
+   * @param dataDir the data directory the server reports, possibly with a trailing slash
+   * @param tmpfsMounts the container's {@code tmpfs} mount points
+   * @return true when the data directory is on {@code tmpfs}
+   */
+  static boolean isOnTmpfs(@Nullable String dataDir, Collection<String> tmpfsMounts) {
+    if (dataDir == null) {
+      return false;
+    }
+    String dir = stripTrailingSlashes(dataDir);
+    return tmpfsMounts.stream()
+        .map(DatabaseContainer::stripTrailingSlashes)
+        .anyMatch(mount -> dir.equals(mount) || dir.startsWith(mount + "/"));
+  }
+
+  private static String stripTrailingSlashes(String path) {
+    return path.replaceAll("/+$", "");
   }
 
   /** Builder for a {@link DatabaseContainer}. */
