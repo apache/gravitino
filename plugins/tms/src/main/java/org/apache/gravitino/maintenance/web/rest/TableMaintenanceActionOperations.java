@@ -132,6 +132,7 @@ public class TableMaintenanceActionOperations {
             if (action == null) {
               throw new NoSuchEntityException("no maintenance action for job_id=%s", jobId);
             }
+            requireActionInFlight(action);
             requireActionInMetalake(action, metalake);
             requireActionMatchesRequest(action, request.getTableId(), request.getPolicyId());
             InJobGateOutcome outcome =
@@ -192,6 +193,7 @@ public class TableMaintenanceActionOperations {
             if (action == null) {
               throw new NoSuchEntityException("no maintenance action for job_id=%s", jobId);
             }
+            requireActionInFlight(action);
             requireActionInMetalake(action, metalake);
             if (request.getAfterSnapshotId() != null
                 && StringUtils.isNotBlank(request.getMetricsJson())) {
@@ -227,6 +229,17 @@ public class TableMaintenanceActionOperations {
           String.format(
               "request tableId/policyId (%s/%s) do not match action for job_id=%s (%s/%s)",
               tableId, policyId, action.jobId(), action.tableId(), action.policyId()));
+    }
+  }
+
+  /**
+   * Soft-slot rows use {@code finished_at = 0} while in flight. Reject sample/finish on completed
+   * rows so a late Spark retry cannot re-gate or re-run maintenance after reclaim/finish.
+   */
+  private static void requireActionInFlight(TableMaintenanceActionPO action) {
+    if (action.finishedAt() == null || action.finishedAt() != 0L) {
+      throw new NoSuchEntityException(
+          "no in-flight maintenance action for job_id=%s", action.jobId());
     }
   }
 

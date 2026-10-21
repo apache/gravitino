@@ -25,7 +25,8 @@ import org.apache.gravitino.meta.PolicyEntity;
  * Decides whether maintenance should run after metrics were sampled at {@code S0}.
  *
  * <p>Production wiring uses {@link TypeDispatchingInJobRecommender}: compaction via {@link
- * CompactionInJobRecommender}, other maintenance types via {@link TriggerExprInJobRecommender}.
+ * CompactionInJobRecommender}, orphan cleanup via {@link TriggerExprInJobRecommender}, and expire /
+ * rewrite-manifests placeholders via {@link AlwaysMaintainInJobRecommender}.
  */
 @FunctionalInterface
 public interface InJobRecommender {

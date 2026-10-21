@@ -152,6 +152,17 @@ gravitino.lance-rest.namespace-backend = gravitino
 # gravitino.maintenance.snapshot-expiry.minIntervalMs = 3600000
 # gravitino.maintenance.orphan-cleanup.minIntervalMs = 86400000
 
+# Base URI Spark jobs use for TMS sample/finish callbacks (updater_options.gravitino_uri).
+# Required for cron Spark submit when the policy does not set updaterOptions.gravitino_uri.
+# gravitino.maintenance.gravitinoUri = http://localhost:8090
+
+# Cluster-static Gravitino client auth overlaid onto policy updaterOptions (camelCase suffixes).
+# See docs/table-maintenance-service/optimizer-configuration.md
+# gravitino.maintenance.gravitinoAuth.authType = none
+
+# Iceberg REST / Spark auth passthrough overlaid onto policy jobOptions, then packed into spark_conf.
+# gravitino.maintenance.ircAuth.rest.auth.type = none
+
 # THE CONFIGURATION FOR sensitive property key matching
 # Comma-separated keywords. Each entry is a literal substring, not a regular expression.
 # This list replaces the default (secret,password,token,credential,access,account).

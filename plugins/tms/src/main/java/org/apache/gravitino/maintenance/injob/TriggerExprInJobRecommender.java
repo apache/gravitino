@@ -34,8 +34,8 @@ import org.slf4j.LoggerFactory;
 /**
  * In-job recommender that evaluates policy {@code trigger-expr} with the shared QL stack (numeric
  * rules + sampled metric bindings). Used for types whose content already exposes a real
- * trigger-expr (for example orphan cleanup {@code true}, expire/manifest placeholders {@code
- * false}).
+ * trigger-expr (for example orphan cleanup {@code true}). Expire / rewrite-manifests placeholders
+ * are dispatched to {@link AlwaysMaintainInJobRecommender} instead.
  */
 public final class TriggerExprInJobRecommender implements InJobRecommender {
 

@@ -373,8 +373,8 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
   @VisibleForTesting
   static long currentSnapshotId(SparkSession spark, String catalogName, String tableIdentifier) {
-    // Catch Exception (not Spark NoSuchTableException) so this class loads on the Gravitino
-    // server classpath, which does not ship Spark catalyst types.
+    // Catch Exception (not Spark NoSuchTableException) so BuiltInJobTemplateProvider can load this
+    // class on the Gravitino server classpath, which does not ship Spark catalyst types.
     try {
       Table table =
           Spark3Util.loadIcebergTable(spark, String.format("%s.%s", catalogName, tableIdentifier));

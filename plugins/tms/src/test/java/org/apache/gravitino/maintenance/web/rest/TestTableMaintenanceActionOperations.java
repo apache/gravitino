@@ -102,6 +102,21 @@ class TestTableMaintenanceActionOperations {
   }
 
   @Test
+  void testSampleAlreadyFinishedReturns404() {
+    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
+
+    Response response =
+        ops.sample(
+            METALAKE,
+            JOB_ID,
+            new MaintenanceActionSampleRequest(TABLE_ID, POLICY_ID, 100L, 100L, "{\"m\":1}"));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    verify(pipeline, never())
+        .gateCronJob(anyLong(), anyLong(), anyLong(), anyLong(), anyString(), any());
+  }
+
+  @Test
   void testSampleWrongMetalakeReturns404() {
     when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
     ops = new TableMaintenanceActionOperations(pipeline, actions, metrics, tableId -> "other-ml");
@@ -162,13 +177,29 @@ class TestTableMaintenanceActionOperations {
     verify(actions, never()).markFinished(anyLong(), any(), anyLong());
   }
 
+  @Test
+  void testFinishAlreadyFinishedReturns404() {
+    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
+
+    Response response =
+        ops.finish(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(200L, "{\"s1\":1}"));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
+    verify(actions, never()).markFinished(anyLong(), any(), anyLong());
+  }
+
   private static TableMaintenanceActionPO action(long tableId, long policyId) {
+    return action(tableId, policyId, 0L);
+  }
+
+  private static TableMaintenanceActionPO action(long tableId, long policyId, long finishedAt) {
     return TableMaintenanceActionPO.builder()
         .withId(1L)
         .withJobId(JOB_ID)
         .withTableId(tableId)
         .withPolicyId(policyId)
-        .withFinishedAt(0L)
+        .withFinishedAt(finishedAt)
         .withCreatedAt(1L)
         .build();
   }
