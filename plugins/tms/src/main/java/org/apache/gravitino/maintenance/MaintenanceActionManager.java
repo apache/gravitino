@@ -30,8 +30,7 @@ import org.apache.gravitino.maintenance.injob.TypeDispatchingInJobRecommender;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
-import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.storage.relational.service.PolicyMetaService;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +43,7 @@ import org.slf4j.LoggerFactory;
 public class MaintenanceActionManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceActionManager.class);
-  private static final PolicyMetaService POLICY_SERVICE = PolicyMetaService.getInstance();
+  private static final TableMetaService TABLE_SERVICE = TableMetaService.getInstance();
 
   private final TableMaintenanceInJobPipeline pipeline;
   private final TableMaintenanceActionMetaService actionMetaService;
@@ -62,7 +61,7 @@ public class MaintenanceActionManager {
             new TableMaintenanceInJobSampler(), new TypeDispatchingInJobRecommender()),
         TableMaintenanceActionMetaService.getInstance(),
         TableSnapshotMetricsMetaService.getInstance(),
-        MaintenanceActionManager::metalakeNameForPolicy);
+        TABLE_SERVICE::getMetalakeNameByTableId);
   }
 
   /**
@@ -71,7 +70,7 @@ public class MaintenanceActionManager {
    * @param pipeline in-job sample and gate pipeline
    * @param actionMetaService action rows
    * @param metricsMetaService snapshot metrics rows
-   * @param metalakeLookup resolves a policy id to its metalake name
+   * @param metalakeLookup resolves a table id to its metalake name
    */
   public MaintenanceActionManager(
       TableMaintenanceInJobPipeline pipeline,
@@ -169,19 +168,14 @@ public class MaintenanceActionManager {
   }
 
   private void requireActionInMetalake(TableMaintenanceActionPO action, String metalake) {
-    String actionMetalake = metalakeLookup.apply(action.policyId());
+    String actionMetalake = metalakeLookup.apply(action.tableId());
     if (actionMetalake == null) {
       throw new NoSuchEntityException(
-          "no metalake for policy_id=%s (job_id=%s)", action.policyId(), action.jobId());
+          "no metalake for table_id=%s (job_id=%s)", action.tableId(), action.jobId());
     }
     if (!actionMetalake.equals(metalake)) {
       throw new NoSuchEntityException(
           "no maintenance action for job_id=%s under metalake %s", action.jobId(), metalake);
     }
-  }
-
-  private static String metalakeNameForPolicy(long policyId) {
-    PolicyEntity policy = POLICY_SERVICE.getPolicyById(policyId);
-    return policy == null ? null : policy.namespace().level(0);
   }
 }
