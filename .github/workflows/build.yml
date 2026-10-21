@@ -324,6 +324,41 @@ jobs:
             build/reports/tests/core
             core/build/test-results
 
+  # Issue #14106: dependency advice is warn-only; the job fails only when a module has more
+  # findings than gradle/build-health-baseline.json allows.
+  build-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: 17
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Check dependency health against the baseline
+        run: ./gradlew checkBuildHealthBaseline --max-workers=2 -PskipWeb=true
+
+      - name: Write job summary
+        if: always()
+        run: |
+          summary=build/reports/dependency-analysis/build-health-summary.md
+          if [ -f "$summary" ]; then cat "$summary" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload build health report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: build-health-report
+          path: build/reports/dependency-analysis/build-health-*
+          if-no-files-found: ignore
+
   coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 30

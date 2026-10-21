@@ -91,3 +91,9 @@ tasks {
     dependsOn(copyLibs, copyConfigs)
   }
 }
+
+// :iceberg:iceberg-rest-server's copyDepends writes into the same build/libs as its jar, so tasks
+// that read that jar (the dependency-analysis tasks behind buildHealth) must run after it.
+tasks.matching { it.javaClass.name.startsWith("com.autonomousapps.") }.configureEach {
+  dependsOn(":iceberg:iceberg-rest-server:copyDepends")
+}
