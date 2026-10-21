@@ -635,6 +635,54 @@ public class TestSparkApplicationUtils {
 
   @Test
   @SuppressWarnings("unchecked")
+  public void testSparkConfOfBuiltinJobReplacesExecutorDefaults() {
+    K8sJobExecutorConfigs withDefaults =
+        newConfigs(
+            ImmutableMap.of(
+                K8sJobExecutorConfigs.NAMESPACE,
+                "jobs",
+                "spark.conf.spark.jars",
+                "https://repo/iceberg-spark-runtime.jar"));
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-update-stats")
+            .withArguments(
+                ImmutableList.of(
+                    "--spark-conf", "{\"spark.jars\":\"https://repo/postgresql.jar\"}"))
+            .build();
+
+    // Like any Spark configuration of the job, spark.jars replaces the executor default.
+    Map<String, String> sparkConf =
+        (Map<String, String>) getSpec(template, withDefaults).get("sparkConf");
+    Assertions.assertEquals("https://repo/postgresql.jar", sparkConf.get("spark.jars"));
+  }
+
+  @Test
+  public void testRejectInvalidEnvironmentNameInSparkConfOfBuiltinJob() {
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-update-stats")
+            .withArguments(
+                ImmutableList.of("--spark-conf", "{\"spark.executorEnv.BAD NAME\":\"v\"}"))
+            .build();
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+    Assertions.assertTrue(e.getMessage().contains("BAD NAME"), e.getMessage());
+
+    SparkJobTemplate valid =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-update-stats")
+            .withArguments(ImmutableList.of("--spark-conf", "{\"spark.executorEnv.MY_VAR\":\"v\"}"))
+            .build();
+    @SuppressWarnings("unchecked")
+    Map<String, String> sparkConf = (Map<String, String>) getSpec(valid, configs).get("sparkConf");
+    Assertions.assertEquals("v", sparkConf.get("spark.executorEnv.MY_VAR"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
   public void testSparkConfOfBuiltinJobIgnoresKubernetesConfigs() {
     String json =
         "{\"spark.kubernetes.namespace\":\"kube-system\","

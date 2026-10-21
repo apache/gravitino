@@ -51,6 +51,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String DEFAULT_SPARK_EXECUTOR_CORES = "1";
   private static final String DEFAULT_SPARK_EXECUTOR_MEMORY = "1g";
   private static final String DEFAULT_SPARK_DRIVER_MEMORY = "1g";
+  private static final String SPARK_MASTER_KEY = "spark.master";
   private static final String SPARK_EXECUTOR_INSTANCES_KEY = "spark.executor.instances";
   private static final String SPARK_EXECUTOR_CORES_KEY = "spark.executor.cores";
   private static final String SPARK_EXECUTOR_MEMORY_KEY = "spark.executor.memory";
@@ -96,6 +97,17 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
     validateUpdaterOptions(updateMode, updaterOptions);
     validateSparkConfigs(tableTargets, sparkConfigs);
+    // The job ignores the master of spark_conf, as spark-submit decides it, so say where it goes.
+    if (StringUtils.isNotBlank(sparkConfigs.get(SPARK_MASTER_KEY))) {
+      context
+          .output()
+          .printf(
+              "WARN: %s=%s in the Spark configurations is ignored by the job. Set %sspark_master"
+                  + " instead.%n",
+              SPARK_MASTER_KEY,
+              sparkConfigs.get(SPARK_MASTER_KEY),
+              OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX);
+    }
 
     if (context.dryRun()) {
       for (TableTarget tableTarget : tableTargets) {

@@ -183,8 +183,9 @@ Notes:
 - If `--updater-options` includes external JDBC metrics settings
   (`gravitino.optimizer.jdbcMetrics.*`), ensure the JDBC driver JAR is available to Spark
   runtime classpath of the driver: with the k8s job executor, for example via `spark.jars` in
-  `--spark-conf`; with the local job executor, by installing it into `SPARK_HOME/jars`, as the
-  driver applies `--spark-conf` only after it starts.
+  `--spark-conf`, which replaces a `spark.jars` default of the k8s job executor, so list the
+  Iceberg runtime there too if that default provides it; with the local job executor, by installing
+  it into `SPARK_HOME/jars`, as the driver applies `--spark-conf` only after it starts.
 - `--spark-conf` and `--updater-options` are flat JSON maps.
 
 ## List Table Metrics
@@ -257,7 +258,9 @@ runtime in `jars`. `gravitino-jobs` also excludes that runtime from its shaded J
 that runs with your Spark cluster is yours to supply. Provide a matching
 `iceberg-spark-runtime-<sparkMajor>_<scala>` JAR on the Spark classpath used by the job executor —
 commonly by installing it into `SPARK_HOME` or the Spark image, or, with the k8s job executor,
-through `spark.jars` in `spark_conf`, which the k8s job executor sets when it submits the job.
+through `spark.jars` in `spark_conf`, which the k8s job executor sets when it submits the job. It
+replaces a `spark.jars` default of the k8s job executor rather than adding to it, so list every jar
+the job needs there.
 With the local job executor, `spark.jars` in `spark_conf` doesn't add it, as the driver applies
 `spark_conf` only after spark-submit has built its classpath. Align the
 artifact with the Spark, Scala, and Iceberg versions you actually run. A reference coordinate used

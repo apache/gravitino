@@ -219,6 +219,8 @@ public final class IcebergJobUtils {
    * @return the custom Spark configurations to apply
    */
   public static Map<String, String> filterCustomSparkConfigs(Map<String, String> configs) {
+    // new SparkConf() reads the spark.* system properties on purpose: spark-submit sets the
+    // configurations it submitted the job with as system properties before it calls main().
     return filterCustomSparkConfigs(configs, new SparkConf());
   }
 

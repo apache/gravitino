@@ -72,6 +72,9 @@ spark.hadoop.fs.defaultFS=file:///
 }
 ```
 
+`spark.jars` in `spark_conf` replaces a `spark.jars` default of the k8s job executor, so if that
+default provides the Iceberg runtime, list it in `spark_conf` as well.
+
 **`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino endpoint needs `auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options` for `builtin-iceberg-update-stats`. A secured Iceberg REST catalog needs `rest.auth.*` in `spark-conf` for any built-in job that reads the table. See [Configuration](./optimizer-configuration.md).
 
 **Built-in Iceberg jobs fail with `Missing Iceberg Spark session extensions`** —

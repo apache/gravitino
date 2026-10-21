@@ -567,8 +567,13 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("custom-metrics-updater"));
     Assertions.assertTrue(output[0].contains("spark.sql.catalog.rest"));
-    // The master of spark_conf isn't passed as the spark_master parameter.
+    // The master of spark_conf isn't passed as the spark_master parameter, and the user is told.
     Assertions.assertTrue(EMPTY_SPARK_MASTER.matcher(output[0]).find(), output[0]);
+    Assertions.assertTrue(
+        output[0].contains(
+            "WARN: spark.master=local[2] in the Spark configurations is ignored by the job."
+                + " Set gravitino.optimizer.jobSubmitterConfig.spark_master instead."),
+        output[0]);
   }
 
   @Test
