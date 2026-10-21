@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.flink.connector;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;

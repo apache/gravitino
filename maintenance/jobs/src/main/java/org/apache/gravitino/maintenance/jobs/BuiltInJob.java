@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.jobs;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;

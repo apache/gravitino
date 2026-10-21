@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.lance.common.config;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Config;

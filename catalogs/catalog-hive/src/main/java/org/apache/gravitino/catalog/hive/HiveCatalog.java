@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;

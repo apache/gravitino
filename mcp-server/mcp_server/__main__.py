@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# Fork CI full-run verification for apache/gravitino#13049; do not merge.
 from mcp_server.main import do_main
 
 if __name__ == "__main__":

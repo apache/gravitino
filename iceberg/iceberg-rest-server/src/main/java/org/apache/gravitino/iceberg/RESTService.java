@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.iceberg;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import com.google.common.collect.Lists;
 import java.security.CodeSource;
 import java.util.List;

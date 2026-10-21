@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# Fork CI full-run verification for apache/gravitino#13049; do not merge.
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional

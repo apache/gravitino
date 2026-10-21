@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.trino.connector;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 import io.trino.spi.connector.ConnectorSplitManager;

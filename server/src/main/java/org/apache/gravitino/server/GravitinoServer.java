@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;

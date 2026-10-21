@@ -757,3 +757,5 @@ podDisruptionBudget:
 ## - For development/testing: Keep PDB disabled (default) for faster iterations
 ## - Consider your replica count when setting PDB values
 ## - Test PDB behavior in staging before applying to production
+
+# Fork CI full-run verification for apache/gravitino#13049; do not merge.

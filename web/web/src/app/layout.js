@@ -17,6 +17,7 @@
  * under the License.
  */
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
 import '@/lib/styles/globals.css'
 
 import { NavigationEvents } from './rootLayout/navigation-events'

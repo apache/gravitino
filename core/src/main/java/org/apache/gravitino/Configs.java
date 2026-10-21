@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.Collections;

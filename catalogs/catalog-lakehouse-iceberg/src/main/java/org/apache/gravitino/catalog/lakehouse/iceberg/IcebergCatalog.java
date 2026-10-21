@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;

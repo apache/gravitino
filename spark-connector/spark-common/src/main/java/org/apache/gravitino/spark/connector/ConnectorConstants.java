@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.spark.connector;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 
 public class ConnectorConstants {

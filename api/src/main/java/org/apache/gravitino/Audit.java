@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import java.time.Instant;
 import org.apache.gravitino.annotation.Evolving;
 

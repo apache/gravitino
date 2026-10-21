@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.client;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import java.io.Closeable;
 
 /** The provider of authentication data */

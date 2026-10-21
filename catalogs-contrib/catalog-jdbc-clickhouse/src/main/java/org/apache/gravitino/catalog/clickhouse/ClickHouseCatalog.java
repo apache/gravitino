@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.clickhouse;
 
+// Fork CI full-run verification for apache/gravitino#13049; do not merge.
+
 import java.util.Map;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
