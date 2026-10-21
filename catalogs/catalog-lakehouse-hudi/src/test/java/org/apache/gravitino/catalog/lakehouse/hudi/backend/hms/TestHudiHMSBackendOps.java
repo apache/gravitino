@@ -32,6 +32,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiColumn;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
+import org.apache.gravitino.catalog.lakehouse.hudi.utils.HudiSparkTestUtils;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.hive.HiveTable;
@@ -73,6 +74,7 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
     createHiveTable();
 
     // use Spark to create a hudi table
+    HudiSparkTestUtils.resetHudiHiveClient();
     SparkSession sparkSession =
         SparkSession.builder()
             .master("local[1]")
