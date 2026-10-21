@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 
 public class StarRocksContainer extends BaseContainer {
@@ -45,6 +46,14 @@ public class StarRocksContainer extends BaseContainer {
   public static final String PASSWORD = "";
   public static final int FE_HTTP_PORT = 8030;
   public static final int FE_MYSQL_PORT = 9030;
+
+  // The allin1 image installs StarRocks under /data/deploy/starrocks, creates these two directories
+  // empty at build time and keeps the default meta_dir and storage_root_path.
+  private static final String FE_META_DIR = "/data/deploy/starrocks/fe/meta";
+  private static final String BE_STORAGE_DIR = "/data/deploy/starrocks/be/storage";
+  // The FE refuses to start when its metadata directory has less than 5 GB free
+  // (MetaHelper.checkMetaDir); tmpfs only uses memory for what is written.
+  private static final String FE_META_TMPFS = "rw,size=6g";
 
   public static Builder builder() {
     return new Builder();
@@ -59,6 +68,14 @@ public class StarRocksContainer extends BaseContainer {
       Map<String, String> envVars,
       Optional<Network> network) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+  }
+
+  // With the metadata and tablets on tmpfs, the FE's BDB JE syncs and the BE's fsyncs cost
+  // nothing, so the FE sync policy can stay as the image sets it, unlike Doris, whose FE metadata
+  // stays on disk.
+  @Override
+  protected void applyDisposableData(GenericContainer<?> container) {
+    container.withTmpFs(Map.of(FE_META_DIR, FE_META_TMPFS, BE_STORAGE_DIR, DISPOSABLE_DATA_TMPFS));
   }
 
   @Override

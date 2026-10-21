@@ -23,10 +23,15 @@ import com.github.dockerjava.api.model.HostConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -136,6 +141,33 @@ public class TestBaseContainer {
     Assertions.assertEquals(
         "forceSync=no", zooKeeper.getContainer().getEnvMap().get("ZOO_CFG_EXTRA"));
     Assertions.assertTrue(mysql.getContainer().getTmpFsMapping().containsKey("/var/lib/mysql"));
+  }
+
+  @Test
+  void testStarRocksKeepsMetadataAndTabletsInMemory() {
+    StarRocksContainer starRocks = StarRocksContainer.builder().build();
+    starRocks.applyDisposableData(starRocks.getContainer());
+
+    Assertions.assertEquals(
+        Set.of("/data/deploy/starrocks/fe/meta", "/data/deploy/starrocks/be/storage"),
+        starRocks.getContainer().getTmpFsMapping().keySet());
+  }
+
+  @Test
+  void testDorisAddsTheDisposableComposeFileUnlessDurable() throws IOException {
+    DorisContainer doris = DorisContainer.builder().build();
+    doris.setDurability(Durability.DISPOSABLE);
+    List<File> disposable = doris.composeFiles();
+    doris.setDurability(Durability.DURABLE);
+    List<File> durable = doris.composeFiles();
+
+    Assertions.assertEquals(
+        List.of("docker-compose.yaml", "docker-compose-disposable.yaml"),
+        disposable.stream().map(File::getName).collect(Collectors.toList()));
+    Assertions.assertEquals(List.of(disposable.get(0)), durable);
+    String override = Files.readString(disposable.get(1).toPath());
+    Assertions.assertTrue(override.contains("GRAVITINO_DISPOSABLE_DATA: \"true\""));
+    Assertions.assertTrue(override.contains("target: /opt/apache-doris/be/storage"));
   }
 
   @Test
