@@ -39,6 +39,10 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.Float4Vector;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -62,6 +66,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.Dataset;
+import org.lance.Fragment;
+import org.lance.FragmentMetadata;
+import org.lance.WriteParams;
+import org.lance.operation.Append;
 
 public class LanceSparkRESTServiceIT extends BaseIT {
 
@@ -326,14 +335,28 @@ public class LanceSparkRESTServiceIT extends BaseIT {
             null,
             null);
 
-    // Reading works for every bundle in the matrix: the file format version is forward-compatible
-    // on the read path.
+    // First the manifest on its own: a freshly created dataset holds no data files, so this only
+    // proves the bundle can open a manifest written by lance-core 12.0.0.
     Assertions.assertTrue(
         sql("SELECT id, score FROM %s.%s", schemaName, tableName).isEmpty(),
         "Expected no rows in a freshly created Lance dataset");
 
-    // Writing is not. A bundle whose Lance predates file format version 2.2 has its commit
-    // rejected with "added files with version 2.0. However, the data storage version is 2.2."
+    // Then the data files. Gravitino's API never writes rows, so seed them here with the same
+    // lance-core the server runs - 12.0.0, at file format version 2.2 - and read them back
+    // through the bundle. Without this the SELECT above would be the only read in the test and
+    // the matrix would never decode a byte written by the new writer.
+    Table createdTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    appendRowsWithServerLance(createdTable.properties().get(Table.PROPERTY_LOCATION));
+
+    List<Row> seededRows = sql("SELECT id, score FROM %s.%s ORDER BY id", schemaName, tableName);
+    Assertions.assertEquals(2, seededRows.size());
+    assertRow(seededRows.get(0), 1, 1.5f);
+    assertRow(seededRows.get(1), 2, 2.5f);
+
+    // Writes are a different matter. A bundle whose Lance predates file format version 2.2 has
+    // its commit rejected with
+    // "added files with version 2.0. However, the data storage version is 2.2."
     // Only lance-spark 0.2.0 (lance-core 2.0.0) is affected; 0.4.0 (lance-core 4.0.0) and later
     // write fine. This is a behaviour change from Gravitino's previous lance-core 6.0.0, whose
     // default was below 2.2, and it is tracked as a separate issue rather than worked around here.
@@ -341,12 +364,13 @@ public class LanceSparkRESTServiceIT extends BaseIT {
         PRE_BLOB_V2_BUNDLE_VERSIONS.contains(lanceSparkBundleVersion()),
         "lance-spark bundles older than 0.4.0 cannot write to a file format version 2.2 dataset");
 
-    sql("INSERT INTO %s.%s VALUES (1, CAST(1.5 AS FLOAT))", schemaName, tableName);
+    sql("INSERT INTO %s.%s VALUES (3, CAST(3.5 AS FLOAT))", schemaName, tableName);
 
     List<Row> rows = sql("SELECT id, score FROM %s.%s ORDER BY id", schemaName, tableName);
-    Assertions.assertEquals(1, rows.size());
-    Assertions.assertEquals(1, rows.get(0).getInt(0));
-    Assertions.assertEquals(1.5f, rows.get(0).getFloat(1), 1e-6f);
+    Assertions.assertEquals(3, rows.size());
+    assertRow(rows.get(0), 1, 1.5f);
+    assertRow(rows.get(1), 2, 2.5f);
+    assertRow(rows.get(2), 3, 3.5f);
   }
 
   @Test
@@ -659,6 +683,50 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     return sql("SHOW NAMESPACES IN %s", CATALOG_NAME).stream()
         .map(row -> row.getString(0))
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Appends two rows to {@code tableLocation} with the test JVM's lance-core, which is the version
+   * the Gravitino server itself writes with. The bundle's Lance lives in a child-first class
+   * loader, so these rows are written by 12.0.0 and read back by whatever Lance the bundle ships.
+   */
+  private void appendRowsWithServerLance(String tableLocation) {
+    Assertions.assertNotNull(tableLocation, "Expected Gravitino to persist a table location");
+
+    try (RootAllocator allocator = new RootAllocator();
+        Dataset dataset = Dataset.open().uri(tableLocation).build()) {
+      List<FragmentMetadata> fragments;
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(dataset.getSchema(), allocator)) {
+        root.allocateNew();
+        IntVector ids = (IntVector) root.getVector("id");
+        Float4Vector scores = (Float4Vector) root.getVector("score");
+        ids.setSafe(0, 1);
+        scores.setSafe(0, 1.5f);
+        ids.setSafe(1, 2);
+        scores.setSafe(1, 2.5f);
+        root.setRowCount(2);
+
+        // No data storage version on the write params: the point is to write exactly what
+        // lance-core 12.0.0 writes by default.
+        fragments =
+            Fragment.write()
+                .datasetUri(tableLocation)
+                .allocator(allocator)
+                .data(root)
+                .writeParams(new WriteParams.Builder().build())
+                .execute();
+      }
+
+      try (Dataset ignored =
+          dataset
+              .newTransactionBuilder()
+              .operation(Append.builder().fragments(fragments).build())
+              .transactionProperties(Map.of())
+              .build()
+              .commit()) {
+        // The dataset handle returned by the commit is closed once the rows are durable.
+      }
+    }
   }
 
   private String newSchemaName(String prefix) {
