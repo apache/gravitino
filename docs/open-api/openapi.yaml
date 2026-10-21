@@ -282,12 +282,6 @@ paths:
   /metalakes/{metalake}/jobs/runs/{jobId}:
     $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1runs~1%7BjobId%7D"
 
-  /metalakes/{metalake}/maintenance/actions/{jobId}/sample:
-    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1sample"
-
-  /metalakes/{metalake}/maintenance/actions/{jobId}/finish:
-    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1finish"
-
   /authn/me:
     $ref: "./authn.yaml#/paths/~1authn~1me"
 

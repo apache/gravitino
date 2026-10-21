@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.dto.requests;
+package org.apache.gravitino.maintenance.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -26,8 +26,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
 /**
- * Spark → TMS callback after sampling Iceberg snapshot {@code S0} for a cron maintenance action
- * (§5.2.2).
+ * Spark callback after sampling Iceberg snapshot {@code S0} for a cron maintenance action.
+ *
+ * <p>Lives in the TMS plugin, the same way built-in IdP request DTOs live in {@code idp-basic}.
  */
 @Getter
 @EqualsAndHashCode
@@ -48,12 +49,14 @@ public class MaintenanceActionSampleRequest implements RESTRequest {
   @JsonProperty("metricsJson")
   private final String metricsJson;
 
-  /** Jackson constructor. */
+  /** Default constructor for Jackson. */
   public MaintenanceActionSampleRequest() {
     this(null, null, null, null, null);
   }
 
   /**
+   * Creates a sample callback.
+   *
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param sampledSnapshotId Iceberg snapshot id at sample time ({@code S0})
