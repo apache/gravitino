@@ -21,10 +21,8 @@ package org.apache.gravitino.trino.connector.integration.test;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -46,6 +44,7 @@ import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
+import org.apache.gravitino.integration.test.container.TrinoNodeSpec;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -86,7 +85,7 @@ public class TrinoConnectorIT extends BaseIT {
 
   @FixtureContainer private static HiveContainer hive;
 
-  // No spec offers this single-container Trino, so the class starts and closes it itself.
+  // Started from @BeforeAll once the metalake and catalog exist: the node reads them at start.
   private static TrinoContainer trinoContainer;
 
   public static String metalakeName =
@@ -120,8 +119,6 @@ public class TrinoConnectorIT extends BaseIT {
 
   @BeforeAll
   public void startDockerContainer() throws TException, InterruptedException {
-    String trinoConfDir = System.getenv("TRINO_CONF_DIR");
-
     // Initial Hive client
     HiveConf hiveConf = new HiveConf();
     String hiveMetastoreUris =
@@ -133,10 +130,7 @@ public class TrinoConnectorIT extends BaseIT {
     createMetalake();
     createCatalog();
 
-    startTrinoContainer(
-        trinoConfDir,
-        System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
-        getGravitinoServerPort());
+    trinoContainer = Fixtures.get(new TrinoNodeSpec(metalakeName, getGravitinoServerPort()));
     Assertions.assertTrue(
         trinoContainer.checkSyncCatalogFromGravitino(5, catalogName),
         "Can not synchronize catalogs from gravitino");
@@ -151,55 +145,6 @@ public class TrinoConnectorIT extends BaseIT {
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
-  }
-
-  private static void startTrinoContainer(
-      String trinoConfDir, String trinoConnectorLibDir, int gravitinoServerPort) {
-    String hiveContainerIp = hive.getContainerIpAddress();
-    trinoContainer =
-        closer.register(
-            TrinoContainer.builder()
-                .withEnvVars(
-                    ImmutableMap.<String, String>builder()
-                        .put("HADOOP_USER_NAME", "anonymous")
-                        .put("GRAVITINO_HOST_IP", "host.docker.internal")
-                        .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
-                        .put("GRAVITINO_METALAKE_NAME", metalakeName)
-                        .build())
-                .withNetwork(Fixtures.network())
-                .withExtraHosts(
-                    ImmutableMap.<String, String>builder()
-                        .put("host.docker.internal", "host-gateway")
-                        .put(HiveContainer.HOST_NAME, hiveContainerIp)
-                        .build())
-                .withFilesToMount(trinoPluginFilesToMount(trinoConnectorLibDir))
-                .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))
-                .withTrinoConfDir(trinoConfDir)
-                .withMetalakeName(metalakeName)
-                .withHiveContainerIP(hiveContainerIp)
-                .build());
-    trinoContainer.start();
-  }
-
-  /**
-   * Files copied into the Gravitino plugin directory of the Trino container: the connector lib
-   * directory, plus every jar in the directory named by {@code
-   * GRAVITINO_TRINO_CONNECTOR_EXTRA_LIBS}, which lets a build add plugin jars that are not part of
-   * the connector itself.
-   */
-  private static Map<String, String> trinoPluginFilesToMount(String trinoConnectorLibDir) {
-    ImmutableMap.Builder<String, String> files = ImmutableMap.builder();
-    files.put(TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, trinoConnectorLibDir);
-    String extraLibDir = System.getenv("GRAVITINO_TRINO_CONNECTOR_EXTRA_LIBS");
-    if (extraLibDir != null && !extraLibDir.isEmpty()) {
-      File[] jars = new File(extraLibDir).listFiles((dir, name) -> name.endsWith(".jar"));
-      for (File jar : jars == null ? new File[0] : jars) {
-        files.put(
-            TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR + "/" + jar.getName(),
-            jar.getAbsolutePath());
-      }
-    }
-    return files.build();
   }
 
   public static void createSchema() throws TException, InterruptedException {

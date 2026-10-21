@@ -26,8 +26,9 @@ package org.apache.gravitino.integration.test.container;
  * is why {@code @TrinoFixture} starts lazily. Each server gets its own cluster: a new port replaces
  * the running cluster.
  *
- * <p>There is no private cluster ({@link Scope#CLASS} or {@link Scope#METHOD}): its nodes find each
- * other by fixed host names, which a second cluster on the run's network would clash with.
+ * <p>A private cluster ({@link Scope#CLASS} or {@link Scope#METHOD}) gives its coordinator, the
+ * only name its nodes look up, a per-run host name, so it runs beside the shared one. It has no
+ * durability work to skip: its services are set up for Trino and keep their data as they are.
  */
 public record TrinoSpec(int version, int workers, HiveVersion hive, int gravitinoServerPort)
     implements ContainerSpec<TrinoCluster> {
@@ -49,19 +50,27 @@ public record TrinoSpec(int version, int workers, HiveVersion hive, int gravitin
 
   @Override
   public TrinoCluster getOrStart(SharedContainers shared) {
+    requireServerPort();
+    return shared.startTrinoCluster(this);
+  }
+
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public TrinoCluster startPrivate(SharedContainers shared, Durability durability) {
+    requireServerPort();
+    return shared.startPrivateTrinoCluster(this);
+  }
+
+  private void requireServerPort() {
     if (gravitinoServerPort == NO_PORT) {
       throw new IllegalStateException(
           "Trino needs a Gravitino server: ask for TrinoCluster in a test or @BeforeAll method of a"
               + " class that implements GravitinoServerAware, after the server starts");
     }
-    return shared.startTrinoCluster(this);
-  }
-
-  // Every cluster also writes its logs to one directory, which each start empties.
-  @Override
-  public String noPrivateReason() {
-    return "has no private clusters: a cluster's nodes find each other by fixed host names, such as"
-        + " trino and hive, that a second cluster on the run's network would clash with";
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<TrinoFixture> {

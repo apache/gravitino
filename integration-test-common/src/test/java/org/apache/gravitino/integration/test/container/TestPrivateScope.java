@@ -53,7 +53,7 @@ public class TestPrivateScope {
   }
 
   @Test
-  void testEverySpecButTrinoAndTheClickHouseClusterSupportsPrivate() throws Exception {
+  void testEverySpecButTheClickHouseClusterSupportsPrivate() throws Exception {
     List<String> withoutPrivate = new ArrayList<>();
     for (Annotation fixture : fixtures(DefaultFixtures.class)) {
       ContainerSpec<?> spec = factory(fixture).specFor(fixture);
@@ -61,7 +61,7 @@ public class TestPrivateScope {
         withoutPrivate.add(spec.getClass().getSimpleName());
       }
     }
-    Assertions.assertEquals(List.of("TrinoSpec"), withoutPrivate);
+    Assertions.assertEquals(List.of(), withoutPrivate);
     Assertions.assertFalse(
         new ClickHouseSpec(3, TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT).supportsPrivate());
     for (HiveStorage storage : HiveStorage.values()) {

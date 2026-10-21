@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.integration.test.container;
 
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
-
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
@@ -38,15 +36,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 import org.testcontainers.containers.wait.strategy.WaitStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategyTarget;
 import org.testcontainers.utility.MountableFile;
 
 /**
@@ -57,8 +59,14 @@ import org.testcontainers.utility.MountableFile;
  * <p>The cluster owns these services: they are configured for Trino (a {@code trino} database user,
  * case-insensitive MySQL table names, Hive ACID tables, seed data) and differ from the run's shared
  * containers. They start in dependency order, each with a readiness check, and stop with the
- * cluster. Container logs and the Hive and Trino server logs land in {@code
- * integration-test-common/build/trino-ci-container-log}, which CI uploads.
+ * cluster. Readiness is checked from the test JVM: Trino over its HTTP API, Hive with the probes of
+ * {@link HiveContainer}. Container logs and the Hive and Trino server logs land in {@code
+ * integration-test-common/build/trino-ci-container-log}, which CI uploads; a private cluster writes
+ * to a subdirectory named after its coordinator.
+ *
+ * <p>Inside the cluster only the workers look up a name, the coordinator's, so a private cluster
+ * gives its coordinator a per-run host name and can run beside the shared one on the run's network.
+ * Tests reach every node by IP address.
  *
  * <p>This object is the coordinator; {@link #serviceUrls()} returns the addresses tests use.
  */
@@ -76,14 +84,21 @@ public final class TrinoCluster extends BaseContainer {
   public static final int DEFAULT_TRINO_VERSION = 478;
 
   private static final String COORDINATOR_HOST = "trino";
+  private static final String GRAVITINO_CATALOG = "gravitino";
   private static final String HIVE_HOST = "hive";
   private static final String MYSQL_HOST = "mysql";
   private static final String POSTGRESQL_HOST = "postgresql";
   private static final String DB_PASSWORD = "ds123";
   private static final String TRINO_USER = "gravitino";
+  private static final String HIVE_HADOOP_USER = "anonymous";
   private static final Pattern NEXT_URI = Pattern.compile("\"nextUri\"\\s*:\\s*\"([^\"]+)\"");
   private static final Pattern SINGLE_VALUE =
       Pattern.compile("\"data\"\\s*:\\s*\\[\\s*\\[\\s*(\\d+)\\s*]\\s*]");
+  private static final Pattern STARTED = Pattern.compile("\"starting\"\\s*:\\s*false");
+  // The Trino CLI check this replaces ran for at most five minutes.
+  private static final Duration COORDINATOR_TIMEOUT = Duration.ofMinutes(5);
+  private static final Duration WORKERS_TIMEOUT = Duration.ofMinutes(2);
+  private static final Duration HIVE_TIMEOUT = Duration.ofMinutes(5);
   // Every Trino node loads the Gravitino connector, which calls the server on the host.
   private static final Map<String, String> GRAVITINO_HOST =
       ImmutableMap.of("host.docker.internal", "host-gateway");
@@ -95,6 +110,7 @@ public final class TrinoCluster extends BaseContainer {
 
   private TrinoCluster(
       GenericContainer<?> coordinator,
+      String coordinatorHost,
       Map<String, String> env,
       Optional<Network> network,
       @Nullable Network ownNetwork,
@@ -103,7 +119,7 @@ public final class TrinoCluster extends BaseContainer {
       Path logDir) {
     super(
         coordinator,
-        COORDINATOR_HOST,
+        coordinatorHost,
         ImmutableSet.of(TRINO_PORT),
         GRAVITINO_HOST,
         ImmutableMap.of(),
@@ -119,7 +135,7 @@ public final class TrinoCluster extends BaseContainer {
     return new Builder();
   }
 
-  // The coordinator's own wait strategy (set by the builder) checks for the gravitino catalog.
+  // The coordinator's own wait strategy, set by the builder from the worker count.
   @Override
   @Nullable
   protected WaitStrategy waitStrategy() {
@@ -132,8 +148,9 @@ public final class TrinoCluster extends BaseContainer {
   }
 
   /**
-   * Starts the services, then the workers, then the coordinator, and waits until every worker has
-   * joined. Workers start first and keep retrying the coordinator until it is up.
+   * Starts the services, then the workers, then the coordinator, whose wait strategy also waits
+   * until every worker has joined. Workers start first and keep retrying the coordinator until it
+   * is up.
    */
   @Override
   public void start() {
@@ -144,57 +161,99 @@ public final class TrinoCluster extends BaseContainer {
       SharedContainers.startTimed(worker);
     }
     super.start();
-    if (!workers.isEmpty()) {
-      await()
-          .atMost(Duration.ofMinutes(2))
-          .pollDelay(Duration.ZERO)
-          .pollInterval(Duration.ofSeconds(1))
-          .until(() -> activeWorkers() >= workers.size());
-    }
   }
 
-  // Runs the query the Trino CLI would, over the HTTP protocol the CLI speaks, following
-  // nextUri until the query finishes. Any failure counts as no workers yet.
-  private int activeWorkers() {
-    HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+  /**
+   * Returns how to tell the coordinator is ready: it has finished starting, lists the {@code
+   * gravitino} catalog, and sees every worker as active. Each check runs from the test JVM over the
+   * Trino HTTP API.
+   *
+   * @param workers the number of workers to wait for
+   * @return the wait strategy
+   */
+  static WaitStrategy coordinatorReadiness(int workers) {
+    WaitAllStrategy readiness =
+        new WaitAllStrategy(WaitAllStrategy.Mode.WITH_INDIVIDUAL_TIMEOUTS_ONLY)
+            .withStrategy(
+                new ProbeWaitStrategy(
+                        "the Trino coordinator to finish starting",
+                        target -> hasStarted(get(baseUri(target) + "/v1/info")))
+                    .withStartupTimeout(COORDINATOR_TIMEOUT))
+            .withStrategy(
+                new ProbeWaitStrategy(
+                        "Trino to list the " + GRAVITINO_CATALOG + " catalog",
+                        target ->
+                            queryCount(
+                                    baseUri(target),
+                                    "SELECT count(*) FROM system.metadata.catalogs"
+                                        + " WHERE catalog_name = '"
+                                        + GRAVITINO_CATALOG
+                                        + "'")
+                                > 0)
+                    .withStartupTimeout(COORDINATOR_TIMEOUT));
+    if (workers > 0) {
+      readiness.withStrategy(
+          new ProbeWaitStrategy(
+                  String.format("%d Trino workers to join", workers),
+                  target ->
+                      queryCount(
+                              baseUri(target),
+                              "SELECT count(*) FROM system.runtime.nodes"
+                                  + " WHERE coordinator = false AND state = 'active'")
+                          >= workers)
+              .withStartupTimeout(WORKERS_TIMEOUT));
+    }
+    return readiness;
+  }
+
+  private static String baseUri(WaitStrategyTarget target) {
+    return String.format("http://%s:%d", target.getHost(), target.getMappedPort(TRINO_PORT));
+  }
+
+  private static String get(String uri) throws IOException, InterruptedException {
     HttpRequest request =
-        HttpRequest.newBuilder(
-                URI.create(
-                    String.format(
-                        "http://%s:%d/v1/statement",
-                        container.getHost(), getMappedPort(TRINO_PORT))))
+        HttpRequest.newBuilder(URI.create(uri)).timeout(Duration.ofSeconds(10)).GET().build();
+    return httpClient().send(request, HttpResponse.BodyHandlers.ofString()).body();
+  }
+
+  // Runs a one-number query the way the Trino CLI would, over the HTTP protocol the CLI speaks,
+  // following nextUri until the query finishes. A failed query has no number, so it counts as 0.
+  private static int queryCount(String baseUri, String sql)
+      throws IOException, InterruptedException {
+    HttpClient http = httpClient();
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create(baseUri + "/v1/statement"))
             .header("X-Trino-User", TRINO_USER)
             .timeout(Duration.ofSeconds(10))
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "SELECT count(*) FROM system.runtime.nodes WHERE coordinator = false"))
+            .POST(HttpRequest.BodyPublishers.ofString(sql))
             .build();
     int count = 0;
-    try {
-      for (int page = 0; request != null && page < 100; page++) {
-        String body = http.send(request, HttpResponse.BodyHandlers.ofString()).body();
-        Optional<Integer> value = firstValue(body);
-        if (value.isPresent()) {
-          count = value.get();
-        }
-        Optional<String> next = nextUri(body);
-        request =
-            next.isEmpty()
-                ? null
-                : HttpRequest.newBuilder(URI.create(next.get()))
-                    .header("X-Trino-User", TRINO_USER)
-                    .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
+    for (int page = 0; request != null && page < 100; page++) {
+      String body = http.send(request, HttpResponse.BodyHandlers.ofString()).body();
+      Optional<Integer> value = firstValue(body);
+      if (value.isPresent()) {
+        count = value.get();
       }
-    } catch (IOException e) {
-      LOG.info("Trino coordinator is not answering queries yet: {}", e.getMessage());
-      return 0;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return 0;
+      Optional<String> next = nextUri(body);
+      request =
+          next.isEmpty()
+              ? null
+              : HttpRequest.newBuilder(URI.create(next.get()))
+                  .header("X-Trino-User", TRINO_USER)
+                  .timeout(Duration.ofSeconds(10))
+                  .GET()
+                  .build();
     }
     return count;
+  }
+
+  private static HttpClient httpClient() {
+    return HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+  }
+
+  /** Returns whether a Trino {@code /v1/info} response says the node has finished starting. */
+  static boolean hasStarted(String infoBody) {
+    return STARTED.matcher(infoBody).find();
   }
 
   /** Returns the {@code nextUri} of a Trino statement response, if the query has more pages. */
@@ -299,6 +358,7 @@ public final class TrinoCluster extends BaseContainer {
     private Services services = Services.ALL;
     private int gravitinoServerPort = -1;
     private String metalake = "test";
+    private boolean privateNames;
 
     private Builder() {}
 
@@ -354,6 +414,27 @@ public final class TrinoCluster extends BaseContainer {
       return this;
     }
 
+    /**
+     * Gives the coordinator a per-run host name, which the workers look up, and the logs a
+     * directory of their own, so that this cluster can run beside the shared one.
+     *
+     * @param privateNames whether this is a private cluster
+     * @return this builder
+     */
+    public Builder withPrivateNames(boolean privateNames) {
+      this.privateNames = privateNames;
+      return this;
+    }
+
+    /**
+     * Returns the coordinator's host name: {@code trino}, or a per-run name for a private cluster.
+     *
+     * @return the host name
+     */
+    String coordinatorHost() {
+      return privateNames ? RunNames.containerName(COORDINATOR_HOST) : COORDINATOR_HOST;
+    }
+
     public TrinoCluster build() {
       if (gravitinoServerPort <= 0) {
         throw new IllegalStateException("The Gravitino server port is required");
@@ -369,11 +450,14 @@ public final class TrinoCluster extends BaseContainer {
               : ITUtils.joinPath(
                   root, "trino-connector", "trino-connector-473-478", "build", "libs");
       checkConnectorDir(connector);
-      Path logDir = Path.of(root, "integration-test-common", "build", "trino-ci-container-log");
+      String coordinatorHost = coordinatorHost();
+      Path sharedLogDir =
+          Path.of(root, "integration-test-common", "build", "trino-ci-container-log");
+      Path logDir = privateNames ? sharedLogDir.resolve(coordinatorHost) : sharedLogDir;
       try {
         // Start from an empty directory, so CI uploads only this run's logs.
         if (Files.isDirectory(logDir)) {
-          try (java.util.stream.Stream<Path> old = Files.list(logDir)) {
+          try (Stream<Path> old = Files.list(logDir)) {
             for (Path file : (Iterable<Path>) old::iterator) {
               if (Files.isRegularFile(file)) {
                 Files.deleteIfExists(file);
@@ -410,19 +494,17 @@ public final class TrinoCluster extends BaseContainer {
                 trino(image, init, connector, logDir, "trino-worker-" + i),
                 "trino-worker-" + i,
                 GRAVITINO_HOST,
-                trinoEnv("worker"),
+                trinoEnv("worker", coordinatorHost),
                 network));
       }
 
       GenericContainer<?> coordinator =
           trino(image, init, connector, logDir, COORDINATOR_HOST)
-              .waitingFor(
-                  Wait.forSuccessfulCommand(
-                          "trino --execute \"SHOW CATALOGS LIKE 'gravitino'\" | grep -q gravitino")
-                      .withStartupTimeout(Duration.ofMinutes(5)));
+              .waitingFor(coordinatorReadiness(workers));
       return new TrinoCluster(
           coordinator,
-          trinoEnv("coordinator"),
+          coordinatorHost,
+          trinoEnv("coordinator", coordinatorHost),
           network,
           ownNetwork,
           List.copyOf(serviceList),
@@ -430,7 +512,7 @@ public final class TrinoCluster extends BaseContainer {
           logDir);
     }
 
-    private Map<String, String> trinoEnv(String role) {
+    private Map<String, String> trinoEnv(String role, String coordinatorHost) {
       return ImmutableMap.<String, String>builder()
           .put("HADOOP_USER_NAME", "anonymous")
           .put("GRAVITINO_HOST_IP", "host.docker.internal")
@@ -439,6 +521,8 @@ public final class TrinoCluster extends BaseContainer {
           .put("HIVE_HOST_IP", HIVE_HOST)
           .put("TRINO_WORKER_NUM", String.valueOf(workers))
           .put("TRINO_ROLE", role)
+          // The workers' discovery.uri; init.sh writes it into their config.properties.
+          .put("TRINO_COORDINATOR_HOST", coordinatorHost)
           .build();
     }
 
@@ -463,19 +547,15 @@ public final class TrinoCluster extends BaseContainer {
               .withCreateContainerCmdModifier(
                   cmd -> cmd.withEntrypoint("/bin/bash", "/tmp/hive/init.sh"))
               .withLogConsumer(fileLog(logDir, HIVE_HOST))
-              // The metastore answers first; Trino also needs a live HDFS data node.
+              // Trino needs the metastore and a live HDFS DataNode.
               .waitingFor(
-                  Wait.forSuccessfulCommand(
-                          "/tmp/check-status.sh"
-                              + " && hdfs dfsadmin -report 2>/dev/null"
-                              + " | grep -q 'Live datanodes ([1-9]'")
-                      .withStartupTimeout(Duration.ofMinutes(5)));
+                  HiveContainer.readiness(HIVE_HADOOP_USER).withStartupTimeout(HIVE_TIMEOUT));
       return new Service(
           hive,
           HIVE_HOST,
           ImmutableMap.of(
-              "HADOOP_USER_NAME",
-              "anonymous",
+              HiveContainer.HADOOP_USER_NAME,
+              HIVE_HADOOP_USER,
               HiveContainer.HIVE_RUNTIME_VERSION,
               hiveRuntimeVersion,
               "TRINO_CONNECTOR_TEST",
@@ -545,7 +625,7 @@ public final class TrinoCluster extends BaseContainer {
     }
 
     // Appends a container's output to <logDir>/<name>.log for CI.
-    private static java.util.function.Consumer<OutputFrame> fileLog(Path logDir, String name) {
+    private static Consumer<OutputFrame> fileLog(Path logDir, String name) {
       Path file = logDir.resolve(name + ".log");
       return frame -> {
         try {

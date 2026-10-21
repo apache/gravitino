@@ -50,6 +50,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -91,6 +92,9 @@ class SharedContainers {
   private static volatile HiveContainer hiveRangerContainer;
   // One cluster per Gravitino server: a test class with another server replaces it.
   private static final ContainerSlot<TrinoSpec, TrinoCluster> trinoCluster = new ContainerSlot<>();
+  // One standalone Trino node per Gravitino server and metalake.
+  private static final ContainerSlot<TrinoNodeSpec, TrinoContainer> trinoNode =
+      new ContainerSlot<>();
   private static volatile RangerContainer rangerContainer;
   private static volatile KafkaContainer kafkaContainer;
   private static final ContainerSlot<String, HiveContainer> kerberosHiveContainer =
@@ -775,16 +779,55 @@ class SharedContainers {
           spec,
           () -> {
             initIfNecessary();
-            TrinoCluster cluster =
-                closer.register(
-                    TrinoCluster.builder()
-                        .withTrinoVersion(spec.version())
-                        .withWorkers(spec.workers())
-                        .withHiveRuntimeVersion(spec.hive().runtimeVersion())
-                        .withGravitinoServerPort(spec.gravitinoServerPort())
-                        .build());
+            TrinoCluster cluster = closer.register(trinoClusterBuilder(spec).build());
             start(cluster);
             return cluster;
+          });
+    }
+  }
+
+  /**
+   * Starts a Trino cluster for the spec that only the caller uses. Its coordinator has a per-run
+   * host name, so it runs beside the shared cluster; the caller closes it.
+   *
+   * @param spec the cluster to run, with the Gravitino server port set
+   * @return the running private cluster
+   */
+  TrinoCluster startPrivateTrinoCluster(TrinoSpec spec) {
+    initIfNecessary();
+    // The builder joins the run's network itself, or makes one of its own when there is none.
+    return startPrivate(
+        network,
+        unused -> trinoClusterBuilder(spec).withPrivateNames(true).build(),
+        SharedContainers::start,
+        cluster -> {});
+  }
+
+  static TrinoCluster.Builder trinoClusterBuilder(TrinoSpec spec) {
+    return TrinoCluster.builder()
+        .withTrinoVersion(spec.version())
+        .withWorkers(spec.workers())
+        .withHiveRuntimeVersion(spec.hive().runtimeVersion())
+        .withGravitinoServerPort(spec.gravitinoServerPort());
+  }
+
+  /**
+   * Starts, or returns the running, standalone Trino node for the spec. A spec for another server
+   * or metalake replaces the running node.
+   *
+   * @param spec the node to run
+   * @param builder builds the node once its dependencies run
+   * @return the running node
+   */
+  TrinoContainer startTrinoNode(TrinoNodeSpec spec, Supplier<TrinoContainer.Builder> builder) {
+    synchronized (SharedContainers.class) {
+      return trinoNode.getOrStart(
+          spec,
+          () -> {
+            initIfNecessary();
+            TrinoContainer node = closer.register(builder.get().withNetwork(network).build());
+            start(node);
+            return node;
           });
     }
   }

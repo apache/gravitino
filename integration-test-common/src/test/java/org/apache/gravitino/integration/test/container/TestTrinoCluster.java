@@ -18,12 +18,88 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.testcontainers.containers.wait.strategy.WaitStrategyTarget;
 
-/** Tests how {@link TrinoCluster} reads Trino statement responses; nothing here starts Trino. */
+/**
+ * Tests how {@link TrinoCluster} reads Trino responses and waits for a coordinator; a stub HTTP
+ * server stands in for Trino, so nothing here starts a container.
+ */
 public class TestTrinoCluster {
+
+  @Test
+  void testInfoSaysWhetherTheNodeHasStarted() {
+    Assertions.assertFalse(TrinoCluster.hasStarted("{\"coordinator\":true,\"starting\":true}"));
+    Assertions.assertTrue(
+        TrinoCluster.hasStarted("{\"coordinator\":true, \"starting\" : false,\"uptime\":\"1s\"}"));
+    Assertions.assertFalse(TrinoCluster.hasStarted(""));
+  }
+
+  @Test
+  void testCoordinatorIsReadyOnceStartedWithTheCatalogAndEveryWorker() throws IOException {
+    AtomicInteger infoCalls = new AtomicInteger();
+    List<String> queries = new ArrayList<>();
+    HttpServer trino =
+        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    // Still starting on the first call; then up with the catalog and two active workers.
+    trino.createContext(
+        "/v1/info",
+        exchange -> respond(exchange, "{\"starting\":" + (infoCalls.incrementAndGet() == 1) + "}"));
+    trino.createContext(
+        "/v1/statement",
+        exchange -> {
+          String sql = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+          queries.add(sql);
+          int count = sql.contains("system.runtime.nodes") ? 2 : 1;
+          respond(exchange, "{\"id\":\"q\",\"data\":[[" + count + "]]}");
+        });
+    trino.start();
+    try {
+      WaitStrategyTarget target = Mockito.mock(WaitStrategyTarget.class);
+      Mockito.when(target.getHost()).thenReturn(InetAddress.getLoopbackAddress().getHostAddress());
+      Mockito.when(target.getMappedPort(TrinoCluster.TRINO_PORT))
+          .thenReturn(trino.getAddress().getPort());
+
+      TrinoCluster.coordinatorReadiness(2).waitUntilReady(target);
+
+      Assertions.assertEquals(2, infoCalls.get());
+      Assertions.assertEquals(2, queries.size(), queries.toString());
+      Assertions.assertTrue(queries.get(0).contains("catalog_name = 'gravitino'"), queries.get(0));
+      Assertions.assertTrue(queries.get(1).contains("state = 'active'"), queries.get(1));
+    } finally {
+      trino.stop(0);
+    }
+  }
+
+  @Test
+  void testPrivateClusterGivesItsCoordinatorARunName() {
+    Assertions.assertEquals("trino", TrinoCluster.builder().coordinatorHost());
+    String name = TrinoCluster.builder().withPrivateNames(true).coordinatorHost();
+    Assertions.assertTrue(name.startsWith("gravitino-trino-" + RunNames.runId() + "-"), name);
+    Assertions.assertNotEquals(
+        name, TrinoCluster.builder().withPrivateNames(true).coordinatorHost());
+  }
+
+  private static void respond(HttpExchange exchange, String body) throws IOException {
+    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+    exchange.sendResponseHeaders(200, bytes.length);
+    try (OutputStream out = exchange.getResponseBody()) {
+      out.write(bytes);
+    }
+  }
 
   @Test
   void testQueuedPageHasNextUriAndNoValue() {

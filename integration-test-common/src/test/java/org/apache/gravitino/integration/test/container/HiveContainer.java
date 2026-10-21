@@ -134,7 +134,7 @@ public class HiveContainer extends BaseContainer {
       allowHadoopUserToImpersonate();
     }
     // Set here rather than in waitStrategy(), which runs before the constructor sets the auth.
-    container.waitingFor(kerberosEnabled ? kerberosReadiness() : readiness());
+    container.waitingFor(kerberosEnabled ? kerberosReadiness() : readiness(getHadoopUser()));
     withStartupTimeout(startupTimeout());
     super.start();
   }
@@ -216,9 +216,13 @@ public class HiveContainer extends BaseContainer {
    * Waits for HDFS through the NameNode's JMX, creates the warehouse directory through WebHDFS and
    * waits for the metastore and HiveServer2 ports. The Hive CLI checks this replaces each boot a
    * JVM with an embedded metastore, which costs several seconds per call; the metastore port covers
-   * Hive itself.
+   * Hive itself. Any non-Kerberos container of the Hive image can wait with it, such as the Hive of
+   * a {@link TrinoCluster}.
+   *
+   * @param hadoopUser the user that creates the warehouse directory, as the Hive CLI would have
+   * @return the wait strategy
    */
-  private WaitStrategy readiness() {
+  static WaitStrategy readiness(String hadoopUser) {
     AtomicInteger namenodePort = new AtomicInteger();
     return new WaitAllStrategy()
         .withStrategy(Wait.forListeningPort())
@@ -255,7 +259,7 @@ public class HiveContainer extends BaseContainer {
                                   ipAddress(target.getContainerInfo()),
                                   namenodePort.get(),
                                   WAREHOUSE_DIR,
-                                  getHadoopUser()));
+                                  hadoopUser));
                       return response != null && response.contains("true");
                     })
                 .withPollInterval(Duration.ofMillis(500)))

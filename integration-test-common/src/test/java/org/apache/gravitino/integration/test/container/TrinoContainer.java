@@ -41,6 +41,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,13 +58,13 @@ public class TrinoContainer extends BaseContainer {
   public static final int TRINO_PORT = 8080;
   public static final int TRINO_HTTPS_PORT = 8443;
 
-  static Connection trinoJdbcConnection = null;
-
   private final int coordinatorPort;
   private final boolean tlsEnabled;
   private final String truststorePath;
   private final String truststorePassword;
   private final String truststoreType;
+  // Per container: a private node must not take over the shared node's connection.
+  @Nullable private Connection trinoJdbcConnection;
 
   public static final String TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR =
       "/usr/lib/trino/plugin/gravitino";

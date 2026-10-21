@@ -72,8 +72,7 @@ public @interface TrinoFixture {
   HiveVersion hive() default HiveVersion.HIVE2;
 
   /**
-   * Returns how long the cluster lives. Only {@link Scope#RUN} works: {@link TrinoSpec} says why a
-   * cluster cannot be private.
+   * Returns how long the cluster lives.
    *
    * @return the scope; the whole run by default, shared with other classes
    */
@@ -88,7 +87,7 @@ public @interface TrinoFixture {
 
   /**
    * Returns whether the container keeps its durability work. A durable container is private to the
-   * class or test, which a Trino cluster cannot be, so this fixture fails fast if asked for one.
+   * class or test; a cluster has no durability work to skip, so only the scope differs.
    *
    * @return disposable by default: data on {@code tmpfs} and no syncing, where the service allows
    */

@@ -209,7 +209,7 @@ public class TestContainerExtension {
 
   @Test
   void testDurableFixtureWithoutPrivateContainersFailsWithTheSpecsReason() {
-    run(DurableTrinoFixture.class)
+    run(DurableClickHouseClusterFixture.class)
         .allEvents()
         .assertThatEvents()
         .haveAtLeast(
@@ -220,8 +220,9 @@ public class TestContainerExtension {
                     message(
                         m ->
                             m.startsWith(
-                                "@TrinoFixture(durability = DURABLE) needs a container of its"
-                                    + " own, but TrinoSpec has no private clusters")))));
+                                "@ClickHouseFixture(durability = DURABLE) needs a container of"
+                                    + " its own, but ClickHouseSpec has no private three-node"
+                                    + " cluster")))));
   }
 
   @Test
@@ -700,8 +701,11 @@ public class TestContainerExtension {
   }
 
   @Tag(FIXTURE)
-  @TrinoFixture(durability = Durability.DURABLE)
-  static class DurableTrinoFixture {
+  @ClickHouseFixture(
+      nodes = 3,
+      database = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT,
+      durability = Durability.DURABLE)
+  static class DurableClickHouseClusterFixture {
     @Test
     void test() {}
   }
