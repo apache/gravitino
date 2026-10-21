@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -61,12 +60,17 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.utility.MountableFile;
 
-// A private Kerberos Hive: the test adds principals with kadmin and changes HDFS permissions,
+// A private Kerberos Hive: the test needs principals of its own and changes HDFS permissions,
 // which would break the shared Kerberos Hive for later classes.
 @Tag("gravitino-docker-test")
-@HiveFixture(auth = HiveAuth.KERBEROS, scope = Scope.CLASS)
+@HiveFixture(
+    auth = HiveAuth.KERBEROS,
+    scope = Scope.CLASS,
+    kerberosPrincipals = {
+      HadoopUserAuthenticationIT.HADOOP_SCHEMA_PRINCIPAL,
+      HadoopUserAuthenticationIT.HADOOP_FILESET_PRINCIPAL
+    })
 public class HadoopUserAuthenticationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopUserAuthenticationIT.class);
 
@@ -82,14 +86,13 @@ public class HadoopUserAuthenticationIT extends BaseIT {
   private static final String HADOOP_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
   private static final String HADOOP_CLIENT_KEYTAB = "/client.keytab";
 
-  private static final String HADOOP_SCHEMA_PRINCIPAL = "cli_schema";
-  private static final String HADOOP_FILESET_PRINCIPAL = "cli_fileset";
+  static final String HADOOP_SCHEMA_PRINCIPAL = "cli_schema";
+  static final String HADOOP_FILESET_PRINCIPAL = "cli_fileset";
 
   private static final String HADOOP_SCHEMA_KEYTAB = "/cli_schema.keytab";
   private static final String HADOOP_FILESET_KEYTAB = "/cli_fileset.keytab";
 
-  private static final String REALM = "HADOOPKRB";
-  private static final String ADMIN_PASSWORD = "Admin12!";
+  private static final String REALM = HiveContainer.KERBEROS_REALM;
 
   private static String TMP_DIR;
 
@@ -146,7 +149,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         .getContainer()
         .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
 
-    createKeyTableForSchemaAndFileset();
+    copyKeytabsOfSchemaAndFileset();
 
     // Keytab of the Gravitino server
     kerberosHive
@@ -174,57 +177,17 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     System.setProperty("sun.security.krb5.debug", "true");
   }
 
-  private static void createKeyTableForSchemaAndFileset() throws IOException {
-    String shellContent =
-        "echo -e \"%s\\n%s\" | kadmin.local -q \"addprinc %s@%s\""
-            + "\n"
-            + "kadmin.local -q \"xst -k /%s.keytab -norandkey %s@%s\"";
-
-    String createSchemaShellFile = String.format("/%s.sh", HADOOP_SCHEMA_PRINCIPAL);
-    String createFileSetShellFile = String.format("/%s.sh", HADOOP_FILESET_PRINCIPAL);
-
-    FileUtils.writeStringToFile(
-        Paths.get(TMP_DIR + createSchemaShellFile).toFile(),
-        String.format(
-            shellContent,
-            ADMIN_PASSWORD,
-            ADMIN_PASSWORD,
-            HADOOP_SCHEMA_PRINCIPAL,
-            REALM,
-            HADOOP_SCHEMA_PRINCIPAL,
-            HADOOP_SCHEMA_PRINCIPAL,
-            REALM),
-        StandardCharsets.UTF_8);
+  // The fixture created both principals and their keytabs when the container started.
+  private static void copyKeytabsOfSchemaAndFileset() {
     kerberosHive
         .getContainer()
-        .copyFileToContainer(
-            MountableFile.forHostPath(TMP_DIR + createSchemaShellFile), createSchemaShellFile);
-    kerberosHive.executeInContainer("bash", createSchemaShellFile);
-
-    FileUtils.writeStringToFile(
-        Paths.get(TMP_DIR + createFileSetShellFile).toFile(),
-        String.format(
-            shellContent,
-            ADMIN_PASSWORD,
-            ADMIN_PASSWORD,
-            HADOOP_FILESET_PRINCIPAL,
-            REALM,
-            HADOOP_FILESET_PRINCIPAL,
-            HADOOP_FILESET_PRINCIPAL,
-            REALM),
-        StandardCharsets.UTF_8);
+        .copyFileFromContainer(
+            HiveContainer.kerberosKeytab(HADOOP_SCHEMA_PRINCIPAL), TMP_DIR + HADOOP_SCHEMA_KEYTAB);
     kerberosHive
         .getContainer()
-        .copyFileToContainer(
-            MountableFile.forHostPath(TMP_DIR + createFileSetShellFile), createFileSetShellFile);
-    kerberosHive.executeInContainer("bash", createFileSetShellFile);
-
-    kerberosHive
-        .getContainer()
-        .copyFileFromContainer(HADOOP_SCHEMA_KEYTAB, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
-    kerberosHive
-        .getContainer()
-        .copyFileFromContainer(HADOOP_FILESET_KEYTAB, TMP_DIR + HADOOP_FILESET_KEYTAB);
+        .copyFileFromContainer(
+            HiveContainer.kerberosKeytab(HADOOP_FILESET_PRINCIPAL),
+            TMP_DIR + HADOOP_FILESET_KEYTAB);
   }
 
   private void addKerberosConfig() {

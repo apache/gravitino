@@ -65,8 +65,18 @@ public @interface HiveFixture {
   HiveStorage storage() default HiveStorage.HDFS;
 
   /**
+   * Returns the extra Kerberos principals the Kerberos Hive creates when it starts, before it is
+   * ready. Each is a name without realm or instance, created in {@link
+   * HiveContainer#KERBEROS_REALM} with a keytab at {@link HiveContainer#kerberosKeytab(String)}.
+   * Needs {@code auth = HiveAuth.KERBEROS} and {@code scope = Scope.CLASS} or {@code Scope.METHOD}.
+   *
+   * @return the principal names; none by default
+   */
+  String[] kerberosPrincipals() default {};
+
+  /**
    * Returns how long the Hive container lives. Use {@link Scope#CLASS} or {@link Scope#METHOD} for
-   * tests that change Hive in ways later tests would see, such as adding Kerberos principals.
+   * tests that change Hive in ways later tests would see, such as changing HDFS permissions.
    *
    * @return the scope; the whole run by default, shared with other classes
    */

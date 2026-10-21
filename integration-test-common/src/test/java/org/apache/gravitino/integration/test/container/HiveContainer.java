@@ -33,7 +33,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -50,6 +52,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 import org.testcontainers.containers.wait.strategy.WaitStrategy;
 import org.testcontainers.containers.wait.strategy.WaitStrategyTarget;
+import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.MountableFile;
 
 public class HiveContainer extends BaseContainer {
@@ -70,6 +73,9 @@ public class HiveContainer extends BaseContainer {
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
   public static final int HIVE_SERVICE_PORT = 10000;
+
+  /** The realm of the Kerberos image's KDC. */
+  public static final String KERBEROS_REALM = "HADOOPKRB";
   // The Kerberos image's second metastore, from its hive-site1.xml.
   private static final int SECOND_HIVE_METASTORE_PORT = 19083;
 
@@ -85,8 +91,14 @@ public class HiveContainer extends BaseContainer {
   // The image's core-site.xml already lets these users impersonate.
   private static final Set<String> USERS_ALLOWED_TO_IMPERSONATE =
       ImmutableSet.of("root", "hive", "gravitino");
+  // Where the container gets the script that creates a test's Kerberos principals.
+  static final String PRINCIPALS_SCRIPT = "/tmp/gravitino-kerberos-principals.sh";
+  // The Kerberos image's start script logs in as hive/<host> right after creating its own
+  // principals and before it configures and starts HDFS; the test's principals go in before it.
+  static final String PRINCIPALS_HOOK_ANCHOR = "kinit hive/";
 
   private final boolean kerberosEnabled;
+  private final List<String> kerberosPrincipals;
 
   public static Builder builder() {
     return new Builder();
@@ -100,9 +112,26 @@ public class HiveContainer extends BaseContainer {
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network,
-      boolean kerberosEnabled) {
+      boolean kerberosEnabled,
+      List<String> kerberosPrincipals) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
     this.kerberosEnabled = kerberosEnabled;
+    this.kerberosPrincipals = List.copyOf(kerberosPrincipals);
+    if (!kerberosEnabled && !this.kerberosPrincipals.isEmpty()) {
+      throw new IllegalArgumentException(
+          "Kerberos principals need a Kerberos Hive: " + this.kerberosPrincipals);
+    }
+  }
+
+  /**
+   * Returns where the Kerberos Hive keeps the keytab of a principal from {@link
+   * HiveFixture#kerberosPrincipals()}. Tests copy it out with {@code copyFileFromContainer}.
+   *
+   * @param principal the principal's name, without realm
+   * @return the keytab's path in the container
+   */
+  public static String kerberosKeytab(String principal) {
+    return "/" + principal + ".keytab";
   }
 
   public String getHostName() {
@@ -140,6 +169,8 @@ public class HiveContainer extends BaseContainer {
   public void start() {
     if (!kerberosEnabled) {
       allowHadoopUserToImpersonate();
+    } else if (!kerberosPrincipals.isEmpty()) {
+      createKerberosPrincipals();
     }
     // Set here rather than in waitStrategy(), which runs before the constructor sets the auth.
     container.waitingFor(kerberosEnabled ? kerberosReadiness() : readiness(getHadoopUser()));
@@ -180,6 +211,62 @@ public class HiveContainer extends BaseContainer {
             rule, HADOOP_CONF_TO_COPY, user);
     container.withCreateContainerCmdModifier(
         cmd -> cmd.withEntrypoint("/bin/bash", "-c", script + " && exec /bin/bash " + IMAGE_START));
+  }
+
+  /**
+   * Creates the test's principals and their keytabs while the container starts.
+   *
+   * <p>The KDC's database only exists once the image's start script has created it, so the
+   * entrypoint hooks a script into the start script, next to the image's own principals and before
+   * HDFS starts; readiness therefore implies the keytabs exist. A missing hook point or a failed
+   * principal stops the start script, and with it the container.
+   */
+  private void createKerberosPrincipals() {
+    container
+        .withCopyToContainer(
+            Transferable.of(principalsScript(kerberosPrincipals), 0755), PRINCIPALS_SCRIPT)
+        .withCreateContainerCmdModifier(
+            cmd -> cmd.withEntrypoint("/bin/bash", "-c", principalsEntrypoint(IMAGE_START)));
+  }
+
+  /**
+   * Returns the script that creates each principal in {@link #KERBEROS_REALM} with a keytab at
+   * {@link #kerberosKeytab(String)}, and fails if a keytab does not hold its principal. {@code
+   * kadmin.local -q} exits 0 even when its query fails, so the keytab is the check.
+   */
+  static String principalsScript(List<String> principals) {
+    StringBuilder script = new StringBuilder("set -e\n");
+    for (String name : principals) {
+      String principal = name + "@" + KERBEROS_REALM;
+      String keytab = kerberosKeytab(name);
+      script
+          .append(format("kadmin.local -q 'addprinc -randkey %s'\n", principal))
+          .append(format("kadmin.local -q 'xst -norandkey -k %s %s'\n", keytab, principal))
+          .append(
+              format(
+                  "klist -k %1$s | grep -q ' %2$s$'"
+                      + " || { echo 'No keytab for %2$s at %1$s' >&2; exit 1; }\n",
+                  keytab, principal));
+    }
+    return script.toString();
+  }
+
+  /**
+   * Returns the entrypoint that runs {@link #PRINCIPALS_SCRIPT} inside {@code imageStart}, before
+   * the line with {@link #PRINCIPALS_HOOK_ANCHOR}, and then runs {@code imageStart}. It fails
+   * without starting anything if that line is missing.
+   */
+  static String principalsEntrypoint(String imageStart) {
+    String hook =
+        format(
+            "bash %s || { echo \"Cannot create the test Kerberos principals\" >&2; exit 1; }",
+            PRINCIPALS_SCRIPT);
+    return format(
+        "sed -i '/%1$s/i %2$s' %3$s"
+            + " && grep -q '^bash %4$s ' %3$s"
+            + " || { echo 'Cannot hook the Kerberos principals into %3$s' >&2; exit 1; }"
+            + " && exec /bin/bash %3$s",
+        PRINCIPALS_HOOK_ANCHOR.replace("/", "\\/"), hook, imageStart, PRINCIPALS_SCRIPT);
   }
 
   @Override
@@ -407,6 +494,9 @@ public class HiveContainer extends BaseContainer {
   }
 
   public static class Builder extends BaseContainer.Builder<Builder, HiveContainer> {
+    // Package-private so that tests can read what a spec asked for.
+    List<String> kerberosPrincipals = List.of();
+
     private Builder() {
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
@@ -432,7 +522,20 @@ public class HiveContainer extends BaseContainer {
           filesToMount,
           envVars,
           network,
-          kerberosEnabled);
+          kerberosEnabled,
+          kerberosPrincipals);
+    }
+
+    /**
+     * Sets the extra Kerberos principals a Kerberos Hive creates when it starts.
+     *
+     * @param kerberosPrincipals the principal names, without realm; see {@link
+     *     HiveFixture#kerberosPrincipals()}
+     * @return this builder
+     */
+    public Builder withKerberosPrincipals(Collection<String> kerberosPrincipals) {
+      this.kerberosPrincipals = List.copyOf(kerberosPrincipals);
+      return this;
     }
   }
 }

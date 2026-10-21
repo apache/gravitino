@@ -21,6 +21,8 @@ package org.apache.gravitino.integration.test.container;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 /**
  * A Hive server of one version, authentication mode and storage.
@@ -31,19 +33,40 @@ import java.util.Map;
  * restart. A Hive with cloud {@link HiveStorage} is a third container, one storage and version at a
  * time. A private Hive ({@link Scope#CLASS} or {@link Scope#METHOD}) of any mode and storage leaves
  * the shared one alone.
+ *
+ * <p>A Kerberos Hive can create extra principals when it starts ({@link
+ * HiveFixture#kerberosPrincipals()}), for tests that log in as users of their own. Such a Hive is
+ * always private, and specs with different principals are different containers.
  */
-public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
+public record HiveSpec(
+    HiveVersion version, HiveAuth auth, HiveStorage storage, List<String> kerberosPrincipals)
     implements ContainerSpec<HiveContainer> {
 
   private static final String GCS_ACCOUNT_FILE_IN_CONTAINER = "/tmp/gcs-service-account.json";
+  // A principal's name is also its keytab's file name and goes into the start script unquoted.
+  private static final String PRIVATE_HINT = "use scope = Scope.CLASS or Scope.METHOD";
+  private static final Pattern PRINCIPAL_NAME = Pattern.compile("[A-Za-z0-9_.-]+");
 
   /**
-   * Checks the combination.
+   * Checks the combination and sorts the principals, so that the order they are declared in does
+   * not make a different container.
    *
-   * @throws IllegalArgumentException if Ranger is asked for with a Hive other than Hive3, or cloud
-   *     storage with authentication
+   * @throws IllegalArgumentException if Ranger is asked for with a Hive other than Hive3, cloud
+   *     storage with authentication, principals without Kerberos, or a principal name with
+   *     characters other than letters, digits, {@code _}, {@code .} and {@code -}
    */
   public HiveSpec {
+    kerberosPrincipals = List.copyOf(new TreeSet<>(kerberosPrincipals));
+    if (!kerberosPrincipals.isEmpty() && auth != HiveAuth.KERBEROS) {
+      throw new IllegalArgumentException(
+          "Kerberos principals need a Kerberos Hive, not " + auth + ": " + kerberosPrincipals);
+    }
+    for (String principal : kerberosPrincipals) {
+      if (!PRINCIPAL_NAME.matcher(principal).matches()) {
+        throw new IllegalArgumentException(
+            "A Kerberos principal is a name without realm or instance, not '" + principal + "'");
+      }
+    }
     if (auth == HiveAuth.RANGER && version != HiveVersion.HIVE3) {
       throw new IllegalArgumentException("Ranger Hive runs Hive3 only, not " + version);
     }
@@ -63,6 +86,17 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
     this(version, auth, HiveStorage.HDFS);
   }
 
+  /**
+   * A Hive without extra Kerberos principals.
+   *
+   * @param version the Hive version
+   * @param auth the authentication mode
+   * @param storage where Hive keeps table data besides its own HDFS
+   */
+  public HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage) {
+    this(version, auth, storage, List.of());
+  }
+
   @Override
   public List<ContainerSpec<?>> dependencies() {
     if (auth == HiveAuth.RANGER) {
@@ -78,6 +112,11 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
 
   @Override
   public HiveContainer getOrStart(SharedContainers shared) {
+    if (!kerberosPrincipals.isEmpty()) {
+      // The shared Kerberos Hive has none of them, and adding them would change it for others.
+      throw new IllegalStateException(
+          "A Hive with Kerberos principals " + kerberosPrincipals + " is private: " + PRIVATE_HINT);
+    }
     if (storage != HiveStorage.HDFS) {
       return shared.startStorageHiveContainer(storage, storageEnv(shared), storageFiles());
     }
@@ -168,7 +207,8 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
     }
     return switch (auth) {
       case NONE -> SharedContainers.hiveBuilder(env());
-      case KERBEROS -> SharedContainers.kerberosHiveBuilder(env());
+      case KERBEROS -> SharedContainers.kerberosHiveBuilder(env())
+          .withKerberosPrincipals(kerberosPrincipals);
       case RANGER -> SharedContainers.hiveRangerBuilder(
           rangerEnv(new RangerSpec().getOrStart(shared)));
     };
@@ -193,7 +233,17 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
 
     @Override
     public HiveSpec specFor(HiveFixture fixture) {
-      return new HiveSpec(fixture.version(), fixture.auth(), fixture.storage());
+      HiveSpec spec =
+          new HiveSpec(
+              fixture.version(),
+              fixture.auth(),
+              fixture.storage(),
+              List.of(fixture.kerberosPrincipals()));
+      if (!spec.kerberosPrincipals().isEmpty() && fixture.scope() == Scope.RUN) {
+        throw new IllegalArgumentException(
+            "@HiveFixture(kerberosPrincipals = ...) needs a container of its own: " + PRIVATE_HINT);
+      }
+      return spec;
     }
 
     @Override
