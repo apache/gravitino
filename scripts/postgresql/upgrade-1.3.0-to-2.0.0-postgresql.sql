@@ -85,6 +85,26 @@ COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relati
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
 
+CREATE TABLE IF NOT EXISTS policy_role_relation_meta (
+    id BIGSERIAL NOT NULL,
+    policy_id BIGINT NOT NULL,
+    role_name VARCHAR(128) NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE (policy_id, role_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS policy_role_relation_meta_idx_role_name ON policy_role_relation_meta (role_name);
+COMMENT ON TABLE policy_role_relation_meta IS 'policy role relation';
+COMMENT ON COLUMN policy_role_relation_meta.id IS 'auto increment id';
+COMMENT ON COLUMN policy_role_relation_meta.policy_id IS 'policy id';
+COMMENT ON COLUMN policy_role_relation_meta.role_name IS 'role name referenced by the policy content';
+COMMENT ON COLUMN policy_role_relation_meta.current_version IS 'policy role relation current version';
+COMMENT ON COLUMN policy_role_relation_meta.last_version IS 'policy role relation last version';
+COMMENT ON COLUMN policy_role_relation_meta.deleted_at IS 'policy role relation deleted at';
+
 ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
 COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 
