@@ -26,10 +26,11 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
-import org.apache.gravitino.maintenance.storage.service.MaintenanceMetadataService;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -193,7 +194,8 @@ public final class OccupancyGate {
 
   @Nullable
   private static JobEntity loadJob(long jobId, long policyId) {
-    String metalake = MaintenanceMetadataService.getInstance().getMetalakeName(policyId);
+    PolicyEntity policy = PolicyMetaService.getInstance().getPolicyById(policyId);
+    String metalake = policy == null ? null : policy.namespace().level(0);
     if (metalake == null) {
       return null;
     }

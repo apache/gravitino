@@ -22,13 +22,13 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
-import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
-import org.apache.gravitino.maintenance.scheduler.RelationalPolicyLookup;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,19 +42,19 @@ public final class TriggerExprInJobRecommender implements InJobRecommender {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerExprInJobRecommender.class);
 
-  private final PolicyLookup policyLookup;
+  private final Function<Long, Optional<PolicyEntity>> policyLoader;
   private final QLExpressionEvaluator evaluator;
 
-  /** Uses relational policy lookup. */
+  /** Loads policies through {@link PolicyMetaService}. */
   public TriggerExprInJobRecommender() {
-    this(new RelationalPolicyLookup());
+    this(TriggerExprInJobRecommender::loadPolicy);
   }
 
   /**
-   * @param policyLookup loads policy content by id when the caller did not supply a policy entity
+   * @param policyLoader loads a policy by id when the caller did not supply a policy entity
    */
-  public TriggerExprInJobRecommender(PolicyLookup policyLookup) {
-    this.policyLookup = Preconditions.checkNotNull(policyLookup);
+  TriggerExprInJobRecommender(Function<Long, Optional<PolicyEntity>> policyLoader) {
+    this.policyLoader = Preconditions.checkNotNull(policyLoader);
     this.evaluator = new QLExpressionEvaluator();
   }
 
@@ -113,11 +113,15 @@ public final class TriggerExprInJobRecommender implements InJobRecommender {
     if (policy != null) {
       return policy.content();
     }
-    Optional<PolicyEntity> loaded = policyLookup.findById(policyId);
+    Optional<PolicyEntity> loaded = policyLoader.apply(policyId);
     if (loaded.isEmpty()) {
       LOG.warn("Trigger-expr recommend skip: policy {} not found (table={})", policyId, tableId);
       return null;
     }
     return loaded.get().content();
+  }
+
+  private static Optional<PolicyEntity> loadPolicy(long policyId) {
+    return Optional.ofNullable(PolicyMetaService.getInstance().getPolicyById(policyId));
   }
 }

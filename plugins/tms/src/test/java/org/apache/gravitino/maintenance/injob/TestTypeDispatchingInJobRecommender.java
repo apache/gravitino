@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.Optional;
-import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
+import java.util.function.Function;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
@@ -45,8 +45,7 @@ class TestTypeDispatchingInJobRecommender {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.policyType()).thenReturn(Policy.BuiltInType.ICEBERG_COMPACTION);
     when(policy.content()).thenReturn(PolicyContents.icebergDataCompaction());
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(1L)).thenReturn(Optional.of(policy));
+    Function<Long, Optional<PolicyEntity>> policies = policiesReturning(policy);
     InJobRecommender compaction = mock(InJobRecommender.class);
     when(compaction.recommend(eq(2L), eq(1L), eq(9L), anyString(), eq(policy)))
         .thenReturn(RecommendDecision.SKIP);
@@ -54,7 +53,7 @@ class TestTypeDispatchingInJobRecommender {
     InJobRecommender placeholder = mock(InJobRecommender.class);
 
     TypeDispatchingInJobRecommender dispatcher =
-        new TypeDispatchingInJobRecommender(lookup, compaction, triggerExpr, placeholder);
+        new TypeDispatchingInJobRecommender(policies, compaction, triggerExpr, placeholder);
     Assertions.assertEquals(RecommendDecision.SKIP, dispatcher.recommend(2L, 1L, 9L, "{\"x\":1}"));
     verify(compaction).recommend(2L, 1L, 9L, "{\"x\":1}", policy);
     verify(triggerExpr, never())
@@ -68,8 +67,7 @@ class TestTypeDispatchingInJobRecommender {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.policyType()).thenReturn(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION);
     when(policy.content()).thenReturn(PolicyContents.icebergSnapshotExpiration());
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(1L)).thenReturn(Optional.of(policy));
+    Function<Long, Optional<PolicyEntity>> policies = policiesReturning(policy);
     InJobRecommender compaction = mock(InJobRecommender.class);
     InJobRecommender triggerExpr = mock(InJobRecommender.class);
     InJobRecommender placeholder = mock(InJobRecommender.class);
@@ -77,7 +75,7 @@ class TestTypeDispatchingInJobRecommender {
         .thenReturn(RecommendDecision.MAINTAIN);
 
     TypeDispatchingInJobRecommender dispatcher =
-        new TypeDispatchingInJobRecommender(lookup, compaction, triggerExpr, placeholder);
+        new TypeDispatchingInJobRecommender(policies, compaction, triggerExpr, placeholder);
     Assertions.assertEquals(RecommendDecision.MAINTAIN, dispatcher.recommend(2L, 1L, 9L, "{}"));
     verify(placeholder).recommend(2L, 1L, 9L, "{}", policy);
     verify(triggerExpr, never())
@@ -91,14 +89,13 @@ class TestTypeDispatchingInJobRecommender {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.policyType()).thenReturn(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION);
     when(policy.content()).thenReturn(PolicyContents.icebergSnapshotExpiration());
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(1L)).thenReturn(Optional.of(policy));
+    Function<Long, Optional<PolicyEntity>> policies = policiesReturning(policy);
 
     TypeDispatchingInJobRecommender dispatcher =
         new TypeDispatchingInJobRecommender(
-            lookup,
-            new CompactionInJobRecommender(lookup),
-            new TriggerExprInJobRecommender(lookup),
+            policies,
+            new CompactionInJobRecommender(policies),
+            new TriggerExprInJobRecommender(policies),
             AlwaysMaintainInJobRecommender.INSTANCE);
 
     Assertions.assertEquals(RecommendDecision.MAINTAIN, dispatcher.recommend(2L, 1L, 9L, "{}"));
@@ -109,12 +106,11 @@ class TestTypeDispatchingInJobRecommender {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.policyType()).thenReturn(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL);
     when(policy.content()).thenReturn(PolicyContents.icebergOrphanFileRemoval());
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(1L)).thenReturn(Optional.of(policy));
+    Function<Long, Optional<PolicyEntity>> policies = policiesReturning(policy);
 
-    TriggerExprInJobRecommender triggerExpr = new TriggerExprInJobRecommender(lookup);
+    TriggerExprInJobRecommender triggerExpr = new TriggerExprInJobRecommender(policies);
     TypeDispatchingInJobRecommender dispatcher =
-        new TypeDispatchingInJobRecommender(lookup, mock(InJobRecommender.class), triggerExpr);
+        new TypeDispatchingInJobRecommender(policies, mock(InJobRecommender.class), triggerExpr);
 
     Assertions.assertEquals(RecommendDecision.MAINTAIN, dispatcher.recommend(2L, 1L, 9L, "{}"));
   }
@@ -125,18 +121,26 @@ class TestTypeDispatchingInJobRecommender {
     when(policy.policyType()).thenReturn(Policy.BuiltInType.ICEBERG_COMPACTION);
     when(policy.content())
         .thenReturn(PolicyContents.icebergDataCompaction(500L, 3L, Collections.emptyMap()));
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(7L)).thenReturn(Optional.of(policy));
+    @SuppressWarnings("unchecked")
+    Function<Long, Optional<PolicyEntity>> policies = mock(Function.class);
+    when(policies.apply(7L)).thenReturn(Optional.of(policy));
 
-    CompactionInJobRecommender compaction = new CompactionInJobRecommender(lookup);
+    CompactionInJobRecommender compaction = new CompactionInJobRecommender(policies);
     TypeDispatchingInJobRecommender dispatcher =
         new TypeDispatchingInJobRecommender(
-            lookup, compaction, new TriggerExprInJobRecommender(lookup));
+            policies, compaction, new TriggerExprInJobRecommender(policies));
 
     String metrics =
         "{\"custom-data-file-mse\":600,\"custom-delete-file-number\":0,\"snapshotId\":1}";
     Assertions.assertEquals(RecommendDecision.MAINTAIN, dispatcher.recommend(1L, 7L, 99L, metrics));
     // Type-dispatch loads once; compaction must not look up again.
-    verify(lookup, times(1)).findById(7L);
+    verify(policies, times(1)).apply(7L);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Function<Long, Optional<PolicyEntity>> policiesReturning(PolicyEntity policy) {
+    Function<Long, Optional<PolicyEntity>> policies = mock(Function.class);
+    when(policies.apply(anyLong())).thenReturn(Optional.of(policy));
+    return policies;
   }
 }

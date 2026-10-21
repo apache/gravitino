@@ -22,7 +22,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
-import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
@@ -35,10 +34,9 @@ class TestTriggerExprInJobRecommender {
   void testOrphanTriggerTrueMaintains() {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.content()).thenReturn(PolicyContents.icebergOrphanFileRemoval());
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(1L)).thenReturn(Optional.of(policy));
 
-    TriggerExprInJobRecommender recommender = new TriggerExprInJobRecommender(lookup);
+    TriggerExprInJobRecommender recommender =
+        new TriggerExprInJobRecommender(policyId -> Optional.of(policy));
     Assertions.assertEquals(
         RecommendDecision.MAINTAIN, recommender.recommend(2L, 1L, 9L, "{}", policy));
   }
@@ -47,10 +45,9 @@ class TestTriggerExprInJobRecommender {
   void testExpirePlaceholderTriggerFalseSkips() {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.content()).thenReturn(PolicyContents.icebergSnapshotExpiration());
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(1L)).thenReturn(Optional.of(policy));
 
-    TriggerExprInJobRecommender recommender = new TriggerExprInJobRecommender(lookup);
+    TriggerExprInJobRecommender recommender =
+        new TriggerExprInJobRecommender(policyId -> Optional.of(policy));
     Assertions.assertEquals(
         RecommendDecision.SKIP, recommender.recommend(2L, 1L, 9L, "{}", policy));
   }
@@ -59,9 +56,9 @@ class TestTriggerExprInJobRecommender {
   void testManifestPlaceholderTriggerFalseSkips() {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.content()).thenReturn(PolicyContents.icebergRewriteManifests());
-    PolicyLookup lookup = mock(PolicyLookup.class);
 
-    TriggerExprInJobRecommender recommender = new TriggerExprInJobRecommender(lookup);
+    TriggerExprInJobRecommender recommender =
+        new TriggerExprInJobRecommender(policyId -> Optional.empty());
     Assertions.assertEquals(
         RecommendDecision.SKIP, recommender.recommend(2L, 1L, 9L, "{}", policy));
   }

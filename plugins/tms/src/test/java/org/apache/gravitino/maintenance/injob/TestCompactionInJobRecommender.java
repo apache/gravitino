@@ -23,7 +23,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.Optional;
-import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
@@ -37,10 +36,9 @@ class TestCompactionInJobRecommender {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.content())
         .thenReturn(PolicyContents.icebergDataCompaction(500L, 3L, Collections.emptyMap()));
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(7L)).thenReturn(Optional.of(policy));
 
-    CompactionInJobRecommender recommender = new CompactionInJobRecommender(lookup);
+    CompactionInJobRecommender recommender =
+        new CompactionInJobRecommender(policyId -> Optional.of(policy));
     String metrics =
         "{\"custom-data-file-mse\":600,\"custom-delete-file-number\":0,\"snapshotId\":1}";
     Assertions.assertEquals(
@@ -55,10 +53,9 @@ class TestCompactionInJobRecommender {
   void testMissingMetricsSkips() {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.content()).thenReturn(PolicyContents.icebergDataCompaction());
-    PolicyLookup lookup = mock(PolicyLookup.class);
-    when(lookup.findById(7L)).thenReturn(Optional.of(policy));
 
-    CompactionInJobRecommender recommender = new CompactionInJobRecommender(lookup);
+    CompactionInJobRecommender recommender =
+        new CompactionInJobRecommender(policyId -> Optional.of(policy));
     Assertions.assertEquals(
         RecommendDecision.SKIP,
         recommender.recommend(

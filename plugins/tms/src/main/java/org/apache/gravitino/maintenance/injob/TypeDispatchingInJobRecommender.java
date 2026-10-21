@@ -21,13 +21,13 @@ package org.apache.gravitino.maintenance.injob;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Optional;
-import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
-import org.apache.gravitino.maintenance.scheduler.RelationalPolicyLookup;
+import java.util.function.Function;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,37 +45,37 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
 
   private static final Logger LOG = LoggerFactory.getLogger(TypeDispatchingInJobRecommender.class);
 
-  private final PolicyLookup policyLookup;
+  private final Function<Long, Optional<PolicyEntity>> policyLoader;
   private final InJobRecommender compactionRecommender;
   private final InJobRecommender triggerExprRecommender;
   private final InJobRecommender placeholderRecommender;
 
-  /** Production wiring with a shared policy lookup. */
+  /** Production wiring. Loads policies through {@link PolicyMetaService}. */
   public TypeDispatchingInJobRecommender() {
-    this(new RelationalPolicyLookup());
+    this(TypeDispatchingInJobRecommender::loadPolicy);
   }
 
-  private TypeDispatchingInJobRecommender(PolicyLookup lookup) {
+  private TypeDispatchingInJobRecommender(Function<Long, Optional<PolicyEntity>> policyLoader) {
     this(
-        lookup,
-        new CompactionInJobRecommender(lookup),
-        new TriggerExprInJobRecommender(lookup),
+        policyLoader,
+        new CompactionInJobRecommender(policyLoader),
+        new TriggerExprInJobRecommender(policyLoader),
         AlwaysMaintainInJobRecommender.INSTANCE);
   }
 
   /**
-   * @param policyLookup policy loader
+   * @param policyLoader loads a policy by id
    * @param compactionRecommender compaction thresholds
    * @param triggerExprRecommender trigger-expr evaluation (orphan and similar)
    * @param placeholderRecommender expire / rewrite-manifests placeholders until real thresholds
    *     land
    */
-  public TypeDispatchingInJobRecommender(
-      PolicyLookup policyLookup,
+  TypeDispatchingInJobRecommender(
+      Function<Long, Optional<PolicyEntity>> policyLoader,
       InJobRecommender compactionRecommender,
       InJobRecommender triggerExprRecommender,
       InJobRecommender placeholderRecommender) {
-    this.policyLookup = Preconditions.checkNotNull(policyLookup);
+    this.policyLoader = Preconditions.checkNotNull(policyLoader);
     this.compactionRecommender = Preconditions.checkNotNull(compactionRecommender);
     this.triggerExprRecommender = Preconditions.checkNotNull(triggerExprRecommender);
     this.placeholderRecommender = Preconditions.checkNotNull(placeholderRecommender);
@@ -85,17 +85,17 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
    * Test wiring that routes expire / rewrite-manifests placeholders to {@link
    * AlwaysMaintainInJobRecommender#INSTANCE}.
    *
-   * @param policyLookup policy loader
+   * @param policyLoader loads a policy by id
    * @param compactionRecommender compaction thresholds
    * @param triggerExprRecommender trigger-expr evaluation for orphan and similar
    */
   @VisibleForTesting
   TypeDispatchingInJobRecommender(
-      PolicyLookup policyLookup,
+      Function<Long, Optional<PolicyEntity>> policyLoader,
       InJobRecommender compactionRecommender,
       InJobRecommender triggerExprRecommender) {
     this(
-        policyLookup,
+        policyLoader,
         compactionRecommender,
         triggerExprRecommender,
         AlwaysMaintainInJobRecommender.INSTANCE);
@@ -104,7 +104,7 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
   @Override
   public RecommendDecision recommend(
       long tableId, long policyId, long sampledSnapshotId, String metricsJson) {
-    Optional<PolicyEntity> loaded = policyLookup.findById(policyId);
+    Optional<PolicyEntity> loaded = policyLoader.apply(policyId);
     if (loaded.isEmpty()) {
       LOG.warn("In-job recommend: policy {} missing; skip (table={})", policyId, tableId);
       return RecommendDecision.SKIP;
@@ -129,5 +129,9 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
         || type == Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS
         || policy.content() instanceof IcebergSnapshotExpirationContent
         || policy.content() instanceof IcebergRewriteManifestsContent;
+  }
+
+  private static Optional<PolicyEntity> loadPolicy(long policyId) {
+    return Optional.ofNullable(PolicyMetaService.getInstance().getPolicyById(policyId));
   }
 }

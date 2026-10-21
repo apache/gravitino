@@ -21,13 +21,13 @@ package org.apache.gravitino.maintenance.injob;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
-import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
-import org.apache.gravitino.maintenance.scheduler.RelationalPolicyLookup;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,18 +39,18 @@ public final class CompactionInJobRecommender implements InJobRecommender {
 
   private static final Logger LOG = LoggerFactory.getLogger(CompactionInJobRecommender.class);
 
-  private final PolicyLookup policyLookup;
+  private final Function<Long, Optional<PolicyEntity>> policyLoader;
 
-  /** Uses relational policy lookup. */
+  /** Loads policies through {@link PolicyMetaService}. */
   public CompactionInJobRecommender() {
-    this(new RelationalPolicyLookup());
+    this(CompactionInJobRecommender::loadPolicy);
   }
 
   /**
-   * @param policyLookup loads policy content by id when the caller did not supply a policy entity
+   * @param policyLoader loads a policy by id when the caller did not supply a policy entity
    */
-  public CompactionInJobRecommender(PolicyLookup policyLookup) {
-    this.policyLookup = Preconditions.checkNotNull(policyLookup);
+  CompactionInJobRecommender(Function<Long, Optional<PolicyEntity>> policyLoader) {
+    this.policyLoader = Preconditions.checkNotNull(policyLoader);
   }
 
   @Override
@@ -98,7 +98,7 @@ public final class CompactionInJobRecommender implements InJobRecommender {
     if (policy != null) {
       content = policy.content();
     } else {
-      Optional<PolicyEntity> loaded = policyLookup.findById(policyId);
+      Optional<PolicyEntity> loaded = policyLoader.apply(policyId);
       if (loaded.isEmpty()) {
         LOG.warn("Compaction recommend skip: policy {} not found (table={})", policyId, tableId);
         return null;
@@ -113,5 +113,9 @@ public final class CompactionInJobRecommender implements InJobRecommender {
       return null;
     }
     return (IcebergDataCompactionContent) content;
+  }
+
+  private static Optional<PolicyEntity> loadPolicy(long policyId) {
+    return Optional.ofNullable(PolicyMetaService.getInstance().getPolicyById(policyId));
   }
 }
