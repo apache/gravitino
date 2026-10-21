@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -66,7 +65,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   private final TagMetaService tagMetaService;
   private final SchemaMetaService schemaMetaService;
   private final TableMetaService tableMetaService;
-  private final Supplier<EntityStore> entityStoreSupplier;
+  private final Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier;
 
   /** Uses relational singletons and {@link GravitinoEnv#entityStore()}. */
   public NearestPolicyTableEnumerator() {
@@ -75,7 +74,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         TagMetaService.getInstance(),
         SchemaMetaService.getInstance(),
         TableMetaService.getInstance(),
-        () -> GravitinoEnv.getInstance().entityStore());
+        () -> new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore()));
   }
 
   /**
@@ -83,19 +82,19 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
    * @param tagMetaService tag metadata
    * @param schemaMetaService schema listing
    * @param tableMetaService table listing
-   * @param entityStoreSupplier entity store for nearest-policy resolution
+   * @param nearestResolverSupplier nearest maintenance-policy resolver
    */
   public NearestPolicyTableEnumerator(
       PolicyTagRelService policyTagRelService,
       TagMetaService tagMetaService,
       SchemaMetaService schemaMetaService,
       TableMetaService tableMetaService,
-      Supplier<EntityStore> entityStoreSupplier) {
+      Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier) {
     this.policyTagRelService = policyTagRelService;
     this.tagMetaService = tagMetaService;
     this.schemaMetaService = schemaMetaService;
     this.tableMetaService = tableMetaService;
-    this.entityStoreSupplier = entityStoreSupplier;
+    this.nearestResolverSupplier = nearestResolverSupplier;
   }
 
   @Override
@@ -110,8 +109,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     List<RelationalEntity<?>> tagEdges =
         policyTagRelService.listRelations(List.of(policyIdent), Entity.EntityType.POLICY);
 
-    NearestMaintenancePolicyResolver nearest =
-        new NearestMaintenancePolicyResolver(entityStoreSupplier.get());
+    NearestMaintenancePolicyResolver nearest = nearestResolverSupplier.get();
     Set<Long> seenTables = new LinkedHashSet<>();
     Map<Long, ExpandTableCandidate> enqueueable = new LinkedHashMap<>();
     long nowMs = System.currentTimeMillis();

@@ -65,12 +65,25 @@ public class EffectiveTagResolver {
    * @return Effective tags in deterministic nearest-assignment order.
    */
   public TagEntity[] resolve(String metalake, MetadataObject metadataObject) {
+    return resolveWithSources(metalake, metadataObject).stream()
+        .map(EffectiveTag::tag)
+        .toArray(TagEntity[]::new);
+  }
+
+  /**
+   * Resolves effective tags and the metadata object that contributed each assignment.
+   *
+   * @param metalake The metalake name.
+   * @param metadataObject The metadata object.
+   * @return Effective tags with sources in deterministic nearest-assignment order.
+   */
+  public List<EffectiveTag> resolveWithSources(String metalake, MetadataObject metadataObject) {
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     List<MetadataObject> resolutionOrder = new ArrayList<>();
     resolutionOrder.add(metadataObject);
     resolutionOrder.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
 
-    Map<String, TagEntity> effectiveTags = new LinkedHashMap<>();
+    Map<String, EffectiveTag> effectiveTags = new LinkedHashMap<>();
     for (int index = 0; index < resolutionOrder.size(); index++) {
       MetadataObject object = resolutionOrder.get(index);
       boolean inherited = index > 0;
@@ -84,8 +97,10 @@ public class EffectiveTagResolver {
                     SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
                     identifier,
                     entityType);
-        tags.forEach(
-            tag -> effectiveTags.putIfAbsent(tag.name(), tag.copyWithInherited(inherited)));
+        for (TagEntity tag : tags) {
+          effectiveTags.putIfAbsent(
+              tag.name(), new EffectiveTag(tag.copyWithInherited(inherited), object));
+        }
       } catch (NoSuchEntityException e) {
         throw new NoSuchMetadataObjectException(
             e, "Failed to resolve effective tags for metadata object %s due to not found", object);
@@ -94,6 +109,6 @@ public class EffectiveTagResolver {
         throw new RuntimeException(e);
       }
     }
-    return effectiveTags.values().toArray(new TagEntity[0]);
+    return new ArrayList<>(effectiveTags.values());
   }
 }

@@ -18,15 +18,14 @@
  */
 package org.apache.gravitino.maintenance.scheduler.expand;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.RelationalEntity;
@@ -45,7 +44,6 @@ import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.tag.TagAssignment;
-import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -60,8 +58,7 @@ class TestNearestPolicyTableEnumerator {
   private TagMetaService tagMetaService;
   private SchemaMetaService schemaMetaService;
   private TableMetaService tableMetaService;
-  private EntityStore entityStore;
-  private SupportsRelationOperations relationOperations;
+  private NearestMaintenancePolicyResolver nearest;
   private NearestPolicyTableEnumerator enumerator;
 
   @BeforeEach
@@ -70,16 +67,14 @@ class TestNearestPolicyTableEnumerator {
     tagMetaService = mock(TagMetaService.class);
     schemaMetaService = mock(SchemaMetaService.class);
     tableMetaService = mock(TableMetaService.class);
-    entityStore = mock(EntityStore.class);
-    relationOperations = mock(SupportsRelationOperations.class);
-    when(entityStore.relationOperations()).thenReturn(relationOperations);
+    nearest = mock(NearestMaintenancePolicyResolver.class);
     enumerator =
         new NearestPolicyTableEnumerator(
             policyTagRelService,
             tagMetaService,
             schemaMetaService,
             tableMetaService,
-            () -> entityStore);
+            () -> nearest);
   }
 
   @Test
@@ -99,22 +94,11 @@ class TestNearestPolicyTableEnumerator {
                     .withEntityType(Entity.EntityType.TABLE)
                     .build()));
 
-    // Winning path: tags on table select this policy
     MetadataObject table =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "schema", "t1"), MetadataObject.Type.TABLE);
-    doReturn(List.of(tag))
-        .when(relationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-            eq(MetadataObjectUtil.toEntityIdent(METALAKE, table)),
-            eq(Entity.EntityType.TABLE));
-    when(relationOperations.batchListEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
-            eq(List.of(NameIdentifierUtil.ofTag(METALAKE, "maint"))),
-            eq(Entity.EntityType.TAG)))
-        .thenReturn(List.of(policyFromTag(tag, policy)));
-    stubEmptyParents(table);
+    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, table));
 
     Assertions.assertEquals(
         List.of(100L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -123,9 +107,7 @@ class TestNearestPolicyTableEnumerator {
   @Test
   void testSchemaExpansionSkipsOverriddenTable() throws Exception {
     PolicyEntity catalogPolicy = policy(10L, "catalog-compaction");
-    PolicyEntity tablePolicy = policy(11L, "table-compaction");
     TagEntity catalogTag = tag(1L, "maint");
-    TagEntity tableTag = tag(2L, "maint-table");
 
     when(policyTagRelService.listRelations(
             eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "catalog-compaction"))),
@@ -167,47 +149,11 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject schema =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "schema"), MetadataObject.Type.SCHEMA);
-    MetadataObject catalog =
-        MetadataObjects.of(
-            java.util.Collections.singletonList("catalog"), MetadataObject.Type.CATALOG);
 
-    // t1 overridden by table-local policy 11
-    doReturn(List.of(tableTag))
-        .when(relationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-            eq(MetadataObjectUtil.toEntityIdent(METALAKE, table1)),
-            eq(Entity.EntityType.TABLE));
-    when(relationOperations.batchListEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
-            eq(List.of(NameIdentifierUtil.ofTag(METALAKE, "maint-table"))),
-            eq(Entity.EntityType.TAG)))
-        .thenReturn(List.of(policyFromTag(tableTag, tablePolicy)));
-
-    // t2 inherits catalog policy via schema-level tag
-    doReturn(List.of())
-        .when(relationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-            eq(MetadataObjectUtil.toEntityIdent(METALAKE, table2)),
-            eq(Entity.EntityType.TABLE));
-    doReturn(List.of(catalogTag))
-        .when(relationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-            eq(MetadataObjectUtil.toEntityIdent(METALAKE, schema)),
-            eq(Entity.EntityType.SCHEMA));
-    when(relationOperations.batchListEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
-            eq(List.of(NameIdentifierUtil.ofTag(METALAKE, "maint"))),
-            eq(Entity.EntityType.TAG)))
-        .thenReturn(List.of(policyFromTag(catalogTag, catalogPolicy)));
-    doReturn(List.of())
-        .when(relationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-            eq(MetadataObjectUtil.toEntityIdent(METALAKE, catalog)),
-            eq(Entity.EntityType.CATALOG));
+    when(nearest.resolve(METALAKE, table1, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(11L, table1));
+    when(nearest.resolve(METALAKE, table2, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, schema));
 
     Assertions.assertEquals(
         List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L)));
@@ -255,25 +201,14 @@ class TestNearestPolicyTableEnumerator {
             eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
         .thenReturn(List.of(t1, t2, t3));
 
-    for (String name : List.of("t1", "t2", "t3")) {
-      MetadataObject table =
-          MetadataObjects.of(
-              java.util.Arrays.asList("catalog", "schema", name), MetadataObject.Type.TABLE);
-      doReturn(List.of(tag))
-          .when(relationOperations)
-          .listEntitiesByRelation(
-              eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              eq(MetadataObjectUtil.toEntityIdent(METALAKE, table)),
-              eq(Entity.EntityType.TABLE));
-      stubEmptyParents(table);
-    }
-    when(relationOperations.batchListEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
-            eq(List.of(NameIdentifierUtil.ofTag(METALAKE, "maint"))),
-            eq(Entity.EntityType.TAG)))
-        .thenReturn(List.of(policyFromTag(tag, policy)));
+    when(nearest.resolve(
+            eq(METALAKE), any(MetadataObject.class), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject table = invocation.getArgument(1);
+              return NearestMaintenancePolicyResolver.Decision.winner(10L, table);
+            });
 
-    // First two winners are cooling down; limit=1 must keep scanning to t3.
     ExpandOccupancyGate gate = (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
     Assertions.assertEquals(
         List.of(102L), tableIds(enumerator.listTableIds(policy, 1, gate, 60_000L)));
@@ -282,9 +217,7 @@ class TestNearestPolicyTableEnumerator {
   @Test
   void testSameLevelConflictSkipsTable() throws Exception {
     PolicyEntity policy = policy(10L, "compaction");
-    PolicyEntity other = policy(11L, "compaction-other");
     TagEntity tagA = tag(1L, "t-a");
-    TagEntity tagB = tag(2L, "t-b");
 
     when(policyTagRelService.listRelations(
             eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
@@ -302,20 +235,8 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject table =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "schema", "t1"), MetadataObject.Type.TABLE);
-    doReturn(List.of(tagA, tagB))
-        .when(relationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-            eq(MetadataObjectUtil.toEntityIdent(METALAKE, table)),
-            eq(Entity.EntityType.TABLE));
-    when(relationOperations.batchListEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
-            eq(
-                List.of(
-                    NameIdentifierUtil.ofTag(METALAKE, "t-a"),
-                    NameIdentifierUtil.ofTag(METALAKE, "t-b"))),
-            eq(Entity.EntityType.TAG)))
-        .thenReturn(List.of(policyFromTag(tagA, policy), policyFromTag(tagB, other)));
+    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.conflict(table, List.of(10L, 11L)));
 
     Assertions.assertEquals(
         List.of(), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -329,32 +250,12 @@ class TestNearestPolicyTableEnumerator {
     return (tableId, policyId, minIntervalMs, nowMs) -> false;
   }
 
-  private void stubEmptyParents(MetadataObject table) throws Exception {
-    for (MetadataObject parent : MetadataObjectUtil.getParentMetadataObjects(table)) {
-      doReturn(List.of())
-          .when(relationOperations)
-          .listEntitiesByRelation(
-              eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              eq(MetadataObjectUtil.toEntityIdent(METALAKE, parent)),
-              eq(MetadataObjectUtil.toEntityType(parent)));
-    }
-  }
-
   private static RelationalEntity<TagEntity> policyTagEdge(PolicyEntity policy, TagEntity tag) {
     return new RelationalEntity<>(
         SupportsRelationOperations.Type.POLICY_TAG_REL,
         policy.nameIdentifier(),
         Entity.EntityType.POLICY,
         tag,
-        null);
-  }
-
-  private static RelationalEntity<PolicyEntity> policyFromTag(TagEntity tag, PolicyEntity policy) {
-    return new RelationalEntity<>(
-        SupportsRelationOperations.Type.POLICY_TAG_REL,
-        tag.nameIdentifier(),
-        Entity.EntityType.TAG,
-        policy,
         null);
   }
 
