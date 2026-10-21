@@ -43,11 +43,7 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
->>>>>>> f8cbcdd3f ([#13980] fix(iceberg): Authorize table metrics reports (#13981))
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.utils.NameIdentifierUtil;
