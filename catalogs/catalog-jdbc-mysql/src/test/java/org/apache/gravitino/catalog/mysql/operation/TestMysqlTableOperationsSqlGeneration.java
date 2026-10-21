@@ -98,12 +98,16 @@ public class TestMysqlTableOperationsSqlGeneration {
                 Transforms.EMPTY_TRANSFORM,
                 Distributions.NONE,
                 Indexes.EMPTY_INDEXES));
+    Assertions.assertEquals(0, connections.totalBorrows());
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> ops.alterTable("database", "test_table", TableChange.setProperty(key, value)));
     Assertions.assertTrue(connections.executedSql().isEmpty());
     Assertions.assertEquals(0, connections.borrowed());
-    Assertions.assertEquals(0, connections.peakBorrowed());
+    // branch-1.3 generates ALTER SQL inside the execution connection; validation still prevents
+    // DDL.
+    Assertions.assertEquals(1, connections.peakBorrowed());
+    Assertions.assertEquals(1, connections.totalBorrows());
   }
 
   @Test

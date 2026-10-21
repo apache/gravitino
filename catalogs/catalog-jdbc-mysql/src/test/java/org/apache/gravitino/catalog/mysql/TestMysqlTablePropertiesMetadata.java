@@ -101,15 +101,7 @@ class TestMysqlTablePropertiesMetadata {
     RecordingTableOperations table = new RecordingTableOperations();
     try (JdbcCatalogOperations operations = operations(table)) {
       Table created =
-          create(
-              operations,
-              Map.of(
-                  "engine",
-                  "InNoDB",
-                  "auto-increment-offset",
-                  "+0042",
-                  "credential-providers",
-                  "test-provider"));
+          create(operations, Map.of("engine", "InNoDB", "auto-increment-offset", "+0042"));
       Assertions.assertEquals(Map.of("ENGINE", "InnoDB", "AUTO_INCREMENT", "42"), table.properties);
       Assertions.assertEquals(
           Map.of("engine", "InnoDB", "auto-increment-offset", "42"), created.properties());

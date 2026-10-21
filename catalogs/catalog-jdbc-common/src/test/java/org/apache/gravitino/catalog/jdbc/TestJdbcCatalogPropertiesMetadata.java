@@ -30,28 +30,21 @@ import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.catalog.jdbc.utils.TestDataSourceValidation.UnsupportedValidationDriver;
 import org.apache.gravitino.connector.CatalogInfo;
-import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
->>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-<<<<<<< HEAD
-=======
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
->>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
 
 public class TestJdbcCatalogPropertiesMetadata {
 
@@ -107,6 +100,7 @@ public class TestJdbcCatalogPropertiesMetadata {
       operations.initialize(properties, poolWaitCatalogInfo(properties), new TestJdbcCatalog());
       BasicDataSource pool = (BasicDataSource) FieldUtils.readField(operations, "dataSource", true);
       Assertions.assertEquals(expected, pool.getMaxWaitDuration().toMillis());
+      Assertions.assertEquals("SELECT 1", pool.getValidationQuery());
     }
   }
 

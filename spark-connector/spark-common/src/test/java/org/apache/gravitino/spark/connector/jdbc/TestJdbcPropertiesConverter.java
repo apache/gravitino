@@ -31,12 +31,10 @@ public class TestJdbcPropertiesConverter {
       JdbcPropertiesConverter.getInstance();
 
   @Test
-<<<<<<< HEAD
-=======
-  void testGetNoTablePropertiesInstance() {
-    JdbcPropertiesConverter instance = JdbcPropertiesConverter.getNoTablePropertiesInstance();
+  void testGetPGInstance() {
+    JdbcPropertiesConverter instance = JdbcPropertiesConverter.getPGInstance();
     Assertions.assertNotNull(instance);
-    Assertions.assertSame(instance, JdbcPropertiesConverter.getNoTablePropertiesInstance());
+    Assertions.assertSame(instance, JdbcPropertiesConverter.getPGInstance());
     Assertions.assertNotSame(instance, JdbcPropertiesConverter.getInstance());
 
     Map<String, String> emptyProps = instance.toGravitinoTableProperties(ImmutableMap.of());
@@ -73,7 +71,6 @@ public class TestJdbcPropertiesConverter {
   }
 
   @Test
->>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
   void testCatalogProperties() {
     String url = "jdbc-url";
     String user = "user1";

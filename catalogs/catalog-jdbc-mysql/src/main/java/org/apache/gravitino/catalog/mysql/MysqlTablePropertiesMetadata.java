@@ -119,7 +119,7 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
               String.join(", ", GRAVITINO_CONFIG_TO_MYSQL.keySet()));
           if (GRAVITINO_CONFIG_TO_MYSQL.containsKey(key)) {
             // A null value represents RemoveProperty in JdbcCatalogOperations. Non-SQL metadata,
-            // such as the internal identifier and credential settings, must not become options.
+            // such as the internal identifier, must not become options.
             result.put(
                 GRAVITINO_CONFIG_TO_MYSQL.get(key),
                 value == null ? null : validateAndEncode(getPropertyEntry(key), value));

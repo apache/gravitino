@@ -37,12 +37,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
-<<<<<<< HEAD
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
-=======
-import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
-import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
->>>>>>> 3ce91977a ([#13945] fix(jdbc): Honor pool wait settings and validate MySQL table properties (#13946))
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
