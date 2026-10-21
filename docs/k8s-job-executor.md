@@ -118,6 +118,11 @@ the Iceberg Spark runtime to a Spark image without it:
   service account, Secrets, and volumes, are ignored, with a warning in the server log that leaves
   out the value. Whoever can run a built-in job sets its `spark_conf`, so only the job executor
   configurations and job templates may set them. The driver ignores them as well.
+- `spark.jars` in `spark_conf` replaces a server-level default of `spark.jars`, like any other
+  configuration. If that default provides the Iceberg Spark runtime, list the runtime in
+  `spark_conf` as well.
+- The names of `spark.executorEnv.*` in `spark_conf` are checked like the `environments` of a job
+  template, see [Environment Variables](#environment-variables).
 - The driver applies the rest of `spark_conf` again when it starts, as it does with every job
   executor.
 
@@ -467,7 +472,8 @@ controller (`embedAdmissionController=false`).
 The `environments` of a job template are set for the driver and the executors as plain Spark
 configurations: a variable `REGION` becomes `spark.kubernetes.driverEnv.REGION` and
 `spark.executorEnv.REGION`. A name must consist of letters, digits, `_`, `-`, and `.`, can't start
-with a digit or `..`, and can't be `.`. Otherwise, the run is rejected.
+with a digit or `..`, and can't be `.`. Otherwise, the run is rejected. The same rule applies to the
+names of `spark.executorEnv.*` in the `spark_conf` of a built-in Iceberg job.
 
 The variables are set in the driver and executor containers, while the local job executor sets them
 on the `spark-submit` process on the Gravitino server. A template written for the local job
