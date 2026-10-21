@@ -18,6 +18,12 @@
 name: Checkout and sync
 description: Check out the upstream base branch and merge the contributor branch for fork CI.
 
+inputs:
+  persist-credentials:
+    description: Whether to keep the token in the git config of the checkout.
+    required: false
+    default: 'true'
+
 outputs:
   base-ref:
     description: Upstream branch used as the comparison base.
@@ -150,6 +156,7 @@ runs:
         fetch-depth: 0
         repository: apache/gravitino
         ref: ${{ steps.base.outputs.base_ref }}
+        persist-credentials: ${{ inputs.persist-credentials }}
 
     - name: Resolve upstream base commit
       id: upstream
