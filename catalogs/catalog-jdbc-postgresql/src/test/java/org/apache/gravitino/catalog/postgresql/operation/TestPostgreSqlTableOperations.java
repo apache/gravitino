@@ -723,15 +723,11 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     // Test delete index definition.
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("test_pk", false);
     result = PostgreSqlTableOperations.deleteIndexDefinition(tableName, deleteIndex);
-    Assertions.assertEquals(
-        "ALTER TABLE \"t1\" DROP CONSTRAINT \"test_pk\";\n" + "DROP INDEX \"test_pk\";", result);
+    Assertions.assertEquals("ALTER TABLE \"t1\" DROP CONSTRAINT \"test_pk\";", result);
 
     deleteIndex = new TableChange.DeleteIndex("test_2_pk", true);
     result = PostgreSqlTableOperations.deleteIndexDefinition(tableName, deleteIndex);
-    Assertions.assertEquals(
-        "ALTER TABLE \"t1\" DROP CONSTRAINT \"test_2_pk\";\n"
-            + "DROP INDEX IF EXISTS \"test_2_pk\";",
-        result);
+    Assertions.assertEquals("ALTER TABLE \"t1\" DROP CONSTRAINT IF EXISTS \"test_2_pk\";", result);
   }
 
   @Test

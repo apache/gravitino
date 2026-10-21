@@ -130,11 +130,14 @@ If a catalog does not set `credential-providers`, Gravitino infers providers fro
 | `s3-access-key-id` and `s3-secret-access-key`                | `s3-secret-key`     |
 | `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
 | `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
+| `cos-access-key-id` and `cos-secret-access-key`              | `cos-secret-key`    |
 | `gcs-service-account-file`                                   | `gcs-token`         |
 | `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
 | `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
 
 JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc-password`.
+
+The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
 
 Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
 
@@ -220,16 +223,16 @@ The vended credentials inherit this policy, narrowed to the table path. Without 
 
 For Gravitino running on EKS. Instead of an access key, Gravitino uses its pod's IAM role to call AssumeRole, so no static keys exist anywhere in the setup.
 
-| Property                    | Description                                                                                    | Default value | Required                    |
-|-----------------------------|------------------------------------------------------------------------------------------------|---------------|-----------------------------|
-| `s3-role-arn`               | ARN of the role to assume, in the form `arn:aws:iam::{account_id}:role/{role_name}`.           | (none)        | For path-scoped credentials |
-| `s3-region`                 | AWS region for STS operations.                                                                 | (none)        | No                          |
-| `s3-token-expire-in-secs`   | Session lifetime of the vended credentials. Cannot exceed the role's maximum session duration. | 3600          | No                          |
-| `s3-token-service-endpoint` | Alternative STS endpoint, for S3-compatible storage.                                           | (none)        | No                          |
+| Property                    | Description                                                                                                                               | Default value | Required |
+|-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `s3-role-arn`               | ARN of the role to assume. When omitted, Gravitino uses the pod's `AWS_ROLE_ARN`.                                                         | (none)        | No       |
+| `s3-region`                 | AWS region for STS operations.                                                                                                            | (none)        | No       |
+| `s3-token-expire-in-secs`   | Session lifetime of the vended credentials. Cannot exceed the role's maximum session duration.                                            | 3600          | No       |
+| `s3-token-service-endpoint` | Alternative STS endpoint, for S3-compatible storage.                                                                                      | (none)        | No       |
 
-Set `s3-role-arn` to get credentials scoped to the table path, with an IAM policy generated per table covering its data, metadata, and write locations. Without it, the vended credentials carry the full permissions of the pod's role.
+For path-based requests, Gravitino always scopes the credentials with a session policy covering the requested data, metadata, and write locations. Catalog-level requests do not include a session policy and inherit the selected role's permissions. The role is selected from `s3-role-arn` when configured, or from the pod's `AWS_ROLE_ARN` otherwise.
 
-The role in `s3-role-arn` needs the same two policies as `s3-token` above, except the trust policy names the pod's IAM role rather than an IAM user.
+The selected role needs the same permission policy as `s3-token` above. Its trust policy must allow `sts:AssumeRoleWithWebIdentity` from the pod's Kubernetes service account identity.
 
 IRSA itself must already be configured on the pod's Kubernetes service account. When it is, EKS injects a signed service account token into the pod and sets `AWS_WEB_IDENTITY_TOKEN_FILE` to its path, which is what the AWS SDK uses to obtain credentials. If vending fails, check that this variable is present in the pod.
 
@@ -392,7 +395,7 @@ The key is long-lived, carries whatever permissions its CAM user has, and is not
 
 ### `adls-token`
 
-Gravitino requests an Azure [user delegation SAS](https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas) and returns it to the client, scoped to the table path.
+Gravitino requests an Azure [user delegation SAS](https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas) and returns it to the client. The SAS is scoped to the single requested root directory that covers the table location and any requested write paths. This is normally the table path, but a custom write path that is its parent results in a broader SAS scope. Requests with independent root paths cannot be represented by one directory-scoped SAS and are rejected.
 
 Azure grants access through role assignments rather than policy documents. The Microsoft Entra ID service principal identified by `azure-tenant-id`, `azure-client-id`, and `azure-client-secret` needs two roles:
 

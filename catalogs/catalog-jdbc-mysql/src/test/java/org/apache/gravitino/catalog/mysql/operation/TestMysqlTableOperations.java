@@ -39,7 +39,6 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -157,15 +156,13 @@ public class TestMysqlTableOperations extends TestMysql {
     assertionsTableInfo(
         newName, tableComment, alterColumns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
-    // Detect unsupported properties
+    // Reject an unsupported engine before generating or executing DDL.
     TableChange setProperty = TableChange.setProperty(MYSQL_ENGINE_KEY, "ABC");
-    GravitinoRuntimeException gravitinoRuntimeException =
+    IllegalArgumentException invalidEngine =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class,
+            IllegalArgumentException.class,
             () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), newName, setProperty));
-    Assertions.assertTrue(
-        StringUtils.contains(
-            gravitinoRuntimeException.getMessage(), "Unknown storage engine 'ABC'"));
+    Assertions.assertTrue(invalidEngine.getMessage().contains("engine"));
 
     // delete column
     TABLE_OPERATIONS.alterTable(
@@ -198,6 +195,39 @@ public class TestMysqlTableOperations extends TestMysql {
         TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName), "table should be dropped");
     Assertions.assertFalse(
         TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName), "table should be non-existent");
+  }
+
+  @Test
+  public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_type_default_table";
+    JdbcColumn col_1 =
+        JdbcColumn.builder().withName("col_1").withType(INT).withNullable(false).build();
+    JdbcColumn col_2 =
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.VarCharType.of(16))
+            .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
+            .withNullable(false)
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        new JdbcColumn[] {col_1, col_2},
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnType(new String[] {col_2.name()}, Types.VarCharType.of(32)));
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Column updated = load.columns()[1];
+    Assertions.assertEquals(Types.VarCharType.of(32), updated.dataType());
+    Assertions.assertEquals(Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
   }
 
   @Test
@@ -543,6 +573,46 @@ public class TestMysqlTableOperations extends TestMysql {
         loaded.columns()[2].defaultValue());
     Assertions.assertEquals(
         Literals.of("world", Types.VarCharType.of(255)), loaded.columns()[3].defaultValue());
+  }
+
+  @Test
+  public void testUpdateColumnDefaultValueKeepsAutoIncrement() {
+    String tableName = RandomNameUtils.genRandomName("auto_increment_table_");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("col_1")
+          .withType(Types.LongType.get())
+          .withAutoIncrement(true)
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("col_2")
+          .withType(Types.VarCharType.of(255))
+          .withNullable(false)
+          .build()
+    };
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_col_1", new String[][] {{"col_1"}})
+        };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        indexes);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnDefaultValue(new String[] {"col_1"}, Column.DEFAULT_VALUE_NOT_SET));
+
+    JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertTrue(loaded.columns()[0].autoIncrement());
   }
 
   @Test

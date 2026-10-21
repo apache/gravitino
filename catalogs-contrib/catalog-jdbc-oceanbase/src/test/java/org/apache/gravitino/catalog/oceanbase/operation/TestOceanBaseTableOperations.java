@@ -45,6 +45,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestOceanBaseTableOperations extends TestOceanBase {
@@ -54,6 +56,58 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
   @BeforeAll
   public static void setUp() {
     DATABASE_OPERATIONS.create(TEST_DB_NAME, null, new HashMap<>());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"customer's id", "quote\\' and \\new\\path\\; \"double\"\n中文"})
+  void testCommentRoundTrips(String comment) {
+    String tableName = RandomNameUtils.genRandomName("comment_round_trip");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withComment(comment)
+            .build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          tableName,
+          new JdbcColumn[] {column},
+          comment,
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(comment, table.comment());
+      Assertions.assertEquals(comment, table.columns()[0].comment());
+
+      String updated = comment + " updated";
+      TABLE_OPERATIONS.alterTable(TEST_DB_NAME, tableName, TableChange.updateComment(updated));
+      Assertions.assertEquals(updated, TABLE_OPERATIONS.load(TEST_DB_NAME, tableName).comment());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME, tableName, TableChange.addColumn(new String[] {"col2"}, VARCHAR, comment));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(comment, table.columns()[1].comment());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME, tableName, TableChange.updateColumnComment(new String[] {"col1"}, updated));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(updated, table.columns()[0].comment());
+
+      // Rebuilding a column definition must also preserve an existing escaped comment.
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(512)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(updated, table.columns()[0].comment());
+      Assertions.assertEquals(updated, table.comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
   }
 
   @Test
@@ -175,6 +229,39 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     Assertions.assertTrue(TABLE_OPERATIONS.drop(TEST_DB_NAME, newName), "table should be dropped");
     Assertions.assertFalse(
         TABLE_OPERATIONS.drop(TEST_DB_NAME, newName), "table should be non-existent");
+  }
+
+  @Test
+  public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
+    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_type_default_table";
+    JdbcColumn col_1 =
+        JdbcColumn.builder().withName("col_1").withType(INT).withNullable(false).build();
+    JdbcColumn col_2 =
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.VarCharType.of(16))
+            .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
+            .withNullable(false)
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        new JdbcColumn[] {col_1, col_2},
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnType(new String[] {col_2.name()}, Types.VarCharType.of(32)));
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Column updated = load.columns()[1];
+    Assertions.assertEquals(Types.VarCharType.of(32), updated.dataType());
+    Assertions.assertEquals(Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
   }
 
   @Test
@@ -519,6 +606,46 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
         loaded.columns()[2].defaultValue());
     Assertions.assertEquals(
         Literals.of("world", Types.VarCharType.of(255)), loaded.columns()[3].defaultValue());
+  }
+
+  @Test
+  public void testUpdateColumnDefaultValueKeepsAutoIncrement() {
+    String tableName = RandomNameUtils.genRandomName("auto_increment_table_");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("col_1")
+          .withType(Types.LongType.get())
+          .withAutoIncrement(true)
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("col_2")
+          .withType(Types.VarCharType.of(255))
+          .withNullable(false)
+          .build()
+    };
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_col_1", new String[][] {{"col_1"}})
+        };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        indexes);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnDefaultValue(new String[] {"col_1"}, Column.DEFAULT_VALUE_NOT_SET));
+
+    JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertTrue(loaded.columns()[0].autoIncrement());
   }
 
   @Test

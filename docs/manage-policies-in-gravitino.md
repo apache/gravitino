@@ -343,6 +343,10 @@ The response includes policies derived from effective tags assigned to the objec
 With `details=true`, the response returns full policy objects instead of policy names.
 Each policy includes an `inherited` field, which is `true` when it matches only through a tag
 assigned to an ancestor of the object. Disabled policies do not appear in this result.
+Both response modes include `hasInaccessiblePolicies`. Gravitino resolves policies from direct and
+inherited tag assignments before authorization filtering, so the flag also covers policies omitted
+from inherited associations. The flag reveals only that at least one policy was omitted; it does not
+reveal the policy's name, count, details, or inheritance source.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -350,6 +354,16 @@ assigned to an ancestor of the object. Disabled policies do not appear in this r
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/policies?details=true"
+```
+
+If every applicable policy is inaccessible, the response contains an empty list and sets the flag:
+
+```json
+{
+  "code": 0,
+  "policies": [],
+  "hasInaccessiblePolicies": true
+}
 ```
 
 </TabItem>
@@ -360,9 +374,26 @@ Table customers =
     client.loadCatalog("catalog1")
         .asTableCatalog()
         .loadTable(NameIdentifier.of("schema1", "customers"));
-String[] policyNames = customers.supportsPolicies().listPolicies();
-Policy[] policies = customers.supportsPolicies().listPolicyInfos();
+PolicyList<String> nameList = customers.supportsPolicies().listPoliciesWithVisibility();
+String[] policyNames = nameList.policies();
+boolean omittedPolicies = nameList.hasInaccessiblePolicies();
+
+PolicyList<Policy> detailList = customers.supportsPolicies().listPolicyInfosWithVisibility();
+Policy[] policies = detailList.policies();
+boolean omittedPolicyDetails = detailList.hasInaccessiblePolicies();
 ```
+
+The existing `listPolicies()` and `listPolicyInfos()` methods continue to return only the visible
+arrays.
 
 </TabItem>
 </Tabs>
+
+Interpret the visible list and `hasInaccessiblePolicies` together:
+
+| Visible list | `hasInaccessiblePolicies` | Meaning |
+|---|---:|---|
+| Empty | `false` | No enabled policy applies to the object. |
+| Empty | `true` | All applicable policies are inaccessible. |
+| Non-empty | `true` | The response includes visible policies and omits at least one inaccessible policy. |
+| Non-empty | `false` | All applicable policies are visible. |

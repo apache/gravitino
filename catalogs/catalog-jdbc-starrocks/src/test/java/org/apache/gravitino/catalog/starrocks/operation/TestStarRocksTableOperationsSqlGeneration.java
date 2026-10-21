@@ -18,24 +18,33 @@
  */
 package org.apache.gravitino.catalog.starrocks.operation;
 
+import java.sql.Connection;
 import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.catalog.jdbc.utils.ConnectionCountingDataSource;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTableOperations;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EmptySource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 
 public class TestStarRocksTableOperationsSqlGeneration {
 
@@ -47,6 +56,11 @@ public class TestStarRocksTableOperationsSqlGeneration {
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
     }
 
+    private TestableStarRocksTableOperations(ConnectionCountingDataSource connections) {
+      this();
+      dataSource = connections.dataSource();
+    }
+
     public String createTableSql(
         String tableName, JdbcColumn[] columns, Distribution distribution) {
       return createTableSql(tableName, columns, distribution, "comment");
@@ -54,6 +68,15 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     public String createTableSql(
         String tableName, JdbcColumn[] columns, Distribution distribution, String comment) {
+      return createTableSql(tableName, columns, distribution, comment, Indexes.EMPTY_INDEXES);
+    }
+
+    String createTableSql(
+        String tableName,
+        JdbcColumn[] columns,
+        Distribution distribution,
+        String comment,
+        Index[] indexes) {
       return generateCreateTableSql(
           tableName,
           columns,
@@ -61,7 +84,7 @@ public class TestStarRocksTableOperationsSqlGeneration {
           Collections.emptyMap(),
           Transforms.EMPTY_TRANSFORM,
           distribution,
-          Indexes.EMPTY_INDEXES);
+          indexes);
     }
 
     public String alterTableSql(String tableName, TableChange... changes) {
@@ -77,6 +100,82 @@ public class TestStarRocksTableOperationsSqlGeneration {
               StringIdentifier.addToComment(StringIdentifier.fromId(42), "existing comment"))
           .build();
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(Index.IndexType.class)
+  void testCreateTableRejectsIndexesBeforeConnecting(Index.IndexType indexType) {
+    TestableStarRocksTableOperations ops =
+        new TestableStarRocksTableOperations() {
+          @Override
+          protected Connection getConnection(String databaseName) {
+            throw new AssertionError("Index validation must happen before acquiring a connection");
+          }
+        };
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(Types.IntegerType.get()).build();
+    Index index = Indexes.of(indexType, "test_index", new String[][] {{"col1"}});
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.create(
+                    "database",
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    "comment",
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.hash(1, NamedReference.field("col1")),
+                    new Index[] {index}));
+
+    Assertions.assertEquals(
+        "StarRocks catalog does not support creating table indexes. "
+            + "Remove indexes from the create table request.",
+        exception.getMessage());
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @EmptySource
+  void testCreateTableWithoutIndexes(Index[] indexes) {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(Types.IntegerType.get()).build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
+
+    Assertions.assertEquals(
+        ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution),
+        ops.createTableSql(
+            "test_table", new JdbcColumn[] {column}, distribution, "comment", indexes));
+  }
+
+  @Test
+  void testPurgeIsRejectedWithoutExecutingSql() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations(connections);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> ops.purge("database", "test_table"));
+
+    Assertions.assertEquals(
+        "StarRocks does not support purge table in Gravitino, please use drop table",
+        exception.getMessage());
+    Assertions.assertTrue(connections.executedSql().isEmpty());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  void testDropStillExecutesDropTable() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations(connections);
+
+    Assertions.assertTrue(ops.drop("database", "test_table"));
+
+    Assertions.assertEquals(List.of("DROP TABLE `test_table`"), connections.executedSql());
+    Assertions.assertEquals(0, connections.borrowed());
   }
 
   @Test
@@ -194,5 +293,71 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     Assertions.assertTrue(alterSql.contains("ADD COLUMN `col2`"), alterSql);
     Assertions.assertTrue(alterSql.contains("COMMENT 'owner\\\\''s \"comment\"; --'"), alterSql);
+  }
+
+  @Test
+  public void testAddColumnWithNotNullAndDefaultValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"created_at"},
+                Types.TimestampType.withoutTimeZone(),
+                "create time",
+                TableChange.ColumnPosition.after("id"),
+                false,
+                false,
+                Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP));
+
+    Assertions.assertTrue(
+        alterSql.contains(
+            "ADD COLUMN `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP "
+                + "COMMENT 'create time' AFTER `id`"),
+        alterSql);
+  }
+
+  @Test
+  public void testAddNullableColumnWithStringDefaultValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"col2"},
+                Types.VarCharType.of(10),
+                null,
+                TableChange.ColumnPosition.after("col1"),
+                true,
+                false,
+                Literals.of("abc", Types.VarCharType.of(10))));
+
+    Assertions.assertTrue(
+        alterSql.contains("ADD COLUMN `col2` varchar(10) NULL DEFAULT 'abc' AFTER `col1`"),
+        alterSql);
+  }
+
+  @Test
+  public void testAddAutoIncrementColumnIsRejected() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.addColumn(
+                        new String[] {"col2"},
+                        Types.LongType.get(),
+                        null,
+                        TableChange.ColumnPosition.defaultPos(),
+                        false,
+                        true)));
+
+    Assertions.assertEquals(
+        "StarRocks does not support adding an auto-increment column: col2", exception.getMessage());
   }
 }
