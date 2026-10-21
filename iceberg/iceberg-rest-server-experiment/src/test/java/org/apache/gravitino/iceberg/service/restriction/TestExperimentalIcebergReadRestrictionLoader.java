@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -42,8 +43,13 @@ import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.Labels;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.expressions.BoundLiteralPredicate;
+import org.apache.iceberg.rest.RemoteSigningConfig;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.restrictions.ReadRestrictions;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Test;
@@ -62,6 +68,30 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   void testServiceLoaderDiscoversExperimentalImplementation() {
     assertInstanceOf(
         ExperimentalIcebergReadRestrictionLoader.class, IcebergReadRestrictionLoader.load());
+  }
+
+  @Test
+  void testPreservesOptionalFieldsAfterSnapshotFiltering() {
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            SCHEMA, PartitionSpec.unpartitioned(), "s3://bucket/table", Collections.emptyMap());
+    RemoteSigningConfig remoteSigningConfig = mock(RemoteSigningConfig.class);
+    Labels labels = mock(Labels.class);
+    LoadTableResponse original =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .withRemoteSigningConfig(remoteSigningConfig)
+            .withLabels(labels)
+            .build();
+    LoadTableResponse filtered = LoadTableResponse.builder().withTableMetadata(metadata).build();
+
+    LoadTableResponse result =
+        new ExperimentalIcebergReadRestrictionLoader()
+            .preserveSnapshotFilteredFields(original, filtered);
+
+    assertSame(metadata, result.tableMetadata());
+    assertSame(remoteSigningConfig, result.remoteSigningConfig());
+    assertSame(labels, result.labels());
   }
 
   @Test
@@ -86,6 +116,38 @@ public class TestExperimentalIcebergReadRestrictionLoader {
     assertNotNull(restrictions.rowFilter());
     assertEquals(1, restrictions.columnProjections().size());
     assertEquals("show-last-4", restrictions.columnProjections().get(0).name());
+    assertEquals(2, restrictions.columnProjections().get(0).fieldId());
+  }
+
+  @Test
+  void testSkipsTableMaskOnIncompatibleFieldTypes() {
+    PolicyEntity mask = maskPolicy(1, "string_mask", "mask := action(\"show-last-4\")");
+    Map<Integer, PolicyEntity[]> policiesByField = new LinkedHashMap<>();
+    for (int fieldId = 1; fieldId <= 3; fieldId++) {
+      policiesByField.put(fieldId, new PolicyEntity[] {mask});
+    }
+
+    ReadRestrictions restrictions =
+        ExperimentalIcebergReadRestrictionLoader.resolve(
+            new PolicyEntity[0], policiesByField, SCHEMA, context("alice"));
+
+    assertEquals(2, restrictions.columnProjections().size());
+    assertEquals(2, restrictions.columnProjections().get(0).fieldId());
+    assertEquals(3, restrictions.columnProjections().get(1).fieldId());
+  }
+
+  @Test
+  void testSkipsReplaceWithNullOnRequiredField() {
+    PolicyEntity mask = maskPolicy(1, "null_mask", "mask := action(\"replace-with-null\")");
+    Map<Integer, PolicyEntity[]> policiesByField = new LinkedHashMap<>();
+    policiesByField.put(1, new PolicyEntity[] {mask});
+    policiesByField.put(2, new PolicyEntity[] {mask});
+
+    ReadRestrictions restrictions =
+        ExperimentalIcebergReadRestrictionLoader.resolve(
+            new PolicyEntity[0], policiesByField, SCHEMA, context("alice"));
+
+    assertEquals(1, restrictions.columnProjections().size());
     assertEquals(2, restrictions.columnProjections().get(0).fieldId());
   }
 
@@ -135,20 +197,30 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   }
 
   @Test
-  void testRejectsAllowAllAlongsideDistinctRowFilter() {
+  void testIgnoresAllowAllAlongsideRowFilter() {
     PolicyEntity[] policies =
         new PolicyEntity[] {
           rowPolicy(1, "allow", "filter := true"),
           rowPolicy(2, "us", "filter := col(\"region\") == \"US\"")
         };
 
-    IllegalArgumentException exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                ExperimentalIcebergReadRestrictionLoader.resolve(
-                    policies, Collections.emptyMap(), SCHEMA, context("alice")));
-    assertTrue(exception.getMessage().contains("Conflicting row-filter"));
+    ReadRestrictions restrictions =
+        ExperimentalIcebergReadRestrictionLoader.resolve(
+            policies, Collections.emptyMap(), SCHEMA, context("alice"));
+    assertNotNull(restrictions.rowFilter());
+  }
+
+  @Test
+  void testAllAllowAllRowFiltersAreUnrestricted() {
+    PolicyEntity[] policies =
+        new PolicyEntity[] {
+          rowPolicy(1, "first", "filter := true"), rowPolicy(2, "second", "filter := true")
+        };
+
+    ReadRestrictions restrictions =
+        ExperimentalIcebergReadRestrictionLoader.resolve(
+            policies, Collections.emptyMap(), SCHEMA, context("alice"));
+    assertTrue(restrictions.isEmpty());
   }
 
   @Test

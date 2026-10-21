@@ -103,6 +103,11 @@ mask := action("show-last-4") if is_group_member("support")
 else := action("replace-with-null")
 ```
 
+When the experimental Iceberg REST read-restriction loader resolves several row-filter policies
+for one table, a filter that resolves to `true` adds no restriction and is ignored. Identical
+effective filters are deduplicated. Distinct restrictive filters conflict and cause the load-table
+request to fail; the loader does not combine them.
+
 Conditional branches are evaluated from left to right. The first true condition selects its result,
 and every conditional rule must end with an unconditional `else`. Row-filter conditions and results
 must be Boolean. Column-mask conditions may use only request context; they cannot reference columns.

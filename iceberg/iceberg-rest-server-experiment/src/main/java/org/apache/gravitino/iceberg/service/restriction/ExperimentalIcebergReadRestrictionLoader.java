@@ -51,6 +51,7 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.restrictions.ReadRestrictions;
@@ -113,24 +114,18 @@ public final class ExperimentalIcebergReadRestrictionLoader
     }
 
     LoadTableResponse.Builder builder =
-        LoadTableResponse.builder()
-            .withTableMetadata(response.tableMetadata())
-            .withReadRestrictions(restrictions);
-    if (response.config() != null) {
-      builder.addAllConfig(response.config());
-    }
-    if (response.credentials() != null) {
-      builder.addAllCredentials(response.credentials());
-    }
-    if (response.remoteSigningConfig() != null) {
-      builder.withRemoteSigningConfig(response.remoteSigningConfig());
-    }
-    if (response.labels() != null) {
-      builder.withLabels(response.labels());
-    }
-
+        copyResponseBuilder(response, response.tableMetadata()).withReadRestrictions(restrictions);
     String signature = ReadRestrictionsParser.toJson(restrictions);
     return Result.of(builder.build(), Optional.of(signature));
+  }
+
+  @Override
+  public LoadTableResponse preserveSnapshotFilteredFields(
+      LoadTableResponse original, LoadTableResponse filtered) {
+    if (original == filtered) {
+      return filtered;
+    }
+    return copyResponseBuilder(original, filtered.tableMetadata()).build();
   }
 
   static ReadRestrictions resolve(
@@ -173,6 +168,9 @@ public final class ExperimentalIcebergReadRestrictionLoader
       ReadRestrictions resolved =
           IcebergReadRestrictionConverter.convert(
               Optional.of(program), Collections.emptyMap(), schema, bindingContext);
+      if (resolved.isEmpty()) {
+        continue;
+      }
       distinct.putIfAbsent(ReadRestrictionsParser.toJson(resolved), program);
     }
     if (distinct.size() > 1) {
@@ -198,13 +196,17 @@ public final class ExperimentalIcebergReadRestrictionLoader
         ColumnMask program =
             RestrictedRegoExpressionParserFacade.parseColumnMask(
                 ((ColumnMaskContent) policy.content()).expression());
-        ReadRestrictions resolved =
-            IcebergReadRestrictionConverter.convert(
-                Optional.empty(),
-                Collections.singletonMap(fieldId, program),
-                schema,
-                bindingContext);
-        distinct.putIfAbsent(ReadRestrictionsParser.toJson(resolved), program);
+        try {
+          ReadRestrictions resolved =
+              IcebergReadRestrictionConverter.convert(
+                  Optional.empty(),
+                  Collections.singletonMap(fieldId, program),
+                  schema,
+                  bindingContext);
+          distinct.putIfAbsent(ReadRestrictionsParser.toJson(resolved), program);
+        } catch (IcebergReadRestrictionConverter.IncompatibleMaskException exception) {
+          LOG.debug("Skipping mask action that is not applicable to field {}", fieldId);
+        }
       }
       if (distinct.size() > 1) {
         throw new IllegalArgumentException(
@@ -213,6 +215,24 @@ public final class ExperimentalIcebergReadRestrictionLoader
       distinct.values().stream().findFirst().ifPresent(mask -> resolvedMasks.put(fieldId, mask));
     }
     return resolvedMasks;
+  }
+
+  private static LoadTableResponse.Builder copyResponseBuilder(
+      LoadTableResponse response, TableMetadata metadata) {
+    LoadTableResponse.Builder builder = LoadTableResponse.builder().withTableMetadata(metadata);
+    if (response.config() != null) {
+      builder.addAllConfig(response.config());
+    }
+    if (response.credentials() != null) {
+      builder.addAllCredentials(response.credentials());
+    }
+    if (response.remoteSigningConfig() != null) {
+      builder.withRemoteSigningConfig(response.remoteSigningConfig());
+    }
+    if (response.labels() != null) {
+      builder.withLabels(response.labels());
+    }
+    return builder;
   }
 
   static final class IdentityBindingContext

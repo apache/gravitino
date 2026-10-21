@@ -115,11 +115,12 @@ public class IcebergTableOperations {
   @Inject
   public IcebergTableOperations(
       IcebergMetricsManager icebergMetricsManager,
-      IcebergTableOperationDispatcher tableOperationDispatcher) {
+      IcebergTableOperationDispatcher tableOperationDispatcher,
+      IcebergReadRestrictionLoader readRestrictionLoader) {
     this.icebergMetricsManager = icebergMetricsManager;
     this.tableOperationDispatcher = tableOperationDispatcher;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
-    this.readRestrictionLoader = IcebergReadRestrictionLoader.load();
+    this.readRestrictionLoader = readRestrictionLoader;
   }
 
   @GET
@@ -347,7 +348,9 @@ public class IcebergTableOperations {
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
             if (IcebergRESTUtils.SnapshotMode.REFS.getValue().equals(snapshots)) {
-              loadTableResponse = filterSnapshotsByRefs(loadTableResponse);
+              loadTableResponse =
+                  readRestrictionLoader.preserveSnapshotFilteredFields(
+                      loadTableResponse, filterSnapshotsByRefs(loadTableResponse));
             }
             IcebergReadRestrictionLoader.Result restrictionResult =
                 readRestrictionLoader.load(context, tableIdentifier, loadTableResponse);

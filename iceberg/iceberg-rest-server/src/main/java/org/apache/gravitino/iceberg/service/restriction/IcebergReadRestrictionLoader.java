@@ -53,6 +53,19 @@ public interface IcebergReadRestrictionLoader {
       IcebergRequestContext context, TableIdentifier tableIdentifier, LoadTableResponse response);
 
   /**
+   * Restores response fields supported by an optional Iceberg distribution after snapshot
+   * filtering.
+   *
+   * @param original the response before snapshot filtering
+   * @param filtered the response with historical snapshots removed
+   * @return the filtered response with supported fields preserved
+   */
+  default LoadTableResponse preserveSnapshotFilteredFields(
+      LoadTableResponse original, LoadTableResponse filtered) {
+    return filtered;
+  }
+
+  /**
    * Discovers the single optional loader on the runtime classpath.
    *
    * @return discovered loader, or a no-op loader when the runtime has no implementation

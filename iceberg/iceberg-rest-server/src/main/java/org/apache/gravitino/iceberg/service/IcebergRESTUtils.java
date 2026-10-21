@@ -345,8 +345,8 @@ public class IcebergRESTUtils {
 
   /**
    * Builds an OK response with the ETag header derived from the table metadata location. Uses the
-   * default snapshots value to ensure ETags from create/update/register are consistent with the
-   * default loadTable endpoint.
+   * default snapshots value, matching an unrestricted default load-table response. A load-table
+   * response with read restrictions has a distinct ETag based on those restrictions.
    *
    * @param loadTableResponse the table response to include in the body
    * @return a Response with ETag header set
