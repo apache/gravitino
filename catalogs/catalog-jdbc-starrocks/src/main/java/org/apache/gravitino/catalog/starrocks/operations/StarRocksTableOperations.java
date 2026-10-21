@@ -562,7 +562,9 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
   private String generateTableProperties(TableChange.SetProperty setProperty) {
     return String.format(
-        "set ( \"%s\" = \"%s\" )", setProperty.getProperty(), setProperty.getValue());
+        "set ( \"%s\" = \"%s\" )",
+        escapeSqlLiteral(setProperty.getProperty(), '"'),
+        escapeSqlLiteral(setProperty.getValue(), '"'));
   }
 
   private String updateColumnPositionFieldDefinition(
