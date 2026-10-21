@@ -60,6 +60,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -1212,6 +1214,1067 @@ public class TestJcasbinAuthorizer {
         "the completed load's policies must survive a late partial result");
   }
 
+  /** Concurrent stale observations must share the entity read, including delayed owners. */
+  @Test
+  public void testConcurrentRoleReloadReadsEntityOnce() throws Exception {
+    long roleId = 9101L;
+    String roleName = "singleFlightRole";
+    RoleEntity role =
+        mockRoleInStore(roleId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    RoleUpdatedAt version = mockedRoleVersions.get(roleId);
+    List<NameIdentifier> roleIdents =
+        ImmutableList.of(NameIdentifierUtil.ofRole(METALAKE, roleName));
+    AtomicInteger entityReads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              entityReads.incrementAndGet();
+              return ImmutableList.of(role);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+
+    int callers = 8;
+    CountDownLatch observedStale = new CountDownLatch(callers);
+    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Long> gatedLoadedRoles = Mockito.spy(loadedRoles);
+    Thread callerThread = Thread.currentThread();
+    ThreadLocal<Boolean> firstRead = ThreadLocal.withInitial(() -> true);
+    doAnswer(
+            invocation -> {
+              Optional<Long> snapshot = loadedRoles.getIfPresent(roleId);
+              if (Thread.currentThread() != callerThread && firstRead.get()) {
+                firstRead.set(false);
+                // Capture the missing marker before releasing any reader. A start latch alone
+                // would let late workers hit the completed cache and hide duplicate loads.
+                observedStale.countDown();
+                assertTrue(observedStale.await(10, TimeUnit.SECONDS));
+              }
+              return snapshot;
+            })
+        .when(gatedLoadedRoles)
+        .getIfPresent(roleId);
+    Field loadedRolesField = JcasbinAuthorizer.class.getDeclaredField("loadedRoles");
+    loadedRolesField.setAccessible(true);
+    loadedRolesField.set(jcasbinAuthorizer, gatedLoadedRoles);
+
+    ExecutorService workers = Executors.newFixedThreadPool(callers);
+    try {
+      List<Future<Set<Long>>> results = new ArrayList<>();
+      for (int i = 0; i < callers; i++) {
+        results.add(
+            workers.submit(
+                () ->
+                    reloadRolesInWorker(
+                        ImmutableList.of(roleId), ImmutableMap.of(roleId, version))));
+      }
+      for (Future<Set<Long>> result : results) {
+        assertTrue(result.get(10, TimeUnit.SECONDS).isEmpty());
+      }
+      assertEquals(1, entityReads.get(), "concurrent misses must share the role entity read");
+      assertEquals(version.getUpdatedAt(), loadedRoles.getIfPresent(roleId).orElse(null));
+      assertEquals(
+          1,
+          getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, String.valueOf(roleId)).size(),
+          "the shared read must still publish the role's actual policy");
+    } finally {
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      loadedRolesField.set(jcasbinAuthorizer, loadedRoles);
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /** Attached waiters share an unreadable outcome, while a fresh request can retry. */
+  @Test
+  public void testFailedRoleReloadIsSharedAndNextRequestRetries() throws Exception {
+    long roleId = 9102L;
+    String roleName = "unreadableSingleFlightRole";
+    RoleEntity role = mockRoleInStore(roleId, roleName, ImmutableList.of(getDenySecurableObject()));
+    RoleUpdatedAt version = mockedRoleVersions.get(roleId);
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, roleName);
+    List<NameIdentifier> roleIdents = ImmutableList.of(roleIdent);
+    int callers = 6;
+    CountDownLatch enteredRead = new CountDownLatch(1);
+    CountDownLatch releaseRead = new CountDownLatch(1);
+    CountDownLatch joined = new CountDownLatch(callers - 1);
+    Map<Object, CompletableFuture<Boolean>> flights = observeRoleLoadJoins(joined);
+    AtomicInteger batchReads = new AtomicInteger();
+    AtomicInteger individualReads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              batchReads.incrementAndGet();
+              enteredRead.countDown();
+              assertTrue(releaseRead.await(10, TimeUnit.SECONDS));
+              return Collections.emptyList();
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    doAnswer(
+            invocation -> {
+              individualReads.incrementAndGet();
+              throw new IOException("role storage unavailable");
+            })
+        .when(entityStore)
+        .get(eq(roleIdent), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+
+    ExecutorService workers = Executors.newFixedThreadPool(callers);
+    try {
+      List<Future<Set<Long>>> results = new ArrayList<>();
+      results.add(
+          workers.submit(
+              () ->
+                  reloadRolesInWorker(ImmutableList.of(roleId), ImmutableMap.of(roleId, version))));
+      assertTrue(enteredRead.await(10, TimeUnit.SECONDS));
+      for (int i = 1; i < callers; i++) {
+        results.add(
+            workers.submit(
+                () ->
+                    reloadRolesInWorker(
+                        ImmutableList.of(roleId), ImmutableMap.of(roleId, version))));
+      }
+      assertTrue(joined.await(10, TimeUnit.SECONDS), "all waiters must join the blocked read");
+      releaseRead.countDown();
+      for (Future<Set<Long>> result : results) {
+        assertEquals(ImmutableSet.of(roleId), result.get(10, TimeUnit.SECONDS));
+      }
+      assertEquals(1, batchReads.get());
+      assertEquals(1, individualReads.get());
+      assertTrue(flights.isEmpty(), "failed flights must not prevent a later retry");
+      assertNoRolePolicyLoadStates();
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent());
+      assertTrue(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(roleId))
+              .isEmpty());
+
+      doAnswer(
+              invocation -> {
+                individualReads.incrementAndGet();
+                return role;
+              })
+          .when(entityStore)
+          .get(eq(roleIdent), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      assertTrue(
+          invokeVersionCheckAndLoadRoles(
+                  jcasbinAuthorizer,
+                  METALAKE,
+                  ImmutableList.of(roleId),
+                  roleContext(ImmutableMap.of(roleId, version)))
+              .isEmpty());
+      assertEquals(2, batchReads.get());
+      assertEquals(2, individualReads.get());
+      assertTrue(flights.isEmpty());
+      assertNoRolePolicyLoadStates();
+      assertEquals(
+          version.getUpdatedAt(),
+          getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).orElse(null));
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(roleId))
+              .isEmpty());
+    } finally {
+      releaseRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      Mockito.doReturn(role)
+          .when(entityStore)
+          .get(eq(roleIdent), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /** Blocking one role's storage read must not serialize an unrelated role's load. */
+  @Test
+  public void testBlockedRoleReloadDoesNotBlockAnotherRole() throws Exception {
+    long blockedId = 9103L;
+    long otherId = 9104L;
+    RoleEntity blockedRole =
+        mockRoleInStore(blockedId, "blockedRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity otherRole =
+        mockRoleInStore(otherId, "independentRole", ImmutableList.of(getDenySecurableObject()));
+    Map<Long, RoleUpdatedAt> versions =
+        ImmutableMap.of(
+            blockedId, mockedRoleVersions.get(blockedId),
+            otherId, mockedRoleVersions.get(otherId));
+    List<NameIdentifier> blockedIdents = ImmutableList.of(blockedRole.nameIdentifier());
+    List<NameIdentifier> otherIdents = ImmutableList.of(otherRole.nameIdentifier());
+    CountDownLatch enteredRead = new CountDownLatch(1);
+    CountDownLatch releaseRead = new CountDownLatch(1);
+    AtomicInteger otherReads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              enteredRead.countDown();
+              assertTrue(releaseRead.await(10, TimeUnit.SECONDS));
+              return ImmutableList.of(blockedRole);
+            })
+        .when(entityStore)
+        .batchGet(eq(blockedIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    doAnswer(
+            invocation -> {
+              otherReads.incrementAndGet();
+              return ImmutableList.of(otherRole);
+            })
+        .when(entityStore)
+        .batchGet(eq(otherIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Set<Long>> blocked =
+          workers.submit(() -> reloadRolesInWorker(ImmutableList.of(blockedId), versions));
+      assertTrue(enteredRead.await(10, TimeUnit.SECONDS));
+      Future<Set<Long>> other =
+          workers.submit(() -> reloadRolesInWorker(ImmutableList.of(otherId), versions));
+      assertTrue(other.get(10, TimeUnit.SECONDS).isEmpty());
+      assertEquals(1, otherReads.get());
+      assertFalse(blocked.isDone(), "role A is still inside the explicitly blocked backend read");
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(otherId).isPresent());
+      releaseRead.countDown();
+      assertTrue(blocked.get(10, TimeUnit.SECONDS).isEmpty());
+    } finally {
+      releaseRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(blockedIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(otherIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /**
+   * A newer complete version remains authoritative when an older load finishes later.
+   *
+   * @param expireOnSecondProbe whether a repeated old-worker marker probe would expire the entry
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNewerRoleVersionDoesNotJoinOlderLoad(boolean expireOnSecondProbe)
+      throws Exception {
+    long roleId = 9105L;
+    String roleName = "changingSingleFlightRole";
+    RoleEntity oldRole =
+        mockRoleInStore(roleId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity newRole =
+        getRoleEntity(roleId, roleName, ImmutableList.of(getDenySecurableObject()));
+    RoleUpdatedAt oldVersion = mockedRoleVersions.get(roleId);
+    RoleUpdatedAt newVersion = new RoleUpdatedAt(roleId, roleName, oldVersion.getUpdatedAt() + 1L);
+    List<NameIdentifier> roleIdents = ImmutableList.of(oldRole.nameIdentifier());
+    CountDownLatch enteredOldRead = new CountDownLatch(1);
+    CountDownLatch releaseOldRead = new CountDownLatch(1);
+    CountDownLatch enteredNewRead = new CountDownLatch(1);
+    CountDownLatch releaseNewRead = new CountDownLatch(1);
+    AtomicInteger reads = new AtomicInteger();
+    AtomicInteger oldMarkerProbes = new AtomicInteger();
+    AtomicReference<Thread> oldWorker = new AtomicReference<>();
+    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Long> observedLoadedRoles = Mockito.spy(loadedRoles);
+    Field loadedRolesField = JcasbinAuthorizer.class.getDeclaredField("loadedRoles");
+    loadedRolesField.setAccessible(true);
+    doAnswer(
+            invocation -> {
+              int read = reads.incrementAndGet();
+              if (read == 1) {
+                enteredOldRead.countDown();
+                assertTrue(releaseOldRead.await(10, TimeUnit.SECONDS));
+                return ImmutableList.of(oldRole);
+              }
+              assertEquals(2, read, "each requested role version should have one read");
+              enteredNewRead.countDown();
+              assertTrue(releaseNewRead.await(10, TimeUnit.SECONDS));
+              return ImmutableList.of(newRole);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Set<Long>> older =
+          workers.submit(
+              () -> {
+                oldWorker.set(Thread.currentThread());
+                return reloadRolesInWorker(
+                    ImmutableList.of(roleId), ImmutableMap.of(roleId, oldVersion));
+              });
+      assertTrue(enteredOldRead.await(10, TimeUnit.SECONDS));
+      Future<Set<Long>> newer =
+          workers.submit(
+              () ->
+                  reloadRolesInWorker(
+                      ImmutableList.of(roleId), ImmutableMap.of(roleId, newVersion)));
+      assertTrue(
+          enteredNewRead.await(10, TimeUnit.SECONDS),
+          "a request for a newer version must not be satisfied by the older blocked flight");
+      releaseNewRead.countDown();
+      assertTrue(newer.get(10, TimeUnit.SECONDS).isEmpty());
+      assertEquals(
+          newVersion.getUpdatedAt(),
+          getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).orElse(null));
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(roleId))
+              .isEmpty());
+      doAnswer(
+              invocation -> {
+                Optional<Long> marker = loadedRoles.getIfPresent(roleId);
+                if (Thread.currentThread() == oldWorker.get()) {
+                  int probe = oldMarkerProbes.incrementAndGet();
+                  if (expireOnSecondProbe && probe == 2) {
+                    // A second replacement probe could run after expiry of the marker accepted
+                    // by the version-floor check. Obsolete work must skip replacement entirely.
+                    loadedRoles.invalidate(roleId);
+                    return Optional.empty();
+                  }
+                }
+                return marker;
+              })
+          .when(observedLoadedRoles)
+          .getIfPresent(roleId);
+      loadedRolesField.set(jcasbinAuthorizer, observedLoadedRoles);
+      releaseOldRead.countDown();
+      assertTrue(older.get(10, TimeUnit.SECONDS).isEmpty());
+      assertEquals(2, reads.get());
+      assertEquals(
+          newVersion.getUpdatedAt(),
+          getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).orElse(null));
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, String.valueOf(roleId)).isEmpty(),
+          "a late old load must not replace the newer deny policy");
+      assertEquals(
+          1,
+          oldMarkerProbes.get(),
+          "obsolete work must not re-probe the newer marker in a replacement fast path");
+    } finally {
+      releaseOldRead.countDown();
+      releaseNewRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      loadedRolesField.set(jcasbinAuthorizer, loadedRoles);
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /** Opposite role-batch ownership must complete without a cross-flight waiting cycle. */
+  @Test
+  public void testOverlappingRoleBatchesCompleteOwnedLoadsBeforeWaiting() throws Exception {
+    long firstId = 9106L;
+    long secondId = 9107L;
+    RoleEntity firstRole =
+        mockRoleInStore(firstId, "overlappingFirst", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity secondRole =
+        mockRoleInStore(secondId, "overlappingSecond", ImmutableList.of(getDenySecurableObject()));
+    Map<Long, RoleUpdatedAt> versions =
+        ImmutableMap.of(
+            firstId, mockedRoleVersions.get(firstId),
+            secondId, mockedRoleVersions.get(secondId));
+    CountDownLatch joined = new CountDownLatch(2);
+    CountDownLatch ownersClaimed = new CountDownLatch(2);
+    Map<Object, CompletableFuture<Boolean>> flights = observeRoleLoadJoins(joined, ownersClaimed);
+    List<NameIdentifier> firstIdents = ImmutableList.of(firstRole.nameIdentifier());
+    List<NameIdentifier> secondIdents = ImmutableList.of(secondRole.nameIdentifier());
+    AtomicInteger firstReads = new AtomicInteger();
+    AtomicInteger secondReads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              firstReads.incrementAndGet();
+              return ImmutableList.of(firstRole);
+            })
+        .when(entityStore)
+        .batchGet(eq(firstIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    doAnswer(
+            invocation -> {
+              secondReads.incrementAndGet();
+              return ImmutableList.of(secondRole);
+            })
+        .when(entityStore)
+        .batchGet(eq(secondIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Set<Long>> first =
+          workers.submit(() -> reloadRolesInWorker(ImmutableList.of(firstId, secondId), versions));
+      Future<Set<Long>> second =
+          workers.submit(() -> reloadRolesInWorker(ImmutableList.of(secondId, firstId), versions));
+      assertTrue(first.get(10, TimeUnit.SECONDS).isEmpty());
+      assertTrue(second.get(10, TimeUnit.SECONDS).isEmpty());
+      assertEquals(0, ownersClaimed.getCount());
+      assertEquals(0, joined.getCount(), "each caller must join the role owned by the other");
+      assertEquals(1, firstReads.get());
+      assertEquals(1, secondReads.get());
+      assertTrue(flights.isEmpty());
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(firstId).isPresent());
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(secondId).isPresent());
+    } finally {
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(firstIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(secondIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /** Interrupting one follower preserves its status without cancelling the owner's work. */
+  @Test
+  public void testInterruptedRoleWaiterDoesNotCancelSharedLoad() throws Exception {
+    long roleId = 9108L;
+    RoleEntity role =
+        mockRoleInStore(
+            roleId, "interruptedWaiterRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleUpdatedAt version = mockedRoleVersions.get(roleId);
+    List<NameIdentifier> roleIdents = ImmutableList.of(role.nameIdentifier());
+    CountDownLatch enteredRead = new CountDownLatch(1);
+    CountDownLatch releaseRead = new CountDownLatch(1);
+    CountDownLatch joined = new CountDownLatch(1);
+    Map<Object, CompletableFuture<Boolean>> flights = observeRoleLoadJoins(joined);
+    AtomicInteger reads = new AtomicInteger();
+    AtomicReference<Thread> waiterThread = new AtomicReference<>();
+    doAnswer(
+            invocation -> {
+              reads.incrementAndGet();
+              enteredRead.countDown();
+              assertTrue(releaseRead.await(10, TimeUnit.SECONDS));
+              return ImmutableList.of(role);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Set<Long>> owner =
+          workers.submit(
+              () ->
+                  reloadRolesInWorker(ImmutableList.of(roleId), ImmutableMap.of(roleId, version)));
+      assertTrue(enteredRead.await(10, TimeUnit.SECONDS));
+      Future<Throwable> waiter =
+          workers.submit(
+              () -> {
+                waiterThread.set(Thread.currentThread());
+                try {
+                  reloadRolesInWorker(ImmutableList.of(roleId), ImmutableMap.of(roleId, version));
+                  throw new AssertionError("an interrupted waiter must report its failed wait");
+                } catch (InvocationTargetException e) {
+                  assertTrue(
+                      Thread.currentThread().isInterrupted(),
+                      "the failed wait must preserve the thread's interruption status");
+                  return e.getCause();
+                }
+              });
+      assertTrue(joined.await(10, TimeUnit.SECONDS));
+      waiterThread.get().interrupt();
+      Throwable failure = waiter.get(10, TimeUnit.SECONDS);
+      assertTrue(failure instanceof IllegalStateException);
+      assertTrue(failure.getCause() instanceof InterruptedException);
+      assertFalse(owner.isDone(), "the owner remains inside the explicitly blocked read");
+      assertEquals(1, flights.size());
+      assertFalse(flights.values().iterator().next().isCancelled());
+      releaseRead.countDown();
+      assertTrue(owner.get(10, TimeUnit.SECONDS).isEmpty());
+      assertEquals(1, reads.get());
+      assertTrue(flights.isEmpty());
+      assertNoRolePolicyLoadStates();
+      assertEquals(
+          version.getUpdatedAt(),
+          getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).orElse(null));
+    } finally {
+      releaseRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /**
+   * Resolver failures reach all attached waiters and do not pin a failed flight.
+   *
+   * @param failWithError whether the resolver throws an Error instead of a RuntimeException
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testRoleResolutionFailureReachesWaitersAndAllowsRetry(boolean failWithError)
+      throws Exception {
+    long roleId = 9109L;
+    RoleEntity role =
+        mockRoleInStore(
+            roleId, "failedResolutionRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleUpdatedAt version = mockedRoleVersions.get(roleId);
+    List<NameIdentifier> roleIdents = ImmutableList.of(role.nameIdentifier());
+    Throwable resolutionFailure =
+        failWithError
+            ? new AssertionError("metadata resolution failed")
+            : new IllegalStateException("metadata resolution failed");
+    int callers = 4;
+    CountDownLatch enteredRead = new CountDownLatch(1);
+    CountDownLatch releaseRead = new CountDownLatch(1);
+    CountDownLatch joined = new CountDownLatch(callers - 1);
+    Map<Object, CompletableFuture<Boolean>> flights = observeRoleLoadJoins(joined);
+    AtomicInteger reads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              reads.incrementAndGet();
+              enteredRead.countDown();
+              assertTrue(releaseRead.await(10, TimeUnit.SECONDS));
+              return ImmutableList.of(role);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(callers);
+    try {
+      List<Future<Throwable>> results = new ArrayList<>();
+      for (int i = 0; i < callers; i++) {
+        results.add(
+            workers.submit(
+                () -> {
+                  try {
+                    reloadRolesInWorker(
+                        ImmutableList.of(roleId),
+                        ImmutableMap.of(roleId, version),
+                        resolutionFailure);
+                    throw new AssertionError(
+                        "a resolution failure must not be reported as success");
+                  } catch (InvocationTargetException e) {
+                    return e.getCause();
+                  }
+                }));
+        if (i == 0) {
+          assertTrue(enteredRead.await(10, TimeUnit.SECONDS));
+        }
+      }
+      assertTrue(joined.await(10, TimeUnit.SECONDS));
+      releaseRead.countDown();
+      for (Future<Throwable> result : results) {
+        assertSame(resolutionFailure, result.get(10, TimeUnit.SECONDS));
+      }
+      assertEquals(1, reads.get());
+      assertTrue(flights.isEmpty());
+      assertNoRolePolicyLoadStates();
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent());
+      assertTrue(
+          invokeVersionCheckAndLoadRoles(
+                  jcasbinAuthorizer,
+                  METALAKE,
+                  ImmutableList.of(roleId),
+                  roleContext(ImmutableMap.of(roleId, version)))
+              .isEmpty());
+      assertEquals(2, reads.get());
+      assertTrue(flights.isEmpty());
+      assertNoRolePolicyLoadStates();
+      assertEquals(
+          version.getUpdatedAt(),
+          getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).orElse(null));
+    } finally {
+      releaseRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /**
+   * An explicit clear fences old work even when the database version has not changed.
+   *
+   * @param oldCompletesFirst whether the old load finishes while the new deny is still blocked
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testClearedRoleLoadCannotRepublishBeforeNewEpochDeny(boolean oldCompletesFirst)
+      throws Exception {
+    long roleId = 9110L;
+    String roleName = "clearedInFlightRole";
+    RoleEntity oldRole =
+        mockRoleInStore(roleId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity newRole =
+        getRoleEntity(roleId, roleName, ImmutableList.of(getDenySecurableObject()));
+    RoleUpdatedAt version = mockedRoleVersions.get(roleId);
+    List<NameIdentifier> roleIdents = ImmutableList.of(oldRole.nameIdentifier());
+    AuthorizationRequestContext oldContext = roleContext(ImmutableMap.of(roleId, version));
+    oldContext.setBoundRoleIds(ImmutableList.of(roleId));
+    oldContext.setRolePolicyGeneration(0L);
+    CountDownLatch enteredOldRead = new CountDownLatch(1);
+    CountDownLatch releaseOldRead = new CountDownLatch(1);
+    CountDownLatch enteredNewRead = new CountDownLatch(1);
+    CountDownLatch releaseNewRead = new CountDownLatch(1);
+    AtomicInteger reads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              int read = reads.incrementAndGet();
+              if (read == 1) {
+                enteredOldRead.countDown();
+                assertTrue(releaseOldRead.await(10, TimeUnit.SECONDS));
+                return ImmutableList.of(oldRole);
+              }
+              assertEquals(2, read);
+              enteredNewRead.countDown();
+              assertTrue(releaseNewRead.await(10, TimeUnit.SECONDS));
+              return ImmutableList.of(newRole);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Set<Long>> older =
+          workers.submit(() -> reloadRolesInWorker(ImmutableList.of(roleId), oldContext, null));
+      assertTrue(enteredOldRead.await(10, TimeUnit.SECONDS));
+      jcasbinAuthorizer.handleRolePrivilegeChange(roleId);
+      Future<Set<Long>> newer =
+          workers.submit(
+              () ->
+                  reloadRolesInWorker(ImmutableList.of(roleId), ImmutableMap.of(roleId, version)));
+      assertTrue(
+          enteredNewRead.await(10, TimeUnit.SECONDS),
+          "the same database version after an explicit clear needs an independent flight");
+      if (oldCompletesFirst) {
+        releaseOldRead.countDown();
+        assertTrue(older.get(10, TimeUnit.SECONDS).isEmpty());
+        assertFalse(
+            getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent(),
+            "old work must not publish a loaded marker in the new clear epoch");
+        assertTrue(
+            getAllowEnforcer(jcasbinAuthorizer)
+                .getFilteredPolicy(0, String.valueOf(roleId))
+                .isEmpty(),
+            "the cleared allow must stay absent while the new deny is still loading");
+      }
+      releaseNewRead.countDown();
+      assertTrue(
+          newer.get(10, TimeUnit.SECONDS).isEmpty(),
+          "the new clear epoch must be able to install its deny policy");
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(roleId))
+              .isEmpty());
+      releaseOldRead.countDown();
+      assertTrue(older.get(10, TimeUnit.SECONDS).isEmpty());
+      assertEquals(2, reads.get());
+      assertEquals(0L, oldContext.getRolePolicyGeneration());
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, String.valueOf(roleId)).isEmpty(),
+          "old same-version work must not replace the new clear epoch's deny policy");
+      assertFalse(
+          invokeAuthorizeByJcasbin(
+              jcasbinAuthorizer,
+              USER_ID,
+              METALAKE,
+              catalogObject(),
+              CATALOG_ID,
+              USE_CATALOG,
+              oldContext),
+          "the old request must revalidate its generation before evaluating the new deny");
+      assertTrue(oldContext.getRolePolicyGeneration() > 0L);
+      assertEquals(2, reads.get(), "revalidation can reuse the new epoch's loaded policy");
+    } finally {
+      releaseOldRead.countDown();
+      releaseNewRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /** A missing role in a nonempty batch gets one shared fallback read and a retryable outcome. */
+  @Test
+  public void testMissingEntityInNonemptyBatchSharesFallbackFailure() throws Exception {
+    long readableId = 9111L;
+    long unreadableId = 9112L;
+    RoleEntity readable =
+        mockRoleInStore(readableId, "batchReadable", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity unreadable =
+        mockRoleInStore(
+            unreadableId, "batchUnreadable", ImmutableList.of(getDenySecurableObject()));
+    List<Long> roleIds = ImmutableList.of(readableId, unreadableId);
+    Map<Long, RoleUpdatedAt> versions =
+        ImmutableMap.of(
+            readableId, mockedRoleVersions.get(readableId),
+            unreadableId, mockedRoleVersions.get(unreadableId));
+    List<NameIdentifier> batchIdents =
+        ImmutableList.of(readable.nameIdentifier(), unreadable.nameIdentifier());
+    List<NameIdentifier> retryIdents = ImmutableList.of(unreadable.nameIdentifier());
+    int callers = 4;
+    CountDownLatch enteredBatch = new CountDownLatch(1);
+    CountDownLatch releaseBatch = new CountDownLatch(1);
+    CountDownLatch joined = new CountDownLatch((callers - 1) * 2);
+    Map<Object, CompletableFuture<Boolean>> flights = observeRoleLoadJoins(joined);
+    AtomicInteger batchReads = new AtomicInteger();
+    AtomicInteger readableGets = new AtomicInteger();
+    AtomicInteger unreadableGets = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              batchReads.incrementAndGet();
+              enteredBatch.countDown();
+              assertTrue(releaseBatch.await(10, TimeUnit.SECONDS));
+              return ImmutableList.of(readable);
+            })
+        .when(entityStore)
+        .batchGet(eq(batchIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    doAnswer(
+            invocation -> {
+              batchReads.incrementAndGet();
+              return Collections.emptyList();
+            })
+        .when(entityStore)
+        .batchGet(eq(retryIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    doAnswer(
+            invocation -> {
+              readableGets.incrementAndGet();
+              return readable;
+            })
+        .when(entityStore)
+        .get(eq(readable.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    doAnswer(
+            invocation -> {
+              unreadableGets.incrementAndGet();
+              throw new IOException("missing batch role temporarily unreadable");
+            })
+        .when(entityStore)
+        .get(eq(unreadable.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(callers);
+    try {
+      List<Future<Set<Long>>> results = new ArrayList<>();
+      results.add(workers.submit(() -> reloadRolesInWorker(roleIds, versions)));
+      assertTrue(enteredBatch.await(10, TimeUnit.SECONDS));
+      for (int i = 1; i < callers; i++) {
+        results.add(workers.submit(() -> reloadRolesInWorker(roleIds, versions)));
+      }
+      assertTrue(joined.await(10, TimeUnit.SECONDS));
+      releaseBatch.countDown();
+      for (Future<Set<Long>> result : results) {
+        assertEquals(ImmutableSet.of(unreadableId), result.get(10, TimeUnit.SECONDS));
+      }
+      assertEquals(1, batchReads.get());
+      assertEquals(0, readableGets.get(), "entities present in the batch need no fallback read");
+      assertEquals(1, unreadableGets.get());
+      assertTrue(flights.isEmpty());
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(readableId).isPresent());
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(unreadableId).isPresent());
+      doAnswer(
+              invocation -> {
+                unreadableGets.incrementAndGet();
+                return unreadable;
+              })
+          .when(entityStore)
+          .get(eq(unreadable.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      assertTrue(
+          invokeVersionCheckAndLoadRoles(
+                  jcasbinAuthorizer, METALAKE, roleIds, roleContext(versions))
+              .isEmpty());
+      assertEquals(2, batchReads.get());
+      assertEquals(0, readableGets.get());
+      assertEquals(2, unreadableGets.get());
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(unreadableId).isPresent());
+      assertTrue(flights.isEmpty());
+    } finally {
+      releaseBatch.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(batchIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(retryIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      Mockito.doReturn(readable)
+          .when(entityStore)
+          .get(eq(readable.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      Mockito.doReturn(unreadable)
+          .when(entityStore)
+          .get(eq(unreadable.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /** Generation capture observes the map removal and pruning watermark as one publication. */
+  @Test
+  public void testRoleGenerationCaptureWaitsForPruningPublication() throws Exception {
+    long roleId = 9113L;
+    Field generationsField = JcasbinAuthorizer.class.getDeclaredField("roleClearGenerations");
+    generationsField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<Long, Long> generations = (Map<Long, Long>) generationsField.get(jcasbinAuthorizer);
+    Field watermarkField = JcasbinAuthorizer.class.getDeclaredField("prunedRoleClearGeneration");
+    watermarkField.setAccessible(true);
+    Method capture = JcasbinAuthorizer.class.getDeclaredMethod("roleClearGeneration", long.class);
+    capture.setAccessible(true);
+    ReentrantReadWriteLock policyLock = getRolePolicyLock(jcasbinAuthorizer);
+    CountDownLatch started = new CountDownLatch(1);
+    AtomicReference<Long> captured = new AtomicReference<>();
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Thread reader =
+        new Thread(
+            () -> {
+              started.countDown();
+              try {
+                captured.set((Long) capture.invoke(jcasbinAuthorizer, roleId));
+              } catch (Throwable e) {
+                failure.set(e);
+              }
+            });
+    reader.setDaemon(true);
+    policyLock.writeLock().lock();
+    try {
+      generations.put(roleId, 10L);
+      watermarkField.setLong(jcasbinAuthorizer, 3L);
+      // Pause pruning after removal and before its watermark publication. Only a reader that
+      // respects the mutation lock can avoid the temporary fallback to the older watermark.
+      generations.remove(roleId);
+      reader.start();
+      assertTrue(started.await(10, TimeUnit.SECONDS));
+      assertTrue(
+          waitForBlockedGenerationCapture(reader),
+          "generation capture must block on the pruning write lock, not return the gap value");
+      assertNull(captured.get());
+      watermarkField.setLong(jcasbinAuthorizer, 20L);
+    } finally {
+      policyLock.writeLock().unlock();
+      reader.join(10000L);
+    }
+    assertFalse(reader.isAlive());
+    assertNull(failure.get());
+    assertEquals(20L, captured.get());
+  }
+
+  /** Loaded-role cache probes must permit removal callbacks to acquire the policy write lock. */
+  @Test
+  public void testRoleReloadDoesNotProbeLoadedCacheUnderPolicyReadLock() throws Exception {
+    long roleId = 9114L;
+    mockRoleInStore(roleId, "cacheProbeLockRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleUpdatedAt version = mockedRoleVersions.get(roleId);
+    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Long> observedLoadedRoles = Mockito.spy(loadedRoles);
+    ReentrantReadWriteLock policyLock = getRolePolicyLock(jcasbinAuthorizer);
+    AtomicInteger probes = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              assertEquals(
+                  0,
+                  policyLock.getReadHoldCount(),
+                  "loaded-role cache maintenance may invoke a write-lock removal callback");
+              probes.incrementAndGet();
+              return loadedRoles.getIfPresent(invocation.getArgument(0));
+            })
+        .when(observedLoadedRoles)
+        .getIfPresent(anyLong());
+    Field loadedRolesField = JcasbinAuthorizer.class.getDeclaredField("loadedRoles");
+    loadedRolesField.setAccessible(true);
+    loadedRolesField.set(jcasbinAuthorizer, observedLoadedRoles);
+    try {
+      assertTrue(
+          invokeVersionCheckAndLoadRoles(
+                  jcasbinAuthorizer,
+                  METALAKE,
+                  ImmutableList.of(roleId),
+                  roleContext(ImmutableMap.of(roleId, version)))
+              .isEmpty());
+      assertTrue(probes.get() > 0);
+      assertEquals(version.getUpdatedAt(), loadedRoles.getIfPresent(roleId).orElse(null));
+    } finally {
+      loadedRolesField.set(jcasbinAuthorizer, loadedRoles);
+    }
+  }
+
+  /**
+   * An older complete flight must preserve a newer partial version's resolved deny policy.
+   *
+   * @param expireBackoff whether the partial-load backoff is removed before old work completes
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testOlderCompleteLoadPreservesNewerPartialDeny(boolean expireBackoff)
+      throws Exception {
+    long roleId = 9115L;
+    String roleName = "olderCompleteNewerPartial";
+    String missingCatalog = "missingPartialCatalog";
+    RoleEntity oldRole =
+        mockRoleInStore(roleId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity partialRole =
+        getRoleEntity(
+            roleId,
+            roleName,
+            ImmutableList.of(
+                getDenySecurableObject(),
+                buildSecurableObject(
+                    roleId, MetadataObject.Type.CATALOG, missingCatalog, USE_CATALOG, "ALLOW")));
+    RoleUpdatedAt oldVersion = mockedRoleVersions.get(roleId);
+    RoleUpdatedAt newVersion = new RoleUpdatedAt(roleId, roleName, oldVersion.getUpdatedAt() + 1L);
+    List<NameIdentifier> roleIdents = ImmutableList.of(oldRole.nameIdentifier());
+    CountDownLatch enteredOldRead = new CountDownLatch(1);
+    CountDownLatch releaseOldRead = new CountDownLatch(1);
+    AtomicInteger reads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              int read = reads.incrementAndGet();
+              if (read == 1) {
+                enteredOldRead.countDown();
+                assertTrue(releaseOldRead.await(10, TimeUnit.SECONDS));
+                return ImmutableList.of(oldRole);
+              }
+              assertEquals(2, read);
+              return ImmutableList.of(partialRole);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Set<Long>> older =
+          workers.submit(
+              () ->
+                  reloadRolesInWorker(
+                      ImmutableList.of(roleId), ImmutableMap.of(roleId, oldVersion)));
+      assertTrue(enteredOldRead.await(10, TimeUnit.SECONDS));
+      Future<Set<Long>> newer =
+          workers.submit(
+              () ->
+                  reloadRoleWithMissingCatalogInWorker(
+                      ImmutableList.of(roleId),
+                      ImmutableMap.of(roleId, newVersion),
+                      missingCatalog));
+      assertTrue(newer.get(10, TimeUnit.SECONDS).isEmpty());
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent());
+      assertTrue(
+          getPartialRoleLoadBackoffCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent());
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, String.valueOf(roleId)).isEmpty(),
+          "the newer partial load must publish the deny whose object resolved");
+      if (expireBackoff) {
+        getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(roleId);
+      }
+      releaseOldRead.countDown();
+      Set<Long> olderOutcome = older.get(10, TimeUnit.SECONDS);
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, String.valueOf(roleId)).isEmpty(),
+          "an older complete load must not clear the newer partial version's resolved deny");
+      assertFalse(
+          getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent(),
+          "an older success must not mark the newer partial policy state as fully loaded");
+      assertEquals(
+          !expireBackoff,
+          getPartialRoleLoadBackoffCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent(),
+          "version ordering must survive independently of the partial-load retry marker");
+      assertEquals(ImmutableSet.of(roleId), olderOutcome);
+      assertEquals(2, reads.get());
+      assertNoRolePolicyLoadStates();
+    } finally {
+      releaseOldRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /**
+   * A failed newer read keeps older in-flight policies from publishing and permits a fresh retry.
+   */
+  @Test
+  public void testNewerReadFailurePreventsOlderPublicationUntilCallsFinish() throws Exception {
+    long roleId = 9116L;
+    String roleName = "newerReadFailedRole";
+    RoleEntity oldRole =
+        mockRoleInStore(roleId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity recoveredRole =
+        getRoleEntity(roleId, roleName, ImmutableList.of(getDenySecurableObject()));
+    RoleUpdatedAt oldVersion = mockedRoleVersions.get(roleId);
+    RoleUpdatedAt newVersion = new RoleUpdatedAt(roleId, roleName, oldVersion.getUpdatedAt() + 1L);
+    NameIdentifier roleIdent = oldRole.nameIdentifier();
+    List<NameIdentifier> roleIdents = ImmutableList.of(roleIdent);
+    CountDownLatch enteredOldRead = new CountDownLatch(1);
+    CountDownLatch releaseOldRead = new CountDownLatch(1);
+    AtomicInteger batchReads = new AtomicInteger();
+    AtomicInteger pointReads = new AtomicInteger();
+    Map<Object, CompletableFuture<Boolean>> flights = observeRoleLoadJoins(new CountDownLatch(0));
+    doAnswer(
+            invocation -> {
+              int read = batchReads.incrementAndGet();
+              if (read == 1) {
+                enteredOldRead.countDown();
+                assertTrue(releaseOldRead.await(10, TimeUnit.SECONDS));
+                return ImmutableList.of(oldRole);
+              }
+              if (read == 2) {
+                return Collections.emptyList();
+              }
+              assertEquals(3, read);
+              return ImmutableList.of(recoveredRole);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    doAnswer(
+            invocation -> {
+              pointReads.incrementAndGet();
+              throw new IOException("newer role read unavailable");
+            })
+        .when(entityStore)
+        .get(eq(roleIdent), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Set<Long>> older =
+          workers.submit(
+              () ->
+                  reloadRolesInWorker(
+                      ImmutableList.of(roleId), ImmutableMap.of(roleId, oldVersion)));
+      assertTrue(enteredOldRead.await(10, TimeUnit.SECONDS));
+      Future<Set<Long>> newer =
+          workers.submit(
+              () ->
+                  reloadRolesInWorker(
+                      ImmutableList.of(roleId), ImmutableMap.of(roleId, newVersion)));
+      assertEquals(ImmutableSet.of(roleId), newer.get(10, TimeUnit.SECONDS));
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent());
+      releaseOldRead.countDown();
+      Set<Long> olderOutcome = older.get(10, TimeUnit.SECONDS);
+      assertTrue(
+          getAllowEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(roleId))
+              .isEmpty(),
+          "the failed newer version must not permit an old allow to publish");
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent());
+      assertEquals(ImmutableSet.of(roleId), olderOutcome);
+      assertEquals(2, batchReads.get());
+      assertEquals(1, pointReads.get());
+      assertTrue(flights.isEmpty());
+      assertNoRolePolicyLoadStates();
+
+      assertTrue(
+          invokeVersionCheckAndLoadRoles(
+                  jcasbinAuthorizer,
+                  METALAKE,
+                  ImmutableList.of(roleId),
+                  roleContext(ImmutableMap.of(roleId, newVersion)))
+              .isEmpty());
+      assertEquals(3, batchReads.get());
+      assertEquals(1, pointReads.get());
+      assertEquals(
+          newVersion.getUpdatedAt(),
+          getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).orElse(null));
+      assertFalse(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(roleId))
+              .isEmpty());
+      assertTrue(flights.isEmpty());
+      assertNoRolePolicyLoadStates();
+    } finally {
+      releaseOldRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+      Mockito.doReturn(oldRole)
+          .when(entityStore)
+          .get(eq(roleIdent), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
   @Test
   public void testConcurrentAuthorizationWaitsForPolicyReload() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -1930,7 +2993,8 @@ public class TestJcasbinAuthorizer {
   }
 
   /** Reflectively invoke the private versionCheckAndLoadRoles. */
-  private static void invokeVersionCheckAndLoadRoles(
+  @SuppressWarnings("unchecked")
+  private static Set<Long> invokeVersionCheckAndLoadRoles(
       JcasbinAuthorizer authorizer,
       String metalake,
       List<Long> roleIds,
@@ -1943,7 +3007,152 @@ public class TestJcasbinAuthorizer {
             List.class,
             AuthorizationRequestContext.class);
     m.setAccessible(true);
-    m.invoke(authorizer, metalake, roleIds, requestContext);
+    return (Set<Long>) m.invoke(authorizer, metalake, roleIds, requestContext);
+  }
+
+  /** Runs a real role reload with the thread-local bridges required by worker threads. */
+  private Set<Long> reloadRolesInWorker(
+      List<Long> roleIds, Map<Long, RoleUpdatedAt> prefetchedVersions) throws Exception {
+    return reloadRolesInWorker(roleIds, prefetchedVersions, null);
+  }
+
+  private Set<Long> reloadRolesInWorker(
+      List<Long> roleIds, Map<Long, RoleUpdatedAt> prefetchedVersions, Throwable metadataFailure)
+      throws Exception {
+    return reloadRolesInWorker(roleIds, roleContext(prefetchedVersions), metadataFailure);
+  }
+
+  private Set<Long> reloadRolesInWorker(
+      List<Long> roleIds, AuthorizationRequestContext requestContext, Throwable metadataFailure)
+      throws Exception {
+    try (MockedStatic<GravitinoEnv> env = mockStatic(GravitinoEnv.class);
+        MockedStatic<MetadataIdConverter> metadata =
+            mockStatic(
+                MetadataIdConverter.class,
+                invocation -> {
+                  String methodName = invocation.getMethod().getName();
+                  if (methodName.equals("getID") || methodName.equals("getIdForNormalizedObject")) {
+                    if (metadataFailure instanceof RuntimeException) {
+                      throw (RuntimeException) metadataFailure;
+                    }
+                    if (metadataFailure instanceof Error) {
+                      throw (Error) metadataFailure;
+                    }
+                    return Optional.of(CATALOG_ID);
+                  }
+                  return invocation.callRealMethod();
+                })) {
+      env.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
+      return invokeVersionCheckAndLoadRoles(jcasbinAuthorizer, METALAKE, roleIds, requestContext);
+    }
+  }
+
+  private Set<Long> reloadRoleWithMissingCatalogInWorker(
+      List<Long> roleIds, Map<Long, RoleUpdatedAt> prefetchedVersions, String missingCatalog)
+      throws Exception {
+    try (MockedStatic<GravitinoEnv> env = mockStatic(GravitinoEnv.class);
+        MockedStatic<MetadataIdConverter> metadata =
+            mockStatic(
+                MetadataIdConverter.class,
+                invocation -> {
+                  String methodName = invocation.getMethod().getName();
+                  if (methodName.equals("getID") || methodName.equals("getIdForNormalizedObject")) {
+                    Object object = invocation.getArgument(0);
+                    if (object instanceof MetadataObject
+                        && ((MetadataObject) object).fullName().equals(missingCatalog)) {
+                      return Optional.empty();
+                    }
+                    return Optional.of(CATALOG_ID);
+                  }
+                  return invocation.callRealMethod();
+                })) {
+      env.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
+      return invokeVersionCheckAndLoadRoles(
+          jcasbinAuthorizer, METALAKE, roleIds, roleContext(prefetchedVersions));
+    }
+  }
+
+  private static boolean waitForBlockedGenerationCapture(Thread reader) {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (reader.isAlive() && System.nanoTime() < deadline) {
+      if (reader.getState() == Thread.State.WAITING
+          && Arrays.stream(reader.getStackTrace())
+              .anyMatch(
+                  frame ->
+                      frame.getClassName().equals(JcasbinAuthorizer.class.getName())
+                          && frame.getMethodName().equals("roleClearGeneration"))) {
+        return true;
+      }
+      Thread.yield();
+    }
+    return false;
+  }
+
+  private void assertNoRolePolicyLoadStates() throws Exception {
+    Field statesField = JcasbinAuthorizer.class.getDeclaredField("rolePolicyLoadStates");
+    statesField.setAccessible(true);
+    ReentrantReadWriteLock policyLock = getRolePolicyLock(jcasbinAuthorizer);
+    policyLock.readLock().lock();
+    try {
+      assertTrue(
+          ((Map<?, ?>) statesField.get(jcasbinAuthorizer)).isEmpty(),
+          "version-floor state must be released when all participating calls finish");
+    } finally {
+      policyLock.readLock().unlock();
+    }
+  }
+
+  private static AuthorizationRequestContext roleContext(
+      Map<Long, RoleUpdatedAt> prefetchedVersions) {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.setPrefetchedRoleVersions(prefetchedVersions);
+    return context;
+  }
+
+  private Map<Object, CompletableFuture<Boolean>> observeRoleLoadJoins(CountDownLatch joined)
+      throws Exception {
+    return observeRoleLoadJoins(joined, null);
+  }
+
+  private Map<Object, CompletableFuture<Boolean>> observeRoleLoadJoins(
+      CountDownLatch joined, CountDownLatch ownersClaimed) throws Exception {
+    ThreadLocal<Boolean> firstOwned = ThreadLocal.withInitial(() -> true);
+    Map<Object, CompletableFuture<Boolean>> flights =
+        new ConcurrentHashMap<Object, CompletableFuture<Boolean>>() {
+          private static final long serialVersionUID = 1L;
+
+          /** {@inheritDoc} */
+          @Override
+          public CompletableFuture<Boolean> putIfAbsent(
+              Object key, CompletableFuture<Boolean> candidate) {
+            CompletableFuture<Boolean> existing = super.putIfAbsent(key, candidate);
+            if (existing != null) {
+              joined.countDown();
+              if (ownersClaimed != null) {
+                try {
+                  assertTrue(joined.await(10, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  throw new AssertionError(e);
+                }
+              }
+            } else if (ownersClaimed != null && firstOwned.get()) {
+              firstOwned.set(false);
+              ownersClaimed.countDown();
+              try {
+                assertTrue(ownersClaimed.await(10, TimeUnit.SECONDS));
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(e);
+              }
+            }
+            return existing;
+          }
+        };
+    Field flightsField = JcasbinAuthorizer.class.getDeclaredField("rolePolicyLoads");
+    flightsField.setAccessible(true);
+    flightsField.set(jcasbinAuthorizer, flights);
+    return flights;
   }
 
   /** Reflectively invoke the allow-side JCasbin authorization step. */

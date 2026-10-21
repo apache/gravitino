@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -34,7 +35,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -234,6 +237,22 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * loadedRoles: roleId -> updated_at. If the DB updated_at is newer, evict and reload policies.
    */
   private GravitinoCache<Long, Long> loadedRoles;
+
+  /**
+   * In-progress policy loads shared across requests. Versions and clear generations are part of the
+   * key: an older load must not satisfy a request that observed newer privileges or a policy
+   * invalidation. Entries are removed on completion, including failures; this is not another cache.
+   */
+  private final Map<RolePolicyLoadKey, CompletableFuture<Boolean>> rolePolicyLoads =
+      new ConcurrentHashMap<>();
+
+  /**
+   * Highest observed role versions while calls are loading or waiting. A partial load has no
+   * loadedRoles marker, so that cache alone cannot stop an older in-progress load from overwriting
+   * it. References keep this floor alive until all such calls finish, independently of the partial
+   * retry backoff. Guarded by the write lock of {@link #rolePolicyLock}; removed when idle.
+   */
+  private final Map<Long, RolePolicyLoadState> rolePolicyLoadStates = new HashMap<>();
 
   /**
    * partialRoleLoadBackoff: roleId -> marker present while a role whose last load was incomplete
@@ -1378,8 +1397,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /**
    * Reloads every role in {@code roleIds} whose loaded version is missing or older than the DB.
    *
-   * @return ids of stale roles whose entity could not be read, so their policies were not reloaded.
-   *     A role that no longer exists is not included: having no policies is correct for it.
+   * @return ids of stale roles whose policies could not be read or were superseded by a newer
+   *     observed version without a complete replacement. A role that no longer exists is not
+   *     included: having no policies is correct for it.
    */
   private Set<Long> versionCheckAndLoadRoles(
       String metalake, List<Long> roleIds, AuthorizationRequestContext requestContext) {
@@ -1416,72 +1436,192 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     List<RoleUpdatedAt> staleRoleVersions = new ArrayList<>();
     for (RoleUpdatedAt rv : roleVersions) {
-      Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(rv.getRoleId());
-      if (cachedUpdatedAt.isPresent() && cachedUpdatedAt.get() >= rv.getUpdatedAt()) {
-        continue;
+      if (needsRolePolicyLoad(rv)) {
+        staleRoleVersions.add(rv);
       }
-      // A role missing from loadedRoles because its last load was incomplete would otherwise be
-      // retried on every single request. Its partially loaded policies stay in the enforcer, so
-      // the privileges that did resolve keep working while the backoff is in effect.
-      if (!cachedUpdatedAt.isPresent()
-          && partialRoleLoadBackoff.getIfPresent(rv.getRoleId()).isPresent()) {
-        continue;
-      }
-      staleRoleVersions.add(rv);
     }
 
     if (staleRoleVersions.isEmpty()) {
       return Collections.emptySet();
     }
 
+    List<Long> leasedRoles = new ArrayList<>();
+    try {
+      return coalesceRolePolicyLoads(metalake, staleRoleVersions, requestContext, leasedRoles);
+    } finally {
+      releaseRolePolicyLoadStates(leasedRoles);
+    }
+  }
+
+  private Set<Long> coalesceRolePolicyLoads(
+      String metalake,
+      List<RoleUpdatedAt> staleRoleVersions,
+      AuthorizationRequestContext requestContext,
+      List<Long> leasedRoles) {
+    Map<RolePolicyLoadKey, CompletableFuture<Boolean>> requestLoads = new LinkedHashMap<>();
+    List<RolePolicyLoadKey> ownedLoads = new ArrayList<>();
+    try {
+      for (RoleUpdatedAt rv : staleRoleVersions) {
+        RolePolicyLoadKey key = new RolePolicyLoadKey(rv, roleClearGeneration(rv.getRoleId()));
+        retainRolePolicyLoadState(key);
+        leasedRoles.add(key.roleVersion.getRoleId());
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
+        CompletableFuture<Boolean> existing = rolePolicyLoads.putIfAbsent(key, result);
+        requestLoads.put(key, existing == null ? result : existing);
+        if (existing == null) {
+          ownedLoads.add(key);
+        }
+      }
+
+      // Claim every role before doing I/O, and finish every load we own before waiting for another
+      // request. Waiting first could deadlock requests owning opposite halves of a role batch.
+      List<RolePolicyLoadKey> pendingLoads =
+          ownedLoads.stream()
+              .filter(key -> needsRolePolicyLoad(key.roleVersion))
+              .collect(Collectors.toList());
+      // Recheck after claiming: a request can observe a stale marker, be delayed, and become the
+      // owner after the previous owner has already completed and removed its flight.
+      Set<Long> unreadableRoleIds = loadRolePolicies(metalake, pendingLoads, requestContext);
+      for (RolePolicyLoadKey key : ownedLoads) {
+        requestLoads.get(key).complete(!unreadableRoleIds.contains(key.roleVersion.getRoleId()));
+      }
+    } catch (RuntimeException | Error e) {
+      for (RolePolicyLoadKey key : ownedLoads) {
+        requestLoads.get(key).completeExceptionally(e);
+      }
+      throw e;
+    } finally {
+      for (RolePolicyLoadKey key : ownedLoads) {
+        rolePolicyLoads.remove(key, requestLoads.get(key));
+      }
+    }
+
+    Set<Long> unreadableRoleIds = new HashSet<>();
+    for (Map.Entry<RolePolicyLoadKey, CompletableFuture<Boolean>> load : requestLoads.entrySet()) {
+      if (!awaitRolePolicyLoad(load.getKey(), load.getValue())) {
+        unreadableRoleIds.add(load.getKey().roleVersion.getRoleId());
+      }
+    }
+    return unreadableRoleIds;
+  }
+
+  private void retainRolePolicyLoadState(RolePolicyLoadKey key) {
+    rolePolicyLock.writeLock().lock();
+    try {
+      long roleId = key.roleVersion.getRoleId();
+      RolePolicyLoadState state = rolePolicyLoadStates.get(roleId);
+      if (state == null) {
+        rolePolicyLoadStates.put(roleId, new RolePolicyLoadState(key.roleVersion.getUpdatedAt()));
+      } else {
+        state.highestVersion = Math.max(state.highestVersion, key.roleVersion.getUpdatedAt());
+        state.references++;
+      }
+    } finally {
+      rolePolicyLock.writeLock().unlock();
+    }
+  }
+
+  private void releaseRolePolicyLoadStates(List<Long> leasedRoles) {
+    rolePolicyLock.writeLock().lock();
+    try {
+      for (Long roleId : leasedRoles) {
+        RolePolicyLoadState state = rolePolicyLoadStates.get(roleId);
+        if (--state.references == 0) {
+          rolePolicyLoadStates.remove(roleId);
+        }
+      }
+    } finally {
+      rolePolicyLock.writeLock().unlock();
+    }
+  }
+
+  private boolean needsRolePolicyLoad(RoleUpdatedAt roleVersion) {
+    Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(roleVersion.getRoleId());
+    if (cachedUpdatedAt.isPresent() && cachedUpdatedAt.get() >= roleVersion.getUpdatedAt()) {
+      return false;
+    }
+    // Partially loaded policies stay usable during their existing retry backoff, even though
+    // they deliberately have no loadedRoles marker.
+    return cachedUpdatedAt.isPresent()
+        || !partialRoleLoadBackoff.getIfPresent(roleVersion.getRoleId()).isPresent();
+  }
+
+  private boolean awaitRolePolicyLoad(RolePolicyLoadKey key, CompletableFuture<Boolean> result) {
+    try {
+      return result.get();
+    } catch (InterruptedException e) {
+      // Interrupting a waiter must not cancel the load other requests still depend on.
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(
+          "Interrupted while waiting for role policy load " + key.roleVersion.getRoleId(), e);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      if (cause instanceof Error) {
+        throw (Error) cause;
+      }
+      throw new IllegalStateException("Failed to load role policies", cause);
+    }
+  }
+
+  private Set<Long> loadRolePolicies(
+      String metalake,
+      List<RolePolicyLoadKey> pendingLoads,
+      AuthorizationRequestContext requestContext) {
+    if (pendingLoads.isEmpty()) {
+      return Collections.emptySet();
+    }
     Set<Long> unreadableRoleIds = new HashSet<>();
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
     List<NameIdentifier> roleIdents =
-        staleRoleVersions.stream()
-            .map(rv -> NameIdentifierUtil.ofRole(metalake, rv.getRoleName()))
+        pendingLoads.stream()
+            .map(key -> NameIdentifierUtil.ofRole(metalake, key.roleVersion.getRoleName()))
             .collect(Collectors.toList());
     List<RoleEntity> roleEntities;
     try {
       roleEntities = entityStore.batchGet(roleIdents, Entity.EntityType.ROLE, RoleEntity.class);
     } catch (Exception e) {
-      LOG.warn("Failed to batch load stale role policies for roleIds {}", staleRoleVersions, e);
-      roleEntities = new ArrayList<>();
+      LOG.warn("Failed to batch load stale role policies for roles {}", roleIdents, e);
+      roleEntities = Collections.emptyList();
     }
-    if (roleEntities == null) {
-      roleEntities = new ArrayList<>();
-    }
-    // Some EntityStore implementations don't support batchGet for ROLE and return empty;
-    // fall back to per-role get so policies still load.
-    if (roleEntities.isEmpty()) {
-      roleEntities = new ArrayList<>(staleRoleVersions.size());
-      for (RoleUpdatedAt rv : staleRoleVersions) {
-        try {
-          roleEntities.add(
-              entityStore.get(
-                  NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
-                  Entity.EntityType.ROLE,
-                  RoleEntity.class));
-        } catch (NoSuchEntityException e) {
-          LOG.debug("Role {} was dropped before its policies could be loaded", rv.getRoleId(), e);
-        } catch (Exception e) {
-          LOG.warn("Failed to load role policies for roleId {}", rv.getRoleId(), e);
-          unreadableRoleIds.add(rv.getRoleId());
+    Map<Long, RoleEntity> roleEntitiesById = new HashMap<>();
+    if (roleEntities != null) {
+      for (RoleEntity roleEntity : roleEntities) {
+        if (roleEntity != null) {
+          roleEntitiesById.put(roleEntity.id(), roleEntity);
         }
       }
     }
 
-    Map<Long, RoleUpdatedAt> staleRoleVersionById =
-        staleRoleVersions.stream().collect(Collectors.toMap(RoleUpdatedAt::getRoleId, rv -> rv));
-    for (RoleEntity roleEntity : roleEntities) {
-      if (roleEntity == null) {
-        continue;
-      }
-      RoleUpdatedAt rv = staleRoleVersionById.get(roleEntity.id());
-      if (rv == null) {
-        continue;
-      }
+    for (RolePolicyLoadKey key : pendingLoads) {
+      RoleUpdatedAt rv = key.roleVersion;
       long roleId = rv.getRoleId();
-      long dbUpdatedAt = rv.getUpdatedAt();
+      RoleEntity roleEntity = roleEntitiesById.get(roleId);
+      // Stores may not support batchGet for ROLE, or may return only part of a batch. Every owned
+      // role needs a concrete outcome so all its waiters receive the same read failure, if any.
+      if (roleEntity == null) {
+        try {
+          roleEntity =
+              entityStore.get(
+                  NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
+                  Entity.EntityType.ROLE,
+                  RoleEntity.class);
+        } catch (NoSuchEntityException e) {
+          LOG.debug("Role {} was dropped before its policies could be loaded", roleId, e);
+          invalidateRolePolicies(roleId);
+          continue;
+        } catch (Exception e) {
+          LOG.warn("Failed to load role policies for roleId {}", roleId, e);
+          unreadableRoleIds.add(roleId);
+          continue;
+        }
+      }
+      if (roleEntity == null || roleEntity.id() != roleId) {
+        unreadableRoleIds.add(roleId);
+        continue;
+      }
 
       // Resolve every securable object to a metadata id before touching the enforcers, so the
       // critical section below stays free of DB round-trips.
@@ -1492,10 +1632,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
       ResolvedRolePolicies resolved = resolution.get();
 
-      if (!replaceRolePolicies(roleId, dbUpdatedAt, resolved)) {
-        // Another request completed this version (or a newer one) while this request was resolving
-        // metadata ids. Its policies and marker are authoritative, even if this request's older
-        // resolution result was partial.
+      if (!replaceUnclearedRolePolicies(key, resolved, unreadableRoleIds)) {
+        // A newer load or an invalidation superseded this work. The caller retains its pre-load
+        // request generation, so the existing bounded evaluation loop reloads cleared policies.
         continue;
       }
 
@@ -1512,6 +1651,91 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
     }
     return unreadableRoleIds;
+  }
+
+  private long roleClearGeneration(long roleId) {
+    // Pruning removes map entries before publishing its watermark under the write lock. Capture
+    // both together so a flight cannot observe the temporary gap between those two mutations.
+    rolePolicyLock.readLock().lock();
+    try {
+      return roleClearGenerationWithoutLock(roleId);
+    } finally {
+      rolePolicyLock.readLock().unlock();
+    }
+  }
+
+  private long roleClearGenerationWithoutLock(long roleId) {
+    return Math.max(roleClearGenerations.getOrDefault(roleId, 0L), prunedRoleClearGeneration);
+  }
+
+  private boolean replaceUnclearedRolePolicies(
+      RolePolicyLoadKey key, ResolvedRolePolicies resolved, Set<Long> unreadableRoleIds) {
+    rolePolicyLock.writeLock().lock();
+    try {
+      long roleId = key.roleVersion.getRoleId();
+      if (roleClearGenerationWithoutLock(roleId) != key.clearGeneration) {
+        return false;
+      }
+      RolePolicyLoadState state = rolePolicyLoadStates.get(roleId);
+      if (state.highestVersion > key.roleVersion.getUpdatedAt()) {
+        Optional<Long> loadedVersion = loadedRoles.getIfPresent(roleId);
+        if (!loadedVersion.isPresent() || loadedVersion.get() < state.highestVersion) {
+          // A newer partial load (or failed read) may have no loaded marker. Do not overwrite it
+          // with an old snapshot. Unlike an epoch change, this has no generation repair signal,
+          // so explicitly fail this load and every waiter closed.
+          unreadableRoleIds.add(roleId);
+        }
+        // A complete newer version already satisfies the request. Do not delegate an obsolete
+        // candidate to replacement: expiry between two marker probes could otherwise admit it.
+        return false;
+      }
+      return replaceRolePolicies(
+          key.roleVersion.getRoleId(), key.roleVersion.getUpdatedAt(), resolved);
+    } finally {
+      rolePolicyLock.writeLock().unlock();
+    }
+  }
+
+  private static final class RolePolicyLoadState {
+    private long highestVersion;
+    private int references = 1;
+
+    private RolePolicyLoadState(long highestVersion) {
+      this.highestVersion = highestVersion;
+    }
+  }
+
+  private static final class RolePolicyLoadKey {
+    private final RoleUpdatedAt roleVersion;
+    private final long clearGeneration;
+
+    private RolePolicyLoadKey(RoleUpdatedAt roleVersion, long clearGeneration) {
+      // RoleUpdatedAt is a mutable mapper DTO; keep the map key stable even if its caller reuses
+      // it.
+      this.roleVersion =
+          new RoleUpdatedAt(
+              roleVersion.getRoleId(), roleVersion.getRoleName(), roleVersion.getUpdatedAt());
+      this.clearGeneration = clearGeneration;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof RolePolicyLoadKey)) {
+        return false;
+      }
+      RolePolicyLoadKey that = (RolePolicyLoadKey) other;
+      return roleVersion.getRoleId() == that.roleVersion.getRoleId()
+          && roleVersion.getUpdatedAt() == that.roleVersion.getUpdatedAt()
+          && clearGeneration == that.clearGeneration;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(roleVersion.getRoleId(), roleVersion.getUpdatedAt(), clearGeneration);
+    }
   }
 
   /**
