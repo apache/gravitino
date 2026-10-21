@@ -29,11 +29,14 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
+  implementation(project(":maintenance:optimizer-api"))
   implementation(project(":server-common"))
 
   implementation(libs.bundles.jersey)
+  implementation(libs.commons.lang3)
   implementation(libs.db.scheduler)
   implementation(libs.guava)
+  implementation(libs.metrics.jersey2)
   implementation(libs.mybatis)
   implementation(libs.servlet)
 
