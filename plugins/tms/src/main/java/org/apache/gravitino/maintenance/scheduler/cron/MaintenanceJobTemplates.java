@@ -41,6 +41,21 @@ public final class MaintenanceJobTemplates {
   /** JobConf key for procedure dispatch inside the TMS template. */
   public static final String MAINTENANCE_TYPE_KEY = "maintenance_type";
 
+  /**
+   * JobConf key for a comma-separated commit-chain of wire types (§5.2.3). When set, Spark runs
+   * each type in order inside one Job.
+   */
+  public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";
+
+  /** JobConf key for overlaid updater options (JSON object string). */
+  public static final String UPDATER_OPTIONS_JOB_CONF_KEY = "updater_options";
+
+  /** JobConf key carrying the TMS table entity id for in-job follow-ups. */
+  public static final String TMS_TABLE_ID_KEY = "tms_table_id";
+
+  /** JobConf key carrying the TMS policy entity id for in-job follow-ups. */
+  public static final String TMS_POLICY_ID_KEY = "tms_policy_id";
+
   private MaintenanceJobTemplates() {}
 
   /**

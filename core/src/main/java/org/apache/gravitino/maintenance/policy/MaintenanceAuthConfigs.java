@@ -115,6 +115,13 @@ public final class MaintenanceAuthConfigs {
           .put(OAUTH_SCOPE_SUFFIX, "oauth_scope")
           .build();
 
+  /**
+   * Updater-option short names that belong to the Gravitino auth bag (after camelCase → short-name
+   * remap).
+   */
+  public static final Set<String> GRAVITINO_AUTH_UPDATER_OPTION_KEYS =
+      ImmutableSet.copyOf(GRAVITINO_AUTH_TO_UPDATER_OPTIONS.values());
+
   public static final ConfigEntry<Optional<String>> GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_TYPE =
       optionalAuth(
           GRAVITINO_AUTH_PREFIX,

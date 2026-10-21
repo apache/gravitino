@@ -24,9 +24,10 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /** Result of nearest maintenance-policy resolution for one table and built-in type. */
-final class NearestPolicyDecision {
+public final class NearestPolicyDecision {
 
-  enum Kind {
+  /** Outcome of nearest-policy resolution. */
+  public enum Kind {
     /** Exactly one matching policy on the nearest non-empty level. */
     WINNER,
     /** No matching policy on the inheritance chain. */
@@ -66,25 +67,40 @@ final class NearestPolicyDecision {
     return new NearestPolicyDecision(Kind.CONFLICT, null, null, level, List.copyOf(policyIds));
   }
 
-  Kind kind() {
+  /**
+   * @return decision kind
+   */
+  public Kind kind() {
     return kind;
   }
 
-  Optional<Long> winnerPolicyId() {
+  /**
+   * @return winning policy id when {@link Kind#WINNER}
+   */
+  public Optional<Long> winnerPolicyId() {
     return Optional.ofNullable(winnerPolicyId);
   }
 
+  /**
+   * @return metadata level that produced the winner, or {@code null}
+   */
   @Nullable
-  MetadataObject winnerLevel() {
+  public MetadataObject winnerLevel() {
     return winnerLevel;
   }
 
+  /**
+   * @return metadata level that produced the conflict, or {@code null}
+   */
   @Nullable
-  MetadataObject conflictLevel() {
+  public MetadataObject conflictLevel() {
     return conflictLevel;
   }
 
-  List<Long> conflictingPolicyIds() {
+  /**
+   * @return conflicting policy ids when {@link Kind#CONFLICT}
+   */
+  public List<Long> conflictingPolicyIds() {
     return conflictingPolicyIds;
   }
 }

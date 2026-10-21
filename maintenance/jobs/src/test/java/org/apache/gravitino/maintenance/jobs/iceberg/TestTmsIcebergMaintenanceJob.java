@@ -56,6 +56,28 @@ public class TestTmsIcebergMaintenanceJob {
   }
 
   @Test
+  public void testParseMaintenanceTypesChainAndSingle() {
+    List<MaintenanceType> chain =
+        TmsIcebergMaintenanceJob.parseMaintenanceTypes(
+            "rewrite_data_files, rewrite_manifests, expire_snapshots", null);
+    assertEquals(3, chain.size());
+    assertEquals(MaintenanceType.REWRITE_DATA_FILES, chain.get(0));
+    assertEquals(MaintenanceType.REWRITE_MANIFESTS, chain.get(1));
+    assertEquals(MaintenanceType.EXPIRE_SNAPSHOTS, chain.get(2));
+
+    List<MaintenanceType> single =
+        TmsIcebergMaintenanceJob.parseMaintenanceTypes(null, "expire_snapshots");
+    assertEquals(List.of(MaintenanceType.EXPIRE_SNAPSHOTS), single);
+  }
+
+  @Test
+  public void testTemplateIncludesMaintenanceTypesPlaceholder() {
+    List<String> args = new TmsIcebergMaintenanceJob().jobTemplate().arguments();
+    assertTrue(args.contains("--maintenance-types"));
+    assertTrue(args.contains("{{maintenance_types:-}}"));
+  }
+
+  @Test
   public void testStubMetricsJson() {
     String json = TmsIcebergMaintenanceJob.stubMetricsJson("expire_snapshots", 42L);
     assertTrue(json.contains("expire_snapshots"));

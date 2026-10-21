@@ -20,7 +20,7 @@ package org.apache.gravitino.maintenance.scheduler.cron;
 
 import java.util.List;
 import org.apache.gravitino.maintenance.scheduler.expand.ExpandTableCandidate;
-import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.meta.PolicyEntity;
 
 /**
  * Inserts one-shot {@code cron-job} rows into the cron-pool db-scheduler table.
@@ -30,6 +30,9 @@ import org.apache.gravitino.policy.Policy;
  * batch:{batch_id}:{policy_id}} rows; incomplete batches are filled via {@code
  * SchedulerClient#getScheduledExecution} / {@code reschedule} before a new {@code batch_id} is
  * allocated (§5.2.2).
+ *
+ * <p>Enqueue builds a {@link org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot}
+ * once (policy → jobConf) into {@code task_data}; pick consumes that snapshot.
  */
 @FunctionalInterface
 public interface CronJobScheduler {
@@ -37,15 +40,10 @@ public interface CronJobScheduler {
   /**
    * Enqueues due-now cron jobs for the given expand candidates.
    *
-   * @param policyType maintenance built-in type
-   * @param policyId policy id encoded in each instance id
+   * @param policy effective maintenance policy (used to build the jobConf snapshot)
    * @param candidates enqueueable tables with winner levels
    * @param batchCapacity max tables per snapshot-expiry batch row (and max candidates considered)
    * @return number of newly inserted cron-job rows (merges into existing batches do not count)
    */
-  int enqueueDueNow(
-      Policy.BuiltInType policyType,
-      long policyId,
-      List<ExpandTableCandidate> candidates,
-      int batchCapacity);
+  int enqueueDueNow(PolicyEntity policy, List<ExpandTableCandidate> candidates, int batchCapacity);
 }

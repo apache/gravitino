@@ -22,42 +22,51 @@ import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerSerializers;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.expand.ExpandTableCandidate;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
 class TestCronJobScheduler extends TestJDBCBackend {
 
+  private static final String GRAVITINO_URI = "http://localhost:8090";
+
   @TestTemplate
   void testEnqueueIsIdempotentAndRespectsBatchSize() {
-    DataSource dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    CronJobScheduler scheduler = new RelationalCronJobScheduler(dataSource);
+    DataSource dataSource = dataSource();
+    CronJobScheduler scheduler = scheduler(dataSource);
+    PolicyEntity policy = compactionPolicy(7L);
 
     List<ExpandTableCandidate> three =
         List.of(
             candidate(1L, MetadataObject.Type.TABLE),
             candidate(2L, MetadataObject.Type.TABLE),
             candidate(3L, MetadataObject.Type.TABLE));
-    Assertions.assertEquals(
-        2, scheduler.enqueueDueNow(Policy.BuiltInType.ICEBERG_COMPACTION, 7L, three, 2));
+    Assertions.assertEquals(2, scheduler.enqueueDueNow(policy, three, 2));
     Assertions.assertEquals(
         0,
         scheduler.enqueueDueNow(
-            Policy.BuiltInType.ICEBERG_COMPACTION,
-            7L,
+            policy,
             List.of(
                 candidate(1L, MetadataObject.Type.TABLE), candidate(2L, MetadataObject.Type.TABLE)),
             2));
@@ -81,34 +90,39 @@ class TestCronJobScheduler extends TestJDBCBackend {
                 TaskInstanceId.of(
                     TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(3L, 7L)))
             .isEmpty());
+
+    MaintenanceJobSnapshot snap =
+        (MaintenanceJobSnapshot)
+            client
+                .getScheduledExecution(
+                    TaskInstanceId.of(
+                        TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(1L, 7L)))
+                .get()
+                .getData();
+    Assertions.assertTrue(snap.isValid());
+    Assertions.assertTrue(snap.getJobConf().containsKey("updater_options"));
+    Assertions.assertEquals(List.of(1L), snap.tableIds());
   }
 
   @TestTemplate
   void testSnapshotExpiryFillsIncompleteBatchBeforeAllocatingNextId() {
-    DataSource dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    CronJobScheduler scheduler = new RelationalCronJobScheduler(dataSource);
+    DataSource dataSource = dataSource();
+    CronJobScheduler scheduler = scheduler(dataSource);
+    PolicyEntity policy = expirePolicy(9L);
 
     Assertions.assertEquals(
         1,
         scheduler.enqueueDueNow(
-            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
-            9L,
+            policy,
             List.of(
                 candidate(10L, MetadataObject.Type.SCHEMA),
                 candidate(11L, MetadataObject.Type.SCHEMA)),
             10));
 
-    // Same policy, new tables: merge into batch:0 (capacity 10) instead of opening batch:1.
     Assertions.assertEquals(
         0,
         scheduler.enqueueDueNow(
-            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
-            9L,
+            policy,
             List.of(
                 candidate(10L, MetadataObject.Type.SCHEMA),
                 candidate(11L, MetadataObject.Type.SCHEMA),
@@ -123,25 +137,23 @@ class TestCronJobScheduler extends TestJDBCBackend {
         TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forBatch(1L, 9L));
     Assertions.assertTrue(client.getScheduledExecution(batch0).isPresent());
     Assertions.assertTrue(client.getScheduledExecution(batch1).isEmpty());
-    CronJobData data = (CronJobData) client.getScheduledExecution(batch0).get().getData();
+    MaintenanceJobSnapshot data =
+        (MaintenanceJobSnapshot) client.getScheduledExecution(batch0).get().getData();
     Assertions.assertEquals(List.of(10L, 11L, 12L, 13L), data.tableIds());
+    Assertions.assertEquals(1, data.getSteps().size());
+    Assertions.assertTrue(data.getJobConf().containsKey("updater_options"));
   }
 
   @TestTemplate
   void testSnapshotExpiryAllocatesNextBatchWhenCapacityFull() {
-    DataSource dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    CronJobScheduler scheduler = new RelationalCronJobScheduler(dataSource);
+    DataSource dataSource = dataSource();
+    CronJobScheduler scheduler = scheduler(dataSource);
+    PolicyEntity policy = expirePolicy(9L);
 
     Assertions.assertEquals(
         1,
         scheduler.enqueueDueNow(
-            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
-            9L,
+            policy,
             List.of(
                 candidate(1L, MetadataObject.Type.SCHEMA),
                 candidate(2L, MetadataObject.Type.SCHEMA)),
@@ -149,8 +161,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
     Assertions.assertEquals(
         1,
         scheduler.enqueueDueNow(
-            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
-            9L,
+            policy,
             List.of(
                 candidate(1L, MetadataObject.Type.SCHEMA),
                 candidate(2L, MetadataObject.Type.SCHEMA),
@@ -158,16 +169,16 @@ class TestCronJobScheduler extends TestJDBCBackend {
             2));
 
     SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
-    CronJobData batch0 =
-        (CronJobData)
+    MaintenanceJobSnapshot batch0 =
+        (MaintenanceJobSnapshot)
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
                         TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forBatch(0L, 9L)))
                 .get()
                 .getData();
-    CronJobData batch1 =
-        (CronJobData)
+    MaintenanceJobSnapshot batch1 =
+        (MaintenanceJobSnapshot)
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
@@ -180,18 +191,12 @@ class TestCronJobScheduler extends TestJDBCBackend {
 
   @TestTemplate
   void testPendingCronGateSkipsQueuedTables() {
-    DataSource dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    CronJobScheduler scheduler = new RelationalCronJobScheduler(dataSource);
+    DataSource dataSource = dataSource();
+    CronJobScheduler scheduler = scheduler(dataSource);
     Assertions.assertEquals(
         1,
         scheduler.enqueueDueNow(
-            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
-            9L,
+            expirePolicy(9L),
             List.of(
                 candidate(10L, MetadataObject.Type.SCHEMA),
                 candidate(11L, MetadataObject.Type.SCHEMA)),
@@ -205,20 +210,12 @@ class TestCronJobScheduler extends TestJDBCBackend {
 
   @TestTemplate
   void testCronJobTaskRemovesRowAfterPick() throws Exception {
-    DataSource dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    CronJobScheduler enqueue = new RelationalCronJobScheduler(dataSource);
+    DataSource dataSource = dataSource();
+    CronJobScheduler enqueue = scheduler(dataSource);
     Assertions.assertEquals(
         1,
         enqueue.enqueueDueNow(
-            Policy.BuiltInType.ICEBERG_COMPACTION,
-            9L,
-            List.of(candidate(99L, MetadataObject.Type.TABLE)),
-            1));
+            compactionPolicy(9L), List.of(candidate(99L, MetadataObject.Type.TABLE)), 1));
 
     TaskInstanceId instanceId =
         TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(99L, 9L));
@@ -229,6 +226,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
         Scheduler.create(dataSource, TableMaintenanceSchedulerPools.cronJobTask())
             .threads(1)
             .pollingInterval(Duration.ofMillis(100))
+            .serializer(MaintenanceSchedulerSerializers.jackson())
             .tableName(TableMaintenanceSchedulerPools.CRON_TASKS_TABLE)
             .commitWhenAutocommitDisabled(true)
             .build();
@@ -247,14 +245,77 @@ class TestCronJobScheduler extends TestJDBCBackend {
     Assertions.assertEquals(
         1,
         enqueue.enqueueDueNow(
-            Policy.BuiltInType.ICEBERG_COMPACTION,
-            9L,
-            List.of(candidate(99L, MetadataObject.Type.TABLE)),
-            1));
+            compactionPolicy(9L), List.of(candidate(99L, MetadataObject.Type.TABLE)), 1));
     Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
+  }
+
+  private static CronJobScheduler scheduler(DataSource dataSource) {
+    return new RelationalCronJobScheduler(
+        dataSource,
+        configWithUri(),
+        ids ->
+            ids.stream()
+                .map(id -> new ResolvedTableRef(id, "iceberg", "db.t" + id))
+                .collect(Collectors.toList()));
+  }
+
+  private static DataSource dataSource() {
+    return SqlSessionFactoryHelper.getInstance()
+        .getSqlSessionFactory()
+        .getConfiguration()
+        .getEnvironment()
+        .getDataSource();
+  }
+
+  private static Config configWithUri() {
+    Config config = new Config(false) {};
+    config.loadFromMap(
+        Map.of(MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_URI.getKey(), GRAVITINO_URI),
+        t -> true);
+    return config;
   }
 
   private static ExpandTableCandidate candidate(long tableId, MetadataObject.Type level) {
     return new ExpandTableCandidate(tableId, level);
+  }
+
+  private static PolicyEntity compactionPolicy(long id) {
+    return PolicyEntity.builder()
+        .withId(id)
+        .withName("p-" + id)
+        .withNamespace(NamespaceUtil.ofPolicy("ml"))
+        .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+        .withEnabled(true)
+        .withContent(
+            PolicyContents.icebergDataCompaction(
+                IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+                IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+                IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+                IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+                IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+                "binpack",
+                "",
+                Map.of(),
+                null,
+                true,
+                null,
+                Map.of("spark_executor_memory", "4g"),
+                Map.of()))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
+        .build();
+  }
+
+  private static PolicyEntity expirePolicy(long id) {
+    return PolicyEntity.builder()
+        .withId(id)
+        .withName("e-" + id)
+        .withNamespace(NamespaceUtil.ofPolicy("ml"))
+        .withPolicyType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
+        .withEnabled(true)
+        .withContent(PolicyContents.icebergSnapshotExpiration())
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
+        .build();
   }
 }

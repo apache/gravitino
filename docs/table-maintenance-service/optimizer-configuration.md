@@ -49,6 +49,26 @@ Cron also injects callback identity into `updater_options`:
 gravitino.maintenance.gravitinoUri = http://localhost:8090
 ```
 
+### TMS commit-job (IRC update → chained Spark)
+
+When Iceberg REST runs as an auxiliary service in the same JVM, register the TMS listener so a
+successful IRC table update upserts a one-shot `commit-job` / `{table_id}` (bursts coalesce). The
+commit pool then collects nearest policies with `commitTrigger=true` in order compaction →
+manifest-rewrite → snapshot-expiry, drops members still inside `minIntervalMs`, aborts if any
+remaining type is in-flight, **fails closed when effective `gravitinoAuth` / `ircAuth` bags
+disagree across the chain**, claims the first remaining type, and submits one chained
+`builtin-tms-iceberg-maintenance` Spark job.
+
+```properties
+gravitino.server.rest.extensionPackages = org.apache.gravitino.maintenance.web.rest.feature
+gravitino.auxService.names = iceberg-rest
+gravitino.eventListener.names = tms-commit-job
+gravitino.eventListener.tms-commit-job.class = org.apache.gravitino.maintenance.listener.IcebergUpdateTableEventListener
+```
+
+Without the listener, the crontab (`timeTrigger` → expand → cron-job) path still works; commit-triggered
+maintenance does not.
+
 #### Gravitino client auth (`gravitino.maintenance.gravitinoAuth.`) — fixed schema
 
 `gravitino.conf` uses **camelCase** suffixes. At load time they are remapped to built-in

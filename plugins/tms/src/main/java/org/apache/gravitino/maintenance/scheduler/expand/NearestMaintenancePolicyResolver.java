@@ -54,13 +54,16 @@ import org.slf4j.LoggerFactory;
  * <em>directly</em> assigned to that object are considered. The first non-empty level decides: one
  * match is the winner; two or more same-type matches are a conflict (fail-closed).
  */
-final class NearestMaintenancePolicyResolver {
+public final class NearestMaintenancePolicyResolver {
 
   private static final Logger LOG = LoggerFactory.getLogger(NearestMaintenancePolicyResolver.class);
 
   private final EntityStore entityStore;
 
-  NearestMaintenancePolicyResolver(EntityStore entityStore) {
+  /**
+   * @param entityStore relational entity store
+   */
+  public NearestMaintenancePolicyResolver(EntityStore entityStore) {
     this.entityStore = entityStore;
   }
 
@@ -70,7 +73,7 @@ final class NearestMaintenancePolicyResolver {
    * @param policyType maintenance built-in type
    * @return winner, none, or same-level conflict
    */
-  NearestPolicyDecision resolve(
+  public NearestPolicyDecision resolve(
       String metalake, MetadataObject table, Policy.BuiltInType policyType) {
     List<MetadataObject> chain = new ArrayList<>();
     chain.add(table);

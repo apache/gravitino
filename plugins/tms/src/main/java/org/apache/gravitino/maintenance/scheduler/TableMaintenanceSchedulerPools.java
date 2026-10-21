@@ -33,7 +33,8 @@ import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
-import org.apache.gravitino.maintenance.scheduler.cron.CronJobData;
+import org.apache.gravitino.maintenance.scheduler.commit.CommitOccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceSparkSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.cron.PendingCronExpandOccupancyGate;
@@ -51,9 +52,9 @@ import org.slf4j.LoggerFactory;
  * <p>db-scheduler requires a dedicated {@code tableName} per Scheduler instance for multi-pool
  * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
- * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows. The cron
- * pool runs OccupancyGate → soft-slot claim → {@code runJob} → bind, then deletes the one-shot row.
- * Commit submit remains a no-op until a follow-up PR.
+ * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows with an
+ * enqueue-time {@link MaintenanceJobSnapshot}. The cron / commit pools consume that snapshot →
+ * soft-slot claim → {@code runJob} → bind, then delete the one-shot row (§5.2.2 / §5.2.3).
  */
 public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
@@ -77,6 +78,16 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
       new AtomicReference<>(
           () -> {
             throw new IllegalStateException("cron-job submit pipeline is not configured");
+          });
+
+  /**
+   * Commit submit pipeline supplier used by {@link #commitJobTask()}. Tests may replace it;
+   * production {@link #start} installs the relational implementation.
+   */
+  private static final AtomicReference<Supplier<MaintenanceCommitSubmitPipeline>> COMMIT_SUBMIT =
+      new AtomicReference<>(
+          () -> {
+            throw new IllegalStateException("commit-job submit pipeline is not configured");
           });
 
   /** Expand-pool db-scheduler table. */
@@ -122,7 +133,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         new PolicyExpandPipeline(
             new RelationalPolicyLookup(),
             new NearestPolicyTableEnumerator(),
-            new RelationalCronJobScheduler(dataSource),
+            new RelationalCronJobScheduler(dataSource, gravitinoConfig),
             expandGate,
             gravitinoConfig,
             config.expandEnqueueBatchSize());
@@ -130,13 +141,19 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
     MaintenanceSparkSubmitPipeline cronSubmit =
         new MaintenanceSparkSubmitPipeline(
-            new RelationalPolicyLookup(),
             occupancyGate::shouldSkip,
             TableMaintenanceActionMetaService.getInstance(),
             MaintenanceJobSubmitter.fromEnv(),
-            gravitinoConfig,
             config.claimTimeoutMs());
     CRON_SUBMIT.set(() -> cronSubmit);
+
+    MaintenanceCommitSubmitPipeline commitSubmit =
+        new MaintenanceCommitSubmitPipeline(
+            CommitOccupancyGate.of(occupancyGate),
+            TableMaintenanceActionMetaService.getInstance(),
+            MaintenanceJobSubmitter.fromEnv(),
+            config.claimTimeoutMs());
+    COMMIT_SUBMIT.set(() -> commitSubmit);
 
     List<Scheduler> built =
         List.of(
@@ -145,11 +162,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
             buildScheduler(
                 dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, cronJobTask()),
             buildScheduler(
-                dataSource,
-                config,
-                config.commitThreads(),
-                COMMIT_TASKS_TABLE,
-                noopTask(COMMIT_JOB)));
+                dataSource, config, config.commitThreads(), COMMIT_TASKS_TABLE, commitJobTask()));
 
     try {
       for (Scheduler scheduler : built) {
@@ -181,6 +194,10 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         () -> {
           throw new IllegalStateException("cron-job submit pipeline is not configured");
         });
+    COMMIT_SUBMIT.set(
+        () -> {
+          throw new IllegalStateException("commit-job submit pipeline is not configured");
+        });
     LOG.info("Stopped table maintenance scheduler pools");
   }
 
@@ -200,6 +217,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         .pollingInterval(Duration.ofMillis(config.pollingIntervalMs()))
         .heartbeatInterval(Duration.ofMillis(config.heartbeatIntervalMs()))
         .missedHeartbeatsLimit(config.missedHeartbeatsLimit())
+        .serializer(MaintenanceSchedulerSerializers.jackson())
         .tableName(tableName)
         .commitWhenAutocommitDisabled(true)
         .registerShutdownHook()
@@ -231,13 +249,14 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
   /**
-   * Cron-pool task definition. Runs OccupancyGate → claim → {@code runJob} → bind, then removes the
-   * one-shot row so a later expand pick can {@code scheduleIfNotExists} again (§5.2.2).
+   * Cron-pool task definition. Consumes the enqueue-time snapshot → claim → {@code runJob} → bind,
+   * then removes the one-shot row so a later expand pick can {@code scheduleIfNotExists} again
+   * (§5.2.2).
    *
    * @return the {@code cron-job} task
    */
-  public static Task<CronJobData> cronJobTask() {
-    return Tasks.custom(CRON_JOB, CronJobData.class)
+  public static Task<MaintenanceJobSnapshot> cronJobTask() {
+    return Tasks.custom(CRON_JOB, MaintenanceJobSnapshot.class)
         .execute(
             (taskInstance, executionContext) -> {
               try {
@@ -271,13 +290,35 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     CRON_SUBMIT.set(pipelineSupplier);
   }
 
-  private static Task<Void> noopTask(String taskName) {
-    return Tasks.custom(taskName, Void.class)
+  /**
+   * Commit-pool task definition. Consumes the enqueue-time snapshot, claims the first type, submits
+   * one chained Spark job, then removes the one-shot row (§5.2.3).
+   *
+   * @return the {@code commit-job} task
+   */
+  public static Task<MaintenanceJobSnapshot> commitJobTask() {
+    return Tasks.custom(COMMIT_JOB, MaintenanceJobSnapshot.class)
         .execute(
             (taskInstance, executionContext) -> {
-              LOG.debug(
-                  "TMS scheduler callback for {} instance {}", taskName, taskInstance.getId());
-              return (executionComplete, executionOperations) -> {};
+              try {
+                COMMIT_SUBMIT.get().get().submit(taskInstance.getId(), taskInstance.getData());
+              } catch (RuntimeException e) {
+                LOG.warn(
+                    "TMS commit-job submit failed for instance {}; removing one-shot row",
+                    taskInstance.getId(),
+                    e);
+              }
+              return (executionComplete, executionOperations) -> executionOperations.remove();
             });
+  }
+
+  /**
+   * Replaces the commit submit pipeline supplier. Intended for unit tests.
+   *
+   * @param pipelineSupplier supplies the pipeline used by {@link #commitJobTask()}
+   */
+  static void setCommitSubmitPipelineForTest(
+      Supplier<MaintenanceCommitSubmitPipeline> pipelineSupplier) {
+    COMMIT_SUBMIT.set(pipelineSupplier);
   }
 }

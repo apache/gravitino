@@ -33,7 +33,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /** Resolves table entity ids to catalog + {@code schema.table} identifiers for Spark jobConf. */
-final class MaintenanceTableRefs {
+public final class MaintenanceTableRefs {
 
   private MaintenanceTableRefs() {}
 
@@ -41,7 +41,7 @@ final class MaintenanceTableRefs {
    * @param tableIds table entity ids (order preserved for known ids)
    * @return resolved refs; unknown / incomplete rows are omitted
    */
-  static List<ResolvedTableRef> resolve(List<Long> tableIds) {
+  public static List<ResolvedTableRef> resolve(List<Long> tableIds) {
     if (tableIds == null || tableIds.isEmpty()) {
       return List.of();
     }
@@ -110,26 +110,40 @@ final class MaintenanceTableRefs {
   }
 
   /** One table ready for Spark expire-snapshots jobConf. */
-  static final class ResolvedTableRef {
+  public static final class ResolvedTableRef {
     private final long tableId;
     private final String catalogName;
     private final String tableIdentifier;
 
-    ResolvedTableRef(long tableId, String catalogName, String tableIdentifier) {
+    /**
+     * @param tableId table entity id
+     * @param catalogName catalog name
+     * @param tableIdentifier {@code schema.table} Spark identifier
+     */
+    public ResolvedTableRef(long tableId, String catalogName, String tableIdentifier) {
       this.tableId = tableId;
       this.catalogName = catalogName;
       this.tableIdentifier = tableIdentifier;
     }
 
-    long tableId() {
+    /**
+     * @return table entity id
+     */
+    public long tableId() {
       return tableId;
     }
 
-    String catalogName() {
+    /**
+     * @return catalog name
+     */
+    public String catalogName() {
       return catalogName;
     }
 
-    String tableIdentifier() {
+    /**
+     * @return {@code schema.table} (or nested-namespace) Spark identifier
+     */
+    public String tableIdentifier() {
       return tableIdentifier;
     }
 

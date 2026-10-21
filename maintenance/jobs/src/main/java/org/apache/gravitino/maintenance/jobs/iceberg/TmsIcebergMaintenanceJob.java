@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.MaintenanceActionClient;
@@ -53,21 +55,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TMS cron Spark entry (§5.2.2): sample S0 via Gravitino, gate, run one Iceberg procedure, finish.
+ * TMS Spark entry for cron (§5.2.2) and commit-chain (§5.2.3) submits.
  *
- * <p>Dispatches by {@code --maintenance-type} and reuses procedure SQL builders from the four
- * standalone {@code Iceberg*Job} classes. Those standalone templates stay unchanged for CLI /
- * optimizer use.
+ * <p>Dispatches by {@code --maintenance-type} (single type) or {@code --maintenance-types}
+ * (comma-separated commit chain). Reuses procedure SQL builders from the four standalone {@code
+ * Iceberg*Job} classes. Those standalone templates stay unchanged for CLI / optimizer use.
+ *
+ * <p>Commit-chain runs share one occupancy claim ({@code policy_id} = first type). Only the first
+ * type uses the HTTP sample/recommend gate; later types skip the HTTP gate, end early on local
+ * snapshot drift, then continue the chain.
  */
 public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
   private static final Logger LOG = LoggerFactory.getLogger(TmsIcebergMaintenanceJob.class);
 
-  /** Built-in template name submitted by TMS cron. */
+  /** Built-in template name submitted by TMS cron / commit. */
   public static final String NAME = JobTemplateProvider.BUILTIN_TMS_ICEBERG_MAINTENANCE;
 
   /** JobConf / CLI key for the maintenance kind ({@code maintenance_type}). */
   public static final String MAINTENANCE_TYPE_KEY = "maintenance_type";
+
+  /** JobConf / CLI key for a commit-chain of wire types ({@code maintenance_types}). */
+  public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";
 
   private static final String VERSION = "v1";
 
@@ -117,7 +126,9 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   public SparkJobTemplate jobTemplate() {
     return SparkJobTemplate.builder()
         .withName(NAME)
-        .withComment("TMS cron Iceberg maintenance: S0 sample/gate, procedure dispatch, S1 finish")
+        .withComment(
+            "TMS Iceberg maintenance: S0 sample/gate, procedure dispatch (single or commit-chain),"
+                + " S1 finish")
         .withExecutable(resolveExecutable(TmsIcebergMaintenanceJob.class))
         .withClassName(TmsIcebergMaintenanceJob.class.getName())
         .withArguments(buildArguments())
@@ -128,7 +139,7 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * TMS cron entry point.
+   * TMS cron / commit entry point.
    *
    * @param args named arguments from the job template
    */
@@ -149,12 +160,13 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
       return 1;
     }
 
-    MaintenanceType type;
+    List<MaintenanceType> types;
     long jobId;
     long tableId;
     long policyId;
     try {
-      type = MaintenanceType.fromWire(argMap.get("maintenance-type"));
+      types =
+          parseMaintenanceTypes(argMap.get("maintenance-types"), argMap.get("maintenance-type"));
       jobId = requirePositiveLong(argMap.get("gravitino-job-id"), "gravitino-job-id");
       tableId = requirePositiveLong(argMap.get("tms-table-id"), "tms-table-id");
       policyId = requirePositiveLong(argMap.get("tms-policy-id"), "tms-policy-id");
@@ -167,8 +179,12 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         parseUpdaterOptions(
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("updater-options")));
 
+    String appLabel =
+        types.size() == 1
+            ? types.get(0).wireName
+            : "chain:" + types.stream().map(t -> t.wireName).collect(Collectors.joining(","));
     SparkSession.Builder sparkBuilder =
-        SparkSession.builder().appName("Gravitino TMS Iceberg Maintenance (" + type.wireName + ")");
+        SparkSession.builder().appName("Gravitino TMS Iceberg Maintenance (" + appLabel + ")");
     String sparkConfJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("spark-conf"));
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson).forEach(sparkBuilder::config);
@@ -182,33 +198,49 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         String finishMetrics = null;
         boolean shouldFinish = false;
         try {
-          SnapshotSample s0 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
-          afterSnapshotId = s0.snapshotId;
-          finishMetrics = s0.metricsJson;
+          for (int i = 0; i < types.size(); i++) {
+            MaintenanceType type = types.get(i);
+            boolean httpGate = i == 0;
+            SnapshotSample s0 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
+            afterSnapshotId = s0.snapshotId;
+            finishMetrics = s0.metricsJson;
 
-          MaintenanceActionSampleResponse gate =
-              actionClient.reportSample(
+            if (httpGate) {
+              MaintenanceActionSampleResponse gate =
+                  actionClient.reportSample(
+                      jobId,
+                      new MaintenanceActionSampleRequest(
+                          tableId, policyId, s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
+              if (!gate.isContinueMaintenance()) {
+                LOG.info(
+                    "TMS gate stopped job {} type={} reason={}; continuing chain if any",
+                    jobId,
+                    type.wireName,
+                    gate.getStopReason());
+                continue;
+              }
+            } else if (s0.snapshotId != s0.headSnapshotId) {
+              // End this type on local drift; continue with the next type in the same Job.
+              LOG.info(
+                  "TMS commit-chain type {} skipped for job {} due to snapshot drift (s0={} head={})",
+                  type.wireName,
                   jobId,
-                  new MaintenanceActionSampleRequest(
-                      tableId, policyId, s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
-          if (!gate.isContinueMaintenance()) {
-            LOG.info(
-                "TMS gate stopped job {} type={} reason={}",
-                jobId,
-                type.wireName,
-                gate.getStopReason());
-          } else {
+                  s0.snapshotId,
+                  s0.headSnapshotId);
+              continue;
+            }
+
             runProcedure(spark, type, catalogName, tableIdentifier, argMap);
             SnapshotSample s1 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
             afterSnapshotId = s1.snapshotId;
             finishMetrics = s1.metricsJson;
           }
-          // Finish only on a clean exit (including gate-stop). Procedure failures leave the action
-          // open so OccupancyGate can reclaim when the Gravitino job becomes terminal.
+          // Finish only on a clean exit (including gate-stop / drift-skip). Procedure failures
+          // leave the action open so OccupancyGate can reclaim when the Gravitino job is terminal.
           shouldFinish = true;
           return 0;
         } catch (Exception e) {
-          LOG.error("TMS Iceberg maintenance failed for job {} type={}", jobId, type.wireName, e);
+          LOG.error("TMS Iceberg maintenance failed for job {}", jobId, e);
           return 1;
         } finally {
           // Finish before try-with-resources closes the client.
@@ -218,6 +250,32 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         }
       }
     }
+  }
+
+  /**
+   * @param maintenanceTypes comma-separated wire names from commit-chain submit (may be blank)
+   * @param maintenanceType single wire name (cron path)
+   * @return ordered types to run
+   */
+  @VisibleForTesting
+  static ImmutableList<MaintenanceType> parseMaintenanceTypes(
+      @Nullable String maintenanceTypes, @Nullable String maintenanceType) {
+    String chain = IcebergJobUtils.nullIfUnresolvedPlaceholder(maintenanceTypes);
+    if (chain != null && !chain.trim().isEmpty()) {
+      ImmutableList.Builder<MaintenanceType> parsed = ImmutableList.builder();
+      for (String part : chain.split(",")) {
+        String trimmed = part.trim();
+        if (!trimmed.isEmpty()) {
+          parsed.add(MaintenanceType.fromWire(trimmed));
+        }
+      }
+      ImmutableList<MaintenanceType> types = parsed.build();
+      if (types.isEmpty()) {
+        throw new IllegalArgumentException("maintenance_types must not be empty");
+      }
+      return types;
+    }
+    return ImmutableList.of(MaintenanceType.fromWire(maintenanceType));
   }
 
   @VisibleForTesting
@@ -513,6 +571,8 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         "{{table_identifier}}",
         "--maintenance-type",
         "{{maintenance_type}}",
+        "--maintenance-types",
+        "{{maintenance_types:-}}",
         "--gravitino-job-id",
         "{{gravitino_job_id}}",
         "--tms-table-id",

@@ -43,7 +43,7 @@ import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyExecutionSpec;
 
 /**
- * Builds {@code runJob} configuration for TMS cron Spark submits.
+ * Builds {@code runJob} configuration for TMS Spark submits.
  *
  * <p>Maps typed compaction / orphan policy fields onto procedure placeholders; expire and manifest
  * rewrite remain jobOptions passthrough until those content types grow real thresholds. Keeps
@@ -51,7 +51,7 @@ import org.apache.gravitino.policy.PolicyExecutionSpec;
  * gravitino.maintenance.ircAuth.*} passthrough properties into {@code spark_conf} under {@code
  * spark.sql.catalog.<catalogName>.} so SparkSession can authenticate to IRC.
  */
-final class MaintenanceJobConfBuilder {
+public final class MaintenanceJobConfBuilder {
 
   private static final DateTimeFormatter ORPHAN_CUTOFF =
       DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ssXXX").withZone(ZoneOffset.UTC);
@@ -87,15 +87,19 @@ final class MaintenanceJobConfBuilder {
           "location",
           "dry_run",
           MaintenanceJobTemplates.MAINTENANCE_TYPE_KEY,
-          MaintenanceSparkSubmitPipeline.UPDATER_OPTIONS_JOB_CONF_KEY,
-          MaintenanceSparkSubmitPipeline.TMS_TABLE_ID_KEY,
-          MaintenanceSparkSubmitPipeline.TMS_POLICY_ID_KEY,
+          MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY,
+          MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY,
+          MaintenanceJobTemplates.TMS_TABLE_ID_KEY,
+          MaintenanceJobTemplates.TMS_POLICY_ID_KEY,
           "gravitino_job_id");
 
   private final Config gravitinoConfig;
   private final Clock clock;
 
-  MaintenanceJobConfBuilder(Config gravitinoConfig) {
+  /**
+   * @param gravitinoConfig server config for auth overlay and gravitino URI
+   */
+  public MaintenanceJobConfBuilder(Config gravitinoConfig) {
     this(gravitinoConfig, Clock.systemUTC());
   }
 
@@ -109,7 +113,7 @@ final class MaintenanceJobConfBuilder {
    * @param catalogName Spark catalog alias for IRC property scoping
    * @return mutable jobConf ready for table / policy id overlays
    */
-  Map<String, String> build(PolicyEntity policy, String catalogName) {
+  public Map<String, String> build(PolicyEntity policy, String catalogName) {
     PolicyContent content = policy.content();
     PolicyExecutionSpec spec = executionSpec(content);
     Map<String, String> jobOptions =
@@ -146,12 +150,12 @@ final class MaintenanceJobConfBuilder {
 
     putTypedProcedureParams(jobConf, content);
 
-    jobConf.put(MaintenanceSparkSubmitPipeline.TMS_POLICY_ID_KEY, Long.toString(policy.id()));
+    jobConf.put(MaintenanceJobTemplates.TMS_POLICY_ID_KEY, Long.toString(policy.id()));
     MaintenanceJobTemplates.maintenanceType(policy.policyType())
         .ifPresent(type -> jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPE_KEY, type));
 
     jobConf.put(
-        MaintenanceSparkSubmitPipeline.UPDATER_OPTIONS_JOB_CONF_KEY,
+        MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY,
         writeJson(updaterOptions, "updater_options"));
     if (!sparkConf.isEmpty()) {
       jobConf.put("spark_conf", writeJson(new TreeMap<>(sparkConf), "spark_conf"));

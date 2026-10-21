@@ -19,299 +19,163 @@
 package org.apache.gravitino.maintenance.scheduler.cron;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import javax.annotation.Nullable;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
-import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
 import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
-import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
-import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceTableRefs.ResolvedTableRef;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot.ChainStep;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshotFactory;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
-import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.policy.ExecutablePolicyContent;
-import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Cron-pool control-plane submit (§5.2.2): occupancy gate → soft-slot claim → {@code runJob} → bind
- * job id.
+ * Cron-pool control-plane submit (§5.2.2): consume enqueue-time {@link MaintenanceJobSnapshot} →
+ * in-flight gate → soft-slot claim → {@code runJob} → bind job id.
  *
- * <p>Single-table {@code table:...} rows submit one Spark job. Snapshot-expiry {@code batch:...}
- * rows are one cron task carrying multiple table ids; the pipeline claims each eligible table and
- * submits one single-table Spark job per table via {@code builtin-tms-iceberg-maintenance}.
+ * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same
+ * snapshot shape; batch pick overlays per-table keys and submits one Spark job per table.
  *
  * <p>Does not sample metrics (that runs inside Spark). The caller always deletes the one-shot
- * {@code cron-job} row after this method returns.
+ * {@code cron-job} row after this method returns. Policy / jobConf are not recomputed here.
  */
 public final class MaintenanceSparkSubmitPipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceSparkSubmitPipeline.class);
 
-  /** JobConf key for overlaid updater options (JSON object string). */
-  public static final String UPDATER_OPTIONS_JOB_CONF_KEY = "updater_options";
-
-  /** JobConf key carrying the TMS table entity id for in-job follow-ups. */
-  public static final String TMS_TABLE_ID_KEY = "tms_table_id";
-
-  /** JobConf key carrying the TMS policy entity id for in-job follow-ups. */
-  public static final String TMS_POLICY_ID_KEY = "tms_policy_id";
-
-  private final PolicyLookup policyLookup;
   private final ExpandOccupancyGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
   private final MaintenanceJobSubmitter jobSubmitter;
-  private final Config gravitinoConfig;
-  private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
-  private final Function<List<Long>, List<ResolvedTableRef>> tableRefResolver;
 
   /**
-   * @param policyLookup loads the policy for the cron instance
-   * @param occupancyGate in-flight / minInterval gate
+   * @param occupancyGate in-flight gate (minInterval already applied at enqueue)
    * @param actionMetaService soft-slot claim / bind
    * @param jobSubmitter Gravitino Job submitter
-   * @param gravitinoConfig server config for auth overlay and minInterval fallbacks
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceSparkSubmitPipeline(
-      PolicyLookup policyLookup,
       ExpandOccupancyGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
       MaintenanceJobSubmitter jobSubmitter,
-      Config gravitinoConfig,
       long claimTimeoutMs) {
-    this(
-        policyLookup,
-        occupancyGate,
-        actionMetaService,
-        jobSubmitter,
-        gravitinoConfig,
-        claimTimeoutMs,
-        MaintenanceTableRefs::resolve);
-  }
-
-  /**
-   * Visible for tests that inject table-id resolution without a JDBC store.
-   *
-   * @param tableRefResolver resolves entity ids to catalog + schema.table
-   */
-  MaintenanceSparkSubmitPipeline(
-      PolicyLookup policyLookup,
-      ExpandOccupancyGate occupancyGate,
-      TableMaintenanceActionMetaService actionMetaService,
-      MaintenanceJobSubmitter jobSubmitter,
-      Config gravitinoConfig,
-      long claimTimeoutMs,
-      Function<List<Long>, List<ResolvedTableRef>> tableRefResolver) {
-    this.policyLookup = Preconditions.checkNotNull(policyLookup);
     this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
     this.jobSubmitter = Preconditions.checkNotNull(jobSubmitter);
-    this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
-    this.jobConfBuilder = new MaintenanceJobConfBuilder(gravitinoConfig);
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.claimTimeoutMs = claimTimeoutMs;
-    this.tableRefResolver = Preconditions.checkNotNull(tableRefResolver);
   }
 
   /**
    * Runs one cron-job pick for {@code instanceId}.
    *
    * @param instanceId db-scheduler cron-job instance id
-   * @param data task payload; required for {@code batch:...} rows
+   * @param snapshot enqueue-time payload; required
    */
-  public void submit(String instanceId, @Nullable CronJobData data) {
-    Optional<CronJobIds.TablePolicyIds> tableIds = CronJobIds.parseTable(instanceId);
-    if (tableIds.isPresent()) {
-      submitOne(tableIds.get().tableId(), tableIds.get().policyId());
+  public void submit(String instanceId, @Nullable MaintenanceJobSnapshot snapshot) {
+    if (snapshot == null || !snapshot.isValid()) {
+      LOG.warn(
+          "Skipping cron-job submit for {} with missing/invalid task_data snapshot", instanceId);
       return;
     }
+
+    Optional<CronJobIds.TablePolicyIds> tableIds = CronJobIds.parseTable(instanceId);
     Optional<CronJobIds.BatchPolicyIds> batchIds = CronJobIds.parseBatch(instanceId);
-    if (batchIds.isPresent()) {
-      List<Long> tables = data == null ? List.of() : data.tableIds();
-      if (tables.isEmpty()) {
-        LOG.warn("Skipping cron-job submit for batch {} with empty task_data", instanceId);
+    if (tableIds.isEmpty() && batchIds.isEmpty()) {
+      LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
+      return;
+    }
+
+    ChainStep step = snapshot.getSteps().get(0);
+    long policyId = step.getPolicyId();
+    long expectedPolicyId =
+        tableIds.isPresent() ? tableIds.get().policyId() : batchIds.get().policyId();
+    if (policyId != expectedPolicyId) {
+      LOG.warn(
+          "Skipping cron-job submit for {}: snapshot policyId {} != instance policyId {}",
+          instanceId,
+          policyId,
+          expectedPolicyId);
+      return;
+    }
+    if (tableIds.isPresent()) {
+      long expectedTableId = tableIds.get().tableId();
+      if (snapshot.getTables().size() != 1
+          || snapshot.getTables().get(0).getTableId() != expectedTableId) {
+        LOG.warn(
+            "Skipping cron-job submit for {}: snapshot tables {} do not match instance tableId {}",
+            instanceId,
+            snapshot.tableIds(),
+            expectedTableId);
         return;
       }
-      submitBatch(tables, batchIds.get().policyId());
-      return;
-    }
-    LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
-  }
-
-  /**
-   * Backward-compatible entry for tests that only pass the instance id.
-   *
-   * @param instanceId db-scheduler cron-job instance id
-   */
-  public void submit(String instanceId) {
-    submit(instanceId, null);
-  }
-
-  private void submitOne(long tableId, long policyId) {
-    Optional<PolicyEntity> loaded = loadRunnablePolicy(policyId);
-    if (loaded.isEmpty()) {
-      return;
-    }
-    PolicyEntity policy = loaded.get();
-    Optional<String> templateName = MaintenanceJobTemplates.templateName(policy.policyType());
-    if (templateName.isEmpty()) {
-      LOG.warn(
-          "Skipping cron-job submit for policy {} with unsupported type {}",
-          policyId,
-          policy.policyType());
-      return;
     }
 
-    long minIntervalMs =
-        MaintenanceMinIntervalConfigs.resolve(
-            gravitinoConfig, policy.policyType(), policyMinIntervalMs(policy.content()));
     long nowMs = System.currentTimeMillis();
-    if (occupancyGate.shouldSkip(tableId, policyId, minIntervalMs, nowMs)) {
-      LOG.info(
-          "Skipping cron-job submit for table {} policy {} (in-flight or within minIntervalMs={})",
-          tableId,
-          policyId,
-          minIntervalMs);
-      return;
-    }
-
-    List<ResolvedTableRef> resolved = tableRefResolver.apply(List.of(tableId));
-    if (resolved.isEmpty()) {
-      LOG.warn(
-          "Skipping cron-job submit for table {} policy {}: could not resolve table identifier",
-          tableId,
-          policyId);
-      return;
-    }
-    ResolvedTableRef ref = resolved.get(0);
-
-    Optional<OccupancyClaim> claim =
-        actionMetaService.tryAcquireInFlight(tableId, policyId, claimTimeoutMs);
-    if (claim.isEmpty()) {
-      LOG.info(
-          "Skipping cron-job submit for table {} policy {} (lost soft-slot race)",
-          tableId,
-          policyId);
-      return;
-    }
-
-    Map<String, String> jobConf = jobConfBuilder.build(policy, ref.catalogName());
-    jobConf.put("catalog_name", ref.catalogName());
-    jobConf.put("table_identifier", ref.tableIdentifier());
-    jobConf.put(TMS_TABLE_ID_KEY, Long.toString(tableId));
-    runAndBind(policy, templateName.get(), jobConf, claim.get(), tableId);
-  }
-
-  /**
-   * One cron batch task, multiple tables: claim each eligible table and submit one single-table
-   * Spark job per table (same builtin expire-snapshots template as {@code table:...} rows).
-   */
-  private void submitBatch(List<Long> tableIds, long policyId) {
-    Optional<PolicyEntity> loaded = loadRunnablePolicy(policyId);
-    if (loaded.isEmpty()) {
-      return;
-    }
-    PolicyEntity policy = loaded.get();
-    if (policy.policyType() != Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION) {
-      LOG.warn(
-          "Skipping batch cron-job submit for policy {} with non-snapshot type {}",
-          policyId,
-          policy.policyType());
-      return;
-    }
-    Optional<String> templateName = MaintenanceJobTemplates.templateName(policy.policyType());
-    if (templateName.isEmpty()) {
-      LOG.warn("Skipping batch cron-job submit for policy {} without template", policyId);
-      return;
-    }
-
-    long minIntervalMs =
-        MaintenanceMinIntervalConfigs.resolve(
-            gravitinoConfig, policy.policyType(), policyMinIntervalMs(policy.content()));
-    long nowMs = System.currentTimeMillis();
-    List<Long> eligible = new ArrayList<>();
-    for (Long tableId : tableIds) {
-      if (occupancyGate.shouldSkip(tableId, policyId, minIntervalMs, nowMs)) {
+    // minInterval was gated at expand enqueue; pick only blocks on in-flight (minIntervalMs=0).
+    for (TableTarget target : snapshot.getTables()) {
+      if (occupancyGate.shouldSkip(target.getTableId(), policyId, 0L, nowMs)) {
         LOG.info(
-            "Skipping table {} in batch submit for policy {} (in-flight or within minIntervalMs={})",
-            tableId,
-            policyId,
-            minIntervalMs);
-        continue;
-      }
-      eligible.add(tableId);
-    }
-    if (eligible.isEmpty()) {
-      LOG.info("Skipping batch cron-job submit for policy {}: no eligible tables", policyId);
-      return;
-    }
-
-    List<ResolvedTableRef> resolved = tableRefResolver.apply(eligible);
-    if (resolved.isEmpty()) {
-      LOG.warn(
-          "Skipping batch cron-job submit for policy {}: could not resolve table identifiers {}",
-          policyId,
-          eligible);
-      return;
-    }
-
-    String template = templateName.get();
-    for (ResolvedTableRef ref : resolved) {
-      Optional<OccupancyClaim> claim =
-          actionMetaService.tryAcquireInFlight(ref.tableId(), policyId, claimTimeoutMs);
-      if (claim.isEmpty()) {
-        LOG.info(
-            "Skipping table {} in batch submit for policy {} (lost soft-slot race)",
-            ref.tableId(),
+            "Skipping table {} in cron-job {} (in-flight for policy {})",
+            target.getTableId(),
+            instanceId,
             policyId);
         continue;
       }
-
-      Map<String, String> jobConf = jobConfBuilder.build(policy, ref.catalogName());
-      jobConf.put("catalog_name", ref.catalogName());
-      jobConf.put("table_identifier", ref.tableIdentifier());
-      jobConf.put(TMS_TABLE_ID_KEY, Long.toString(ref.tableId()));
-      runAndBind(policy, template, jobConf, claim.get(), ref.tableId());
+      submitOne(snapshot, target, policyId);
     }
   }
 
+  private void submitOne(MaintenanceJobSnapshot snapshot, TableTarget target, long policyId) {
+    Optional<OccupancyClaim> claim =
+        actionMetaService.tryAcquireInFlight(target.getTableId(), policyId, claimTimeoutMs);
+    if (claim.isEmpty()) {
+      LOG.info(
+          "Skipping cron-job submit for table {} policy {} (lost soft-slot race)",
+          target.getTableId(),
+          policyId);
+      return;
+    }
+
+    Map<String, String> jobConf;
+    try {
+      jobConf = MaintenanceJobSnapshotFactory.jobConfForTable(snapshot.getJobConf(), target);
+    } catch (RuntimeException e) {
+      releaseClaimQuietly(claim.get());
+      LOG.warn(
+          "Skipping cron-job submit for table {} policy {}: invalid snapshot table target: {}",
+          target.getTableId(),
+          policyId,
+          e.toString());
+      return;
+    }
+    jobConf.putIfAbsent(MaintenanceJobTemplates.TMS_POLICY_ID_KEY, Long.toString(policyId));
+    runAndBind(snapshot.getMetalake(), jobConf, claim.get(), target.getTableId(), policyId);
+  }
+
   private void runAndBind(
-      PolicyEntity policy,
-      String templateName,
+      String metalake,
       Map<String, String> jobConf,
       OccupancyClaim claim,
-      long tableId) {
-    String metalake = policy.namespace().level(0);
+      long tableId,
+      long policyId) {
     Long jobId = null;
     try {
-      jobId = jobSubmitter.runJob(metalake, templateName, jobConf);
+      jobId =
+          jobSubmitter.runJob(
+              metalake, MaintenanceJobTemplates.TMS_ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
       actionMetaService.bindJobId(claim, jobId);
-      LOG.info(
-          "Submitted cron-job for table {} policy {} as job {} (template={})",
-          tableId,
-          policy.id(),
-          jobId,
-          templateName);
+      LOG.info("Submitted cron-job for table {} policy {} as job {}", tableId, policyId, jobId);
     } catch (RuntimeException e) {
       if (jobId != null) {
         cancelJobQuietly(metalake, jobId);
       }
       releaseClaimQuietly(claim);
       LOG.warn(
-          "Failed cron-job submit for table {} policy {} (template={}): {}",
-          tableId,
-          policy.id(),
-          templateName,
-          e.toString());
+          "Failed cron-job submit for table {} policy {}: {}", tableId, policyId, e.toString());
     }
   }
 
@@ -327,24 +191,6 @@ public final class MaintenanceSparkSubmitPipeline {
     }
   }
 
-  private Optional<PolicyEntity> loadRunnablePolicy(long policyId) {
-    Optional<PolicyEntity> loaded = policyLookup.findById(policyId);
-    if (loaded.isEmpty()) {
-      LOG.info("Skipping cron-job submit for missing policy {}", policyId);
-      return Optional.empty();
-    }
-    PolicyEntity policy = loaded.get();
-    if (!policy.enabled() || !isMaintenance(policy)) {
-      LOG.info(
-          "Skipping cron-job submit for policy {} (enabled={}, maintenance={})",
-          policyId,
-          policy.enabled(),
-          isMaintenance(policy));
-      return Optional.empty();
-    }
-    return Optional.of(policy);
-  }
-
   private void releaseClaimQuietly(OccupancyClaim claim) {
     try {
       actionMetaService.deleteById(claim.id());
@@ -352,31 +198,5 @@ public final class MaintenanceSparkSubmitPipeline {
       LOG.warn(
           "Failed to release occupancy claim {} after submit failure", claim.id(), releaseError);
     }
-  }
-
-  private static boolean isMaintenance(PolicyEntity policy) {
-    return MaintenancePolicyDefinitions.isMaintenance(policy.policyType())
-        && isMaintenanceContent(policy.content());
-  }
-
-  private static boolean isMaintenanceContent(@Nullable PolicyContent content) {
-    if (content == null) {
-      return false;
-    }
-    for (Policy.BuiltInType type : Policy.BuiltInType.values()) {
-      if (MaintenancePolicyDefinitions.isMaintenance(type)
-          && type.contentClass().isInstance(content)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  @Nullable
-  private static Long policyMinIntervalMs(@Nullable PolicyContent content) {
-    if (!(content instanceof ExecutablePolicyContent)) {
-      return null;
-    }
-    return ((ExecutablePolicyContent) content).executionSpec().minIntervalMs();
   }
 }

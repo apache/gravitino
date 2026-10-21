@@ -163,6 +163,10 @@ gravitino.lance-rest.namespace-backend = gravitino
 # Iceberg REST / Spark auth passthrough overlaid onto policy jobOptions, then packed into spark_conf.
 # gravitino.maintenance.ircAuth.rest.auth.type = none
 
+# IRC → commit-job listener (§5.2.3). Requires colocated iceberg-rest aux service and TMS Feature.
+# gravitino.eventListener.names = tms-commit-job
+# gravitino.eventListener.tms-commit-job.class = org.apache.gravitino.maintenance.listener.IcebergUpdateTableEventListener
+
 # THE CONFIGURATION FOR sensitive property key matching
 # Comma-separated keywords. Each entry is a literal substring, not a regular expression.
 # This list replaces the default (secret,password,token,credential,access,account).
