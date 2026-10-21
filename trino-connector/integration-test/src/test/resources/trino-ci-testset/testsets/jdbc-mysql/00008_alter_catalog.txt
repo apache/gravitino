@@ -1,33 +1,17 @@
 CALL
 
-<<<<<<< HEAD
-"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false""}","test"
+"gt_mysql_xxx1","jdbc-mysql","{""credential-providers"":""jdbc-user-password"",""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false""}","test"
 
 CALL
 
-"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""test_key"":""test_value"",""trino.bypass.join-pushdown.strategy"":""EAGER""}","test"
+"gt_mysql_xxx1","jdbc-mysql","{""credential-providers"":""jdbc-user-password"",""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""test_key"":""test_value"",""trino.bypass.join-pushdown.strategy"":""EAGER""}","test"
 
 CALL
 
-"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""test_key"":""test_value""}","test"
+"gt_mysql_xxx1","jdbc-mysql","{""credential-providers"":""jdbc-user-password"",""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""test_key"":""test_value""}","test"
 
 CALL
 
-"gt_mysql_xxx1","jdbc-mysql","{""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""trino.bypass.join-pushdown.strategy"":""EAGER""}","test"
-=======
-"gt_mysql_xxx1","jdbc-mysql","{""credential-providers"":""jdbc-user-password"",""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""******"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino""}","test"
-
-CALL
-
-"gt_mysql_xxx1","jdbc-mysql","{""credential-providers"":""jdbc-user-password"",""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""******"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""test_key"":""test_value"",""trino.bypass.join-pushdown.strategy"":""EAGER""}","test"
-
-CALL
-
-"gt_mysql_xxx1","jdbc-mysql","{""credential-providers"":""jdbc-user-password"",""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""******"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""test_key"":""test_value""}","test"
-
-CALL
-
-"gt_mysql_xxx1","jdbc-mysql","{""credential-providers"":""jdbc-user-password"",""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-password"":""******"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""trino.bypass.join-pushdown.strategy"":""EAGER""}","test"
->>>>>>> 7cad7718d ([#14029] fix(core): Expose inferred credential-providers in catalog properties (#14030))
+"gt_mysql_xxx1","jdbc-mysql","{""credential-providers"":""jdbc-user-password"",""in-use"":""true"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""trino.bypass.join-pushdown.strategy"":""EAGER""}","test"
 
 CALL
