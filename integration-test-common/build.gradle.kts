@@ -52,8 +52,12 @@ dependencies {
   testImplementation(libs.junit.platform.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.clickhouse)
   testImplementation(libs.testcontainers.jdbc)
+  testImplementation(libs.testcontainers.kafka)
+  testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.oceanbase)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.ranger.intg) {
     exclude("org.apache.hadoop", "hadoop-common")
@@ -93,9 +97,13 @@ configurations {
 }
 
 dependencies {
-  // The shared MySQL and PostgreSQL containers build on these Testcontainers modules, so
-  // every module that uses the test artifacts needs them at test runtime.
+  // The shared containers build on these Testcontainers modules, so every module that uses the
+  // test artifacts needs them at test runtime.
+  "testArtifacts"(libs.testcontainers.clickhouse)
+  "testArtifacts"(libs.testcontainers.kafka)
+  "testArtifacts"(libs.testcontainers.localstack)
   "testArtifacts"(libs.testcontainers.mysql)
+  "testArtifacts"(libs.testcontainers.oceanbase)
   "testArtifacts"(libs.testcontainers.postgresql)
   // The container classes wait with Awaitility, which Gravitino's code style imports unshaded.
   "testArtifacts"(libs.awaitility)

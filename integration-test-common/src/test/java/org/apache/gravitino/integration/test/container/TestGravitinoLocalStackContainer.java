@@ -20,28 +20,26 @@ package org.apache.gravitino.integration.test.container;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.wait.strategy.HttpWaitStrategy;
+import org.testcontainers.utility.DockerImageName;
 
-/** Tests the LocalStack readiness check without Docker. */
+/**
+ * Tests the LocalStack image handling without Docker. Building the container itself needs Docker,
+ * as the module asks it for its socket path.
+ */
 public class TestGravitinoLocalStackContainer {
 
   @Test
-  void testWaitsForTheHealthEndpoint() {
-    GravitinoLocalStackContainer container = GravitinoLocalStackContainer.builder().build();
+  void testImagesStandInForTheModuleImage() {
+    DockerImageName module = DockerImageName.parse("localstack/localstack");
+    for (String image :
+        new String[] {
+          TestImages.LOCALSTACK, "mirror.example.com/localstack/localstack:4.14.0", "localstack:4"
+        }) {
+      DockerImageName name = GravitinoLocalStackContainer.imageName(image);
 
-    Assertions.assertInstanceOf(HttpWaitStrategy.class, container.waitStrategy());
-  }
-
-  @Test
-  void testS3MustBeAvailableOrRunning() {
-    Assertions.assertTrue(
-        GravitinoLocalStackContainer.reportsS3Ready(
-            "{\"services\": {\"iam\": \"available\", \"s3\": \"available\"}, \"edition\": \"community\"}"));
-    Assertions.assertTrue(
-        GravitinoLocalStackContainer.reportsS3Ready("{\"services\":{\"s3\":\"running\"}}"));
-    Assertions.assertFalse(
-        GravitinoLocalStackContainer.reportsS3Ready("{\"services\":{\"s3\":\"starting\"}}"));
-    Assertions.assertFalse(
-        GravitinoLocalStackContainer.reportsS3Ready("{\"services\":{\"sqs\":\"running\"}}"));
+      Assertions.assertTrue(name.isCompatibleWith(module), image);
+      Assertions.assertEquals(
+          DockerImageName.parse(image).asCanonicalNameString(), name.asCanonicalNameString());
+    }
   }
 }

@@ -445,13 +445,10 @@ class SharedContainers {
           OceanBaseContainer.Builder oceanBaseBuilder =
               OceanBaseContainer.builder()
                   .withHostName("gravitino-ci-oceanbase")
+                  // The module sets MODE (mini) and OB_TENANT_PASSWORD.
                   .withEnvVars(
                       ImmutableMap.of(
-                          "MODE",
-                          "MINI",
                           "OB_SYS_PASSWORD",
-                          OceanBaseContainer.PASSWORD,
-                          "OB_TENANT_PASSWORD",
                           OceanBaseContainer.PASSWORD,
                           "OB_DATAFILE_SIZE",
                           "1G",

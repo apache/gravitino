@@ -24,13 +24,39 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 
-/** Tests the Kafka readiness probe against a local socket; nothing here starts a container. */
+/**
+ * Tests the Kafka container as built on the Testcontainers module, and its readiness probe against
+ * a local socket; nothing here starts a container.
+ */
 public class TestKafkaContainer {
+
+  @Test
+  void testRunsOnTheKafkaModuleWithItsListenerLayout() {
+    KafkaContainer kafka = KafkaContainer.builder().build();
+    GenericContainer<?> container = kafka.getContainer();
+
+    Assertions.assertInstanceOf(org.testcontainers.kafka.KafkaContainer.class, container);
+    Map<String, String> env = container.getEnvMap();
+    Assertions.assertTrue(env.get("KAFKA_LISTENERS").contains("PLAINTEXT://0.0.0.0:9092"));
+    Assertions.assertEquals("BROKER", env.get("KAFKA_INTER_BROKER_LISTENER_NAME"));
+    Assertions.assertEquals("9092", env.get("DEFAULT_BROKER_PORT"));
+    Assertions.assertTrue(container.getExposedPorts().contains(KafkaContainer.DEFAULT_BROKER_PORT));
+    Assertions.assertInstanceOf(WaitAllStrategy.class, kafka.waitStrategy());
+  }
+
+  @Test
+  void testAcceptsAMirroredImage() {
+    Assertions.assertDoesNotThrow(
+        () -> KafkaContainer.builder().withImage("mirror.example.com/apache/kafka:3.7.0").build());
+  }
 
   @Test
   void testProbeSendsApiVersionsAndAcceptsTheMatchingAnswer() throws Exception {

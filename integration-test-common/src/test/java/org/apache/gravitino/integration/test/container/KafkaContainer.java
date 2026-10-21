@@ -39,7 +39,14 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 import org.testcontainers.containers.wait.strategy.WaitStrategy;
+import org.testcontainers.utility.DockerImageName;
 
+/**
+ * A single KRaft broker on the official {@code org.testcontainers.kafka.KafkaContainer} module,
+ * which runs the {@code apache/kafka} image that {@link TestImages#KAFKA} names. The module owns
+ * the listener layout; the mounted {@code run} script only advertises the container IP on {@link
+ * #DEFAULT_BROKER_PORT}, which callers use as the bootstrap address.
+ */
 public class KafkaContainer extends BaseContainer {
 
   public static final int DEFAULT_BROKER_PORT = 9092;
@@ -48,6 +55,8 @@ public class KafkaContainer extends BaseContainer {
   private static final String KAFKA_LOGS_DIR = "/opt/kafka/logs";
   private static final short API_VERSIONS_KEY = 18;
   private static final int PROBE_CORRELATION_ID = 0x6772;
+  // The module's own readiness line: the broker has left recovery and is unfenced.
+  private static final String RUNNING_LOG = ".*Transitioning from RECOVERY to RUNNING.*";
 
   protected KafkaContainer(
       String image,
@@ -57,7 +66,7 @@ public class KafkaContainer extends BaseContainer {
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
-    super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+    super(module(image), hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
   public static Builder builder() {
@@ -85,10 +94,12 @@ public class KafkaContainer extends BaseContainer {
     }
   }
 
+  // The module waits for its log line, which the broker writes just before it serves requests; the
+  // ApiVersions request checks that it does.
   @Override
   protected WaitStrategy waitStrategy() {
     return new WaitAllStrategy()
-        .withStrategy(Wait.forListeningPort())
+        .withStrategy(Wait.forLogMessage(RUNNING_LOG, 1))
         .withStrategy(
             new ProbeWaitStrategy(
                 "Kafka to answer an ApiVersions request",
@@ -100,7 +111,7 @@ public class KafkaContainer extends BaseContainer {
                 }));
   }
 
-  // The port check's five minutes plus the minute the ApiVersions check had before.
+  // The log line's five minutes plus the minute the ApiVersions check had before.
   @Override
   protected Duration startupTimeout() {
     return Duration.ofMinutes(6);
@@ -133,21 +144,21 @@ public class KafkaContainer extends BaseContainer {
     }
   }
 
+  private static org.testcontainers.kafka.KafkaContainer module(String image) {
+    // The image may be a mirror or a custom tag; the module only needs an apache/kafka image.
+    // Its environment holds the KRaft layout: PLAINTEXT on 9092, the inter-broker listener on
+    // 9093 and the controller on 9094.
+    return new org.testcontainers.kafka.KafkaContainer(
+        DockerImageName.parse(image).asCompatibleSubstituteFor("apache/kafka"));
+  }
+
   public static class Builder extends BaseContainer.Builder<Builder, KafkaContainer> {
     private Builder() {
       this.image = DEFAULT_KAFKA_IMAGE;
       this.hostName = DEFAULT_HOST_NAME;
       this.exposePorts = ImmutableSet.of(DEFAULT_BROKER_PORT);
-      this.envVars =
-          ImmutableMap.<String, String>builder()
-              .put("KAFKA_PROCESS_ROLES", "broker,controller")
-              .put("KAFKA_NODE_ID", "1")
-              .put("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@" + hostName + ":9093")
-              .put("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
-              .put("KAFKA_LISTENERS", "PLAINTEXT://:" + DEFAULT_BROKER_PORT + ",CONTROLLER://:9093")
-              .put("DEFAULT_BROKER_PORT", String.valueOf(DEFAULT_BROKER_PORT))
-              .put("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
-              .build();
+      // The run script advertises PLAINTEXT on this port.
+      this.envVars = ImmutableMap.of("DEFAULT_BROKER_PORT", String.valueOf(DEFAULT_BROKER_PORT));
 
       String rootDir = System.getenv("GRAVITINO_ROOT_DIR");
       Preconditions.checkArgument(rootDir != null, "GRAVITINO_ROOT_DIR is not set");
