@@ -111,6 +111,15 @@ public class TestBuiltInJobTemplateProvider {
     expected.put(
         "builtin-iceberg-rewrite-data-files",
         ImmutableSet.<String>builder().addAll(icebergCatalog).add("where_clause").build());
+    expected.put(
+        "builtin-tms-iceberg-maintenance",
+        ImmutableSet.<String>builder()
+            .addAll(icebergCatalog)
+            .add("maintenance_type")
+            .add("gravitino_job_id")
+            .add("tms_table_id")
+            .add("tms_policy_id")
+            .build());
 
     for (JobTemplate template : new BuiltInJobTemplateProvider().jobTemplates()) {
       Set<String> required = new JobTemplateResolver(toEntity(template)).requiredParameters();
