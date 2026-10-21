@@ -372,9 +372,8 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
   private String updateColumnNullabilityDefinition(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
-    validateUpdateColumnNullable(change, table);
+    JdbcColumn column = validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
     JdbcColumn updateColumn =
         JdbcColumn.builder()
             .withName(col)

@@ -657,12 +657,19 @@ public abstract class JdbcTableOperations implements TableOperation {
     return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
   }
 
-  protected void validateUpdateColumnNullable(
+  /**
+   * Validates a nullability change and returns the column it applies to.
+   *
+   * @param change the nullability change
+   * @param table the table that contains the column
+   * @return the current column
+   */
+  protected JdbcColumn validateUpdateColumnNullable(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
     if (change.fieldName().length > 1) {
       throw new UnsupportedOperationException("Nested column names are not supported");
     }
-    getJdbcColumnFromTable(table, change.fieldName()[0]);
+    return getJdbcColumnFromTable(table, change.fieldName()[0]);
   }
 
   /**

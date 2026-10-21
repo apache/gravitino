@@ -55,6 +55,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
@@ -369,9 +370,23 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
             (TableChange.UpdateColumnNullability) change;
 
         lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
-        validateUpdateColumnNullable(updateColumnNullability, lazyLoadTable);
+        JdbcColumn column = validateUpdateColumnNullable(updateColumnNullability, lazyLoadTable);
 
         alterSql.add(updateColumnNullabilityDefinition(updateColumnNullability, tableName));
+        // A NULL default conflicts with NOT NULL, so drop it when the column becomes non-nullable.
+        if (!updateColumnNullability.nullable() && Literals.NULL.equals(column.defaultValue())) {
+          alterSql.add(
+              ALTER_TABLE
+                  + PG_QUOTE
+                  + tableName
+                  + PG_QUOTE
+                  + " "
+                  + ALTER_COLUMN
+                  + PG_QUOTE
+                  + updateColumnNullability.fieldName()[0]
+                  + PG_QUOTE
+                  + " DROP DEFAULT;");
+        }
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition(tableName, (TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {

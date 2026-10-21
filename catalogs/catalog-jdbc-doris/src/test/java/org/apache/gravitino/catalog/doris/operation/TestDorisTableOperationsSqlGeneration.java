@@ -156,6 +156,31 @@ public class TestDorisTableOperationsSqlGeneration {
     }
   }
 
+  /** Verifies a nullable column cannot be changed to not null. */
+  @Test
+  public void testUpdateColumnNullabilityRejectsNullableToNotNull() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    ops.setTableForAlter(
+        JdbcTable.builder().withName("test_table").withColumns(new JdbcColumn[] {column}).build());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.updateColumnNullability(new String[] {"col1"}, false)));
+    Assertions.assertEquals(
+        "Doris does not support changing nullable column col1 to not null", exception.getMessage());
+  }
+
   /** Verifies string defaults and unchanged column attributes are preserved. */
   @Test
   public void testUpdateColumnTypePreservesStringDefaultAndColumnAttributes() {

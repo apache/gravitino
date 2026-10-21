@@ -236,7 +236,12 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     assertionsTableInfo(
         newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
-    // a nullable column without default value can be changed back to not null
+    // a nullable column with a NULL default can be changed back to not null, and the NULL
+    // default is dropped
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME,
+        newName,
+        TableChange.updateColumnDefaultValue(new String[] {"col_2"}, Literals.NULL));
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME, newName, TableChange.updateColumnNullability(new String[] {"col_2"}, false));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
