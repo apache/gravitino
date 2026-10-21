@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.annotations.VisibleForTesting;
+import java.util.function.LongFunction;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -41,6 +42,7 @@ import org.apache.gravitino.maintenance.injob.InJobGateOutcome;
 import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobPipeline;
 import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobSampler;
 import org.apache.gravitino.maintenance.injob.TypeDispatchingInJobRecommender;
+import org.apache.gravitino.maintenance.storage.MetalakeNames;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
@@ -73,6 +75,9 @@ public class TableMaintenanceActionOperations {
   private final TableMaintenanceInJobPipeline pipeline;
   private final TableMaintenanceActionMetaService actionMetaService;
   private final TableSnapshotMetricsMetaService metricsMetaService;
+  private final LongFunction<String> metalakeLookup;
+
+  @Context private HttpServletRequest httpRequest;
 
   /** Production wiring with default sampler / type-dispatching recommender. */
   public TableMaintenanceActionOperations() {
@@ -80,24 +85,30 @@ public class TableMaintenanceActionOperations {
         new TableMaintenanceInJobPipeline(
             new TableMaintenanceInJobSampler(), new TypeDispatchingInJobRecommender()),
         TableMaintenanceActionMetaService.getInstance(),
-        TableSnapshotMetricsMetaService.getInstance());
+        TableSnapshotMetricsMetaService.getInstance(),
+        MetalakeNames::forTableId);
   }
 
   @VisibleForTesting
   TableMaintenanceActionOperations(
       TableMaintenanceInJobPipeline pipeline,
       TableMaintenanceActionMetaService actionMetaService,
-      TableSnapshotMetricsMetaService metricsMetaService) {
+      TableSnapshotMetricsMetaService metricsMetaService,
+      LongFunction<String> metalakeLookup) {
     this.pipeline = pipeline;
     this.actionMetaService = actionMetaService;
     this.metricsMetaService = metricsMetaService;
+    this.metalakeLookup = metalakeLookup;
   }
-
-  @Context private HttpServletRequest httpRequest;
 
   /**
    * Persists S0 metrics + {@code before_snapshot_id}, then returns continue vs stop (drift /
    * recommender).
+   *
+   * @param metalake metalake name from the request path (must own the action's table)
+   * @param jobId Gravitino job run id bound to the action
+   * @param request sample payload
+   * @return gate outcome
    */
   @POST
   @Path("{jobId}/sample")
@@ -121,6 +132,7 @@ public class TableMaintenanceActionOperations {
             if (action == null) {
               throw new NoSuchEntityException("no maintenance action for job_id=%s", jobId);
             }
+            requireActionInMetalake(action, metalake);
             requireActionMatchesRequest(action, request.getTableId(), request.getPolicyId());
             InJobGateOutcome outcome =
                 pipeline.gateCronJob(
@@ -152,6 +164,11 @@ public class TableMaintenanceActionOperations {
   /**
    * Optionally persists S1 metrics, then marks {@code table_maintenance_action} finished with
    * {@code after_snapshot_id}.
+   *
+   * @param metalake metalake name from the request path (must own the action's table)
+   * @param jobId Gravitino job run id bound to the action
+   * @param request finish payload
+   * @return empty success response
    */
   @POST
   @Path("{jobId}/finish")
@@ -175,6 +192,7 @@ public class TableMaintenanceActionOperations {
             if (action == null) {
               throw new NoSuchEntityException("no maintenance action for job_id=%s", jobId);
             }
+            requireActionInMetalake(action, metalake);
             if (request.getAfterSnapshotId() != null
                 && StringUtils.isNotBlank(request.getMetricsJson())) {
               metricsMetaService.insertMetrics(
@@ -209,6 +227,22 @@ public class TableMaintenanceActionOperations {
           String.format(
               "request tableId/policyId (%s/%s) do not match action for job_id=%s (%s/%s)",
               tableId, policyId, action.jobId(), action.tableId(), action.policyId()));
+    }
+  }
+
+  /**
+   * Ensures the path metalake matches the table that owns the action (same scoping pattern as job
+   * REST APIs under {@code /metalakes/{metalake}/jobs/...}).
+   */
+  private void requireActionInMetalake(TableMaintenanceActionPO action, String metalake) {
+    String actionMetalake = metalakeLookup.apply(action.tableId());
+    if (actionMetalake == null) {
+      throw new NoSuchEntityException(
+          "no metalake for table_id=%s (job_id=%s)", action.tableId(), action.jobId());
+    }
+    if (!actionMetalake.equals(metalake)) {
+      throw new NoSuchEntityException(
+          "no maintenance action for job_id=%s under metalake %s", action.jobId(), metalake);
     }
   }
 }

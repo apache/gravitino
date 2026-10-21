@@ -169,7 +169,9 @@ components:
         stopReason:
           type: string
           nullable: true
-          description: SNAPSHOT_DRIFT or RECOMMENDER_SKIP when stopping
+          description: >
+            Present when continueMaintenance is false. Wire values are SNAPSHOT_DRIFT or
+            RECOMMENDER_SKIP.
         sampledSnapshotId:
           type: integer
           format: int64
@@ -197,7 +199,6 @@ components:
       value: {
         "code": 0,
         "continueMaintenance": true,
-        "stopReason": null,
         "sampledSnapshotId": 9001,
         "headSnapshotId": 9001
       }

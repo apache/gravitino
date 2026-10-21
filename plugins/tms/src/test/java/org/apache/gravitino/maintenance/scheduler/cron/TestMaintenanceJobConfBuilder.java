@@ -142,7 +142,7 @@ class TestMaintenanceJobConfBuilder {
   }
 
   @Test
-  void testPolicyUpdaterOptionsOverrideClusterUri() {
+  void testPolicyUpdaterOptionsOverrideClusterUriButNotMetalake() {
     Config config = configWithUri();
     PolicyEntity policy =
         PolicyEntity.builder()
@@ -176,7 +176,9 @@ class TestMaintenanceJobConfBuilder {
 
     Assertions.assertTrue(
         conf.get("updater_options").contains("\"gravitino_uri\":\"http://policy-uri:8090\""));
-    Assertions.assertTrue(conf.get("updater_options").contains("\"metalake\":\"policy-ml\""));
+    // Path metalake always comes from the policy namespace, never policy updaterOptions.
+    Assertions.assertTrue(conf.get("updater_options").contains("\"metalake\":\"ml\""));
+    Assertions.assertFalse(conf.get("updater_options").contains("policy-ml"));
   }
 
   private static Config configWithUri() {

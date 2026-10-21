@@ -18,16 +18,10 @@
  */
 package org.apache.gravitino.maintenance.injob;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
 import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
 import org.apache.gravitino.maintenance.scheduler.RelationalPolicyLookup;
@@ -76,7 +70,7 @@ public final class CompactionInJobRecommender implements InJobRecommender {
     if (compaction == null) {
       return RecommendDecision.SKIP;
     }
-    Map<String, Object> metrics = parseMetricValues(metricsJson);
+    Map<String, Object> metrics = MetricsJson.parseNumericValues(metricsJson);
     if (metrics.isEmpty()
         || !metrics.containsKey(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)
         || !metrics.containsKey(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC)) {
@@ -119,32 +113,5 @@ public final class CompactionInJobRecommender implements InJobRecommender {
       return null;
     }
     return (IcebergDataCompactionContent) content;
-  }
-
-  private static Map<String, Object> parseMetricValues(String metricsJson) {
-    Map<String, Object> metrics = new HashMap<>();
-    if (metricsJson == null || metricsJson.trim().isEmpty()) {
-      return metrics;
-    }
-    try {
-      JsonNode root = JsonUtils.anyFieldMapper().readTree(metricsJson);
-      Iterator<Entry<String, JsonNode>> fields = root.fields();
-      while (fields.hasNext()) {
-        Entry<String, JsonNode> field = fields.next();
-        JsonNode value = field.getValue();
-        if (value == null || value.isNull() || !value.isNumber()) {
-          continue;
-        }
-        if (value.isIntegralNumber()) {
-          metrics.put(field.getKey(), value.longValue());
-        } else {
-          metrics.put(field.getKey(), value.doubleValue());
-        }
-      }
-      return metrics;
-    } catch (IOException | RuntimeException e) {
-      LOG.warn("Failed to parse compaction metrics JSON: {}", e.toString());
-      return metrics;
-    }
   }
 }

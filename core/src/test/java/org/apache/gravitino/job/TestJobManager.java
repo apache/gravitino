@@ -826,6 +826,47 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobInjectsGravitinoJobIdAndRejectsMismatch() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity shellJobTemplate =
+        newShellJobTemplateEntity("shell_job", "A shell job template");
+    when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
+
+    String jobExecutionId = "job_execution_id_for_gravitino_job_id";
+    when(jobExecutor.submitJob(any(), any())).thenReturn(jobExecutionId);
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    IdGenerator fixedIdGenerator = Mockito.mock(IdGenerator.class);
+    when(fixedIdGenerator.nextId()).thenReturn(777L);
+    JobManager fixedIdJobManager =
+        Mockito.spy(new JobManager(config, entityStore, fixedIdGenerator, jobExecutor));
+    try {
+      fixedIdJobManager.cleanUpExecutor.shutdownNow();
+      fixedIdJobManager.statusPullExecutor.shutdownNow();
+      when(fixedIdJobManager.getJobTemplate(metalake, shellJobTemplate.name()))
+          .thenReturn(shellJobTemplate);
+
+      JobEntity matching =
+          fixedIdJobManager.runJob(
+              metalake, "shell_job", Collections.singletonMap("gravitino_job_id", "777"));
+      Assertions.assertEquals(777L, matching.id());
+
+      IllegalArgumentException mismatch =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  fixedIdJobManager.runJob(
+                      metalake, "shell_job", Collections.singletonMap("gravitino_job_id", "999")));
+      Assertions.assertTrue(mismatch.getMessage().contains("gravitino_job_id"));
+    } finally {
+      fixedIdJobManager.close();
+    }
+  }
+
+  @Test
   public void testRunJobQueuesJobBeforeSubmission() throws IOException {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))

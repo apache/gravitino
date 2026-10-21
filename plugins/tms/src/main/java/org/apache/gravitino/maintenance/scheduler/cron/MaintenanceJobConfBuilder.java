@@ -45,8 +45,9 @@ import org.apache.gravitino.policy.PolicyExecutionSpec;
 /**
  * Builds {@code runJob} configuration for TMS cron Spark submits.
  *
- * <p>Maps typed policy content onto procedure placeholders (same fields the optimizer adapters
- * emit), keeps catalog / Spark resource keys as top-level jobConf, and packs Iceberg REST / {@code
+ * <p>Maps typed compaction / orphan policy fields onto procedure placeholders; expire and manifest
+ * rewrite remain jobOptions passthrough until those content types grow real thresholds. Keeps
+ * catalog / Spark resource keys as top-level jobConf, and packs Iceberg REST / {@code
  * gravitino.maintenance.ircAuth.*} passthrough properties into {@code spark_conf} under {@code
  * spark.sql.catalog.<catalogName>.} so SparkSession can authenticate to IRC.
  */
@@ -168,8 +169,10 @@ final class MaintenanceJobConfBuilder {
     if (overlaid != null) {
       updaterOptions.putAll(overlaid);
     }
+    // Callback metalake must match the policy namespace (authz path + job scope). Policy
+    // updaterOptions must not redirect sample/finish to another metalake.
     String metalake = policy.namespace().level(0);
-    updaterOptions.putIfAbsent("metalake", metalake);
+    updaterOptions.put("metalake", metalake);
 
     Optional<String> configuredUri =
         gravitinoConfig.get(MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_URI);
@@ -185,11 +188,6 @@ final class MaintenanceJobConfBuilder {
       throw new IllegalArgumentException(
           "updater_options.gravitino_uri is required for TMS cron Spark submit; set policy "
               + "updaterOptions.gravitino_uri or gravitino.maintenance.gravitinoUri");
-    }
-    String resolvedMetalake = updaterOptions.get("metalake");
-    if (resolvedMetalake == null || resolvedMetalake.trim().isEmpty()) {
-      throw new IllegalArgumentException(
-          "updater_options.metalake is required for TMS cron Spark submit");
     }
     return updaterOptions;
   }

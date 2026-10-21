@@ -19,23 +19,17 @@
 package org.apache.gravitino.maintenance.occupancy;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.storage.MetalakeNames;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
-import org.apache.gravitino.storage.relational.po.MetalakePO;
-import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
-import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
@@ -187,7 +181,7 @@ public final class OccupancyGate {
 
   @Nullable
   private static JobEntity loadJob(long jobId, long tableId) {
-    String metalake = metalakeNameForTable(tableId);
+    String metalake = MetalakeNames.forTableId(tableId);
     if (metalake == null) {
       return null;
     }
@@ -197,21 +191,5 @@ public final class OccupancyGate {
     } catch (NoSuchEntityException e) {
       return null;
     }
-  }
-
-  @Nullable
-  private static String metalakeNameForTable(long tableId) {
-    List<TablePO> tables =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.listTablePOsByTableIds(Collections.singletonList(tableId)));
-    if (tables == null || tables.isEmpty()) {
-      return null;
-    }
-    MetalakePO metalake =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaById(tables.get(0).getMetalakeId()));
-    return metalake == null ? null : metalake.getMetalakeName();
   }
 }

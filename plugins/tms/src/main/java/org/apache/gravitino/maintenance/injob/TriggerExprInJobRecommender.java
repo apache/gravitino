@@ -18,16 +18,11 @@
  */
 package org.apache.gravitino.maintenance.injob;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
 import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
 import org.apache.gravitino.maintenance.scheduler.RelationalPolicyLookup;
@@ -39,12 +34,14 @@ import org.slf4j.LoggerFactory;
 /**
  * In-job recommender that evaluates policy {@code trigger-expr} with the shared QL stack (numeric
  * rules + sampled metric bindings). Used for types whose content already exposes a real
- * trigger-expr (for example orphan cleanup {@code true}).
+ * trigger-expr (for example orphan cleanup {@code true}, expire/manifest placeholders {@code
+ * false}).
  */
 public final class TriggerExprInJobRecommender implements InJobRecommender {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerExprInJobRecommender.class);
 
+  /** Shared rule key on all Iceberg maintenance policy contents. */
   private static final String TRIGGER_EXPR_KEY = "trigger-expr";
 
   private final PolicyLookup policyLookup;
@@ -100,7 +97,7 @@ public final class TriggerExprInJobRecommender implements InJobRecommender {
                 // Non-numeric rule values are not QL bindings.
               }
             });
-    context.putAll(parseMetricValues(metricsJson));
+    context.putAll(MetricsJson.parseNumericValues(metricsJson));
 
     boolean maintain = evaluator.evaluateBool(expression, context);
     LOG.info(
@@ -124,32 +121,5 @@ public final class TriggerExprInJobRecommender implements InJobRecommender {
       return null;
     }
     return loaded.get().content();
-  }
-
-  private static Map<String, Object> parseMetricValues(String metricsJson) {
-    Map<String, Object> metrics = new HashMap<>();
-    if (metricsJson == null || metricsJson.trim().isEmpty()) {
-      return metrics;
-    }
-    try {
-      JsonNode root = JsonUtils.anyFieldMapper().readTree(metricsJson);
-      Iterator<Entry<String, JsonNode>> fields = root.fields();
-      while (fields.hasNext()) {
-        Entry<String, JsonNode> field = fields.next();
-        JsonNode value = field.getValue();
-        if (value == null || value.isNull() || !value.isNumber()) {
-          continue;
-        }
-        if (value.isIntegralNumber()) {
-          metrics.put(field.getKey(), value.longValue());
-        } else {
-          metrics.put(field.getKey(), value.doubleValue());
-        }
-      }
-      return metrics;
-    } catch (IOException | RuntimeException e) {
-      LOG.warn("Failed to parse metrics JSON for trigger-expr: {}", e.toString());
-      return metrics;
-    }
   }
 }

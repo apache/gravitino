@@ -38,11 +38,12 @@ into `updater_options` for Spark → Gravitino callbacks), and `gravitino.mainte
 overlays policy `jobOptions`. Auth wins on duplicate keys. Non-template IRC keys are then packed
 into `spark_conf` as `spark.sql.catalog.<catalog>.*` so Spark Iceberg REST catalogs can authenticate.
 
-Cron also injects callback identity into `updater_options` when missing from the policy:
+Cron also injects callback identity into `updater_options`:
 
-- `metalake` — from the policy namespace
-- `gravitino_uri` — from `gravitino.maintenance.gravitinoUri` (policy `updaterOptions.gravitino_uri`
-  may override). Submit fails closed if neither source provides a URI.
+- `metalake` — always from the policy namespace (policy `updaterOptions.metalake` cannot redirect
+  sample/finish to another metalake)
+- `gravitino_uri` — from `gravitino.maintenance.gravitinoUri` when the policy does not set
+  `updaterOptions.gravitino_uri`. Submit fails closed if neither source provides a URI.
 
 ```properties
 gravitino.maintenance.gravitinoUri = http://localhost:8090

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.function.LongFunction;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.requests.MaintenanceActionFinishRequest;
@@ -53,6 +54,7 @@ class TestTableMaintenanceActionOperations {
   private TableMaintenanceInJobPipeline pipeline;
   private TableMaintenanceActionMetaService actions;
   private TableSnapshotMetricsMetaService metrics;
+  private LongFunction<String> metalakeLookup;
   private TableMaintenanceActionOperations ops;
 
   @BeforeEach
@@ -60,7 +62,8 @@ class TestTableMaintenanceActionOperations {
     pipeline = mock(TableMaintenanceInJobPipeline.class);
     actions = mock(TableMaintenanceActionMetaService.class);
     metrics = mock(TableSnapshotMetricsMetaService.class);
-    ops = new TableMaintenanceActionOperations(pipeline, actions, metrics);
+    metalakeLookup = tableId -> METALAKE;
+    ops = new TableMaintenanceActionOperations(pipeline, actions, metrics, metalakeLookup);
     ops.setHttpRequest(mock(HttpServletRequest.class));
   }
 
@@ -86,6 +89,23 @@ class TestTableMaintenanceActionOperations {
   @Test
   void testSampleMissingActionReturns404() {
     when(actions.getByJobId(JOB_ID)).thenReturn(null);
+
+    Response response =
+        ops.sample(
+            METALAKE,
+            JOB_ID,
+            new MaintenanceActionSampleRequest(TABLE_ID, POLICY_ID, 100L, 100L, "{\"m\":1}"));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    verify(pipeline, never())
+        .gateCronJob(anyLong(), anyLong(), anyLong(), anyLong(), anyString(), any());
+  }
+
+  @Test
+  void testSampleWrongMetalakeReturns404() {
+    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+    ops = new TableMaintenanceActionOperations(pipeline, actions, metrics, tableId -> "other-ml");
+    ops.setHttpRequest(mock(HttpServletRequest.class));
 
     Response response =
         ops.sample(

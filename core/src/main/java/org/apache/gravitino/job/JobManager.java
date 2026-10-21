@@ -510,7 +510,17 @@ public class JobManager implements JobOperationDispatcher {
     if (jobConf != null) {
       resolvedConf.putAll(jobConf);
     }
-    resolvedConf.put("gravitino_job_id", Long.toString(jobId));
+    String allocatedJobId = Long.toString(jobId);
+    String callerJobId = resolvedConf.get("gravitino_job_id");
+    if (callerJobId != null
+        && !callerJobId.trim().isEmpty()
+        && !callerJobId.trim().equals(allocatedJobId)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "jobConf.gravitino_job_id (%s) must match the allocated job id (%s), or be omitted",
+              callerJobId, allocatedJobId));
+    }
+    resolvedConf.put("gravitino_job_id", allocatedJobId);
 
     // Reject a job with missing parameters before creating anything for it.
     JobTemplateResolver jobTemplateResolver = new JobTemplateResolver(jobTemplateEntity);

@@ -174,56 +174,49 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
       IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson).forEach(sparkBuilder::config);
     }
 
-    SparkSession spark = sparkBuilder.getOrCreate();
-    IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
-    GravitinoClient client = null;
-    MaintenanceActionClient actionClient = null;
-    Long afterSnapshotId = null;
-    String finishMetrics = null;
-    boolean shouldFinish = false;
-    try {
-      client = openClient(updaterOptions);
-      actionClient = client.maintenanceActionClient();
-      SnapshotSample s0 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
-      afterSnapshotId = s0.snapshotId;
-      finishMetrics = s0.metricsJson;
-
-      MaintenanceActionSampleResponse gate =
-          actionClient.reportSample(
-              jobId,
-              new MaintenanceActionSampleRequest(
-                  tableId, policyId, s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
-      if (!gate.isContinueMaintenance()) {
-        LOG.info(
-            "TMS gate stopped job {} type={} reason={}",
-            jobId,
-            type.wireName,
-            gate.getStopReason());
-      } else {
-        runProcedure(spark, type, catalogName, tableIdentifier, argMap);
-        SnapshotSample s1 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
-        afterSnapshotId = s1.snapshotId;
-        finishMetrics = s1.metricsJson;
-      }
-      // Finish only on a clean exit (including gate-stop). Procedure failures leave the action
-      // open so OccupancyGate can reclaim when the Gravitino job becomes terminal.
-      shouldFinish = true;
-      return 0;
-    } catch (Exception e) {
-      LOG.error("TMS Iceberg maintenance failed for job {} type={}", jobId, type.wireName, e);
-      return 1;
-    } finally {
-      if (client != null) {
-        if (shouldFinish && actionClient != null) {
-          finishQuietly(actionClient, jobId, afterSnapshotId, finishMetrics);
-        }
+    try (SparkSession spark = sparkBuilder.getOrCreate()) {
+      IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
+      try (GravitinoClient client = openClient(updaterOptions)) {
+        MaintenanceActionClient actionClient = client.maintenanceActionClient();
+        Long afterSnapshotId = null;
+        String finishMetrics = null;
+        boolean shouldFinish = false;
         try {
-          client.close();
-        } catch (Exception closeError) {
-          LOG.warn("Failed to close GravitinoClient", closeError);
+          SnapshotSample s0 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
+          afterSnapshotId = s0.snapshotId;
+          finishMetrics = s0.metricsJson;
+
+          MaintenanceActionSampleResponse gate =
+              actionClient.reportSample(
+                  jobId,
+                  new MaintenanceActionSampleRequest(
+                      tableId, policyId, s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
+          if (!gate.isContinueMaintenance()) {
+            LOG.info(
+                "TMS gate stopped job {} type={} reason={}",
+                jobId,
+                type.wireName,
+                gate.getStopReason());
+          } else {
+            runProcedure(spark, type, catalogName, tableIdentifier, argMap);
+            SnapshotSample s1 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
+            afterSnapshotId = s1.snapshotId;
+            finishMetrics = s1.metricsJson;
+          }
+          // Finish only on a clean exit (including gate-stop). Procedure failures leave the action
+          // open so OccupancyGate can reclaim when the Gravitino job becomes terminal.
+          shouldFinish = true;
+          return 0;
+        } catch (Exception e) {
+          LOG.error("TMS Iceberg maintenance failed for job {} type={}", jobId, type.wireName, e);
+          return 1;
+        } finally {
+          // Finish before try-with-resources closes the client.
+          if (shouldFinish) {
+            finishQuietly(actionClient, jobId, afterSnapshotId, finishMetrics);
+          }
         }
       }
-      spark.stop();
     }
   }
 
