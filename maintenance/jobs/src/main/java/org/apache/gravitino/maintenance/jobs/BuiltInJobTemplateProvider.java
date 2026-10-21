@@ -19,10 +19,11 @@
 package org.apache.gravitino.maintenance.jobs;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob;
@@ -31,6 +32,7 @@ import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteDataFilesJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateManifestStatsJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateStatsAndMetricsJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.TmsIcebergMaintenanceJob;
 import org.apache.gravitino.maintenance.jobs.spark.SparkPiJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,22 +47,36 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
   private static final Pattern VERSION_PATTERN =
       Pattern.compile(JobTemplateProvider.VERSION_VALUE_PATTERN);
 
-  private static final List<BuiltInJob> BUILT_IN_JOBS =
+  /**
+   * Lazy suppliers so a linkage failure in one Spark job class does not prevent the provider SPI
+   * class from loading (or other templates from registering).
+   */
+  // Lambdas (not method refs) so job classes are not loaded until jobTemplates() runs.
+  private static final List<Supplier<BuiltInJob>> BUILT_IN_JOB_SUPPLIERS =
       ImmutableList.of(
-          new SparkPiJob(),
-          new IcebergRewriteDataFilesJob(),
-          new IcebergRewriteManifestsJob(),
-          new IcebergUpdateStatsAndMetricsJob(),
-          new IcebergUpdateManifestStatsJob(),
-          new IcebergExpireSnapshotsJob(),
-          new IcebergRemoveOrphanFilesJob());
+          () -> new SparkPiJob(),
+          () -> new IcebergRewriteDataFilesJob(),
+          () -> new IcebergRewriteManifestsJob(),
+          () -> new IcebergUpdateStatsAndMetricsJob(),
+          () -> new IcebergUpdateManifestStatsJob(),
+          () -> new IcebergExpireSnapshotsJob(),
+          () -> new IcebergRemoveOrphanFilesJob(),
+          () -> new TmsIcebergMaintenanceJob());
 
   @Override
   public List<? extends JobTemplate> jobTemplates() {
-    return BUILT_IN_JOBS.stream()
-        .map(BuiltInJob::jobTemplate)
-        .filter(this::isValid)
-        .collect(Collectors.toList());
+    List<JobTemplate> templates = new ArrayList<>();
+    for (Supplier<BuiltInJob> supplier : BUILT_IN_JOB_SUPPLIERS) {
+      try {
+        JobTemplate template = supplier.get().jobTemplate();
+        if (isValid(template)) {
+          templates.add(template);
+        }
+      } catch (LinkageError | RuntimeException e) {
+        LOG.warn("Skip built-in job template that failed to load: {}", e.toString());
+      }
+    }
+    return templates;
   }
 
   private boolean isValid(JobTemplate template) {
