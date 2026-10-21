@@ -29,6 +29,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.ConnectionCountingDataSource;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTableOperations;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -292,5 +293,71 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     Assertions.assertTrue(alterSql.contains("ADD COLUMN `col2`"), alterSql);
     Assertions.assertTrue(alterSql.contains("COMMENT 'owner\\\\''s \"comment\"; --'"), alterSql);
+  }
+
+  @Test
+  public void testAddColumnWithNotNullAndDefaultValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"created_at"},
+                Types.TimestampType.withoutTimeZone(),
+                "create time",
+                TableChange.ColumnPosition.after("id"),
+                false,
+                false,
+                Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP));
+
+    Assertions.assertTrue(
+        alterSql.contains(
+            "ADD COLUMN `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP "
+                + "COMMENT 'create time' AFTER `id`"),
+        alterSql);
+  }
+
+  @Test
+  public void testAddNullableColumnWithStringDefaultValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"col2"},
+                Types.VarCharType.of(10),
+                null,
+                TableChange.ColumnPosition.after("col1"),
+                true,
+                false,
+                Literals.of("abc", Types.VarCharType.of(10))));
+
+    Assertions.assertTrue(
+        alterSql.contains("ADD COLUMN `col2` varchar(10) NULL DEFAULT 'abc' AFTER `col1`"),
+        alterSql);
+  }
+
+  @Test
+  public void testAddAutoIncrementColumnIsRejected() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.addColumn(
+                        new String[] {"col2"},
+                        Types.LongType.get(),
+                        null,
+                        TableChange.ColumnPosition.defaultPos(),
+                        false,
+                        true)));
+
+    Assertions.assertEquals(
+        "StarRocks does not support adding an auto-increment column: col2", exception.getMessage());
   }
 }
