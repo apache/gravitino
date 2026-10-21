@@ -28,7 +28,6 @@ import org.apache.gravitino.meta.PolicyEntity;
  * CompactionInJobRecommender}, orphan cleanup via {@link TriggerExprInJobRecommender}, and expire /
  * rewrite-manifests placeholders via {@link AlwaysMaintainInJobRecommender}.
  */
-@FunctionalInterface
 public interface InJobRecommender {
 
   /**

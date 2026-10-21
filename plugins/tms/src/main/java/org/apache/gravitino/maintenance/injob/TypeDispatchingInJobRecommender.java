@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.injob;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Optional;
 import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
@@ -81,15 +82,15 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
   }
 
   /**
-   * Backward-compatible test wiring: non-compaction types use {@code triggerExprRecommender} except
-   * expire / rewrite-manifests placeholders, which use {@link
+   * Test wiring that routes expire / rewrite-manifests placeholders to {@link
    * AlwaysMaintainInJobRecommender#INSTANCE}.
    *
    * @param policyLookup policy loader
    * @param compactionRecommender compaction thresholds
    * @param triggerExprRecommender trigger-expr evaluation for orphan and similar
    */
-  public TypeDispatchingInJobRecommender(
+  @VisibleForTesting
+  TypeDispatchingInJobRecommender(
       PolicyLookup policyLookup,
       InJobRecommender compactionRecommender,
       InJobRecommender triggerExprRecommender) {

@@ -31,6 +31,8 @@ import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMe
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Expand / submit occupancy checks against {@code table_maintenance_action} (§5.2).
@@ -42,6 +44,8 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  * inventing stub S1 metrics rows).
  */
 public final class OccupancyGate {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OccupancyGate.class);
 
   private static final Set<JobHandle.Status> ACTIVE =
       EnumSet.of(JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING);
@@ -74,19 +78,18 @@ public final class OccupancyGate {
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return true when any open row is a live unbound claim or an active Gravitino job
+   * @return true when any open row is a live unbound claim or a still-bound soft-slot row
    */
   public boolean isInFlight(long tableId, long policyId) {
     reclaimTerminalBound(tableId, policyId);
     if (actionMetaService.hasLiveUnboundClaim(tableId, policyId, claimTimeoutMs)) {
       return true;
     }
+    // After reclaim, any remaining bound open row occupies the soft slot (ACTIVE job, or a
+    // terminal/missing job whose markFinished raced/failed). Fail closed so UNIQUE(table, policy,
+    // finished_at=0) cannot be ignored while still blocking tryAcquireInFlight.
     for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
-      if (open.jobId() == null) {
-        continue;
-      }
-      JobEntity job = loadJob(open.jobId(), tableId);
-      if (job != null && ACTIVE.contains(job.status())) {
+      if (open.jobId() != null) {
         return true;
       }
     }
@@ -121,7 +124,14 @@ public final class OccupancyGate {
       try {
         actionMetaService.markFinished(open.jobId(), afterSnapshotId, finishedAt);
       } catch (RuntimeException e) {
-        // Another node may have finished the row; ignore and continue.
+        // Another node may have finished the row, or DB is unhealthy — log and keep fail-closed
+        // via isInFlight seeing the still-open bound row.
+        LOG.warn(
+            "Failed to reclaim terminal/missing job {} for table {} policy {}: {}",
+            open.jobId(),
+            tableId,
+            policyId,
+            e.toString());
       }
     }
   }

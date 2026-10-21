@@ -27,6 +27,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionE
 import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
 import org.apache.gravitino.maintenance.scheduler.RelationalPolicyLookup;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +41,6 @@ import org.slf4j.LoggerFactory;
 public final class TriggerExprInJobRecommender implements InJobRecommender {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerExprInJobRecommender.class);
-
-  /** Shared rule key on all Iceberg maintenance policy contents. */
-  private static final String TRIGGER_EXPR_KEY = "trigger-expr";
 
   private final PolicyLookup policyLookup;
   private final QLExpressionEvaluator evaluator;
@@ -77,7 +75,7 @@ public final class TriggerExprInJobRecommender implements InJobRecommender {
     if (content == null) {
       return RecommendDecision.SKIP;
     }
-    Object trigger = content.rules().get(TRIGGER_EXPR_KEY);
+    Object trigger = content.rules().get(IcebergOrphanFileRemovalContent.TRIGGER_EXPR_KEY);
     String expression =
         trigger == null || trigger.toString().trim().isEmpty()
             ? "false"
