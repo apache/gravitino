@@ -37,6 +37,7 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -110,6 +111,28 @@ public class TestBaseCatalogCredentialProviders {
       Assertions.assertTrue(exception.getMessage().contains(type));
       Assertions.assertTrue(exception.getMessage().contains("test"));
     }
+
+    // Provider lookup ignores case, so validation does too.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "GCS-Token")));
+  }
+
+  @Test
+  void testGcsTokenInferredOnlyWithPathBasedCredentials() throws IllegalAccessException {
+    Map<String, String> props = new HashMap<>();
+    props.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs.json");
+
+    Map<String, String> result = newCatalog(props).properties();
+    Assertions.assertFalse(result.containsKey(CredentialConstants.CREDENTIAL_PROVIDERS));
+
+    TestCatalogImpl catalog = newCatalog(props);
+    catalog.pathBasedCredentials = true;
+    Assertions.assertEquals(
+        GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
+        catalog.properties().get(CredentialConstants.CREDENTIAL_PROVIDERS));
   }
 
   @Test

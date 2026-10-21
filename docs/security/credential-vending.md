@@ -133,7 +133,7 @@ If a catalog does not set `credential-providers`, Gravitino infers providers fro
 | `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
 | `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
 | `cos-access-key-id` and `cos-secret-access-key`              | `cos-secret-key`    |
-| `gcs-service-account-file`                                   | `gcs-token`         |
+| `gcs-service-account-file` (Fileset and Iceberg only)        | `gcs-token`         |
 | `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
 | `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
 

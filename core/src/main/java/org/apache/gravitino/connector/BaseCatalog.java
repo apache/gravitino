@@ -26,6 +26,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -268,7 +269,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
     List<String> unsupportedProviders =
         CredentialUtils.getCredentialProvidersByOrder(() -> properties).stream()
-            .filter(CredentialUtils.PATH_BASED_CREDENTIAL_TYPES::contains)
+            // Provider lookup ignores case, so match the type names case-insensitively too.
+            .filter(
+                p ->
+                    CredentialUtils.PATH_BASED_CREDENTIAL_TYPES.contains(
+                        p.toLowerCase(Locale.ROOT)))
             .sorted()
             .collect(Collectors.toList());
     Preconditions.checkArgument(
@@ -709,7 +714,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
-    if (StringUtils.isNotBlank(gcsServiceAccountFile)) {
+    // gcs-token only vends credentials for path-based contexts.
+    if (StringUtils.isNotBlank(gcsServiceAccountFile) && supportsPathBasedCredentials()) {
       credentialProviders.add(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
     }
 
