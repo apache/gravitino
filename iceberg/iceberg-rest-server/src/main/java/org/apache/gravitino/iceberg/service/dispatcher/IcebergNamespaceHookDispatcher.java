@@ -26,6 +26,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -141,6 +142,13 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
   @Override
   public void dropNamespace(IcebergRequestContext context, Namespace namespace) {
     String catalogName = context.catalogName();
+    NameIdentifier schemaIdent =
+        IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+            metalake, catalogName, namespace, HierarchicalSchemaUtil.schemaSeparator());
+    // Read the locations before the drop, while the namespace still exists, like
+    // SchemaHookDispatcher.
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(schemaIdent, Entity.EntityType.SCHEMA);
     // Same top-level branch lock as createNamespace, so the phantom-row cleanup stays atomic
     // against concurrent creates that could re-add children under our ancestors.
     TreeLockUtils.doWithTreeLock(
@@ -164,6 +172,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
           IcebergOrphanSchemaCleanup.bestEffortCleanUp(metalake, dispatcher, context, namespace);
           return null;
         });
+    // The backend drop succeeded, so remove the namespace's privileges from the authorization
+    // plugins and the cached name-id mapping, like SchemaHookDispatcher.dropSchema. A failed drop
+    // throws above and keeps the privileges.
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        schemaIdent, Entity.EntityType.SCHEMA, locations);
   }
 
   @Override

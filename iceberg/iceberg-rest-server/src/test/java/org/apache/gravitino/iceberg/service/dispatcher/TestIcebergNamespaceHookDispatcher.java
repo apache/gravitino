@@ -40,6 +40,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -63,6 +64,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestIcebergNamespaceHookDispatcher {
 
@@ -540,5 +543,47 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockEntityStore, times(1))
         .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
     Assertions.assertEquals("A:B:C", captor.getValue().name());
+  }
+
+  @Test
+  public void testDropNamespaceRemovesPrivilegesAfterBackendDrop() {
+    Namespace leaf = Namespace.of("parent", "child");
+    NameIdentifier schemaIdent = NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "parent:child");
+    List<String> locations = List.of("s3://bucket/parent/child");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      schemaIdent, Entity.EntityType.SCHEMA))
+          .thenReturn(locations);
+
+      hookDispatcher.dropNamespace(mockContext, leaf);
+
+      verify(mockDispatcher).dropNamespace(mockContext, leaf);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  schemaIdent, Entity.EntityType.SCHEMA, locations));
+    }
+  }
+
+  @Test
+  public void testFailedDropNamespaceKeepsPrivileges() {
+    Namespace namespace = Namespace.of("test_schema");
+    RuntimeException failure = new RuntimeException("namespace is not empty");
+    doThrow(failure).when(mockDispatcher).dropNamespace(mockContext, namespace);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              RuntimeException.class, () -> hookDispatcher.dropNamespace(mockContext, namespace)));
+
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
   }
 }

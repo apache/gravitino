@@ -23,6 +23,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -108,6 +109,16 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     bestEffortReconcileViewEntity(context, viewIdentifier);
     IcebergOrphanSchemaCleanup.bestEffortCleanUp(
         metalake, namespaceDispatcher, context, viewIdentifier.namespace());
+    // The backend drop succeeded. A view created later under the same name gets a new id, so drop
+    // the cached name-id mapping, like ViewHookDispatcher.dropView. Views have no catalog
+    // authorization plugin privileges to remove.
+    AuthorizationUtils.notifyEntityNameIdMappingChange(
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            viewIdentifier,
+            HierarchicalSchemaUtil.schemaSeparator()),
+        Entity.EntityType.VIEW);
   }
 
   @Override

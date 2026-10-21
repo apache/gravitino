@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,6 +38,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -58,6 +60,8 @@ import org.apache.iceberg.view.ImmutableViewVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestIcebergViewHookDispatcher {
 
@@ -520,5 +524,41 @@ public class TestIcebergViewHookDispatcher {
 
     verify(mockExecutor, times(1)).viewExists(mockContext, viewIdent);
     assertEquals(true, exists);
+  }
+
+  @Test
+  public void testDropViewEvictsNameIdMappingAfterBackendDrop() {
+    TableIdentifier viewId = TableIdentifier.of(Namespace.of("parent", "child"), VIEW_NAME);
+    NameIdentifier viewIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewId, ":");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      hookDispatcher.dropView(mockContext, viewId);
+
+      verify(mockExecutor).dropView(mockContext, viewId);
+      authz.verify(
+          () ->
+              AuthorizationUtils.notifyEntityNameIdMappingChange(
+                  viewIdent, Entity.EntityType.VIEW));
+      // Views have no catalog authorization plugin privileges, like ViewHookDispatcher.dropView.
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
+  }
+
+  @Test
+  public void testFailedDropViewKeepsNameIdMapping() {
+    TableIdentifier viewId = TableIdentifier.of(SCHEMA_NAME, VIEW_NAME);
+    RuntimeException failure = new RuntimeException("backend drop failed");
+    doThrow(failure).when(mockExecutor).dropView(mockContext, viewId);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      assertSame(
+          failure,
+          assertThrows(RuntimeException.class, () -> hookDispatcher.dropView(mockContext, viewId)));
+
+      authz.verify(() -> AuthorizationUtils.notifyEntityNameIdMappingChange(any(), any()), never());
+    }
   }
 }

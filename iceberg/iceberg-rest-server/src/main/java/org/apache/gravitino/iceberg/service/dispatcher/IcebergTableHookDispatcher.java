@@ -20,11 +20,13 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -101,6 +103,15 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
+    NameIdentifier tableIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            tableIdentifier,
+            HierarchicalSchemaUtil.schemaSeparator());
+    // Read the locations before the drop, while the table still exists, like TableHookDispatcher.
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(tableIdent, Entity.EntityType.TABLE);
     dispatcher.dropTable(context, tableIdentifier, purgeRequested);
     // Reconcile against Iceberg backend state — without a distributed TreeLock,
     // another node may recreate the same table between the drop above and the
@@ -108,6 +119,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     bestEffortReconcileTableEntity(context, tableIdentifier);
     IcebergOrphanSchemaCleanup.bestEffortCleanUp(
         metalake, namespaceDispatcher, context, tableIdentifier.namespace());
+    // The backend drop (or purge) succeeded, so remove the table's privileges from the
+    // authorization plugins and the cached name-id mapping, like TableHookDispatcher.dropTable.
+    // A failed drop throws above and keeps the privileges.
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        tableIdent, Entity.EntityType.TABLE, locations);
   }
 
   @Override

@@ -38,6 +38,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
@@ -62,7 +63,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestIcebergTableHookDispatcher {
 
@@ -547,5 +552,72 @@ public class TestIcebergTableHookDispatcher {
     verify(mockTableDispatcher, never()).loadTable(any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testDropTableRemovesPrivilegesAfterBackendDrop(boolean purgeRequested) {
+    TableIdentifier tableId = TableIdentifier.of(Namespace.of("parent", "child"), "test_table");
+    NameIdentifier tableIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    List<String> locations = List.of("s3://bucket/parent/child/test_table");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(tableIdent, Entity.EntityType.TABLE))
+          .thenReturn(locations);
+
+      hookDispatcher.dropTable(mockContext, tableId, purgeRequested);
+
+      verify(mockDispatcher).dropTable(mockContext, tableId, purgeRequested);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  tableIdent, Entity.EntityType.TABLE, locations));
+    }
+  }
+
+  @Test
+  public void testFailedDropTableKeepsPrivileges() {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    RuntimeException failure = new RuntimeException("backend drop failed");
+    doThrow(failure).when(mockDispatcher).dropTable(mockContext, tableId, true);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              RuntimeException.class, () -> hookDispatcher.dropTable(mockContext, tableId, true)));
+
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
+  }
+
+  @Test
+  public void testDropTablePropagatesPluginFailureAfterEntityCleanup() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier tableIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    RuntimeException failure = new RuntimeException("plugin failed");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()))
+          .thenThrow(failure);
+
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              RuntimeException.class, () -> hookDispatcher.dropTable(mockContext, tableId, false)));
+    }
+    // The backend drop and the entity cleanup happened before the plugin was called.
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    verify(mockEntityStore).delete(tableIdent, Entity.EntityType.TABLE);
   }
 }
