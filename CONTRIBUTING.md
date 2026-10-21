@@ -92,7 +92,13 @@ Contributors who participate actively and constructively may be invited to becom
 
 ## 🧪 Continuous Integration
 
-All PRs are automatically tested using GitHub Actions. Please check test results and fix failures before requesting a review.
+Pull request tests run with GitHub Actions in your fork, not in `apache/gravitino`:
+
+1. Enable GitHub Actions in your fork (the **Actions** tab of your fork).
+2. Push your branch to your fork. The **Fork CI** workflow merges it onto the latest base branch and runs the test suites.
+3. Open the pull request. The pull request shows a **Fork CI** check that mirrors the result of the run in your fork, with links to any failed jobs. The final result can take up to about 15 minutes after the run finishes to appear on the pull request.
+
+If the check says that Fork CI is not available, enable Actions in your fork, merge or rebase your branch onto the latest base branch, and push again. To re-run flaky tests, re-run the failed jobs in your fork; reviewers cannot re-run them for you. Please fix failures before requesting a review.
 
 ## 🆘 Need Help?
 
