@@ -18,9 +18,11 @@
  */
 package org.apache.gravitino.catalog.doris.converter;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
@@ -138,8 +140,6 @@ public class TestDorisColumnDefaultValueConverter {
         Literals.of("owner's a\"\"b \"value\"\\path", Types.VarCharType.of(255)),
         CONVERTER.toGravitino(varcharType, "owner's a\"\"b \"value\"\\\\path", false, false));
   }
-<<<<<<< HEAD
-=======
 
   /** Verifies loaded literal and native expression defaults use MODIFY COLUMN SQL forms. */
   @Test
@@ -190,5 +190,4 @@ public class TestDorisColumnDefaultValueConverter {
     Assertions.assertEquals(
         "12", converter.fromGravitinoForCreateTable(Literals.integerLiteral(12), true));
   }
->>>>>>> 4e900e8f1 ([#13973][#13974] fix(catalog-jdbc): Escape column default literals and table properties (#13975))
 }

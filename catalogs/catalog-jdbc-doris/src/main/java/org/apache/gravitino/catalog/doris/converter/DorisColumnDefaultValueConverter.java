@@ -32,6 +32,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -88,8 +89,6 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     return super.fromGravitino(defaultValue);
   }
 
-<<<<<<< HEAD
-=======
   /**
    * Converts a CREATE TABLE default value to Doris SQL.
    *
@@ -168,7 +167,6 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     return super.fromGravitino(defaultValue);
   }
 
->>>>>>> 4e900e8f1 ([#13973][#13974] fix(catalog-jdbc): Escape column default literals and table properties (#13975))
   @Override
   public Expression toGravitino(
       JdbcTypeConverter.JdbcTypeBean columnType,
@@ -240,6 +238,14 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
       return "'" + escaped + "'";
     }
     escaped = escaped.replace("\"", "\\\"");
+    return "\"" + escaped + "\"";
+  }
+
+  private static String quoteDorisModifyLiteral(
+      String value, boolean doubleEscapeBackslashes, boolean tripleEscapeQuotes) {
+    String escapedBackslash = doubleEscapeBackslashes ? "\\".repeat(4) : "\\".repeat(2);
+    String escapedQuote = "\\".repeat(tripleEscapeQuotes ? 3 : 1) + "\"";
+    String escaped = value.replace("\\", escapedBackslash).replace("\"", escapedQuote);
     return "\"" + escaped + "\"";
   }
 

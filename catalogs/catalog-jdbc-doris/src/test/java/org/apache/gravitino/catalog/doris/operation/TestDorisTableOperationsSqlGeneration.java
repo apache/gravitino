@@ -30,6 +30,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
@@ -41,6 +42,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -48,6 +50,7 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -58,6 +61,8 @@ import org.mockito.Mockito;
 public class TestDorisTableOperationsSqlGeneration {
 
   private static class TestableDorisTableOperations extends DorisTableOperations {
+    private JdbcTable tableForAlter = JdbcTable.builder().withName("test_table").build();
+
     public TestableDorisTableOperations() {
       this("doris-3.0.6.2-rc01-910c4249c5");
     }
@@ -102,10 +107,31 @@ public class TestDorisTableOperationsSqlGeneration {
       return generateAlterTableSql("database", tableName, changes);
     }
 
+    /**
+     * Generates ALTER SQL while retaining the loaded column attributes.
+     *
+     * @param column the current column
+     * @param newType the requested type
+     * @return the generated SQL
+     */
+    public String updateColumnTypeSql(JdbcColumn column, Type newType) {
+      setTableForAlter(
+          JdbcTable.builder()
+              .withName("test_table")
+              .withColumns(new JdbcColumn[] {column})
+              .build());
+      return alterTableSql(
+          "test_table", TableChange.updateColumnType(new String[] {column.name()}, newType));
+    }
+
+    void setTableForAlter(JdbcTable table) {
+      this.tableForAlter = table;
+    }
+
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return tableForAlter;
     }
 
     public String createTableSqlWithIndexes(
@@ -118,13 +144,6 @@ public class TestDorisTableOperationsSqlGeneration {
           Transforms.EMPTY_TRANSFORM,
           distribution,
           indexes);
-    }
-<<<<<<< HEAD
-=======
-
-    List<Index> indexes(Connection connection, String databaseName, String tableName)
-        throws SQLException {
-      return getIndexes(connection, databaseName, tableName);
     }
   }
 
@@ -339,23 +358,6 @@ public class TestDorisTableOperationsSqlGeneration {
         ops.updateColumnTypeSql(unsetDefault, Types.LongType.get()).contains("bigint NULL ;"));
   }
 
-  /**
-   * Verifies rejected nested-column changes follow the alter-table exception contract.
-   *
-   * @param change the nested-column change to reject
-   */
-  @ParameterizedTest
-  @MethodSource("nestedColumnChanges")
-  public void testRejectsNestedColumnName(TableChange change) {
-    TestableDorisTableOperations ops = new TestableDorisTableOperations();
-
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> ops.alterTableSql("test_table", change));
-
-    Assertions.assertEquals("Doris does not support nested column names.", exception.getMessage());
-  }
-
   /** Verifies version lookup is cached across type changes in one ALTER request. */
   @Test
   public void testUpdateColumnTypeQueriesVersionOnceForAlterRequest() throws Exception {
@@ -415,7 +417,6 @@ public class TestDorisTableOperationsSqlGeneration {
         TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(64)));
 
     Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
->>>>>>> 4e900e8f1 ([#13973][#13974] fix(catalog-jdbc): Escape column default literals and table properties (#13975))
   }
 
   /**
@@ -1338,18 +1339,6 @@ public class TestDorisTableOperationsSqlGeneration {
     Mockito.when(resultSet.getString(1)).thenReturn(dorisVersion);
     return dataSource;
   }
-<<<<<<< HEAD
-=======
-
-  private static Stream<TableChange> nestedColumnChanges() {
-    String[] fieldName = {"parent", "child"};
-    return Stream.of(
-        TableChange.addColumn(fieldName, Types.LongType.get()),
-        TableChange.updateColumnComment(fieldName, "new comment"),
-        TableChange.updateColumnPosition(fieldName, TableChange.ColumnPosition.first()),
-        TableChange.deleteColumn(fieldName, false),
-        TableChange.updateColumnType(fieldName, Types.LongType.get()));
-  }
 
   @Test
   public void testSetPropertyEscapesKeyAndValue() {
@@ -1365,5 +1354,4 @@ public class TestDorisTableOperationsSqlGeneration {
             + "\"plain\" = \"value\");",
         sql);
   }
->>>>>>> 4e900e8f1 ([#13973][#13974] fix(catalog-jdbc): Escape column default literals and table properties (#13975))
 }
