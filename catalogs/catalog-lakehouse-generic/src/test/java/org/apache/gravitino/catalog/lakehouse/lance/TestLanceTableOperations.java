@@ -1110,7 +1110,12 @@ public class TestLanceTableOperations {
                       TableChange.addColumn(
                           new String[] {"image"}, Types.ExternalType.of("lance.blob"))
                     }));
-    Assertions.assertTrue(exception.getMessage().contains("2.2"), exception.getMessage());
+    // Both rejection messages mention 2.2, so assert the clause that tells them apart.
+    Assertions.assertTrue(
+        exception.getMessage().contains("requires Lance file format version 2.2 or later"),
+        exception.getMessage());
+    Assertions.assertTrue(
+        exception.getMessage().contains("the dataset uses 2.1"), exception.getMessage());
   }
 
   @Test
@@ -1141,13 +1146,21 @@ public class TestLanceTableOperations {
                       TableChange.addColumn(
                           new String[] {"legacy_image"}, Types.ExternalType.of("lance.blob.legacy"))
                     }));
-    Assertions.assertTrue(exception.getMessage().contains("2.2"), exception.getMessage());
+    // Mirror assertion: this message mentions 2.2 twice, so match the distinguishing clause.
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("is not supported by Lance file format version 2.2 or later"),
+        exception.getMessage());
   }
 
   @Test
   public void testAddBlobV2ColumnSucceedsOnDefaultFileFormatVersion() {
-    // lance-core 12.0.0 defaults new datasets to file format version 2.2, so a table created
-    // without blob columns now accepts a lance.blob column.
+    // Unlike the two tests above, this one deliberately depends on Lance's default: the default is
+    // what decides whether a table created without blob columns later accepts lance.blob, and
+    // docs/lakehouse-generic-lance-table.md states that behaviour as user-facing. The version
+    // assertion is therefore a canary - if a lance-core upgrade moves the default below 2.2 this
+    // fails, and the documented behaviour has to be revisited rather than quietly flipped.
     String location = tempDir.resolve("add-blob-default").toString();
     try (Dataset dataset =
         lanceTableOps.createDataset(

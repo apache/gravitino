@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
@@ -45,7 +47,10 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.AnalysisException;
@@ -54,6 +59,7 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -71,6 +77,10 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   private static final String HISTORY_CATALOG_NAME =
       GravitinoITUtils.genRandomName("lance_history_catalog");
   private static final String TABLE_COLUMNS = "(id INT, score FLOAT)";
+  // lance-spark bundles whose bundled Lance cannot write to a file format version 2.2 dataset.
+  private static final Set<String> PRE_BLOB_V2_BUNDLE_VERSIONS = Set.of("0.2.0");
+  private static final Pattern BUNDLE_VERSION_PATTERN =
+      Pattern.compile("lance-spark-bundle-[^/]*?-(\\d+\\.\\d+\\.\\d+(?:-[\\w.]+)?)\\.jar$");
   private static final String LANCE_CLASS_PREFIX = "org.lance.";
   private static final String LANCE_NATIVE_LOADER_CLASS_PREFIX = "io.questdb.jar.jni.";
   private static final String LANCE_NATIVE_RESOURCE_PREFIX = "nativelib/";
@@ -285,6 +295,58 @@ public class LanceSparkRESTServiceIT extends BaseIT {
 
     List<Row> rows = sql("SELECT id, score FROM %s.%s ORDER BY id", schemaName, tableName);
     Assertions.assertTrue(rows.isEmpty(), "Expected no rows for a newly created empty table");
+  }
+
+  @Test
+  public void testSparkReadsTableCreatedThroughGravitino() {
+    // Creating through Gravitino's own API is the only path that reaches
+    // LanceTableOperations#createDataset, which leaves the Lance file format version at
+    // lance-core's
+    // default whenever the table has no blob column - 2.2 as of lance-core 12.0.0, where earlier
+    // releases defaulted lower. Spark's CREATE TABLE goes through `declare` instead, where
+    // Gravitino
+    // writes no dataset at all and the bundle writes it at its own version. So this is the one
+    // combination that puts a Gravitino-written dataset in front of the bundle's Lance, which in
+    // this matrix goes back to lance-core 2.0.0.
+    String schemaName = createSchema("spark_gravitino_created");
+    String tableName = newTableName("orders");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, tableName),
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()), Column.of("score", Types.FloatType.get())
+            },
+            "created through the Gravitino API",
+            // Deliberately no LANCE_TABLE_DECLARED: that is the `declare` path, where Gravitino
+            // writes no dataset and the point of this test is lost.
+            ImmutableMap.of("format", "lance"),
+            Transforms.EMPTY_TRANSFORM,
+            null,
+            null);
+
+    // Reading works for every bundle in the matrix: the file format version is forward-compatible
+    // on the read path.
+    Assertions.assertTrue(
+        sql("SELECT id, score FROM %s.%s", schemaName, tableName).isEmpty(),
+        "Expected no rows in a freshly created Lance dataset");
+
+    // Writing is not. A bundle whose Lance predates file format version 2.2 has its commit
+    // rejected with "added files with version 2.0. However, the data storage version is 2.2."
+    // Only lance-spark 0.2.0 (lance-core 2.0.0) is affected; 0.4.0 (lance-core 4.0.0) and later
+    // write fine. This is a behaviour change from Gravitino's previous lance-core 6.0.0, whose
+    // default was below 2.2, and it is tracked as a separate issue rather than worked around here.
+    Assumptions.assumeFalse(
+        PRE_BLOB_V2_BUNDLE_VERSIONS.contains(lanceSparkBundleVersion()),
+        "lance-spark bundles older than 0.4.0 cannot write to a file format version 2.2 dataset");
+
+    sql("INSERT INTO %s.%s VALUES (1, CAST(1.5 AS FLOAT))", schemaName, tableName);
+
+    List<Row> rows = sql("SELECT id, score FROM %s.%s ORDER BY id", schemaName, tableName);
+    Assertions.assertEquals(1, rows.size());
+    Assertions.assertEquals(1, rows.get(0).getInt(0));
+    Assertions.assertEquals(1.5f, rows.get(0).getFloat(1), 1e-6f);
   }
 
   @Test
@@ -543,6 +605,13 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     } finally {
       Thread.currentThread().setContextClassLoader(originalClassLoader);
     }
+  }
+
+  /** Returns the lance-spark bundle version this run is testing against, from its jar name. */
+  private static String lanceSparkBundleVersion() {
+    String jarPath = System.getProperty(LANCE_SPARK_BUNDLE_JAR_PATH_PROPERTY, "");
+    Matcher matcher = BUNDLE_VERSION_PATTERN.matcher(jarPath);
+    return matcher.find() ? matcher.group(1) : "";
   }
 
   private String createSchema(String schemaNamePrefix) {

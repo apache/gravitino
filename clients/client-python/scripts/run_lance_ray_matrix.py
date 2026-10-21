@@ -39,7 +39,7 @@ use::
 
     distribution/package/bin/gravitino.sh start
     python3 clients/client-python/scripts/run_lance_ray_matrix.py \
-        --versions 0.5.0=0.8.6,0.4.2=0.7.5 \
+        --versions 0.5.0=0.11.1,0.4.2=0.7.5 \
         --gravitino-home distribution/package
     distribution/package/bin/gravitino.sh stop
 
@@ -65,19 +65,24 @@ from typing import List
 # Each entry pins the lance-namespace client that lance-ray version is tested
 # with. The pairing is curated, not derived: lance-ray never bounds
 # lance-namespace, so a single shared pin or no pin at all would collapse every
-# row onto the same client and the matrix would lose its version spread. Two
-# constraints shape the pairs, both measured against a 0.11.1 server:
+# row onto the same client and the matrix would lose its version spread. The
+# rows below were all measured against a 0.11.1 server:
 #
+#   * 0.5.0 is pinned to 0.11.1, the generation the server itself embeds, so the
+#     matrix covers the matching client and not only older ones.
 #   * pylance, not lance-ray, is what bounds lance-namespace: pylance 9-11
 #     require >=0.8.5,<0.9 and pylance 12-13 require >=0.11.1,<0.12. lance-ray
 #     0.5.0 requires pylance>=9.0.0, so pairing it with 0.7.5 is unsatisfiable
-#     and pip fails with ResolutionImpossible.
+#     and pip fails with ResolutionImpossible; 0.11.1 resolves to pylance 12/13.
 #   * lance-namespace 0.6.1 creates tables through the legacy
 #     ``POST /v1/table/{id}/create-empty`` endpoint, dropped from the spec in
 #     0.7.5 and never implemented by Gravitino, which serves ``declare``
 #     instead. lance-ray 0.3.0 is therefore paired with 0.7.5 rather than the
 #     0.6.1 its own lockfile pins.
-DEFAULT_VERSIONS = ["0.5.0=0.8.6", "0.4.2=0.7.5", "0.3.0=0.7.5", "0.2.0=0.4.5"]
+#   * 0.2.0 is pinned to 0.4.5 because that uniquely forces pylance 2.0.1:
+#     pylance 3.0.0+ require lance-namespace >=0.5.2, and it is pylance 6.0.0
+#     that lacks the ``LanceNamespaceStorageOptionsProvider`` 0.2.0 imports.
+DEFAULT_VERSIONS = ["0.5.0=0.11.1", "0.4.2=0.7.5", "0.3.0=0.7.5", "0.2.0=0.4.5"]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
