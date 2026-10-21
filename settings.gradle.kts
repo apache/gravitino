@@ -72,12 +72,12 @@ val skipTrinoConnector: Boolean =
   gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() ?: false
 if (!skipTrinoConnector) {
   include(
-    "trino-connector:trino-connector",
-    "trino-connector:trino-connector-440-445",
-    "trino-connector:trino-connector-446-451",
-    "trino-connector:trino-connector-452-468",
     "trino-connector:trino-connector-469-472",
-    "trino-connector:trino-connector-473-478",
+    "trino-connector:trino-connector-473-477",
+    "trino-connector:trino-connector-478-479",
+    "trino-connector:trino-connector-480",
+    "trino-connector:trino-connector-481",
+    "trino-connector:trino-connector-482-483",
     "trino-connector:integration-test"
   )
 } else {

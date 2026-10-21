@@ -64,7 +64,9 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     }
     // Trino may be explicitly omitted from the build, but its listed files must still exist.
     def skippedSourceRoots = gradle.startParameter.projectProperties['skipTrinoConnector']?.equalsIgnoreCase('true')
-      ? [file('trino-connector/trino-connector/src/main/java').canonicalFile.toPath()] : []
+      ? ['trino-connector/src/common/main/java',
+         'trino-connector/src/common-469-481/main/java'].collect { file(it).canonicalFile.toPath() }
+      : []
     def requireOwnedSources = { Collection sources ->
       def compiled = sources.findAll { source -> sourceOwners.values().any { it.contains(source) } }
       def unowned = sources.findAll { source ->
@@ -86,11 +88,11 @@ def legalTests = tasks.register('testMavenLegalFiles') {
       // https://github.com/trinodb/trino/tree/435 has only a server dependency NOTICE,
       // which does not apply to these copied classes.
       'Trino': [
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java',
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/AbstractTypedJacksonModule.java',
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/BlockJsonSerde.java',
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeDeserializer.java',
-        'trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeSignatureDeserializer.java'
+        'trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java',
+        'trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/util/json/AbstractTypedJacksonModule.java',
+        'trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/util/json/BlockJsonSerde.java',
+        'trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/util/json/TypeDeserializer.java',
+        'trino-connector/src/common-469-481/main/java/org/apache/gravitino/trino/connector/util/json/TypeSignatureDeserializer.java'
       ]
     ].collectEntries { component, paths -> [(component): paths.collect { file(it).canonicalFile }.toSet()] }
     def sourceNoticeFor = { String component, Collection sources ->
@@ -157,7 +159,7 @@ def legalTests = tasks.register('testMavenLegalFiles') {
     unownedSource.text = 'class Unowned {}'
     expectFailure('LICENSE lists missing or uncompiled production sources') { requireOwnedSources([unownedSource]) }
     expectFailure('LICENSE lists missing or uncompiled production sources') {
-      requireOwnedSources([file('trino-connector/trino-connector/src/main/java/MissingLegalFixture.java').canonicalFile])
+      requireOwnedSources([file('trino-connector/src/common/main/java/MissingLegalFixture.java').canonicalFile])
     }
     ['LICENSE': 'Fixture license', 'NOTICE': 'Fixture notice', 'LICENSE.exact': 'Exact version terms',
      'terms.txt': 'Fallback terms', 'LICENSE.group': 'Group terms'].each { name, text ->
