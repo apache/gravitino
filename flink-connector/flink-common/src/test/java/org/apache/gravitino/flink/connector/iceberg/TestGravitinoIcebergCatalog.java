@@ -33,6 +33,8 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.storage.GCSProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -66,7 +68,7 @@ class TestGravitinoIcebergCatalog {
     CatalogException exception =
         assertThrows(
             CatalogException.class,
-            () -> GravitinoIcebergCatalog.checkCredentialProviders("c1", properties));
+            () -> GravitinoIcebergCatalog.checkCredentialProviders("c1", "hive", properties));
     assertTrue(exception.getMessage().contains("aws-irsa"));
   }
 
@@ -83,7 +85,7 @@ class TestGravitinoIcebergCatalog {
 
     assertEquals(
         ImmutableList.of(upperCaseProvider),
-        GravitinoIcebergCatalog.checkCredentialProviders("c1", properties));
+        GravitinoIcebergCatalog.checkCredentialProviders("c1", "hive", properties));
   }
 
   @Test
@@ -95,7 +97,7 @@ class TestGravitinoIcebergCatalog {
             CredentialConstants.CREDENTIAL_PROVIDERS,
             "s3-secret-key,jdbc-user-password");
 
-    assertTrue(GravitinoIcebergCatalog.checkCredentialProviders("c1", properties).isEmpty());
+    assertTrue(GravitinoIcebergCatalog.checkCredentialProviders("c1", null, properties).isEmpty());
   }
 
   @Test
@@ -103,7 +105,37 @@ class TestGravitinoIcebergCatalog {
     Map<String, String> properties =
         ImmutableMap.of(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND, "hive");
 
-    assertTrue(GravitinoIcebergCatalog.checkCredentialProviders("c1", properties).isEmpty());
+    assertTrue(
+        GravitinoIcebergCatalog.checkCredentialProviders("c1", "hive", properties).isEmpty());
+  }
+
+  @Test
+  void testCheckCredentialProvidersInfersGcsTokenFromServiceAccountFile() {
+    Map<String, String> properties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            "hive",
+            GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
+            "/path/to/sa.json");
+
+    assertEquals(
+        ImmutableList.of(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE),
+        GravitinoIcebergCatalog.checkCredentialProviders("c1", "hive", properties));
+  }
+
+  @Test
+  void testCheckCredentialProvidersUsesExplicitProvidersOverGcsInference() {
+    Map<String, String> properties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            "hive",
+            GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
+            "/path/to/sa.json",
+            CredentialConstants.CREDENTIAL_PROVIDERS,
+            "s3-secret-key");
+
+    assertTrue(
+        GravitinoIcebergCatalog.checkCredentialProviders("c1", "hive", properties).isEmpty());
   }
 
   @Test
@@ -115,6 +147,20 @@ class TestGravitinoIcebergCatalog {
             CredentialConstants.CREDENTIAL_PROVIDERS,
             "s3-token,aws-irsa");
 
-    assertTrue(GravitinoIcebergCatalog.checkCredentialProviders("c1", properties).isEmpty());
+    assertTrue(
+        GravitinoIcebergCatalog.checkCredentialProviders("c1", "REST", properties).isEmpty());
+  }
+
+  @Test
+  void testCheckCredentialProvidersUsesEffectiveCatalogType() {
+    Map<String, String> properties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            "hive",
+            CredentialConstants.CREDENTIAL_PROVIDERS,
+            "aws-irsa");
+
+    assertTrue(
+        GravitinoIcebergCatalog.checkCredentialProviders("c1", "rest", properties).isEmpty());
   }
 }

@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
@@ -48,6 +49,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.storage.GCSProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,7 +112,10 @@ public abstract class GravitinoIcebergCatalog extends BaseCatalog {
       try {
         Catalog gravitinoCatalog = catalog();
         List<String> tokenProviders =
-            checkCredentialProviders(catalogName(), gravitinoCatalog.properties());
+            checkCredentialProviders(
+                catalogName(),
+                mutableIcebergProperties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE),
+                gravitinoCatalog.properties());
         if (!tokenProviders.isEmpty()) {
           LOG.warn(
               "Catalog '{}' uses credential providers {}, which vend no credential at catalog"
@@ -175,19 +180,25 @@ public abstract class GravitinoIcebergCatalog extends BaseCatalog {
   // itself. aws-irsa is rejected: its credential is injected but never refreshed, so it overrides
   // the node's own credentials and then expires. Path-scoped token providers vend nothing at
   // catalog level, which leaves the node's own credentials in effect, so they are only returned
-  // for the caller to warn about.
+  // for the caller to warn about. The REST check uses the effective inner catalog-type, since an
+  // explicit catalog-type may differ from the persisted catalog-backend. When no provider list is
+  // set, the server infers gcs-token from gcs-service-account-file, which is not reflected in the
+  // catalog properties seen by the client, so the same inference is applied here.
   @VisibleForTesting
   static List<String> checkCredentialProviders(
-      String catalogName, Map<String, String> gravitinoCatalogProperties) {
-    String backend =
-        gravitinoCatalogProperties.get(
-            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND);
-    if (IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST.equalsIgnoreCase(backend)) {
+      String catalogName,
+      @Nullable String icebergCatalogType,
+      Map<String, String> gravitinoCatalogProperties) {
+    if (IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST.equalsIgnoreCase(
+        icebergCatalogType)) {
       return Collections.emptyList();
     }
     String providers = gravitinoCatalogProperties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
     if (StringUtils.isBlank(providers)) {
-      return Collections.emptyList();
+      return StringUtils.isNotBlank(
+              gravitinoCatalogProperties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE))
+          ? Collections.singletonList(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE)
+          : Collections.emptyList();
     }
     List<String> providerList =
         Splitter.on(',').trimResults().omitEmptyStrings().splitToList(providers);
