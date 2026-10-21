@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.policy;
 
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.ExecutionComplete;
@@ -37,6 +37,7 @@ import java.time.ZoneId;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
+import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 
 /**
