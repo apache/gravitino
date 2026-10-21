@@ -75,7 +75,7 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testReconcileSkipsPolicyWithBadCron() {
+  void testReconcileFailsOnPolicyWithBadCron() {
     PolicyEntity bad =
         PolicyEntity.builder()
             .withId(7L)
@@ -97,9 +97,11 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
 
     PolicyExpandLifecycleHook aligner =
         new PolicyExpandLifecycleHook(PolicyExpandRegistrar.joiningCurrentTransaction());
-    int aligned = new PolicyExpandReconciler(aligner, metalakes, policies).reconcileAll();
-
-    Assertions.assertEquals(0, aligned);
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new PolicyExpandReconciler(aligner, metalakes, policies).reconcileAll());
+    Assertions.assertTrue(failure.getMessage().contains("fix timeTrigger"));
   }
 
   private static DataSource entityStoreDataSource() {

@@ -66,10 +66,12 @@ public final class PolicyExpandReconciler {
   }
 
   /**
-   * Scans every metalake and aligns expand rows. A bad cron on one policy is logged and skipped so
-   * TMS still starts.
+   * Scans every metalake and aligns expand rows.
    *
-   * @return number of policies successfully aligned
+   * <p>Same rule as policy writes: an invalid {@code timeTrigger} fails the reconcile so TMS does
+   * not start until the policy is fixed. Partial success from earlier policies in the scan is kept.
+   *
+   * @return number of policies aligned
    */
   public int reconcileAll() {
     int aligned = 0;
@@ -78,14 +80,14 @@ public final class PolicyExpandReconciler {
           policyMetaService.listPoliciesByNamespace(NamespaceUtil.ofPolicy(metalake.name()))) {
         try {
           SessionUtils.doMultipleWithCommit(() -> aligner.align(policy));
-          aligned++;
         } catch (RuntimeException e) {
-          LOG.warn(
-              "Skipping expand reconcile for policy {} under metalake {}: {}",
-              policy.name(),
-              metalake.name(),
-              e.toString());
+          throw new IllegalArgumentException(
+              String.format(
+                  "Expand reconcile failed for policy %s under metalake %s; fix timeTrigger before starting TMS",
+                  policy.name(), metalake.name()),
+              e);
         }
+        aligned++;
       }
     }
     LOG.info("Reconciled expand rows for {} policies", aligned);
