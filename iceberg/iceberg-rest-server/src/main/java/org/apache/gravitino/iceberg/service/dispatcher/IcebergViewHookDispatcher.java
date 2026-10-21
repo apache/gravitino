@@ -182,6 +182,12 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // stale entity on the source or miss importing a re-created destination.
     bestEffortReconcileViewEntity(context, renameViewRequest.source());
     bestEffortReconcileViewEntity(context, renameViewRequest.destination());
+
+    // The backend rename succeeded, so rename the view's privileges and evict the cached name-id
+    // mapping, like ViewHookDispatcher.alterView. The destination may be in another namespace. A
+    // failed rename throws above and leaves both untouched.
+    AuthorizationUtils.authorizationPluginRenamePrivileges(
+        sourceIdent, Entity.EntityType.VIEW, destIdent, null);
   }
 
   /**

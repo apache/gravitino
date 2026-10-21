@@ -561,4 +561,49 @@ public class TestIcebergViewHookDispatcher {
       authz.verify(() -> AuthorizationUtils.notifyEntityNameIdMappingChange(any(), any()), never());
     }
   }
+
+  @Test
+  public void testRenameViewRenamesPrivilegesAfterBackendRename() {
+    TableIdentifier sourceIdent = TableIdentifier.of(Namespace.of("parent", "child"), "old_view");
+    TableIdentifier destIdent = TableIdentifier.of(Namespace.of("other"), "new_view");
+    RenameTableRequest renameRequest =
+        RenameTableRequest.builder().withSource(sourceIdent).withDestination(destIdent).build();
+    NameIdentifier sourceGravitinoIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent, ":");
+    NameIdentifier destGravitinoIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, destIdent, ":");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      hookDispatcher.renameView(mockContext, renameRequest);
+
+      verify(mockExecutor).renameView(mockContext, renameRequest);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  sourceGravitinoIdent, Entity.EntityType.VIEW, destGravitinoIdent, null));
+    }
+  }
+
+  @Test
+  public void testFailedRenameViewKeepsPrivileges() {
+    TableIdentifier sourceIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), "old_view");
+    TableIdentifier destIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), "new_view");
+    RenameTableRequest renameRequest =
+        RenameTableRequest.builder().withSource(sourceIdent).withDestination(destIdent).build();
+    RuntimeException failure = new RuntimeException("backend rename failed");
+    doThrow(failure).when(mockExecutor).renameView(mockContext, renameRequest);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      assertSame(
+          failure,
+          assertThrows(
+              RuntimeException.class, () -> hookDispatcher.renameView(mockContext, renameRequest)));
+
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  any(), any(), any(NameIdentifier.class), any()),
+          never());
+    }
+  }
 }

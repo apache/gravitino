@@ -65,6 +65,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -619,5 +620,83 @@ public class TestIcebergTableHookDispatcher {
     // The backend drop and the entity cleanup happened before the plugin was called.
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
     verify(mockEntityStore).delete(tableIdent, Entity.EntityType.TABLE);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"schema1, schema1", "schema1, schema2", "parent:child, other"})
+  public void testRenameTableRenamesPrivilegesAfterBackendRename(
+      String sourceNamespace, String destNamespace) {
+    TableIdentifier source =
+        TableIdentifier.of(Namespace.of(sourceNamespace.split(":")), "old_table");
+    TableIdentifier dest = TableIdentifier.of(Namespace.of(destNamespace.split(":")), "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+    NameIdentifier sourceIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, source, ":");
+    NameIdentifier destIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, dest, ":");
+    List<String> locations = List.of("s3://bucket/old_table");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      sourceIdent, Entity.EntityType.TABLE))
+          .thenReturn(locations);
+
+      hookDispatcher.renameTable(mockContext, request);
+
+      verify(mockDispatcher).renameTable(mockContext, request);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  sourceIdent, Entity.EntityType.TABLE, destIdent, locations));
+    }
+  }
+
+  @Test
+  public void testFailedRenameTableKeepsPrivileges() throws IOException {
+    TableIdentifier source = TableIdentifier.of("schema1", "old_table");
+    TableIdentifier dest = TableIdentifier.of("schema2", "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+    RuntimeException failure = new RuntimeException("backend rename failed");
+    doThrow(failure).when(mockDispatcher).renameTable(mockContext, request);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              RuntimeException.class, () -> hookDispatcher.renameTable(mockContext, request)));
+
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  any(), any(), any(NameIdentifier.class), any()),
+          never());
+    }
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRenameTableKeepsPrivilegesWhenEntityUpdateFails() throws IOException {
+    TableIdentifier source = TableIdentifier.of("schema1", "old_table");
+    TableIdentifier dest = TableIdentifier.of("schema2", "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+    doThrow(new IOException("IO error")).when(mockEntityStore).update(any(), any(), any(), any());
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertThrows(
+          RuntimeException.class, () -> hookDispatcher.renameTable(mockContext, request));
+
+      // The Gravitino entity keeps the source name, so its privileges keep it too.
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  any(), any(), any(NameIdentifier.class), any()),
+          never());
+    }
   }
 }
