@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.starrocks.operation;
 
 import java.sql.Connection;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.StringIdentifier;
@@ -49,6 +50,8 @@ import org.junit.jupiter.params.provider.NullSource;
 public class TestStarRocksTableOperationsSqlGeneration {
 
   private static class TestableStarRocksTableOperations extends StarRocksTableOperations {
+
+    private String[] columnNames = new String[0];
 
     public TestableStarRocksTableOperations() {
       super.exceptionMapper = new JdbcExceptionConverter();
@@ -96,6 +99,15 @@ public class TestStarRocksTableOperationsSqlGeneration {
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
       return JdbcTable.builder()
           .withName(tableName)
+          .withColumns(
+              Arrays.stream(columnNames)
+                  .map(
+                      name ->
+                          JdbcColumn.builder()
+                              .withName(name)
+                              .withType(Types.IntegerType.get())
+                              .build())
+                  .toArray(JdbcColumn[]::new))
           .withComment(
               StringIdentifier.addToComment(StringIdentifier.fromId(42), "existing comment"))
           .build();
@@ -359,5 +371,51 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     Assertions.assertEquals(
         "StarRocks does not support adding an auto-increment column: col2", exception.getMessage());
+  }
+
+  @Test
+  void testRenameColumnQuotesIdentifiers() {
+    TestableStarRocksTableOperations ops =
+        withColumns(new TestableStarRocksTableOperations(), "id", "order-id");
+
+    String alterSql =
+        ops.alterTableSql("test_table", TableChange.renameColumn(new String[] {"order-id"}, "key"));
+
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\nRENAME COLUMN `order-id` TO `key`;", alterSql);
+  }
+
+  @Test
+  void testDeleteMissingColumnIfExistsSkipsAlter() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableStarRocksTableOperations ops =
+        withColumns(new TestableStarRocksTableOperations(connections), "id", "col1");
+    TableChange deleteMissing = TableChange.deleteColumn(new String[] {"missing"}, true);
+
+    Assertions.assertEquals("", ops.alterTableSql("test_table", deleteMissing));
+
+    ops.alterTable("database", "test_table", deleteMissing);
+    Assertions.assertTrue(connections.executedSql().isEmpty());
+    Assertions.assertEquals(0, connections.borrowed());
+  }
+
+  @Test
+  void testDeleteMissingColumnIfExistsWithOtherChanges() {
+    TestableStarRocksTableOperations ops =
+        withColumns(new TestableStarRocksTableOperations(), "id", "col1");
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.deleteColumn(new String[] {"missing"}, true),
+            TableChange.deleteColumn(new String[] {"col1"}, false));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nDROP COLUMN `col1`;", alterSql);
+  }
+
+  private static TestableStarRocksTableOperations withColumns(
+      TestableStarRocksTableOperations ops, String... columnNames) {
+    ops.columnNames = columnNames;
+    return ops;
   }
 }
