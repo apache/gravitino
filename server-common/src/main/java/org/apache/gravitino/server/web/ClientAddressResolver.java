@@ -50,9 +50,9 @@ import org.apache.commons.lang3.StringUtils;
  *       entries from right to left, skipping trusted proxies. The first untrusted entry is the
  *       client. Entries left of it were supplied by the client and are not trusted.
  *   <li>If every entry is a trusted proxy, return the left-most one.
+ *   <li>Empty list elements, such as the one in {@code 203.0.113.5, , 10.2.2.2}, are ignored.
  *   <li>If an entry is malformed (not an IP literal, or {@code unknown}), stop and return the last
- *       trusted hop seen so far, which may be the TCP peer itself. Empty list elements, such as the
- *       one in {@code 203.0.113.5, , 10.2.2.2}, are ignored.
+ *       trusted hop seen so far, which may be the TCP peer itself.
  * </ol>
  *
  * <p>Ports and IPv6 brackets ({@code 203.0.113.5:4711}, {@code [2001:db8::1]:4711}) are stripped
@@ -172,7 +172,7 @@ public final class ClientAddressResolver {
    * identifiers.
    */
   private static Optional<InetAddress> parseForwardedEntry(String entry) {
-    if (entry.isEmpty() || UNKNOWN.equalsIgnoreCase(entry)) {
+    if (UNKNOWN.equalsIgnoreCase(entry)) {
       return Optional.empty();
     }
     String host;
@@ -266,11 +266,16 @@ public final class ClientAddressResolver {
         if (!StringUtils.isNumeric(prefixPart)) {
           throw invalid(text, "the prefix length must be a number");
         }
-        // Check the length before parsing so a very long digit string cannot overflow.
-        if (prefixPart.length() > 3 || Integer.parseInt(prefixPart) > maxBits) {
+        int parsed;
+        try {
+          parsed = Integer.parseInt(prefixPart);
+        } catch (NumberFormatException overflow) {
           throw invalid(text, "the prefix length must be between 0 and " + maxBits);
         }
-        prefix = Integer.parseInt(prefixPart);
+        if (parsed > maxBits) {
+          throw invalid(text, "the prefix length must be between 0 and " + maxBits);
+        }
+        prefix = parsed;
       }
       int prefixBits = writtenAsIpv4 ? prefix + IPV4_MAPPED_PREFIX_BITS : prefix;
       return new IpRange(mask(toIpv6Bytes(address), prefixBits), prefixBits);

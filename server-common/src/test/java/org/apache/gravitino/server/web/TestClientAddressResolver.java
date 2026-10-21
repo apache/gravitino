@@ -267,7 +267,8 @@ public class TestClientAddressResolver {
 
   @Test
   public void testOutOfRangePrefixReportsRange() {
-    for (String invalid : Arrays.asList("10.0.0.0/0128", "10.0.0.0/33", "fd00::/1290")) {
+    for (String invalid :
+        Arrays.asList("10.0.0.0/0128", "10.0.0.0/33", "fd00::/1290", "10.0.0.0/99999999999")) {
       IllegalArgumentException e =
           Assertions.assertThrows(
               IllegalArgumentException.class,
@@ -279,6 +280,16 @@ public class TestClientAddressResolver {
             IllegalArgumentException.class,
             () -> new ClientAddressResolver(ImmutableList.of("10.0.0.0/abc")));
     Assertions.assertTrue(e.getMessage().contains("must be a number"), e.getMessage());
+  }
+
+  @Test
+  public void testZeroPaddedPrefixIsAccepted() {
+    // The value decides, not the digit count.
+    for (String range : Arrays.asList("10.0.0.0/024", "10.0.0.0/0024")) {
+      ClientAddressResolver resolver = new ClientAddressResolver(ImmutableList.of(range));
+      Assertions.assertEquals("203.0.113.5", resolver.resolve(request("10.0.0.5", "203.0.113.5")));
+      Assertions.assertEquals("10.0.1.5", resolver.resolve(request("10.0.1.5", "203.0.113.5")));
+    }
   }
 
   @Test
