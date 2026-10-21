@@ -25,8 +25,8 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.storage.MetalakeNames;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
+import org.apache.gravitino.maintenance.storage.service.MaintenanceMetadataService;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
@@ -109,7 +109,7 @@ public final class OccupancyGate {
       if (open.jobId() == null) {
         continue;
       }
-      JobEntity job = loadJob(open.jobId(), tableId);
+      JobEntity job = loadJob(open.jobId(), policyId);
       // Missing job meta (purged / unresolvable) must free the soft slot; otherwise UNIQUE(table,
       // policy, finished_at=0) blocks every future acquire.
       if (job != null && ACTIVE.contains(job.status())) {
@@ -176,7 +176,7 @@ public final class OccupancyGate {
       if (open.jobId() == null) {
         continue;
       }
-      JobEntity job = loadJob(open.jobId(), tableId);
+      JobEntity job = loadJob(open.jobId(), policyId);
       if (job == null || ACTIVE.contains(job.status())) {
         continue;
       }
@@ -192,8 +192,8 @@ public final class OccupancyGate {
   }
 
   @Nullable
-  private static JobEntity loadJob(long jobId, long tableId) {
-    String metalake = MetalakeNames.forTableId(tableId);
+  private static JobEntity loadJob(long jobId, long policyId) {
+    String metalake = MaintenanceMetadataService.getInstance().getMetalakeName(policyId);
     if (metalake == null) {
       return null;
     }

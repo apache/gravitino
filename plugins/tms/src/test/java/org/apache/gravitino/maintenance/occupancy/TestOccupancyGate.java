@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.maintenance.occupancy;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.function.Function;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
@@ -27,7 +30,9 @@ import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -49,7 +54,7 @@ class TestOccupancyGate extends TestJDBCBackend {
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     OccupancyGate gate = new OccupancyGate(actions);
-    long policyId = 22L;
+    long policyId = insertPolicy(metalakeName, "occ-policy").id();
 
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
 
@@ -138,7 +143,7 @@ class TestOccupancyGate extends TestJDBCBackend {
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     OccupancyGate gate = new OccupancyGate(actions);
-    long policyId = 55L;
+    long policyId = insertPolicy(metalakeName, "occ-policy-3").id();
     long finishedAt = 1_700_000_200_000L;
 
     JobEntity succeeded =
@@ -240,5 +245,14 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertTrue(
         actions.tryAcquireInFlight(table.id(), policyId, claimTimeoutMs).isPresent());
     Assertions.assertEquals(claim.id(), actions.getById(claim.id()).id());
+  }
+
+  private PolicyEntity insertPolicy(String metalakeName, String policyName) throws IOException {
+    return createAndInsertPolicyEntity(
+        policyName,
+        "comment",
+        PolicyContents.custom(
+            ImmutableMap.of("k", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null),
+        metalakeName);
   }
 }

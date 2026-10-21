@@ -19,35 +19,14 @@
 package org.apache.gravitino.maintenance.scheduler;
 
 import java.util.Optional;
-import org.apache.gravitino.Namespace;
+import org.apache.gravitino.maintenance.storage.service.MaintenanceMetadataService;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
-import org.apache.gravitino.storage.relational.po.MetalakePO;
-import org.apache.gravitino.storage.relational.po.PolicyPO;
-import org.apache.gravitino.storage.relational.utils.POConverters;
-import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.NamespaceUtil;
 
-/** Loads policies through the relational entity-store mappers. */
+/** Loads policies through {@link MaintenanceMetadataService}. */
 public final class RelationalPolicyLookup implements PolicyLookup {
 
   @Override
   public Optional<PolicyEntity> findById(long policyId) {
-    PolicyPO policyPO =
-        SessionUtils.getWithoutCommit(
-            PolicyMetaMapper.class, mapper -> mapper.selectPolicyByPolicyId(policyId));
-    if (policyPO == null) {
-      return Optional.empty();
-    }
-    MetalakePO metalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaById(policyPO.getMetalakeId()));
-    if (metalakePO == null) {
-      return Optional.empty();
-    }
-    Namespace namespace = NamespaceUtil.ofPolicy(metalakePO.getMetalakeName());
-    return Optional.of(POConverters.fromPolicyPO(policyPO, namespace));
+    return MaintenanceMetadataService.getInstance().getPolicyById(policyId);
   }
 }
