@@ -731,7 +731,7 @@ subprojects {
 
   apply(plugin = "net.ltgt.errorprone")
   dependencies {
-    errorprone("com.google.errorprone:error_prone_core:2.10.0")
+    errorprone("com.google.errorprone:error_prone_core:2.50.0")
   }
 
   tasks.withType<JavaCompile>().configureEach {
