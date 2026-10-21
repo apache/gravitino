@@ -46,6 +46,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
           JdbcConfig.PASSWORD.getKey(),
           JdbcConfig.POOL_MIN_SIZE.getKey(),
           JdbcConfig.POOL_MAX_SIZE.getKey(),
+          JdbcConfig.POOL_MAX_WAIT_MS.getKey(),
           JdbcConfig.TEST_ON_BORROW.getKey(),
           JdbcConfig.CONNECT_TIMEOUT_MS.getKey(),
           JdbcConfig.VERIFY_ON_CREATE.getKey());
@@ -107,6 +108,12 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
                 false /* hidden */,
                 false /* reserved */),
+            longOptionalPropertyEntry(
+                JdbcConfig.POOL_MAX_WAIT_MS.getKey(),
+                JdbcConfig.POOL_MAX_WAIT_MS.getDoc(),
+                false /* immutable */,
+                JdbcConfig.POOL_MAX_WAIT_MS.getDefaultValue(),
+                false /* hidden */),
             booleanPropertyEntry(
                 JdbcConfig.TEST_ON_BORROW.getKey(),
                 JdbcConfig.TEST_ON_BORROW.getDoc(),
