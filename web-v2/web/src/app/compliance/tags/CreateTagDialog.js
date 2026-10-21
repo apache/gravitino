@@ -101,7 +101,12 @@ export default function CreateTagDialog({ ...props }) {
         const submitData = {
           name: values.name.trim(),
           comment: values.comment,
-          allowedValues: values.valueMode === 'any' ? null : values.valueMode === 'none' ? [] : values.allowedValues,
+          allowedValues:
+            values.valueMode === 'any'
+              ? null
+              : values.valueMode === 'none'
+                ? []
+                : values.allowedValues.map(value => value.trim()),
           properties: values.properties.reduce((acc, item) => {
             acc[item.key] = values[item.key] || item.value
 
@@ -171,8 +176,8 @@ export default function CreateTagDialog({ ...props }) {
                 'No value'
               ) : (
                 <Space wrap>
-                  {cacheData.allowedValues.map(value => (
-                    <Tag className='mr-0' key={value}>{value}</Tag>
+                  {cacheData.allowedValues.map((value, index) => (
+                    <Tag className='mr-0' key={index}>{value}</Tag>
                   ))}
                 </Space>
               )}
@@ -196,10 +201,21 @@ export default function CreateTagDialog({ ...props }) {
                   extra='Press Enter to add each value. Case-sensitive, 256 characters maximum.'
                   rules={[
                     {
-                      validator: (_, allowedValues) =>
-                        allowedValues?.every(value => value.length <= 256)
+                      validator: (_, allowedValues) => {
+                        if (!allowedValues?.length) {
+                          return Promise.reject(new Error('Add at least one allowed value'))
+                        }
+                        const values = allowedValues.map(value => value.trim())
+                        if (values.some(value => !value)) {
+                          return Promise.reject(new Error('Allowed values cannot be empty'))
+                        }
+                        if (new Set(values).size !== values.length) {
+                          return Promise.reject(new Error('Allowed values must be unique'))
+                        }
+                        return values.every(value => value.length <= 256)
                           ? Promise.resolve()
                           : Promise.reject(new Error('Each value must be at most 256 characters'))
+                      }
                     }
                   ]}
                 >
