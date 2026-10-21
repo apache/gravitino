@@ -268,6 +268,39 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
   }
 
   @Test
+  public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
+    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_type_default_table";
+    JdbcColumn col_1 =
+        JdbcColumn.builder().withName("col_1").withType(INT).withNullable(false).build();
+    JdbcColumn col_2 =
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.VarCharType.of(16))
+            .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
+            .withNullable(false)
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        new JdbcColumn[] {col_1, col_2},
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnType(new String[] {col_2.name()}, Types.VarCharType.of(32)));
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Column updated = load.columns()[1];
+    Assertions.assertEquals(Types.VarCharType.of(32), updated.dataType());
+    Assertions.assertEquals(Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
+  }
+
+  @Test
   public void testAlterTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_al_table";
     String tableComment = "test_comment";

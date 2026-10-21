@@ -41,6 +41,7 @@ import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTablePartitionOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -275,6 +276,46 @@ public class TestStarRocksTableOperations extends TestStarRocks {
     } finally {
       TABLE_OPERATIONS.drop(databaseName, tableName);
     }
+  }
+
+  @Test
+  public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_type_default_test_table");
+    JdbcColumn col_1 = JdbcColumn.builder().withName("col_1").withType(INT).build();
+    // The wide col_2 keeps col_3 out of the default key columns, so col_3 is a value column.
+    JdbcColumn col_2 = JdbcColumn.builder().withName("col_2").withType(VARCHAR_255).build();
+    JdbcColumn col_3 =
+        JdbcColumn.builder()
+            .withName("col_3")
+            .withType(Types.VarCharType.of(16))
+            .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
+            .build();
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        new JdbcColumn[] {col_1, col_2, col_3},
+        "test_comment",
+        createProperties(),
+        null,
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        databaseName,
+        tableName,
+        TableChange.updateColumnType(new String[] {col_3.name()}, Types.VarCharType.of(32)));
+
+    // StarRocks applies schema changes asynchronously.
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updated = TABLE_OPERATIONS.load(databaseName, tableName).columns()[2];
+              Assertions.assertEquals(Types.VarCharType.of(32), updated.dataType());
+              Assertions.assertEquals(
+                  Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
+            });
   }
 
   @Test
