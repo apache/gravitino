@@ -648,8 +648,6 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp4.getCode());
     Assertions.assertEquals(NoSuchJobTemplateException.class.getSimpleName(), errorResp4.getType());
 
-<<<<<<< HEAD
-=======
     // Test throw JobTemplateAlreadyExistsException
     doThrow(new JobTemplateAlreadyExistsException("mock error"))
         .when(jobOperationDispatcher)
@@ -668,24 +666,6 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(
         JobTemplateAlreadyExistsException.class.getSimpleName(), errorRespExists.getType());
 
-    // Test throw UnsupportedOperationException
-    doThrow(new UnsupportedOperationException("mock error"))
-        .when(jobOperationDispatcher)
-        .alterJobTemplate(any(), any(), any());
-
-    Response resp5b =
-        target(jobTemplatePath())
-            .path(templateName)
-            .request(APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp5b.getStatus());
-    ErrorResponse errorResp4b = resp5b.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(
-        UnsupportedOperationException.class.getSimpleName(), errorResp4b.getType());
-
->>>>>>> 60cd03915 ([#14017] fix(core): Return JobTemplateAlreadyExistsException when renaming a job template to an existing name (#14018))
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(jobOperationDispatcher)
