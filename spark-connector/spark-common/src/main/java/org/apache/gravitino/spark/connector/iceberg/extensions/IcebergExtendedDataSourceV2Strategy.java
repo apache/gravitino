@@ -82,7 +82,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         addPartitionField.name());
                 return toSeq(addPartitionFieldExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof CreateOrReplaceBranch) {
       CreateOrReplaceBranch createOrReplaceBranch = (CreateOrReplaceBranch) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -100,7 +100,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         createOrReplaceBranch.ifNotExists());
                 return toSeq(createOrReplaceBranchExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof CreateOrReplaceTag) {
       CreateOrReplaceTag createOrReplaceTag = (CreateOrReplaceTag) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -118,7 +118,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         createOrReplaceTag.ifNotExists());
                 return toSeq(createOrReplaceTagExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof DropBranch) {
       DropBranch dropBranch = (DropBranch) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -133,7 +133,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         dropBranch.ifExists());
                 return toSeq(dropBranchExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof DropTag) {
       DropTag dropTag = (DropTag) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -148,7 +148,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         dropTag.ifExists());
                 return toSeq(dropTagExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof DropPartitionField) {
       DropPartitionField dropPartitionField = (DropPartitionField) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -162,7 +162,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         dropPartitionField.transform());
                 return toSeq(dropPartitionFieldExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof ReplacePartitionField) {
       ReplacePartitionField replacePartitionField = (ReplacePartitionField) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -178,7 +178,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         replacePartitionField.name());
                 return toSeq(replacePartitionFieldExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof SetIdentifierFields) {
       SetIdentifierFields setIdentifierFields = (SetIdentifierFields) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -192,7 +192,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         setIdentifierFields.fields());
                 return toSeq(setIdentifierFieldsExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof DropIdentifierFields) {
       DropIdentifierFields dropIdentifierFields = (DropIdentifierFields) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
@@ -206,7 +206,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         dropIdentifierFields.fields());
                 return toSeq(dropIdentifierFieldsExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else if (plan instanceof SetWriteDistributionAndOrdering) {
       SetWriteDistributionAndOrdering setWriteDistributionAndOrdering =
           (SetWriteDistributionAndOrdering) plan;
@@ -230,7 +230,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                 }
                 return toSeq(setWriteDistributionAndOrderingExec);
               })
-          .get();
+          .getOrElse(() -> superFallback(plan));
     } else {
       scala.collection.Seq<SparkPlan> sparkPlans = super.apply(plan);
       if (sparkPlans != null) {
@@ -269,12 +269,18 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
         return new Some<>(
             IcebergCatalogAndIdentifier.of(
                 (TableCatalog) catalog, catalogAndIdentifier.identifier()));
-      } else {
-        // TODO: support SparkSessionCatalog
-        throw new UnsupportedOperationException(
-            "Unsupported catalog type: " + catalog.getClass().getName());
       }
+      // Not our catalog: return None so this strategy skips the plan and Spark falls through to
+      // the next registered strategy - the co-registered Iceberg extension serves plain Iceberg
+      // SparkCatalog/SparkSessionCatalog tables exactly as in a session without this plugin.
+      return Option.empty();
     }
+  }
+
+  private Seq<SparkPlan> superFallback(LogicalPlan plan) {
+    // Strategy.apply returns the general scala.collection.Seq while the Option chains carry
+    // the immutable.Seq that toSeq produces.
+    return (Seq<SparkPlan>) (Object) super.apply(plan);
   }
 
   private static SetWriteDistributionAndOrderingExec createDistributionAndOrderingExec(
