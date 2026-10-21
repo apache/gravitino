@@ -1225,40 +1225,6 @@ public class TestJobManager {
         JobHandle.Status.FAILED, captureUpdatedJobEntity(otherJob, otherJob).status());
   }
 
-<<<<<<< HEAD
-=======
-  /** Conflicts preserve files without stopping this cleanup batch or its next scheduled run. */
-  @Test
-  public void testCleanUpStagingDirsContinuesAfterOccConflict() throws IOException {
-    JobEntity conflicted = expiredJob();
-    JobEntity other = expiredJob();
-    mockedMetalake
-        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
-        .thenReturn(ImmutableList.of(metalake));
-    when(jobManager.listJobs(metalake, Optional.empty()))
-        .thenReturn(ImmutableList.of(conflicted, other), ImmutableList.of(conflicted));
-    NameIdentifier conflictedIdent = NameIdentifierUtil.ofJob(metalake, conflicted.name());
-    NameIdentifier otherIdent = NameIdentifierUtil.ofJob(metalake, other.name());
-    when(entityStore.delete(conflictedIdent, Entity.EntityType.JOB))
-        .thenThrow(new OptimisticLockException("job changed"))
-        .thenReturn(true);
-    when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File conflictedDir = jobManager.jobStagingDir(conflicted.id());
-    File otherDir = jobManager.jobStagingDir(other.id());
-    Assertions.assertTrue(conflictedDir.mkdirs());
-    Assertions.assertTrue(otherDir.mkdirs());
-    File artifact = new File(conflictedDir, "artifact");
-    Assertions.assertTrue(artifact.createNewFile());
-
-    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
-    Assertions.assertTrue(artifact.isFile());
-    Assertions.assertFalse(otherDir.exists());
-    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
-    Assertions.assertFalse(conflictedDir.exists());
-    verify(entityStore, times(2)).delete(conflictedIdent, Entity.EntityType.JOB);
-    verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
-  }
-
   /** A failure to list the metalakes is logged and does not stop later status polls. */
   @Test
   public void testPullJobStatusContinuesAfterFailingToListMetalakes() throws IOException {
@@ -1268,12 +1234,11 @@ public class TestJobManager {
         .thenThrow(new RuntimeException("Failed to list in-use metalakes"))
         .thenReturn(ImmutableList.of(metalake));
     doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
-    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
-        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
     stubEntityStoreUpdateToApply(job);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
-    verify(jobExecutor, never()).getJobExecutionInfo(any());
+    verify(jobExecutor, never()).getJobStatus(any());
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(job).status());
@@ -1291,8 +1256,7 @@ public class TestJobManager {
         .when(jobManager)
         .listJobs(disabledMetalake, Optional.empty());
     doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
-    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
-        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
     stubEntityStoreUpdateToApply(job, job);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
@@ -1312,8 +1276,7 @@ public class TestJobManager {
         .when(jobManager)
         .listJobs(brokenMetalake, Optional.empty());
     doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
-    when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
-        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
     stubEntityStoreUpdateToApply(job, job);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
@@ -1329,13 +1292,13 @@ public class TestJobManager {
     mockListActiveJobs(failingJob, otherJob);
     when(jobExecutor.ownsJob(failingJob.jobExecutionId()))
         .thenThrow(new AbstractMethodError("ownsJob"));
-    when(jobExecutor.getJobExecutionInfo(otherJob.jobExecutionId()))
-        .thenReturn(JobExecutionInfo.of(JobHandle.Status.SUCCEEDED));
+    when(jobExecutor.getJobStatus(otherJob.jobExecutionId()))
+        .thenReturn(JobHandle.Status.SUCCEEDED);
     stubEntityStoreUpdateToApply(otherJob, otherJob);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
-    verify(jobExecutor, never()).getJobExecutionInfo(failingJob.jobExecutionId());
+    verify(jobExecutor, never()).getJobStatus(failingJob.jobExecutionId());
     Assertions.assertEquals(
         JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(otherJob, otherJob).status());
   }
@@ -1356,7 +1319,7 @@ public class TestJobManager {
         .thenThrow(new NoClassDefFoundError("org/example/MissingClass"));
     NameIdentifier expiredIdent = NameIdentifierUtil.ofJob(metalake, expired.name());
     when(entityStore.delete(expiredIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File expiredDir = jobManager.jobStagingDir(expired.id());
+    File expiredDir = jobStagingDir(expired.id());
     Assertions.assertTrue(expiredDir.mkdirs());
 
     Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
@@ -1376,7 +1339,7 @@ public class TestJobManager {
         .thenThrow(new AbstractMethodError("isJobStateNodeLocal"));
     NameIdentifier expiredIdent = NameIdentifierUtil.ofJob(metalake, expired.name());
     when(entityStore.delete(expiredIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File expiredDir = jobManager.jobStagingDir(expired.id());
+    File expiredDir = jobStagingDir(expired.id());
     Assertions.assertTrue(expiredDir.mkdirs());
 
     Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
@@ -1396,7 +1359,7 @@ public class TestJobManager {
     when(entityStore.delete(failingIdent, Entity.EntityType.JOB))
         .thenThrow(new NoClassDefFoundError("org/example/MissingClass"));
     when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File otherDir = jobManager.jobStagingDir(other.id());
+    File otherDir = jobStagingDir(other.id());
     Assertions.assertTrue(otherDir.mkdirs());
 
     Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
@@ -1416,7 +1379,7 @@ public class TestJobManager {
     doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
     NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
     when(entityStore.delete(jobIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File jobDir = jobManager.jobStagingDir(job.id());
+    File jobDir = jobStagingDir(job.id());
     Assertions.assertTrue(jobDir.mkdirs());
 
     Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
@@ -1442,7 +1405,7 @@ public class TestJobManager {
     doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
     NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
     when(entityStore.delete(jobIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File jobDir = jobManager.jobStagingDir(job.id());
+    File jobDir = jobStagingDir(job.id());
     Assertions.assertTrue(jobDir.mkdirs());
 
     Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
@@ -1467,8 +1430,8 @@ public class TestJobManager {
     when(entityStore.delete(failingIdent, Entity.EntityType.JOB))
         .thenThrow(new RuntimeException("store error"));
     when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
-    File failingDir = jobManager.jobStagingDir(failing.id());
-    File otherDir = jobManager.jobStagingDir(other.id());
+    File failingDir = jobStagingDir(failing.id());
+    File otherDir = jobStagingDir(other.id());
     Assertions.assertTrue(failingDir.mkdirs());
     Assertions.assertTrue(otherDir.mkdirs());
 
@@ -1480,215 +1443,24 @@ public class TestJobManager {
     verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
   }
 
-  @Test
-  public void testCleanUpStagingDirsDeletesLegacyStagingDirOfRenamedTemplate() throws IOException {
-    // The job ran from template "shell_job" before an upgrade, in the legacy layout, and the
-    // template was renamed afterwards, so the job now reports the new name.
-    JobEntity job = expiredJob();
-    JobEntity renamedJob =
-        JobEntity.builder()
-            .withId(job.id())
-            .withJobExecutionId(job.jobExecutionId())
-            .withNamespace(job.namespace())
-            .withJobTemplateName("renamed_shell_job")
-            .withStartedAt(job.startedAt())
-            .withFinishedAt(job.finishedAt())
-            .withStatus(job.status())
-            .withAuditInfo(job.auditInfo())
-            .build();
-    mockListActiveJobs(renamedJob);
-    when(entityStore.delete(NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB))
-        .thenReturn(true);
-    File legacyDir = new File(testStagingDir, metalake + "/shell_job/" + job.name());
-    Assertions.assertTrue(legacyDir.mkdirs());
-    Assertions.assertTrue(new File(legacyDir, "output.log").createNewFile());
-    File otherJobDir = new File(testStagingDir, metalake + "/shell_job/job-" + (job.id() + 1));
-    Assertions.assertTrue(otherJobDir.mkdirs());
-
-    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
-
-    Assertions.assertFalse(legacyDir.exists());
-    Assertions.assertTrue(otherJobDir.isDirectory());
+  private JobEntity expiredJob() {
+    long id = idGenerator.nextId();
+    return JobEntity.builder()
+        .withId(id)
+        .withJobExecutionId(Long.toString(id))
+        .withNamespace(NamespaceUtil.ofJob(metalake))
+        .withJobTemplateName("shell_job")
+        .withFinishedAt(2L)
+        .withStatus(JobHandle.Status.SUCCEEDED)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
   }
 
-  @Test
-  public void testDeleteJobTemplateDeletesLegacyStagingDirOfRenamedMetalake() throws IOException {
-    // The job ran in the legacy layout under the metalake's former name.
-    JobEntity job = expiredJob();
-    doReturn(Collections.singletonList(job)).when(jobManager).listJobs(metalake, Optional.of("t"));
-    doReturn(true)
-        .when(entityStore)
-        .delete(NameIdentifierUtil.ofJobTemplate(metalake, "t"), Entity.EntityType.JOB_TEMPLATE);
-    File legacyDir = new File(testStagingDir, "old_metalake_name/t/" + job.name());
-    Assertions.assertTrue(legacyDir.mkdirs());
-
-    Assertions.assertTrue(jobManager.deleteJobTemplate(metalake, "t"));
-
-    Assertions.assertFalse(legacyDir.exists());
-    // Only the job's own directory is deleted, never the template or metalake directory.
-    Assertions.assertTrue(legacyDir.getParentFile().isDirectory());
+  private File jobStagingDir(long jobId) {
+    return new File(
+        new File(new File(testStagingDir, metalake), "shell_job"), JobHandle.JOB_ID_PREFIX + jobId);
   }
 
-  @Test
-  public void testDeleteJobStagingDirPrefersCurrentLayout() throws IOException {
-    JobEntity job = expiredJob();
-    doReturn(Collections.singletonList(job)).when(jobManager).listJobs(metalake, Optional.of("t"));
-    doReturn(true)
-        .when(entityStore)
-        .delete(NameIdentifierUtil.ofJobTemplate(metalake, "t"), Entity.EntityType.JOB_TEMPLATE);
-    File jobStagingDir = jobManager.jobStagingDir(job.id());
-    Assertions.assertTrue(jobStagingDir.mkdirs());
-
-    Assertions.assertTrue(jobManager.deleteJobTemplate(metalake, "t"));
-
-    Assertions.assertFalse(jobStagingDir.exists());
-    verify(jobManager, never()).findLegacyJobStagingDirs(job.id());
-  }
-
-  @Test
-  public void testFindLegacyJobStagingDirs() throws IOException {
-    long jobId = idGenerator.nextId();
-    String jobDirName = JobHandle.JOB_ID_PREFIX + jobId;
-    File stagingDir = new File(testStagingDir).getAbsoluteFile();
-    File legacyDir = new File(stagingDir, metalake + "/shell_job/" + jobDirName);
-    Assertions.assertTrue(legacyDir.mkdirs());
-
-    // Not the job's directory: a file of the same name, a directory at the wrong depth, a hidden
-    // top-level directory and the directory of the current layout.
-    File sameNameFile = new File(stagingDir, metalake + "/other_job/" + jobDirName);
-    Assertions.assertTrue(sameNameFile.getParentFile().mkdirs());
-    Assertions.assertTrue(sameNameFile.createNewFile());
-    Assertions.assertTrue(new File(stagingDir, metalake + "/" + jobDirName).mkdirs());
-    Assertions.assertTrue(new File(stagingDir, ".job-output-index/x/" + jobDirName).mkdirs());
-    Assertions.assertTrue(jobManager.jobStagingDir(jobId).mkdirs());
-    Assertions.assertTrue(
-        new File(jobManager.jobStagingDir(jobId).getParentFile(), "x/" + jobDirName).mkdirs());
-    Assertions.assertTrue(new File(stagingDir, "a_file").createNewFile());
-
-    // Symbolic links are never followed, so nothing outside the staging directory is found.
-    File outsideDir = Files.createTempDirectory("gravitino-test-outside-staging").toFile();
-    try {
-      Assertions.assertTrue(new File(outsideDir, "t/" + jobDirName).mkdirs());
-      Files.createSymbolicLink(
-          new File(stagingDir, "linked_metalake").toPath(), outsideDir.toPath());
-      Assertions.assertTrue(new File(stagingDir, "metalake_2").mkdirs());
-      Files.createSymbolicLink(
-          new File(stagingDir, "metalake_2/linked_template").toPath(),
-          new File(outsideDir, "t").toPath());
-      File linkedJobTemplateDir = new File(stagingDir, metalake + "/linked_job");
-      Assertions.assertTrue(linkedJobTemplateDir.mkdirs());
-      Files.createSymbolicLink(
-          new File(linkedJobTemplateDir, jobDirName).toPath(),
-          new File(outsideDir, "t/" + jobDirName).toPath());
-    } catch (IOException e) {
-      FileUtils.deleteDirectory(outsideDir);
-      throw e;
-    }
-
-    try {
-      Assertions.assertEquals(
-          ImmutableList.of(legacyDir.getAbsolutePath()),
-          jobManager.findLegacyJobStagingDirs(jobId).stream()
-              .map(File::getAbsolutePath)
-              .collect(Collectors.toList()));
-      Assertions.assertTrue(
-          jobManager.findLegacyJobStagingDirs(idGenerator.nextId()).isEmpty(),
-          "No directory of an unknown job");
-    } finally {
-      FileUtils.deleteDirectory(outsideDir);
-    }
-  }
-
-  @Test
-  public void testCleanUpStagingDirsDeletesLegacyStagingDirOfNestedTemplateName()
-      throws IOException {
-    // Template names may contain '/', which the legacy layout put in the path as is, so the job
-    // directory is nested deeper. The template was never renamed: this is an upgraded job.
-    JobEntity job = expiredJob();
-    JobEntity nestedTemplateJob =
-        JobEntity.builder()
-            .withId(job.id())
-            .withJobExecutionId(job.jobExecutionId())
-            .withNamespace(job.namespace())
-            .withJobTemplateName("team/etl")
-            .withStartedAt(job.startedAt())
-            .withFinishedAt(job.finishedAt())
-            .withStatus(job.status())
-            .withAuditInfo(job.auditInfo())
-            .build();
-    mockListActiveJobs(nestedTemplateJob);
-    when(entityStore.delete(NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB))
-        .thenReturn(true);
-    File legacyDir = new File(testStagingDir, metalake + "/team/etl/" + job.name());
-    Assertions.assertTrue(legacyDir.mkdirs());
-
-    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
-
-    Assertions.assertFalse(legacyDir.exists());
-  }
-
-  @Test
-  public void testFindLegacyJobStagingDirsOfNestedTemplateNames() throws IOException {
-    long jobId = idGenerator.nextId();
-    String jobDirName = JobHandle.JOB_ID_PREFIX + jobId;
-    File stagingDir = new File(testStagingDir).getAbsoluteFile();
-    File nestedDir = new File(stagingDir, metalake + "/team/etl/" + jobDirName);
-    Assertions.assertTrue(nestedDir.mkdirs());
-    File deeplyNestedDir = new File(stagingDir, metalake + "/a/b/c/d/" + jobDirName);
-    Assertions.assertTrue(deeplyNestedDir.mkdirs());
-
-    // The staging directory of another job is not descended into: a directory of its own files
-    // named like this job is not this job's staging directory.
-    File otherJobDir =
-        new File(
-            stagingDir,
-            metalake
-                + "/shell_job/"
-                + JobHandle.JOB_ID_PREFIX
-                + (jobId + 1)
-                + File.separator
-                + jobDirName);
-    Assertions.assertTrue(otherJobDir.mkdirs());
-
-    // A template name nested deeper than the lookup goes keeps its directory.
-    StringBuilder tooDeepPath = new StringBuilder(metalake);
-    for (int i = 0; i < 20; i++) {
-      tooDeepPath.append(File.separator).append("d").append(i);
-    }
-    File tooDeepDir = new File(stagingDir, tooDeepPath + File.separator + jobDirName);
-    Assertions.assertTrue(tooDeepDir.mkdirs());
-
-    Assertions.assertEquals(
-        ImmutableSet.of(nestedDir.getAbsolutePath(), deeplyNestedDir.getAbsolutePath()),
-        jobManager.findLegacyJobStagingDirs(jobId).stream()
-            .map(File::getAbsolutePath)
-            .collect(Collectors.toSet()));
-  }
-
-  @Test
-  public void testFindLegacyJobStagingDirsSkipsUnreadableDirectory() throws IOException {
-    long jobId = idGenerator.nextId();
-    File stagingDir = new File(testStagingDir);
-    File legacyDir =
-        new File(stagingDir, metalake + "/shell_job/" + JobHandle.JOB_ID_PREFIX + jobId);
-    Assertions.assertTrue(legacyDir.mkdirs());
-    // E.g. "lost+found" when the staging directory is the root of a file system.
-    File unreadableDir = new File(stagingDir, "lost+found");
-    Assertions.assertTrue(unreadableDir.mkdirs());
-    Assertions.assertTrue(unreadableDir.setReadable(false, false));
-
-    try {
-      Assertions.assertEquals(
-          ImmutableList.of(legacyDir.getAbsolutePath()),
-          jobManager.findLegacyJobStagingDirs(jobId).stream()
-              .map(File::getAbsolutePath)
-              .collect(Collectors.toList()));
-    } finally {
-      Assertions.assertTrue(unreadableDir.setReadable(true, false));
-    }
-  }
-
->>>>>>> 02954c331 ([#14014] fix(core): keep job status polling and staging cleanup running after a failure (#14016))
   @Test
   public void testCleanUpStagingDirs() throws IOException, InterruptedException {
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.STARTED);

@@ -59,6 +59,7 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -609,33 +610,7 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   void pullAndUpdateJobStatus() {
-<<<<<<< HEAD
-    List<String> metalakes = MetalakeManager.listInUseMetalakes(entityStore);
-    for (String metalake : metalakes) {
-      // This unnecessary list all the jobs, we need to improve the code to only list the active
-      // jobs.
-      List<JobEntity> activeJobs =
-          listJobs(metalake, Optional.empty()).stream()
-              .filter(
-                  job ->
-                      job.status() == JobHandle.Status.QUEUED
-                          || job.status() == JobHandle.Status.STARTED
-                          || job.status() == JobHandle.Status.CANCELLING)
-              .toList();
-
-      activeJobs.forEach(
-          job -> {
-            // Only the job executor instance owning the job can query its status. The jobs
-            // owned by other servers are skipped, and the jobs left behind by a server that has
-            // exited are settled by cleanUpStagingDirs() once they expire.
-            if (jobExecutor.ownsJob(job.jobExecutionId())) {
-              pullAndUpdateOwnedJobStatus(metalake, job);
-            }
-          });
-    }
-=======
     forEachInUseMetalake("job status pull", this::pullAndUpdateJobStatus);
->>>>>>> 02954c331 ([#14014] fix(core): keep job status polling and staging cleanup running after a failure (#14016))
   }
 
   private JobEntity toUpdatedStatusJobEntity(
@@ -685,52 +660,7 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   void cleanUpStagingDirs() {
-<<<<<<< HEAD
-    List<String> metalakes = MetalakeManager.listInUseMetalakes(entityStore);
-
-    for (String metalake : metalakes) {
-      long now = System.currentTimeMillis();
-      List<JobEntity> expiredJobs = new ArrayList<>();
-      for (JobEntity job : listJobs(metalake, Optional.empty())) {
-        if (isFinishedStatus(job.status())) {
-          if (job.finishedAt() > 0 && job.finishedAt() + jobStagingDirKeepTimeInMs < now) {
-            expiredJobs.add(job);
-          }
-        } else if (jobExecutor.isJobStateNodeLocal() && isStaleActiveJob(job, now)) {
-          // The state of a node local job is lost when the Gravitino server running it exits, so
-          // an active job that has not been updated for the whole retention time is considered
-          // left behind. Mark it as finished, and it is cleaned up once it expires as a finished
-          // job. Jobs of other job executors can be tracked by any server, so they never expire.
-          try {
-            expireStaleActiveJob(metalake, job, now);
-          } catch (RuntimeException e) {
-            LOG.error("Failed to expire job {} under metalake {}", job.name(), metalake, e);
-          }
-        }
-      }
-
-      expiredJobs.forEach(
-          job -> {
-            try {
-              entityStore.delete(
-                  NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
-
-              String jobStagingPath =
-                  stagingDir.getAbsolutePath()
-                      + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
-              File jobStagingDir = new File(jobStagingPath);
-              if (jobStagingDir.exists()) {
-                FileUtils.deleteDirectory(jobStagingDir);
-                LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
-              }
-            } catch (IOException e) {
-              LOG.error("Failed to delete job and staging directory for job {}", job.name(), e);
-            }
-          });
-    }
-=======
     forEachInUseMetalake("job staging directory cleanup", this::cleanUpStagingDirs);
->>>>>>> 02954c331 ([#14014] fix(core): keep job status polling and staging cleanup running after a failure (#14016))
   }
 
   @VisibleForTesting
@@ -1209,15 +1139,15 @@ public class JobManager implements JobOperationDispatcher {
           try {
             entityStore.delete(
                 NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
-            deleteJobStagingDir(job);
-          } catch (OptimisticLockException e) {
-            // Keep files when deletion conflicts or times out on a lock. The next cleanup run
-            // re-reads the job and checks retention eligibility again; other jobs in this batch
-            // can still be processed.
-            LOG.info(
-                "Job {} under metalake {} could not be deleted because of a concurrent operation; deferring cleanup",
-                job.name(),
-                metalake);
+
+            String jobStagingPath =
+                stagingDir.getAbsolutePath()
+                    + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
+            File jobStagingDir = new File(jobStagingPath);
+            if (jobStagingDir.exists()) {
+              FileUtils.deleteDirectory(jobStagingDir);
+              LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
+            }
           } catch (Throwable t) {
             LOG.error(
                 "Failed to delete job and staging directory for job {} under metalake {}",
