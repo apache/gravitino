@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.connector;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,8 +27,14 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialUtils;
+import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.S3Properties;
@@ -68,6 +76,52 @@ public class TestBaseCatalogCredentialProviders {
     Assertions.assertFalse(result.containsKey(CredentialConstants.CREDENTIAL_PROVIDERS));
   }
 
+  @Test
+  void testPathBasedCredentialTypes() {
+    Assertions.assertEquals(
+        ImmutableSet.of(
+            S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
+            OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE,
+            GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
+            ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE,
+            COSTokenCredential.COS_TOKEN_CREDENTIAL_TYPE),
+        CredentialUtils.PATH_BASED_CREDENTIAL_TYPES);
+  }
+
+  @Test
+  void testValidateCredentialProviders() throws IllegalAccessException {
+    TestCatalogImpl catalog = newCatalog(new HashMap<>());
+    Assertions.assertDoesNotThrow(() -> catalog.validateCredentialProviders(null));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(
+                    CredentialConstants.CREDENTIAL_PROVIDERS,
+                    "s3-secret-key,oss-secret-key,azure-account-key,aws-irsa")));
+
+    for (String type : CredentialUtils.PATH_BASED_CREDENTIAL_TYPES) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  catalog.validateCredentialProviders(
+                      ImmutableMap.of(
+                          CredentialConstants.CREDENTIAL_PROVIDERS, "s3-secret-key," + type)));
+      Assertions.assertTrue(exception.getMessage().contains(type));
+      Assertions.assertTrue(exception.getMessage().contains("test"));
+    }
+  }
+
+  @Test
+  void testValidateCredentialProvidersWithPathBasedCredentials() throws IllegalAccessException {
+    TestCatalogImpl catalog = newCatalog(new HashMap<>());
+    catalog.pathBasedCredentials = true;
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,gcs-token")));
+  }
+
   private TestCatalogImpl newCatalog(Map<String, String> props) throws IllegalAccessException {
     CatalogEntity entity =
         CatalogEntity.builder()
@@ -87,6 +141,13 @@ public class TestBaseCatalogCredentialProviders {
   }
 
   private static class TestCatalogImpl extends BaseCatalog<TestCatalogImpl> {
+
+    private boolean pathBasedCredentials = false;
+
+    @Override
+    public boolean supportsPathBasedCredentials() {
+      return pathBasedCredentials;
+    }
 
     @Override
     public String shortName() {

@@ -84,6 +84,12 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
         && StringUtils.isNotBlank(warehouse);
   }
 
+  // The Iceberg REST server vends credentials with table location contexts.
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return true;
+  }
+
   @Override
   public Capability newCapability() {
     return new IcebergCatalogCapability(HierarchicalSchemaUtil.schemaSeparator());

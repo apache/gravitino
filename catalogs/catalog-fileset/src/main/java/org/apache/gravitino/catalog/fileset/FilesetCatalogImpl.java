@@ -71,6 +71,11 @@ public class FilesetCatalogImpl extends BaseCatalog<FilesetCatalogImpl> {
     return FILESET_PROPERTIES_META;
   }
 
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return true;
+  }
+
   /**
    * Fileset access goes through the Hadoop FileSystem API (e.g. GVFS over S3A), whose {@code
    * getFileStatus} issues a HEAD on the directory-root key. That HEAD returns 404 (instead of 403)

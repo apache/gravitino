@@ -73,6 +73,7 @@ import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -387,6 +388,58 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
+    reset();
+  }
+
+  @Test
+  void testPathBasedCredentialProviderValidation() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "token_provider");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+            .put("mock", "mock")
+            .build();
+    Map<String, String> tokenProps =
+        ImmutableMap.<String, String>builder()
+            .putAll(props)
+            .put(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-secret-key,gcs-token")
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", tokenProps));
+    Assertions.assertTrue(exception.getMessage().contains("gcs-token"));
+    Assertions.assertTrue(exception.getMessage().contains(provider));
+    Assertions.assertFalse(catalogManager.catalogExists(ident));
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.alterCatalog(
+                    ident,
+                    CatalogChange.setProperty(
+                        CredentialConstants.CREDENTIAL_PROVIDERS, "adls-token")));
+    Assertions.assertTrue(exception.getMessage().contains("adls-token"));
+
+    catalogManager.alterCatalog(
+        ident,
+        CatalogChange.setProperty(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-secret-key"));
+    Assertions.assertEquals(
+        "s3-secret-key",
+        catalogManager
+            .loadCatalog(ident)
+            .properties()
+            .get(CredentialConstants.CREDENTIAL_PROVIDERS));
     reset();
   }
 

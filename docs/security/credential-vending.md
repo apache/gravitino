@@ -14,13 +14,15 @@ Gravitino credential vending is used to generate temporary or static credentials
 | Catalog type | Vends                           |
 |--------------|---------------------------------|
 | Fileset      | S3, OSS, GCS, ADLS, COS         |
-| Hive         | S3, OSS, GCS, ADLS              |
+| Hive         | S3, OSS, ADLS                   |
 | Iceberg      | S3, OSS, GCS, ADLS              |
 | Glue         | S3                              |
 | JDBC         | JDBC user and password          |
 | Paimon       | S3, OSS, JDBC user and password |
 
-S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs.
+S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs, except that the Trino Hive connector does not consume OSS credentials.
+
+Token providers (`s3-token`, `oss-token`, `gcs-token`, `adls-token`, and `cos-token`) scope credentials to a path, so only Fileset and Iceberg catalogs support them. Other catalogs vend static keys only, such as `s3-secret-key`, `oss-secret-key`, and `azure-account-key`. Creating or altering such a catalog with a token provider fails.
 
 ## Quick Start
 

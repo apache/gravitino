@@ -1185,6 +1185,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             f.catalogPropertiesMetadata(),
                             alterProperty.getLeft(),
                             alterProperty.getRight());
+                        catalog.validateCredentialProviders(alterProperty.getLeft());
                         return null;
                       });
             } catch (IllegalArgumentException e1) {
@@ -1815,6 +1816,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       wrapper.classLoader.withClassLoader(
           cl -> {
             validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
+            catalog.validateCredentialProviders(propsToValidate);
             // Preload properties() and capability() inside the IsolatedClassLoader so that
             // AppClassLoader can read them later without needing the isolated context.
             catalog.properties();
