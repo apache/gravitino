@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.dto.requests;
+package org.apache.gravitino.maintenance.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -25,7 +25,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Spark → TMS callback when a cron maintenance Spark job reaches a terminal outcome (§5.2.2). */
+/**
+ * Spark callback when a cron maintenance job reaches a terminal outcome.
+ *
+ * <p>Lives in the TMS plugin, the same way built-in IdP request DTOs live in {@code idp-basic}.
+ */
 @Getter
 @EqualsAndHashCode
 public class MaintenanceActionFinishRequest implements RESTRequest {
@@ -38,12 +42,14 @@ public class MaintenanceActionFinishRequest implements RESTRequest {
   @Nullable
   private final String metricsJson;
 
-  /** Jackson constructor. */
+  /** Default constructor for Jackson. */
   public MaintenanceActionFinishRequest() {
     this(null, null);
   }
 
   /**
+   * Creates a finish callback.
+   *
    * @param afterSnapshotId Iceberg HEAD after work (or {@code S0}/HEAD when skipped); may be null
    * @param metricsJson optional S1 metrics JSON to persist before marking finished
    */

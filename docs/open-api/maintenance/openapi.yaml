@@ -1,0 +1,68 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+openapi: 3.0.3
+info:
+  title: Gravitino Table Maintenance REST API
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  version: 1.3.0-SNAPSHOT
+  description: |
+    OpenAPI specification for table-maintenance action callbacks exposed by the TMS plugin.
+    Enable them by registering `org.apache.gravitino.maintenance.web.rest.feature` in
+    `gravitino.server.rest.extensionPackages`. Callers authenticate with the server
+    authenticators and must be the metalake owner or hold `RUN_JOB`.
+
+servers:
+  - url: "{scheme}://{host}:{port}/{basePath}"
+    description: Generic base server URL, with all parts configurable.
+    variables:
+      scheme:
+        description: The scheme of the URI, either http or https.
+        default: http
+      host:
+        description: The host address for the specified server
+        default: localhost
+      port:
+        description: The port used when addressing the host
+        default: "8090"
+      basePath:
+        description: Optional prefix to be appended to all routes
+        default: "api"
+
+security:
+  - OAuth2WithJWT: [serviceAudience]
+  - BasicAuth: []
+  - KerberosAuth: []
+
+paths:
+  /metalakes/{metalake}/maintenance/actions/{jobId}/sample:
+    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1sample"
+
+  /metalakes/{metalake}/maintenance/actions/{jobId}/finish:
+    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1finish"
+
+components:
+  securitySchemes:
+    OAuth2WithJWT:
+      $ref: "../openapi.yaml#/components/securitySchemes/OAuth2WithJWT"
+    BasicAuth:
+      $ref: "../openapi.yaml#/components/securitySchemes/BasicAuth"
+    KerberosAuth:
+      $ref: "../openapi.yaml#/components/securitySchemes/KerberosAuth"

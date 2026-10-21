@@ -32,6 +32,7 @@ import org.apache.gravitino.maintenance.policy.PolicyExpandReconciler;
 import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.web.rest.TableMaintenanceActionOperations;
+import org.apache.gravitino.maintenance.web.rest.TableMaintenanceBinder;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
@@ -104,6 +105,7 @@ public class TableMaintenanceRESTFeature implements Feature {
     // Register only after a successful CAS so a later configure-after-stop can attach a listener
     // again on the new FeatureContext (listener is scoped to the Jersey Application).
     context.register(new SchedulerShutdownListener());
+    context.register(TableMaintenanceBinder.class);
     context.register(TableMaintenanceActionOperations.class);
     LOG.info("Table maintenance scheduler pools are running");
     return true;

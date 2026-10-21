@@ -30,10 +30,11 @@ import static org.mockito.Mockito.when;
 import java.util.function.LongFunction;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.dto.requests.MaintenanceActionFinishRequest;
-import org.apache.gravitino.dto.requests.MaintenanceActionSampleRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.MaintenanceActionSampleResponse;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
+import org.apache.gravitino.maintenance.dto.responses.MaintenanceActionSampleResponse;
 import org.apache.gravitino.maintenance.injob.InJobGateOutcome;
 import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobPipeline;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
@@ -63,7 +64,7 @@ class TestTableMaintenanceActionOperations {
     actions = mock(TableMaintenanceActionMetaService.class);
     metrics = mock(TableSnapshotMetricsMetaService.class);
     metalakeLookup = tableId -> METALAKE;
-    ops = new TableMaintenanceActionOperations(pipeline, actions, metrics, metalakeLookup);
+    ops = operations(metalakeLookup);
     ops.setHttpRequest(mock(HttpServletRequest.class));
   }
 
@@ -119,7 +120,7 @@ class TestTableMaintenanceActionOperations {
   @Test
   void testSampleWrongMetalakeReturns404() {
     when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
-    ops = new TableMaintenanceActionOperations(pipeline, actions, metrics, tableId -> "other-ml");
+    ops = operations(tableId -> "other-ml");
     ops.setHttpRequest(mock(HttpServletRequest.class));
 
     Response response =
@@ -187,6 +188,11 @@ class TestTableMaintenanceActionOperations {
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
     verify(actions, never()).markFinished(anyLong(), any(), anyLong());
+  }
+
+  private TableMaintenanceActionOperations operations(LongFunction<String> lookup) {
+    return new TableMaintenanceActionOperations(
+        new MaintenanceActionManager(pipeline, actions, metrics, lookup));
   }
 
   private static TableMaintenanceActionPO action(long tableId, long policyId) {

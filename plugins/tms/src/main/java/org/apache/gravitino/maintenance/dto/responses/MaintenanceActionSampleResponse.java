@@ -16,15 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.dto.responses;
+package org.apache.gravitino.maintenance.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.gravitino.dto.responses.BaseResponse;
 
-/** Gate outcome after TMS persists {@code S0} metrics / {@code before_snapshot_id}. */
+/**
+ * Gate outcome after TMS persists {@code S0} metrics and {@code before_snapshot_id}.
+ *
+ * <p>Lives in the TMS plugin, the same way built-in IdP responses live in {@code idp-basic}.
+ */
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
@@ -43,14 +48,16 @@ public class MaintenanceActionSampleResponse extends BaseResponse {
   @JsonProperty("headSnapshotId")
   private final long headSnapshotId;
 
-  /** Jackson constructor. */
+  /** Default constructor for Jackson. */
   public MaintenanceActionSampleResponse() {
     this(false, null, 0L, 0L);
   }
 
   /**
+   * Creates a sample gate response.
+   *
    * @param continueMaintenance whether the Spark job should run maintenance work
-   * @param stopReason {@code SNAPSHOT_DRIFT} / {@code RECOMMENDER_SKIP} when stopping
+   * @param stopReason {@code SNAPSHOT_DRIFT} or {@code RECOMMENDER_SKIP} when stopping
    * @param sampledSnapshotId {@code S0}
    * @param headSnapshotId HEAD observed for the gate
    */
