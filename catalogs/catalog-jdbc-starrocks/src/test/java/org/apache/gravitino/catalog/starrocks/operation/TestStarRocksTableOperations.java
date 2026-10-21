@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -240,6 +241,37 @@ public class TestStarRocksTableOperations extends TestStarRocks {
                   Assertions.assertEquals(
                       StringIdentifier.addToComment(identifier, ""),
                       TABLE_OPERATIONS.load(databaseName, tableName).comment()));
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
+  }
+
+  @Test
+  public void testClearTableCommentWithNull() {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_clear_comment_table");
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
+
+    try {
+      TABLE_OPERATIONS.create(
+          databaseName,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          createProperties(),
+          null,
+          Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(databaseName, tableName, TableChange.updateComment(null));
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(
+              () -> {
+                String comment = TABLE_OPERATIONS.load(databaseName, tableName).comment();
+                Assertions.assertTrue(StringUtils.isEmpty(comment), comment);
+              });
     } finally {
       TABLE_OPERATIONS.drop(databaseName, tableName);
     }
