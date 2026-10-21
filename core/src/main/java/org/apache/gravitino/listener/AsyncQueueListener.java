@@ -107,8 +107,10 @@ public class AsyncQueueListener implements EventListenerPlugin {
     long joinMillis = TimeUnit.SECONDS.toMillis(dispatcherJoinSeconds);
     long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(joinMillis);
     try {
-      // Give the dispatcher thread time to drain the queued events, then interrupt it if it does
-      // not finish in time.
+      // Give the dispatcher thread up to dispatcherJoinSeconds to drain the queued events. If it
+      // does not finish in time, interrupt it and wait up to another dispatcherJoinSeconds for it
+      // to exit, which is how long stop() waited for the thread before draining was added. So a
+      // stuck dispatcher delays stop() by at most twice dispatcherJoinSeconds.
       if (asyncProcessor.isAlive()
           && queue.offer(STOP_SIGNAL, remainingMillis(deadlineNanos), TimeUnit.MILLISECONDS)) {
         asyncProcessor.join(remainingMillis(deadlineNanos));

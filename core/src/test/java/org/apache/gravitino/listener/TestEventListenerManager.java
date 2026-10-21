@@ -412,6 +412,40 @@ public class TestEventListenerManager {
   }
 
   @Test
+  void testFirstSharedListenerAddedAfterStart() {
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(new HashMap<>());
+    eventListenerManager.start();
+    EventBus eventBus = eventListenerManager.createEventBus();
+
+    ThreadRecordingEventListener sharedListener =
+        new ThreadRecordingEventListener(Mode.ASYNC_SHARED);
+    try {
+      // No shared queue exists yet, so registering the listener creates and starts one.
+      eventListenerManager.addEventListener("shared", sharedListener);
+      Assertions.assertTrue(sharedListener.started.get());
+      Assertions.assertEquals(1, eventBus.getEventListeners().size());
+      Assertions.assertTrue(eventBus.getEventListeners().get(0) instanceof AsyncQueueListener);
+
+      eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-default"), sharedListener.awaitPostEventThreads());
+    } finally {
+      eventListenerManager.stop();
+    }
+  }
+
+  @Test
+  void testInitTwiceFails() {
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(createSyncEventListenerConfig("sync1", "sync2"));
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> eventListenerManager.init(createSyncEventListenerConfig("sync1", "sync2")));
+  }
+
+  @Test
   void testHighWatermarkIncludesListenerAddedAfterEventBusCreated() {
     Map<String, String> properties = new HashMap<>();
     properties.put(EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY, "10");

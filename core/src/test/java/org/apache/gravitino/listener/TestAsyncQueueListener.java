@@ -190,8 +190,11 @@ class TestAsyncQueueListener {
     long startNanos = System.nanoTime();
     listener.stop();
 
-    // One join timeout to drain, then the dispatcher is interrupted and exits.
-    assertTrue(TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startNanos) < 10);
+    // Stop waits at most twice dispatcherJoinSeconds: once to drain, once after the interrupt.
+    // The dispatcher exits right after the interrupt, so stop() takes a little over 1 second.
+    long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+    assertTrue(elapsedMillis >= 900, "stop() returned before the drain timeout: " + elapsedMillis);
+    assertTrue(elapsedMillis < 5000, "stop() took too long: " + elapsedMillis);
   }
 
   private static class BlockingAppender extends AbstractAppender {

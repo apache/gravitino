@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.BaseEvent;
@@ -52,13 +53,36 @@ public class EventBus {
   private final List<EventListenerPlugin> eventListeners;
 
   /**
+   * Holds instances of {@link AsyncQueueListener}, mainly used to check the status of async queue,
+   * like {@link #isHighWatermark()}.
+   */
+  private final List<AsyncQueueListener> asyncQueueListeners;
+
+  /**
    * Constructs an EventBus with a predefined list of event listeners.
    *
    * @param eventListeners A list of {@link EventListenerPlugin} instances that are to be registered
    *     with this EventBus for event dispatch.
    */
   public EventBus(List<EventListenerPlugin> eventListeners) {
+    this(
+        eventListeners,
+        eventListeners.stream()
+            .filter(AsyncQueueListener.class::isInstance)
+            .map(AsyncQueueListener.class::cast)
+            .collect(Collectors.toList()));
+  }
+
+  /**
+   * Constructs an EventBus with the event listeners and the async queues among them. The lists are
+   * kept by reference, so listeners the caller adds to them later are dispatched and checked too.
+   *
+   * @param eventListeners The listeners to dispatch events to.
+   * @param asyncQueueListeners The {@link AsyncQueueListener} instances in {@code eventListeners}.
+   */
+  EventBus(List<EventListenerPlugin> eventListeners, List<AsyncQueueListener> asyncQueueListeners) {
     this.eventListeners = eventListeners;
+    this.asyncQueueListeners = asyncQueueListeners;
   }
 
   /**
@@ -100,12 +124,7 @@ public class EventBus {
   }
 
   public boolean isHighWatermark() {
-    // Scan the listeners on each call, so async queues registered after this bus was created are
-    // also checked.
-    return eventListeners.stream()
-        .filter(AsyncQueueListener.class::isInstance)
-        .map(AsyncQueueListener.class::cast)
-        .anyMatch(AsyncQueueListener::isHighWatermark);
+    return asyncQueueListeners.stream().anyMatch(AsyncQueueListener::isHighWatermark);
   }
 
   /**

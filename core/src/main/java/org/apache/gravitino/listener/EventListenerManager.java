@@ -61,9 +61,14 @@ public class EventListenerManager {
   // Copy-on-write lists, so listeners added after start() are safe to iterate concurrently.
   private final List<EventListenerPlugin> eventListeners = new CopyOnWriteArrayList<>();
   private final List<EventListenerPlugin> sharedQueueListeners = new CopyOnWriteArrayList<>();
+  private final List<AsyncQueueListener> asyncQueueListeners = new CopyOnWriteArrayList<>();
+  private boolean initialized = false;
   private volatile boolean started = false;
 
-  public void init(Map<String, String> properties) {
+  public synchronized void init(Map<String, String> properties) {
+    // The listener lists are only appended to, so a second init would register them twice.
+    Preconditions.checkState(!initialized, "EventListenerManager has already been initialized");
+    initialized = true;
     EventListenerConfig config = new EventListenerConfig(properties);
     this.queueCapacity = config.get(EventListenerConfig.QUEUE_CAPACITY);
     this.dispatcherJoinSeconds = config.get(EventListenerConfig.DISPATCHER_JOIN_SECONDS);
@@ -99,7 +104,7 @@ public class EventListenerManager {
   }
 
   public EventBus createEventBus() {
-    return new EventBus(eventListeners);
+    return new EventBus(eventListeners, asyncQueueListeners);
   }
 
   /**
@@ -121,8 +126,7 @@ public class EventListenerManager {
         addAndStartIfNeeded(eventListeners, wrapper);
         break;
       case ASYNC_ISOLATED:
-        addAndStartIfNeeded(
-            eventListeners,
+        addAsyncQueueListener(
             new AsyncQueueListener(
                 ImmutableList.of(wrapper), listenerName, queueCapacity, dispatcherJoinSeconds));
         break;
@@ -132,8 +136,7 @@ public class EventListenerManager {
         } else {
           // Starting the shared queue starts the wrapper as well.
           sharedQueueListeners.add(wrapper);
-          addAndStartIfNeeded(
-              eventListeners,
+          addAsyncQueueListener(
               new AsyncQueueListener(
                   sharedQueueListeners, "default", queueCapacity, dispatcherJoinSeconds));
         }
@@ -141,6 +144,11 @@ public class EventListenerManager {
       default:
         throw new RuntimeException("Unexpected listener mode:" + listener.mode());
     }
+  }
+
+  private void addAsyncQueueListener(AsyncQueueListener asyncQueueListener) {
+    addAndStartIfNeeded(eventListeners, asyncQueueListener);
+    asyncQueueListeners.add(asyncQueueListener);
   }
 
   private void addAndStartIfNeeded(
