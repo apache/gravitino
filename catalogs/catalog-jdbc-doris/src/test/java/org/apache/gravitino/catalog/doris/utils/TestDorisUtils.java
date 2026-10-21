@@ -74,6 +74,16 @@ public class TestDorisUtils {
     assertEquals(expectedStr, result);
   }
 
+  /** Verifies large escaped properties are parsed without recursive regex stack growth. */
+  @Test
+  public void testLongEscapedPropertiesRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key".repeat(10000), "value\" = \"part\\".repeat(2000));
+    assertEquals(
+        properties,
+        DorisUtils.extractPropertiesFromSql(DorisUtils.generatePropertiesSql(properties)));
+  }
+
   /** Verifies escaped quotes cannot be mistaken for the property key/value separator. */
   @Test
   public void testPropertiesWithQuotedSeparatorsRoundTrip() {

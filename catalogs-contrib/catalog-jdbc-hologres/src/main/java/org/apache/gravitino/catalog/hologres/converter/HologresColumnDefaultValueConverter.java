@@ -46,7 +46,8 @@ public class HologresColumnDefaultValueConverter extends JdbcColumnDefaultValueC
   // for example:
   // '2021-10-01 00:00:00'::timestamp without time zone
   // ''something'::character varying'
-  private static final Pattern VALUE_WITH_TYPE = Pattern.compile("'((?:[^']|'')*)'::\\s*(.+)");
+  // Possessive repetition avoids recursive backtracking for long default literals.
+  private static final Pattern VALUE_WITH_TYPE = Pattern.compile("'((?:[^']|'')*+)'::\\s*(.+)");
 
   // for example:
   // NULL::character varying

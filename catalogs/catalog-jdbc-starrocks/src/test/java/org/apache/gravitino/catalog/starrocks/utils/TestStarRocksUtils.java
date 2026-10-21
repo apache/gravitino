@@ -120,6 +120,16 @@ public class TestStarRocksUtils {
     assertEquals("owner\\s \"comment\"", result.get("plain"));
   }
 
+  /** Verifies large escaped properties are parsed without recursive regex stack growth. */
+  @Test
+  public void testLongEscapedPropertiesRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key".repeat(10000), "value\" = \"part\\".repeat(2000));
+    assertEquals(
+        properties,
+        StarRocksUtils.extractPropertiesFromSql(StarRocksUtils.generatePropertiesSql(properties)));
+  }
+
   /** Verifies escaped quotes cannot be mistaken for the property key/value separator. */
   @Test
   public void testPropertiesWithQuotedSeparatorsRoundTrip() {

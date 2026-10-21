@@ -121,8 +121,9 @@ public class StarRocksUtils {
     String[] lines = createTableSql.split("\n");
 
     boolean isProperties = false;
+    // Escape alternatives exclude the closing delimiter, so no backtracking is needed.
     final String sProperties =
-        "\"((?:\\\\.|\"\"|[^\"\\\\])*)\"\\s*=\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*)\",?";
+        "\"((?:\\\\.|\"\"|[^\"\\\\])*+)\"\\s*=\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*+)\",?";
     final Pattern patternProperties = Pattern.compile(sProperties);
 
     for (String line : lines) {
