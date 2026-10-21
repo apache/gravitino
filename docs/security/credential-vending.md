@@ -31,12 +31,68 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 ## General Configurations
 
+<<<<<<< HEAD
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations           | Description                                                                                | Default value | Required |
 |-------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|
 | `credential-provider-type`          | `gravitino.iceberg-rest.credential-provider-type`      | Deprecated; use `credential-providers` instead.                                            | (none)        | Yes      |
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`          | The credential provider types, separated by comma.                                         | (none)        | Yes      |
 | `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       |
 | `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       |
+=======
+| Property                        | Description                                                                                                                       | Default value | Required             |
+|---------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------|
+| `credential-providers`          | The credential provider types, separated by comma. If omitted, Gravitino infers some providers from the other properties present. | (none)        | Yes, unless inferred |
+| `credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino removes the credential from the cache.                                   | 0.15          | No                   |
+| `credential-cache-max-size`     | Max size for the credential cache.                                                                                                | 10000         | No                   |
+
+### Values for `credential-providers`
+
+| Value                | Storage | Vends                                                      |
+|----------------------|---------|------------------------------------------------------------|
+| `s3-token`           | S3      | Temporary STS credentials, scoped to the table path        |
+| `aws-irsa`           | S3      | Credentials from an IAM role for service accounts, for EKS |
+| `s3-secret-key`      | S3      | The configured static access key and secret                |
+| `oss-token`          | OSS     | Temporary STS credentials, scoped to the table path        |
+| `oss-secret-key`     | OSS     | The configured static access key and secret                |
+| `adls-token`         | ADLS    | A user delegation SAS token                                |
+| `azure-account-key`  | ADLS    | The configured static storage account key                  |
+| `gcs-token`          | GCS     | A downscoped access token                                  |
+| `cos-token`          | COS     | A temporary STS token                                      |
+| `cos-secret-key`     | COS     | The configured static access key and secret                |
+| `jdbc-user-password` | JDBC    | The configured JDBC username and password                  |
+| `aws-secret-key`     | Glue    | The configured AWS access key and secret for Glue API auth |
+| `dlf-secret-key`     | Paimon  | The configured DLF access key and secret (optional token)  |
+
+Each value has its own properties, listed in the sections below. To vend for more than one storage type on a catalog, separate values with a comma. Custom providers can be added by implementing `CredentialProvider`, described under [Custom Credentials](#custom-credentials).
+
+### When `credential-providers` Is Omitted
+
+If a catalog does not set `credential-providers`, Gravitino infers providers from the credential properties present:
+
+| Properties present                                           | Provider enabled    |
+|--------------------------------------------------------------|---------------------|
+| `s3-access-key-id` and `s3-secret-access-key`                | `s3-secret-key`     |
+| `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
+| `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
+| `cos-access-key-id` and `cos-secret-access-key`              | `cos-secret-key`    |
+| `gcs-service-account-file`                                   | `gcs-token`         |
+| `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
+| `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
+
+JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc-password`.
+
+The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
+
+Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
+
+### Static providers and `getCredentials` privilege risk
+
+Static providers such as `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`,
+`jdbc-user-password`, `aws-secret-key`, and `dlf-secret-key` return the configured long-lived
+plaintext keys from `getCredentials` / `GET .../credentials`. That endpoint does **not** require a
+dedicated privilege beyond being able to load the metadata object (unlike `getSecrets`, which
+requires `USE_SECRETS`, with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
+>>>>>>> 7cad7718d ([#14029] fix(core): Expose inferred credential-providers in catalog properties (#14030))
 
 ## Build-in Credentials Configurations
 
