@@ -138,4 +138,57 @@ public class TestDorisColumnDefaultValueConverter {
         Literals.of("owner's a\"\"b \"value\"\\path", Types.VarCharType.of(255)),
         CONVERTER.toGravitino(varcharType, "owner's a\"\"b \"value\"\\\\path", false, false));
   }
+<<<<<<< HEAD
+=======
+
+  /** Verifies loaded literal and native expression defaults use MODIFY COLUMN SQL forms. */
+  @Test
+  public void testModifyColumnSerializesLoadedDefaultValues() {
+    Assertions.assertNull(
+        CONVERTER.fromGravitinoForModifyColumn(DEFAULT_VALUE_NOT_SET, false, false));
+    Assertions.assertEquals(
+        "NULL", CONVERTER.fromGravitinoForModifyColumn(Literals.NULL, false, false));
+    Assertions.assertEquals(
+        "7", CONVERTER.fromGravitinoForModifyColumn(Literals.integerLiteral(7), false, false));
+    Assertions.assertEquals(
+        "CURRENT_TIMESTAMP",
+        CONVERTER.fromGravitinoForModifyColumn(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, false, false));
+    Assertions.assertEquals(
+        "CURRENT_DATE",
+        CONVERTER.fromGravitinoForModifyColumn(
+            UnparsedExpression.of("CURRENT_DATE"), false, false));
+
+    Assertions.assertEquals(
+        "\"owner's \\\"value\\\"\\\\path\"",
+        CONVERTER.fromGravitinoForModifyColumn(
+            Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)), false, false));
+  }
+
+  /** Verifies adjacent backslash and quote escaping for Doris 3.x and 4.x. */
+  @Test
+  public void testModifyColumnEscapesAdjacentBackslashAndQuoteByDorisVersion() {
+    String defaultValue = "prefix" + "\\" + "\"" + "suffix";
+
+    Assertions.assertEquals(
+        "\"" + "prefix" + "\\".repeat(3) + "\"suffix\"",
+        CONVERTER.fromGravitinoForModifyColumn(
+            Literals.of(defaultValue, Types.VarCharType.of(255)), false, false));
+    Assertions.assertEquals(
+        "\"" + "prefix" + "\\".repeat(7) + "\"suffix\"",
+        CONVERTER.fromGravitinoForModifyColumn(
+            Literals.of(defaultValue, Types.VarCharType.of(255)), true, true));
+  }
+
+  @Test
+  public void testCreateTableStringDefaultLiteralForms() {
+    DorisColumnDefaultValueConverter converter = new DorisColumnDefaultValueConverter();
+    Literal<?> value = Literals.varcharLiteral(64, "O'Brien C:\\tmp \"x\"");
+    Assertions.assertEquals(
+        "\"O'Brien C:\\\\tmp \\\"x\\\"\"", converter.fromGravitinoForCreateTable(value, true));
+    Assertions.assertEquals(
+        "'O''Brien C:\\\\tmp \"x\"'", converter.fromGravitinoForCreateTable(value, false));
+    Assertions.assertEquals(
+        "12", converter.fromGravitinoForCreateTable(Literals.integerLiteral(12), true));
+  }
+>>>>>>> 4e900e8f1 ([#13973][#13974] fix(catalog-jdbc): Escape column default literals and table properties (#13975))
 }
