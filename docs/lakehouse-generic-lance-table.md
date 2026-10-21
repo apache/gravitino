@@ -130,7 +130,8 @@ of `lance-core` 12.0.0. Such a table therefore accepts a later `lance.blob` colu
 
 This default applies to every table created through Gravitino's own table API, not only to tables
 with blob columns, and there is no property to override it. Any Lance client can still **read** such
-a table — the file format version is forward-compatible on the read path. **Writing** to it requires
+a table: `LanceSparkRESTServiceIT` seeds rows with `lance-core` 12.0.0 and reads them back through
+every `lance-spark` bundle in the matrix, down to the one built on `lance-core` 2.0.0. **Writing** to it requires
 a Lance that understands version 2.2: a client built on `lance-core` 2.0.0 has its commit rejected
 with `added files with version 2.0. However, the data storage version is 2.2.`, where before this
 upgrade the same write succeeded because Gravitino's default was below 2.2. `lance-core` 4.0.0 and
