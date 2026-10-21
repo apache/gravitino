@@ -37,6 +37,8 @@ as more models are added or their definitions grow.
 3. **Consistency.** Keep discovered metric definitions consistent with the current committed
    definition of each Semantic Model.
 4. **Visibility.** Apply the same visibility rules as the existing Semantic Model listing.
+5. **Integration.** Both listing modes emit pre, success, and failure events through Gravitino's
+   existing listener framework.
 
 ## Non-Goals
 
@@ -54,10 +56,16 @@ as more models are added or their definitions grow.
 The `SemanticModelCatalog` interface adds separate methods for identifiers and complete definitions:
 
 ```java
-NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException;
+default NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+  throw new UnsupportedOperationException("Metric listing is not supported");
+}
 
-SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException;
+default SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+  throw new UnsupportedOperationException("Metric info listing is not supported");
+}
 ```
+
+The built-in implementation and Java client override these defaults to support metric discovery.
 
 `listMetrics` returns one identifier per metric. A full identifier has a four-level namespace
 `[metalake, catalog, schema, semanticModel]` and the metric name as its `name`. Including the containing
@@ -94,10 +102,10 @@ Callers can reconstruct its identifier with `NameIdentifier.of(info.namespace(),
 
 #### REST API
 
-The new route sits alongside `semantic-models`, avoiding a conflict with a model named `metrics`:
+The schema-level discovery route sits alongside `semantic-models`:
 
 ```http
-GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/metrics
+GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-model-metrics
 ```
 
 The `details` query parameter defaults to `false`. With `details=false`, the endpoint implements
@@ -162,8 +170,11 @@ Metrics inherit the visibility of their containing Semantic Model. Both `listMet
 including schema access checks and the existing ownership, use, and modify visibility rules.
 No metric-level privileges are introduced.
 
-The server applies these rules in the caller's authorization context for REST, SDK, and MCP requests.
-Each model's metrics are included or excluded together in both listing modes.
+The REST layer applies these rules in the caller's authorization context after the dispatcher
+returns metric identifiers or typed metric results. It filters the distinct containing-model
+identifiers and includes or excludes each model's metrics together before DTO conversion. REST, SDK,
+and MCP requests use this same path. EntityStore performs schema-scoped reads without authorization
+filtering.
 
 The [existing visibility filter][visibility-filter] excludes a model on denial or an authorization
 evaluation exception, logging exceptions. Request-level authorization failures, including denied
@@ -236,6 +247,9 @@ Discovery grants no access to underlying data.
 This proposal selects option 3. Separate definition columns support metric-only reads while keeping
 each complete model snapshot in one row. The identity table stores names and stable IDs, and changes
 only when metrics are added or removed.
+
+**Endpoint naming.** The route uses `semantic-model-metrics` to make clear that it lists metrics
+contained in Semantic Models. It sits alongside `semantic-models` to avoid conflicts with model names.
 
 ### Internal Storage
 
@@ -370,18 +384,20 @@ Use the following read paths, restricting discovery to live models in the reques
   current snapshot.
 
 Each discovery query reads model names and metrics in one consistent statement or read snapshot,
-so concurrent changes cannot mix a model's states. Apply model authorization before decoding and
-assembling results. Storage failures, or metric decoding failures for included models, fail the
-request without partial results. Metadata and permission changes do not share a schema-wide
-transaction.
+so concurrent changes cannot mix a model's states. Detailed listing decodes metrics before REST
+visibility filtering, so decoding failures fail the request even for models that would otherwise
+be filtered out. Storage failures also fail the request without partial results. Metadata and
+permission changes do not share a schema-wide transaction.
 
 ## Development Plan
 
 1. Split definition storage into five columns and update model serialization and reconstruction
    across supported databases.
 2. Add the metric identity table and integrate transactional reconciliation, cascade deletion, and
-   cleanup with the existing model lifecycle.
-3. Implement authorized identifier and detail listings with REST, Java, Python, and MCP integration.
+   cleanup with the existing model lifecycle. Extend relational garbage collection to purge retired
+   identities, including those retired by metalake/catalog deletion.
+3. Implement authorized identifier and detail listings with REST, Java, Python, and MCP integration,
+   including OpenAPI definitions.
 4. Validate definition round-trips, identity rules, and transactional consistency.
 
 [metric-validation]: https://github.com/apache/gravitino/blob/62a948972d5b7e8762020ccc099a52f7cfc91331/core/src/main/java/org/apache/gravitino/catalog/SemanticModelValidator.java#L145-L165
