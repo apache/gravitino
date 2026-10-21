@@ -2059,6 +2059,51 @@ public class TestJobManager {
         JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(otherJob, otherJob).status());
   }
 
+  /** An Error expiring a stale job still lets the expired jobs found before it be deleted. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterErrorExpiringJob() throws IOException {
+    Instant longAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+    JobEntity expired = expiredJob();
+    JobEntity stale = newJobEntity("local-job-gone-1", JobHandle.Status.STARTED, longAgo, longAgo);
+    mockListActiveJobs(expired, stale);
+    when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
+    when(entityStore.update(
+            eq(NameIdentifierUtil.ofJob(metalake, stale.name())),
+            eq(JobEntity.class),
+            eq(Entity.EntityType.JOB),
+            any()))
+        .thenThrow(new NoClassDefFoundError("org/example/MissingClass"));
+    NameIdentifier expiredIdent = NameIdentifierUtil.ofJob(metalake, expired.name());
+    when(entityStore.delete(expiredIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File expiredDir = jobManager.jobStagingDir(expired.id());
+    Assertions.assertTrue(expiredDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(expiredDir.exists());
+    verify(entityStore, times(1)).delete(expiredIdent, Entity.EntityType.JOB);
+  }
+
+  /** An Error deleting one expired job does not stop the cleanup of the others. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterErrorDeletingJob() throws IOException {
+    JobEntity failing = expiredJob();
+    JobEntity other = expiredJob();
+    mockListActiveJobs(failing, other);
+    NameIdentifier failingIdent = NameIdentifierUtil.ofJob(metalake, failing.name());
+    NameIdentifier otherIdent = NameIdentifierUtil.ofJob(metalake, other.name());
+    when(entityStore.delete(failingIdent, Entity.EntityType.JOB))
+        .thenThrow(new NoClassDefFoundError("org/example/MissingClass"));
+    when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File otherDir = jobManager.jobStagingDir(other.id());
+    Assertions.assertTrue(otherDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(otherDir.exists());
+    verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
+  }
+
   /** A failure to list the metalakes is logged and does not stop later cleanup runs. */
   @Test
   public void testCleanUpStagingDirsContinuesAfterFailingToListMetalakes() throws IOException {

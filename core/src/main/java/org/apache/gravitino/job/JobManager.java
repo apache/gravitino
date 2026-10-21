@@ -751,12 +751,12 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   void pullAndUpdateJobStatus() {
-    forEachInUseMetalake("pull the job status", this::pullAndUpdateJobStatus);
+    forEachInUseMetalake("job status pull", this::pullAndUpdateJobStatus);
   }
 
   @VisibleForTesting
   void cleanUpStagingDirs() {
-    forEachInUseMetalake("clean up the job staging directories", this::cleanUpStagingDirs);
+    forEachInUseMetalake("job staging directory cleanup", this::cleanUpStagingDirs);
   }
 
   @VisibleForTesting
@@ -994,7 +994,7 @@ public class JobManager implements JobOperationDispatcher {
     try {
       metalakes = MetalakeManager.listInUseMetalakes(entityStore);
     } catch (Throwable t) {
-      LOG.error("Failed to list the in-use metalakes to {}", task, t);
+      LOG.error("Failed to list the in-use metalakes for the {}", task, t);
       return;
     }
 
@@ -1004,9 +1004,9 @@ public class JobManager implements JobOperationDispatcher {
       } catch (MetalakeNotInUseException | NoSuchMetalakeException e) {
         // The metalake was disabled or dropped after it was listed as in use, which is an expected
         // race, so it is logged without the stack trace.
-        LOG.warn("Skipped to {} under metalake {}: {}", task, metalake, e.getMessage());
+        LOG.warn("Skipped the {} for metalake {}: {}", task, metalake, e.getMessage());
       } catch (Throwable t) {
-        LOG.error("Failed to {} under metalake {}", task, metalake, t);
+        LOG.error("The {} failed for metalake {}", task, metalake, t);
       }
     }
   }
@@ -1364,8 +1364,8 @@ public class JobManager implements JobOperationDispatcher {
         // job. Jobs of other job executors can be tracked by any server, so they never expire.
         try {
           expireStaleActiveJob(metalake, job, now);
-        } catch (RuntimeException e) {
-          LOG.error("Failed to expire job {} under metalake {}", job.name(), metalake, e);
+        } catch (Throwable t) {
+          LOG.error("Failed to expire job {} under metalake {}", job.name(), metalake, t);
         }
       }
     }
@@ -1384,12 +1384,12 @@ public class JobManager implements JobOperationDispatcher {
                 "Job {} under metalake {} could not be deleted because of a concurrent operation; deferring cleanup",
                 job.name(),
                 metalake);
-          } catch (IOException | RuntimeException e) {
+          } catch (Throwable t) {
             LOG.error(
                 "Failed to delete job and staging directory for job {} under metalake {}",
                 job.name(),
                 metalake,
-                e);
+                t);
           }
         });
   }
