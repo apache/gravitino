@@ -41,7 +41,7 @@ public final class RoleSessionNameUtils {
             + UUID.nameUUIDFromBytes(userName.getBytes(StandardCharsets.UTF_8))
                 .toString()
                 .substring(0, 16);
-    String cleaned = userName.replaceAll("[^A-Za-z0-9_+=,.@-]", "_");
+    String cleaned = userName.replaceAll("[^A-Za-z0-9_@.-]", "_");
     int available = MAX_LENGTH - prefix.length() - suffix.length();
     if (available < 1) {
       throw new IllegalArgumentException("Role session prefix is too long");

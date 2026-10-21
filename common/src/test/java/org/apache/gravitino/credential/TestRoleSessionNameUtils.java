@@ -32,7 +32,7 @@ class TestRoleSessionNameUtils {
     String first = RoleSessionNameUtils.create("gravitino_irsa_session_", "first name/" + nonAscii);
     String second =
         RoleSessionNameUtils.create("gravitino_irsa_session_", "first name:" + nonAscii);
-    assertTrue(first.matches("[A-Za-z0-9_+=,.@-]{2,64}"));
+    assertTrue(first.matches("[A-Za-z0-9_@.-]{2,64}"));
     assertNotEquals(first, second);
     assertEquals(
         first, RoleSessionNameUtils.create("gravitino_irsa_session_", "first name/" + nonAscii));
@@ -40,5 +40,14 @@ class TestRoleSessionNameUtils {
     String longName = "firstname.lastname.contractor@subsidiary.example.com";
     assertTrue(RoleSessionNameUtils.create("gravitino_irsa_session_", longName).length() <= 64);
     assertTrue(RoleSessionNameUtils.create("gravitino_", longName).length() <= 64);
+  }
+
+  @Test
+  void replacesCharactersRejectedByAliyun() {
+    String sessionName =
+        RoleSessionNameUtils.create("gravitino_", "alice+etl=prod,team@example.com");
+
+    assertTrue(sessionName.matches("[A-Za-z0-9_@.-]{2,64}"));
+    assertTrue(sessionName.startsWith("gravitino_alice_etl_prod_team@example.com_"));
   }
 }

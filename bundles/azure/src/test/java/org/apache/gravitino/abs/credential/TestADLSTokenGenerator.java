@@ -185,6 +185,23 @@ class TestADLSTokenGenerator {
     }
   }
 
+  @Test
+  void providerPreservesUnsupportedLocationError() throws Exception {
+    String path = "wasbs://container@account.blob.core.windows.net/warehouse/table";
+    try (ADLSTokenProvider provider = new ADLSTokenProvider()) {
+      provider.initialize(createProperties());
+      PathBasedCredentialContext context =
+          new PathBasedCredentialContext(
+              "test-user", Collections.emptySet(), Collections.singleton(path));
+
+      IllegalArgumentException exception =
+          assertThrows(IllegalArgumentException.class, () -> provider.getCredential(context));
+
+      assertTrue(exception.getMessage().contains("abfs or abfss"));
+      assertTrue(exception.getMessage().contains(path));
+    }
+  }
+
   private static Map<String, String> createProperties() {
     Map<String, String> properties = new HashMap<>();
     properties.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, "account");
