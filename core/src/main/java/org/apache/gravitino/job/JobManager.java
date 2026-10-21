@@ -112,10 +112,13 @@ public class JobManager implements JobOperationDispatcher {
 
   // A live owner of a node local job cancels it at its next status pull, and records it as
   // CANCELLED at the pull after the process exits, so it answers a cancellation within about two
-  // pull intervals, as long as the process exits within one, e.g. it is killed forcibly within
-  // gravitino.jobExecutor.local.cancelForceKillDelayInMs. A job still CANCELLING after this many
+  // pull intervals plus the time the process takes to exit. A job still CANCELLING after this many
   // pull intervals is considered left behind by an owner that has exited. This assumes all servers
-  // use the same pull interval and have their clocks in sync.
+  // use the same pull interval and have their clocks in sync, and that a cancelled process exits
+  // within one pull interval, i.e. gravitino.jobExecutor.local.cancelForceKillDelayInMs is shorter
+  // than it, which holds for the recommended intervals of 1 minute or more. Otherwise a job may be
+  // marked as CANCELLED while its process is still exiting, after its owner has already asked it to
+  // stop.
   private static final int CANCELLATION_TIMEOUT_IN_PULL_INTERVALS = 3;
 
   private final EntityStore entityStore;

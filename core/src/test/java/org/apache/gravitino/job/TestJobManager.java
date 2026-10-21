@@ -1714,6 +1714,94 @@ public class TestJobManager {
   }
 
   @Test
+  public void testPullJobStatusSettlesCancellationOnlyAfterTimeout() throws IOException {
+    // The timeout is three pull intervals. A job cancelled just within it is left to its owner, one
+    // cancelled just beyond it is settled.
+    long timeoutInMs = 3 * config.get(Configs.JOB_STATUS_PULL_INTERVAL_IN_MS);
+    Instant longAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+    JobEntity withinTimeout =
+        newJobEntity(
+            "local-job-other-1",
+            JobHandle.Status.CANCELLING,
+            longAgo,
+            Instant.now().minusMillis(timeoutInMs).plusSeconds(10));
+    JobEntity beyondTimeout =
+        newJobEntity(
+            "local-job-other-2",
+            JobHandle.Status.CANCELLING,
+            longAgo,
+            Instant.now().minusMillis(timeoutInMs).minusSeconds(10));
+    mockListActiveJobs(withinTimeout, beyondTimeout);
+    when(jobExecutor.ownsJob(any())).thenReturn(false);
+    when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
+    stubEntityStoreUpdateToApply(beyondTimeout, beyondTimeout);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    verify(entityStore, never())
+        .update(
+            eq(NameIdentifierUtil.ofJob(metalake, withinTimeout.name())),
+            eq(JobEntity.class),
+            eq(Entity.EntityType.JOB),
+            any());
+    Assertions.assertEquals(
+        JobHandle.Status.CANCELLED, captureUpdatedJobEntity(beyondTimeout, beyondTimeout).status());
+  }
+
+  @Test
+  public void testPullJobStatusContinuesAfterFailingToSettleCancellation() throws IOException {
+    // Failing to settle one job must not stop settling the others.
+    Instant longAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+    JobEntity failingJob =
+        newJobEntity("local-job-gone-1", JobHandle.Status.CANCELLING, longAgo, longAgo);
+    JobEntity otherJob =
+        newJobEntity("local-job-gone-2", JobHandle.Status.CANCELLING, longAgo, longAgo);
+    mockListActiveJobs(failingJob, otherJob);
+    when(jobExecutor.ownsJob(any())).thenReturn(false);
+    when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
+    when(entityStore.update(
+            eq(NameIdentifierUtil.ofJob(metalake, failingJob.name())),
+            eq(JobEntity.class),
+            eq(Entity.EntityType.JOB),
+            any()))
+        .thenThrow(new IOException("store error"));
+    stubEntityStoreUpdateToApply(otherJob, otherJob);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    Assertions.assertEquals(
+        JobHandle.Status.CANCELLED, captureUpdatedJobEntity(otherJob, otherJob).status());
+  }
+
+  @Test
+  public void testPullJobStatusContinuesAfterFailingToCheckNodeLocalJobState() throws IOException {
+    // The job executor fails to tell whether its job state is node local for the first job, which
+    // must not stop settling the next one.
+    Instant longAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+    JobEntity failingJob =
+        newJobEntity("local-job-gone-1", JobHandle.Status.CANCELLING, longAgo, longAgo);
+    JobEntity otherJob =
+        newJobEntity("local-job-gone-2", JobHandle.Status.CANCELLING, longAgo, longAgo);
+    mockListActiveJobs(failingJob, otherJob);
+    when(jobExecutor.ownsJob(any())).thenReturn(false);
+    when(jobExecutor.isJobStateNodeLocal())
+        .thenThrow(new AbstractMethodError("isJobStateNodeLocal"))
+        .thenReturn(true);
+    stubEntityStoreUpdateToApply(otherJob, otherJob);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    verify(entityStore, never())
+        .update(
+            eq(NameIdentifierUtil.ofJob(metalake, failingJob.name())),
+            eq(JobEntity.class),
+            eq(Entity.EntityType.JOB),
+            any());
+    Assertions.assertEquals(
+        JobHandle.Status.CANCELLED, captureUpdatedJobEntity(otherJob, otherJob).status());
+  }
+
+  @Test
   public void testPullJobStatusWaitsForOwnerToAnswerCancellation() throws IOException {
     // The job was cancelled just now, so its owner may still answer it. A job owned by another
     // server that is not cancelling is skipped however long it has not been updated.
