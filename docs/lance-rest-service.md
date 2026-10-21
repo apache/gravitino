@@ -282,6 +282,9 @@ URL encoded:        lance_catalog%24schema%24table01
 - Tables **cannot** be nested deeper than schema level  
 - Parent catalog must be created in Gravitino before using Lance REST API
 - Namespace deletion defaults to `restrict`; use `cascade` to remove child metadata
+- Lance **branches and tags** are not implemented. `lance-namespace` 0.11.1 added optional
+  `branch` and `tag` selectors to the describe and alter requests; a request that sets either is
+  rejected with HTTP `400` rather than silently falling back to the table's own history
 :::
 
 ## Authentication and authorization

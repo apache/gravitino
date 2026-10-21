@@ -25,6 +25,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -687,7 +688,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
   }
 
   @Test
-  void testDescribeTableAcceptsNewOptionalRequestFields() {
+  void testDescribeTableResponseCarriesEmptyContext() {
     Mockito.reset(tableOps);
     String tableIds = "catalog.scheme.describe_table_new_fields";
     String delimiter = ".";
@@ -697,14 +698,10 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     when(tableOps.describeTable(any(), any(), any(), anyBoolean(), anyBoolean()))
         .thenReturn(describeTableResponse);
 
-    // Sent as raw JSON rather than a built request object: lance-namespace 0.11.1 added the
-    // optional `branch` and `tag` fields, and newer clients put them on the wire even though
-    // Gravitino does not implement branches or tags. The server must accept such a payload
-    // instead of failing deserialization, and must ignore the two fields rather than letting
-    // them shift the version it resolves.
+    // Sent as raw JSON rather than a built request object, so the assertion is about the wire
+    // payload a 0.11.1 client produces rather than about the model's getters.
     String rawRequest =
-        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_new_fields\"],"
-            + "\"version\":3,\"branch\":\"main\",\"tag\":\"v1\"}";
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_new_fields\"],\"version\":3}";
     Response resp =
         target(String.format("/v1/table/%s/describe", tableIds))
             .queryParam("delimiter", delimiter)
@@ -723,6 +720,86 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // carries no context the server did not intend to send.
     String body = resp.readEntity(String.class);
     Assertions.assertTrue(body.contains("\"context\":{}"), body);
+  }
+
+  @Test
+  void testDescribeTableRejectsBranchAndTagSelectors() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.describe_table_selectors";
+    String delimiter = ".";
+
+    // lance-namespace 0.11.1 added `branch` and `tag` to DescribeTableRequest. Gravitino resolves
+    // neither, and answering with the table's current state would hand the caller a different
+    // snapshot than it asked for, so both selectors must be refused. Raw JSON, because the point
+    // is what an upgraded client puts on the wire.
+    String withBranch =
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_selectors\"],\"branch\":\"dev\"}";
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(withBranch, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        "Lance table branches are not supported, got branch: dev", errorResp.getError());
+
+    String withTag =
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_selectors\"],\"tag\":\"v1\"}";
+    resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(withTag, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        "Lance table tags are not supported, got tag: v1", errorResp.getError());
+
+    // Neither request may reach the backing operations.
+    Mockito.verify(tableOps, never())
+        .describeTable(any(), any(), any(), anyBoolean(), anyBoolean());
+  }
+
+  @Test
+  void testAlterRequestsRejectBranchSelector() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.alter_table_branch_selector";
+    String delimiter = ".";
+
+    // 0.11.1 also added `branch` to the two alter requests Gravitino serves. A mutation aimed at a
+    // branch must not fall through to the table itself, so assert both the rejection and that no
+    // alterTable call was made at all.
+    AlterTableDropColumnsRequest dropColumnsRequest = new AlterTableDropColumnsRequest();
+    dropColumnsRequest.setColumns(List.of("id"));
+    dropColumnsRequest.setBranch("dev");
+    Response resp =
+        target(String.format("/v1/table/%s/drop_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(dropColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        "Lance table branches are not supported, got branch: dev", errorResp.getError());
+
+    AlterTableAlterColumnsRequest alterColumnsRequest = new AlterTableAlterColumnsRequest();
+    AlterColumnsEntry columnAlteration = new AlterColumnsEntry();
+    columnAlteration.setPath("col1");
+    columnAlteration.setRename("col1_new");
+    alterColumnsRequest.setAlterations(List.of(columnAlteration));
+    alterColumnsRequest.setBranch("dev");
+    resp =
+        target(String.format("/v1/table/%s/alter_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(alterColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        "Lance table branches are not supported, got branch: dev", errorResp.getError());
+
+    Mockito.verify(tableOps, never()).alterTable(any(), any(), any());
   }
 
   @Test
