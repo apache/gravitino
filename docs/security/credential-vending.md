@@ -56,17 +56,17 @@ A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with t
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                               | Default value | Required |
 |-------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `aws-irsa` for AWS IRSA credential provider.                                                              | (none)        | Yes      |
-| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the IAM role to assume. Required for fine-grained path-based access control.                   | (none)        | Yes*     |
+| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the IAM role to assume. Falls back to the pod's `AWS_ROLE_ARN` when unset or blank.             | (none)        | No       |
 | `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The AWS region for STS operations. Used for fine-grained access control.                                  | (none)        | No       |
 | `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       |
 | `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services.       | (none)        | No       |
 
-**Note**: `s3-role-arn` is required only when using fine-grained path-based access control with vended credentials. For basic IRSA usage without path restrictions, only `credential-providers=aws-irsa` is needed.
+**Note**: Set `s3-role-arn` or provide `AWS_ROLE_ARN` in the pod environment. Gravitino selects that role when credentials are requested. For table-path requests, it adds a session policy covering the requested data, metadata, and write locations. Catalog-level requests have no path to scope and return credentials with the selected role's full permissions.
 
 **Prerequisites for fine-grained mode:**
 - EKS cluster with IRSA properly configured
 - `AWS_WEB_IDENTITY_TOKEN_FILE` environment variable pointing to the service account token
-- IAM role with permissions to assume the target role specified in `s3-role-arn`
+- Target IAM role selected by `s3-role-arn` or `AWS_ROLE_ARN` with a trust policy allowing `sts:AssumeRoleWithWebIdentity` from the pod's Kubernetes service account
 - Target IAM role with necessary S3 permissions for the data locations
 
 #### S3 Secret Key Credential
@@ -135,6 +135,8 @@ A credential with static Azure storage account name and key.
 #### ADLS Token Credential
 
 An ADLS token is a token credential with scoped privileges, by leveraging Azure [User Delegation Sas](https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas). To use an ADLS token credential, you should create a Microsoft Entra ID service principal and grant it proper privileges.
+
+The SAS is scoped to one requested root directory that covers the table location and any requested write paths. A custom write path that is the parent of the table path results in a broader SAS scope. Requests with independent roots or paths in different storage accounts or containers are rejected.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations        | Description                                                         | Default value | Required |
 |-------------------------------------|-----------------------------------------------------|---------------------------------------------------------------------|---------------|----------|
