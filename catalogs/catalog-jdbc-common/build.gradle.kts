@@ -67,10 +67,6 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
   testImplementation(libs.sqlite.jdbc)
-  testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.jdbc)
-  testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

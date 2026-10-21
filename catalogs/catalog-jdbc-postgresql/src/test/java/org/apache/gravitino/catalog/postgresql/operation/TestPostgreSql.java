@@ -18,58 +18,66 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.HashMap;
+import com.google.common.collect.Maps;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.TestJdbc;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
-import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
+import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
+import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.BeforeAll;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
+@PostgreSQLFixture(database = TestDatabaseName.PG_TEST_PG_OPERATIONS)
 public class TestPostgreSql extends TestJdbc {
 
-  public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
+  @FixtureContainer private static PostgreSQLContainer postgreSQLContainer;
 
   @BeforeAll
   public static void startup() throws Exception {
-    CONTAINER =
-        new PostgreSQLContainer(DEFAULT_POSTGRES_IMAGE)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
+    // Each class gets a database of its own, as it did with a server of its own, so classes
+    // sharing the server do not see each other's schemas.
+    String database = RandomNameUtils.genRandomName("test_db_");
+    try (Connection connection =
+            DriverManager.getConnection(
+                postgreSQLContainer.getJdbcUrl(TestDatabaseName.PG_TEST_PG_OPERATIONS),
+                postgreSQLContainer.getUsername(),
+                postgreSQLContainer.getPassword());
+        Statement statement = connection.createStatement()) {
+      statement.execute("CREATE DATABASE " + database);
+    }
+    DATA_SOURCE = DataSourceUtils.createDataSource(dataSourceProperties(database));
     DATABASE_OPERATIONS = new PostgreSqlSchemaOperations();
     JDBC_EXCEPTION_CONVERTER = new PostgreSqlExceptionConverter();
-    TestJdbc.startup();
-    String jdbcUrl = CONTAINER.getJdbcUrl();
-    try {
-      String database =
-          new URI(CONTAINER.getJdbcUrl().substring(jdbcUrl.lastIndexOf("/") + 1, jdbcUrl.length()))
-              .getPath();
-      Map<String, String> config =
-          new HashMap<String, String>() {
-            {
-              put(JdbcConfig.JDBC_DATABASE.getKey(), database);
-            }
-          };
-      TABLE_OPERATIONS = new PostgreSqlTableOperations();
-      DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, config);
-      TABLE_OPERATIONS.initialize(
-          DATA_SOURCE,
-          JDBC_EXCEPTION_CONVERTER,
-          new PostgreSqlTypeConverter(),
-          new PostgreSqlColumnDefaultValueConverter(),
-          config);
-      if (TABLE_OPERATIONS instanceof RequireDatabaseOperation) {
-        ((RequireDatabaseOperation) TABLE_OPERATIONS).setDatabaseOperation(DATABASE_OPERATIONS);
-      }
-      DATABASE_OPERATIONS.create(TEST_DB_NAME, null, null);
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
+    Map<String, String> config = Map.of(JdbcConfig.JDBC_DATABASE.getKey(), database);
+    PostgreSqlTableOperations tableOperations = new PostgreSqlTableOperations();
+    TABLE_OPERATIONS = tableOperations;
+    DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, config);
+    TABLE_OPERATIONS.initialize(
+        DATA_SOURCE,
+        JDBC_EXCEPTION_CONVERTER,
+        new PostgreSqlTypeConverter(),
+        new PostgreSqlColumnDefaultValueConverter(),
+        config);
+    tableOperations.setDatabaseOperation(DATABASE_OPERATIONS);
+    DATABASE_OPERATIONS.create(TEST_DB_NAME, null, null);
+  }
+
+  /** Returns the data source properties for {@code database} on the shared server. */
+  protected static Map<String, String> dataSourceProperties(String database) {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), postgreSQLContainer.getJdbcUrl() + database);
+    properties.put(JdbcConfig.USERNAME.getKey(), postgreSQLContainer.getUsername());
+    properties.put(JdbcConfig.PASSWORD.getKey(), postgreSQLContainer.getPassword());
+    return properties;
   }
 }

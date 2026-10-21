@@ -19,34 +19,34 @@
 
 package org.apache.gravitino.maintenance.optimizer.integration.test.storage;
 
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.BaseGenericJdbcMetricsRepositoryTest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
-import org.testcontainers.mysql.MySQLContainer;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@MySQLFixture(database = TestDatabaseName.MYSQL_OPTIMIZER_JDBC_METRICS_IT)
 class TestMySqlGenericJdbcMetricsRepositoryBehaviorIT extends BaseGenericJdbcMetricsRepositoryTest {
 
-  private MySQLContainer mysql;
+  @FixtureContainer private MySQLContainer mysql;
 
   @BeforeAll
   void setUp() {
-    mysql = new MySQLContainer("mysql:8.0.33");
-    mysql.start();
+    String jdbcUrl = mysql.getJdbcUrl(TestDatabaseName.MYSQL_OPTIMIZER_JDBC_METRICS_IT);
     JdbcMetricsRepositoryITUtils.initializeSchema(
-        mysql.getJdbcUrl(), mysql.getUsername(), mysql.getPassword(), "mysql");
+        jdbcUrl, mysql.getUsername(), mysql.getPassword(), "mysql");
 
     storage = new GenericJdbcMetricsRepository();
     storage.initialize(
         JdbcMetricsRepositoryITUtils.createJdbcMetricsConfigs(
-            mysql.getJdbcUrl(),
-            mysql.getUsername(),
-            mysql.getPassword(),
-            mysql.getDriverClassName()));
+            jdbcUrl, mysql.getUsername(), mysql.getPassword(), "com.mysql.cj.jdbc.Driver"));
   }
 
   @AfterAll
@@ -54,8 +54,5 @@ class TestMySqlGenericJdbcMetricsRepositoryBehaviorIT extends BaseGenericJdbcMet
     storage.cleanupTableMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
     storage.cleanupJobMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
     storage.close();
-    if (mysql != null) {
-      mysql.stop();
-    }
   }
 }

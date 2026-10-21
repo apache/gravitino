@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
-import com.google.common.collect.Maps;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -422,14 +421,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     try (Connection connection = DATA_SOURCE.getConnection()) {
       JdbcConnectorUtils.executeUpdate(connection, "CREATE DATABASE " + testDbName);
     }
-    HashMap<String, String> properties = Maps.newHashMap();
-    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
-    String jdbcUrl =
-        StringUtils.substring(CONTAINER.getJdbcUrl(), 0, CONTAINER.getJdbcUrl().lastIndexOf("/"));
-    properties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl + "/" + testDbName);
-    properties.put(JdbcConfig.USERNAME.getKey(), CONTAINER.getUsername());
-    properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());
-    DataSource dataSource = DataSourceUtils.createDataSource(properties);
+    DataSource dataSource = DataSourceUtils.createDataSource(dataSourceProperties(testDbName));
     PostgreSqlSchemaOperations postgreSqlSchemaOperations = new PostgreSqlSchemaOperations();
     Map<String, String> config =
         new HashMap<String, String>() {

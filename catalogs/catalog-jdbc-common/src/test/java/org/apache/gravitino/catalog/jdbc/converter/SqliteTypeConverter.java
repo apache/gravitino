@@ -21,7 +21,7 @@ package org.apache.gravitino.catalog.jdbc.converter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.Strings;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
@@ -39,7 +39,7 @@ public class SqliteTypeConverter extends JdbcTypeConverter {
   @Override
   public Type toGravitino(JdbcTypeBean type) {
     return GRAVITINO_TO_SQLITE_MAPPING.entrySet().stream()
-        .filter(entry -> Strings.CI.equals(type.getTypeName(), entry.getValue()))
+        .filter(entry -> StringUtils.equalsIgnoreCase(type.getTypeName(), entry.getValue()))
         .map(Map.Entry::getKey)
         .findFirst()
         .orElse(Types.ExternalType.of(type.getTypeName()));

@@ -87,8 +87,6 @@ dependencies {
     exclude(group = "org.slf4j", module = "slf4j-log4j12")
   }
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.testcontainers.postgresql)
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testRuntimeOnly(libs.mysql.driver)

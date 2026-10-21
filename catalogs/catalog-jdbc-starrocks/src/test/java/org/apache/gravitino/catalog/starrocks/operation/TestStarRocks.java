@@ -32,7 +32,6 @@ import org.apache.gravitino.catalog.starrocks.operations.StarRocksTableOperation
 import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.StarRocksContainer;
 import org.apache.gravitino.integration.test.container.StarRocksFixture;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
 @StarRocksFixture
@@ -55,15 +54,6 @@ public class TestStarRocks extends TestJdbc {
         new StarRocksTypeConverter(),
         new StarRocksColumnDefaultValueConverter(),
         Collections.emptyMap());
-  }
-
-  // Overwrite the stop method to close the data source and stop the container
-  @AfterAll
-  public static void stop() {
-    DataSourceUtils.closeDataSource(DATA_SOURCE);
-    if (null != CONTAINER) {
-      CONTAINER.stop();
-    }
   }
 
   private static Map<String, String> getStarRocksCatalogProperties() {

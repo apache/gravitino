@@ -30,7 +30,6 @@ import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.OceanBaseContainer;
 import org.apache.gravitino.integration.test.container.OceanBaseFixture;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
 @OceanBaseFixture
@@ -53,15 +52,6 @@ public class TestOceanBase extends TestJdbc {
         new OceanBaseTypeConverter(),
         new OceanBaseColumnDefaultValueConverter(),
         Collections.emptyMap());
-  }
-
-  // Overwrite the stop method to close the data source and stop the container
-  @AfterAll
-  public static void stop() {
-    DataSourceUtils.closeDataSource(DATA_SOURCE);
-    if (null != CONTAINER) {
-      CONTAINER.stop();
-    }
   }
 
   private static Map<String, String> getOceanBaseCatalogProperties() {

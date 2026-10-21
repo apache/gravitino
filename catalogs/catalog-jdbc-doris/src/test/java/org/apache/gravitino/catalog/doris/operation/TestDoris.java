@@ -30,7 +30,6 @@ import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.integration.test.container.DorisContainer;
 import org.apache.gravitino.integration.test.container.DorisFixture;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
 @DorisFixture
@@ -53,15 +52,6 @@ public class TestDoris extends TestJdbc {
         new DorisTypeConverter(),
         new DorisColumnDefaultValueConverter(),
         Collections.emptyMap());
-  }
-
-  // Overwrite the stop method to close the data source and stop the container
-  @AfterAll
-  public static void stop() {
-    DataSourceUtils.closeDataSource(DATA_SOURCE);
-    if (null != CONTAINER) {
-      CONTAINER.stop();
-    }
   }
 
   private static Map<String, String> getDorisCatalogProperties() {
