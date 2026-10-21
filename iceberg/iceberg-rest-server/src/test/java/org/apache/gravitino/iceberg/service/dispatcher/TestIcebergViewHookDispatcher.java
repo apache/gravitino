@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,6 +38,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -58,6 +60,8 @@ import org.apache.iceberg.view.ImmutableViewVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestIcebergViewHookDispatcher {
 
@@ -520,5 +524,50 @@ public class TestIcebergViewHookDispatcher {
 
     verify(mockExecutor, times(1)).viewExists(mockContext, viewIdent);
     assertEquals(true, exists);
+  }
+
+  @Test
+  public void testRenameViewRenamesPrivilegesAfterBackendRename() {
+    TableIdentifier sourceIdent = TableIdentifier.of(Namespace.of("parent", "child"), "old_view");
+    TableIdentifier destIdent = TableIdentifier.of(Namespace.of("other"), "new_view");
+    RenameTableRequest renameRequest =
+        RenameTableRequest.builder().withSource(sourceIdent).withDestination(destIdent).build();
+    NameIdentifier sourceGravitinoIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent, ":");
+    NameIdentifier destGravitinoIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, destIdent, ":");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      hookDispatcher.renameView(mockContext, renameRequest);
+
+      verify(mockExecutor).renameView(mockContext, renameRequest);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  sourceGravitinoIdent, Entity.EntityType.VIEW, destGravitinoIdent, null));
+    }
+  }
+
+  @Test
+  public void testFailedRenameViewKeepsPrivileges() {
+    TableIdentifier sourceIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), "old_view");
+    TableIdentifier destIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), "new_view");
+    RenameTableRequest renameRequest =
+        RenameTableRequest.builder().withSource(sourceIdent).withDestination(destIdent).build();
+    RuntimeException failure = new RuntimeException("backend rename failed");
+    doThrow(failure).when(mockExecutor).renameView(mockContext, renameRequest);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      assertSame(
+          failure,
+          assertThrows(
+              RuntimeException.class, () -> hookDispatcher.renameView(mockContext, renameRequest)));
+
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  any(), any(), any(NameIdentifier.class), any()),
+          never());
+    }
   }
 }
