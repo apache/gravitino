@@ -24,7 +24,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +58,7 @@ import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 
 public class ModelCatalogOperations extends ManagedSchemaOperations
     implements CatalogOperations, ModelCatalog {
@@ -327,11 +327,11 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       throw new NoSuchModelException(nsee, "Model %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
       String newName =
-          Arrays.stream(changes)
-              .filter(c -> c instanceof ModelChange.RenameModel)
-              .map(c -> ((ModelChange.RenameModel) c).newName())
-              .reduce((first, second) -> second)
-              .orElse(ident.name());
+          RenameUtils.getLastRenameName(
+              ident.name(),
+              changes,
+              ModelChange.RenameModel.class,
+              ModelChange.RenameModel::newName);
       throw new ModelAlreadyExistsException(
           e, "Model %s already exists", NameIdentifier.of(ident.namespace(), newName));
     }

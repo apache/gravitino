@@ -128,6 +128,7 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PooledClassLoaderEntry;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1248,11 +1249,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } catch (EntityAlreadyExistsException e) {
             String newName =
-                Arrays.stream(changes)
-                    .filter(c -> c instanceof CatalogChange.RenameCatalog)
-                    .map(c -> ((CatalogChange.RenameCatalog) c).getNewName())
-                    .reduce((first, second) -> second)
-                    .orElse(ident.name());
+                RenameUtils.getLastRenameName(
+                    ident.name(),
+                    changes,
+                    CatalogChange.RenameCatalog.class,
+                    CatalogChange.RenameCatalog::getNewName);
             throw new CatalogAlreadyExistsException(
                 e, "Catalog %s already exists", NameIdentifier.of(ident.namespace(), newName));
 

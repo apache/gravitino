@@ -58,6 +58,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -344,11 +345,11 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
           } catch (EntityAlreadyExistsException e) {
             String newName =
-                Arrays.stream(changes)
-                    .filter(c -> c instanceof MetalakeChange.RenameMetalake)
-                    .map(c -> ((MetalakeChange.RenameMetalake) c).getNewName())
-                    .reduce((first, second) -> second)
-                    .orElse(ident.name());
+                RenameUtils.getLastRenameName(
+                    ident.name(),
+                    changes,
+                    MetalakeChange.RenameMetalake.class,
+                    MetalakeChange.RenameMetalake::getNewName);
             throw new MetalakeAlreadyExistsException(e, "Metalake %s already exists", newName);
 
           } catch (IOException ioe) {

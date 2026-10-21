@@ -127,6 +127,7 @@ import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -728,11 +729,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw new NoSuchFilesetException(nsee, FILESET_DOES_NOT_EXIST_MSG, ident);
     } catch (EntityAlreadyExistsException e) {
       String newName =
-          Arrays.stream(changes)
-              .filter(c -> c instanceof FilesetChange.RenameFileset)
-              .map(c -> ((FilesetChange.RenameFileset) c).getNewName())
-              .reduce((first, second) -> second)
-              .orElse(ident.name());
+          RenameUtils.getLastRenameName(
+              ident.name(),
+              changes,
+              FilesetChange.RenameFileset.class,
+              FilesetChange.RenameFileset::getNewName);
       throw new FilesetAlreadyExistsException(
           e, "Fileset %s already exists", NameIdentifier.of(ident.namespace(), newName));
     } finally {

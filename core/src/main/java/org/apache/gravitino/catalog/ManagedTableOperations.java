@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Entity;
@@ -168,6 +169,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
     // The alterTable in ManagedTableOperations only updates the table metadata in the entity store.
     // It doesn't handle any additional operations like modifying physical data, etc. Those
     // operations should be handled in the specific catalog implementation.
+    AtomicReference<NameIdentifier> targetIdent = new AtomicReference<>(ident);
     try {
       TableEntity newTableEntity =
           store()
@@ -175,32 +177,17 @@ public abstract class ManagedTableOperations implements TableCatalog {
                   ident,
                   TableEntity.class,
                   Entity.EntityType.TABLE,
-                  oldEntity -> applyChanges(oldEntity, changes));
+                  oldEntity -> {
+                    TableEntity updatedEntity = applyChanges(oldEntity, changes);
+                    targetIdent.set(updatedEntity.nameIdentifier());
+                    return updatedEntity;
+                  });
 
       return toGenericTable(newTableEntity);
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
-      NameIdentifier newIdent =
-          Arrays.stream(changes)
-              .filter(c -> c instanceof TableChange.RenameTable)
-              .map(c -> (TableChange.RenameTable) c)
-              .map(
-                  rename ->
-                      NameIdentifier.of(
-                          rename
-                              .getNewSchemaName()
-                              .map(
-                                  schema ->
-                                      NamespaceUtil.ofTable(
-                                          ident.namespace().level(0),
-                                          ident.namespace().level(1),
-                                          schema))
-                              .orElse(ident.namespace()),
-                          rename.getNewName()))
-              .reduce((first, second) -> second)
-              .orElse(ident);
-      throw new TableAlreadyExistsException(e, "Table %s already exists", newIdent);
+      throw new TableAlreadyExistsException(e, "Table %s already exists", targetIdent.get());
     } catch (IOException e) {
       throw new RuntimeException("Failed to alter table " + ident, e);
     }
@@ -251,7 +238,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
             rename
                 .getNewSchemaName()
                 .map(s -> NamespaceUtil.ofTable(oldNs.level(0), oldNs.level(1), s))
-                .orElse(oldNs);
+                .orElse(newNs);
 
       } else if (change instanceof TableChange.UpdateComment updateComment) {
         newComment = updateComment.getNewComment();

@@ -173,39 +173,30 @@ public class TestRenameConflicts extends TestJDBCBackend {
     backend.insert(source, false);
     backend.insert(target, false);
     backend.insert(crossSchemaTarget, false);
-    ManagedTableOperations operations =
-        new ManagedTableOperations() {
-          @Override
-          protected EntityStore store() {
-            return store;
-          }
-
-          @Override
-          protected SupportsSchemas schemas() {
-            return Mockito.mock(SupportsSchemas.class);
-          }
-
-          @Override
-          protected IdGenerator idGenerator() {
-            return RandomIdGenerator.INSTANCE;
-          }
-        };
-    for (TableChange[] changes :
-        new TableChange[][] {
-          {TableChange.rename("target")},
-          {TableChange.rename("intermediate"), TableChange.rename("target")},
-          {TableChange.rename("target", "other_schema")},
-          {TableChange.rename("intermediate", "other_schema"), TableChange.rename("target")}
+    ManagedTableOperations operations = managedTableOperations();
+    record RenameCase(TableEntity expectedTarget, TableChange... changes) {}
+    for (RenameCase renameCase :
+        new RenameCase[] {
+          new RenameCase(target, TableChange.rename("target")),
+          new RenameCase(target, TableChange.rename("intermediate"), TableChange.rename("target")),
+          new RenameCase(crossSchemaTarget, TableChange.rename("target", "other_schema")),
+          new RenameCase(
+              crossSchemaTarget,
+              TableChange.rename("intermediate", "other_schema"),
+              TableChange.rename("target")),
+          new RenameCase(
+              target,
+              TableChange.rename("intermediate", "other_schema"),
+              TableChange.rename("intermediate", "schema"),
+              TableChange.rename("target"))
         }) {
-      TableChange.RenameTable lastRename = (TableChange.RenameTable) changes[changes.length - 1];
-      TableEntity expectedTarget =
-          lastRename.getNewSchemaName().isPresent() ? crossSchemaTarget : target;
       TableAlreadyExistsException exception =
           Assertions.assertThrows(
               TableAlreadyExistsException.class,
-              () -> operations.alterTable(source.nameIdentifier(), changes));
+              () -> operations.alterTable(source.nameIdentifier(), renameCase.changes()));
       Assertions.assertEquals(
-          "Table " + expectedTarget.nameIdentifier() + " already exists", exception.getMessage());
+          "Table " + renameCase.expectedTarget().nameIdentifier() + " already exists",
+          exception.getMessage());
       Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
       Assertions.assertEquals(
           source.id(),
@@ -222,6 +213,85 @@ public class TestRenameConflicts extends TestJDBCBackend {
           store.exists(
               NameIdentifier.of(crossSchemaTarget.namespace(), "intermediate"), EntityType.TABLE));
     }
+  }
+
+  @TestTemplate
+  void testRenameManagedTableKeepsEarlierSchema() throws Exception {
+    createParentEntities("lake", "catalog", "schema", AUDIT_INFO);
+    createAndInsertSchema("lake", "catalog", "other_schema");
+    TableEntity source = table(Namespace.of("lake", "catalog", "schema"), "source");
+    TableEntity originalSchemaTarget = table(source.namespace(), "target");
+    backend.insert(source, false);
+    backend.insert(originalSchemaTarget, false);
+
+    managedTableOperations()
+        .alterTable(
+            source.nameIdentifier(),
+            TableChange.rename("intermediate", "other_schema"),
+            TableChange.rename("target"));
+
+    NameIdentifier expectedTarget = NameIdentifier.of("lake", "catalog", "other_schema", "target");
+    Assertions.assertEquals(
+        source.id(), store.get(expectedTarget, EntityType.TABLE, TableEntity.class).id());
+    Assertions.assertEquals(
+        originalSchemaTarget.id(),
+        store.get(originalSchemaTarget.nameIdentifier(), EntityType.TABLE, TableEntity.class).id());
+    Assertions.assertFalse(store.exists(source.nameIdentifier(), EntityType.TABLE));
+    Assertions.assertFalse(
+        store.exists(
+            NameIdentifier.of("lake", "catalog", "other_schema", "intermediate"),
+            EntityType.TABLE));
+  }
+
+  @TestTemplate
+  void testRenameManagedTableBackToOriginalSchema() throws Exception {
+    createParentEntities("lake", "catalog", "schema", AUDIT_INFO);
+    createAndInsertSchema("lake", "catalog", "other_schema");
+    TableEntity source = table(Namespace.of("lake", "catalog", "schema"), "source");
+    TableEntity crossSchemaTarget =
+        table(Namespace.of("lake", "catalog", "other_schema"), "target");
+    backend.insert(source, false);
+    backend.insert(crossSchemaTarget, false);
+
+    managedTableOperations()
+        .alterTable(
+            source.nameIdentifier(),
+            TableChange.rename("intermediate", "other_schema"),
+            TableChange.rename("intermediate", "schema"),
+            TableChange.rename("target"));
+
+    NameIdentifier expectedTarget = NameIdentifier.of(source.namespace(), "target");
+    Assertions.assertEquals(
+        source.id(), store.get(expectedTarget, EntityType.TABLE, TableEntity.class).id());
+    Assertions.assertEquals(
+        crossSchemaTarget.id(),
+        store.get(crossSchemaTarget.nameIdentifier(), EntityType.TABLE, TableEntity.class).id());
+    Assertions.assertFalse(store.exists(source.nameIdentifier(), EntityType.TABLE));
+    Assertions.assertFalse(
+        store.exists(NameIdentifier.of(source.namespace(), "intermediate"), EntityType.TABLE));
+    Assertions.assertFalse(
+        store.exists(
+            NameIdentifier.of("lake", "catalog", "other_schema", "intermediate"),
+            EntityType.TABLE));
+  }
+
+  private ManagedTableOperations managedTableOperations() {
+    return new ManagedTableOperations() {
+      @Override
+      protected EntityStore store() {
+        return store;
+      }
+
+      @Override
+      protected SupportsSchemas schemas() {
+        return Mockito.mock(SupportsSchemas.class);
+      }
+
+      @Override
+      protected IdGenerator idGenerator() {
+        return RandomIdGenerator.INSTANCE;
+      }
+    };
   }
 
   private TableEntity table(Namespace namespace, String name) {

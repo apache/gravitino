@@ -45,6 +45,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,11 +164,11 @@ public class PolicyManager implements PolicyDispatcher {
           "Policy with name %s under metalake %s does not exist", policyName, metalake);
     } catch (EntityAlreadyExistsException e) {
       String newName =
-          Arrays.stream(changes)
-              .filter(c -> c instanceof PolicyChange.RenamePolicy)
-              .map(c -> ((PolicyChange.RenamePolicy) c).getNewName())
-              .reduce((first, second) -> second)
-              .orElse(policyName);
+          RenameUtils.getLastRenameName(
+              policyName,
+              changes,
+              PolicyChange.RenamePolicy.class,
+              PolicyChange.RenamePolicy::getNewName);
       throw new PolicyAlreadyExistsException(
           e, "Policy with name %s under metalake %s already exists", newName, metalake);
     } catch (IOException ioe) {
