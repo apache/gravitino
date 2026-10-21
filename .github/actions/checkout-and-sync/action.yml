@@ -131,13 +131,14 @@ runs:
           exit 1
         fi
 
-        base_ref="$(jq -r \
+        pull_request="$(jq -c \
           --arg head_sha "${HEAD_SHA}" \
           --arg head_repository "${HEAD_REPOSITORY}" \
           '.[]
-           | select(.head.sha == $head_sha and .head.repo.full_name == $head_repository)
-           | .base.ref' \
+           | select(.head.sha == $head_sha and .head.repo.full_name == $head_repository)' \
           <<< "${response}")"
+        base_ref="$(jq -r '.base.ref' <<< "${pull_request}")"
+        echo "Testing ${HEAD_SHA} for apache/gravitino#$(jq -r '.number' <<< "${pull_request}") against ${base_ref}."
 
         echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
         echo "should_sync=true" >> "${GITHUB_OUTPUT}"
