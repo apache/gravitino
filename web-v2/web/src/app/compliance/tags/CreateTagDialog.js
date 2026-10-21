@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react'
-import { ColorPicker, Form, Input, Modal, Space, Typography } from 'antd'
+import { ColorPicker, Form, Input, Modal, Radio, Select, Space, Tag, Typography } from 'antd'
 import Icons from '@/components/Icons'
 import RenderPropertiesFormItem from '@/components/EntityPropertiesFormItem'
 import { validateMessages, mismatchName } from '@/config'
@@ -35,6 +35,8 @@ const defaultValues = {
   name: '',
   comment: '',
   color: '#0369a1',
+  valueMode: 'any',
+  allowedValues: [],
   properties: []
 }
 
@@ -99,6 +101,7 @@ export default function CreateTagDialog({ ...props }) {
         const submitData = {
           name: values.name.trim(),
           comment: values.comment,
+          allowedValues: values.valueMode === 'any' ? null : values.valueMode === 'none' ? [] : values.allowedValues,
           properties: values.properties.reduce((acc, item) => {
             acc[item.key] = values[item.key] || item.value
 
@@ -160,6 +163,51 @@ export default function CreateTagDialog({ ...props }) {
           <Form.Item name='comment' label='Comment'>
             <TextArea />
           </Form.Item>
+          {editTag ? (
+            <Form.Item label='Values' extra='Set when the tag was created.'>
+              {cacheData?.allowedValues == null ? (
+                'Any value'
+              ) : cacheData.allowedValues.length === 0 ? (
+                'No value'
+              ) : (
+                <Space wrap>
+                  {cacheData.allowedValues.map(value => (
+                    <Tag className='mr-0' key={value}>{value}</Tag>
+                  ))}
+                </Space>
+              )}
+            </Form.Item>
+          ) : (
+            <>
+              <Form.Item label='Values' className={values?.valueMode === 'allowed' ? 'mb-2' : undefined}>
+                <Form.Item name='valueMode' noStyle>
+                  <Radio.Group
+                    options={[
+                      { label: 'Any value', value: 'any' },
+                      { label: 'No value', value: 'none' },
+                      { label: 'Only these values', value: 'allowed' }
+                    ]}
+                  />
+                </Form.Item>
+              </Form.Item>
+              {values?.valueMode === 'allowed' && (
+                <Form.Item
+                  name='allowedValues'
+                  extra='Press Enter to add each value. Case-sensitive, 256 characters maximum.'
+                  rules={[
+                    {
+                      validator: (_, allowedValues) =>
+                        allowedValues?.every(value => value.length <= 256)
+                          ? Promise.resolve()
+                          : Promise.reject(new Error('Each value must be at most 256 characters'))
+                    }
+                  ]}
+                >
+                  <Select mode='tags' placeholder='Type a value and press Enter' />
+                </Form.Item>
+              )}
+            </>
+          )}
           <Form.Item name='color' label='Color'>
             <Space>
               <ColorPicker value={values?.color} onChange={handlePickerChange} />
