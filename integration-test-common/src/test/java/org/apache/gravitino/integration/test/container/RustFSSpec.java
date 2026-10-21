@@ -32,7 +32,22 @@ public record RustFSSpec() implements ContainerSpec<RustFSContainer> {
     return shared.getRustFSContainer();
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public RustFSContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(RustFSContainer.builder(), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<RustFSFixture> {
+    @Override
+    public Scope scopeFor(RustFSFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(RustFSFixture fixture) {
       return fixture.durability();

@@ -28,9 +28,9 @@ import java.util.Map;
  * <p>Plain and Kerberos Hive run side by side, but each holds one version at a time: asking for a
  * different version stops the running Hive of that mode and starts the requested one (see {@code
  * ContainerSlot}). Tests of one version therefore share a container, and a version switch costs a
- * restart. A private Hive ({@link Scope#CLASS} or {@link Scope#METHOD}) leaves the shared one
- * alone. A Hive with cloud {@link HiveStorage} is a third container, one storage and version at a
- * time.
+ * restart. A Hive with cloud {@link HiveStorage} is a third container, one storage and version at a
+ * time. A private Hive ({@link Scope#CLASS} or {@link Scope#METHOD}) of any mode and storage leaves
+ * the shared one alone.
  */
 public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
     implements ContainerSpec<HiveContainer> {
@@ -152,29 +152,25 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
   // containers by IP; on Linux CI there is no shared network.
   @Override
   public boolean supportsPrivate() {
-    return storage == HiveStorage.HDFS && auth != HiveAuth.RANGER;
+    return true;
   }
 
+  // Its dependencies stay shared: a private Ranger Hive reports to the shared Ranger, and a
+  // private S3 Hive keeps its tables in the shared LocalStack.
   @Override
   public HiveContainer startPrivate(SharedContainers shared, Durability durability) {
-    if (storage != HiveStorage.HDFS) {
-      throw new UnsupportedOperationException(
-          "scope CLASS/METHOD is not supported for Hive with " + storage + " storage yet");
-    }
-    return shared.startPrivate(
-        network -> {
-          HiveContainer container = builder().withNetwork(network).build();
-          container.setDurability(durability);
-          return container;
-        });
+    return shared.startPrivate(builder(shared), durability);
   }
 
-  private HiveContainer.Builder builder() {
+  private HiveContainer.Builder builder(SharedContainers shared) {
+    if (storage != HiveStorage.HDFS) {
+      return SharedContainers.hiveBuilder(storageEnv(shared)).withFilesToMount(storageFiles());
+    }
     return switch (auth) {
       case NONE -> SharedContainers.hiveBuilder(env());
       case KERBEROS -> SharedContainers.kerberosHiveBuilder(env());
-      case RANGER -> throw new UnsupportedOperationException(
-          "scope CLASS/METHOD is not supported for Ranger Hive yet");
+      case RANGER -> SharedContainers.hiveRangerBuilder(
+          rangerEnv(new RangerSpec().getOrStart(shared)));
     };
   }
 

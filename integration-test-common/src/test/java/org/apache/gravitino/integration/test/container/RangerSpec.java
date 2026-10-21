@@ -44,7 +44,24 @@ public record RangerSpec() implements ContainerSpec<RangerContainer> {
     return shared.getRangerContainer();
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  // Ranger's setup drops and recreates its database, so a private Ranger cannot share the shared
+  // one's database on the run's MySQL; it keeps its policies in the image's own MariaDB instead.
+  @Override
+  public RangerContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(RangerContainer.builder(), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<RangerFixture> {
+    @Override
+    public Scope scopeFor(RangerFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(RangerFixture fixture) {
       return fixture.durability();

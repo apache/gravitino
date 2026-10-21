@@ -32,7 +32,22 @@ public record KafkaSpec() implements ContainerSpec<KafkaContainer> {
     return shared.getKafkaContainer();
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public KafkaContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(KafkaContainer.builder(), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<KafkaFixture> {
+    @Override
+    public Scope scopeFor(KafkaFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(KafkaFixture fixture) {
       return fixture.durability();

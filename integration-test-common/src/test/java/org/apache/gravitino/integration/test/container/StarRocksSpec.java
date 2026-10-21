@@ -32,7 +32,22 @@ public record StarRocksSpec() implements ContainerSpec<StarRocksContainer> {
     return shared.getStarRocksContainer();
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public StarRocksContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(StarRocksContainer.builder(), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<StarRocksFixture> {
+    @Override
+    public Scope scopeFor(StarRocksFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(StarRocksFixture fixture) {
       return fixture.durability();

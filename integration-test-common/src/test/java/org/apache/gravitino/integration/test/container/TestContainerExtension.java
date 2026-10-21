@@ -190,8 +190,8 @@ public class TestContainerExtension {
   }
 
   @Test
-  void testUnsupportedPrivateScopeFailsWhenTheClassIsFound() {
-    run(S3HiveClassScopeFixture.class)
+  void testUnsupportedPrivateScopeFailsWithTheSpecsReason() {
+    run(ClickHouseClusterClassScopeFixture.class)
         .allEvents()
         .assertThatEvents()
         .haveAtLeast(
@@ -199,7 +199,29 @@ public class TestContainerExtension {
             event(
                 finishedWithFailure(
                     instanceOf(ExtensionConfigurationException.class),
-                    message(m -> m.contains("does not support scope = Scope.CLASS")))));
+                    message(
+                        m ->
+                            m.startsWith(
+                                    "@ClickHouseFixture does not support scope = Scope.CLASS:"
+                                        + " ClickHouseSpec has no private three-node cluster")
+                                && m.contains("fixed host names")))));
+  }
+
+  @Test
+  void testDurableFixtureWithoutPrivateContainersFailsWithTheSpecsReason() {
+    run(DurableTrinoFixture.class)
+        .allEvents()
+        .assertThatEvents()
+        .haveAtLeast(
+            1,
+            event(
+                finishedWithFailure(
+                    instanceOf(ExtensionConfigurationException.class),
+                    message(
+                        m ->
+                            m.startsWith(
+                                "@TrinoFixture(durability = DURABLE) needs a container of its"
+                                    + " own, but TrinoSpec has no private clusters")))));
   }
 
   @Test
@@ -325,11 +347,10 @@ public class TestContainerExtension {
         Assertions.assertThrows(
             UnsupportedOperationException.class,
             () ->
-                new KafkaSpec()
+                new OtherSpec()
                     .startPrivate(SharedContainers.getInstance(), Durability.DISPOSABLE));
 
-    Assertions.assertEquals(
-        "scope CLASS/METHOD is not supported for KafkaSpec yet", e.getMessage());
+    Assertions.assertEquals("OtherSpec has no private containers", e.getMessage());
   }
 
   private static EngineExecutionResults run(Class<?> fixture) {
@@ -669,8 +690,18 @@ public class TestContainerExtension {
   static class KafkaFixtureOnly {}
 
   @Tag(FIXTURE)
-  @HiveFixture(storage = HiveStorage.S3, scope = Scope.CLASS)
-  static class S3HiveClassScopeFixture {
+  @ClickHouseFixture(
+      nodes = 3,
+      database = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT,
+      scope = Scope.CLASS)
+  static class ClickHouseClusterClassScopeFixture {
+    @Test
+    void test() {}
+  }
+
+  @Tag(FIXTURE)
+  @TrinoFixture(durability = Durability.DURABLE)
+  static class DurableTrinoFixture {
     @Test
     void test() {}
   }

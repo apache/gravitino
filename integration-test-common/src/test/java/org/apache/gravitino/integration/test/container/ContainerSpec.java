@@ -108,17 +108,28 @@ public interface ContainerSpec<C extends BaseContainer> {
   }
 
   /**
+   * Returns why this spec has no private containers, for the error a fixture that asks for one
+   * gets. Read only when {@link #supportsPrivate()} is false.
+   *
+   * @return the reason, as a clause that follows the spec's name
+   */
+  default String noPrivateReason() {
+    return "has no private containers";
+  }
+
+  /**
    * Starts a new container for this spec that only the caller uses, for fixtures with {@link
-   * Scope#CLASS} or {@link Scope#METHOD}. The caller closes it; it never replaces the shared
-   * container.
+   * Scope#CLASS} or {@link Scope#METHOD}. It is built like the shared container, on the run's
+   * network, and starts through the same timed path; it never replaces the shared container. The
+   * caller closes it. Its {@linkplain #dependencies() dependencies} stay shared unless the spec
+   * says otherwise.
    *
    * @param shared the run's shared containers, which start the container on the run's network
    * @param durability whether the container keeps its durability work
    * @return the running private container
-   * @throws UnsupportedOperationException if this spec has no private containers yet
+   * @throws UnsupportedOperationException if this spec has no private containers
    */
   default C startPrivate(SharedContainers shared, Durability durability) {
-    throw new UnsupportedOperationException(
-        "scope CLASS/METHOD is not supported for " + getClass().getSimpleName() + " yet");
+    throw new UnsupportedOperationException(getClass().getSimpleName() + " " + noPrivateReason());
   }
 }

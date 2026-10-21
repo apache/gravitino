@@ -32,7 +32,22 @@ public record LocalStackSpec() implements ContainerSpec<GravitinoLocalStackConta
     return shared.getLocalStackContainer();
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public GravitinoLocalStackContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(GravitinoLocalStackContainer.builder(), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<LocalStackFixture> {
+    @Override
+    public Scope scopeFor(LocalStackFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(LocalStackFixture fixture) {
       return fixture.durability();

@@ -32,7 +32,22 @@ public record ZooKeeperSpec() implements ContainerSpec<ZooKeeperContainer> {
     return shared.getZooKeeperContainer();
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public ZooKeeperContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(SharedContainers.zooKeeperBuilder(), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<ZooKeeperFixture> {
+    @Override
+    public Scope scopeFor(ZooKeeperFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(ZooKeeperFixture fixture) {
       return fixture.durability();

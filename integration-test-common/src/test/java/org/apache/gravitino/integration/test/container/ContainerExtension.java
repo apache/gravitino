@@ -365,25 +365,30 @@ public class ContainerExtension
             factory.scopeFor(annotation),
             factory.startupFor(annotation),
             factory.durabilityFor(annotation));
-    if (declaration.scope() != Scope.RUN && !declaration.spec().supportsPrivate()) {
+    ContainerSpec<?> spec = declaration.spec();
+    String fixtureName = annotation.annotationType().getSimpleName();
+    if (declaration.scope() != Scope.RUN && !spec.supportsPrivate()) {
       throw new ExtensionConfigurationException(
           String.format(
-              "@%s does not support scope = Scope.%s yet; today only @HiveFixture with HDFS"
-                  + " storage and no Ranger has containers of its own",
-              annotation.annotationType().getSimpleName(), declaration.scope()));
+              "@%s does not support scope = Scope.%s: %s %s",
+              fixtureName,
+              declaration.scope(),
+              spec.getClass().getSimpleName(),
+              spec.noPrivateReason()));
     }
     // A shared container is disposable for every class; durable data needs a container of its own.
     if (declaration.durability() == Durability.DURABLE
         && declaration.scope() == Scope.RUN
         && Durability.runDefault() == Durability.DISPOSABLE) {
       throw new ExtensionConfigurationException(
-          String.format(
-              declaration.spec().supportsPrivate()
-                  ? "@%s(durability = DURABLE) needs a container of its own: add scope ="
-                      + " Scope.CLASS or Scope.METHOD"
-                  : "@%s(durability = DURABLE) needs a container of its own, which only"
-                      + " @HiveFixture with HDFS storage supports today",
-              annotation.annotationType().getSimpleName()));
+          spec.supportsPrivate()
+              ? String.format(
+                  "@%s(durability = DURABLE) needs a container of its own: add scope ="
+                      + " Scope.CLASS or Scope.METHOD",
+                  fixtureName)
+              : String.format(
+                  "@%s(durability = DURABLE) needs a container of its own, but %s %s",
+                  fixtureName, spec.getClass().getSimpleName(), spec.noPrivateReason()));
     }
     return declaration;
   }

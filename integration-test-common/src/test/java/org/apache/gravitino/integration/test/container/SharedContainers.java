@@ -233,13 +233,8 @@ class SharedContainers {
     if (hiveRangerContainer == null) {
       synchronized (SharedContainers.class) {
         if (hiveRangerContainer == null) {
-          // Start Hive container
-          HiveContainer.Builder hiveBuilder =
-              HiveContainer.builder()
-                  .withHostName("gravitino-ci-hive-ranger")
-                  .withEnvVars(envVars)
-                  .withNetwork(network);
-          HiveContainer container = closer.register(hiveBuilder.build());
+          HiveContainer container =
+              closer.register(hiveRangerBuilder(envVars).withNetwork(network).build());
           start(container);
           hiveRangerContainer = container;
         }
@@ -321,29 +316,128 @@ class SharedContainers {
         .withEnvVars(env);
   }
 
+  static HiveContainer.Builder hiveRangerBuilder(Map<String, String> env) {
+    return HiveContainer.builder().withHostName("gravitino-ci-hive-ranger").withEnvVars(env);
+  }
+
+  static MySQLContainer.Builder mySQLBuilder(MySQLVersion version) {
+    MySQLContainer.Builder builder =
+        MySQLContainer.builder().withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT));
+    return switch (version) {
+      case MYSQL_8_0 -> builder.withHostName("gravitino-ci-mysql");
+      case MYSQL_5_7 -> builder
+          .withImage(TestImages.MYSQL_5_7)
+          .withHostName("gravitino-ci-mysql-v5");
+    };
+  }
+
+  static PostgreSQLContainer.Builder postgreSQLBuilder(PGImageName version) {
+    return PostgreSQLContainer.builder()
+        .withImage(version.toString())
+        .withHostName(PostgreSQLContainer.HOST_NAME)
+        .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT));
+  }
+
+  static DorisContainer.Builder dorisBuilder(DorisImageName version) {
+    return DorisContainer.builder()
+        .withHostName("gravitino-ci-doris-" + version.name().toLowerCase().replace("_", ""))
+        .withImage(version.toString());
+  }
+
+  // Each call makes a new data directory, so a private OceanBase never shares the shared one's.
+  static OceanBaseContainer.Builder oceanBaseBuilder() {
+    return OceanBaseContainer.builder()
+        .withHostName("gravitino-ci-oceanbase")
+        // The module sets MODE (mini) and OB_TENANT_PASSWORD.
+        .withEnvVars(
+            ImmutableMap.of(
+                "OB_SYS_PASSWORD",
+                OceanBaseContainer.PASSWORD,
+                "OB_DATAFILE_SIZE",
+                "1G",
+                "OB_LOG_DISK_SIZE",
+                "8G",
+                "OB_MEMORY_LIMIT",
+                "6G"))
+        .withFilesToMount(ImmutableMap.of(oceanBaseDataDir(), "/root/ob"))
+        .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
+  }
+
+  // The single server; the cluster nodes differ in host name, ports and remote servers.
+  static ClickHouseContainer.Builder clickHouseBuilder() {
+    return ClickHouseContainer.builder()
+        .withImage(TestImages.CLICKHOUSE)
+        .withFilesToMount(resolveClickHouseTestFiles())
+        .withHostName("gravitino-ci-clickhouse")
+        .withEnvVars(ImmutableMap.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
+        .withExposePorts(ImmutableSet.of(ClickHouseContainer.CLICKHOUSE_PORT));
+  }
+
+  static ZooKeeperContainer.Builder zooKeeperBuilder() {
+    return ZooKeeperContainer.builder()
+        .withHostName(ZooKeeperContainer.HOST_NAME)
+        .withExposePorts(ImmutableSet.of(ZooKeeperContainer.ZK_PORT));
+  }
+
   /**
    * Starts a container that only the caller uses, for fixtures with {@link Scope#CLASS} or {@link
-   * Scope#METHOD}. It starts like a shared container, on the shared network, but no field keeps it,
-   * so it never replaces a shared container. The caller closes it; the run's closer also closes it
-   * at the end of the run in case the caller does not.
+   * Scope#METHOD}. It is built from the builder a shared container uses, on the shared network, and
+   * starts through the same timed path, but no field keeps it, so it never replaces a shared
+   * container. The caller closes it; the run's closer also closes it at the end of the run in case
+   * the caller does not.
    *
-   * @param build builds the container on the given network, which is null when there is none
+   * @param builder the builder of the shared container
+   * @param durability whether the container keeps its durability work
    * @param <C> the container type
    * @return the running container
    */
-  <C extends BaseContainer> C startPrivate(Function<Network, C> build) {
+  <C extends BaseContainer> C startPrivate(
+      BaseContainer.Builder<?, C> builder, Durability durability) {
+    return startPrivate(builder, durability, container -> {});
+  }
+
+  /**
+   * Starts a container like {@link #startPrivate(BaseContainer.Builder, Durability)} and then sets
+   * it up, such as by creating a test database; a failed set-up closes the container.
+   *
+   * @param builder the builder of the shared container
+   * @param durability whether the container keeps its durability work
+   * @param setUp the work on the running container
+   * @param <C> the container type
+   * @return the running, set-up container
+   */
+  <C extends BaseContainer> C startPrivate(
+      BaseContainer.Builder<?, C> builder, Durability durability, Consumer<? super C> setUp) {
     initIfNecessary();
-    return startPrivate(network, build, SharedContainers::start);
+    return startPrivate(network, privateBuild(builder, durability), SharedContainers::start, setUp);
+  }
+
+  static <C extends BaseContainer> Function<Network, C> privateBuild(
+      BaseContainer.Builder<?, C> builder, Durability durability) {
+    return network -> {
+      C container = builder.withNetwork(network).build();
+      container.setDurability(durability);
+      return container;
+    };
   }
 
   // Tests pass their own start so that no Docker and no disk cleanup run.
   static <C extends BaseContainer> C startPrivate(
-      @Nullable Network network, Function<Network, C> build, Consumer<BaseContainer> start) {
+      @Nullable Network network,
+      Function<Network, C> build,
+      Consumer<BaseContainer> start,
+      Consumer<? super C> setUp) {
     C container = build.apply(network);
     synchronized (SharedContainers.class) {
       closer.register(container);
     }
     start.accept(container);
+    try {
+      setUp.accept(container);
+    } catch (RuntimeException | Error e) {
+      closeFailedStart(container, e);
+      throw e;
+    }
     return container;
   }
 
@@ -352,13 +446,8 @@ class SharedContainers {
       synchronized (SharedContainers.class) {
         if (!dorisContainerMap.containsKey(imageName)) {
           initIfNecessary();
-          DorisContainer.Builder dorisBuilder =
-              DorisContainer.builder()
-                  .withHostName(
-                      "gravitino-ci-doris-" + imageName.name().toLowerCase().replace("_", ""))
-                  .withImage(imageName.toString())
-                  .withNetwork(network);
-          DorisContainer container = closer.register(dorisBuilder.build());
+          DorisContainer container =
+              closer.register(dorisBuilder(imageName).withNetwork(network).build());
           start(container);
           dorisContainerMap.put(imageName, container);
         }
@@ -371,14 +460,8 @@ class SharedContainers {
       synchronized (SharedContainers.class) {
         if (mySQLContainer == null) {
           initIfNecessary();
-          // Start MySQL container
-          MySQLContainer.Builder mysqlBuilder =
-              MySQLContainer.builder()
-                  .withHostName("gravitino-ci-mysql")
-                  .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
-                  .withNetwork(network);
-
-          MySQLContainer container = closer.register(mysqlBuilder.build());
+          MySQLContainer container =
+              closer.register(mySQLBuilder(MySQLVersion.MYSQL_8_0).withNetwork(network).build());
           start(container);
           mySQLContainer = container;
         }
@@ -394,15 +477,8 @@ class SharedContainers {
       synchronized (SharedContainers.class) {
         if (mySQLVersion5Container == null) {
           initIfNecessary();
-          // Start MySQL container
-          MySQLContainer.Builder mysqlBuilder =
-              MySQLContainer.builder()
-                  .withImage(TestImages.MYSQL_5_7)
-                  .withHostName("gravitino-ci-mysql-v5")
-                  .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
-                  .withNetwork(network);
-
-          MySQLContainer container = closer.register(mysqlBuilder.build());
+          MySQLContainer container =
+              closer.register(mySQLBuilder(MySQLVersion.MYSQL_5_7).withNetwork(network).build());
           start(container);
           mySQLVersion5Container = container;
         }
@@ -418,15 +494,8 @@ class SharedContainers {
       synchronized (SharedContainers.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
           initIfNecessary();
-          // Start PostgreSQL container
-          PostgreSQLContainer.Builder pgBuilder =
-              PostgreSQLContainer.builder()
-                  .withImage(pgImageName.toString())
-                  .withHostName(PostgreSQLContainer.HOST_NAME)
-                  .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
-                  .withNetwork(network);
-
-          PostgreSQLContainer container = closer.register(pgBuilder.build());
+          PostgreSQLContainer container =
+              closer.register(postgreSQLBuilder(pgImageName).withNetwork(network).build());
           start(container);
           pgContainerMap.put(pgImageName, container);
         }
@@ -441,25 +510,8 @@ class SharedContainers {
     if (oceanBaseContainer == null) {
       synchronized (SharedContainers.class) {
         if (oceanBaseContainer == null) {
-          // Start OceanBase container
-          OceanBaseContainer.Builder oceanBaseBuilder =
-              OceanBaseContainer.builder()
-                  .withHostName("gravitino-ci-oceanbase")
-                  // The module sets MODE (mini) and OB_TENANT_PASSWORD.
-                  .withEnvVars(
-                      ImmutableMap.of(
-                          "OB_SYS_PASSWORD",
-                          OceanBaseContainer.PASSWORD,
-                          "OB_DATAFILE_SIZE",
-                          "1G",
-                          "OB_LOG_DISK_SIZE",
-                          "8G",
-                          "OB_MEMORY_LIMIT",
-                          "6G"))
-                  .withNetwork(network)
-                  .withFilesToMount(ImmutableMap.of(oceanBaseDataDir(), "/root/ob"))
-                  .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
-          OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
+          OceanBaseContainer container =
+              closer.register(oceanBaseBuilder().withNetwork(network).build());
           start(container);
           oceanBaseContainer = container;
         }
@@ -552,20 +604,8 @@ class SharedContainers {
       synchronized (SharedContainers.class) {
         if (clickHouseContainer == null) {
           initIfNecessary();
-          // Start ClickHouse container
-          ClickHouseContainer.Builder clickHouseBuilder =
-              ClickHouseContainer.builder()
-                  .withImage(TestImages.CLICKHOUSE)
-                  .withFilesToMount(resolveClickHouseTestFiles())
-                  .withHostName("gravitino-ci-clickhouse")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD)
-                          .build())
-                  .withExposePorts(ImmutableSet.of(ClickHouseContainer.CLICKHOUSE_PORT))
-                  .withNetwork(network);
-
-          ClickHouseContainer container = closer.register(clickHouseBuilder.build());
+          ClickHouseContainer container =
+              closer.register(clickHouseBuilder().withNetwork(network).build());
           start(container);
           clickHouseContainer = container;
         }
@@ -650,12 +690,8 @@ class SharedContainers {
       synchronized (SharedContainers.class) {
         if (zooKeeperContainer == null) {
           initIfNecessary();
-          ZooKeeperContainer.Builder zkBuilder =
-              ZooKeeperContainer.builder()
-                  .withHostName(ZooKeeperContainer.HOST_NAME)
-                  .withExposePorts(ImmutableSet.of(ZooKeeperContainer.ZK_PORT))
-                  .withNetwork(network);
-          ZooKeeperContainer container = closer.register(zkBuilder.build());
+          ZooKeeperContainer container =
+              closer.register(zooKeeperBuilder().withNetwork(network).build());
           start(container);
           zooKeeperContainer = container;
         }
@@ -768,11 +804,12 @@ class SharedContainers {
           initIfNecessary();
           // Ranger keeps its policies in the run's MySQL, which also gets disposable data.
           MySQLContainer mysql = RangerSpec.DATABASE.getOrStart(this);
-          RangerContainer.Builder rangerBuilder =
-              RangerContainer.builder()
-                  .withNetwork(network)
-                  .withDatabase(mysql, RangerSpec.DATABASE.database());
-          RangerContainer container = closer.register(rangerBuilder.build());
+          RangerContainer container =
+              closer.register(
+                  RangerContainer.builder()
+                      .withNetwork(network)
+                      .withDatabase(mysql, RangerSpec.DATABASE.database())
+                      .build());
           try {
             start(container);
           } catch (Exception e) {

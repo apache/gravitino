@@ -81,8 +81,7 @@ public @interface HiveFixture {
 
   /**
    * Returns whether the container keeps its durability work. A durable container is private to the
-   * class or test, so it needs {@code scope = Scope.CLASS} or {@code Scope.METHOD}, with HDFS
-   * storage and without Ranger.
+   * class or test, so it needs {@code scope = Scope.CLASS} or {@code Scope.METHOD}.
    *
    * @return disposable by default: data on {@code tmpfs} and no syncing, where the service allows
    */

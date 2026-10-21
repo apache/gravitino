@@ -32,7 +32,22 @@ public record OceanBaseSpec() implements ContainerSpec<OceanBaseContainer> {
     return shared.getOceanBaseContainer();
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public OceanBaseContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(SharedContainers.oceanBaseBuilder(), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<OceanBaseFixture> {
+    @Override
+    public Scope scopeFor(OceanBaseFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(OceanBaseFixture fixture) {
       return fixture.durability();

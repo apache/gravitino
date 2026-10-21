@@ -25,6 +25,9 @@ package org.apache.gravitino.integration.test.container;
  * has none until {@link #forTestInstance} reads it from a {@link GravitinoServerAware} test; that
  * is why {@code @TrinoFixture} starts lazily. Each server gets its own cluster: a new port replaces
  * the running cluster.
+ *
+ * <p>There is no private cluster ({@link Scope#CLASS} or {@link Scope#METHOD}): its nodes find each
+ * other by fixed host names, which a second cluster on the run's network would clash with.
  */
 public record TrinoSpec(int version, int workers, HiveVersion hive, int gravitinoServerPort)
     implements ContainerSpec<TrinoCluster> {
@@ -54,7 +57,19 @@ public record TrinoSpec(int version, int workers, HiveVersion hive, int gravitin
     return shared.startTrinoCluster(this);
   }
 
+  // Every cluster also writes its logs to one directory, which each start empties.
+  @Override
+  public String noPrivateReason() {
+    return "has no private clusters: a cluster's nodes find each other by fixed host names, such as"
+        + " trino and hive, that a second cluster on the run's network would clash with";
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<TrinoFixture> {
+    @Override
+    public Scope scopeFor(TrinoFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(TrinoFixture fixture) {
       return fixture.durability();

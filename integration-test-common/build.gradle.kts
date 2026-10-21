@@ -48,6 +48,7 @@ dependencies {
   testImplementation(libs.guava)
   testImplementation(libs.httpclient5)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.junit.platform.commons)
   testImplementation(libs.junit.platform.engine)
   testImplementation(libs.mockito.core)
@@ -75,6 +76,13 @@ dependencies {
 
   testImplementation("org.junit.jupiter:junit-jupiter")
   testImplementation("org.junit.platform:junit-platform-testkit")
+
+  // TestPrivateContainers starts the JDBC containers here; modules that use the test artifacts
+  // bring their own drivers.
+  testRuntimeOnly(libs.clickhouse.driver)
+  testRuntimeOnly(libs.lz4.java)
+  testRuntimeOnly(libs.mysql.driver)
+  testRuntimeOnly(libs.postgresql.driver)
 }
 
 tasks.test {

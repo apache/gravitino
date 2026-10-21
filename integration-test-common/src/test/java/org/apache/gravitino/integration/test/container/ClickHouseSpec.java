@@ -38,6 +38,10 @@ import org.apache.gravitino.integration.test.util.TestDatabaseName;
  * specs that differ only by database share one ClickHouse. The cluster size is fixed by {@link
  * SharedContainers}, so a variable size needs the cluster start to move out of {@code
  * SharedContainers}.
+ *
+ * <p>A single server can be private ({@link Scope#CLASS} or {@link Scope#METHOD}) and gets the
+ * database too. The cluster cannot: its nodes have fixed host names in {@code remote_servers.xml}
+ * and keep their replicas in the shared ZooKeeper.
  */
 public record ClickHouseSpec(int nodes, TestDatabaseName database)
     implements ContainerSpec<ClickHouseContainer> {
@@ -103,6 +107,28 @@ public record ClickHouseSpec(int nodes, TestDatabaseName database)
     return container;
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return nodes == SINGLE_NODE;
+  }
+
+  @Override
+  public String noPrivateReason() {
+    return "has no private three-node cluster: its nodes have fixed host names in"
+        + " remote_servers.xml and keep their replicas in the shared ZooKeeper";
+  }
+
+  @Override
+  public ClickHouseContainer startPrivate(SharedContainers shared, Durability durability) {
+    if (!supportsPrivate()) {
+      return ContainerSpec.super.startPrivate(shared, durability);
+    }
+    return shared.startPrivate(
+        SharedContainers.clickHouseBuilder(),
+        durability,
+        container -> container.createDatabase(database));
+  }
+
   private static Path copyRemoteServersTemplate() {
     try (InputStream template =
         Objects.requireNonNull(
@@ -118,6 +144,11 @@ public record ClickHouseSpec(int nodes, TestDatabaseName database)
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<ClickHouseFixture> {
+    @Override
+    public Scope scopeFor(ClickHouseFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(ClickHouseFixture fixture) {
       return fixture.durability();

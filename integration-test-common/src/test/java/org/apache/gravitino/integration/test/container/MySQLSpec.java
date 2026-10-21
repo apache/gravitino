@@ -53,7 +53,26 @@ public record MySQLSpec(MySQLVersion version, TestDatabaseName database)
     };
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  // Like the shared server, the private one holds the fixture's database.
+  @Override
+  public MySQLContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(
+        SharedContainers.mySQLBuilder(version),
+        durability,
+        container -> container.createDatabase(database));
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<MySQLFixture> {
+    @Override
+    public Scope scopeFor(MySQLFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(MySQLFixture fixture) {
       return fixture.durability();

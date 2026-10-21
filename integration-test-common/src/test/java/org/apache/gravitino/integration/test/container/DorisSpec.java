@@ -35,7 +35,22 @@ public record DorisSpec(DorisImageName version) implements ContainerSpec<DorisCo
     return shared.getDorisContainer(version);
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public DorisContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(SharedContainers.dorisBuilder(version), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<DorisFixture> {
+    @Override
+    public Scope scopeFor(DorisFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(DorisFixture fixture) {
       return fixture.durability();

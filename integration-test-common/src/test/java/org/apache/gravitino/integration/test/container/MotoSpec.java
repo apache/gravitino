@@ -32,7 +32,22 @@ public record MotoSpec() implements ContainerSpec<GravitinoMotoContainer> {
     return shared.getMotoContainer();
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  @Override
+  public GravitinoMotoContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(GravitinoMotoContainer.builder(), durability);
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<MotoFixture> {
+    @Override
+    public Scope scopeFor(MotoFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(MotoFixture fixture) {
       return fixture.durability();

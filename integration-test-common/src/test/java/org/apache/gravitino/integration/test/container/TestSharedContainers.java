@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
 
 /** Tests for {@link SharedContainers}. */
 public class TestSharedContainers {
@@ -147,7 +148,8 @@ public class TestSharedContainers {
     BaseContainer container = mockContainer();
 
     BaseContainer started =
-        SharedContainers.startPrivate(null, network -> container, SharedContainers::startTimed);
+        SharedContainers.startPrivate(
+            null, network -> container, SharedContainers::startTimed, running -> {});
 
     Assertions.assertSame(container, started);
     Mockito.verify(container, Mockito.times(1)).start();
@@ -168,6 +170,40 @@ public class TestSharedContainers {
     // Registered with the closer, so the end of the run closes it even if the caller does not.
     SharedContainers.getInstance().close();
     Mockito.verify(container).close();
+  }
+
+  @Test
+  void testFailedPrivateSetUpClosesTheContainerAndRethrows() {
+    BaseContainer container = mockContainer();
+    IllegalStateException failure = new IllegalStateException("cannot create the database");
+
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                SharedContainers.startPrivate(
+                    null,
+                    network -> container,
+                    SharedContainers::startTimed,
+                    started -> {
+                      throw failure;
+                    })));
+    Mockito.verify(container).close();
+  }
+
+  @Test
+  void testPrivateBuildUsesTheNetworkAndTheDurability() {
+    Network network = Mockito.mock(Network.class);
+
+    ZooKeeperContainer container =
+        SharedContainers.privateBuild(SharedContainers.zooKeeperBuilder(), Durability.DURABLE)
+            .apply(network);
+
+    Assertions.assertEquals(Durability.DURABLE, container.durability());
+    Assertions.assertSame(network, container.getContainer().getNetwork());
+    Assertions.assertTrue(
+        container.getContainer().getNetworkAliases().contains(ZooKeeperContainer.HOST_NAME));
   }
 
   private static BaseContainer mockContainer() {

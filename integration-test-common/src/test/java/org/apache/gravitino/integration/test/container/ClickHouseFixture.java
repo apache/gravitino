@@ -64,6 +64,15 @@ public @interface ClickHouseFixture {
   TestDatabaseName database();
 
   /**
+   * Returns how long the container lives. Use {@link Scope#CLASS} or {@link Scope#METHOD} for tests
+   * that change the service in ways later tests would see, or that need durable data; only a single
+   * server ({@code nodes = 1}) can be private.
+   *
+   * @return the scope; the whole run by default, shared with other classes
+   */
+  Scope scope() default Scope.RUN;
+
+  /**
    * Returns when the container starts.
    *
    * @return the startup mode; before {@code @BeforeAll} by default
@@ -72,8 +81,7 @@ public @interface ClickHouseFixture {
 
   /**
    * Returns whether the container keeps its durability work. A durable container is private to the
-   * class or test, which only {@link HiveFixture} with HDFS storage supports today; this fixture
-   * fails fast if asked for one.
+   * class or test, so it needs {@code scope = Scope.CLASS} or {@code Scope.METHOD}.
    *
    * @return disposable by default: data on {@code tmpfs} and no syncing, where the service allows
    */

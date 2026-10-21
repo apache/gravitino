@@ -45,7 +45,26 @@ public record PostgreSQLSpec(PGImageName version, TestDatabaseName database)
     return shared.getPostgreSQLContainer(version);
   }
 
+  @Override
+  public boolean supportsPrivate() {
+    return true;
+  }
+
+  // Like the shared server, the private one holds the fixture's database.
+  @Override
+  public PostgreSQLContainer startPrivate(SharedContainers shared, Durability durability) {
+    return shared.startPrivate(
+        SharedContainers.postgreSQLBuilder(version),
+        durability,
+        container -> container.createDatabase(database));
+  }
+
   static final class Factory implements ContainerFixture.SpecFactory<PostgreSQLFixture> {
+    @Override
+    public Scope scopeFor(PostgreSQLFixture fixture) {
+      return fixture.scope();
+    }
+
     @Override
     public Durability durabilityFor(PostgreSQLFixture fixture) {
       return fixture.durability();

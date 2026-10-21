@@ -72,6 +72,14 @@ public @interface TrinoFixture {
   HiveVersion hive() default HiveVersion.HIVE2;
 
   /**
+   * Returns how long the cluster lives. Only {@link Scope#RUN} works: {@link TrinoSpec} says why a
+   * cluster cannot be private.
+   *
+   * @return the scope; the whole run by default, shared with other classes
+   */
+  Scope scope() default Scope.RUN;
+
+  /**
    * Returns when the cluster starts.
    *
    * @return lazily by default, since the Gravitino server must run first
@@ -80,8 +88,7 @@ public @interface TrinoFixture {
 
   /**
    * Returns whether the container keeps its durability work. A durable container is private to the
-   * class or test, which only {@link HiveFixture} with HDFS storage supports today; this fixture
-   * fails fast if asked for one.
+   * class or test, which a Trino cluster cannot be, so this fixture fails fast if asked for one.
    *
    * @return disposable by default: data on {@code tmpfs} and no syncing, where the service allows
    */
