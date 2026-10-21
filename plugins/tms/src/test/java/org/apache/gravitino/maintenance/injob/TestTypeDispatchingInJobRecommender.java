@@ -51,18 +51,20 @@ class TestTypeDispatchingInJobRecommender {
     when(compaction.recommend(eq(2L), eq(1L), eq(9L), anyString(), eq(policy)))
         .thenReturn(RecommendDecision.SKIP);
     InJobRecommender triggerExpr = mock(InJobRecommender.class);
+    InJobRecommender placeholder = mock(InJobRecommender.class);
 
     TypeDispatchingInJobRecommender dispatcher =
-        new TypeDispatchingInJobRecommender(lookup, compaction, triggerExpr);
+        new TypeDispatchingInJobRecommender(lookup, compaction, triggerExpr, placeholder);
     Assertions.assertEquals(RecommendDecision.SKIP, dispatcher.recommend(2L, 1L, 9L, "{\"x\":1}"));
     verify(compaction).recommend(2L, 1L, 9L, "{\"x\":1}", policy);
     verify(triggerExpr, never())
         .recommend(anyLong(), anyLong(), anyLong(), anyString(), any(PolicyEntity.class));
-    verify(triggerExpr, never()).recommend(anyLong(), anyLong(), anyLong(), anyString());
+    verify(placeholder, never())
+        .recommend(anyLong(), anyLong(), anyLong(), anyString(), any(PolicyEntity.class));
   }
 
   @Test
-  void testDispatchesTriggerExprForExpire() {
+  void testDispatchesAlwaysMaintainForExpirePlaceholder() {
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.policyType()).thenReturn(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION);
     when(policy.content()).thenReturn(PolicyContents.icebergSnapshotExpiration());
@@ -70,16 +72,36 @@ class TestTypeDispatchingInJobRecommender {
     when(lookup.findById(1L)).thenReturn(Optional.of(policy));
     InJobRecommender compaction = mock(InJobRecommender.class);
     InJobRecommender triggerExpr = mock(InJobRecommender.class);
-    when(triggerExpr.recommend(eq(2L), eq(1L), eq(9L), anyString(), eq(policy)))
-        .thenReturn(RecommendDecision.SKIP);
+    InJobRecommender placeholder = mock(InJobRecommender.class);
+    when(placeholder.recommend(eq(2L), eq(1L), eq(9L), anyString(), eq(policy)))
+        .thenReturn(RecommendDecision.MAINTAIN);
 
     TypeDispatchingInJobRecommender dispatcher =
-        new TypeDispatchingInJobRecommender(lookup, compaction, triggerExpr);
-    Assertions.assertEquals(RecommendDecision.SKIP, dispatcher.recommend(2L, 1L, 9L, "{}"));
-    verify(triggerExpr).recommend(2L, 1L, 9L, "{}", policy);
+        new TypeDispatchingInJobRecommender(lookup, compaction, triggerExpr, placeholder);
+    Assertions.assertEquals(RecommendDecision.MAINTAIN, dispatcher.recommend(2L, 1L, 9L, "{}"));
+    verify(placeholder).recommend(2L, 1L, 9L, "{}", policy);
+    verify(triggerExpr, never())
+        .recommend(anyLong(), anyLong(), anyLong(), anyString(), any(PolicyEntity.class));
     verify(compaction, never())
         .recommend(anyLong(), anyLong(), anyLong(), anyString(), any(PolicyEntity.class));
-    verify(compaction, never()).recommend(anyLong(), anyLong(), anyLong(), anyString());
+  }
+
+  @Test
+  void testProductionWiringExpirePlaceholderMaintainsDespiteTriggerFalse() {
+    PolicyEntity policy = mock(PolicyEntity.class);
+    when(policy.policyType()).thenReturn(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION);
+    when(policy.content()).thenReturn(PolicyContents.icebergSnapshotExpiration());
+    PolicyLookup lookup = mock(PolicyLookup.class);
+    when(lookup.findById(1L)).thenReturn(Optional.of(policy));
+
+    TypeDispatchingInJobRecommender dispatcher =
+        new TypeDispatchingInJobRecommender(
+            lookup,
+            new CompactionInJobRecommender(lookup),
+            new TriggerExprInJobRecommender(lookup),
+            AlwaysMaintainInJobRecommender.INSTANCE);
+
+    Assertions.assertEquals(RecommendDecision.MAINTAIN, dispatcher.recommend(2L, 1L, 9L, "{}"));
   }
 
   @Test

@@ -186,6 +186,35 @@ class TestOccupancyGate extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testMissingJobMetaIsReclaimedSoSlotCanBeAcquiredAgain() throws IOException {
+    String metalakeName = "tms_occ_ml5";
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "cat");
+    createAndInsertSchema(metalakeName, "cat", "sch");
+    TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
+
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    OccupancyGate gate = new OccupancyGate(actions);
+    long policyId = 77L;
+    long orphanJobId = 7005L;
+
+    OccupancyClaim stale =
+        actions.insertInFlight(
+            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actions.bindJobId(stale, orphanJobId);
+    Assertions.assertEquals(0L, actions.getByJobId(orphanJobId).finishedAt());
+    // No JobEntity row for orphanJobId — reclaim must still free the soft slot.
+    Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+    Assertions.assertTrue(actions.getByJobId(orphanJobId).finishedAt() > 0L);
+    Assertions.assertEquals(0, actions.listInFlight(table.id(), policyId).size());
+    Assertions.assertTrue(
+        actions
+            .tryAcquireInFlight(
+                table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS)
+            .isPresent());
+  }
+
+  @TestTemplate
   void testExpiredUnboundClaimIsNotInFlightOnDbClock() throws Exception {
     String metalakeName = "tms_occ_ml4";
     createAndInsertMakeLake(metalakeName);

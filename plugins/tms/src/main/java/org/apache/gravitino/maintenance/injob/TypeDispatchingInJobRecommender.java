@@ -24,14 +24,21 @@ import org.apache.gravitino.maintenance.scheduler.PolicyLookup;
 import org.apache.gravitino.maintenance.scheduler.RelationalPolicyLookup;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.Policy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Dispatches in-job recommenders by policy type. Compaction uses threshold evaluation; other
- * maintenance types evaluate policy {@code trigger-expr} (orphan {@code true}, expire/manifest
- * placeholders {@code false}).
+ * Dispatches in-job recommenders by policy type.
+ *
+ * <ul>
+ *   <li>Compaction → threshold / {@code trigger-expr} evaluation
+ *   <li>Orphan cleanup → policy {@code trigger-expr} ({@code true} by default)
+ *   <li>Expire / rewrite-manifests placeholders → always maintain (cron already scheduled the work;
+ *       content still ships {@code trigger-expr=false} for optimizer-only gating)
+ * </ul>
  */
 public final class TypeDispatchingInJobRecommender implements InJobRecommender {
 
@@ -40,27 +47,57 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
   private final PolicyLookup policyLookup;
   private final InJobRecommender compactionRecommender;
   private final InJobRecommender triggerExprRecommender;
+  private final InJobRecommender placeholderRecommender;
 
-  /** Production wiring. */
+  /** Production wiring with a shared policy lookup. */
   public TypeDispatchingInJobRecommender() {
+    this(new RelationalPolicyLookup());
+  }
+
+  private TypeDispatchingInJobRecommender(PolicyLookup lookup) {
     this(
-        new RelationalPolicyLookup(),
-        new CompactionInJobRecommender(),
-        new TriggerExprInJobRecommender());
+        lookup,
+        new CompactionInJobRecommender(lookup),
+        new TriggerExprInJobRecommender(lookup),
+        AlwaysMaintainInJobRecommender.INSTANCE);
   }
 
   /**
    * @param policyLookup policy loader
    * @param compactionRecommender compaction thresholds
-   * @param triggerExprRecommender trigger-expr evaluation for non-compaction types
+   * @param triggerExprRecommender trigger-expr evaluation (orphan and similar)
+   * @param placeholderRecommender expire / rewrite-manifests placeholders until real thresholds
+   *     land
+   */
+  public TypeDispatchingInJobRecommender(
+      PolicyLookup policyLookup,
+      InJobRecommender compactionRecommender,
+      InJobRecommender triggerExprRecommender,
+      InJobRecommender placeholderRecommender) {
+    this.policyLookup = Preconditions.checkNotNull(policyLookup);
+    this.compactionRecommender = Preconditions.checkNotNull(compactionRecommender);
+    this.triggerExprRecommender = Preconditions.checkNotNull(triggerExprRecommender);
+    this.placeholderRecommender = Preconditions.checkNotNull(placeholderRecommender);
+  }
+
+  /**
+   * Backward-compatible test wiring: non-compaction types use {@code triggerExprRecommender} except
+   * expire / rewrite-manifests placeholders, which use {@link
+   * AlwaysMaintainInJobRecommender#INSTANCE}.
+   *
+   * @param policyLookup policy loader
+   * @param compactionRecommender compaction thresholds
+   * @param triggerExprRecommender trigger-expr evaluation for orphan and similar
    */
   public TypeDispatchingInJobRecommender(
       PolicyLookup policyLookup,
       InJobRecommender compactionRecommender,
       InJobRecommender triggerExprRecommender) {
-    this.policyLookup = Preconditions.checkNotNull(policyLookup);
-    this.compactionRecommender = Preconditions.checkNotNull(compactionRecommender);
-    this.triggerExprRecommender = Preconditions.checkNotNull(triggerExprRecommender);
+    this(
+        policyLookup,
+        compactionRecommender,
+        triggerExprRecommender,
+        AlwaysMaintainInJobRecommender.INSTANCE);
   }
 
   @Override
@@ -77,7 +114,19 @@ public final class TypeDispatchingInJobRecommender implements InJobRecommender {
       return compactionRecommender.recommend(
           tableId, policyId, sampledSnapshotId, metricsJson, policy);
     }
+    if (isPlaceholderMaintenance(policy)) {
+      return placeholderRecommender.recommend(
+          tableId, policyId, sampledSnapshotId, metricsJson, policy);
+    }
     return triggerExprRecommender.recommend(
         tableId, policyId, sampledSnapshotId, metricsJson, policy);
+  }
+
+  private static boolean isPlaceholderMaintenance(PolicyEntity policy) {
+    Policy.BuiltInType type = policy.policyType();
+    return type == Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION
+        || type == Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS
+        || policy.content() instanceof IcebergSnapshotExpirationContent
+        || policy.content() instanceof IcebergRewriteManifestsContent;
   }
 }

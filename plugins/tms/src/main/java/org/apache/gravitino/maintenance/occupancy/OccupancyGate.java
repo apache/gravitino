@@ -107,11 +107,13 @@ public final class OccupancyGate {
         continue;
       }
       JobEntity job = loadJob(open.jobId(), tableId);
-      if (job == null || ACTIVE.contains(job.status())) {
+      // Missing job meta (purged / unresolvable) must free the soft slot; otherwise UNIQUE(table,
+      // policy, finished_at=0) blocks every future acquire.
+      if (job != null && ACTIVE.contains(job.status())) {
         continue;
       }
       long finishedAt =
-          job.finishedAt() != null && job.finishedAt() > 0
+          job != null && job.finishedAt() != null && job.finishedAt() > 0
               ? job.finishedAt()
               : System.currentTimeMillis();
       Long afterSnapshotId =
