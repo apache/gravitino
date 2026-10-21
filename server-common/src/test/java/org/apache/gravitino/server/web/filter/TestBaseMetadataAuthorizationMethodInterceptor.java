@@ -253,12 +253,147 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   public void testOperationFailureUsesProtocolMapper() throws Throwable {
     IllegalStateException failure = new IllegalStateException("operation failed");
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    TestInvocation invocation = invocation("unannotated", null);
+    TestInvocation invocation = invocation("operationFails", null);
     when(invocation.proceed()).thenThrow(failure);
 
     assertSame(failure, interceptor.invoke(invocation));
   }
 
+<<<<<<< HEAD
+=======
+  @Test
+  public void testMissingAuthorizationExpressionIsDenied() throws Throwable {
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    TestInvocation invocation = invocation("unannotated", "authorized");
+
+    ForbiddenException response =
+        assertInstanceOf(ForbiddenException.class, interceptor.invoke(invocation));
+    assertTrue(response.getMessage().contains("unannotated"));
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
+  public void testUnannotatedHelperProceeds() throws Throwable {
+    TestInvocation invocation = invocation("helper", "helper result");
+
+    assertEquals("helper result", new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation));
+    verify(invocation).proceed();
+  }
+
+  /** Entry authorization, parent checks and worker filtering share one user lookup. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testReadListReusesEntryContext(boolean hasDeny) throws Throwable {
+    AtomicInteger userLoads = new AtomicInteger();
+    Set<AuthorizationRequestContext> contexts = ConcurrentHashMap.newKeySet();
+    AtomicBoolean perObjectLoopRan = new AtomicBoolean();
+    AtomicReference<AuthorizationRequestContext> entryContext = new AtomicReference<>();
+    Function<String, Optional<UserUpdatedAt>> loadUser =
+        key -> {
+          userLoads.incrementAndGet();
+          return Optional.of(new UserUpdatedAt(1L, 1L));
+        };
+    try (MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class)) {
+      GravitinoEnv env = mock(GravitinoEnv.class);
+      Config config = mock(Config.class);
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+      when(env.config()).thenReturn(config);
+      when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
+      when(config.get(Configs.GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE)).thenReturn(2);
+      principalUtils.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      authorizationUtils
+          .when(() -> AuthorizationUtils.checkCurrentUser(any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                AuthorizationRequestContext context = invocation.getArgument(2);
+                entryContext.set(context);
+                context.computeUserInfoIfAbsent("metalake::tester", loadUser);
+                return null;
+              });
+      when(authorizer.authorize(any(), any(), any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                AuthorizationRequestContext context = invocation.getArgument(4);
+                contexts.add(context);
+                context.computeUserInfoIfAbsent("metalake::tester", loadUser);
+                return true;
+              });
+      when(authorizer.hasDenyPolicy(any(), any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                contexts.add(invocation.getArgument(3));
+                return hasDeny;
+              });
+      when(authorizer.deny(any(), any(), any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                MetadataObject object = invocation.getArgument(2);
+                contexts.add(invocation.getArgument(4));
+                if (object.type() == MetadataObject.Type.TABLE) {
+                  perObjectLoopRan.set(true);
+                }
+                return hasDeny && object.name().equals("hidden");
+              });
+      NameIdentifier visible = NameIdentifier.of("metalake", "catalog", "schema", "visible");
+      NameIdentifier hidden = NameIdentifier.of("metalake", "catalog", "schema", "hidden");
+      TestInvocation invocation = invocation("listTables", null);
+      when(invocation.proceed())
+          .thenAnswer(
+              unused ->
+                  MetadataAuthzHelper.filterByExpression(
+                      "metalake",
+                      AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.TABLE,
+                      new NameIdentifier[] {visible, hidden}));
+
+      Object result = new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation);
+
+      assertArrayEquals(
+          hasDeny ? new NameIdentifier[] {visible} : new NameIdentifier[] {visible, hidden},
+          (NameIdentifier[]) result);
+      assertEquals(Set.of(entryContext.get()), contexts);
+      assertEquals(1, userLoads.get());
+      assertEquals(hasDeny, perObjectLoopRan.get());
+      assertNotSame(entryContext.get(), AuthorizationRequestScope.getOrCreate("metalake"));
+    }
+  }
+
+  /** An endpoint failure must not retain a request's permission cache on a reused thread. */
+  @Test
+  public void testReadContextIsClearedAfterOperationFailure() throws Throwable {
+    when(authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+    AtomicReference<AuthorizationRequestContext> context = new AtomicReference<>();
+    TestInvocation invocation = invocation("listTables", null);
+    IllegalStateException failure = new IllegalStateException("list failed");
+    when(invocation.proceed())
+        .thenAnswer(
+            unused -> {
+              context.set(AuthorizationRequestScope.getOrCreate("metalake"));
+              throw failure;
+            });
+    assertSame(failure, new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation));
+    assertNotSame(context.get(), AuthorizationRequestScope.getOrCreate("metalake"));
+  }
+
+  /** Write operations must not expose pre-mutation authorization decisions to later filtering. */
+  @Test
+  public void testWriteDoesNotReuseEntryContext() throws Throwable {
+    AtomicReference<AuthorizationRequestContext> entryContext = new AtomicReference<>();
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              entryContext.set(invocation.getArgument(4));
+              return true;
+            });
+    TestInvocation invocation = invocation("writeTables", null);
+    when(invocation.proceed())
+        .thenAnswer(unused -> AuthorizationRequestScope.getOrCreate("metalake"));
+    Object result = new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation);
+    assertInstanceOf(AuthorizationRequestContext.class, result);
+    assertNotSame(entryContext.get(), result);
+  }
+
+>>>>>>> f8cbcdd3f ([#13980] fix(iceberg): Authorize table metrics reports (#13981))
   private static TestInvocation invocation(String methodName, Object result) throws Throwable {
     Method method = TestOperations.class.getDeclaredMethod(methodName);
     TestInvocation invocation = mock(TestInvocation.class);
@@ -361,7 +496,17 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
       return "unused";
     }
 
+    @GET
     private String unannotated() {
+      return "unused";
+    }
+
+    private String helper() {
+      return "unused";
+    }
+
+    @AuthorizationExpression(expression = "true")
+    private String operationFails() {
       return "unused";
     }
   }

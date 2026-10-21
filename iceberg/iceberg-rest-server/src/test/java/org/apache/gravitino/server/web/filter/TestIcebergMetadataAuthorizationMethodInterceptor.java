@@ -43,6 +43,11 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+>>>>>>> f8cbcdd3f ([#13980] fix(iceberg): Authorize table metrics reports (#13981))
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -51,6 +56,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -293,6 +299,31 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
 
     assertEquals("PROCEEDED", result);
     Mockito.verify(invocation, Mockito.times(1)).proceed();
+  }
+
+  @Test
+  public void testMetricsReportDoesNotSkipAuthorizationForRestCatalog() throws Exception {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(true);
+    resetContext(wrapperManager, true);
+
+    Method method =
+        IcebergTableOperations.class.getMethod(
+            "reportTableMetrics",
+            String.class,
+            String.class,
+            String.class,
+            ReportMetricsRequest.class);
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+
+    assertFalse(
+        interceptor.shouldSkipAuthorization(
+            method,
+            Map.of(Entity.EntityType.CATALOG, NameIdentifier.of(TEST_METALAKE, TEST_CATALOG))));
+    Mockito.verifyNoInteractions(wrapperManager);
   }
 
   @Test

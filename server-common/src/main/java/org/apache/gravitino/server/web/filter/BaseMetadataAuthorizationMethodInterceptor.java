@@ -19,11 +19,17 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+<<<<<<< HEAD
+=======
+import java.util.Set;
+import javax.ws.rs.HttpMethod;
+>>>>>>> f8cbcdd3f ([#13980] fix(iceberg): Authorize table metrics reports (#13981))
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -193,9 +199,27 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   }
 
   /**
+<<<<<<< HEAD
    * Hook for requests that must validate the current user but do not have a metadata object on
    * which to evaluate an expression. A protocol root-list request is a typical example: its
    * returned children are filtered separately.
+=======
+   * Returns whether authorization may be delegated for this operation.
+   *
+   * @param method invoked protocol method
+   * @param nameIdentifierMap identifiers resolved from the request
+   * @return {@code true} if the local authorization pipeline may be skipped
+   */
+  protected boolean shouldSkipAuthorization(
+      Method method, Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    return shouldSkipAuthorization(nameIdentifierMap);
+  }
+
+  /**
+   * Hook for requests that must validate the current user and active roles but do not have a
+   * metadata object on which to evaluate an expression. A protocol root-list request is a typical
+   * example: its returned children are filtered separately.
+>>>>>>> f8cbcdd3f ([#13980] fix(iceberg): Authorize table metrics reports (#13981))
    *
    * @param target resolved authorization target
    * @return {@code true} to skip only expression evaluation
@@ -228,7 +252,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         AuthorizationTarget target =
             resolveAuthorizationTarget(method, expressionAnnotation, parameters, args);
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = target.nameIdentifiers();
-        boolean skipStandardCheck = shouldSkipAuthorization(nameIdentifierMap);
+        boolean skipStandardCheck = shouldSkipAuthorization(method, nameIdentifierMap);
 
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
         AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
@@ -291,6 +315,19 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
             throw new ForbiddenException(notAuthzMessage);
           }
         }
+<<<<<<< HEAD
+=======
+        // A skipped standard check authorized nothing that list filtering could reuse.
+        scope.bindIfRead(
+            method, skipStandardCheck ? null : metalakeIdent, authorizationRequestContext);
+      } else {
+        for (Annotation annotation : method.getAnnotations()) {
+          if (annotation.annotationType().isAnnotationPresent(HttpMethod.class)) {
+            throw new ForbiddenException(
+                "Authorization expression is missing for operation '%s'", method.getName());
+          }
+        }
+>>>>>>> f8cbcdd3f ([#13980] fix(iceberg): Authorize table metrics reports (#13981))
       }
     } catch (Exception ex) {
       if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {
