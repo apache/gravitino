@@ -554,13 +554,9 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       getJdbcColumnFromTable(jdbcTable, renameColumn.getNewName());
     } catch (NoSuchColumnException ex) {
       return "RENAME COLUMN "
-          + BACK_QUOTE
-          + oldColName
-          + BACK_QUOTE
+          + quoteIdentifier(oldColName)
           + " TO "
-          + BACK_QUOTE
-          + renameColumn.getNewName()
-          + BACK_QUOTE;
+          + quoteIdentifier(renameColumn.getNewName());
     }
     throw new IllegalArgumentException("Column already exists: " + renameColumn.getNewName());
   }

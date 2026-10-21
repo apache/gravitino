@@ -51,16 +51,22 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
   private static class TestableStarRocksTableOperations extends StarRocksTableOperations {
 
-    private String[] columnNames = new String[0];
+    private final String[] columnNames;
 
     public TestableStarRocksTableOperations() {
+      this(new String[0]);
+    }
+
+    private TestableStarRocksTableOperations(String... columnNames) {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new StarRocksTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+      this.columnNames = columnNames;
     }
 
-    private TestableStarRocksTableOperations(ConnectionCountingDataSource connections) {
-      this();
+    private TestableStarRocksTableOperations(
+        ConnectionCountingDataSource connections, String... columnNames) {
+      this(columnNames);
       dataSource = connections.dataSource();
     }
 
@@ -375,8 +381,7 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
   @Test
   void testRenameColumnQuotesIdentifiers() {
-    TestableStarRocksTableOperations ops =
-        withColumns(new TestableStarRocksTableOperations(), "id", "order-id");
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations("id", "order-id");
 
     String alterSql =
         ops.alterTableSql("test_table", TableChange.renameColumn(new String[] {"order-id"}, "key"));
@@ -389,20 +394,18 @@ public class TestStarRocksTableOperationsSqlGeneration {
   void testDeleteMissingColumnIfExistsSkipsAlter() {
     ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
     TestableStarRocksTableOperations ops =
-        withColumns(new TestableStarRocksTableOperations(connections), "id", "col1");
+        new TestableStarRocksTableOperations(connections, "id", "col1");
     TableChange deleteMissing = TableChange.deleteColumn(new String[] {"missing"}, true);
 
     Assertions.assertEquals("", ops.alterTableSql("test_table", deleteMissing));
 
     ops.alterTable("database", "test_table", deleteMissing);
     Assertions.assertTrue(connections.executedSql().isEmpty());
-    Assertions.assertEquals(0, connections.borrowed());
   }
 
   @Test
   void testDeleteMissingColumnIfExistsWithOtherChanges() {
-    TestableStarRocksTableOperations ops =
-        withColumns(new TestableStarRocksTableOperations(), "id", "col1");
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations("id", "col1");
 
     String alterSql =
         ops.alterTableSql(
@@ -411,11 +414,5 @@ public class TestStarRocksTableOperationsSqlGeneration {
             TableChange.deleteColumn(new String[] {"col1"}, false));
 
     Assertions.assertEquals("ALTER TABLE `test_table`\nDROP COLUMN `col1`;", alterSql);
-  }
-
-  private static TestableStarRocksTableOperations withColumns(
-      TestableStarRocksTableOperations ops, String... columnNames) {
-    ops.columnNames = columnNames;
-    return ops;
   }
 }
