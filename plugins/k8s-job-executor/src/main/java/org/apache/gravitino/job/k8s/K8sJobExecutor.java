@@ -26,6 +26,7 @@ import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceList;
+import io.fabric8.kubernetes.api.model.ListOptionsBuilder;
 import io.fabric8.kubernetes.api.model.OwnerReference;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -33,10 +34,14 @@ import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.dsl.NonNamespaceOperation;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import io.fabric8.kubernetes.client.dsl.Resource;
+import io.fabric8.kubernetes.client.extension.ExtensibleResource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.http.HttpConnectTimeoutException;
+import java.net.http.HttpTimeoutException;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -46,6 +51,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
@@ -92,6 +98,10 @@ public class K8sJobExecutor implements JobExecutor {
   // How many times a change of a SparkApplication is tried again after it changed meanwhile.
   private static final int UPDATE_CONFLICT_RETRIES = 3;
 
+  // How many SparkApplications a listing gets per request, so that a namespace with many of them
+  // is listed in several shorter requests rather than one that may time out.
+  @VisibleForTesting static final long LIST_PAGE_SIZE = 500L;
+
   private final Clock clock;
 
   // The failure of the last status query that couldn't reach the API server, and when it failed.
@@ -129,17 +139,13 @@ public class K8sJobExecutor implements JobExecutor {
     this.sparkApplicationCache =
         new NamespacedResourceCache<>(
             configs.statusCacheTtlMs(),
-            namespace ->
-                getSparkApplicationClient(namespace)
-                    .withLabel(
-                        K8sJobResourceUtils.LABEL_MANAGED_BY,
-                        K8sJobResourceUtils.MANAGED_BY_GRAVITINO)
-                    .list()
-                    .getItems(),
-            // Getting the SparkApplication itself couldn't reach the API server either.
+            this::listSparkApplications,
+            // Getting the SparkApplication itself couldn't reach the API server either. A listing
+            // that the API server is too slow to answer isn't, it gets the jobs one by one instead.
             e ->
                 e instanceof KubernetesClientException
-                    && isUnreachable((KubernetesClientException) e),
+                    && isUnreachable((KubernetesClientException) e)
+                    && !isResponseTimedOut((KubernetesClientException) e),
             clock::millis);
     LOG.info(
         "Initialized the k8s job executor for cluster {} at {}, default namespace {}, built-in"
@@ -170,9 +176,10 @@ public class K8sJobExecutor implements JobExecutor {
     try {
       getSparkApplicationClient(namespace).resource(app).create();
     } catch (KubernetesClientException e) {
-      if (isUnreachable(e)) {
-        // The SparkApplication may have been created although no response came back. Gravitino
-        // records no job for a failed submission, so delete it, otherwise it would run unknown.
+      if (isUnreachable(e) || e.getCode() >= HttpURLConnection.HTTP_INTERNAL_ERROR) {
+        // The SparkApplication may have been created although no response or an error came back.
+        // Gravitino records no job for a failed submission, so delete it, otherwise it would run
+        // unknown.
         deleteUnsubmittedSparkApplication(jobExecutionId, context.jobId());
         throw e;
       }
@@ -373,6 +380,23 @@ public class K8sJobExecutor implements JobExecutor {
   }
 
   /**
+   * Returns whether a request failed because the API server didn't answer it in time, although it
+   * could be connected to.
+   *
+   * @param e the failure of the request
+   * @return true if the response timed out
+   */
+  @VisibleForTesting
+  static boolean isResponseTimedOut(KubernetesClientException e) {
+    for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+      if (cause instanceof HttpTimeoutException) {
+        return !(cause instanceof HttpConnectTimeoutException);
+      }
+    }
+    return false;
+  }
+
+  /**
    * Fails right away if the API server couldn't be reached a moment ago, so that querying the
    * status of many jobs doesn't wait for the connection to time out once per job.
    */
@@ -479,11 +503,15 @@ public class K8sJobExecutor implements JobExecutor {
   private JobExecutionInfo getExecutionInfoWithoutStatus(
       K8sJobExecutionId id, String jobId, JobExecutionInfo failed) {
     // The SparkApplication may come from the cache: it may have got a status since, or be being
-    // deleted, for example by a cancellation on another server. Then it is mapped as usual. If it
-    // is gone meanwhile, the job is missing rather than failed, which settles a cancelling job as
-    // cancelled.
+    // deleted, for example by a cancellation on another server. Then it is mapped as usual, also
+    // if it gets one between the read and the deletion. If it is gone meanwhile, the job is
+    // missing rather than failed, which settles a cancelling job as cancelled.
     GenericKubernetesResource latest =
-        getSparkApplication(id)
+        deleteSparkApplicationIf(
+                id,
+                app ->
+                    !SparkApplicationStatusUtils.hasStatus(app)
+                        && app.getMetadata().getDeletionTimestamp() == null)
             .orElseThrow(
                 () -> new NoSuchJobException("SparkApplication of job %s doesn't exist", jobId));
     if (SparkApplicationStatusUtils.hasStatus(latest)
@@ -491,7 +519,6 @@ public class K8sJobExecutor implements JobExecutor {
       sparkApplicationCache.invalidate(id.namespace());
       return getExecutionInfo(id, jobId, latest);
     }
-    deleteSparkApplication(id);
     return failed;
   }
 
@@ -502,9 +529,9 @@ public class K8sJobExecutor implements JobExecutor {
    */
   private void deleteUnsubmittedSparkApplication(K8sJobExecutionId id, long jobId) {
     try {
-      Optional<GenericKubernetesResource> app = getSparkApplication(id);
+      Optional<GenericKubernetesResource> app =
+          deleteSparkApplicationIf(id, current -> K8sJobResourceUtils.isOfJob(current, jobId));
       if (app.isPresent() && K8sJobResourceUtils.isOfJob(app.get(), jobId)) {
-        deleteSparkApplication(id);
         LOG.info("Deleted the SparkApplication of job {}, whose submission failed", jobId);
       }
     } catch (RuntimeException e) {
@@ -558,6 +585,55 @@ public class K8sJobExecutor implements JobExecutor {
   }
 
   /**
+   * Deletes the SparkApplication of a job if it should be, only if it hasn't changed since it was
+   * read, and reads it again to decide again otherwise.
+   *
+   * @param id the job execution id
+   * @param shouldDelete tells whether to delete the SparkApplication
+   * @return the SparkApplication the deletion was decided on, or empty if it doesn't exist
+   */
+  private Optional<GenericKubernetesResource> deleteSparkApplicationIf(
+      K8sJobExecutionId id, Predicate<GenericKubernetesResource> shouldDelete) {
+    for (int attempt = 0; ; attempt++) {
+      Optional<GenericKubernetesResource> app = getSparkApplication(id);
+      if (!app.isPresent() || !shouldDelete.test(app.get())) {
+        return app;
+      }
+      try {
+        deleteUnchangedSparkApplication(app.get());
+        return app;
+      } catch (KubernetesClientException e) {
+        if (e.getCode() != HttpURLConnection.HTTP_CONFLICT || attempt >= UPDATE_CONFLICT_RETRIES) {
+          throw e;
+        }
+      }
+    }
+  }
+
+  /**
+   * Deletes a SparkApplication only if it hasn't changed since it was read, as its resource version
+   * tells. Its pods are deleted first, as by {@link #deleteSparkApplication(K8sJobExecutionId)}.
+   *
+   * @param app the SparkApplication as it was read
+   * @throws KubernetesClientException with the code 409 if it has changed since
+   */
+  @SuppressWarnings("unchecked")
+  private void deleteUnchangedSparkApplication(GenericKubernetesResource app) {
+    String namespace = app.getMetadata().getNamespace();
+    // fabric8 types a resource locked to a version as one that can't set the propagation policy,
+    // but its implementation can: it sends both the precondition and the policy in the options of
+    // the deletion.
+    ExtensibleResource<GenericKubernetesResource> resource =
+        (ExtensibleResource<GenericKubernetesResource>)
+            getSparkApplicationClient(namespace).withName(app.getMetadata().getName());
+    resource
+        .lockResourceVersion(app.getMetadata().getResourceVersion())
+        .withPropagationPolicy(DeletionPropagation.FOREGROUND)
+        .delete();
+    sparkApplicationCache.invalidate(namespace);
+  }
+
+  /**
    * Returns the newest driver pod of a SparkApplication. The operator names the driver pod after
    * the Spark app id, which it may hash-truncate, so it is looked up by the operator's labels, and
    * also by its owner, the SparkApplication, when that is known.
@@ -606,6 +682,26 @@ public class K8sJobExecutor implements JobExecutor {
         .withPropagationPolicy(DeletionPropagation.FOREGROUND)
         .delete();
     sparkApplicationCache.invalidate(id.namespace());
+  }
+
+  /** Lists the SparkApplications managed by Gravitino in a namespace, page by page. */
+  private List<GenericKubernetesResource> listSparkApplications(String namespace) {
+    List<GenericKubernetesResource> apps = new ArrayList<>();
+    String continueToken = null;
+    do {
+      GenericKubernetesResourceList page =
+          getSparkApplicationClient(namespace)
+              .withLabel(
+                  K8sJobResourceUtils.LABEL_MANAGED_BY, K8sJobResourceUtils.MANAGED_BY_GRAVITINO)
+              .list(
+                  new ListOptionsBuilder()
+                      .withLimit(LIST_PAGE_SIZE)
+                      .withContinue(continueToken)
+                      .build());
+      apps.addAll(page.getItems());
+      continueToken = page.getMetadata() == null ? null : page.getMetadata().getContinue();
+    } while (StringUtils.isNotBlank(continueToken));
+    return apps;
   }
 
   private NonNamespaceOperation<

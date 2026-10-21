@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.job.k8s;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.fabric8.kubernetes.api.model.HasMetadata;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -147,6 +150,12 @@ final class NamespacedResourceCache<T extends HasMetadata> {
    */
   void invalidate(String namespace) {
     snapshots.remove(namespace);
+  }
+
+  /** Returns the namespaces whose listing is cached or being made. */
+  @VisibleForTesting
+  Set<String> getCachedNamespaces() {
+    return ImmutableSet.copyOf(snapshots.keySet());
   }
 
   /** Whether a listing must be made again: there is none, it failed, or it is too old. */
