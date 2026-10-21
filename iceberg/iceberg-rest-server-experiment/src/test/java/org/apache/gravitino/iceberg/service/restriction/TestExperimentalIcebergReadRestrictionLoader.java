@@ -120,35 +120,35 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   }
 
   @Test
-  void testSkipsTableMaskOnIncompatibleFieldTypes() {
+  void testRejectsTableMaskOnIncompatibleFieldTypes() {
     PolicyEntity mask = maskPolicy(1, "string_mask", "mask := action(\"show-last-4\")");
     Map<Integer, PolicyEntity[]> policiesByField = new LinkedHashMap<>();
     for (int fieldId = 1; fieldId <= 3; fieldId++) {
       policiesByField.put(fieldId, new PolicyEntity[] {mask});
     }
 
-    ReadRestrictions restrictions =
-        ExperimentalIcebergReadRestrictionLoader.resolve(
-            new PolicyEntity[0], policiesByField, SCHEMA, context("alice"));
-
-    assertEquals(2, restrictions.columnProjections().size());
-    assertEquals(2, restrictions.columnProjections().get(0).fieldId());
-    assertEquals(3, restrictions.columnProjections().get(1).fieldId());
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                ExperimentalIcebergReadRestrictionLoader.resolveForLoad(
+                    new PolicyEntity[0], policiesByField, SCHEMA, context("alice")));
+    assertEquals(
+        "Unable to resolve read restrictions for the requested table", exception.getMessage());
   }
 
   @Test
-  void testSkipsReplaceWithNullOnRequiredField() {
+  void testRejectsReplaceWithNullOnRequiredField() {
     PolicyEntity mask = maskPolicy(1, "null_mask", "mask := action(\"replace-with-null\")");
     Map<Integer, PolicyEntity[]> policiesByField = new LinkedHashMap<>();
     policiesByField.put(1, new PolicyEntity[] {mask});
     policiesByField.put(2, new PolicyEntity[] {mask});
 
-    ReadRestrictions restrictions =
-        ExperimentalIcebergReadRestrictionLoader.resolve(
-            new PolicyEntity[0], policiesByField, SCHEMA, context("alice"));
-
-    assertEquals(1, restrictions.columnProjections().size());
-    assertEquals(2, restrictions.columnProjections().get(0).fieldId());
+    assertThrows(
+        IcebergReadRestrictionConverter.IncompatibleMaskException.class,
+        () ->
+            ExperimentalIcebergReadRestrictionLoader.resolve(
+                new PolicyEntity[0], policiesByField, SCHEMA, context("alice")));
   }
 
   @Test

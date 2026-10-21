@@ -196,17 +196,13 @@ public final class ExperimentalIcebergReadRestrictionLoader
         ColumnMask program =
             RestrictedRegoExpressionParserFacade.parseColumnMask(
                 ((ColumnMaskContent) policy.content()).expression());
-        try {
-          ReadRestrictions resolved =
-              IcebergReadRestrictionConverter.convert(
-                  Optional.empty(),
-                  Collections.singletonMap(fieldId, program),
-                  schema,
-                  bindingContext);
-          distinct.putIfAbsent(ReadRestrictionsParser.toJson(resolved), program);
-        } catch (IcebergReadRestrictionConverter.IncompatibleMaskException exception) {
-          LOG.debug("Skipping mask action that is not applicable to field {}", fieldId);
-        }
+        ReadRestrictions resolved =
+            IcebergReadRestrictionConverter.convert(
+                Optional.empty(),
+                Collections.singletonMap(fieldId, program),
+                schema,
+                bindingContext);
+        distinct.putIfAbsent(ReadRestrictionsParser.toJson(resolved), program);
       }
       if (distinct.size() > 1) {
         throw new IllegalArgumentException(

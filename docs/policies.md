@@ -108,6 +108,10 @@ for one table, a filter that resolves to `true` adds no restriction and is ignor
 effective filters are deduplicated. Distinct restrictive filters conflict and cause the load-table
 request to fail; the loader does not combine them.
 
+If a column-mask action is not applicable to a column type, the experimental loader fails the
+load-table request rather than omitting the mask and exposing the original values. For example,
+`replace-with-null` cannot apply to a required column.
+
 Conditional branches are evaluated from left to right. The first true condition selects its result,
 and every conditional rule must end with an unconditional `else`. Row-filter conditions and results
 must be Boolean. Column-mask conditions may use only request context; they cannot reference columns.
