@@ -42,6 +42,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
@@ -248,6 +249,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   /**
    * Whether this catalog provides path-based credential contexts, which token credential providers
    * such as {@code s3-token} require to vend credentials.
+   *
+   * <p>A catalog whose operations implement {@link SupportsPathBasedCredentials} must override this
+   * method to return {@code true}; otherwise creating or altering the catalog with a token provider
+   * fails.
    *
    * @return {@code true} if path-based credentials are supported; {@code false} (default) otherwise
    */

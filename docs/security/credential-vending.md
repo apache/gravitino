@@ -158,7 +158,8 @@ can retrieve the same static AK/SK or JDBC password that Gravitino uses server-s
 
 - Prefer short-lived token providers (`s3-token`, `oss-token`, `adls-token`, `gcs-token`,
   `cos-token`, `aws-irsa`) over static `*-secret-key` / `azure-account-key` / `jdbc-user-password`
-  whenever possible.
+  whenever possible. Path-based token providers (all except `aws-irsa`) are only accepted on
+  Fileset and Iceberg catalogs.
 - When static providers are unavoidable, grant load / use privileges only to trusted principals
   (connectors and operators that must recover credentials).
 - Do not treat `getCredentials` as a secrets-protected API for static keys; use `USE_SECRETS` /

@@ -431,6 +431,16 @@ public class TestCatalogManager {
                         CredentialConstants.CREDENTIAL_PROVIDERS, "adls-token")));
     Assertions.assertTrue(exception.getMessage().contains("adls-token"));
 
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.testConnection(
+                    ident,
+                    CatalogChange.setProperty(
+                        CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token")));
+    Assertions.assertTrue(exception.getMessage().contains("s3-token"));
+
     catalogManager.alterCatalog(
         ident,
         CatalogChange.setProperty(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-secret-key"));
@@ -2132,6 +2142,59 @@ public class TestCatalogManager {
       Assertions.assertTrue(manager.dropCatalog(ident, true));
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testCredentialProvidersCannotBeSecret() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_credential_providers");
+      SecretReference reference = new SecretReference("reference", Map.of("path", "providers"));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(
+                      CredentialConstants.CREDENTIAL_PROVIDERS,
+                      new SecretBinding("memory", "gcs-token")),
+                  Map.of()));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(),
+                  Map.of(CredentialConstants.CREDENTIAL_PROVIDERS, reference)));
+      Assertions.assertFalse(manager.catalogExists(ident));
+
+      manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", catalogProps());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.alterCatalog(
+                  ident,
+                  CatalogChange.setSecretBinding(
+                      CredentialConstants.CREDENTIAL_PROVIDERS,
+                      new SecretBinding("memory", "gcs-token"))));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.alterCatalog(
+                  ident,
+                  CatalogChange.setSecretReference(
+                      CredentialConstants.CREDENTIAL_PROVIDERS, reference)));
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
     }
   }
 
