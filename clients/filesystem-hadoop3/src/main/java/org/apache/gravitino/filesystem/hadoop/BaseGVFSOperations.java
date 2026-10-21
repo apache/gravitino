@@ -971,10 +971,31 @@ public abstract class BaseGVFSOperations implements Closeable {
   Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
     String catalogName = filesetIdent.namespace().level(1);
     String schemaName = filesetIdent.namespace().level(2);
-    Catalog catalog = getGravitinoClient().loadCatalog(catalogName);
-    Schema schema = catalog.asSchemas().loadSchema(schemaName);
+    // Go through the metadata cache when it is enabled, so that an operation does not reload the
+    // catalog, schema and fileset. Secrets are not cached and are still fetched on every call.
+    NameIdentifier catalogIdent =
+        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(
+            filesetIdent.namespace().level(0),
+            filesetIdent.namespace().level(1),
+            filesetIdent.namespace().level(2));
+    Catalog catalog =
+        getFilesetMetadataCache()
+            .map(cache -> cache.getCatalog(catalogIdent))
+            .orElseGet(() -> getGravitinoClient().loadCatalog(catalogName));
+    Schema schema =
+        getFilesetMetadataCache()
+            .map(cache -> cache.getSchema(schemaIdent))
+            .orElseGet(() -> catalog.asSchemas().loadSchema(schemaName));
     Fileset fileset =
-        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetIdent.name()));
+        getFilesetMetadataCache()
+            .map(cache -> cache.getFileset(filesetIdent))
+            .orElseGet(
+                () ->
+                    catalog
+                        .asFilesetCatalog()
+                        .loadFileset(NameIdentifier.of(schemaName, filesetIdent.name())));
 
     Map<String, String> all = new HashMap<>();
     putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
