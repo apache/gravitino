@@ -2084,6 +2084,26 @@ public class TestJobManager {
     verify(entityStore, times(1)).delete(expiredIdent, Entity.EntityType.JOB);
   }
 
+  /** A failure checking the job executor still lets the expired jobs found before be deleted. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterFailingToCheckJobExecutor() throws IOException {
+    Instant longAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+    JobEntity expired = expiredJob();
+    JobEntity active = newJobEntity("local-job-gone-1", JobHandle.Status.STARTED, longAgo, longAgo);
+    mockListActiveJobs(expired, active);
+    when(jobExecutor.isJobStateNodeLocal())
+        .thenThrow(new AbstractMethodError("isJobStateNodeLocal"));
+    NameIdentifier expiredIdent = NameIdentifierUtil.ofJob(metalake, expired.name());
+    when(entityStore.delete(expiredIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File expiredDir = jobManager.jobStagingDir(expired.id());
+    Assertions.assertTrue(expiredDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(expiredDir.exists());
+    verify(entityStore, times(1)).delete(expiredIdent, Entity.EntityType.JOB);
+  }
+
   /** An Error deleting one expired job does not stop the cleanup of the others. */
   @Test
   public void testCleanUpStagingDirsContinuesAfterErrorDeletingJob() throws IOException {
