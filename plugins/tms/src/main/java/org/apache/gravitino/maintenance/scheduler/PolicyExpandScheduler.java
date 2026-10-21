@@ -43,6 +43,9 @@ import org.apache.gravitino.storage.relational.session.SqlSessions;
  * Writes {@code policy-expand} rows into {@link TableMaintenanceSchedulerPools#EXPAND_TASKS_TABLE}
  * through a db-scheduler client.
  *
+ * <p>The instance id is the policy id. A blank {@code timeTrigger}, or a disabled policy, removes
+ * the row. Handlers that fan the row out into cron jobs are out of scope here.
+ *
  * <p>{@code timeTrigger} is a six-field Quartz cron. This class is the runtime that decides whether
  * the expression has a next fire time; policy content does not parse cron itself.
  *
@@ -50,7 +53,7 @@ import org.apache.gravitino.storage.relational.session.SqlSessions;
  * not commit or close that connection, so the policy transaction and the expand row commit
  * together.
  */
-public final class PolicyExpandScheduler implements PolicyExpandSchedule {
+public final class PolicyExpandScheduler {
 
   private final DataSource dataSource;
 
@@ -88,7 +91,14 @@ public final class PolicyExpandScheduler implements PolicyExpandSchedule {
         .build();
   }
 
-  @Override
+  /**
+   * Inserts or moves the expand row to the next cron fire time, or removes it when the policy
+   * should not run.
+   *
+   * @param policyId persisted policy id, used as the db-scheduler task instance
+   * @param enabled whether the policy is enabled
+   * @param timeTrigger cron expression, or {@code null} when the policy has no time trigger
+   */
   public void sync(long policyId, boolean enabled, @Nullable String timeTrigger) {
     TaskInstanceId instanceId = instanceId(policyId);
     if (!enabled || timeTrigger == null || timeTrigger.isBlank()) {
@@ -108,7 +118,11 @@ public final class PolicyExpandScheduler implements PolicyExpandSchedule {
     }
   }
 
-  @Override
+  /**
+   * Deletes the expand row for a dropped policy.
+   *
+   * @param policyId persisted policy id
+   */
   public void remove(long policyId) {
     cancelIfPresent(instanceId(policyId));
   }

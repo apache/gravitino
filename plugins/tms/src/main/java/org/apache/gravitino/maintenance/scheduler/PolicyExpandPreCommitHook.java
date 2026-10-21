@@ -35,13 +35,13 @@ import org.apache.gravitino.policy.PolicyPreCommitHook;
  */
 public final class PolicyExpandPreCommitHook implements PolicyPreCommitHook {
 
-  private final PolicyExpandSchedule schedule;
+  private final PolicyExpandScheduler scheduler;
 
   /**
-   * @param schedule expand-row writer bound to the current SQL session
+   * @param scheduler expand-row writer bound to the current SQL session
    */
-  public PolicyExpandPreCommitHook(PolicyExpandSchedule schedule) {
-    this.schedule = schedule;
+  public PolicyExpandPreCommitHook(PolicyExpandScheduler scheduler) {
+    this.scheduler = scheduler;
   }
 
   @Override
@@ -56,15 +56,15 @@ public final class PolicyExpandPreCommitHook implements PolicyPreCommitHook {
 
   @Override
   public void beforeRemove(long policyId) {
-    schedule.remove(policyId);
+    scheduler.remove(policyId);
   }
 
   private void syncExpandRow(PolicyEntity policy) {
     if (!isMaintenance(policy.content())) {
-      schedule.remove(policy.id());
+      scheduler.remove(policy.id());
       return;
     }
-    schedule.sync(policy.id(), policy.enabled(), timeTrigger(policy.content()));
+    scheduler.sync(policy.id(), policy.enabled(), timeTrigger(policy.content()));
   }
 
   private static boolean isMaintenance(@Nullable PolicyContent content) {

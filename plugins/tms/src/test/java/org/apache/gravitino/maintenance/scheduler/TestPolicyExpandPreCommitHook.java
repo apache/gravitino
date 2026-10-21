@@ -18,10 +18,9 @@
  */
 package org.apache.gravitino.maintenance.scheduler;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.sql.DataSource;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -29,53 +28,75 @@ import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
-class TestPolicyExpandPreCommitHook {
+class TestPolicyExpandPreCommitHook extends TestJDBCBackend {
 
   private static final String CRON = "0 0 2 * * ?";
 
-  @Test
+  @TestTemplate
   void testEnabledMaintenancePolicyIsScheduled() {
-    RecordingSchedule schedule = new RecordingSchedule();
-    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(schedule);
+    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
+    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
+    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(writer);
 
-    hook.afterPersist(policy(42L, true, compaction(CRON)));
+    SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(42L, true, compaction(CRON))));
 
-    Assertions.assertEquals(List.of("sync 42 true " + CRON), schedule.operations);
+    Assertions.assertTrue(reader.scheduledExecutionTime(42L).isPresent());
   }
 
-  @Test
+  @TestTemplate
   void testDisabledMaintenancePolicyRemovesTheRow() {
-    RecordingSchedule schedule = new RecordingSchedule();
-    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(schedule);
+    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
+    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
+    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(writer);
 
-    hook.afterUpdate(policy(7L, false, compaction(CRON)));
+    SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(7L, true, compaction(CRON))));
+    Assertions.assertTrue(reader.scheduledExecutionTime(7L).isPresent());
 
-    Assertions.assertEquals(List.of("sync 7 false " + CRON), schedule.operations);
+    SessionUtils.doMultipleWithCommit(() -> hook.afterUpdate(policy(7L, false, compaction(CRON))));
+    Assertions.assertTrue(reader.scheduledExecutionTime(7L).isEmpty());
   }
 
-  @Test
+  @TestTemplate
   void testNonMaintenancePolicyRemovesAnyStrayRow() {
-    RecordingSchedule schedule = new RecordingSchedule();
-    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(schedule);
+    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
+    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
+    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(writer);
     PolicyContent custom = PolicyContents.custom(Map.of(), Set.of(MetadataObject.Type.TABLE), null);
 
-    hook.afterPersist(policy(1L, true, custom, Policy.BuiltInType.CUSTOM));
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(1L, true, CRON));
+    Assertions.assertTrue(reader.scheduledExecutionTime(1L).isPresent());
 
-    Assertions.assertEquals(List.of("remove 1"), schedule.operations);
+    SessionUtils.doMultipleWithCommit(
+        () -> hook.afterPersist(policy(1L, true, custom, Policy.BuiltInType.CUSTOM)));
+    Assertions.assertTrue(reader.scheduledExecutionTime(1L).isEmpty());
   }
 
-  @Test
+  @TestTemplate
   void testDeleteRemovesByPolicyId() {
-    RecordingSchedule schedule = new RecordingSchedule();
-    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(schedule);
+    PolicyExpandScheduler writer = PolicyExpandScheduler.joiningCurrentTransaction();
+    PolicyExpandScheduler reader = PolicyExpandScheduler.forReads(entityStoreDataSource());
+    PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(writer);
 
-    hook.beforeRemove(11L);
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(11L, true, CRON));
+    Assertions.assertTrue(reader.scheduledExecutionTime(11L).isPresent());
 
-    Assertions.assertEquals(List.of("remove 11"), schedule.operations);
+    SessionUtils.doMultipleWithCommit(() -> hook.beforeRemove(11L));
+    Assertions.assertTrue(reader.scheduledExecutionTime(11L).isEmpty());
+  }
+
+  private static DataSource entityStoreDataSource() {
+    return SqlSessionFactoryHelper.getInstance()
+        .getSqlSessionFactory()
+        .getConfiguration()
+        .getEnvironment()
+        .getDataSource();
   }
 
   private static PolicyEntity policy(long id, boolean enabled, PolicyContent content) {
@@ -110,19 +131,5 @@ class TestPolicyExpandPreCommitHook {
         null,
         null,
         null);
-  }
-
-  private static final class RecordingSchedule implements PolicyExpandSchedule {
-    private final List<String> operations = new ArrayList<>();
-
-    @Override
-    public void sync(long policyId, boolean enabled, String timeTrigger) {
-      operations.add("sync " + policyId + " " + enabled + " " + timeTrigger);
-    }
-
-    @Override
-    public void remove(long policyId) {
-      operations.add("remove " + policyId);
-    }
   }
 }
