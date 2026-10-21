@@ -503,12 +503,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     // Create table with MATERIALIZED and ALIAS columns via raw SQL.
     // Using DriverManager.getConnection directly because Gravitino's create() API
     // does not support specifying MATERIALIZED/ALIAS default value kinds.
-    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    String jdbcUrl = clickHouseContainer.getJdbcUrl(TEST_DB_NAME);
     try (Connection conn =
             DriverManager.getConnection(
-                jdbcUrl,
-                containerSuite.getClickHouseContainer().getUsername(),
-                containerSuite.getClickHouseContainer().getPassword());
+                jdbcUrl, clickHouseContainer.getUsername(), clickHouseContainer.getPassword());
         Statement stmt = conn.createStatement()) {
       stmt.execute(
           String.format(

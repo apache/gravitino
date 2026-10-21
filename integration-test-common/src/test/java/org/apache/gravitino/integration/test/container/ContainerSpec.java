@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.integration.test.container;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
 
 /**
@@ -65,57 +63,15 @@ public interface ContainerSpec<C extends BaseContainer> {
 
   /**
    * Returns the specs whose containers must run before this one starts, such as the Ranger server a
-   * Ranger-enabled Hive reports to. {@link #startWithDependencies} starts them first, as shared
-   * run-wide containers, so they outlive this container whatever its scope. Inside {@link
-   * #getOrStart} the spec reads a dependency's running container with {@code
-   * dependency.getOrStart(suite)}, which returns the one already started.
+   * Ranger-enabled Hive reports to. They start first, as shared run-wide containers, so they
+   * outlive this container whatever its scope. Inside {@link #getOrStart} the spec reads a
+   * dependency's running container with {@code dependency.getOrStart(shared)}, which returns the
+   * one already started.
    *
    * @return the direct dependencies; none by default
    */
   default List<ContainerSpec<?>> dependencies() {
     return List.of();
-  }
-
-  /**
-   * Starts every dependency of {@code spec}, deepest first, and then returns its running shared
-   * container.
-   *
-   * @param spec the spec to start
-   * @param suite the shared container suite
-   * @param <C> the container type
-   * @return the running container
-   * @throws IllegalStateException if the dependencies form a cycle
-   */
-  static <C extends BaseContainer> C startWithDependencies(
-      ContainerSpec<C> spec, ContainerSuite suite) {
-    startDependencies(spec, suite);
-    return spec.getOrStart(suite);
-  }
-
-  /**
-   * Starts every dependency of {@code spec}, deepest first, but not {@code spec} itself; for
-   * private containers, whose own start happens elsewhere.
-   *
-   * @param spec the spec whose dependencies to start
-   * @param suite the shared container suite
-   * @throws IllegalStateException if the dependencies form a cycle
-   */
-  static void startDependencies(ContainerSpec<?> spec, ContainerSuite suite) {
-    startDependencies(spec, suite, new ArrayDeque<>());
-  }
-
-  private static void startDependencies(
-      ContainerSpec<?> spec, ContainerSuite suite, Deque<ContainerSpec<?>> path) {
-    if (path.contains(spec)) {
-      path.addLast(spec);
-      throw new IllegalStateException("Container dependencies form a cycle: " + path);
-    }
-    path.addLast(spec);
-    for (ContainerSpec<?> dependency : spec.dependencies()) {
-      startDependencies(dependency, suite, path);
-      dependency.getOrStart(suite);
-    }
-    path.removeLast();
   }
 
   /**
@@ -130,15 +86,15 @@ public interface ContainerSpec<C extends BaseContainer> {
   }
 
   /**
-   * Returns the running container for this spec, starting it on first use.
+   * Returns the running shared container for this spec, starting it on first use. The container
+   * lives for the whole run, so every fixture and every {@link Fixtures#get} call for an equal spec
+   * receives it. Only this package calls it; other code calls {@link Fixtures#get}, which starts
+   * the dependencies first.
    *
-   * <p>{@link ContainerSuite} keeps the container for the whole run, so tests that use fixtures and
-   * tests that call {@code ContainerSuite} directly share it.
-   *
-   * @param suite the shared container suite
+   * @param shared the run's shared containers
    * @return the running container
    */
-  C getOrStart(ContainerSuite suite);
+  C getOrStart(SharedContainers shared);
 
   /**
    * Returns whether {@link #startPrivate} can start a container for this spec, so that a fixture
@@ -156,12 +112,12 @@ public interface ContainerSpec<C extends BaseContainer> {
    * Scope#CLASS} or {@link Scope#METHOD}. The caller closes it; it never replaces the shared
    * container.
    *
-   * @param suite the shared container suite, which starts the container on its network
+   * @param shared the run's shared containers, which start the container on the run's network
    * @param durability whether the container keeps its durability work
    * @return the running private container
    * @throws UnsupportedOperationException if this spec has no private containers yet
    */
-  default C startPrivate(ContainerSuite suite, Durability durability) {
+  default C startPrivate(SharedContainers shared, Durability durability) {
     throw new UnsupportedOperationException(
         "scope CLASS/METHOD is not supported for " + getClass().getSimpleName() + " yet");
   }

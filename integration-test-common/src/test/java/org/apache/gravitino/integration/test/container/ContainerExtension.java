@@ -30,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
-import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
@@ -63,10 +62,10 @@ import org.slf4j.LoggerFactory;
  * of the class's fixtures, so one class can hold two containers of one type.
  *
  * <p>By default ({@link Scope#RUN}) each container starts once per run and is shared by every class
- * that asks for the same spec; the containers close when the run ends, through {@link
- * CloseContainerExtension}. A {@link Scope#CLASS} container is private to the class and closes
- * after it; a {@link Scope#METHOD} container is private to one test and closes after it, so it can
- * only reach instance fields and the parameters of test and {@code @BeforeEach} methods.
+ * that asks for the same spec, and by {@link Fixtures#get} callers; the containers close when the
+ * run ends. A {@link Scope#CLASS} container is private to the class and closes after it; a {@link
+ * Scope#METHOD} container is private to one test and closes after it, so it can only reach instance
+ * fields and the parameters of test and {@code @BeforeEach} methods.
  */
 public class ContainerExtension
     implements AfterAllCallback,
@@ -82,14 +81,12 @@ public class ContainerExtension
   // Where unused-fixture warnings go; a test swaps it to read them.
   static Consumer<String> warnings = LOG::warn;
 
-  private final CloseContainerExtension suiteCloser = new CloseContainerExtension();
-
   /** A fixture on the test class: what it asks for and how long its container lives. */
   record Declaration(ContainerSpec<?> spec, Scope scope, Startup startup, Durability durability) {}
 
   @Override
   public void beforeAll(ExtensionContext context) {
-    suiteCloser.beforeAll(context);
+    SharedContainers.closeWhenRunEnds(context);
     Class<?> testClass = context.getRequiredTestClass();
     for (Declaration declaration : declarations(testClass)) {
       if (declaration.scope() != Scope.METHOD && declaration.startup() == Startup.EAGER) {
@@ -134,7 +131,7 @@ public class ContainerExtension
   public void beforeEach(ExtensionContext context) {
     // An extension declared only on an instance field of a PER_METHOD class never gets
     // beforeAll(), so register the run's closer here too; registering twice is harmless.
-    suiteCloser.beforeAll(context);
+    SharedContainers.closeWhenRunEnds(context);
     Class<?> testClass = context.getRequiredTestClass();
     for (Declaration declaration : declarations(testClass)) {
       if (declaration.scope() == Scope.METHOD) {
@@ -272,7 +269,7 @@ public class ContainerExtension
             .<ContainerSpec<?>>map(instance -> declaration.spec().forTestInstance(instance))
             .orElse(declaration.spec());
     if (declaration.scope() == Scope.RUN) {
-      return ContainerSpec.startWithDependencies(spec, ContainerSuite.getInstance());
+      return SharedContainers.startWithDependencies(spec, SharedContainers.getInstance());
     }
     ExtensionContext owner =
         declaration.scope() == Scope.CLASS ? classContext(context) : methodContext(context, spec);
@@ -281,9 +278,9 @@ public class ContainerExtension
         .computeIfAbsent(
             PRIVATE_CONTAINER,
             key -> {
-              ContainerSpec.startDependencies(spec, ContainerSuite.getInstance());
+              SharedContainers.startDependencies(spec, SharedContainers.getInstance());
               return spec.startPrivate(
-                  ContainerSuite.getInstance(),
+                  SharedContainers.getInstance(),
                   // -PdurableTestContainers makes every container durable.
                   Durability.runDefault() == Durability.DURABLE
                       ? Durability.DURABLE

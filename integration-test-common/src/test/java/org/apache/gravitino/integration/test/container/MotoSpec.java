@@ -27,9 +27,9 @@ public record MotoSpec() implements ContainerSpec<GravitinoMotoContainer> {
   }
 
   @Override
-  public GravitinoMotoContainer getOrStart(ContainerSuite suite) {
-    suite.startMotoContainer();
-    return suite.getMotoContainer();
+  public GravitinoMotoContainer getOrStart(SharedContainers shared) {
+    shared.startMotoContainer();
+    return shared.getMotoContainer();
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<MotoFixture> {

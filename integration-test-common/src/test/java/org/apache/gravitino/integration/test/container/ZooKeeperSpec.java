@@ -27,9 +27,9 @@ public record ZooKeeperSpec() implements ContainerSpec<ZooKeeperContainer> {
   }
 
   @Override
-  public ZooKeeperContainer getOrStart(ContainerSuite suite) {
-    suite.startZooKeeperContainer();
-    return suite.getZooKeeperContainer();
+  public ZooKeeperContainer getOrStart(SharedContainers shared) {
+    shared.startZooKeeperContainer();
+    return shared.getZooKeeperContainer();
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<ZooKeeperFixture> {

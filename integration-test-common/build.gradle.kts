@@ -93,7 +93,7 @@ configurations {
 }
 
 dependencies {
-  // ContainerSuite builds its MySQL and PostgreSQL containers on these Testcontainers modules, so
+  // The shared MySQL and PostgreSQL containers build on these Testcontainers modules, so
   // every module that uses the test artifacts needs them at test runtime.
   "testArtifacts"(libs.testcontainers.mysql)
   "testArtifacts"(libs.testcontainers.postgresql)

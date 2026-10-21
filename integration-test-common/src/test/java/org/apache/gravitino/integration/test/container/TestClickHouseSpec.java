@@ -59,34 +59,34 @@ public class TestClickHouseSpec {
 
   @Test
   void testSingleNodeStartsWithTheDatabase() {
-    ContainerSuite suite = Mockito.mock(ContainerSuite.class);
+    SharedContainers shared = Mockito.mock(SharedContainers.class);
     ClickHouseContainer clickHouse = Mockito.mock(ClickHouseContainer.class);
-    Mockito.when(suite.getClickHouseContainer()).thenReturn(clickHouse);
+    Mockito.when(shared.getClickHouseContainer()).thenReturn(clickHouse);
 
-    Assertions.assertSame(clickHouse, new ClickHouseSpec(1, DATABASE).getOrStart(suite));
+    Assertions.assertSame(clickHouse, new ClickHouseSpec(1, DATABASE).getOrStart(shared));
 
-    InOrder order = Mockito.inOrder(suite);
-    order.verify(suite).startClickHouseContainer(DATABASE);
-    order.verify(suite).getClickHouseContainer();
-    Mockito.verify(suite, Mockito.never())
+    InOrder order = Mockito.inOrder(shared);
+    order.verify(shared).startClickHouseContainer(DATABASE);
+    order.verify(shared).getClickHouseContainer();
+    Mockito.verify(shared, Mockito.never())
         .startClickHouseClusterContainer(Mockito.any(), Mockito.anyString());
   }
 
   @Test
   void testClusterStartsWithTheDatabaseAndTheTemplate() throws Exception {
-    ContainerSuite suite = Mockito.mock(ContainerSuite.class);
+    SharedContainers shared = Mockito.mock(SharedContainers.class);
     ClickHouseContainer firstNode = Mockito.mock(ClickHouseContainer.class);
-    Mockito.when(suite.getClickHouseClusterContainer()).thenReturn(firstNode);
+    Mockito.when(shared.getClickHouseClusterContainer()).thenReturn(firstNode);
 
-    Assertions.assertSame(firstNode, new ClickHouseSpec(3, DATABASE).getOrStart(suite));
+    Assertions.assertSame(firstNode, new ClickHouseSpec(3, DATABASE).getOrStart(shared));
 
     ArgumentCaptor<String> templatePath = ArgumentCaptor.forClass(String.class);
-    InOrder order = Mockito.inOrder(suite);
+    InOrder order = Mockito.inOrder(shared);
     order
-        .verify(suite)
+        .verify(shared)
         .startClickHouseClusterContainer(Mockito.eq(DATABASE), templatePath.capture());
-    order.verify(suite).getClickHouseClusterContainer();
-    Mockito.verify(suite, Mockito.never()).startClickHouseContainer(Mockito.any());
+    order.verify(shared).getClickHouseClusterContainer();
+    Mockito.verify(shared, Mockito.never()).startClickHouseContainer(Mockito.any());
 
     Path template = Paths.get(templatePath.getValue());
     Assertions.assertTrue(Files.isReadable(template));
@@ -96,14 +96,14 @@ public class TestClickHouseSpec {
 
   @Test
   void testClusterTemplateIsCopiedOnce() {
-    ContainerSuite suite = Mockito.mock(ContainerSuite.class);
+    SharedContainers shared = Mockito.mock(SharedContainers.class);
     ClickHouseSpec spec = new ClickHouseSpec(3, DATABASE);
 
-    spec.getOrStart(suite);
-    spec.getOrStart(suite);
+    spec.getOrStart(shared);
+    spec.getOrStart(shared);
 
     ArgumentCaptor<String> templatePath = ArgumentCaptor.forClass(String.class);
-    Mockito.verify(suite, Mockito.times(2))
+    Mockito.verify(shared, Mockito.times(2))
         .startClickHouseClusterContainer(Mockito.eq(DATABASE), templatePath.capture());
     Assertions.assertEquals(templatePath.getAllValues().get(0), templatePath.getAllValues().get(1));
   }

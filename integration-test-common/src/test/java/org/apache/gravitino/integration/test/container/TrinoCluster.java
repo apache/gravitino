@@ -129,10 +129,10 @@ public final class TrinoCluster extends BaseContainer {
   @Override
   public void start() {
     for (BaseContainer service : services) {
-      ContainerSuite.startTimed(service);
+      SharedContainers.startTimed(service);
     }
     for (BaseContainer worker : workers) {
-      ContainerSuite.startTimed(worker);
+      SharedContainers.startTimed(worker);
     }
     super.start();
     if (!workers.isEmpty()) {
@@ -333,7 +333,7 @@ public final class TrinoCluster extends BaseContainer {
         throw new UncheckedIOException(e);
       }
 
-      Network shared = ContainerSuite.getInstance().getNetwork();
+      Network shared = SharedContainers.getInstance().getNetwork();
       Network ownNetwork = shared == null ? Network.newNetwork() : null;
       Optional<Network> network = Optional.of(shared != null ? shared : ownNetwork);
 

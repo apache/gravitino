@@ -34,8 +34,9 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -50,15 +51,15 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@MySQLFixture(database = TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT)
 public class AuditCatalogMysqlIT extends BaseIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String metalakeName = GravitinoITUtils.genRandomName("audit_mysql_metalake");
   private static final String expectUser = System.getProperty("user.name");
   protected static TestDatabaseName TEST_DB_NAME;
   private static final String provider = "jdbc-mysql";
 
   private static MysqlService mysqlService;
-  private static MySQLContainer MYSQL_CONTAINER;
+  @FixtureContainer private static MySQLContainer MYSQL_CONTAINER;
   private static GravitinoMetalake metalake;
 
   @BeforeAll
@@ -68,10 +69,8 @@ public class AuditCatalogMysqlIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT);
-    MYSQL_CONTAINER = containerSuite.getMySQLContainer();
     TEST_DB_NAME = TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT;
-    mysqlService = new MysqlService(containerSuite.getMySQLContainer(), TEST_DB_NAME);
+    mysqlService = new MysqlService(MYSQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
   }
 

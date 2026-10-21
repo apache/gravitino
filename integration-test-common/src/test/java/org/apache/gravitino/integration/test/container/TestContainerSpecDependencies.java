@@ -41,7 +41,7 @@ public class TestContainerSpecDependencies {
   void testDependenciesStartDeepestFirst() {
     graph = Map.of("hive", List.of("ranger", "localstack"), "ranger", List.of("solr"));
 
-    ContainerSpec.startWithDependencies(new Node("hive"), null);
+    SharedContainers.startWithDependencies(new Node("hive"), null);
 
     Assertions.assertEquals(List.of("solr", "ranger", "localstack", "hive"), STARTED);
   }
@@ -50,9 +50,18 @@ public class TestContainerSpecDependencies {
   void testPrivateStartOnlyStartsDependencies() {
     graph = Map.of("hive", List.of("ranger"));
 
-    ContainerSpec.startDependencies(new Node("hive"), null);
+    SharedContainers.startDependencies(new Node("hive"), null);
 
     Assertions.assertEquals(List.of("ranger"), STARTED);
+  }
+
+  @Test
+  void testFixturesGetStartsDependenciesFirst() {
+    graph = Map.of("hive", List.of("ranger"));
+
+    Fixtures.get(new Node("hive"));
+
+    Assertions.assertEquals(List.of("ranger", "hive"), STARTED);
   }
 
   @Test
@@ -62,7 +71,7 @@ public class TestContainerSpecDependencies {
     IllegalStateException e =
         Assertions.assertThrows(
             IllegalStateException.class,
-            () -> ContainerSpec.startWithDependencies(new Node("a"), null));
+            () -> SharedContainers.startWithDependencies(new Node("a"), null));
 
     Assertions.assertTrue(e.getMessage().contains("cycle"), e.getMessage());
     Assertions.assertTrue(STARTED.isEmpty());
@@ -121,7 +130,7 @@ public class TestContainerSpecDependencies {
     }
 
     @Override
-    public FakeContainer getOrStart(ContainerSuite suite) {
+    public FakeContainer getOrStart(SharedContainers shared) {
       STARTED.add(name);
       return Mockito.mock(FakeContainer.class);
     }

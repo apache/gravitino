@@ -53,9 +53,10 @@ import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -93,9 +94,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@PostgreSQLFixture(database = TestDatabaseName.PG_CATALOG_POSTGRESQL_IT)
 public class CatalogPostgreSqlIT extends BaseIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  public static final PGImageName DEFAULT_POSTGRES_IMAGE = PGImageName.VERSION_13;
 
   public String metalakeName = GravitinoITUtils.genRandomName("postgresql_it_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("postgresql_it_catalog");
@@ -115,17 +115,12 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
   private PostgreSqlService postgreSqlService;
 
-  private PostgreSQLContainer POSTGRESQL_CONTAINER;
+  @FixtureContainer private PostgreSQLContainer POSTGRESQL_CONTAINER;
 
   protected final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
 
-  protected PGImageName postgreImageName = DEFAULT_POSTGRES_IMAGE;
-
   @BeforeAll
   public void startup() throws IOException, SQLException {
-    containerSuite.startPostgreSQLContainer(TEST_DB_NAME, postgreImageName);
-    POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer(postgreImageName);
-
     postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
     catalog = createCatalog(catalogName);
@@ -1640,8 +1635,9 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
   @Test
   void testNumericScaleOutsidePrecision() {
-    Assumptions.assumeTrue(
-        postgreImageName == PGImageName.VERSION_15 || postgreImageName == PGImageName.VERSION_16);
+    // The version subclasses re-declare the fixture, so the class's fixture names the version.
+    PGImageName version = getClass().getAnnotation(PostgreSQLFixture.class).version();
+    Assumptions.assumeTrue(version == PGImageName.VERSION_15 || version == PGImageName.VERSION_16);
     String tableName = GravitinoITUtils.genRandomName("test_numeric_scale");
     postgreSqlService.executeQuery(
         String.format(

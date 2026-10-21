@@ -36,14 +36,14 @@ import org.apache.gravitino.integration.test.util.TestDatabaseName;
  *
  * <p>The database is created on the shared container and is not part of the container identity: two
  * specs that differ only by database share one ClickHouse. The cluster size is fixed by {@link
- * ContainerSuite}, so a variable size needs the cluster start to move out of {@code
- * ContainerSuite}.
+ * SharedContainers}, so a variable size needs the cluster start to move out of {@code
+ * SharedContainers}.
  */
 public record ClickHouseSpec(int nodes, TestDatabaseName database)
     implements ContainerSpec<ClickHouseContainer> {
 
   private static final int SINGLE_NODE = 1;
-  // Must match ContainerSuite.CLICKHOUSE_CLUSTER_SIZE.
+  // Must match SharedContainers.CLICKHOUSE_CLUSTER_SIZE.
   private static final int CLUSTER_NODES = 3;
 
   private static final String REMOTE_SERVERS_TEMPLATE = "/remote_servers.xml";
@@ -71,16 +71,16 @@ public record ClickHouseSpec(int nodes, TestDatabaseName database)
   }
 
   @Override
-  public ClickHouseContainer getOrStart(ContainerSuite suite) {
+  public ClickHouseContainer getOrStart(SharedContainers shared) {
     if (nodes == SINGLE_NODE) {
-      suite.startClickHouseContainer(database);
-      return suite.getClickHouseContainer();
+      shared.startClickHouseContainer(database);
+      return shared.getClickHouseContainer();
     }
-    suite.startClickHouseClusterContainer(database, REMOTE_SERVERS.get().toString());
-    return suite.getClickHouseClusterContainer();
+    shared.startClickHouseClusterContainer(database, REMOTE_SERVERS.get().toString());
+    return shared.getClickHouseClusterContainer();
   }
 
-  // ContainerSuite reads the template from a file path, and the resource may sit inside a jar.
+  // SharedContainers reads the template from a file path, and the resource may sit inside a jar.
   // Copied on first use, not in a static initializer, so loading this class never touches the
   // disk; a failed copy is not cached and the next start tries again.
   // The cluster keeps its replication metadata in ZooKeeper.
@@ -98,7 +98,7 @@ public record ClickHouseSpec(int nodes, TestDatabaseName database)
   @Override
   public Object injectAs(Class<?> wanted, ClickHouseContainer container) {
     if (wanted == ClickHouseCluster.class) {
-      return new ClickHouseCluster(ContainerSuite.getInstance().getClickHouseClusterContainers());
+      return new ClickHouseCluster(SharedContainers.getInstance().getClickHouseClusterContainers());
     }
     return container;
   }

@@ -38,24 +38,35 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.condition.DisabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Boots a deploy-mode Gravitino server with the Iceberg REST auxiliary service, OAuth
  * authentication, and authorization enabled.
+ *
+ * <p>It drives the server through Trino's native REST connector, which only works against the
+ * packaged distribution in deploy mode. The Java 24 / Trino module does not carry the server on its
+ * classpath, so the embedded path would fail with NoClassDefFoundError; the class is disabled
+ * there, before its PostgreSQL fixture starts.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DisabledIf(
+    value = "org.apache.gravitino.integration.test.util.ITUtils#isEmbedded",
+    disabledReason = "Trino Iceberg REST authorization IT only runs in deploy mode")
+@PostgreSQLFixture(database = TestDatabaseName.PG_ICEBERG_AUTHZ_IT)
 public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
 
   private static final Logger LOG =
@@ -76,6 +87,7 @@ public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
   protected GravitinoMetalake metalakeAsSuper;
   protected Catalog catalogAsSuper;
   protected QueryRunner queryRunner;
+  @FixtureContainer private PostgreSQLContainer postgreSQL;
 
   /**
    * Mints a signed bearer token for a test user.
@@ -98,13 +110,6 @@ public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    // This IT boots the Gravitino server with the Iceberg REST auxiliary service and drives it
-    // through Trino's native REST connector, which only works against the packaged distribution in
-    // deploy mode. The Java 24 / Trino module does not carry the server on its classpath, so the
-    // embedded path would fail with NoClassDefFoundError; skip it when not running in deploy mode.
-    Assumptions.assumeFalse(
-        ITUtils.isEmbedded(), "Trino Iceberg REST authorization IT only runs in deploy mode");
-    containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
     tokenServer = new MockOAuthTokenServer(keyPair, SERVICE_AUDIENCE, SUPER_USER);
     tokenServer.start();
     warehouseDir = Files.createTempDirectory("trino-irc-warehouse").toString();
@@ -174,18 +179,10 @@ public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
             .put(IcebergConstants.CATALOG_BACKEND, "jdbc")
-            .put(
-                IcebergConstants.URI,
-                containerSuite
-                    .getPostgreSQLContainer()
-                    .getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT))
+            .put(IcebergConstants.URI, postgreSQL.getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT))
             .put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.postgresql.Driver")
-            .put(
-                IcebergConstants.GRAVITINO_JDBC_USER,
-                containerSuite.getPostgreSQLContainer().getUsername())
-            .put(
-                IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-                containerSuite.getPostgreSQLContainer().getPassword())
+            .put(IcebergConstants.GRAVITINO_JDBC_USER, postgreSQL.getUsername())
+            .put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, postgreSQL.getPassword())
             .put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true")
             .put("gravitino.bypass.jdbc.schema-version", "v1")
             .put(IcebergConstants.WAREHOUSE, "file://" + warehouseDir)
@@ -239,10 +236,9 @@ public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
       if (tokenServer != null) {
         tokenServer.close();
       }
-      // Do not close the shared ContainerSuite here: it is a process-wide singleton whose
-      // PostgreSQL container may be reused by other tests in the same JVM. Test classes that share
-      // its PostgreSQL-backed Iceberg catalog isolate themselves with distinct schema namespaces
-      // rather than resetting the container; the suite cleans up its containers on JVM shutdown.
+      // The PostgreSQL fixture is shared with other classes in the same JVM and closes when the run
+      // ends. Test classes that share its PostgreSQL-backed Iceberg catalog isolate themselves with
+      // distinct schema namespaces rather than resetting the container.
       super.stopIntegrationTest();
     }
   }

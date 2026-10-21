@@ -31,16 +31,14 @@ import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
 import org.apache.gravitino.integration.test.container.ClickHouseFixture;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.BeforeAll;
 
 @ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_CLICKHOUSE_ABSTRACT_IT)
 public class TestClickHouse extends TestJdbc {
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static TestDatabaseName TEST_DB_NAME;
-  @FixtureContainer private static ClickHouseContainer clickHouseContainer;
+  @FixtureContainer protected static ClickHouseContainer clickHouseContainer;
 
   @BeforeAll
   public static void startup() throws Exception {

@@ -35,9 +35,13 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.idp.storage.relational.converters.IdpSQLExceptionConverterFactory;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLSpec;
+import org.apache.gravitino.integration.test.container.MySQLVersion;
+import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLSpec;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.storage.relational.JDBCBackend;
@@ -147,9 +151,9 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   private void initializeMySQLBackend(Config backendConfig) throws IOException {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startMySQLContainer(MYSQL_TEST_DATABASE);
-    MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();
+    // The backend is a test parameter, so the container comes from Fixtures, not an annotation.
+    MySQLContainer mySQLContainer =
+        Fixtures.get(new MySQLSpec(MySQLVersion.MYSQL_8_0, MYSQL_TEST_DATABASE));
     String jdbcUrl = mySQLContainer.getJdbcUrl(MYSQL_TEST_DATABASE);
 
     backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, jdbcUrl);
@@ -174,9 +178,8 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   private void initializePostgreSQLBackend(Config backendConfig) throws IOException {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startPostgreSQLContainer(POSTGRESQL_TEST_DATABASE);
-    PostgreSQLContainer postgreSQLContainer = containerSuite.getPostgreSQLContainer();
+    PostgreSQLContainer postgreSQLContainer =
+        Fixtures.get(new PostgreSQLSpec(PGImageName.VERSION_13, POSTGRESQL_TEST_DATABASE));
     String schemaName = "idp_user_" + UUID.randomUUID().toString().replace("-", "");
     String jdbcUrl = postgreSQLContainer.getJdbcUrl(POSTGRESQL_TEST_DATABASE);
 

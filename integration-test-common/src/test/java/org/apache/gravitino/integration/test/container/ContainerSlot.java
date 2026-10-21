@@ -32,7 +32,7 @@ import javax.annotation.Nullable;
  *
  * <p>A start that throws leaves the slot empty, so the next request starts again instead of being
  * handed a container that never became ready. The slot cannot close that container: the starter
- * creates it and never returns it, so the starter closes it, as {@code ContainerSuite} does.
+ * creates it and never returns it, so the starter closes it, as {@link SharedContainers} does.
  *
  * @param <K> what makes two requests different, such as a Hive version
  * @param <C> the container type

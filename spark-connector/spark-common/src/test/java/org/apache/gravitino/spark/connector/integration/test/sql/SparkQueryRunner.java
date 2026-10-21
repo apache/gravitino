@@ -35,7 +35,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.HiveSpec;
@@ -125,8 +125,7 @@ public class SparkQueryRunner {
   private void setupGravitinoEnv() throws Exception {
     // Start Hive and HDFS. Not a JUnit class, so it asks for the spec @HiveFixture would use and
     // shares the run's Hive with fixture classes.
-    HiveContainer hive =
-        new HiveSpec(HiveVersion.HIVE2, HiveAuth.NONE).getOrStart(ContainerSuite.getInstance());
+    HiveContainer hive = Fixtures.get(new HiveSpec(HiveVersion.HIVE2, HiveAuth.NONE));
     String hiveMetastoreUri =
         String.format(
             "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);

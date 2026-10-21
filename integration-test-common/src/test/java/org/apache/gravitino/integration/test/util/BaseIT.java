@@ -61,10 +61,14 @@ import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.integration.test.MiniGravitino;
 import org.apache.gravitino.integration.test.MiniGravitinoContext;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.container.GravitinoServerAware;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLSpec;
+import org.apache.gravitino.integration.test.container.MySQLVersion;
+import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLSpec;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -87,8 +91,6 @@ import org.slf4j.LoggerFactory;
 @ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class BaseIT implements GravitinoServerAware {
-
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseIT.class);
   private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
@@ -246,8 +248,8 @@ public class BaseIT implements GravitinoServerAware {
 
   public String startAndInitPGBackend() {
     META_DATA = PG_JDBC_BACKEND;
-    containerSuite.startPostgreSQLContainer(META_DATA);
-    POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
+    // The backend is chosen at run time, so it comes from Fixtures rather than an annotation.
+    POSTGRESQL_CONTAINER = Fixtures.get(new PostgreSQLSpec(PGImageName.VERSION_13, META_DATA));
 
     String pgUrlWithoutSchema = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
     String randomSchemaName = RandomStringUtils.insecure().next(10, true, false);
@@ -297,8 +299,7 @@ public class BaseIT implements GravitinoServerAware {
 
   public String startAndInitMySQLBackend() {
     META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
-    containerSuite.startMySQLContainer(META_DATA);
-    MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+    MYSQL_CONTAINER = Fixtures.get(new MySQLSpec(MySQLVersion.MYSQL_8_0, META_DATA));
 
     String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
     LOG.info("MySQL URL: {}", mysqlUrl);

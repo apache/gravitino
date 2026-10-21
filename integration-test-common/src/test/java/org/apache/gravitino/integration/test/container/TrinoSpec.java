@@ -45,13 +45,13 @@ public record TrinoSpec(int version, int workers, HiveVersion hive, int gravitin
   }
 
   @Override
-  public TrinoCluster getOrStart(ContainerSuite suite) {
+  public TrinoCluster getOrStart(SharedContainers shared) {
     if (gravitinoServerPort == NO_PORT) {
       throw new IllegalStateException(
           "Trino needs a Gravitino server: ask for TrinoCluster in a test or @BeforeAll method of a"
               + " class that implements GravitinoServerAware, after the server starts");
     }
-    return suite.startTrinoCluster(this);
+    return shared.startTrinoCluster(this);
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<TrinoFixture> {

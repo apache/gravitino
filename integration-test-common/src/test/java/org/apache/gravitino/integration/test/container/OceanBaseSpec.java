@@ -27,9 +27,9 @@ public record OceanBaseSpec() implements ContainerSpec<OceanBaseContainer> {
   }
 
   @Override
-  public OceanBaseContainer getOrStart(ContainerSuite suite) {
-    suite.startOceanBaseContainer();
-    return suite.getOceanBaseContainer();
+  public OceanBaseContainer getOrStart(SharedContainers shared) {
+    shared.startOceanBaseContainer();
+    return shared.getOceanBaseContainer();
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<OceanBaseFixture> {

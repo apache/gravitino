@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog.glue.integration.test;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoMotoContainer;
 import org.apache.gravitino.integration.test.container.MotoFixture;
@@ -32,7 +31,7 @@ import org.junit.jupiter.api.TestInstance;
  *
  * <p>Requires Docker. Skipped by default when the {@code gravitino-docker-test} tag is excluded.
  * Override the container image with the {@code GRAVITINO_CI_MOTO_DOCKER_IMAGE} environment
- * variable. The shared Moto server starts through {@link ContainerSuite} and closes at run end.
+ * variable. The shared Moto server starts through {@link MotoFixture} and closes at run end.
  */
 @MotoFixture
 @Tag("gravitino-docker-test")

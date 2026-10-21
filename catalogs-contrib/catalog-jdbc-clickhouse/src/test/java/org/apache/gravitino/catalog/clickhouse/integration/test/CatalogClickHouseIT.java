@@ -68,8 +68,8 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
 import org.apache.gravitino.integration.test.container.ClickHouseFixture;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -112,7 +112,6 @@ import org.junit.jupiter.api.condition.EnabledIf;
 @TestInstance(Lifecycle.PER_CLASS)
 @ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT)
 public class CatalogClickHouseIT extends BaseIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-clickhouse";
 
   public String metalakeName = GravitinoITUtils.genRandomName("clickhouse_it_metalake");
@@ -938,7 +937,7 @@ public class CatalogClickHouseIT extends BaseIT {
             .withHostName("gravitino-ci-clickhouse-legacy")
             .withEnvVars(Map.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
             .withExposePorts(Set.of(ClickHouseContainer.CLICKHOUSE_PORT))
-            .withNetwork(containerSuite.getNetwork())
+            .withNetwork(Fixtures.network())
             .build();
     Catalog legacyCatalog = null;
     try {
@@ -1036,7 +1035,7 @@ public class CatalogClickHouseIT extends BaseIT {
             .withHostName("gravitino-ci-clickhouse-legacy-annoy")
             .withEnvVars(Map.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
             .withExposePorts(Set.of(ClickHouseContainer.CLICKHOUSE_PORT))
-            .withNetwork(containerSuite.getNetwork())
+            .withNetwork(Fixtures.network())
             .build();
     Catalog legacyCatalog = null;
     try {

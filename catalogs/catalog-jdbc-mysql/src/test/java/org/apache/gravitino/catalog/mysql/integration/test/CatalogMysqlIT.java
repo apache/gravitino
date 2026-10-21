@@ -51,8 +51,9 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -87,8 +88,8 @@ import org.junit.jupiter.api.condition.EnabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@MySQLFixture(database = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT)
 public class CatalogMysqlIT extends BaseIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-mysql";
 
   public String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
@@ -112,13 +113,9 @@ public class CatalogMysqlIT extends BaseIT {
 
   private MysqlService mysqlService;
 
-  private MySQLContainer MYSQL_CONTAINER;
+  @FixtureContainer private MySQLContainer MYSQL_CONTAINER;
 
   private TestDatabaseName TEST_DB_NAME;
-
-  public static final String defaultMysqlImageName = "mysql:8.0";
-
-  protected String mysqlImageName = defaultMysqlImageName;
 
   boolean SupportColumnDefaultValueExpression() {
     return true;
@@ -127,14 +124,6 @@ public class CatalogMysqlIT extends BaseIT {
   @BeforeAll
   public void startup() throws IOException, SQLException {
     TEST_DB_NAME = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
-
-    if (mysqlImageName.equals("mysql:5.7")) {
-      containerSuite.startMySQLVersion5Container(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
-      MYSQL_CONTAINER = containerSuite.getMySQLVersion5Container();
-    } else {
-      containerSuite.startMySQLContainer(TEST_DB_NAME);
-      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-    }
 
     mysqlService = new MysqlService(MYSQL_CONTAINER, TEST_DB_NAME);
     createMetalake();

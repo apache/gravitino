@@ -29,7 +29,7 @@ package org.apache.gravitino.integration.test.container;
  * automatically derives the corresponding BE image, passing both via compose environment variables.
  *
  * @see DorisContainer
- * @see ContainerSuite#startDorisContainer(DorisImageName)
+ * @see DorisSpec
  */
 public enum DorisImageName {
   /**

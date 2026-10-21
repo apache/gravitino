@@ -55,8 +55,11 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.container.LocalStackFixture;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -79,6 +82,7 @@ import org.slf4j.LoggerFactory;
 @Tag("gravitino-docker-test")
 @EnabledIfSystemProperty(named = ITUtils.TEST_MODE, matches = ITUtils.DEPLOY_TEST_MODE)
 @LocalStackFixture
+@PostgreSQLFixture(database = TestDatabaseName.PG_ICEBERG_AUTHZ_IT)
 public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(TrinoTlsOAuthCredentialVendingIT.class);
@@ -101,13 +105,13 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   private OAuthServer oauthServer;
   private TrinoContainer trinoContainer;
   @FixtureContainer private GravitinoLocalStackContainer localStack;
+  @FixtureContainer private PostgreSQLContainer postgreSQL;
   private Path trinoConfigDirectory;
 
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
     createBucket();
-    containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
 
     oauthServer = new OAuthServer(keyPair, AUDIENCE, "admin", CLIENT_CREDENTIAL);
     oauthServer.start();
@@ -276,18 +280,10 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
             .put(IcebergConstants.CATALOG_BACKEND, "jdbc")
-            .put(
-                IcebergConstants.URI,
-                containerSuite
-                    .getPostgreSQLContainer()
-                    .getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT))
+            .put(IcebergConstants.URI, postgreSQL.getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT))
             .put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.postgresql.Driver")
-            .put(
-                IcebergConstants.GRAVITINO_JDBC_USER,
-                containerSuite.getPostgreSQLContainer().getUsername())
-            .put(
-                IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-                containerSuite.getPostgreSQLContainer().getPassword())
+            .put(IcebergConstants.GRAVITINO_JDBC_USER, postgreSQL.getUsername())
+            .put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, postgreSQL.getPassword())
             .put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true")
             .put("gravitino.bypass.jdbc.schema-version", "v1")
             .put(IcebergConstants.WAREHOUSE, "s3://" + bucketName + "/warehouse")
@@ -404,7 +400,7 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
                     TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, connectorDirectory))
             .withExtraHosts(ImmutableMap.of("host.docker.internal", "host-gateway"))
             .withEnvVars(ImmutableMap.of("IRC_CLIENT_CREDENTIAL", CLIENT_CREDENTIAL))
-            .withNetwork(containerSuite.getNetwork())
+            .withNetwork(Fixtures.network())
             .withTls(truststore.toString(), STORE_PASSWORD, "PKCS12")
             .build();
     trinoContainer.start();

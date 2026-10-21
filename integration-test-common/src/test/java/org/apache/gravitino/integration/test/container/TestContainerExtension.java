@@ -325,7 +325,8 @@ public class TestContainerExtension {
         Assertions.assertThrows(
             UnsupportedOperationException.class,
             () ->
-                new KafkaSpec().startPrivate(ContainerSuite.getInstance(), Durability.DISPOSABLE));
+                new KafkaSpec()
+                    .startPrivate(SharedContainers.getInstance(), Durability.DISPOSABLE));
 
     Assertions.assertEquals(
         "scope CLASS/METHOD is not supported for KafkaSpec yet", e.getMessage());
@@ -352,7 +353,7 @@ public class TestContainerExtension {
     }
 
     @Override
-    public FakeContainer getOrStart(ContainerSuite suite) {
+    public FakeContainer getOrStart(SharedContainers shared) {
       LOG.add("start " + name);
       return name.equals("first") ? FIRST : SECOND;
     }
@@ -364,7 +365,7 @@ public class TestContainerExtension {
     }
 
     @Override
-    public FakeContainer startPrivate(ContainerSuite suite, Durability durability) {
+    public FakeContainer startPrivate(SharedContainers shared, Durability durability) {
       LOG.add("startPrivate " + name + (durability == Durability.DURABLE ? " durable" : ""));
       FakeContainer container = Mockito.mock(FakeContainer.class);
       PRIVATE.add(container);
@@ -386,7 +387,7 @@ public class TestContainerExtension {
     }
 
     @Override
-    public OtherContainer getOrStart(ContainerSuite suite) {
+    public OtherContainer getOrStart(SharedContainers shared) {
       LOG.add("start other");
       return OTHER;
     }

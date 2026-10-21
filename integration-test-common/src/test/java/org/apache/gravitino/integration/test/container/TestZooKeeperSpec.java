@@ -41,15 +41,15 @@ public class TestZooKeeperSpec {
 
   @Test
   void testGetOrStartStartsThroughTheSuite() {
-    ContainerSuite suite = Mockito.mock(ContainerSuite.class);
+    SharedContainers shared = Mockito.mock(SharedContainers.class);
     ZooKeeperContainer zooKeeper = Mockito.mock(ZooKeeperContainer.class);
-    Mockito.when(suite.getZooKeeperContainer()).thenReturn(zooKeeper);
+    Mockito.when(shared.getZooKeeperContainer()).thenReturn(zooKeeper);
 
-    Assertions.assertSame(zooKeeper, new ZooKeeperSpec().getOrStart(suite));
+    Assertions.assertSame(zooKeeper, new ZooKeeperSpec().getOrStart(shared));
 
-    InOrder order = Mockito.inOrder(suite);
-    order.verify(suite).startZooKeeperContainer();
-    order.verify(suite).getZooKeeperContainer();
+    InOrder order = Mockito.inOrder(shared);
+    order.verify(shared).startZooKeeperContainer();
+    order.verify(shared).getZooKeeperContainer();
   }
 
   // The build excludes this tag, so Gradle never runs the fixture class on its own.

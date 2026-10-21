@@ -28,9 +28,9 @@ import java.util.Map;
  * <p>Plain and Kerberos Hive run side by side, but each holds one version at a time: asking for a
  * different version stops the running Hive of that mode and starts the requested one (see {@code
  * ContainerSlot}). Tests of one version therefore share a container, and a version switch costs a
- * restart, as with direct {@link ContainerSuite} calls. A private Hive ({@link Scope#CLASS} or
- * {@link Scope#METHOD}) leaves the shared one alone. A Hive with cloud {@link HiveStorage} is a
- * third container, one storage and version at a time.
+ * restart. A private Hive ({@link Scope#CLASS} or {@link Scope#METHOD}) leaves the shared one
+ * alone. A Hive with cloud {@link HiveStorage} is a third container, one storage and version at a
+ * time.
  */
 public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
     implements ContainerSpec<HiveContainer> {
@@ -77,31 +77,31 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
   }
 
   @Override
-  public HiveContainer getOrStart(ContainerSuite suite) {
+  public HiveContainer getOrStart(SharedContainers shared) {
     if (storage != HiveStorage.HDFS) {
-      return suite.startStorageHiveContainer(storage, storageEnv(suite), storageFiles());
+      return shared.startStorageHiveContainer(storage, storageEnv(shared), storageFiles());
     }
     return switch (auth) {
       case NONE -> {
-        suite.startHiveContainer(env());
-        yield suite.getHiveContainer();
+        shared.startHiveContainer(env());
+        yield shared.getHiveContainer();
       }
       case KERBEROS -> {
-        suite.startKerberosHiveContainer(env());
-        yield suite.getKerberosHiveContainer();
+        shared.startKerberosHiveContainer(env());
+        yield shared.getKerberosHiveContainer();
       }
       case RANGER -> {
-        suite.startHiveRangerContainer(rangerEnv(new RangerSpec().getOrStart(suite)));
-        yield suite.getHiveRangerContainer();
+        shared.startHiveRangerContainer(rangerEnv(new RangerSpec().getOrStart(shared)));
+        yield shared.getHiveRangerContainer();
       }
     };
   }
 
-  private Map<String, String> storageEnv(ContainerSuite suite) {
+  private Map<String, String> storageEnv(SharedContainers shared) {
     ImmutableMap.Builder<String, String> env = ImmutableMap.<String, String>builder().putAll(env());
     switch (storage) {
       case S3 -> {
-        GravitinoLocalStackContainer localStack = new LocalStackSpec().getOrStart(suite);
+        GravitinoLocalStackContainer localStack = new LocalStackSpec().getOrStart(shared);
         env.put("S3_ACCESS_KEY", GravitinoLocalStackContainer.ACCESS_KEY)
             .put("S3_SECRET_KEY", GravitinoLocalStackContainer.SECRET_KEY)
             .put(
@@ -156,12 +156,12 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
   }
 
   @Override
-  public HiveContainer startPrivate(ContainerSuite suite, Durability durability) {
+  public HiveContainer startPrivate(SharedContainers shared, Durability durability) {
     if (storage != HiveStorage.HDFS) {
       throw new UnsupportedOperationException(
           "scope CLASS/METHOD is not supported for Hive with " + storage + " storage yet");
     }
-    return suite.startPrivate(
+    return shared.startPrivate(
         network -> {
           HiveContainer container = builder().withNetwork(network).build();
           container.setDurability(durability);
@@ -171,8 +171,8 @@ public record HiveSpec(HiveVersion version, HiveAuth auth, HiveStorage storage)
 
   private HiveContainer.Builder builder() {
     return switch (auth) {
-      case NONE -> ContainerSuite.hiveBuilder(env());
-      case KERBEROS -> ContainerSuite.kerberosHiveBuilder(env());
+      case NONE -> SharedContainers.hiveBuilder(env());
+      case KERBEROS -> SharedContainers.kerberosHiveBuilder(env());
       case RANGER -> throw new UnsupportedOperationException(
           "scope CLASS/METHOD is not supported for Ranger Hive yet");
     };

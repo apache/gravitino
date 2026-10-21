@@ -41,6 +41,9 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
@@ -64,6 +67,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@MySQLFixture(database = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT)
 public abstract class SparkAuthorizationIT extends BaseIT {
 
   private static final String METALAKE = "metalake";
@@ -87,6 +91,8 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   protected String mysqlPassword;
 
   protected String mysqlDriver;
+
+  @FixtureContainer private MySQLContainer mysql;
 
   private SparkSession normalUserSparkSession;
 
@@ -125,11 +131,10 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   }
 
   private void initMysqlContainer() throws SQLException {
-    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
-    mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
-    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
-    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
-    mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
+    mysqlUrl = mysql.getJdbcUrl();
+    mysqlUsername = mysql.getUsername();
+    mysqlPassword = mysql.getPassword();
+    mysqlDriver = mysql.getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
   }
 
   private void initTables() {

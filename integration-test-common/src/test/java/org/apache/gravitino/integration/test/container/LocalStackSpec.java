@@ -27,9 +27,9 @@ public record LocalStackSpec() implements ContainerSpec<GravitinoLocalStackConta
   }
 
   @Override
-  public GravitinoLocalStackContainer getOrStart(ContainerSuite suite) {
-    suite.startLocalStackContainer();
-    return suite.getLocalStackContainer();
+  public GravitinoLocalStackContainer getOrStart(SharedContainers shared) {
+    shared.startLocalStackContainer();
+    return shared.getLocalStackContainer();
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<LocalStackFixture> {

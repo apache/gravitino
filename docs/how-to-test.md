@@ -57,6 +57,8 @@ To run one class or method, add `--tests` to its lane:
 
 If the class is not in that lane, Gradle fails with "No tests found for given includes".
 
+Tests get their containers from fixture annotations, such as `@MySQLFixture(database = ...)` with a `@FixtureContainer MySQLContainer` field. Code that cannot carry an annotation, such as a base class that picks its backend at run time, calls `Fixtures.get(spec)` with the same Spec and shares the same container. Containers start once per test JVM and stop when the run ends.
+
 Test containers skip durability work by default: MySQL and PostgreSQL keep their data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk, Hive keeps HDFS in memory and its metastore database skips syncing, Doris and StarRocks keep their backend storage in memory, and so on. No test reads data back after a container stops, so nothing is lost that a test needs. A test class that needs durable data asks for it on its fixture, for example `@HiveFixture(durability = Durability.DURABLE, scope = Scope.CLASS)`, and gets its own container; today only `@HiveFixture` with HDFS storage supports that. To make every container durable, for example to inspect a container's data after a failure, pass `-PdurableTestContainers`.
 
 #### Database reuse and reset

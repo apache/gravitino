@@ -165,7 +165,8 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   public void close() {
-    // A private container is closed by its JUnit store and again by the suite at the end of the
+    // A private container is closed by its JUnit store and again by the run's closer at the end of
+    // the
     // run; only a running container has logs to copy.
     if (container.isRunning()) {
       copyHiveLog();

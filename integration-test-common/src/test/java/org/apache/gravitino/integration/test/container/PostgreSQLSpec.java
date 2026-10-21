@@ -40,9 +40,9 @@ public record PostgreSQLSpec(PGImageName version, TestDatabaseName database)
   }
 
   @Override
-  public PostgreSQLContainer getOrStart(ContainerSuite suite) {
-    suite.startPostgreSQLContainer(database, version);
-    return suite.getPostgreSQLContainer(version);
+  public PostgreSQLContainer getOrStart(SharedContainers shared) {
+    shared.startPostgreSQLContainer(database, version);
+    return shared.getPostgreSQLContainer(version);
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<PostgreSQLFixture> {

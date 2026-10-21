@@ -51,7 +51,6 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
-import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -94,7 +93,6 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
 
   protected static final TestDatabaseName TEST_DB_NAME =
       TestDatabaseName.PG_TEST_PAIMON_CATALOG_MULTIPLE_JDBC_LOAD;
-  protected static MySQLContainer mySQLContainer;
   protected String WAREHOUSE;
   protected String TYPE;
   protected String URI;

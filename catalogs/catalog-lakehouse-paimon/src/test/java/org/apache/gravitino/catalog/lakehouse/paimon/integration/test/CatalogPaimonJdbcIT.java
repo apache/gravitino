@@ -26,7 +26,10 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -35,15 +38,14 @@ import org.junit.jupiter.api.TestInstance;
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @HiveFixture
+@MySQLFixture(database = TestDatabaseName.PG_TEST_PAIMON_CATALOG_MULTIPLE_JDBC_LOAD)
 public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
 
   @FixtureContainer private HiveContainer hive;
+  @FixtureContainer private MySQLContainer mySQLContainer;
 
   @Override
   protected Map<String, String> initPaimonCatalogProperties() {
-    containerSuite.startMySQLContainer(TEST_DB_NAME);
-    mySQLContainer = containerSuite.getMySQLContainer();
-
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put("key1", "val1");
     catalogProperties.put("key2", "val2");

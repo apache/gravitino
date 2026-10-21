@@ -27,9 +27,9 @@ public record RustFSSpec() implements ContainerSpec<RustFSContainer> {
   }
 
   @Override
-  public RustFSContainer getOrStart(ContainerSuite suite) {
-    suite.startRustFSContainer();
-    return suite.getRustFSContainer();
+  public RustFSContainer getOrStart(SharedContainers shared) {
+    shared.startRustFSContainer();
+    return shared.getRustFSContainer();
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<RustFSFixture> {

@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.integration.test.util;
 
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
@@ -30,6 +30,6 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 public class CloseContainerExtension implements BeforeAllCallback {
   @Override
   public void beforeAll(ExtensionContext extensionContext) {
-    ContainerSuite.closeWhenRunEnds(extensionContext);
+    Fixtures.closeWhenRunEnds(extensionContext);
   }
 }

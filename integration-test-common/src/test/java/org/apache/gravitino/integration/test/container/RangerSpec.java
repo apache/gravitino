@@ -39,9 +39,9 @@ public record RangerSpec() implements ContainerSpec<RangerContainer> {
   }
 
   @Override
-  public RangerContainer getOrStart(ContainerSuite suite) {
-    suite.startRangerContainer();
-    return suite.getRangerContainer();
+  public RangerContainer getOrStart(SharedContainers shared) {
+    shared.startRangerContainer();
+    return shared.getRangerContainer();
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<RangerFixture> {

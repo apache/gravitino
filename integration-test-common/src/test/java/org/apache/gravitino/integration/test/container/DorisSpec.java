@@ -30,9 +30,9 @@ public record DorisSpec(DorisImageName version) implements ContainerSpec<DorisCo
   }
 
   @Override
-  public DorisContainer getOrStart(ContainerSuite suite) {
-    suite.startDorisContainer(version);
-    return suite.getDorisContainer(version);
+  public DorisContainer getOrStart(SharedContainers shared) {
+    shared.startDorisContainer(version);
+    return shared.getDorisContainer(version);
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<DorisFixture> {

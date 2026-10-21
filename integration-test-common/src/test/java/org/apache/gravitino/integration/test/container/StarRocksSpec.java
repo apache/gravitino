@@ -27,9 +27,9 @@ public record StarRocksSpec() implements ContainerSpec<StarRocksContainer> {
   }
 
   @Override
-  public StarRocksContainer getOrStart(ContainerSuite suite) {
-    suite.startStarRocksContainer();
-    return suite.getStarRocksContainer();
+  public StarRocksContainer getOrStart(SharedContainers shared) {
+    shared.startStarRocksContainer();
+    return shared.getStarRocksContainer();
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<StarRocksFixture> {

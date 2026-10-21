@@ -40,8 +40,7 @@ import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
-import org.apache.gravitino.integration.test.container.ContainerSpec;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.HiveSpec;
@@ -73,7 +72,6 @@ public class RangerITEnv {
   public static RangerClient rangerClient;
   public static final String HADOOP_USER_NAME = RangerContainer.HADOOP_USER;
   private static volatile boolean initRangerService = false;
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   // Hive resource database name
   public static final String RESOURCE_DATABASE = "database";
@@ -201,8 +199,7 @@ public class RangerITEnv {
    * @return the running Ranger-enabled Hive
    */
   public static HiveContainer startHiveRangerContainer() {
-    return ContainerSpec.startWithDependencies(
-        new HiveSpec(HiveVersion.HIVE3, HiveAuth.RANGER), containerSuite);
+    return Fixtures.get(new HiveSpec(HiveVersion.HIVE3, HiveAuth.RANGER));
   }
 
   /** Currently we only test Ranger Hive, So wo Allow anyone to visit HDFS */

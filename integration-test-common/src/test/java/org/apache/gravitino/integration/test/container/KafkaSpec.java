@@ -27,9 +27,9 @@ public record KafkaSpec() implements ContainerSpec<KafkaContainer> {
   }
 
   @Override
-  public KafkaContainer getOrStart(ContainerSuite suite) {
-    suite.startKafkaContainer();
-    return suite.getKafkaContainer();
+  public KafkaContainer getOrStart(SharedContainers shared) {
+    shared.startKafkaContainer();
+    return shared.getKafkaContainer();
   }
 
   static final class Factory implements ContainerFixture.SpecFactory<KafkaFixture> {

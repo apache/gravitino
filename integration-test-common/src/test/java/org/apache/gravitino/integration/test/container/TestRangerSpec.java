@@ -40,15 +40,15 @@ public class TestRangerSpec {
 
   @Test
   void testGetOrStartStartsThroughTheSuite() {
-    ContainerSuite suite = Mockito.mock(ContainerSuite.class);
+    SharedContainers shared = Mockito.mock(SharedContainers.class);
     RangerContainer ranger = Mockito.mock(RangerContainer.class);
-    Mockito.when(suite.getRangerContainer()).thenReturn(ranger);
+    Mockito.when(shared.getRangerContainer()).thenReturn(ranger);
 
-    Assertions.assertSame(ranger, new RangerSpec().getOrStart(suite));
+    Assertions.assertSame(ranger, new RangerSpec().getOrStart(shared));
 
-    InOrder order = Mockito.inOrder(suite);
-    order.verify(suite).startRangerContainer();
-    order.verify(suite).getRangerContainer();
+    InOrder order = Mockito.inOrder(shared);
+    order.verify(shared).startRangerContainer();
+    order.verify(shared).getRangerContainer();
   }
 
   @RangerFixture

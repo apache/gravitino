@@ -40,15 +40,15 @@ public record MySQLSpec(MySQLVersion version, TestDatabaseName database)
   }
 
   @Override
-  public MySQLContainer getOrStart(ContainerSuite suite) {
+  public MySQLContainer getOrStart(SharedContainers shared) {
     return switch (version) {
       case MYSQL_8_0 -> {
-        suite.startMySQLContainer(database);
-        yield suite.getMySQLContainer();
+        shared.startMySQLContainer(database);
+        yield shared.getMySQLContainer();
       }
       case MYSQL_5_7 -> {
-        suite.startMySQLVersion5Container(database);
-        yield suite.getMySQLVersion5Container();
+        shared.startMySQLVersion5Container(database);
+        yield shared.getMySQLVersion5Container();
       }
     };
   }

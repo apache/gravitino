@@ -30,14 +30,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.testcontainers.containers.GenericContainer;
 
-/** Tests for {@link ContainerSuite}. */
-public class TestContainerSuite {
+/** Tests for {@link SharedContainers}. */
+public class TestSharedContainers {
 
   @Test
   void testCloseResetsEveryContainerReference() throws Exception {
     // Every mutable static field, so a field added later without a reset fails this test.
     List<Field> stateFields =
-        Arrays.stream(ContainerSuite.class.getDeclaredFields())
+        Arrays.stream(SharedContainers.class.getDeclaredFields())
             .filter(f -> Modifier.isStatic(f.getModifiers()))
             .filter(f -> !Modifier.isFinal(f.getModifiers()))
             .filter(f -> !f.getName().equals("instance"))
@@ -52,10 +52,10 @@ public class TestContainerSuite {
     hiveSlot("hiveContainer").getOrStart(HiveContainer.HIVE3, () -> hive);
     hiveSlot("kerberosHiveContainer").getOrStart(HiveContainer.HIVE3, () -> hive);
 
-    ContainerSuite.getInstance().close();
+    SharedContainers.getInstance().close();
 
-    Assertions.assertNull(ContainerSuite.getInstance().getHiveContainer());
-    Assertions.assertNull(ContainerSuite.getInstance().getKerberosHiveContainer());
+    Assertions.assertNull(SharedContainers.getInstance().getHiveContainer());
+    Assertions.assertNull(SharedContainers.getInstance().getKerberosHiveContainer());
     for (Field field : stateFields) {
       Object value = field.get(null);
       if (value instanceof Map) {
@@ -72,10 +72,10 @@ public class TestContainerSuite {
 
   @Test
   void testHiveVersionDefaultsToHive2() {
-    Assertions.assertEquals(HiveContainer.HIVE2, ContainerSuite.hiveVersion(Map.of()));
+    Assertions.assertEquals(HiveContainer.HIVE2, SharedContainers.hiveVersion(Map.of()));
     Assertions.assertEquals(
         HiveContainer.HIVE3,
-        ContainerSuite.hiveVersion(
+        SharedContainers.hiveVersion(
             Map.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3)));
   }
 
@@ -83,7 +83,7 @@ public class TestContainerSuite {
   void testStartTimedStartsTheContainer() {
     BaseContainer container = mockContainer();
 
-    ContainerSuite.startTimed(container);
+    SharedContainers.startTimed(container);
 
     Mockito.verify(container).start();
   }
@@ -92,7 +92,7 @@ public class TestContainerSuite {
   void testStartTimedKeepsAStartedContainerRunning() {
     BaseContainer container = mockContainer();
 
-    ContainerSuite.startTimed(container);
+    SharedContainers.startTimed(container);
 
     Mockito.verify(container, Mockito.never()).close();
   }
@@ -106,7 +106,7 @@ public class TestContainerSuite {
     Assertions.assertSame(
         failure,
         Assertions.assertThrows(
-            IllegalStateException.class, () -> ContainerSuite.startTimed(container)));
+            IllegalStateException.class, () -> SharedContainers.startTimed(container)));
     Mockito.verify(container).close();
   }
 
@@ -120,7 +120,7 @@ public class TestContainerSuite {
 
     IllegalStateException thrown =
         Assertions.assertThrows(
-            IllegalStateException.class, () -> ContainerSuite.startTimed(container));
+            IllegalStateException.class, () -> SharedContainers.startTimed(container));
 
     Assertions.assertSame(failure, thrown);
     Assertions.assertArrayEquals(new Throwable[] {closeFailure}, thrown.getSuppressed());
@@ -136,7 +136,7 @@ public class TestContainerSuite {
 
     IllegalStateException thrown =
         Assertions.assertThrows(
-            IllegalStateException.class, () -> ContainerSuite.startTimed(container));
+            IllegalStateException.class, () -> SharedContainers.startTimed(container));
 
     Assertions.assertSame(failure, thrown);
     Assertions.assertArrayEquals(new Throwable[] {closeFailure}, thrown.getSuppressed());
@@ -147,11 +147,11 @@ public class TestContainerSuite {
     BaseContainer container = mockContainer();
 
     BaseContainer started =
-        ContainerSuite.startPrivate(null, network -> container, ContainerSuite::startTimed);
+        SharedContainers.startPrivate(null, network -> container, SharedContainers::startTimed);
 
     Assertions.assertSame(container, started);
     Mockito.verify(container, Mockito.times(1)).start();
-    for (Field field : ContainerSuite.class.getDeclaredFields()) {
+    for (Field field : SharedContainers.class.getDeclaredFields()) {
       if (!Modifier.isStatic(field.getModifiers()) || field.getName().equals("closer")) {
         continue;
       }
@@ -166,7 +166,7 @@ public class TestContainerSuite {
     }
 
     // Registered with the closer, so the end of the run closes it even if the caller does not.
-    ContainerSuite.getInstance().close();
+    SharedContainers.getInstance().close();
     Mockito.verify(container).close();
   }
 
@@ -180,7 +180,7 @@ public class TestContainerSuite {
 
   @SuppressWarnings("unchecked")
   private static ContainerSlot<String, HiveContainer> hiveSlot(String fieldName) throws Exception {
-    Field field = ContainerSuite.class.getDeclaredField(fieldName);
+    Field field = SharedContainers.class.getDeclaredField(fieldName);
     field.setAccessible(true);
     return (ContainerSlot<String, HiveContainer>) field.get(null);
   }
