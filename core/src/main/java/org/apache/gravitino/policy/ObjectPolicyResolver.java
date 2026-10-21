@@ -19,10 +19,15 @@
 package org.apache.gravitino.policy;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -33,8 +38,8 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.tag.EffectiveTag;
 import org.apache.gravitino.tag.EffectiveTagResolver;
+import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -76,7 +81,7 @@ public class ObjectPolicyResolver {
    */
   public PolicyEntity[] resolve(String metalake, MetadataObject metadataObject) {
     return resolveMatches(metalake, metadataObject).stream()
-        .map(MatchedPolicy::policy)
+        .map(Match::policy)
         .toArray(PolicyEntity[]::new);
   }
 
@@ -84,25 +89,25 @@ public class ObjectPolicyResolver {
    * Resolves enabled policies together with the metadata-object sources that caused each match.
    *
    * <p>{@link #resolve(String, MetadataObject)} stays the PolicyManager list shape; callers that
-   * need nearest-level or multi-source reasoning should use this method.
+   * need contributing sources should use this method.
    *
    * @param metalake The metalake name.
    * @param metadataObject The metadata object.
    * @return Matched enabled policies with contributing sources.
    */
-  public List<MatchedPolicy> resolveMatches(String metalake, MetadataObject metadataObject) {
-    List<EffectiveTag> effectiveTags =
+  public List<Match> resolveMatches(String metalake, MetadataObject metadataObject) {
+    List<ResolvedTag> effectiveTags =
         effectiveTagResolver.resolveWithSources(metalake, metadataObject);
     if (effectiveTags.isEmpty()) {
       return List.of();
     }
 
-    Map<String, EffectiveTag> tagsByName =
+    Map<String, ResolvedTag> tagsByName =
         effectiveTags.stream()
             .collect(
                 Collectors.toMap(
-                    effectiveTag -> effectiveTag.tag().name(),
-                    effectiveTag -> effectiveTag,
+                    resolvedTag -> resolvedTag.tag().name(),
+                    resolvedTag -> resolvedTag,
                     (left, right) -> left,
                     LinkedHashMap::new));
     List<NameIdentifier> tagIdentifiers =
@@ -124,13 +129,13 @@ public class ObjectPolicyResolver {
       throw new RuntimeException(e);
     }
 
-    Map<Long, MatchedPolicy.Builder> matchStates = new LinkedHashMap<>();
+    Map<Long, MatchState> matchStates = new LinkedHashMap<>();
     for (RelationalEntity<?> relation : relations) {
-      EffectiveTag effectiveTag = tagsByName.get(relation.source().name());
-      if (effectiveTag == null) {
+      ResolvedTag resolvedTag = tagsByName.get(relation.source().name());
+      if (resolvedTag == null) {
         continue;
       }
-      TagEntity tag = effectiveTag.tag();
+      TagEntity tag = resolvedTag.tag();
       PolicyEntity policy = (PolicyEntity) relation.targetEntity();
       PolicyAssociationSelector selector =
           relation
@@ -139,14 +144,14 @@ public class ObjectPolicyResolver {
               .orElseGet(AllValuesSelector::get);
       TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
       boolean matches = matches(selector, assignment);
-      MatchedPolicy.Builder state =
-          matchStates.computeIfAbsent(policy.id(), ignored -> new MatchedPolicy.Builder(policy));
-      state.record(matches, tag.inherited().orElse(false), effectiveTag.source());
+      MatchState state =
+          matchStates.computeIfAbsent(policy.id(), ignored -> new MatchState(policy));
+      state.record(matches, tag.inherited().orElse(false), resolvedTag.source());
     }
 
     return matchStates.values().stream()
-        .filter(MatchedPolicy.Builder::matched)
-        .map(MatchedPolicy.Builder::build)
+        .filter(MatchState::matched)
+        .map(MatchState::toMatch)
         .filter(match -> match.policy().enabled())
         .collect(Collectors.toList());
   }
@@ -161,5 +166,66 @@ public class ObjectPolicyResolver {
     }
     throw new IllegalArgumentException(
         "Unsupported policy association selector type: " + selector.type());
+  }
+
+  /**
+   * An enabled policy matched for a metadata object, together with the metadata-object sources that
+   * contributed matching effective tags.
+   */
+  public static final class Match {
+
+    private final PolicyEntity policy;
+    private final List<MetadataObject> sources;
+
+    /**
+     * @param policy matched enabled policy (inherited flag already applied)
+     * @param sources contributing metadata objects, nearest-first encounter order
+     */
+    public Match(PolicyEntity policy, List<MetadataObject> sources) {
+      this.policy = Objects.requireNonNull(policy, "policy");
+      this.sources =
+          Collections.unmodifiableList(new ArrayList<>(Objects.requireNonNull(sources, "sources")));
+    }
+
+    /**
+     * @return the matched policy
+     */
+    public PolicyEntity policy() {
+      return policy;
+    }
+
+    /**
+     * @return metadata objects whose effective tag assignments caused this policy to match
+     */
+    public List<MetadataObject> sources() {
+      return sources;
+    }
+  }
+
+  private static final class MatchState {
+
+    private final PolicyEntity policy;
+    private final Set<MetadataObject> sources = new LinkedHashSet<>();
+    private boolean directMatch;
+
+    private MatchState(PolicyEntity policy) {
+      this.policy = policy;
+    }
+
+    private void record(boolean matches, boolean inherited, MetadataObject source) {
+      if (!matches) {
+        return;
+      }
+      sources.add(source);
+      directMatch |= !inherited;
+    }
+
+    private boolean matched() {
+      return !sources.isEmpty();
+    }
+
+    private Match toMatch() {
+      return new Match(policy.copyWithInherited(!directMatch), new ArrayList<>(sources));
+    }
   }
 }

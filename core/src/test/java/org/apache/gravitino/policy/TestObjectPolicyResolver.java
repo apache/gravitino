@@ -37,8 +37,8 @@ import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.tag.EffectiveTag;
 import org.apache.gravitino.tag.EffectiveTagResolver;
+import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -76,8 +76,7 @@ public class TestObjectPolicyResolver {
     PolicyEntity selected = policy(10L, "selected", true);
     PolicyEntity disabled = policy(11L, "disabled", false);
     when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
-        .thenReturn(
-            List.of(new EffectiveTag(domain, OBJECT), new EffectiveTag(classified, CATALOG)));
+        .thenReturn(List.of(new ResolvedTag(domain, OBJECT), new ResolvedTag(classified, CATALOG)));
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Arrays.asList(
@@ -95,7 +94,7 @@ public class TestObjectPolicyResolver {
     Assertions.assertArrayEquals(new PolicyEntity[] {selected}, policies);
     Assertions.assertFalse(policies[0].inherited().orElseThrow());
 
-    List<MatchedPolicy> matches = resolver.resolveMatches(METALAKE, OBJECT);
+    List<ObjectPolicyResolver.Match> matches = resolver.resolveMatches(METALAKE, OBJECT);
     Assertions.assertEquals(1, matches.size());
     Assertions.assertEquals(List.of(OBJECT, CATALOG), matches.get(0).sources());
   }
@@ -105,7 +104,7 @@ public class TestObjectPolicyResolver {
     TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance")).copyWithInherited(true);
     PolicyEntity policy = policy(10L, "policy", true);
     when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
-        .thenReturn(List.of(new EffectiveTag(domain, CATALOG)));
+        .thenReturn(List.of(new ResolvedTag(domain, CATALOG)));
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Collections.singletonList(NameIdentifierUtil.ofTag(METALAKE, "domain")),
@@ -131,7 +130,7 @@ public class TestObjectPolicyResolver {
     TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("engineering"));
     PolicyEntity policy = policy(10L, "policy", true);
     when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
-        .thenReturn(List.of(new EffectiveTag(domain, OBJECT)));
+        .thenReturn(List.of(new ResolvedTag(domain, OBJECT)));
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Collections.singletonList(NameIdentifierUtil.ofTag(METALAKE, "domain")),
@@ -149,8 +148,7 @@ public class TestObjectPolicyResolver {
     TagEntity classified = tag(2L, "classified", TagAssignment.ofValues("public"));
     PolicyEntity policy = policy(10L, "policy", true);
     when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
-        .thenReturn(
-            List.of(new EffectiveTag(domain, OBJECT), new EffectiveTag(classified, OBJECT)));
+        .thenReturn(List.of(new ResolvedTag(domain, OBJECT), new ResolvedTag(classified, OBJECT)));
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Arrays.asList(
@@ -172,7 +170,7 @@ public class TestObjectPolicyResolver {
         tag(1L, "data_domain", TagAssignment.ofValues("risk")).copyWithInherited(false);
     PolicyEntity financePolicy = policy(30L, "finance-policy", true);
     when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
-        .thenReturn(List.of(new EffectiveTag(domain, OBJECT)));
+        .thenReturn(List.of(new ResolvedTag(domain, OBJECT)));
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Collections.singletonList(NameIdentifierUtil.ofTag(METALAKE, "data_domain")),

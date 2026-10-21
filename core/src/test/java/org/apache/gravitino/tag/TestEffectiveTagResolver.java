@@ -128,7 +128,8 @@ public class TestEffectiveTagResolver {
             Entity.EntityType.CATALOG))
         .thenReturn(Collections.singletonList(catalogDomain));
 
-    List<EffectiveTag> effectiveTags = resolver.resolveWithSources(METALAKE, TABLE);
+    List<EffectiveTagResolver.ResolvedTag> effectiveTags =
+        resolver.resolveWithSources(METALAKE, TABLE);
 
     Assertions.assertEquals(1, effectiveTags.size());
     Assertions.assertEquals(TABLE, effectiveTags.get(0).source());

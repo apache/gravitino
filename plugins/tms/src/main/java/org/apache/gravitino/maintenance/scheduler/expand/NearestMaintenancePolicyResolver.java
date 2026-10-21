@@ -25,8 +25,8 @@ import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.policy.MatchedPolicy;
 import org.apache.gravitino.policy.ObjectPolicyResolver;
+import org.apache.gravitino.policy.ObjectPolicyResolver.Match;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -62,13 +62,13 @@ public class NearestMaintenancePolicyResolver {
    * @return winner, none, or same-level conflict
    */
   public Decision resolve(String metalake, MetadataObject table, Policy.BuiltInType policyType) {
-    List<MatchedPolicy> matches = objectPolicyResolver.resolveMatches(metalake, table);
+    List<Match> matches = objectPolicyResolver.resolveMatches(metalake, table);
     List<MetadataObject> chain = new ArrayList<>();
     chain.add(table);
     chain.addAll(MetadataObjectUtil.getParentMetadataObjects(table));
     for (MetadataObject level : chain) {
       TreeSet<Long> atLevel = new TreeSet<>();
-      for (MatchedPolicy match : matches) {
+      for (Match match : matches) {
         if (match.policy().policyType() != policyType) {
           continue;
         }

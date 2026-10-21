@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -66,7 +67,7 @@ public class EffectiveTagResolver {
    */
   public TagEntity[] resolve(String metalake, MetadataObject metadataObject) {
     return resolveWithSources(metalake, metadataObject).stream()
-        .map(EffectiveTag::tag)
+        .map(ResolvedTag::tag)
         .toArray(TagEntity[]::new);
   }
 
@@ -77,13 +78,13 @@ public class EffectiveTagResolver {
    * @param metadataObject The metadata object.
    * @return Effective tags with sources in deterministic nearest-assignment order.
    */
-  public List<EffectiveTag> resolveWithSources(String metalake, MetadataObject metadataObject) {
+  public List<ResolvedTag> resolveWithSources(String metalake, MetadataObject metadataObject) {
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     List<MetadataObject> resolutionOrder = new ArrayList<>();
     resolutionOrder.add(metadataObject);
     resolutionOrder.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
 
-    Map<String, EffectiveTag> effectiveTags = new LinkedHashMap<>();
+    Map<String, ResolvedTag> effectiveTags = new LinkedHashMap<>();
     for (int index = 0; index < resolutionOrder.size(); index++) {
       MetadataObject object = resolutionOrder.get(index);
       boolean inherited = index > 0;
@@ -99,7 +100,7 @@ public class EffectiveTagResolver {
                     entityType);
         for (TagEntity tag : tags) {
           effectiveTags.putIfAbsent(
-              tag.name(), new EffectiveTag(tag.copyWithInherited(inherited), object));
+              tag.name(), new ResolvedTag(tag.copyWithInherited(inherited), object));
         }
       } catch (NoSuchEntityException e) {
         throw new NoSuchMetadataObjectException(
@@ -110,5 +111,39 @@ public class EffectiveTagResolver {
       }
     }
     return new ArrayList<>(effectiveTags.values());
+  }
+
+  /**
+   * An effective tag assignment together with the metadata object that contributed it.
+   *
+   * <p>The source is the nearest object in the inheritance chain that assigned the tag name.
+   */
+  public static final class ResolvedTag {
+
+    private final TagEntity tag;
+    private final MetadataObject source;
+
+    /**
+     * @param tag effective tag entity, including assignment and inherited flag
+     * @param source metadata object that contributed this assignment
+     */
+    public ResolvedTag(TagEntity tag, MetadataObject source) {
+      this.tag = Objects.requireNonNull(tag, "tag");
+      this.source = Objects.requireNonNull(source, "source");
+    }
+
+    /**
+     * @return the effective tag entity
+     */
+    public TagEntity tag() {
+      return tag;
+    }
+
+    /**
+     * @return the metadata object that contributed this assignment
+     */
+    public MetadataObject source() {
+      return source;
+    }
   }
 }
