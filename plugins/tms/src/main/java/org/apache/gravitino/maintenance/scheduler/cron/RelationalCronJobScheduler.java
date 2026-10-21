@@ -166,10 +166,46 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     if (tableIds.isEmpty()) {
       return 0;
     }
+    // Same-catalog batches only: mixed catalogs would reuse wrong spark.sql.catalog.* props.
+    Map<String, List<Long>> byCatalog = groupByCatalog(tableIds);
+    int newRows = 0;
+    for (Map.Entry<String, List<Long>> entry : byCatalog.entrySet()) {
+      newRows +=
+          packSameCatalog(client, policy, entry.getKey(), entry.getValue(), batchCapacity, due);
+    }
+    return newRows;
+  }
+
+  private Map<String, List<Long>> groupByCatalog(List<Long> tableIds) {
+    List<ResolvedTableRef> resolved = tableRefResolver.apply(tableIds);
+    Map<Long, ResolvedTableRef> byId = new LinkedHashMap<>();
+    for (ResolvedTableRef ref : resolved) {
+      byId.put(ref.tableId(), ref);
+    }
+    Map<String, List<Long>> byCatalog = new LinkedHashMap<>();
+    for (Long tableId : tableIds) {
+      ResolvedTableRef ref = byId.get(tableId);
+      if (ref == null) {
+        LOG.warn("Skipping unresolved table {} from snapshot-expiry batch packing", tableId);
+        continue;
+      }
+      byCatalog.computeIfAbsent(ref.catalogName(), ignored -> new ArrayList<>()).add(tableId);
+    }
+    return byCatalog;
+  }
+
+  private int packSameCatalog(
+      SchedulerClient client,
+      PolicyEntity policy,
+      String catalogName,
+      List<Long> tableIds,
+      int batchCapacity,
+      Instant due) {
     List<Long> remaining = new ArrayList<>(tableIds);
     int newRows = 0;
     while (!remaining.isEmpty()) {
-      Optional<OpenBatch> incomplete = findIncompleteBatch(client, policy.id(), batchCapacity);
+      Optional<OpenBatch> incomplete =
+          findIncompleteBatch(client, policy.id(), batchCapacity, catalogName);
       if (incomplete.isPresent()) {
         OpenBatch open = incomplete.get();
         int room = batchCapacity - open.snapshot.tableIds().size();
@@ -183,8 +219,19 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
       List<Long> chunk = new ArrayList<>(remaining.subList(0, end));
       if (scheduleBatch(client, policy, chunk, due)) {
         newRows++;
+        remaining.subList(0, end).clear();
+        continue;
       }
-      remaining.subList(0, end).clear();
+      // Fail-closed: do not drop a whole multi-table chunk on build failure — peel one id.
+      Long first = remaining.remove(0);
+      if (chunk.size() > 1 && scheduleBatch(client, policy, List.of(first), due)) {
+        newRows++;
+      } else {
+        LOG.warn(
+            "Dropping table {} from snapshot-expiry enqueue for policy {} after failed batch build",
+            first,
+            policy.id());
+      }
     }
     return newRows;
   }
@@ -217,6 +264,13 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     for (TableTarget target : open.snapshot.getTables()) {
       byId.put(target.getTableId(), target);
     }
+    String openCatalog = open.snapshot.getTables().get(0).catalogName();
+    if (openCatalog == null || openCatalog.isEmpty()) {
+      LOG.warn(
+          "Could not merge tables into cron-job {}: open batch missing catalog name",
+          open.instanceId.getId());
+      return false;
+    }
     List<ResolvedTableRef> resolved = tableRefResolver.apply(extraTableIds);
     // Require every requested id so packIntoBatches does not drop unresolved tables from
     // remaining after a partial merge.
@@ -232,6 +286,15 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     String metalake = open.snapshot.getMetalake();
     boolean added = false;
     for (ResolvedTableRef ref : resolved) {
+      if (!openCatalog.equals(ref.catalogName())) {
+        LOG.warn(
+            "Could not merge table {} into cron-job {}: catalog {} != open batch catalog {}",
+            ref.tableId(),
+            open.instanceId.getId(),
+            ref.catalogName(),
+            openCatalog);
+        return false;
+      }
       if (!byId.containsKey(ref.tableId())) {
         byId.put(ref.tableId(), MaintenanceJobSnapshotFactory.toTarget(metalake, ref));
         added = true;
@@ -278,9 +341,10 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
   }
 
   private static Optional<OpenBatch> findIncompleteBatch(
-      SchedulerClient client, long policyId, int batchCapacity) {
+      SchedulerClient client, long policyId, int batchCapacity, String catalogName) {
     return listOpenBatches(client, policyId).stream()
         .filter(b -> !b.picked && b.snapshot.tableIds().size() < batchCapacity)
+        .filter(b -> catalogName.equals(b.snapshot.getTables().get(0).catalogName()))
         .min(Comparator.comparingLong(b -> b.batchId));
   }
 
@@ -295,7 +359,7 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
         continue;
       }
       MaintenanceJobSnapshot data = execution.getData();
-      if (data == null) {
+      if (data == null || !data.isValid()) {
         continue;
       }
       open.add(

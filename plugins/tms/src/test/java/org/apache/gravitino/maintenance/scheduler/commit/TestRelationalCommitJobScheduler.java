@@ -18,9 +18,6 @@
  */
 package org.apache.gravitino.maintenance.scheduler.commit;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import java.time.Instant;
@@ -29,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
@@ -54,11 +52,13 @@ class TestRelationalCommitJobScheduler extends TestJDBCBackend {
 
   @TestTemplate
   void testEnqueueSkipsWhenAllWithinMinInterval() {
-    CommitChainCollector collector = mockCollector(List.of(member(POLICY_ID)));
     RelationalCommitJobScheduler scheduler =
         new RelationalCommitJobScheduler(
-            dataSource(), configWithUri(), collector, coolingGate(POLICY_ID));
-    Assertions.assertFalse(scheduler.upsertDueNow(TABLE_ID));
+            dataSource(),
+            configWithUri(),
+            fixedCollector(List.of(member(POLICY_ID))),
+            coolingGate(POLICY_ID));
+    Assertions.assertEquals(CommitJobUpsertResult.SKIPPED, scheduler.upsertDueNow(TABLE_ID));
     Assertions.assertTrue(
         RelationalCommitJobScheduler.client(dataSource())
             .getScheduledExecution(
@@ -69,12 +69,15 @@ class TestRelationalCommitJobScheduler extends TestJDBCBackend {
 
   @TestTemplate
   void testEnqueueWritesSnapshotAndIsIdempotent() {
-    CommitChainCollector collector = mockCollector(List.of(member(POLICY_ID)));
     RelationalCommitJobScheduler scheduler =
-        new RelationalCommitJobScheduler(dataSource(), configWithUri(), collector, allowAllGate());
+        new RelationalCommitJobScheduler(
+            dataSource(),
+            configWithUri(),
+            fixedCollector(List.of(member(POLICY_ID))),
+            allowAllGate());
 
-    Assertions.assertTrue(scheduler.upsertDueNow(TABLE_ID));
-    Assertions.assertFalse(scheduler.upsertDueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobUpsertResult.INSERTED, scheduler.upsertDueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobUpsertResult.ALREADY_QUEUED, scheduler.upsertDueNow(TABLE_ID));
 
     SchedulerClient client = RelationalCommitJobScheduler.client(dataSource());
     MaintenanceJobSnapshot snap =
@@ -92,12 +95,11 @@ class TestRelationalCommitJobScheduler extends TestJDBCBackend {
     Assertions.assertEquals("iceberg", snap.getJobConf().get("catalog_name"));
   }
 
-  private static CommitChainCollector mockCollector(List<CommitChainMember> chain) {
-    CommitChainCollector collector = mock(CommitChainCollector.class);
-    when(collector.collect(TABLE_ID)).thenReturn(chain);
-    when(collector.resolveTableRef(TABLE_ID))
-        .thenReturn(Optional.of(new ResolvedTableRef(TABLE_ID, "iceberg", "db.t")));
-    return collector;
+  private static Function<Long, Optional<CollectedCommitChain>> fixedCollector(
+      List<CommitChainMember> chain) {
+    ResolvedTableRef ref = new ResolvedTableRef(TABLE_ID, "iceberg", "db.t");
+    CollectedCommitChain collected = new CollectedCommitChain(chain, ref);
+    return tableId -> tableId == TABLE_ID ? Optional.of(collected) : Optional.empty();
   }
 
   private static CommitChainMember member(long policyId) {

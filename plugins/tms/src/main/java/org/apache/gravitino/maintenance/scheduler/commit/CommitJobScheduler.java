@@ -33,7 +33,7 @@ public interface CommitJobScheduler {
    * when one is not already queued and the snapshot is non-empty.
    *
    * @param tableId table entity id
-   * @return {@code true} when a new row was inserted
+   * @return insert / coalesce / skip outcome
    */
-  boolean upsertDueNow(long tableId);
+  CommitJobUpsertResult upsertDueNow(long tableId);
 }

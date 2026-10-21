@@ -60,6 +60,10 @@ class TestCommitJobSnapshotFactory {
     Assertions.assertEquals("101", snap.getJobConf().get(MaintenanceJobTemplates.TMS_TABLE_ID_KEY));
     Assertions.assertEquals(
         "202", snap.getJobConf().get(MaintenanceJobTemplates.TMS_POLICY_ID_KEY));
+    // Later chain members contribute procedure params the first policy does not set.
+    Assertions.assertEquals("7d", snap.getJobConf().get("older_than"));
+    Assertions.assertEquals("10", snap.getJobConf().get("retain_last"));
+    Assertions.assertEquals("4g", snap.getJobConf().get("spark_executor_memory"));
   }
 
   private static Config configWithUri() {
@@ -104,7 +108,13 @@ class TestCommitJobSnapshotFactory {
         .withNamespace(NamespaceUtil.ofPolicy("ml"))
         .withPolicyType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
         .withEnabled(true)
-        .withContent(PolicyContents.icebergSnapshotExpiration())
+        .withContent(
+            PolicyContents.icebergSnapshotExpiration(
+                null,
+                true,
+                null,
+                Map.of("older_than", "7d", "retain_last", "10", "spark_executor_memory", "2g"),
+                Map.of()))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
         .build();

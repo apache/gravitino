@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.scheduler.commit;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot;
@@ -34,8 +35,21 @@ import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceTableRefs.Reso
 /**
  * Builds enqueue-time {@link MaintenanceJobSnapshot} values for the commit-job path (keeps commit →
  * scheduler dependency one-way; no scheduler → commit package cycle).
+ *
+ * <p>Chain {@code jobConf} starts from the first policy, takes the max of resource-shaped keys from
+ * later members, and {@code putIfAbsent}s remaining keys so later types keep their procedure params
+ * (e.g. expire {@code older_than}) when auth bags already agree.
  */
 final class CommitJobSnapshotFactory {
+
+  private static final Set<String> CHAIN_OWNED_KEYS =
+      Set.of(
+          MaintenanceJobTemplates.MAINTENANCE_TYPE_KEY,
+          MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY,
+          "catalog_name",
+          "table_identifier",
+          MaintenanceJobTemplates.TMS_TABLE_ID_KEY,
+          MaintenanceJobTemplates.TMS_POLICY_ID_KEY);
 
   private final MaintenanceJobConfBuilder jobConfBuilder;
 
@@ -76,7 +90,7 @@ final class CommitJobSnapshotFactory {
     Map<String, String> jobConf = jobConfBuilder.build(first.policy(), ref.catalogName());
     for (int i = 1; i < chain.size(); i++) {
       Map<String, String> other = jobConfBuilder.build(chain.get(i).policy(), ref.catalogName());
-      MaintenanceJobSnapshotFactory.mergeResourceKeys(jobConf, other);
+      mergeLaterMemberJobConf(jobConf, other);
     }
     List<String> types =
         chain.stream().map(CommitChainMember::maintenanceType).collect(Collectors.toList());
@@ -87,5 +101,21 @@ final class CommitJobSnapshotFactory {
     jobConf.put(MaintenanceJobTemplates.TMS_TABLE_ID_KEY, Long.toString(ref.tableId()));
     jobConf.put(MaintenanceJobTemplates.TMS_POLICY_ID_KEY, Long.toString(first.policy().id()));
     return jobConf;
+  }
+
+  /**
+   * Max-merge resource keys; fill missing non-owned keys from a later chain member (procedure
+   * params). First-policy auth / {@code spark_conf} / {@code updater_options} win.
+   */
+  static void mergeLaterMemberJobConf(Map<String, String> into, Map<String, String> from) {
+    MaintenanceJobSnapshotFactory.mergeResourceKeys(into, from);
+    for (Map.Entry<String, String> entry : from.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key == null || value == null || CHAIN_OWNED_KEYS.contains(key)) {
+        continue;
+      }
+      into.putIfAbsent(key, value);
+    }
   }
 }

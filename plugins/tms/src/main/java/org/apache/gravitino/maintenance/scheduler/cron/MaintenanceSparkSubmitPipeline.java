@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot.ChainStep;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot.TableTarget;
@@ -37,16 +36,17 @@ import org.slf4j.LoggerFactory;
  * in-flight gate → soft-slot claim → {@code runJob} → bind job id.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same
- * snapshot shape; batch pick overlays per-table keys and submits one Spark job per table.
+ * snapshot shape; batch pick overlays per-table keys and submits one Spark job per table. If any
+ * snapshot table is in-flight, the whole pick stops without partial submits (one-shot row is still
+ * removed by the caller).
  *
- * <p>Does not sample metrics (that runs inside Spark). The caller always deletes the one-shot
- * {@code cron-job} row after this method returns. Policy / jobConf are not recomputed here.
+ * <p>Does not sample metrics (that runs inside Spark). Policy / jobConf are not recomputed here.
  */
 public final class MaintenanceSparkSubmitPipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceSparkSubmitPipeline.class);
 
-  private final ExpandOccupancyGate occupancyGate;
+  private final CronSubmitGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
   private final MaintenanceJobSubmitter jobSubmitter;
   private final long claimTimeoutMs;
@@ -58,7 +58,7 @@ public final class MaintenanceSparkSubmitPipeline {
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceSparkSubmitPipeline(
-      ExpandOccupancyGate occupancyGate,
+      CronSubmitGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
       MaintenanceJobSubmitter jobSubmitter,
       long claimTimeoutMs) {
@@ -114,17 +114,19 @@ public final class MaintenanceSparkSubmitPipeline {
       }
     }
 
-    long nowMs = System.currentTimeMillis();
-    // minInterval was gated at expand enqueue; pick only blocks on in-flight (minIntervalMs=0).
+    // minInterval was gated at expand enqueue; pick only blocks on in-flight. Any in-flight
+    // member aborts the whole pick so a batch row is not partially submitted then deleted.
     for (TableTarget target : snapshot.getTables()) {
-      if (occupancyGate.shouldSkip(target.getTableId(), policyId, 0L, nowMs)) {
+      if (occupancyGate.isInFlight(target.getTableId(), policyId)) {
         LOG.info(
-            "Skipping table {} in cron-job {} (in-flight for policy {})",
-            target.getTableId(),
+            "Skipping cron-job {} entirely (table {} in-flight for policy {})",
             instanceId,
+            target.getTableId(),
             policyId);
-        continue;
+        return;
       }
+    }
+    for (TableTarget target : snapshot.getTables()) {
       submitOne(snapshot, target, policyId);
     }
   }

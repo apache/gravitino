@@ -129,20 +129,6 @@ class TestMaintenanceCommitSubmitPipeline {
     Assertions.assertEquals("db.t", conf.get("table_identifier"));
   }
 
-  @Test
-  void testMergeResourceKeysTakesMax() {
-    Map<String, String> into =
-        MaintenanceCommitSubmitPipeline.newLinkedMap(
-            "spark_executor_memory", "4g", "spark_executor_cores", "2", "catalog_uri", "http://a");
-    Map<String, String> from =
-        MaintenanceCommitSubmitPipeline.newLinkedMap(
-            "spark_executor_memory", "7g", "spark_executor_cores", "1", "catalog_uri", "http://b");
-    MaintenanceCommitSubmitPipeline.mergeResourceKeys(into, from);
-    Assertions.assertEquals("7g", into.get("spark_executor_memory"));
-    Assertions.assertEquals("2", into.get("spark_executor_cores"));
-    Assertions.assertEquals("http://a", into.get("catalog_uri"));
-  }
-
   private static MaintenanceCommitSubmitPipeline pipeline(
       CommitOccupancyGate gate,
       TableMaintenanceActionMetaService actions,

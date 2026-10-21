@@ -20,14 +20,17 @@ package org.apache.gravitino.maintenance.scheduler.commit;
 
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstance;
+import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
@@ -35,7 +38,6 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerSerializers;
 import org.apache.gravitino.maintenance.scheduler.RelationalPolicyLookup;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
-import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.PolicyContent;
@@ -56,7 +58,7 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
 
   private final DataSource dataSource;
   private final Config gravitinoConfig;
-  private final CommitChainCollector chainCollector;
+  private final Function<Long, Optional<CollectedCommitChain>> chainCollector;
   private final CommitOccupancyGate occupancyGate;
   private final CommitJobSnapshotFactory snapshotFactory;
 
@@ -68,8 +70,11 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
     this(
         dataSource,
         gravitinoConfig,
-        new CommitChainCollector(new RelationalPolicyLookup()),
-        CommitOccupancyGate.of(new OccupancyGate(TableMaintenanceActionMetaService.getInstance())));
+        new CommitChainCollector(new RelationalPolicyLookup())::collect,
+        CommitOccupancyGate.of(
+            new OccupancyGate(
+                TableMaintenanceActionMetaService.getInstance(),
+                TableMaintenanceConfig.from(gravitinoConfig).claimTimeoutMs())));
   }
 
   /**
@@ -77,13 +82,13 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
    *
    * @param dataSource JDBC pool
    * @param gravitinoConfig server config
-   * @param chainCollector onCommit chain builder
+   * @param chainCollector returns the collected onCommit chain for a table id
    * @param occupancyGate cooldown / in-flight checks for enqueue gating
    */
   RelationalCommitJobScheduler(
       DataSource dataSource,
       Config gravitinoConfig,
-      CommitChainCollector chainCollector,
+      Function<Long, Optional<CollectedCommitChain>> chainCollector,
       CommitOccupancyGate occupancyGate) {
     this.dataSource = Preconditions.checkNotNull(dataSource);
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
@@ -93,17 +98,25 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
   }
 
   @Override
-  public boolean upsertDueNow(long tableId) {
+  public CommitJobUpsertResult upsertDueNow(long tableId) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
-    Optional<MaintenanceJobSnapshot> snapshot = buildSnapshot(tableId);
-    if (snapshot.isEmpty()) {
-      return false;
-    }
     SchedulerClient client = client(dataSource);
     String id = Long.toString(tableId);
-    return client.scheduleIfNotExists(
-        new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, snapshot.get()),
-        Instant.now());
+    // Coalesce without rebuilding task_data: keep the first enqueue-time snapshot.
+    if (client
+        .getScheduledExecution(TaskInstanceId.of(TableMaintenanceSchedulerPools.COMMIT_JOB, id))
+        .isPresent()) {
+      return CommitJobUpsertResult.ALREADY_QUEUED;
+    }
+    Optional<MaintenanceJobSnapshot> snapshot = buildSnapshot(tableId);
+    if (snapshot.isEmpty()) {
+      return CommitJobUpsertResult.SKIPPED;
+    }
+    boolean inserted =
+        client.scheduleIfNotExists(
+            new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, snapshot.get()),
+            Instant.now());
+    return inserted ? CommitJobUpsertResult.INSERTED : CommitJobUpsertResult.ALREADY_QUEUED;
   }
 
   /**
@@ -121,14 +134,18 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
   }
 
   private Optional<MaintenanceJobSnapshot> buildSnapshot(long tableId) {
-    List<CommitChainMember> collected = chainCollector.collect(tableId);
+    Optional<CollectedCommitChain> collected = chainCollector.apply(tableId);
     if (collected.isEmpty()) {
+      return Optional.empty();
+    }
+    List<CommitChainMember> members = collected.get().members();
+    if (members.isEmpty()) {
       LOG.debug("Skipping commit-job enqueue for table {}: empty onCommit chain", tableId);
       return Optional.empty();
     }
 
     long nowMs = System.currentTimeMillis();
-    List<CommitChainMember> chain = filterDueToMinInterval(tableId, collected, nowMs);
+    List<CommitChainMember> chain = filterDueToMinInterval(tableId, members, nowMs);
     if (chain.isEmpty()) {
       LOG.debug(
           "Skipping commit-job enqueue for table {}: all onCommit types within minIntervalMs",
@@ -143,15 +160,8 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
       return Optional.empty();
     }
 
-    Optional<ResolvedTableRef> resolved = chainCollector.resolveTableRef(tableId);
-    if (resolved.isEmpty()) {
-      LOG.warn(
-          "Skipping commit-job enqueue for table {}: could not resolve table identifier", tableId);
-      return Optional.empty();
-    }
-
     try {
-      return Optional.of(snapshotFactory.forCommit(chain, resolved.get()));
+      return Optional.of(snapshotFactory.forCommit(chain, collected.get().tableRef()));
     } catch (RuntimeException e) {
       LOG.warn(
           "Skipping commit-job enqueue for table {}: failed to build jobConf snapshot: {}",

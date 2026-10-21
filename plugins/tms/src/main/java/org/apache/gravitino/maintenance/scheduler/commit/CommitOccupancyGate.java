@@ -21,8 +21,10 @@ package org.apache.gravitino.maintenance.scheduler.commit;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 
 /**
- * Occupancy checks for commit-job submit: in-flight aborts the pick; cooldown drops a member from
- * the chain.
+ * Occupancy checks for commit-job paths.
+ *
+ * <p>{@link #withinMinInterval} gates enqueue (drops cooled-down chain members before snapshot
+ * build). {@link #isInFlight} gates pick (any snapshot type still in-flight aborts submit).
  */
 public interface CommitOccupancyGate {
 

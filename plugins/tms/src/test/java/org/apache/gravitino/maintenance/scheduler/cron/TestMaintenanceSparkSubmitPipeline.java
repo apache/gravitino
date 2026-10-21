@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -33,7 +34,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot.ChainStep;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot.TableTarget;
@@ -68,10 +68,35 @@ class TestMaintenanceSparkSubmitPipeline {
   }
 
   @Test
-  void testShouldSkipDoesNotClaimOrSubmit() {
+  void testInFlightDoesNotClaimOrSubmit() {
     MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(mockGate(true), actions, submitter).submit(INSTANCE, snapshot());
+    verify(actions, never()).tryAcquireInFlight(anyLong(), anyLong(), anyLong());
+    verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
+  }
+
+  @Test
+  void testBatchInFlightAbortsEntirePick() {
+    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
+    CronSubmitGate gate = (tableId, policyId) -> tableId == 11L;
+
+    Map<String, String> shared = new LinkedHashMap<>();
+    shared.put(MaintenanceJobTemplates.MAINTENANCE_TYPE_KEY, "expire_snapshots");
+    shared.put(MaintenanceJobTemplates.TMS_POLICY_ID_KEY, Long.toString(POLICY_ID));
+    shared.put("updater_options", "{\"gravitino_uri\":\"http://localhost:8090\"}");
+    MaintenanceJobSnapshot batch =
+        new MaintenanceJobSnapshot(
+            "metalake",
+            List.of(
+                new TableTarget(10L, List.of("metalake", "iceberg", "db", "t1")),
+                new TableTarget(11L, List.of("metalake", "iceberg", "db", "t2"))),
+            List.of(new ChainStep(POLICY_ID, "expire_snapshots")),
+            shared);
+
+    pipeline(gate, actions, submitter).submit(CronJobIds.forBatch(0L, POLICY_ID), batch);
+
     verify(actions, never()).tryAcquireInFlight(anyLong(), anyLong(), anyLong());
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
   }
@@ -133,9 +158,7 @@ class TestMaintenanceSparkSubmitPipeline {
     OccupancyClaim claim = new OccupancyClaim(9L, 3_000L);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(claim));
-    org.mockito.Mockito.doThrow(new RuntimeException("bind failed"))
-        .when(actions)
-        .bindJobId(claim, 777L);
+    doThrow(new RuntimeException("bind failed")).when(actions).bindJobId(claim, 777L);
 
     Assertions.assertDoesNotThrow(
         () -> pipeline(mockGate(false), actions, submitter).submit(INSTANCE, snapshot()));
@@ -241,14 +264,14 @@ class TestMaintenanceSparkSubmitPipeline {
   }
 
   private static MaintenanceSparkSubmitPipeline pipeline(
-      ExpandOccupancyGate gate,
+      CronSubmitGate gate,
       TableMaintenanceActionMetaService actions,
       MaintenanceJobSubmitter submitter) {
     return new MaintenanceSparkSubmitPipeline(gate, actions, submitter, CLAIM_TIMEOUT_MS);
   }
 
-  private static ExpandOccupancyGate mockGate(boolean shouldSkip) {
-    return (tableId, policyId, minIntervalMs, nowMs) -> shouldSkip;
+  private static CronSubmitGate mockGate(boolean inFlight) {
+    return (tableId, policyId) -> inFlight;
   }
 
   private static MaintenanceJobSnapshot snapshot() {

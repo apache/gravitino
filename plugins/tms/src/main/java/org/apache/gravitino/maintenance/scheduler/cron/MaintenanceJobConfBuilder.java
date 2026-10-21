@@ -190,7 +190,7 @@ public final class MaintenanceJobConfBuilder {
     String gravitinoUri = updaterOptions.get("gravitino_uri");
     if (gravitinoUri == null || gravitinoUri.trim().isEmpty()) {
       throw new IllegalArgumentException(
-          "updater_options.gravitino_uri is required for TMS cron Spark submit; set policy "
+          "updater_options.gravitino_uri is required for TMS Spark submit; set policy "
               + "updaterOptions.gravitino_uri or gravitino.maintenance.gravitinoUri");
     }
     return updaterOptions;

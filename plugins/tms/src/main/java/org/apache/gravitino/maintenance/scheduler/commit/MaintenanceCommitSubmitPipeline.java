@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot.ChainStep;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshot.TableTarget;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSnapshotFactory;
 import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.cron.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
@@ -181,20 +180,5 @@ public final class MaintenanceCommitSubmitPipeline {
           claim.id(),
           releaseError);
     }
-  }
-
-  /**
-   * Delegates to {@link MaintenanceJobSnapshotFactory#mergeResourceKeys} for tests.
-   *
-   * @param into baseline
-   * @param from candidate
-   */
-  static void mergeResourceKeys(Map<String, String> into, Map<String, String> from) {
-    MaintenanceJobSnapshotFactory.mergeResourceKeys(into, from);
-  }
-
-  /** Visible for tests that assert resource merge. */
-  static Map<String, String> newLinkedMap(String... kv) {
-    return MaintenanceJobSnapshotFactory.newLinkedMap(kv);
   }
 }

@@ -60,6 +60,24 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableMaintenanceSchedulerPools.class);
 
+  /** Expand-pool db-scheduler table. */
+  public static final String EXPAND_TASKS_TABLE = "scheduled_expand_tasks";
+
+  /** Cron-pool db-scheduler table. */
+  public static final String CRON_TASKS_TABLE = "scheduled_cron_tasks";
+
+  /** Commit-pool db-scheduler table. */
+  public static final String COMMIT_TASKS_TABLE = "scheduled_commit_tasks";
+
+  /** Long-lived policy expand lease ({@code task_name}). */
+  public static final String POLICY_EXPAND = "policy-expand";
+
+  /** One-shot crontab Spark submit ({@code task_name}). */
+  public static final String CRON_JOB = "cron-job";
+
+  /** One-shot on-commit chained Spark submit ({@code task_name}). */
+  public static final String COMMIT_JOB = "commit-job";
+
   /**
    * Expand pipeline supplier used by {@link #policyExpandTask()}. Tests may replace it; production
    * {@link #start} installs the relational implementation.
@@ -89,24 +107,6 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
           () -> {
             throw new IllegalStateException("commit-job submit pipeline is not configured");
           });
-
-  /** Expand-pool db-scheduler table. */
-  public static final String EXPAND_TASKS_TABLE = "scheduled_expand_tasks";
-
-  /** Cron-pool db-scheduler table. */
-  public static final String CRON_TASKS_TABLE = "scheduled_cron_tasks";
-
-  /** Commit-pool db-scheduler table. */
-  public static final String COMMIT_TASKS_TABLE = "scheduled_commit_tasks";
-
-  /** Long-lived policy expand lease ({@code task_name}). */
-  public static final String POLICY_EXPAND = "policy-expand";
-
-  /** One-shot crontab Spark submit ({@code task_name}). */
-  public static final String CRON_JOB = "cron-job";
-
-  /** One-shot on-commit chained Spark submit ({@code task_name}). */
-  public static final String COMMIT_JOB = "commit-job";
 
   private final List<Scheduler> schedulers = new ArrayList<>();
 
@@ -141,7 +141,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
     MaintenanceSparkSubmitPipeline cronSubmit =
         new MaintenanceSparkSubmitPipeline(
-            occupancyGate::shouldSkip,
+            occupancyGate::isInFlight,
             TableMaintenanceActionMetaService.getInstance(),
             MaintenanceJobSubmitter.fromEnv(),
             config.claimTimeoutMs());

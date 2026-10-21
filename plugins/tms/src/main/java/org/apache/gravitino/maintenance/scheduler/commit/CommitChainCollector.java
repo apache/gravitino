@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * Builds the onCommit maintenance chain for a table: compaction → manifest-rewrite →
  * snapshot-expiry (§5.2.3). Orphan cleanup is timeTrigger-only and never included.
  */
-public class CommitChainCollector {
+public final class CommitChainCollector {
 
   private static final Logger LOG = LoggerFactory.getLogger(CommitChainCollector.class);
 
@@ -92,14 +92,17 @@ public class CommitChainCollector {
   }
 
   /**
+   * Collects the onCommit chain and the Spark table ref in one metadata resolution pass.
+   *
    * @param tableId table entity id
-   * @return ordered chain members (may be empty)
+   * @return collected chain (members may be empty) when the table resolves; empty when metadata is
+   *     unknown
    */
-  public List<CommitChainMember> collect(long tableId) {
+  public Optional<CollectedCommitChain> collect(long tableId) {
     Optional<TableContext> ctx = tableContextResolver.apply(tableId);
     if (ctx.isEmpty()) {
       LOG.info("Skipping commit chain for table {}: could not resolve table metadata", tableId);
-      return List.of();
+      return Optional.empty();
     }
     TableContext table = ctx.get();
     NearestMaintenancePolicyResolver nearest =
@@ -108,12 +111,13 @@ public class CommitChainCollector {
     for (Policy.BuiltInType type : CHAIN_ORDER) {
       NearestPolicyDecision decision = nearest.resolve(table.metalake(), table.tableObject(), type);
       if (decision.kind() == NearestPolicyDecision.Kind.CONFLICT) {
+        // Match expand fail-closed: ambiguous same-level policies skip the whole table.
         LOG.error(
-            "Skip commit-chain type {} for table {}: ambiguous policies {} on nearest level",
-            type,
+            "Skip commit-job enqueue for table {}: ambiguous {} policies {} on nearest level",
             tableId,
+            type,
             decision.conflictingPolicyIds());
-        continue;
+        return Optional.empty();
       }
       Optional<Long> winnerId = decision.winnerPolicyId();
       if (winnerId.isEmpty()) {
@@ -133,16 +137,7 @@ public class CommitChainCollector {
       }
       chain.add(new CommitChainMember(type, policy, wire.get()));
     }
-    return chain;
-  }
-
-  /**
-   * @param tableId table entity id
-   * @return resolved Spark table ref when known
-   */
-  public Optional<ResolvedTableRef> resolveTableRef(long tableId) {
-    List<ResolvedTableRef> resolved = MaintenanceTableRefs.resolve(List.of(tableId));
-    return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
+    return Optional.of(new CollectedCommitChain(chain, table.tableRef()));
   }
 
   @Nullable
@@ -171,17 +166,19 @@ public class CommitChainCollector {
     names.add(ref.catalogName());
     names.addAll(Arrays.asList(parts));
     MetadataObject tableObject = MetadataObjects.of(names, MetadataObject.Type.TABLE);
-    return Optional.of(new TableContext(metalake, tableObject));
+    return Optional.of(new TableContext(metalake, tableObject, ref));
   }
 
-  /** Metalake + metadata object for nearest-policy walks. */
+  /** Metalake + metadata object + Spark ref for nearest-policy walks and snapshot build. */
   static final class TableContext {
     private final String metalake;
     private final MetadataObject tableObject;
+    private final ResolvedTableRef tableRef;
 
-    TableContext(String metalake, MetadataObject tableObject) {
+    TableContext(String metalake, MetadataObject tableObject, ResolvedTableRef tableRef) {
       this.metalake = metalake;
       this.tableObject = tableObject;
+      this.tableRef = tableRef;
     }
 
     String metalake() {
@@ -190,6 +187,10 @@ public class CommitChainCollector {
 
     MetadataObject tableObject() {
       return tableObject;
+    }
+
+    ResolvedTableRef tableRef() {
+      return tableRef;
     }
   }
 }

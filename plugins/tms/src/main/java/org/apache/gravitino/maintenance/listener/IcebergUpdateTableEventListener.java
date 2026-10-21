@@ -29,6 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.maintenance.scheduler.commit.CommitJobScheduler;
+import org.apache.gravitino.maintenance.scheduler.commit.CommitJobUpsertResult;
 import org.apache.gravitino.maintenance.scheduler.commit.RelationalCommitJobScheduler;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -109,11 +110,22 @@ public class IcebergUpdateTableEventListener implements EventListenerPlugin {
     }
     try {
       long tableId = resolveTableId(identifier);
-      boolean inserted = scheduler.upsertDueNow(tableId);
-      if (inserted) {
-        LOG.info("Upserted commit-job for table {} ({})", tableId, identifier);
-      } else {
-        LOG.debug("commit-job already queued for table {} ({})", tableId, identifier);
+      CommitJobUpsertResult result = scheduler.upsertDueNow(tableId);
+      switch (result) {
+        case INSERTED:
+          LOG.info("Upserted commit-job for table {} ({})", tableId, identifier);
+          break;
+        case ALREADY_QUEUED:
+          LOG.debug("commit-job already queued for table {} ({})", tableId, identifier);
+          break;
+        case SKIPPED:
+          LOG.debug(
+              "Skipped commit-job enqueue for table {} ({}) (empty chain, unresolved table, auth, or jobConf build)",
+              tableId,
+              identifier);
+          break;
+        default:
+          throw new IllegalStateException("Unexpected commit-job upsert result: " + result);
       }
     } catch (NoSuchEntityException e) {
       LOG.debug("No Gravitino table for IRC update {}: {}", identifier, e.getMessage());

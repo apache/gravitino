@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.listener;
 
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,6 +31,7 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.maintenance.scheduler.commit.CommitJobScheduler;
+import org.apache.gravitino.maintenance.scheduler.commit.CommitJobUpsertResult;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -53,14 +55,14 @@ class TestIcebergUpdateTableEventListener {
 
     listener.onPostEvent(new OtherEvent("u", NameIdentifier.of("ml", "c", "s", "t")));
 
-    verify(scheduler, never()).upsertDueNow(org.mockito.ArgumentMatchers.anyLong());
+    verify(scheduler, never()).upsertDueNow(anyLong());
   }
 
   @Test
   void testEnqueueUpsertsCommitJob() {
     IcebergUpdateTableEventListener listener = new IcebergUpdateTableEventListener();
     CommitJobScheduler scheduler = mock(CommitJobScheduler.class);
-    when(scheduler.upsertDueNow(eq(42L))).thenReturn(true);
+    when(scheduler.upsertDueNow(eq(42L))).thenReturn(CommitJobUpsertResult.INSERTED);
     listener.setCommitJobScheduler(scheduler);
     listener.setTableLookup(
         ident ->
