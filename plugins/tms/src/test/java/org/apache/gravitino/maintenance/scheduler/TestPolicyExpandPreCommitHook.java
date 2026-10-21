@@ -42,7 +42,7 @@ class TestPolicyExpandPreCommitHook {
     RecordingSchedule schedule = new RecordingSchedule();
     PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(schedule);
 
-    hook.afterWrite(policy(42L, true, compaction(CRON)));
+    hook.afterPersist(policy(42L, true, compaction(CRON)));
 
     Assertions.assertEquals(List.of("sync 42 true " + CRON), schedule.operations);
   }
@@ -52,7 +52,7 @@ class TestPolicyExpandPreCommitHook {
     RecordingSchedule schedule = new RecordingSchedule();
     PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(schedule);
 
-    hook.afterWrite(policy(7L, false, compaction(CRON)));
+    hook.afterUpdate(policy(7L, false, compaction(CRON)));
 
     Assertions.assertEquals(List.of("sync 7 false " + CRON), schedule.operations);
   }
@@ -63,7 +63,7 @@ class TestPolicyExpandPreCommitHook {
     PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(schedule);
     PolicyContent custom = PolicyContents.custom(Map.of(), Set.of(MetadataObject.Type.TABLE), null);
 
-    hook.afterWrite(policy(1L, true, custom, Policy.BuiltInType.CUSTOM));
+    hook.afterPersist(policy(1L, true, custom, Policy.BuiltInType.CUSTOM));
 
     Assertions.assertEquals(List.of("remove 1"), schedule.operations);
   }
@@ -73,7 +73,7 @@ class TestPolicyExpandPreCommitHook {
     RecordingSchedule schedule = new RecordingSchedule();
     PolicyExpandPreCommitHook hook = new PolicyExpandPreCommitHook(schedule);
 
-    hook.beforeDelete(11L);
+    hook.beforeRemove(11L);
 
     Assertions.assertEquals(List.of("remove 11"), schedule.operations);
   }

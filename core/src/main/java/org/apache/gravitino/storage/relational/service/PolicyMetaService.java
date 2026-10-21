@@ -112,8 +112,7 @@ public class PolicyMetaService {
 
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForPolicyCreate(metalakePO),
-          () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten),
-          () -> afterWrite(policyEntity));
+          () -> insertOrOverwritePolicyWithHooks(policyEntity, policyPO, overwritten));
     } catch (RuntimeException e) {
       try {
         ExceptionUtils.checkSQLException(
@@ -151,9 +150,10 @@ public class PolicyMetaService {
       PolicyPO newPolicyPO =
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
       SessionUtils.doMultipleWithCommit(
+          () -> beforeUpdate(updatedPolicyEntity),
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
           () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
-          () -> afterWrite(updatedPolicyEntity));
+          () -> afterUpdate(updatedPolicyEntity));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
@@ -192,6 +192,7 @@ public class PolicyMetaService {
 
     try {
       SessionUtils.doMultipleWithCommit(
+          () -> beforeRemove(policyId),
           () -> deletePolicyWithVersion(ident, policyPO),
           () ->
               SessionUtils.doWithoutCommit(
@@ -218,7 +219,7 @@ public class PolicyMetaService {
                   mapper ->
                       mapper.softDeleteObjectRelsByMetadataObject(
                           policyId, MetadataObject.Type.POLICY.name())),
-          () -> beforeDelete(policyId));
+          () -> afterRemove(policyId));
       return true;
     } catch (NoSuchEntityException e) {
       return false;
@@ -344,7 +345,11 @@ public class PolicyMetaService {
   }
 
   /**
-   * Writes the policy row and its content snapshot.
+   * Writes the policy row and its content snapshot, firing the matching pre-commit lifecycle hooks.
+   *
+   * <p>A plain create (or an overwrite that finds no row) uses persist hooks. An overwrite that
+   * replaces an existing row uses update hooks and passes the entity as stored — including the
+   * retained policy id when the caller supplied a different id for the same name.
    *
    * <p>An overwrite is not an upsert any more: the existing row is located and locked first, and
    * the replacement is written as the next version of that row, so the snapshot history survives
@@ -356,10 +361,10 @@ public class PolicyMetaService {
    * Such a row keeps the primary key, so the insert is rejected as an already-existing policy,
    * which is the honest answer: the snapshots and relations of the deleted policy are gone with it.
    */
-  private void insertPolicyWithoutCommit(
+  private void insertOrOverwritePolicyWithHooks(
       PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
     if (!overwritten) {
-      insertNewPolicyWithoutCommit(initializedPolicyPO);
+      persistNewPolicyWithHooks(policyEntity, initializedPolicyPO);
       return;
     }
 
@@ -373,16 +378,26 @@ public class PolicyMetaService {
             "The policy ID %s is reserved by a deleted policy; use a new ID",
             initializedPolicyPO.getPolicyId());
       }
-      insertNewPolicyWithoutCommit(initializedPolicyPO);
+      persistNewPolicyWithHooks(policyEntity, initializedPolicyPO);
       return;
     }
 
     PolicyPO replacementPolicyPO =
         POConverters.updatePolicyPOWithVersion(existingPolicyPO, initializedPolicyPO);
+    PolicyEntity storedPolicy =
+        POConverters.fromPolicyPO(replacementPolicyPO, policyEntity.namespace());
     NameIdentifier observedIdentifier =
         NameIdentifier.of(policyEntity.namespace(), existingPolicyPO.getPolicyName());
+    beforeUpdate(storedPolicy);
     updatePolicyRootWithVersion(observedIdentifier, existingPolicyPO, replacementPolicyPO);
     insertPolicyVersionIfAllocated(existingPolicyPO, replacementPolicyPO);
+    afterUpdate(storedPolicy);
+  }
+
+  private void persistNewPolicyWithHooks(PolicyEntity policyEntity, PolicyPO initializedPolicyPO) {
+    beforePersist(policyEntity);
+    insertNewPolicyWithoutCommit(initializedPolicyPO);
+    afterPersist(policyEntity);
   }
 
   /**
@@ -552,17 +567,45 @@ public class PolicyMetaService {
     return policyPO;
   }
 
-  private static void afterWrite(PolicyEntity policy) {
+  private static void beforePersist(PolicyEntity policy) {
     PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
     if (hook != null) {
-      hook.afterWrite(policy);
+      hook.beforePersist(policy);
     }
   }
 
-  private static void beforeDelete(long policyId) {
+  private static void afterPersist(PolicyEntity policy) {
     PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
     if (hook != null) {
-      hook.beforeDelete(policyId);
+      hook.afterPersist(policy);
+    }
+  }
+
+  private static void beforeUpdate(PolicyEntity policy) {
+    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    if (hook != null) {
+      hook.beforeUpdate(policy);
+    }
+  }
+
+  private static void afterUpdate(PolicyEntity policy) {
+    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    if (hook != null) {
+      hook.afterUpdate(policy);
+    }
+  }
+
+  private static void beforeRemove(long policyId) {
+    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    if (hook != null) {
+      hook.beforeRemove(policyId);
+    }
+  }
+
+  private static void afterRemove(long policyId) {
+    PolicyPreCommitHook hook = PolicyPreCommitHooks.get();
+    if (hook != null) {
+      hook.afterRemove(policyId);
     }
   }
 }

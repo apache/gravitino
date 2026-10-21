@@ -29,9 +29,10 @@ public final class PolicyPreCommitHooks {
   private PolicyPreCommitHooks() {}
 
   /**
-   * Installs the hook used by policy transactions.
+   * Installs the hook invoked at policy create / update / delete lifecycle points inside the open
+   * transaction.
    *
-   * @param hook hook to run before a policy transaction commits
+   * @param hook hook to run during policy create, update, and delete transactions
    * @throws IllegalStateException if a hook is already registered
    */
   public static void register(PolicyPreCommitHook hook) {

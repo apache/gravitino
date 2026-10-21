@@ -104,7 +104,13 @@ public class TableMaintenanceRESTFeature implements Feature {
     return true;
   }
 
-  /** Stops scheduler pools. Invoked from Jersey destroy and tests. */
+  /**
+   * Stops scheduler pools. Invoked from Jersey destroy and tests.
+   *
+   * <p>Unregisters the pre-commit hook first so later policy writes skip expand sync. In-flight
+   * transactions that already passed the hook may still finish; any expand drift is corrected when
+   * pools start again.
+   */
   public static void stopSchedulers() {
     unregisterPreCommitHook();
     TableMaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);

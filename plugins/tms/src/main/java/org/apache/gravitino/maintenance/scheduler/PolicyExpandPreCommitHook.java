@@ -45,17 +45,26 @@ public final class PolicyExpandPreCommitHook implements PolicyPreCommitHook {
   }
 
   @Override
-  public void afterWrite(PolicyEntity policy) {
+  public void afterPersist(PolicyEntity policy) {
+    syncExpandRow(policy);
+  }
+
+  @Override
+  public void afterUpdate(PolicyEntity policy) {
+    syncExpandRow(policy);
+  }
+
+  @Override
+  public void beforeRemove(long policyId) {
+    schedule.remove(policyId);
+  }
+
+  private void syncExpandRow(PolicyEntity policy) {
     if (!isMaintenance(policy.content())) {
       schedule.remove(policy.id());
       return;
     }
     schedule.sync(policy.id(), policy.enabled(), timeTrigger(policy.content()));
-  }
-
-  @Override
-  public void beforeDelete(long policyId) {
-    schedule.remove(policyId);
   }
 
   private static boolean isMaintenance(@Nullable PolicyContent content) {
