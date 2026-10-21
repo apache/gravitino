@@ -164,7 +164,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
-      throws NoSuchTableException, IllegalArgumentException {
+      throws NoSuchTableException, TableAlreadyExistsException, IllegalArgumentException {
     // The alterTable in ManagedTableOperations only updates the table metadata in the entity store.
     // It doesn't handle any additional operations like modifying physical data, etc. Those
     // operations should be handled in the specific catalog implementation.
@@ -181,8 +181,26 @@ public abstract class ManagedTableOperations implements TableCatalog {
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
-      throw new IllegalArgumentException(
-          "Failed to rename table " + ident + " due to table already exists: ", e);
+      NameIdentifier newIdent =
+          Arrays.stream(changes)
+              .filter(c -> c instanceof TableChange.RenameTable)
+              .map(c -> (TableChange.RenameTable) c)
+              .map(
+                  rename ->
+                      NameIdentifier.of(
+                          rename
+                              .getNewSchemaName()
+                              .map(
+                                  schema ->
+                                      NamespaceUtil.ofTable(
+                                          ident.namespace().level(0),
+                                          ident.namespace().level(1),
+                                          schema))
+                              .orElse(ident.namespace()),
+                          rename.getNewName()))
+              .reduce((first, second) -> second)
+              .orElse(ident);
+      throw new TableAlreadyExistsException(e, "Table %s already exists", newIdent);
     } catch (IOException e) {
       throw new RuntimeException("Failed to alter table " + ident, e);
     }

@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -301,7 +302,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   /** {@inheritDoc} */
   @Override
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
-      throws NoSuchModelException, IllegalArgumentException {
+      throws NoSuchModelException, ModelAlreadyExistsException, IllegalArgumentException {
     try {
       if (!store.exists(ident, Entity.EntityType.MODEL)) {
         throw new NoSuchModelException("Model %s does not exist", ident);
@@ -324,9 +325,15 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       throw ExceptionMessages.wrap("Failed to load model " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
       throw new NoSuchModelException(nsee, "Model %s does not exist", ident);
-    } catch (EntityAlreadyExistsException eaee) {
-      // This is happened when renaming a model to an existing model name.
-      throw ExceptionMessages.wrap("Model already exist " + ident.name(), eaee);
+    } catch (EntityAlreadyExistsException e) {
+      String newName =
+          Arrays.stream(changes)
+              .filter(c -> c instanceof ModelChange.RenameModel)
+              .map(c -> ((ModelChange.RenameModel) c).newName())
+              .reduce((first, second) -> second)
+              .orElse(ident.name());
+      throw new ModelAlreadyExistsException(
+          e, "Model %s already exists", NameIdentifier.of(ident.namespace(), newName));
     }
   }
 

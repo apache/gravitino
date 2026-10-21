@@ -148,7 +148,8 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   @Override
-  public PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes) {
+  public PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes)
+      throws NoSuchPolicyException, PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
     try {
@@ -161,10 +162,14 @@ public class PolicyManager implements PolicyDispatcher {
       throw new NoSuchPolicyException(
           "Policy with name %s under metalake %s does not exist", policyName, metalake);
     } catch (EntityAlreadyExistsException e) {
-      throw new RuntimeException(
-          String.format(
-              "Trying to alter policy %s under metalake %s, but the new name already exists",
-              policyName, metalake));
+      String newName =
+          Arrays.stream(changes)
+              .filter(c -> c instanceof PolicyChange.RenamePolicy)
+              .map(c -> ((PolicyChange.RenamePolicy) c).getNewName())
+              .reduce((first, second) -> second)
+              .orElse(policyName);
+      throw new PolicyAlreadyExistsException(
+          e, "Policy with name %s under metalake %s already exists", newName, metalake);
     } catch (IOException ioe) {
       LOG.error("Failed to alter policy {} under metalake {}", policyName, metalake, ioe);
       throw new RuntimeException(ioe);

@@ -99,7 +99,6 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.dto.file.FileInfoDTO;
-import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -686,7 +685,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
-      throws NoSuchFilesetException, IllegalArgumentException {
+      throws NoSuchFilesetException, FilesetAlreadyExistsException, IllegalArgumentException {
     try {
       if (!store.exists(ident, Entity.EntityType.FILESET)) {
         throw new NoSuchFilesetException(FILESET_DOES_NOT_EXIST_MSG, ident);
@@ -727,10 +726,15 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw ExceptionMessages.wrap("Failed to update fileset " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
       throw new NoSuchFilesetException(nsee, FILESET_DOES_NOT_EXIST_MSG, ident);
-    } catch (AlreadyExistsException aee) {
-      // This is happened when renaming a fileset to an existing fileset name.
-      throw ExceptionMessages.wrap(
-          "Fileset with the same name " + ident.name() + " already exists", aee);
+    } catch (EntityAlreadyExistsException e) {
+      String newName =
+          Arrays.stream(changes)
+              .filter(c -> c instanceof FilesetChange.RenameFileset)
+              .map(c -> ((FilesetChange.RenameFileset) c).getNewName())
+              .reduce((first, second) -> second)
+              .orElse(ident.name());
+      throw new FilesetAlreadyExistsException(
+          e, "Fileset %s already exists", NameIdentifier.of(ident.namespace(), newName));
     } finally {
       if (!alterCommitted) {
         secretManager.rollbackSecrets(writtenSecretMaterials.get());
