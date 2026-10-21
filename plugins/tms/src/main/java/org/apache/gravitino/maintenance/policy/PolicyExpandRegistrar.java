@@ -34,7 +34,9 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
@@ -136,6 +138,25 @@ public final class PolicyExpandRegistrar {
     return client()
         .getScheduledExecution(instanceId(policyId))
         .map(execution -> execution.getExecutionTime());
+  }
+
+  /**
+   * @return policy ids that currently have a {@code policy-expand} row
+   */
+  Set<Long> scheduledPolicyIds() {
+    Set<Long> ids = new HashSet<>();
+    client()
+        .fetchScheduledExecutionsForTask(
+            TableMaintenanceSchedulerPools.POLICY_EXPAND,
+            Void.class,
+            execution -> {
+              try {
+                ids.add(Long.parseLong(execution.getTaskInstance().getId()));
+              } catch (NumberFormatException ignored) {
+                // Non-numeric instance ids are not policy-expand leases from this registrar.
+              }
+            });
+    return ids;
   }
 
   /**

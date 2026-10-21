@@ -132,9 +132,9 @@ public class TableMaintenanceRESTFeature implements Feature {
   }
 
   private static void reconcileExistingPolicies() {
-    PolicyExpandLifecycleHook aligner =
-        new PolicyExpandLifecycleHook(PolicyExpandRegistrar.joiningCurrentTransaction());
-    new PolicyExpandReconciler(aligner).reconcileAll();
+    PolicyExpandRegistrar registrar = PolicyExpandRegistrar.joiningCurrentTransaction();
+    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(registrar);
+    new PolicyExpandReconciler(aligner, registrar).reconcileAll();
   }
 
   private static void unregisterLifecycleHook() {

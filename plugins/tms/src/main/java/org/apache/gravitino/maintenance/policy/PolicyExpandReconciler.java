@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.policy;
 
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -28,69 +30,83 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Backfills {@code policy-expand} rows for policies that already exist when TMS starts.
+ * Reconciles {@code policy-expand} rows when TMS starts.
  *
- * <p>Lifecycle hooks only run on later policy writes. Upgrade and first-enable paths need a scan so
- * enabled maintenance policies with a {@code timeTrigger} get a matching expand row without an
- * edit.
+ * <p>Lifecycle hooks only run on later policy writes. Startup walks stored policies and the expand
+ * table so upgrade / first-enable paths converge without an edit:
+ *
+ * <ul>
+ *   <li>redundant expand rows (disabled, blank trigger, non-maintenance, or orphan) are deleted
+ *   <li>valid schedules are upserted to the next due time
+ *   <li>invalid cron clears the expand row (scheduler fixed; policy content still needs an edit)
+ * </ul>
  */
 public final class PolicyExpandReconciler {
 
   private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandReconciler.class);
 
   private final PolicyExpandLifecycleHook aligner;
+  private final PolicyExpandRegistrar registrar;
   private final MetalakeMetaService metalakeMetaService;
   private final PolicyMetaService policyMetaService;
 
   /**
-   * @param aligner same expand rules as the lifecycle hook; must use {@link
-   *     PolicyExpandRegistrar#joiningCurrentTransaction()} so each align commits with {@link
-   *     SessionUtils#doMultipleWithCommit}
+   * @param aligner same expand rules as the lifecycle hook
+   * @param registrar writer used for orphan cleanup; both must use {@link
+   *     PolicyExpandRegistrar#joiningCurrentTransaction()}
    */
-  public PolicyExpandReconciler(PolicyExpandLifecycleHook aligner) {
-    this(aligner, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance());
+  public PolicyExpandReconciler(
+      PolicyExpandLifecycleHook aligner, PolicyExpandRegistrar registrar) {
+    this(aligner, registrar, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance());
   }
 
   /**
    * @param aligner expand aligner
+   * @param registrar expand registrar for orphan deletes
    * @param metalakeMetaService metalake listing
    * @param policyMetaService policy listing
    */
   public PolicyExpandReconciler(
       PolicyExpandLifecycleHook aligner,
+      PolicyExpandRegistrar registrar,
       MetalakeMetaService metalakeMetaService,
       PolicyMetaService policyMetaService) {
     this.aligner = aligner;
+    this.registrar = registrar;
     this.metalakeMetaService = metalakeMetaService;
     this.policyMetaService = policyMetaService;
   }
 
   /**
-   * Scans every metalake and aligns expand rows.
+   * Aligns every stored policy, then deletes expand rows that no longer have a policy.
    *
-   * <p>Same rule as policy writes: an invalid {@code timeTrigger} fails the reconcile so TMS does
-   * not start until the policy is fixed. Partial success from earlier policies in the scan is kept.
-   *
-   * @return number of policies aligned
+   * @return number of policies walked
    */
   public int reconcileAll() {
+    Set<Long> knownPolicyIds = new HashSet<>();
     int aligned = 0;
     for (BaseMetalake metalake : metalakeMetaService.listMetalakes()) {
       for (PolicyEntity policy :
           policyMetaService.listPoliciesByNamespace(NamespaceUtil.ofPolicy(metalake.name()))) {
-        try {
-          SessionUtils.doMultipleWithCommit(() -> aligner.align(policy));
-        } catch (RuntimeException e) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "Expand reconcile failed for policy %s under metalake %s; fix timeTrigger before starting TMS",
-                  policy.name(), metalake.name()),
-              e);
-        }
+        knownPolicyIds.add(policy.id());
+        SessionUtils.doMultipleWithCommit(() -> aligner.align(policy));
         aligned++;
       }
     }
-    LOG.info("Reconciled expand rows for {} policies", aligned);
+    int[] removedOrphans = {0};
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          for (long scheduledId : registrar.scheduledPolicyIds()) {
+            if (!knownPolicyIds.contains(scheduledId)) {
+              registrar.remove(scheduledId);
+              removedOrphans[0]++;
+            }
+          }
+        });
+    LOG.info(
+        "Reconciled expand rows for {} policies; removed {} orphan expand rows",
+        aligned,
+        removedOrphans[0]);
     return aligned;
   }
 }

@@ -33,6 +33,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -63,11 +64,11 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
     PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
     Assertions.assertTrue(reader.scheduledExecutionTime(policy.id()).isEmpty());
 
-    PolicyExpandLifecycleHook aligner =
-        new PolicyExpandLifecycleHook(PolicyExpandRegistrar.joiningCurrentTransaction());
+    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
     int aligned =
         new PolicyExpandReconciler(
-                aligner, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
+                aligner, writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
             .reconcileAll();
 
     Assertions.assertTrue(aligned >= 1);
@@ -75,7 +76,7 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testReconcileFailsOnPolicyWithBadCron() {
+  void testReconcileRemovesExpandRowForInvalidCron() {
     PolicyEntity bad =
         PolicyEntity.builder()
             .withId(7L)
@@ -95,13 +96,31 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
     Mockito.when(policies.listPoliciesByNamespace(NamespaceUtil.ofPolicy("ml")))
         .thenReturn(List.of(bad));
 
-    PolicyExpandLifecycleHook aligner =
-        new PolicyExpandLifecycleHook(PolicyExpandRegistrar.joiningCurrentTransaction());
-    IllegalArgumentException failure =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> new PolicyExpandReconciler(aligner, metalakes, policies).reconcileAll());
-    Assertions.assertTrue(failure.getMessage().contains("fix timeTrigger"));
+    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(7L, true, CRON));
+    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    Assertions.assertTrue(reader.scheduledExecutionTime(7L).isPresent());
+
+    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
+    Assertions.assertDoesNotThrow(
+        () -> new PolicyExpandReconciler(aligner, writer, metalakes, policies).reconcileAll());
+    Assertions.assertTrue(reader.scheduledExecutionTime(7L).isEmpty());
+  }
+
+  @TestTemplate
+  void testReconcileRemovesOrphanExpandRow() {
+    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(99L, true, CRON));
+    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    Assertions.assertTrue(reader.scheduledExecutionTime(99L).isPresent());
+
+    MetalakeMetaService metalakes = Mockito.mock(MetalakeMetaService.class);
+    PolicyMetaService policies = Mockito.mock(PolicyMetaService.class);
+    Mockito.when(metalakes.listMetalakes()).thenReturn(List.of());
+
+    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
+    new PolicyExpandReconciler(aligner, writer, metalakes, policies).reconcileAll();
+    Assertions.assertTrue(reader.scheduledExecutionTime(99L).isEmpty());
   }
 
   private static DataSource entityStoreDataSource() {

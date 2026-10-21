@@ -24,15 +24,20 @@ import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Keeps the expand-pool row aligned with a maintenance policy inside the policy transaction.
  *
  * <p>An enabled maintenance policy with a non-blank {@code timeTrigger} is scheduled. Disable, a
  * blank trigger, and a non-maintenance write remove the row. Delete removes the row by policy id.
- * An invalid cron throws, so the policy write rolls back with the expand change.
+ * An invalid cron throws on write so the policy change rolls back; on startup reconcile the expand
+ * row is removed so scheduler state is corrected while the bad policy content remains to be edited.
  */
 public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandLifecycleHook.class);
 
   private final PolicyExpandRegistrar registrar;
 
@@ -61,10 +66,32 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
   /**
    * Aligns the expand row for a policy that is already stored (startup backfill / reconcile).
    *
+   * <p>Deletes a redundant row when the policy should not be scheduled. Upserts the due time when
+   * the cron is valid. For an invalid cron, removes any expand row so the scheduler is corrected;
+   * the policy content itself is left for an operator to fix.
+   *
    * @param policy persisted policy
    */
   public void align(PolicyEntity policy) {
-    syncExpandRow(policy);
+    if (!isMaintenance(policy.content())) {
+      registrar.remove(policy.id());
+      return;
+    }
+    String trigger = timeTrigger(policy.content());
+    if (!policy.enabled() || trigger == null || trigger.isBlank()) {
+      registrar.remove(policy.id());
+      return;
+    }
+    try {
+      registrar.sync(policy.id(), true, trigger);
+    } catch (IllegalArgumentException e) {
+      registrar.remove(policy.id());
+      LOG.error(
+          "Removed expand row for policy id {} name {} with invalid timeTrigger; fix the policy content",
+          policy.id(),
+          policy.name(),
+          e);
+    }
   }
 
   private void syncExpandRow(PolicyEntity policy) {
