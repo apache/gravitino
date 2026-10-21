@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.policy;
 
+import java.time.Instant;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -66,9 +68,10 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
   /**
    * Aligns the {@code policy-expand} task for a stored policy (startup reconcile).
    *
-   * <p>Only mutates expand tasks: inserts when missing, reschedules when the due time is wrong,
-   * removes the expand task when the policy must not run or the cron is invalid. Never deletes the
-   * policy itself.
+   * <p>Only mutates expand tasks: inserts when missing; reschedules a <em>future</em> due that no
+   * longer matches the policy cron; leaves an overdue due (&lt; now) alone so the expand pool can
+   * catch up after downtime. Removes the expand task when the policy must not run or the cron is
+   * invalid. Never deletes the policy itself.
    *
    * @param policy persisted policy
    */
@@ -82,9 +85,9 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
       registrar.remove(policy.id());
       return;
     }
+    Instant expectedNext;
     try {
-      // Insert if missing; WHEN_EXISTS_RESCHEDULE corrects a stale due time.
-      registrar.sync(policy.id(), true, trigger);
+      expectedNext = PolicyExpandRegistrar.nextExecution(trigger);
     } catch (IllegalArgumentException e) {
       registrar.remove(policy.id());
       LOG.error(
@@ -92,7 +95,18 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
           policy.id(),
           policy.name(),
           e);
+      return;
     }
+    Optional<Instant> current = registrar.scheduledExecutionTime(policy.id());
+    Instant now = Instant.now();
+    if (current.isPresent() && current.get().isBefore(now)) {
+      // Overdue: keep so db-scheduler can catch up after a restart.
+      return;
+    }
+    if (current.isPresent() && current.get().equals(expectedNext)) {
+      return;
+    }
+    registrar.scheduleAt(policy.id(), expectedNext);
   }
 
   private void syncExpandRow(PolicyEntity policy) {

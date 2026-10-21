@@ -78,6 +78,36 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testReconcilePreservesOverdueExpandDue() throws IOException {
+    createAndInsertMakeLake(METALAKE + "_overdue");
+    String metalake = METALAKE + "_overdue";
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("overdue")
+            .withNamespace(NamespaceUtil.ofPolicy(metalake))
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withContent(compaction(CRON))
+            .withEnabled(true)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    PolicyMetaService.getInstance().insertPolicy(policy, false);
+
+    Instant overdue = Instant.now().minusSeconds(3600);
+    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    SessionUtils.doMultipleWithCommit(() -> writer.scheduleAt(policy.id(), overdue));
+    Assertions.assertEquals(overdue, reader.scheduledExecutionTime(policy.id()).orElseThrow());
+
+    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
+    new PolicyExpandReconciler(
+            aligner, writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
+        .reconcileAll();
+
+    Assertions.assertEquals(overdue, reader.scheduledExecutionTime(policy.id()).orElseThrow());
+  }
+
+  @TestTemplate
   void testReconcileCorrectsStaleExpandDueTime() throws IOException {
     createAndInsertMakeLake(METALAKE + "_stale");
     String metalake = METALAKE + "_stale";

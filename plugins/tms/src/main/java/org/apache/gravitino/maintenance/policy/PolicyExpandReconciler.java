@@ -37,9 +37,10 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li><b>missing</b> — enabled maintenance policy with a valid {@code timeTrigger} but no expand
- *       task → insert
- *   <li><b>wrong</b> — expand task exists but due time does not match the policy cron → reschedule;
- *       invalid cron → remove that expand task only
+ *       task → insert the next due after now
+ *   <li><b>wrong future due</b> — expand due is still in the future but does not match the policy
+ *       cron → reschedule; invalid cron → remove that expand task only
+ *   <li><b>overdue</b> — expand due is before now → leave unchanged so the pool can catch up
  *   <li><b>surplus</b> — expand task for disabled / blank / non-maintenance / deleted policy →
  *       delete that expand task only
  * </ul>

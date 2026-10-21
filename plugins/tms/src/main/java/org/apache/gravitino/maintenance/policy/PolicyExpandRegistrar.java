@@ -25,6 +25,7 @@ import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import com.github.kagkarlsson.scheduler.task.schedule.CronSchedule;
 import com.github.kagkarlsson.scheduler.task.schedule.CronStyle;
 import com.github.kagkarlsson.scheduler.task.schedule.Schedule;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -108,13 +109,25 @@ public final class PolicyExpandRegistrar {
       cancelIfPresent(instanceId);
       return;
     }
-    Instant due = nextExecution(timeTrigger);
-    SchedulerClient client = client();
+    scheduleAt(policyId, nextExecution(timeTrigger));
+  }
+
+  /**
+   * Inserts or moves the expand row to an explicit due time.
+   *
+   * @param policyId persisted policy id
+   * @param due execution time to store
+   */
+  @VisibleForTesting
+  void scheduleAt(long policyId, Instant due) {
+    TaskInstanceId instanceId = instanceId(policyId);
     boolean scheduled =
-        client.schedule(
-            new TaskInstance<>(TableMaintenanceSchedulerPools.POLICY_EXPAND, instanceId.getId()),
-            due,
-            SchedulerClient.ScheduleOptions.WHEN_EXISTS_RESCHEDULE);
+        client()
+            .schedule(
+                new TaskInstance<>(
+                    TableMaintenanceSchedulerPools.POLICY_EXPAND, instanceId.getId()),
+                due,
+                SchedulerClient.ScheduleOptions.WHEN_EXISTS_RESCHEDULE);
     if (!scheduled) {
       throw new IllegalStateException(
           "Failed to schedule policy-expand instance " + instanceId.getId() + " at " + due);
