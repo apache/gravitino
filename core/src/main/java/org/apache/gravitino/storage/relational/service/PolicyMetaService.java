@@ -112,7 +112,7 @@ public class PolicyMetaService {
 
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForPolicyCreate(metalakePO),
-          () -> insertOrOverwritePolicyWithHooks(policyEntity, policyPO, overwritten));
+          () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten));
     } catch (RuntimeException e) {
       try {
         ExceptionUtils.checkSQLException(
@@ -345,7 +345,8 @@ public class PolicyMetaService {
   }
 
   /**
-   * Writes the policy row and its content snapshot, firing the matching pre-commit lifecycle hooks.
+   * Writes the policy row and its content snapshot without committing, and fires the matching
+   * pre-commit lifecycle hooks around the DML.
    *
    * <p>A plain create (or an overwrite that finds no row) uses persist hooks. An overwrite that
    * replaces an existing row uses update hooks and passes the entity as stored — including the
@@ -361,10 +362,12 @@ public class PolicyMetaService {
    * Such a row keeps the primary key, so the insert is rejected as an already-existing policy,
    * which is the honest answer: the snapshots and relations of the deleted policy are gone with it.
    */
-  private void insertOrOverwritePolicyWithHooks(
+  private void insertPolicyWithoutCommit(
       PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
     if (!overwritten) {
-      persistNewPolicyWithHooks(policyEntity, initializedPolicyPO);
+      beforePersist(policyEntity);
+      insertNewPolicyWithoutCommit(initializedPolicyPO);
+      afterPersist(policyEntity);
       return;
     }
 
@@ -378,7 +381,9 @@ public class PolicyMetaService {
             "The policy ID %s is reserved by a deleted policy; use a new ID",
             initializedPolicyPO.getPolicyId());
       }
-      persistNewPolicyWithHooks(policyEntity, initializedPolicyPO);
+      beforePersist(policyEntity);
+      insertNewPolicyWithoutCommit(initializedPolicyPO);
+      afterPersist(policyEntity);
       return;
     }
 
@@ -392,12 +397,6 @@ public class PolicyMetaService {
     updatePolicyRootWithVersion(observedIdentifier, existingPolicyPO, replacementPolicyPO);
     insertPolicyVersionIfAllocated(existingPolicyPO, replacementPolicyPO);
     afterUpdate(storedPolicy);
-  }
-
-  private void persistNewPolicyWithHooks(PolicyEntity policyEntity, PolicyPO initializedPolicyPO) {
-    beforePersist(policyEntity);
-    insertNewPolicyWithoutCommit(initializedPolicyPO);
-    afterPersist(policyEntity);
   }
 
   /**
