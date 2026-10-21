@@ -65,10 +65,26 @@ jobs:
 
             // The check mirrors the Required CI job rather than the run conclusion: a run whose
             // suites were all skipped (no pull request yet, or Fork CI disabled in the fork)
-            // still concludes as success.
+            // still concludes as success. Failed jobs are listed while the run is still going,
+            // so reviewers and contributors can open their logs without waiting for the run.
             const mirror = async (owner, repo, run) => {
+              const jobs = await github.paginate(
+                'GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/jobs',
+                { owner, repo, run_id: run.id, attempt_number: run.run_attempt, per_page: 100 });
+              const failed = jobs.filter(job =>
+                job.name !== 'Required CI' && ['failure', 'timed_out'].includes(job.conclusion));
+              const failedNote = failed.length
+                ? `Failed jobs:\n${failed.map(job => `- [${job.name}](${job.html_url})`).join('\n')}`
+                : '';
               if (run.status !== 'completed') {
-                return { status: run.status === 'in_progress' ? 'in_progress' : 'queued' };
+                // A run stays queued while any of its jobs waits for a runner, even after other
+                // jobs have finished, so report it as in progress once any job has started.
+                const started = jobs.some(job => ['in_progress', 'completed'].includes(job.status));
+                return {
+                  status: started ? 'in_progress' : 'queued',
+                  title: failed.length ? `Running, ${failed.length} job(s) failed so far` : 'Running',
+                  note: failedNote
+                };
               }
               if (run.conclusion !== 'success') {
                 // Check runs reject some run conclusions, such as startup_failure.
@@ -78,18 +94,18 @@ jobs:
                     : (['neutral', 'skipped'].includes(run.conclusion) ? 'action_required' : 'failure');
                 return {
                   status: 'completed', conclusion,
-                  note: `The fork workflow run concluded with ${run.conclusion}.`
+                  title: failed.length ? `${failed.length} job(s) failed` : `Fork CI ${run.conclusion}`,
+                  note: [`The fork workflow run concluded with ${run.conclusion}.`, failedNote]
+                    .filter(Boolean).join('\n\n')
                 };
               }
-              const jobs = await github.paginate(
-                'GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/jobs',
-                { owner, repo, run_id: run.id, attempt_number: run.run_attempt, per_page: 100 });
               const required = jobs.find(job => job.name === 'Required CI');
               if (required && required.conclusion === 'success') {
-                return { status: 'completed', conclusion: 'success' };
+                return { status: 'completed', conclusion: 'success', title: 'All required suites passed' };
               }
               return {
                 status: 'completed', conclusion: 'action_required',
+                title: 'No suites were verified',
                 note: `Required CI was ${required ? required.conclusion : 'not run'}, so no suites were verified. ` +
                   'Open the pull request first and check that Fork CI is enabled in the fork, then push the branch again.'
               };
@@ -106,7 +122,7 @@ jobs:
 
             const output = run
               ? {
-                  title: 'Fork CI results',
+                  title: result.title || 'Fork CI results',
                   summary: `[See fork CI results](${detailsUrl})` + (result.note ? `\n\n${result.note}` : ''),
                   text: JSON.stringify({ owner, repo, run_id: run.id, run_attempt: run.run_attempt })
                 }
