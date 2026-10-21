@@ -43,6 +43,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -224,6 +225,105 @@ public class TestDorisTableOperationsSqlGeneration {
                 + new DorisColumnDefaultValueConverter()
                     .fromGravitinoForModifyColumn(defaultValue, true, true)),
         sql);
+  }
+
+  /**
+   * Verifies nullability and position changes use the same default encoding as MODIFY COLUMN.
+   *
+   * @param version the Doris version
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"1.2.7", "2.1.0", "3.0.6.2", "4.0.6"})
+  public void testNullabilityAndPositionPreserveEscapedDefaults(String version) throws Exception {
+    for (String value : new String[] {"O'Brien", "a\"\"b", "\\path", "trailing\\"}) {
+      TestableDorisTableOperations ops = new TestableDorisTableOperations(version);
+      DataSource versionDataSource = mockVersionDataSource(version);
+      ops.setDataSource(versionDataSource);
+      JdbcColumn column =
+          JdbcColumn.builder()
+              .withName("col1")
+              .withType(Types.VarCharType.of(64))
+              .withNullable(true)
+              .withComment("column comment")
+              .withDefaultValue(Literals.varcharLiteral(64, value))
+              .build();
+      ops.setTableForAlter(
+          JdbcTable.builder()
+              .withName("test_table")
+              .withColumns(new JdbcColumn[] {column})
+              .build());
+
+      String sql =
+          ops.alterTableSql(
+              "test_table",
+              TableChange.updateColumnNullability(new String[] {"col1"}, false),
+              TableChange.updateColumnPosition(
+                  new String[] {"col1"}, TableChange.ColumnPosition.first()),
+              TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(128)));
+
+      boolean isDoris3x = version.startsWith("3.");
+      String expectedDefault =
+          new DorisColumnDefaultValueConverter()
+              .fromGravitinoForModifyColumn(column.defaultValue(), isDoris3x, isDoris3x);
+      Assertions.assertEquals(
+          "ALTER TABLE `test_table`\n"
+              + "MODIFY COLUMN `col1` varchar(64) NOT NULL DEFAULT "
+              + expectedDefault
+              + " COMMENT 'column comment' ,\n"
+              + "MODIFY COLUMN `col1` varchar(64) NULL DEFAULT "
+              + expectedDefault
+              + " COMMENT 'column comment' FIRST,\n"
+              + "MODIFY COLUMN `col1` varchar(128) NULL DEFAULT "
+              + expectedDefault
+              + " COMMENT 'column comment' ;",
+          sql);
+      if (value.contains("\\") || value.contains("\"")) {
+        Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
+      } else {
+        Mockito.verifyNoInteractions(versionDataSource);
+      }
+    }
+  }
+
+  /** Verifies ordinary defaults do not add a version query for nullability or position changes. */
+  @Test
+  public void testNullabilityAndPositionSkipVersionLookupForPlainDefaults() {
+    for (Expression defaultValue :
+        new Expression[] {DEFAULT_VALUE_NOT_SET, Literals.NULL, Literals.integerLiteral(7)}) {
+      TestableDorisTableOperations ops = new TestableDorisTableOperations();
+      DataSource versionDataSource = Mockito.mock(DataSource.class);
+      ops.setDataSource(versionDataSource);
+      JdbcColumn column =
+          JdbcColumn.builder()
+              .withName("col1")
+              .withType(Types.IntegerType.get())
+              .withDefaultValue(defaultValue)
+              .build();
+      ops.setTableForAlter(
+          JdbcTable.builder()
+              .withName("test_table")
+              .withColumns(new JdbcColumn[] {column})
+              .build());
+      String sql =
+          ops.alterTableSql(
+              "test_table",
+              TableChange.updateColumnNullability(new String[] {"col1"}, true),
+              TableChange.updateColumnPosition(
+                  new String[] {"col1"}, TableChange.ColumnPosition.first()));
+      String expectedDefault =
+          DEFAULT_VALUE_NOT_SET.equals(defaultValue)
+              ? ""
+              : "DEFAULT " + (Literals.NULL.equals(defaultValue) ? "NULL" : "7") + " ";
+      Assertions.assertTrue(
+          sql.contains(
+              "int NULL "
+                  + expectedDefault
+                  + ",\nMODIFY COLUMN `col1` int NULL "
+                  + expectedDefault
+                  + "FIRST;"),
+          sql);
+      Mockito.verifyNoInteractions(versionDataSource);
+    }
   }
 
   /** Verifies native unparsed defaults pass through without interpretation. */

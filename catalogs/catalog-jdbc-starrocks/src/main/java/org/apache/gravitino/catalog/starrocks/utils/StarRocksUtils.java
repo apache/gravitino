@@ -121,7 +121,8 @@ public class StarRocksUtils {
     String[] lines = createTableSql.split("\n");
 
     boolean isProperties = false;
-    final String sProperties = "\"(.*)\"\\s*=\\s*\"(.*)\",?";
+    final String sProperties =
+        "\"((?:\\\\.|\"\"|[^\"\\\\])*)\"\\s*=\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*)\",?";
     final Pattern patternProperties = Pattern.compile(sProperties);
 
     for (String line : lines) {
@@ -134,8 +135,8 @@ public class StarRocksUtils {
         if (matcherProperties.find()) {
           // generatePropertiesSql escapes keys and values for double-quoted literals, and SHOW
           // CREATE echoes them escaped; unescape both so callers observe the original text.
-          final String key = unescapeSqlLiteral(matcherProperties.group(1).trim(), '"');
-          String value = unescapeSqlLiteral(matcherProperties.group(2).trim(), '"');
+          final String key = unescapeSqlLiteral(matcherProperties.group(1), '"');
+          String value = unescapeSqlLiteral(matcherProperties.group(2), '"');
           properties.put(key, value);
         }
       }

@@ -120,6 +120,31 @@ public class TestStarRocksUtils {
     assertEquals("owner\\s \"comment\"", result.get("plain"));
   }
 
+  /** Verifies escaped quotes cannot be mistaken for the property key/value separator. */
+  @Test
+  public void testPropertiesWithQuotedSeparatorsRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("k", "a\" = \"b");
+    properties.put("key\" = \"part", "value\" = \"part\\");
+    properties.put(" spaced key ", " spaced value ");
+    properties.put("empty", "");
+    properties.put("\\\"", "\\\" = \"\\");
+
+    assertEquals(
+        properties,
+        StarRocksUtils.extractPropertiesFromSql(StarRocksUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies backslash-escaped quotes around an equals sign remain in the property value. */
+  @Test
+  public void testPropertiesWithBackslashEscapedSeparators() {
+    String sql = "PROPERTIES (\n\"k\" = \"a\\\" = \\\"b\",\n\"end\" = \"tail\\\\\"\n)";
+    Map<String, String> expected = new HashMap<>();
+    expected.put("k", "a\" = \"b");
+    expected.put("end", "tail\\");
+    assertEquals(expected, StarRocksUtils.extractPropertiesFromSql(sql));
+  }
+
   @Test
   public void testExtractEscapedTableCommentFromSql() {
     String createTableSql =
