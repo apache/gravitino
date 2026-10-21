@@ -263,6 +263,12 @@ class TestOccupancyGate extends TestJDBCBackend {
         beforeSnapshotId, actions.getByJobId(succeeded.id()).beforeSnapshotId());
     // Failsafe reclaim must not invent S1 from S0 (§5.2.3).
     Assertions.assertNull(actions.getByJobId(succeeded.id()).afterSnapshotId());
+
+    // Late finish listener may still backfill a real S1 after reclaim closed the soft slot.
+    long afterSnapshotId = 200L;
+    actions.markFinished(succeeded.id(), afterSnapshotId, System.currentTimeMillis());
+    Assertions.assertEquals(afterSnapshotId, actions.getByJobId(succeeded.id()).afterSnapshotId());
+    Assertions.assertEquals(finishedAt, actions.getByJobId(succeeded.id()).finishedAt());
   }
 
   @TestTemplate

@@ -42,7 +42,8 @@ import org.slf4j.LoggerFactory;
  * rows consult {@link JobMetaService}; when that job is already terminal or confirmed missing,
  * {@link #reclaimTerminalBound} marks {@code finished_at} so the soft slot can be claimed again
  * (without inventing stub S1 metrics rows or copying {@code before_snapshot_id} into {@code
- * after_snapshot_id}).
+ * after_snapshot_id}). A later finish listener may still backfill a real S1 via {@link
+ * TableMaintenanceActionMetaService#markFinished}.
  */
 public final class OccupancyGate {
 

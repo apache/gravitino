@@ -254,6 +254,10 @@ public class TableMaintenanceActionMetaService {
    * single soft slot per pair (like {@code deleted_at}). Only one in-flight row can finish that
    * pair at a time, so two completed rows cannot race to the same millisecond {@code finished_at}.
    *
+   * <p>If failsafe reclaim already closed the row ({@code finished_at > 0}) with a null after
+   * snapshot, a later finish callback may still backfill a real S1 when {@code afterSnapshotId} is
+   * non-null.
+   *
    * @param jobId Gravitino job run id
    * @param afterSnapshotId terminal snapshot id
    * @param finishedAt finish timestamp millis
@@ -267,8 +271,27 @@ public class TableMaintenanceActionMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
             mapper -> mapper.markFinished(jobId, afterSnapshotId, finishedAt));
+    if (updated == 1) {
+      return;
+    }
+    if (afterSnapshotId != null) {
+      int backfilled =
+          SessionUtils.doWithCommitAndFetchResult(
+              TableMaintenanceActionMapper.class,
+              mapper -> mapper.backfillAfterSnapshot(jobId, afterSnapshotId));
+      Preconditions.checkState(
+          backfilled == 1,
+          "expected to finish or backfill exactly one action for job_id=%s, finished=%s, backfilled=%s",
+          jobId,
+          updated,
+          backfilled);
+      return;
+    }
     Preconditions.checkState(
-        updated == 1, "expected to finish exactly one in-flight action, updated=%s", updated);
+        false,
+        "expected to finish exactly one in-flight action for job_id=%s, updated=%s",
+        jobId,
+        updated);
   }
 
   /**

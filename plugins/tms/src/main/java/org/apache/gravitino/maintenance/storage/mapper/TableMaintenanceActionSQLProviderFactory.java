@@ -145,6 +145,16 @@ public class TableMaintenanceActionSQLProviderFactory {
   }
 
   /**
+   * @param jobId job run id
+   * @param afterSnapshotId after snapshot
+   * @return UPDATE statement
+   */
+  public static String backfillAfterSnapshot(
+      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId) {
+    return getProvider().backfillAfterSnapshot(jobId, afterSnapshotId);
+  }
+
+  /**
    * @param id action id
    * @return DELETE statement
    */
