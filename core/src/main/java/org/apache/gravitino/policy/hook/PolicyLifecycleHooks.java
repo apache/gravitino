@@ -16,12 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy;
+package org.apache.gravitino.policy.hook;
 
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 
-/** Holds the optional {@link PolicyLifecycleHook} registered by an extension. */
+/**
+ * Holds the optional {@link PolicyLifecycleHook} registered by an extension.
+ *
+ * <p>This is a storage-layer SPI invoked from {@code PolicyMetaService} inside the open policy
+ * transaction. It is not the same as {@code org.apache.gravitino.hook.PolicyHookDispatcher}, which
+ * wraps the policy API for owner side effects after a successful manager call.
+ */
 public final class PolicyLifecycleHooks {
 
   private static final AtomicReference<PolicyLifecycleHook> HOOK = new AtomicReference<>();

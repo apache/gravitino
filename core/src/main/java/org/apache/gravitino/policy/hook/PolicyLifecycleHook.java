@@ -16,17 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy;
+package org.apache.gravitino.policy.hook;
 
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**
- * Runs inside policy create / update / delete transactions, with JPA-style lifecycle points
- * relative to the policy DML.
+ * Storage-layer callbacks inside policy create / update / delete transactions, with JPA-style
+ * lifecycle points relative to the policy DML.
  *
- * <p>The caller already holds the open SQL session. Implementations must use that connection, and
- * must not commit, roll back, or close it. An exception rolls the policy write back together with
- * the hook's own writes.
+ * <p>Distinct from {@code org.apache.gravitino.hook.PolicyHookDispatcher}, which decorates the
+ * policy API after a successful manager call (for example ownership). This SPI runs in {@code
+ * PolicyMetaService} on the open SQL session so extension writes commit or roll back with the
+ * policy row.
+ *
+ * <p>Implementations must use that connection, and must not commit, roll back, or close it. An
+ * exception rolls the policy write back together with the hook's own writes.
  *
  * <p>Defaults are no-ops so an extension only overrides the points it needs.
  *

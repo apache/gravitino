@@ -23,7 +23,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
-import org.apache.gravitino.policy.PolicyLifecycleHook;
+import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
 
 /**
  * Keeps the expand-pool row aligned with a maintenance policy inside the policy transaction.
@@ -56,6 +56,15 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
   @Override
   public void beforeRemove(long policyId) {
     registrar.remove(policyId);
+  }
+
+  /**
+   * Aligns the expand row for a policy that is already stored (startup backfill / reconcile).
+   *
+   * @param policy persisted policy
+   */
+  public void align(PolicyEntity policy) {
+    syncExpandRow(policy);
   }
 
   private void syncExpandRow(PolicyEntity policy) {
