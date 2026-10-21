@@ -19,20 +19,17 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.rnorth.ducttape.Preconditions;
@@ -149,6 +146,21 @@ public class DorisContainer extends BaseContainer {
                 Wait.forListeningPort()
                     .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
             .withExposedService(FE_SERVICE, FE_HTTP_PORT)
+            // Runs after the FE port checks; the FE answers before the BEs have registered.
+            .waitingFor(
+                FE_SERVICE,
+                new ProbeWaitStrategy(
+                        format("Doris to report %d live backends with capacity", BE_SCALE),
+                        ProbeWaitStrategy.jdbcQuery(
+                            target ->
+                                format(
+                                    "jdbc:mysql://%s:%d/",
+                                    target.getHost(), target.getMappedPort(FE_MYSQL_PORT)),
+                            USER_NAME,
+                            "",
+                            "SHOW PROC '/backends';",
+                            backends -> StarRocksContainer.readyBackends(backends) >= BE_SCALE))
+                    .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
             .withScaledService(BE_SERVICE, BE_SCALE)
             .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS))
             .withTailChildContainers(true);
@@ -171,9 +183,8 @@ public class DorisContainer extends BaseContainer {
   public void start() {
     LOG.info("Starting Doris from {}", composeFiles());
     composeContainer = newComposeContainer();
-    composeContainer.start();
+    timedStart(composeContainer);
     resolveFeIpAddress();
-    Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
     Preconditions.check("Doris container password change failed!", changePassword());
   }
 
@@ -222,55 +233,6 @@ public class DorisContainer extends BaseContainer {
   /** Returns the host-mapped MySQL port (random, not the container-internal 9030). */
   public int getFeMysqlPort() {
     return feMysqlPort;
-  }
-
-  @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, feMysqlPort);
-    LOG.info("Doris JDBC url is {}", dorisJdbcUrl);
-
-    await()
-        .atMost(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .pollDelay(Duration.ZERO)
-        .pollInterval(STARTUP_TIMEOUT_SECONDS / retryLimit, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try (Connection connection =
-                      DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
-                  Statement statement = connection.createStatement()) {
-
-                // execute `SHOW PROC '/backends';` to check if all backends are ready
-                String query = "SHOW PROC '/backends';";
-                int aliveCount = 0;
-                try (ResultSet resultSet = statement.executeQuery(query)) {
-                  while (resultSet.next()) {
-                    String alive = resultSet.getString("Alive");
-                    String totalCapacity = resultSet.getString("TotalCapacity");
-                    float totalCapacityFloat = Float.parseFloat(totalCapacity.split(" ")[0]);
-
-                    if (alive.equalsIgnoreCase("true") && totalCapacityFloat > 0.0f) {
-                      aliveCount++;
-                    }
-                  }
-                }
-
-                if (aliveCount >= BE_SCALE) {
-                  LOG.info(
-                      "Doris docker-compose cluster startup success! All {} backends are alive.",
-                      aliveCount);
-                  return true;
-                }
-                LOG.info(
-                    "Doris docker-compose cluster is not ready yet! {}/{} backends alive.",
-                    aliveCount,
-                    BE_SCALE);
-              } catch (Exception e) {
-                LOG.error(e.getMessage(), e);
-              }
-              return false;
-            });
-
-    return true;
   }
 
   private void resolveFeIpAddress() {

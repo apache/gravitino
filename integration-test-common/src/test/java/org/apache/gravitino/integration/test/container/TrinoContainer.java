@@ -45,6 +45,9 @@ import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
 
 public class TrinoContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoContainer.class);
@@ -102,26 +105,22 @@ public class TrinoContainer extends BaseContainer {
     super.start();
 
     Preconditions.check("Initialization Trino JDBC connect failed!", initTrinoJdbcConnection());
-    Preconditions.check("Trino container startup failed!", checkContainerStatus(5));
   }
 
+  // The coordinator opens its port before it runs queries. The probe runs at wait time, after the
+  // constructor has set the TLS fields openJdbcConnection reads.
   @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    await()
-        .atMost(30, TimeUnit.SECONDS)
-        .pollDelay(Duration.ZERO)
-        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                return testTrinoJdbcConnection();
-              } catch (Exception e) {
-                LOG.error("Trino container startup failed!", e);
-              }
-              return false;
-            });
+  protected WaitStrategy waitStrategy() {
+    return new WaitAllStrategy()
+        .withStrategy(Wait.forListeningPort())
+        .withStrategy(
+            new ProbeWaitStrategy("Trino to answer select 1", target -> answersSelectOne()));
+  }
 
-    return true;
+  // The port check's five minutes plus the 50 seconds the connection and query checks had before.
+  @Override
+  protected Duration startupTimeout() {
+    return Duration.ofMinutes(5).plusSeconds(50);
   }
 
   @Override
@@ -175,20 +174,12 @@ public class TrinoContainer extends BaseContainer {
     return true;
   }
 
-  private boolean testTrinoJdbcConnection() {
-    try (Statement stmt = trinoJdbcConnection.createStatement();
+  private boolean answersSelectOne() throws SQLException {
+    try (Connection connection = openJdbcConnection("admin", Map.of());
+        Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery("select 1")) {
-      while (rs.next()) {
-        int one = rs.getInt(1);
-        Preconditions.check("Trino JDBC connection test failed!", one == 1);
-      }
-    } catch (SQLException e) {
-      // Maybe Trino server is still initialing
-      LOG.warn(e.getMessage(), e);
-      return false;
+      return rs.next() && rs.getInt(1) == 1;
     }
-
-    return true;
   }
 
   /**

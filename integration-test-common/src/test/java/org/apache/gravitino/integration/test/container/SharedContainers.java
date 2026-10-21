@@ -836,8 +836,9 @@ class SharedContainers {
     startTimed(container);
   }
 
-  // Logs one greppable line per start, including the container's own readiness check, so CI logs
-  // show where container time goes. Failed starts are logged too, with ok=false.
+  // Logs one greppable line per start, so CI logs show where container time goes: containerMs is
+  // the Testcontainers start with its wait strategy, which holds the readiness checks; readyMs is
+  // the work after it. Failed starts are logged too, with ok=false.
   //
   // A failed start is closed here because Testcontainers leaves the container running when its
   // readiness check times out, and the caller never stores it, so the next start* call would start

@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
+import org.testcontainers.containers.ContainerState;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
@@ -187,8 +188,19 @@ public abstract class BaseContainer implements Startable {
       container
           .withStartupCheckStrategy(new IsRunningStartupCheckStrategy())
           .waitingFor(waitStrategy)
-          .withStartupTimeout(Duration.ofMinutes(5));
+          .withStartupTimeout(startupTimeout());
     }
+  }
+
+  /**
+   * Returns how long {@link #waitStrategy()} may take in all. The default is five minutes; a
+   * container whose strategy chains several checks returns at least the sum of their budgets.
+   * Called from the constructor, so an override must not read subclass fields.
+   *
+   * @return the startup timeout
+   */
+  protected Duration startupTimeout() {
+    return Duration.ofMinutes(5);
   }
 
   /**
@@ -252,11 +264,19 @@ public abstract class BaseContainer implements Startable {
   // This method is used to get the IP address of the container.
   public String getContainerIpAddress() {
     DockerClient dockerClient = DockerClientFactory.instance().client();
-    InspectContainerResponse containerResponse =
-        dockerClient.inspectContainerCmd(container.getContainerId()).exec();
+    return ipAddress(dockerClient.inspectContainerCmd(container.getContainerId()).exec());
+  }
 
+  /**
+   * Returns the address of a container on its only network, as other containers and a Linux host
+   * reach it. A wait strategy passes its target's {@link ContainerState#getContainerInfo()}.
+   *
+   * @param containerInfo the inspected container
+   * @return the IP address
+   */
+  static String ipAddress(InspectContainerResponse containerInfo) {
     Map<String, ContainerNetwork> containerNetworkMap =
-        containerResponse.getNetworkSettings().getNetworks();
+        containerInfo.getNetworkSettings().getNetworks();
     Preconditions.checkArgument(
         (containerNetworkMap.size() == 1),
         "Container \"NetworkMap\" size is required equals to 1.");
@@ -273,9 +293,19 @@ public abstract class BaseContainer implements Startable {
       applyDisposableData(container);
       disposableDataApplied = true;
     }
+    timedStart(container);
+  }
+
+  /**
+   * Starts a Testcontainers container, or Compose project, and records the time as {@link
+   * #lastContainerStartMs()}. For a subclass that starts something other than {@link #container}.
+   *
+   * @param startable what to start
+   */
+  protected final void timedStart(Startable startable) {
     long startNanos = System.nanoTime();
     try {
-      container.start();
+      startable.start();
     } finally {
       lastContainerStartMs = (System.nanoTime() - startNanos) / 1_000_000;
     }
@@ -283,7 +313,8 @@ public abstract class BaseContainer implements Startable {
 
   /**
    * Returns how long the last {@code start()} spent in Testcontainers' own start: creating and
-   * starting the container and its wait strategy, without this class's own readiness check.
+   * starting the container and running its wait strategy, which holds the readiness checks. Work
+   * after that, such as {@link #checkContainerStatus(int)} or creating clients, is not included.
    *
    * @return the time in milliseconds, or 0 before the first start
    */
@@ -296,7 +327,16 @@ public abstract class BaseContainer implements Startable {
     container.stop();
   }
 
-  protected abstract boolean checkContainerStatus(int retryLimit);
+  /**
+   * Checks the started container beyond its wait strategy. Readiness belongs in {@link
+   * #waitStrategy()}; the default checks nothing.
+   *
+   * @param retryLimit how many times to try
+   * @return whether the container is ready
+   */
+  protected boolean checkContainerStatus(int retryLimit) {
+    return true;
+  }
 
   // Execute the command in the container.
   public Container.ExecResult executeInContainer(String... commandAndArgs) {

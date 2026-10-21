@@ -25,6 +25,10 @@ import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,6 +38,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.testcontainers.containers.GenericContainer;
@@ -74,6 +80,10 @@ public final class TrinoCluster extends BaseContainer {
   private static final String MYSQL_HOST = "mysql";
   private static final String POSTGRESQL_HOST = "postgresql";
   private static final String DB_PASSWORD = "ds123";
+  private static final String TRINO_USER = "gravitino";
+  private static final Pattern NEXT_URI = Pattern.compile("\"nextUri\"\\s*:\\s*\"([^\"]+)\"");
+  private static final Pattern SINGLE_VALUE =
+      Pattern.compile("\"data\"\\s*:\\s*\\[\\s*\\[\\s*(\\d+)\\s*]\\s*]");
   // Every Trino node loads the Gravitino connector, which calls the server on the host.
   private static final Map<String, String> GRAVITINO_HOST =
       ImmutableMap.of("host.docker.internal", "host-gateway");
@@ -143,16 +153,60 @@ public final class TrinoCluster extends BaseContainer {
     }
   }
 
+  // Runs the query the Trino CLI would, over the HTTP protocol the CLI speaks, following
+  // nextUri until the query finishes. Any failure counts as no workers yet.
   private int activeWorkers() {
-    String out =
-        executeInContainer(
-                "trino",
-                "--execute",
-                "SELECT count(*) FROM system.runtime.nodes WHERE coordinator = false")
-            .getStdout()
-            .replace("\"", "")
-            .trim();
-    return out.isEmpty() ? 0 : Integer.parseInt(out);
+    HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(
+                    String.format(
+                        "http://%s:%d/v1/statement",
+                        container.getHost(), getMappedPort(TRINO_PORT))))
+            .header("X-Trino-User", TRINO_USER)
+            .timeout(Duration.ofSeconds(10))
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "SELECT count(*) FROM system.runtime.nodes WHERE coordinator = false"))
+            .build();
+    int count = 0;
+    try {
+      for (int page = 0; request != null && page < 100; page++) {
+        String body = http.send(request, HttpResponse.BodyHandlers.ofString()).body();
+        Optional<Integer> value = firstValue(body);
+        if (value.isPresent()) {
+          count = value.get();
+        }
+        Optional<String> next = nextUri(body);
+        request =
+            next.isEmpty()
+                ? null
+                : HttpRequest.newBuilder(URI.create(next.get()))
+                    .header("X-Trino-User", TRINO_USER)
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+      }
+    } catch (IOException e) {
+      LOG.info("Trino coordinator is not answering queries yet: {}", e.getMessage());
+      return 0;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return 0;
+    }
+    return count;
+  }
+
+  /** Returns the {@code nextUri} of a Trino statement response, if the query has more pages. */
+  static Optional<String> nextUri(String body) {
+    Matcher matcher = NEXT_URI.matcher(body);
+    return matcher.find() ? Optional.of(matcher.group(1)) : Optional.empty();
+  }
+
+  /** Returns the single integer of a one-row, one-column Trino statement response page. */
+  static Optional<Integer> firstValue(String body) {
+    Matcher matcher = SINGLE_VALUE.matcher(body);
+    return matcher.find() ? Optional.of(Integer.parseInt(matcher.group(1))) : Optional.empty();
   }
 
   /**

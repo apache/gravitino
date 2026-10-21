@@ -22,6 +22,7 @@ import static java.lang.String.format;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +31,13 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.ranger.RangerClient;
-import org.apache.ranger.RangerServiceException;
-import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
 import org.testcontainers.utility.MountableFile;
 
 public class RangerContainer extends BaseContainer {
@@ -128,35 +130,31 @@ public class RangerContainer extends BaseContainer {
 
     rangerUrl = String.format("http://localhost:%s", this.getMappedPort(RANGER_SERVER_PORT));
     rangerClient = new RangerClient(rangerUrl, authType, rangerUserName, rangerPassword, null);
-
-    Preconditions.check("Ranger container startup failed!", checkContainerStatus(10));
   }
 
+  // The port opens before Ranger admin serves requests, so the plugins API must answer too.
   @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
-    boolean isRangerContainerReady = false;
-    int sleepTimeMillis = 3_000;
-    while (nRetry++ < retryLimit) {
-      try {
-        rangerClient.getPluginsInfo();
-        isRangerContainerReady = true;
-        LOG.info("Ranger container startup success!");
-        break;
-      } catch (RangerServiceException e) {
-        LOG.warn("Check Ranger startup status... {}", e.getMessage());
-      }
-      if (!isRangerContainerReady) {
-        try {
-          Thread.sleep(sleepTimeMillis);
-          LOG.warn("Waiting for Ranger server to be ready... ({}ms)", nRetry * sleepTimeMillis);
-        } catch (InterruptedException e) {
-          // ignore
-        }
-      }
-    }
+  protected WaitStrategy waitStrategy() {
+    return new WaitAllStrategy()
+        .withStrategy(Wait.forListeningPort())
+        .withStrategy(
+            new ProbeWaitStrategy(
+                "Ranger admin to answer its plugins API",
+                target -> {
+                  String url =
+                      String.format(
+                          "http://%s:%d",
+                          target.getHost(), target.getMappedPort(RANGER_SERVER_PORT));
+                  new RangerClient(url, authType, rangerUserName, rangerPassword, null)
+                      .getPluginsInfo();
+                  return true;
+                }));
+  }
 
-    return isRangerContainerReady;
+  // The port check's five minutes plus the 30 seconds the plugins API had before.
+  @Override
+  protected Duration startupTimeout() {
+    return Duration.ofMinutes(5).plusSeconds(30);
   }
 
   /**

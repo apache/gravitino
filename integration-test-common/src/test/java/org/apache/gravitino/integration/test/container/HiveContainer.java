@@ -19,7 +19,6 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
@@ -34,13 +33,17 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import org.rnorth.ducttape.Preconditions;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategyTarget;
 import org.testcontainers.utility.MountableFile;
 
 public class HiveContainer extends BaseContainer {
@@ -130,8 +133,16 @@ public class HiveContainer extends BaseContainer {
     if (!kerberosEnabled) {
       allowHadoopUserToImpersonate();
     }
+    // Set here rather than in waitStrategy(), which runs before the constructor sets the auth.
+    container.waitingFor(kerberosEnabled ? kerberosReadiness() : readiness());
+    withStartupTimeout(startupTimeout());
     super.start();
-    Preconditions.check("Hive container startup failed!", checkContainerStatus(15));
+  }
+
+  // The port check's five minutes plus the 330 seconds the HTTP and the CLI checks each had before.
+  @Override
+  protected Duration startupTimeout() {
+    return Duration.ofMinutes(5).plusSeconds(330);
   }
 
   /**
@@ -201,66 +212,117 @@ public class HiveContainer extends BaseContainer {
     LOG.info("Hive report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
   }
 
-  @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    if (kerberosEnabled) {
-      awaitReadyWithHiveCli();
-      awaitPort(HIVE_METASTORE_PORT, "Hive Metastore");
-    } else {
-      awaitReadyOverHttp();
-      awaitPort(HIVE_METASTORE_PORT, "Hive Metastore");
-      // Tests run HiveQL over JDBC; Kerberos Hive tests still use the CLI.
-      awaitPort(HIVE_SERVICE_PORT, "HiveServer2");
+  /**
+   * Waits for HDFS through the NameNode's JMX, creates the warehouse directory through WebHDFS and
+   * waits for the metastore and HiveServer2 ports. The Hive CLI checks this replaces each boot a
+   * JVM with an embedded metastore, which costs several seconds per call; the metastore port covers
+   * Hive itself.
+   */
+  private WaitStrategy readiness() {
+    AtomicInteger namenodePort = new AtomicInteger();
+    return new WaitAllStrategy()
+        .withStrategy(Wait.forListeningPort())
+        .withStrategy(
+            new ProbeWaitStrategy(
+                    "HDFS to report a live DataNode",
+                    target -> {
+                      for (int port : NAMENODE_HTTP_PORTS) {
+                        String jmx =
+                            httpRequest(
+                                "GET",
+                                format(
+                                    "http://%s:%d/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState",
+                                    ipAddress(target.getContainerInfo()), port));
+                        if (hasLiveDataNode(jmx)) {
+                          namenodePort.set(port);
+                          return true;
+                        }
+                      }
+                      return false;
+                    })
+                .withPollInterval(Duration.ofMillis(500)))
+        // `CREATE TABLE` through the Hive CLI used to create this directory as the Hadoop user;
+        // tests that write to the default database expect it to exist.
+        .withStrategy(
+            new ProbeWaitStrategy(
+                    "WebHDFS to create " + WAREHOUSE_DIR,
+                    target -> {
+                      String response =
+                          httpRequest(
+                              "PUT",
+                              format(
+                                  "http://%s:%d/webhdfs/v1%s?op=MKDIRS&user.name=%s",
+                                  ipAddress(target.getContainerInfo()),
+                                  namenodePort.get(),
+                                  WAREHOUSE_DIR,
+                                  getHadoopUser()));
+                      return response != null && response.contains("true");
+                    })
+                .withPollInterval(Duration.ofMillis(500)))
+        .withStrategy(portProbe(HIVE_METASTORE_PORT, "Hive Metastore"))
+        // Tests run HiveQL over JDBC; Kerberos Hive tests still use the CLI.
+        .withStrategy(portProbe(HIVE_SERVICE_PORT, "HiveServer2"));
+  }
+
+  /**
+   * Waits for the image's check-status.sh and a {@code CREATE TABLE} through the Hive CLI, then for
+   * the metastore port. Kerberos Hive keeps the CLI: over HTTP the NameNode wants SPNEGO, and the
+   * CLI table creates the warehouse directory as the image's own Kerberos user, with the
+   * permissions tests such as HiveUserAuthenticationIT rely on.
+   */
+  private WaitStrategy kerberosReadiness() {
+    String createTableSQL =
+        "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
+            + "salary String, destination String) ";
+    return new WaitAllStrategy()
+        .withStrategy(Wait.forListeningPort())
+        .withStrategy(
+            new ProbeWaitStrategy(
+                    "HDFS and the Hive CLI to pass check-status.sh",
+                    target -> succeeds(target, "bash", "/tmp/check-status.sh"))
+                // Each report runs two more CLIs, so only print it once Hive has run out of time.
+                .withTimeoutReport(target -> outputHiveStatus()))
+        .withStrategy(
+            new ProbeWaitStrategy(
+                "the Hive CLI to create default.employee",
+                target -> succeeds(target, "hive", "-e", createTableSQL)))
+        .withStrategy(portProbe(HIVE_METASTORE_PORT, "Hive Metastore"));
+  }
+
+  private static boolean succeeds(WaitStrategyTarget target, String... commandAndArgs)
+      throws IOException, InterruptedException {
+    Container.ExecResult result = target.execInContainer(commandAndArgs);
+    if (result.getExitCode() != 0) {
+      LOG.info(
+          "Command [{}] exited with {}, stdout: {}, stderr: {}",
+          String.join(" ", commandAndArgs),
+          result.getExitCode(),
+          result.getStdout(),
+          result.getStderr());
+      return false;
     }
     return true;
   }
 
-  /**
-   * Waits for HDFS through the NameNode's JMX and creates the warehouse directory through WebHDFS.
-   * The Hive CLI checks this replaces each boot a JVM with an embedded metastore, which costs
-   * several seconds per call; the metastore port check that follows covers Hive itself.
-   */
-  private void awaitReadyOverHttp() {
-    String containerIp = getContainerIpAddress();
-    int[] namenodePort = new int[1];
-    await()
-        .atMost(150, TimeUnit.SECONDS)
-        .pollDelay(Duration.ZERO)
-        .pollInterval(500, TimeUnit.MILLISECONDS)
-        .until(
-            () -> {
-              for (int port : NAMENODE_HTTP_PORTS) {
-                String jmx =
-                    httpRequest(
-                        "GET",
-                        format(
-                            "http://%s:%d/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState",
-                            containerIp, port));
-                if (jmx != null && jmx.matches("(?s).*\"NumLiveDataNodes\"\\s*:\\s*[1-9].*")) {
-                  namenodePort[0] = port;
-                  return true;
-                }
-              }
-              return false;
-            });
+  private static WaitStrategy portProbe(int port, String service) {
+    return new ProbeWaitStrategy(
+        format("%s to accept connections on port %d", service, port),
+        target -> {
+          try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(ipAddress(target.getContainerInfo()), port), 3000);
+            return true;
+          }
+        });
+  }
 
-    // `CREATE TABLE` through the Hive CLI used to create this directory as the Hadoop user; tests
-    // that write to the default database expect it to exist.
-    await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollDelay(Duration.ZERO)
-        .pollInterval(500, TimeUnit.MILLISECONDS)
-        .until(
-            () -> {
-              String response =
-                  httpRequest(
-                      "PUT",
-                      format(
-                          "http://%s:%d/webhdfs/v1%s?op=MKDIRS&user.name=%s",
-                          containerIp, namenodePort[0], WAREHOUSE_DIR, getHadoopUser()));
-              return response != null && response.contains("true");
-            });
-    LOG.info("Hive container startup success!");
+  /**
+   * Returns whether a NameNode {@code FSNamesystemState} JMX response reports a live DataNode.
+   *
+   * @param jmx the response body, or null when the request failed
+   * @return true when at least one DataNode is live
+   */
+  static boolean hasLiveDataNode(@Nullable String jmx) {
+    return jmx != null && jmx.matches("(?s).*\"NumLiveDataNodes\"\\s*:\\s*[1-9].*");
   }
 
   /** Returns the response body, or null when the request fails or returns a non-2xx status. */
@@ -293,94 +355,6 @@ public class HiveContainer extends BaseContainer {
         connection.disconnect();
       }
     }
-  }
-
-  // Ready means HDFS has a live data node and the Hive CLI can list databases.
-  private void awaitHiveCli() {
-    await()
-        .atMost(150, TimeUnit.SECONDS)
-        .pollDelay(Duration.ZERO)
-        // Each check runs the Hive CLI, which takes seconds; a short interval only stops it from
-        // waiting long after Hive is up.
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                String[] commandAndArgs = new String[] {"bash", "/tmp/check-status.sh"};
-                Container.ExecResult execResult = executeInContainer(commandAndArgs);
-                if (execResult.getExitCode() != 0) {
-                  String message =
-                      format(
-                          "Command [%s] exited with %s",
-                          String.join(" ", commandAndArgs), execResult.getExitCode());
-                  LOG.info("{}, stderr: {}", message, execResult.getStderr());
-                } else {
-                  LOG.info("Hive container startup success!");
-                  return true;
-                }
-              } catch (RuntimeException e) {
-                LOG.error(e.getMessage(), e);
-              }
-              return false;
-            });
-  }
-
-  private void awaitReadyWithHiveCli() {
-    try {
-      awaitHiveCli();
-    } catch (RuntimeException e) {
-      // Each report runs two more CLIs, so only print it once Hive has run out of time.
-      outputHiveStatus();
-      throw e;
-    }
-
-    // Creating a table also creates /user/hive/warehouse in HDFS as the image's own user; Kerberos
-    // tests such as HiveUserAuthenticationIT rely on that directory and its permissions.
-    final String createTableSQL =
-        "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
-            + "salary String, destination String) ";
-    await()
-        .atMost(120, TimeUnit.SECONDS)
-        .pollDelay(Duration.ZERO)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result = executeInContainer("hive", "-e", createTableSQL);
-                if (result.getExitCode() == 0) {
-                  return true;
-                }
-
-                LOG.warn(
-                    "Failed to execute sql: {}, Std-out: {}, Std-error:{}",
-                    createTableSQL,
-                    result.getStdout(),
-                    result.getStderr());
-              } catch (Exception e) {
-                LOG.error("Failed to execute sql: {}", createTableSQL, e);
-              }
-              return false;
-            });
-  }
-
-  private void awaitPort(int port, String service) {
-    String containerIp = getContainerIpAddress();
-    // The metastore opens its port only after its schema is set up; under CI load that can take
-    // well over 10 seconds, so give it the same kind of budget as the other stages.
-    await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollDelay(Duration.ZERO)
-        .pollInterval(Duration.ofSeconds(1))
-        .until(
-            () -> {
-              try (Socket socket = new Socket()) {
-                socket.connect(new InetSocketAddress(containerIp, port), 3000);
-                return true;
-              } catch (Exception e) {
-                LOG.warn("Can't connect to {}:[{}:{}]", service, containerIp, port, e);
-              }
-              return false;
-            });
   }
 
   public static class Builder extends BaseContainer.Builder<Builder, HiveContainer> {

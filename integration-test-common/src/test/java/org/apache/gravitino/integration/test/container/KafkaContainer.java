@@ -18,23 +18,27 @@
  */
 package org.apache.gravitino.integration.test.container;
 
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
 
 public class KafkaContainer extends BaseContainer {
 
@@ -42,6 +46,8 @@ public class KafkaContainer extends BaseContainer {
   private static final String DEFAULT_KAFKA_IMAGE = TestImages.KAFKA;
   private static final String DEFAULT_HOST_NAME = "gravitino-ci-kafka";
   private static final String KAFKA_LOGS_DIR = "/opt/kafka/logs";
+  private static final short API_VERSIONS_KEY = 18;
+  private static final int PROBE_CORRELATION_ID = 0x6772;
 
   protected KafkaContainer(
       String image,
@@ -56,12 +62,6 @@ public class KafkaContainer extends BaseContainer {
 
   public static Builder builder() {
     return new Builder();
-  }
-
-  @Override
-  public void start() {
-    super.start();
-    Preconditions.checkArgument(checkContainerStatus(5), "Kafka container startup failed!");
   }
 
   @Override
@@ -86,54 +86,51 @@ public class KafkaContainer extends BaseContainer {
   }
 
   @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    String address = getContainerIpAddress();
-    Preconditions.checkArgument(
-        Strings.isNotBlank(address), "Kafka container IP address is not available.");
-    String broker = String.format("%s:%d", address, DEFAULT_BROKER_PORT);
+  protected WaitStrategy waitStrategy() {
+    return new WaitAllStrategy()
+        .withStrategy(Wait.forListeningPort())
+        .withStrategy(
+            new ProbeWaitStrategy(
+                "Kafka to answer an ApiVersions request",
+                target -> {
+                  String address = ipAddress(target.getContainerInfo());
+                  Preconditions.checkArgument(
+                      Strings.isNotBlank(address), "Kafka container IP address is not available.");
+                  return answersApiVersions(address, DEFAULT_BROKER_PORT);
+                }));
+  }
 
-    await()
-        .atMost(1, TimeUnit.MINUTES)
-        .pollDelay(Duration.ZERO)
-        .pollInterval(60 / retryLimit, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    executeInContainer(
-                        "sh",
-                        "/opt/kafka/bin/kafka-cluster.sh",
-                        "cluster-id",
-                        "--bootstrap-server",
-                        broker);
-                if (result.getStdout().startsWith("Cluster ID:")) {
-                  LOG.info("Kafka server has started." + result.getStdout());
-                  return true;
-                }
-              } catch (Exception ex) {
-                LOG.warn(
-                    "Could not connect to Kafka server[{}:{}]", address, DEFAULT_BROKER_PORT, ex);
-              }
-              return false;
-            });
+  // The port check's five minutes plus the minute the ApiVersions check had before.
+  @Override
+  protected Duration startupTimeout() {
+    return Duration.ofMinutes(6);
+  }
 
-    await()
-        .atMost(30, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try (Socket socket = new Socket()) {
-                socket.connect(
-                    new java.net.InetSocketAddress(getContainerIpAddress(), DEFAULT_BROKER_PORT),
-                    3000);
-              } catch (Exception ex) {
-                LOG.warn(
-                    "Could not connect to Kafka server[{}:{}]", address, DEFAULT_BROKER_PORT, ex);
-                return false;
-              }
-              return true;
-            });
-
-    return true;
+  /**
+   * Sends a Kafka {@code ApiVersions} v0 request and returns whether the broker answers it. The
+   * port accepts connections while the broker still starts; it answers requests only once it serves
+   * clients.
+   */
+  static boolean answersApiVersions(String host, int port) {
+    byte[] clientId = "gravitino-it".getBytes(StandardCharsets.UTF_8);
+    try (Socket socket = new Socket()) {
+      socket.connect(new InetSocketAddress(host, port), 3000);
+      socket.setSoTimeout(3000);
+      DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+      // Request header v1: api key, api version, correlation id, client id.
+      out.writeInt(2 + 2 + 4 + 2 + clientId.length);
+      out.writeShort(API_VERSIONS_KEY);
+      out.writeShort(0);
+      out.writeInt(PROBE_CORRELATION_ID);
+      out.writeShort(clientId.length);
+      out.write(clientId);
+      out.flush();
+      DataInputStream in = new DataInputStream(socket.getInputStream());
+      return in.readInt() >= 4 && in.readInt() == PROBE_CORRELATION_ID;
+    } catch (IOException e) {
+      LOG.info("Kafka server {}:{} is not ready yet: {}", host, port, e.getMessage());
+      return false;
+    }
   }
 
   public static class Builder extends BaseContainer.Builder<Builder, KafkaContainer> {
