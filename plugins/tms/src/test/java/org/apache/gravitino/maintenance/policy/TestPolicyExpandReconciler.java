@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.policy;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import javax.sql.DataSource;
 import org.apache.gravitino.meta.AuditInfo;
@@ -42,6 +43,7 @@ import org.mockito.Mockito;
 class TestPolicyExpandReconciler extends TestJDBCBackend {
 
   private static final String CRON = "0 0 2 * * ?";
+  private static final String LATER_CRON = "0 30 4 * * ?";
   private static final String METALAKE = "metalake_for_expand_reconcile";
 
   @TestTemplate
@@ -73,6 +75,36 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
 
     Assertions.assertTrue(aligned >= 1);
     Assertions.assertTrue(reader.scheduledExecutionTime(policy.id()).isPresent());
+  }
+
+  @TestTemplate
+  void testReconcileCorrectsStaleExpandDueTime() throws IOException {
+    createAndInsertMakeLake(METALAKE + "_stale");
+    String metalake = METALAKE + "_stale";
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("stale-due")
+            .withNamespace(NamespaceUtil.ofPolicy(metalake))
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withContent(compaction(CRON))
+            .withEnabled(true)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    PolicyMetaService.getInstance().insertPolicy(policy, false);
+
+    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    SessionUtils.doMultipleWithCommit(() -> writer.sync(policy.id(), true, LATER_CRON));
+    Instant staleDue = reader.scheduledExecutionTime(policy.id()).orElseThrow();
+
+    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
+    new PolicyExpandReconciler(
+            aligner, writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
+        .reconcileAll();
+
+    Instant corrected = reader.scheduledExecutionTime(policy.id()).orElseThrow();
+    Assertions.assertNotEquals(staleDue, corrected);
   }
 
   @TestTemplate

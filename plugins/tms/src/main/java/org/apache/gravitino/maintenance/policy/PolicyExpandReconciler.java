@@ -30,15 +30,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Reconciles {@code policy-expand} rows when TMS starts.
+ * Reconciles {@code policy-expand} tasks when TMS starts.
  *
- * <p>Lifecycle hooks only run on later policy writes. Startup walks stored policies and the expand
- * table so upgrade / first-enable paths converge without an edit:
+ * <p>Only {@code scheduled_expand_tasks} rows are touched — never policy rows or other scheduler
+ * tables. Lifecycle hooks cover later writes; startup must still converge existing state:
  *
  * <ul>
- *   <li>redundant expand rows (disabled, blank trigger, non-maintenance, or orphan) are deleted
- *   <li>valid schedules are upserted to the next due time
- *   <li>invalid cron clears the expand row (scheduler fixed; policy content still needs an edit)
+ *   <li><b>missing</b> — enabled maintenance policy with a valid {@code timeTrigger} but no expand
+ *       task → insert
+ *   <li><b>wrong</b> — expand task exists but due time does not match the policy cron → reschedule;
+ *       invalid cron → remove that expand task only
+ *   <li><b>surplus</b> — expand task for disabled / blank / non-maintenance / deleted policy →
+ *       delete that expand task only
  * </ul>
  */
 public final class PolicyExpandReconciler {
@@ -78,13 +81,14 @@ public final class PolicyExpandReconciler {
   }
 
   /**
-   * Aligns every stored policy, then deletes expand rows that no longer have a policy.
+   * For each policy, insert or correct its expand task; then delete orphan expand tasks.
    *
    * @return number of policies walked
    */
   public int reconcileAll() {
     Set<Long> knownPolicyIds = new HashSet<>();
     int aligned = 0;
+    // Missing → insert; wrong due / invalid cron → correct or clear expand task only.
     for (BaseMetalake metalake : metalakeMetaService.listMetalakes()) {
       for (PolicyEntity policy :
           policyMetaService.listPoliciesByNamespace(NamespaceUtil.ofPolicy(metalake.name()))) {
@@ -93,6 +97,7 @@ public final class PolicyExpandReconciler {
         aligned++;
       }
     }
+    // Surplus expand tasks with no policy left → delete expand only.
     int[] removedOrphans = {0};
     SessionUtils.doMultipleWithCommit(
         () -> {
@@ -104,7 +109,7 @@ public final class PolicyExpandReconciler {
           }
         });
     LOG.info(
-        "Reconciled expand rows for {} policies; removed {} orphan expand rows",
+        "Reconciled expand tasks for {} policies; removed {} orphan expand tasks",
         aligned,
         removedOrphans[0]);
     return aligned;

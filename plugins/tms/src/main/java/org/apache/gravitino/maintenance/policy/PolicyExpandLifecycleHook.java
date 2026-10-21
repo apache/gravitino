@@ -64,11 +64,11 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
   }
 
   /**
-   * Aligns the expand row for a policy that is already stored (startup backfill / reconcile).
+   * Aligns the {@code policy-expand} task for a stored policy (startup reconcile).
    *
-   * <p>Deletes a redundant row when the policy should not be scheduled. Upserts the due time when
-   * the cron is valid. For an invalid cron, removes any expand row so the scheduler is corrected;
-   * the policy content itself is left for an operator to fix.
+   * <p>Only mutates expand tasks: inserts when missing, reschedules when the due time is wrong,
+   * removes the expand task when the policy must not run or the cron is invalid. Never deletes the
+   * policy itself.
    *
    * @param policy persisted policy
    */
@@ -83,11 +83,12 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
       return;
     }
     try {
+      // Insert if missing; WHEN_EXISTS_RESCHEDULE corrects a stale due time.
       registrar.sync(policy.id(), true, trigger);
     } catch (IllegalArgumentException e) {
       registrar.remove(policy.id());
       LOG.error(
-          "Removed expand row for policy id {} name {} with invalid timeTrigger; fix the policy content",
+          "Cleared policy-expand task for policy id {} name {} with invalid timeTrigger; fix the policy content",
           policy.id(),
           policy.name(),
           e);
