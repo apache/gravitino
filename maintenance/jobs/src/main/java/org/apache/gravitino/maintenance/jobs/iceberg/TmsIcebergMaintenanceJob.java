@@ -49,7 +49,6 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -381,6 +380,8 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
   @VisibleForTesting
   static long currentSnapshotId(SparkSession spark, String catalogName, String tableIdentifier) {
+    // Catch Exception (not Spark NoSuchTableException) so this class loads on the Gravitino
+    // server classpath, which does not ship Spark catalyst types.
     try {
       Table table =
           Spark3Util.loadIcebergTable(spark, String.format("%s.%s", catalogName, tableIdentifier));
@@ -390,9 +391,6 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
             "Iceberg table has no current snapshot: " + catalogName + "." + tableIdentifier);
       }
       return snapshot.snapshotId();
-    } catch (NoSuchTableException e) {
-      throw new IllegalStateException(
-          "Iceberg table not found: " + catalogName + "." + tableIdentifier, e);
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {

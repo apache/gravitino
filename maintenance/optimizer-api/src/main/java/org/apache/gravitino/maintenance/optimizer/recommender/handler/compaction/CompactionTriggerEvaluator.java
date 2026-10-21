@@ -26,8 +26,9 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionE
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 
 /**
- * Evaluates Iceberg compaction {@code trigger-expr} with the same QL expression stack used by
- * {@link CompactionStrategyHandler} / {@code BaseExpressionStrategyHandler}.
+ * Evaluates Iceberg compaction {@code trigger-expr} with the same QL expression stack used by the
+ * optimizer compaction strategy handler ({@code CompactionStrategyHandler} / {@code
+ * BaseExpressionStrategyHandler}).
  *
  * <p>Intended for callers that already have table-level metric values (for example TMS in-job
  * sample JSON) without constructing a full strategy handler.
