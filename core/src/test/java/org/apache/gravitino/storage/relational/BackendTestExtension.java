@@ -246,7 +246,7 @@ public class BackendTestExtension
    * Closes with the root store, in reverse insertion order, so before the containers {@code
    * CloseContainerExtension} registered earlier.
    */
-  static class LiveBackend implements ExtensionContext.Store.CloseableResource {
+  static class LiveBackend implements AutoCloseable {
     private final String backendType;
     private final RelationalBackend backend;
     private final Config config;

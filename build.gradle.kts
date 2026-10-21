@@ -584,6 +584,8 @@ fun excludePackagesForSparkConnector(project: Project) {
 
 val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
 val checkstyleVersion: String = libs.versions.checkstyle.get()
+val junitBom = libs.junit.bom
+val junitPlatformLauncher = libs.junit.platform.launcher
 
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
@@ -711,13 +713,25 @@ subprojects {
       options.release.set(8)
     }
 
-    // Tests still need Java 17 to compile against dependencies that only publish Java 17 variants.
-    tasks.named<JavaCompile>("compileTestJava") {
-      options.release.set(17)
-    }
+    // Tests and test fixtures still need Java 17 to compile against dependencies that only
+    // publish Java 17 variants, such as JUnit 6.
+    tasks.matching { it.name in setOf("compileTestJava", "compileTestFixturesJava") }
+      .withType<JavaCompile>()
+      .configureEach {
+        options.release.set(17)
+      }
 
     val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
-    configurations.matching { it.name in setOf("testCompileClasspath", "testRuntimeClasspath") }
+    configurations.matching {
+      it.name in setOf(
+        "testCompileClasspath",
+        "testRuntimeClasspath",
+        "testFixturesCompileClasspath",
+        "testFixturesRuntimeClasspath",
+        "testFixturesApiElements",
+        "testFixturesRuntimeElements"
+      )
+    }
       .configureEach {
         attributes.attribute(targetJvmVersionAttribute, 17)
       }
@@ -744,6 +758,11 @@ subprojects {
   apply(plugin = "net.ltgt.errorprone")
   dependencies {
     errorprone("com.google.errorprone:error_prone_core:2.10.0")
+    // Align every JUnit artifact (including transitive ones) on one version. JUnit 6 also needs
+    // the matching launcher on the test runtime classpath, otherwise Gradle falls back to its
+    // bundled 1.x launcher, which cannot drive a 6.x engine.
+    testImplementation(platform(junitBom))
+    testRuntimeOnly(junitPlatformLauncher)
   }
 
   tasks.withType<JavaCompile>().configureEach {

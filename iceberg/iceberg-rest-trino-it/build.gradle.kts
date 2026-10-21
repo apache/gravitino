@@ -81,12 +81,9 @@ dependencies {
   testRuntimeOnly(libs.jwt.impl)
   testImplementation(libs.guava)
   testImplementation(libs.slf4j.api)
-  // Trino 478's test stack forces JUnit to 6.0.0; pin the BOM to match so the platform launcher,
-  // engine and commons jars stay on the same version (a mismatch makes Gradle's TagFilter crash
-  // with NoSuchMethodError on CollectionUtils.toUnmodifiableList).
-  testImplementation(platform("org.junit:junit-bom:6.0.0"))
+  // The root build aligns JUnit through the BOM and adds the matching launcher; Trino 478's own
+  // 6.0.x JUnit dependencies resolve up to that version.
   testImplementation("org.junit.jupiter:junit-jupiter")
-  testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<JavaCompile>().configureEach {

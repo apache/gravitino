@@ -75,7 +75,7 @@ dependencies {
     exclude("org.junit.jupiter")
     exclude("org.junit.platform")
   }
-  testImplementation(enforcedPlatform("org.junit:junit-bom:5.11.4"))
+  testImplementation(enforcedPlatform(libs.junit.bom))
   testImplementation("org.junit.jupiter:junit-jupiter-api")
   testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 }
