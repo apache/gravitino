@@ -51,6 +51,9 @@ public final class OccupancyGate {
   private static final Set<JobHandle.Status> ACTIVE =
       EnumSet.of(JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING);
 
+  private static final PolicyMetaService POLICY_SERVICE = PolicyMetaService.getInstance();
+  private static final JobMetaService JOB_SERVICE = JobMetaService.getInstance();
+
   private final TableMaintenanceActionMetaService actionMetaService;
   private final long claimTimeoutMs;
 
@@ -194,14 +197,14 @@ public final class OccupancyGate {
 
   @Nullable
   private static JobEntity loadJob(long jobId, long policyId) {
-    PolicyEntity policy = PolicyMetaService.getInstance().getPolicyById(policyId);
+    PolicyEntity policy = POLICY_SERVICE.getPolicyById(policyId);
     String metalake = policy == null ? null : policy.namespace().level(0);
     if (metalake == null) {
       return null;
     }
     try {
-      return JobMetaService.getInstance()
-          .getJobByIdentifier(NameIdentifierUtil.ofJob(metalake, JobHandle.JOB_ID_PREFIX + jobId));
+      return JOB_SERVICE.getJobByIdentifier(
+          NameIdentifierUtil.ofJob(metalake, JobHandle.JOB_ID_PREFIX + jobId));
     } catch (NoSuchEntityException e) {
       return null;
     }

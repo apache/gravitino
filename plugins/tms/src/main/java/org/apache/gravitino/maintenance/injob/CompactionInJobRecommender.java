@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 public final class CompactionInJobRecommender implements InJobRecommender {
 
   private static final Logger LOG = LoggerFactory.getLogger(CompactionInJobRecommender.class);
+  private static final PolicyMetaService POLICY_SERVICE = PolicyMetaService.getInstance();
 
   private final Function<Long, Optional<PolicyEntity>> policyLoader;
 
@@ -116,6 +117,6 @@ public final class CompactionInJobRecommender implements InJobRecommender {
   }
 
   private static Optional<PolicyEntity> loadPolicy(long policyId) {
-    return Optional.ofNullable(PolicyMetaService.getInstance().getPolicyById(policyId));
+    return Optional.ofNullable(POLICY_SERVICE.getPolicyById(policyId));
   }
 }

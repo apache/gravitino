@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 public final class TriggerExprInJobRecommender implements InJobRecommender {
 
   private static final Logger LOG = LoggerFactory.getLogger(TriggerExprInJobRecommender.class);
+  private static final PolicyMetaService POLICY_SERVICE = PolicyMetaService.getInstance();
 
   private final Function<Long, Optional<PolicyEntity>> policyLoader;
   private final QLExpressionEvaluator evaluator;
@@ -122,6 +123,6 @@ public final class TriggerExprInJobRecommender implements InJobRecommender {
   }
 
   private static Optional<PolicyEntity> loadPolicy(long policyId) {
-    return Optional.ofNullable(PolicyMetaService.getInstance().getPolicyById(policyId));
+    return Optional.ofNullable(POLICY_SERVICE.getPolicyById(policyId));
   }
 }
