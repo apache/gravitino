@@ -69,7 +69,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 
 /**
  * Verifies the complete secured Trino connector path: HTTPS coordinator, OAuth2-authenticated
@@ -160,10 +159,8 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
         oauthServer.invalidRequests(),
         "The mock OAuth2 server rejected an unexpected or malformed token request");
 
-    Container.ExecResult objects =
-        localStack.executeInContainer("awslocal", "s3", "ls", "s3://" + bucketName, "--recursive");
-    assertEquals(0, objects.getExitCode(), objects.getStderr());
-    assertFalse(objects.getStdout().isBlank(), "No Iceberg objects were written to S3");
+    assertFalse(
+        localStack.listObjectKeys(bucketName).isEmpty(), "No Iceberg objects were written to S3");
 
     trinoContainer.executeUpdateSQL("DROP TABLE " + table);
     trinoContainer.executeUpdateSQL("DROP SCHEMA " + catalogName + "." + schema);
@@ -413,9 +410,7 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   }
 
   private void createBucket() {
-    Container.ExecResult result =
-        localStack.executeInContainer("awslocal", "s3", "mb", "s3://" + bucketName);
-    assertEquals(0, result.getExitCode(), result.getStderr());
+    localStack.createBucket(bucketName);
   }
 
   private void copyIcebergAwsBundle() {

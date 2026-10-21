@@ -96,15 +96,6 @@ public class PostgreSQLContainer extends DatabaseContainer {
     super.start();
     logDurability(
         List.of("data_directory", "fsync", "synchronous_commit", "full_page_writes"),
-        "psql",
-        "-U",
-        getUsername(),
-        "-d",
-        "postgres",
-        "--no-align",
-        "--tuples-only",
-        "--field-separator=\t",
-        "-c",
         "SELECT current_setting('data_directory'), current_setting('fsync'),"
             + " current_setting('synchronous_commit'), current_setting('full_page_writes')");
   }

@@ -83,12 +83,6 @@ public class MySQLContainer extends DatabaseContainer {
     super.start();
     logDurability(
         List.of("datadir", "innodb_flush_log_at_trx_commit", "log_bin", "innodb_doublewrite"),
-        "mysql",
-        "-u" + getUsername(),
-        "-p" + getPassword(),
-        "--batch",
-        "--skip-column-names",
-        "-e",
         "SELECT @@datadir, @@innodb_flush_log_at_trx_commit, @@log_bin, @@innodb_doublewrite");
   }
 

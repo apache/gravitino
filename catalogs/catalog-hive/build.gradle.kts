@@ -142,6 +142,10 @@ dependencies {
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
 
+  // The LocalStack fixture creates buckets with the S3 SDK v2; the synchronous client needs no Netty.
+  testRuntimeOnly(libs.aws.s3) {
+    exclude("software.amazon.awssdk", "netty-nio-client")
+  }
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
