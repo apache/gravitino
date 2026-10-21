@@ -29,11 +29,11 @@ class TestLanceRayMatrixVersions(unittest.TestCase):
     """Covers --versions parsing for the lance-ray compatibility matrix."""
 
     def test_paired_entry_pins_its_own_lance_namespace(self):
-        specs = parse_version_specs("0.5.0=0.8.6", FALLBACK)
+        specs = parse_version_specs("0.5.0=0.11.1", FALLBACK)
 
         self.assertEqual(1, len(specs))
         self.assertEqual("0.5.0", specs[0].version)
-        self.assertEqual("lance-namespace==0.8.6", specs[0].lance_namespace_spec)
+        self.assertEqual("lance-namespace==0.11.1", specs[0].lance_namespace_spec)
 
     def test_bare_entry_falls_back_to_default_spec(self):
         specs = parse_version_specs("0.4.2", FALLBACK)
@@ -42,11 +42,11 @@ class TestLanceRayMatrixVersions(unittest.TestCase):
         self.assertEqual(FALLBACK, specs[0].lance_namespace_spec)
 
     def test_mixed_entries_keep_order_and_per_row_pins(self):
-        specs = parse_version_specs("0.5.0=0.8.6, 0.4.2 ,0.2.0=0.4.5", FALLBACK)
+        specs = parse_version_specs("0.5.0=0.11.1, 0.4.2 ,0.2.0=0.4.5", FALLBACK)
 
         self.assertEqual(
             [
-                ("0.5.0", "lance-namespace==0.8.6"),
+                ("0.5.0", "lance-namespace==0.11.1"),
                 ("0.4.2", FALLBACK),
                 ("0.2.0", "lance-namespace==0.4.5"),
             ],
@@ -87,7 +87,7 @@ class TestLanceRayMatrixVersions(unittest.TestCase):
 
         self.assertEqual(
             [
-                ("0.5.0", "lance-namespace==0.8.6"),
+                ("0.5.0", "lance-namespace==0.11.1"),
                 ("0.4.2", "lance-namespace==0.7.5"),
                 ("0.3.0", "lance-namespace==0.7.5"),
                 ("0.2.0", "lance-namespace==0.4.5"),

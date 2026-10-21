@@ -128,6 +128,17 @@ of `lance-core` 12.0.0. Such a table therefore accepts a later `lance.blob` colu
 `lance.blob.legacy`. Tables created by earlier Gravitino releases, whose Lance default was below
 2.2, behave the other way round; their stored version is unchanged by an upgrade.
 
+This default applies to every table created through Gravitino's own table API, not only to tables
+with blob columns, and there is no property to override it. Any Lance client can still **read** such
+a table — the file format version is forward-compatible on the read path. **Writing** to it requires
+a Lance that understands version 2.2: a client built on `lance-core` 2.0.0 has its commit rejected
+with `added files with version 2.0. However, the data storage version is 2.2.`, where before this
+upgrade the same write succeeded because Gravitino's default was below 2.2. `lance-core` 4.0.0 and
+later are unaffected. `LanceSparkRESTServiceIT` covers this combination per bundle.
+
+Tables created *through* a connector are unaffected, because that path uses `DeclareTable`, where
+Gravitino registers metadata only and the connector writes the dataset at its own version.
+
 Only the blob marker is recognized. Other blob metadata, such as
 `lance-encoding:blob-dedicated-size-threshold`, is not shown in the Gravitino type, and columns created
 through Gravitino use Lance's defaults. A blob field in any other layout, for example a blob v2 struct
