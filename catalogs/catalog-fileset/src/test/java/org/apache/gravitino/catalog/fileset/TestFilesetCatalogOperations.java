@@ -19,10 +19,14 @@
 package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -86,6 +90,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
@@ -290,6 +295,10 @@ public class TestFilesetCatalogOperations {
     when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     // Fix cache config for test
@@ -1310,6 +1319,44 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(type, loadedRenamedFileset.type());
       Assertions.assertEquals("comment", loadedRenamedFileset.comment());
       Assertions.assertEquals(expect, loadedRenamedFileset.storageLocation());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(Fileset.Type.class)
+  void testRenameFilesetToExistingName(Fileset.Type type) throws IOException {
+    String schemaName = "rename_conflict_" + generateTestId();
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, "schema", null, schemaPath);
+    Fileset source =
+        createFileset("source", schemaName, "source comment", type, null, schemaPath + "/source");
+    Fileset target =
+        createFileset("target", schemaName, "target comment", type, null, schemaPath + "/target");
+    NameIdentifier sourceIdent = NameIdentifier.of("m1", "c1", schemaName, "source");
+    NameIdentifier targetIdent = NameIdentifier.of("m1", "c1", schemaName, "target");
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      for (FilesetChange[] changes :
+          new FilesetChange[][] {
+            {FilesetChange.rename("target")},
+            {FilesetChange.rename("intermediate"), FilesetChange.rename("target")}
+          }) {
+        FilesetAlreadyExistsException exception =
+            Assertions.assertThrows(
+                FilesetAlreadyExistsException.class, () -> ops.alterFileset(sourceIdent, changes));
+        Assertions.assertEquals(
+            "Fileset " + targetIdent + " already exists", exception.getMessage());
+        Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
+        Assertions.assertEquals(source.comment(), ops.loadFileset(sourceIdent).comment());
+        Assertions.assertEquals(
+            source.storageLocations(), ops.loadFileset(sourceIdent).storageLocations());
+        Assertions.assertEquals(target.comment(), ops.loadFileset(targetIdent).comment());
+        Assertions.assertEquals(
+            target.storageLocations(), ops.loadFileset(targetIdent).storageLocations());
+        Assertions.assertFalse(
+            ops.filesetExists(NameIdentifier.of(sourceIdent.namespace(), "intermediate")));
+      }
     }
   }
 

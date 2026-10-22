@@ -20,6 +20,8 @@ package org.apache.gravitino.maintenance.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import java.sql.SQLIntegrityConstraintViolationException;
+import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
 import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
@@ -45,6 +47,9 @@ public class TableSnapshotMetricsMetaService {
    * Idempotently stores metrics JSON for a table/policy/snapshot triple. If a row already exists,
    * this is a no-op (does not overwrite) so sample / listener retries are safe.
    *
+   * <p>A concurrent insert that loses the unique-key race is treated as success (first writer
+   * wins).
+   *
    * @param tableId table id
    * @param policyId policy id
    * @param snapshotId Iceberg snapshot id
@@ -65,8 +70,15 @@ public class TableSnapshotMetricsMetaService {
             .withMetricsValue(metricsJson)
             .withCreatedAt(System.currentTimeMillis())
             .build();
-    SessionUtils.doWithCommit(
-        TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(metricsMeta));
+    try {
+      SessionUtils.doWithCommit(
+          TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(metricsMeta));
+    } catch (RuntimeException e) {
+      if (isUniqueViolation(e)) {
+        return;
+      }
+      throw e;
+    }
   }
 
   /**
@@ -83,5 +95,21 @@ public class TableSnapshotMetricsMetaService {
     return SessionUtils.getWithoutCommit(
         TableSnapshotMetricsMapper.class,
         mapper -> mapper.selectMetrics(tableId, policyId, snapshotId));
+  }
+
+  private static boolean isUniqueViolation(Throwable throwable) {
+    for (Throwable t = throwable; t != null; t = t.getCause()) {
+      if (t instanceof SQLIntegrityConstraintViolationException) {
+        return true;
+      }
+      String message = t.getMessage();
+      if (message != null) {
+        String lower = message.toLowerCase(Locale.ROOT);
+        if (lower.contains("unique") || lower.contains("duplicate")) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,8 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyList;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
@@ -213,6 +216,73 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   @Test
+  @Order(5)
+  public void testListPoliciesByMetadataObjectVisibility() throws Exception {
+    String hiddenTag = "hidden_policy_tag";
+    String visibleTag = "visible_policy_tag";
+    String allHiddenTable = "all_hidden_policy_table";
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(CATALOG).asTableCatalog();
+
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
+        ImmutableList.of(Privileges.SelectTable.allow(), Privileges.UseSchema.allow()));
+    tableCatalog.createTable(
+        NameIdentifier.of(SCHEMA, allHiddenTable),
+        createColumns(),
+        "test policy visibility indicators",
+        new HashMap<>());
+    gravitinoMetalake.createTag(hiddenTag, "hidden policy tag", Map.of());
+    gravitinoMetalake.createTag(visibleTag, "visible policy tag", Map.of());
+    gravitinoMetalake.addPolicyForTag(hiddenTag, "policy1");
+    gravitinoMetalake.addPolicyForTag(visibleTag, "policy2");
+
+    try {
+      tableCatalog
+          .loadTable(NameIdentifier.of(SCHEMA, allHiddenTable))
+          .supportsTags()
+          .associateTags(new String[] {hiddenTag}, null);
+      tableCatalog
+          .loadTable(NameIdentifier.of(SCHEMA, "table1"))
+          .supportsTags()
+          .associateTags(new String[] {hiddenTag, visibleTag}, null);
+
+      SupportsPolicies allHiddenPolicies =
+          normalUserClient
+              .loadMetalake(METALAKE)
+              .loadCatalog(CATALOG)
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(SCHEMA, allHiddenTable))
+              .supportsPolicies();
+      assertPolicyList(allHiddenPolicies, new String[0], true);
+
+      SupportsPolicies mixedPolicies =
+          normalUserClient
+              .loadMetalake(METALAKE)
+              .loadCatalog(CATALOG)
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(SCHEMA, "table1"))
+              .supportsPolicies();
+      assertPolicyList(mixedPolicies, new String[] {"policy2"}, true);
+    } finally {
+      tableCatalog
+          .loadTable(NameIdentifier.of(SCHEMA, allHiddenTable))
+          .supportsTags()
+          .associateTags(null, new String[] {hiddenTag});
+      tableCatalog
+          .loadTable(NameIdentifier.of(SCHEMA, "table1"))
+          .supportsTags()
+          .associateTags(null, new String[] {hiddenTag, visibleTag});
+      gravitinoMetalake.removePolicyFromTag(hiddenTag, "policy1");
+      gravitinoMetalake.removePolicyFromTag(visibleTag, "policy2");
+      gravitinoMetalake.deleteTag(hiddenTag);
+      gravitinoMetalake.deleteTag(visibleTag);
+      tableCatalog.dropTable(NameIdentifier.of(SCHEMA, allHiddenTable));
+    }
+  }
+
+  @Test
   @Order(10)
   public void testDropPolicy() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -225,5 +295,24 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
         });
     gravitinoMetalake.deletePolicy("policy1");
     metalakeLoadByNormalUser.deletePolicy("policy2");
+  }
+
+  private void assertPolicyList(
+      SupportsPolicies supportsPolicies,
+      String[] expectedPolicyNames,
+      boolean hasInaccessiblePolicies) {
+    PolicyList<String> nameResult = supportsPolicies.listPoliciesWithVisibility();
+    String[] actualPolicyNames = nameResult.policies();
+    Arrays.sort(actualPolicyNames);
+    Arrays.sort(expectedPolicyNames);
+    Assertions.assertArrayEquals(expectedPolicyNames, actualPolicyNames);
+    Assertions.assertEquals(hasInaccessiblePolicies, nameResult.hasInaccessiblePolicies());
+
+    var detailsResult = supportsPolicies.listPolicyInfosWithVisibility();
+    String[] actualDetailNames =
+        Arrays.stream(detailsResult.policies()).map(policy -> policy.name()).toArray(String[]::new);
+    Arrays.sort(actualDetailNames);
+    Assertions.assertArrayEquals(expectedPolicyNames, actualDetailNames);
+    Assertions.assertEquals(hasInaccessiblePolicies, detailsResult.hasInaccessiblePolicies());
   }
 }

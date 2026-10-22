@@ -24,6 +24,12 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
+// Tests of the shaded jar on the classpath of the Gravitino server, without the classes and the
+// dependencies of this module, to catch relocation mistakes and dependency conflicts.
+val shadedJarTest: SourceSet by sourceSets.creating
+val shadedJarTestImplementation: Configuration by configurations.getting
+val shadedJarTestRuntimeOnly: Configuration by configurations.getting
+
 dependencies {
   annotationProcessor(libs.lombok)
 
@@ -53,6 +59,17 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+
+  shadedJarTestImplementation(project(":api"))
+  shadedJarTestImplementation(project(":common"))
+  shadedJarTestImplementation(project(":core"))
+  shadedJarTestImplementation(libs.guava)
+  shadedJarTestImplementation(libs.jackson.databind)
+  shadedJarTestImplementation(libs.junit.jupiter.api)
+
+  shadedJarTestRuntimeOnly(project(":server"))
+  shadedJarTestRuntimeOnly(files(tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFile }))
+  shadedJarTestRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -82,4 +99,39 @@ tasks.withType(ShadowJar::class.java) {
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
+}
+
+tasks {
+  val shadedJarTestTask = register<Test>("shadedJarTest") {
+    group = "verification"
+    description = "Tests the shaded jar on the classpath of the Gravitino server"
+    testClassesDirs = shadedJarTest.output.classesDirs
+    classpath = shadedJarTest.runtimeClasspath
+
+    val shadedJar = named<ShadowJar>("shadowJar").flatMap { it.archiveFile }
+    inputs.file(shadedJar)
+    doFirst {
+      systemProperty("gravitino.k8s.shadedJar", shadedJar.get().asFile.absolutePath)
+    }
+  }
+
+  check {
+    dependsOn(shadedJarTestTask)
+  }
+
+  val copyLibs by registering(Copy::class) {
+    dependsOn(named("shadowJar"))
+    from(layout.buildDirectory.dir("libs")) {
+      include("gravitino-k8s-job-executor-*.jar")
+      exclude("*-empty.jar", "*-javadoc.jar", "*-sources.jar")
+    }
+    into("$rootDir/distribution/package/libs")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  }
+
+  register("copyLibAndConfigs", Copy::class) {
+    group = "gravitino distribution"
+    description = "Copy the k8s job executor jar into distribution package libs"
+    dependsOn(copyLibs)
+  }
 }
