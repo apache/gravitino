@@ -233,6 +233,47 @@ public class TestMysqlTableOperations extends TestMysql {
   }
 
   @Test
+  public void testUpdateColumnPositionWithSpecialReferenceColumn() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_position_table";
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build(),
+          JdbcColumn.builder().withName("status").withType(VARCHAR).build(),
+          JdbcColumn.builder().withName("order-id").withType(VARCHAR).build(),
+          JdbcColumn.builder().withName("key").withType(VARCHAR).build()
+        };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnPosition(
+            new String[] {"status"}, TableChange.ColumnPosition.after("order-id")));
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertArrayEquals(
+        new String[] {"id", "order-id", "status", "key"},
+        Arrays.stream(load.columns()).map(Column::name).toArray(String[]::new));
+
+    // A null position moves the column after the last column `key`, a reserved word.
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnPosition(new String[] {"id"}, null));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertArrayEquals(
+        new String[] {"order-id", "status", "key", "id"},
+        Arrays.stream(load.columns()).map(Column::name).toArray(String[]::new));
+  }
+
+  @Test
   public void testAlterTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_al_table";
     String tableComment = "test_comment";
@@ -676,6 +717,37 @@ public class TestMysqlTableOperations extends TestMysql {
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     assertionsTableInfo(
         tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, loaded);
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_clear_comment";
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("col comment").build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME.toString(),
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          new HashMap<>(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME.toString(),
+          tableName,
+          TableChange.updateColumnComment(new String[] {"col_1"}, null),
+          TableChange.updateComment(null));
+
+      JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertTrue(StringUtils.isEmpty(load.comment()), load.comment());
+      Assertions.assertTrue(
+          StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
+    }
   }
 
   @Test

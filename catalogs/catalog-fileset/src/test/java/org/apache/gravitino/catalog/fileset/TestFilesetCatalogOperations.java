@@ -91,6 +91,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
@@ -1779,6 +1780,44 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(type, loadedRenamedFileset.type());
       Assertions.assertEquals("comment", loadedRenamedFileset.comment());
       Assertions.assertEquals(expect, loadedRenamedFileset.storageLocation());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(Fileset.Type.class)
+  void testRenameFilesetToExistingName(Fileset.Type type) throws IOException {
+    String schemaName = "rename_conflict_" + generateTestId();
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, "schema", null, schemaPath);
+    Fileset source =
+        createFileset("source", schemaName, "source comment", type, null, schemaPath + "/source");
+    Fileset target =
+        createFileset("target", schemaName, "target comment", type, null, schemaPath + "/target");
+    NameIdentifier sourceIdent = NameIdentifier.of("m1", "c1", schemaName, "source");
+    NameIdentifier targetIdent = NameIdentifier.of("m1", "c1", schemaName, "target");
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      for (FilesetChange[] changes :
+          new FilesetChange[][] {
+            {FilesetChange.rename("target")},
+            {FilesetChange.rename("intermediate"), FilesetChange.rename("target")}
+          }) {
+        FilesetAlreadyExistsException exception =
+            Assertions.assertThrows(
+                FilesetAlreadyExistsException.class, () -> ops.alterFileset(sourceIdent, changes));
+        Assertions.assertEquals(
+            "Fileset " + targetIdent + " already exists", exception.getMessage());
+        Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
+        Assertions.assertEquals(source.comment(), ops.loadFileset(sourceIdent).comment());
+        Assertions.assertEquals(
+            source.storageLocations(), ops.loadFileset(sourceIdent).storageLocations());
+        Assertions.assertEquals(target.comment(), ops.loadFileset(targetIdent).comment());
+        Assertions.assertEquals(
+            target.storageLocations(), ops.loadFileset(targetIdent).storageLocations());
+        Assertions.assertFalse(
+            ops.filesetExists(NameIdentifier.of(sourceIdent.namespace(), "intermediate")));
+      }
     }
   }
 
