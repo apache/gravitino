@@ -76,7 +76,18 @@ A method-level `@DatabaseFixture` replaces the class-level one. A class's backen
 
 #### `:core:test`
 
-In CI, `build (17)` skips core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` runs all core tests in one task. It is deprecated, and no CI job uses it. It selects no database: every database test runs against H2, and with `-PskipDockerTests=false` also against MySQL and PostgreSQL, building a new backend at every change of database. Without Docker, it runs the database tests like `coreH2Test`.
+In CI, the `test` and `medium-test` stages skip core tests; their results appear under the `core-test (17, <lane>)` checks. `./gradlew :core:test` runs all core tests in one task. It is deprecated, and no CI job uses it. It selects no database: every database test runs against H2, and with `-PskipDockerTests=false` also against MySQL and PostgreSQL, building a new backend at every change of database. Without Docker, it runs the database tests like `coreH2Test`.
+
+### Unit test stages in CI
+
+The `build` workflow runs in stages, cheapest first, and each stage starts only after the one before it passes:
+
+1. `lint`: `./gradlew ciLint`, which runs Spotless, the license header check and checkstyle.
+2. `build`: `./gradlew build testClasses -x test`, which compiles main and test sources but runs no tests.
+3. `test`: `./gradlew ciSmallTest -PskipITs -PskipDockerTests=false`, the `test` task of every module whose unit tests need no Docker.
+4. `medium-test (<shard>)`: `./gradlew ciMediumTest<Shard> -PskipITs -PskipDockerTests=false`, the modules whose unit tests are tagged `gravitino-docker-test`, and the `core-test` lanes.
+
+`gradle/ci-stages.gradle.kts` lists the medium shards and their modules; `./gradlew ciShards` prints them. A module with Docker-tagged tests that is not listed there runs in `ciSmallTest` with Docker on.
 
 ## Run the Integration Tests
 

@@ -146,26 +146,70 @@ jobs:
             build/reports
             spark-connector/**/*.log
 
+  # The pipeline runs in stages, cheapest first: lint, build, small tests, then medium tests
+  # (Docker) next to the core lanes. Each stage needs the one before, so a PR that fails lint stops
+  # there; jobs within a stage run in parallel. The test stages are Gradle tasks defined in
+  # gradle/ci-stages.gradle.kts.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: 17
+
+      - name: Lint
+        run: ./gradlew ciLint -PskipWeb=true
+
   build:
-    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [ changes, lint ]
+    if: needs.changes.outputs.source_changes == 'true'
+    outputs:
+      medium-shards: ${{ steps.shards.outputs.medium-shards }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: 17
+
+      - name: Test publish to local
+        run: ./gradlew publishToMavenLocal -PskipWeb=true -x test
+
+      # testClasses compiles the test sources too, so a test that does not compile fails here.
+      # shadedJarTest is a test that `check` runs; it runs in the test stage instead.
+      - name: Build without tests
+        run: >-
+          ./gradlew build testClasses -x test
+          -x :plugins:k8s-job-executor:shadedJarTest
+          -PskipWeb=true
+          -x :clients:client-python:build
+          ${{ needs.changes.outputs.mcp_server_changes != 'true' && '-x :mcp-server:build -x :mcp-server:pylint -x :web-v2:web:build' || '' }}
+
+      - name: List medium test shards
+        id: shards
+        run: ./gradlew ciShards -PskipWeb=true
+
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         java-version: [ 17 ]
     timeout-minutes: 120
-    needs: changes
+    needs: [ changes, build ]
     if: needs.changes.outputs.source_changes == 'true'
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-java-toolchains
         with:
           java-version: ${{ matrix.java-version }}
-
-      - name: Test publish to local
-        run: ./gradlew publishToMavenLocal -PskipWeb=true -x test
 
       - name: Free up disk space
         run: |
@@ -182,54 +226,33 @@ jobs:
           [ -s "$deb" ] || { echo "Could not download $deb from any mirror" >&2; exit 1; }
           sudo dpkg -i "$deb"
 
-      - name: Build with Gradle
-        run: |
-          if [ "${{ needs.changes.outputs.maintenance_module_only_changes }}" = "true" ]; then
-            ./gradlew \
-              :maintenance:optimizer-api:build \
-              :maintenance:updaters:build \
-              :maintenance:optimizer:build \
-              :maintenance:jobs:build \
-              -PskipWeb=true \
-              -PskipITs \
-              -PskipDockerTests=false
-            exit 0
-          fi
+      - name: Run maintenance module tests
+        if: needs.changes.outputs.maintenance_module_only_changes == 'true'
+        run: >-
+          ./gradlew
+          :maintenance:optimizer-api:build
+          :maintenance:updaters:build
+          :maintenance:optimizer:build
+          :maintenance:jobs:build
+          -PskipWeb=true
+          -PskipITs
+          -PskipDockerTests=false
 
-          gradle_args=(
-            build
-            --max-workers=2
-            -PskipWeb=true
-            -PskipITs
-            -PskipDockerTests=false
-            -x :clients:client-python:build
-            -x :catalogs-contrib:catalog-jdbc-clickhouse:test
-            -x :catalogs-contrib:catalog-jdbc-hologres:test
-            -x :catalogs-contrib:catalog-jdbc-oceanbase:test
-            # Core's tests run in the core-test job, one lane per job; :core:test is deprecated.
-            -x :core:test
-          )
-
-          if [ "${{ needs.changes.outputs.mcp_server_changes }}" != "true" ]; then
-            gradle_args+=(
-              -x :mcp-server:build
-              -x :mcp-server:test
-              -x :mcp-server:pylint
-              -x :web-v2:web:build
-            )
-          fi
-
-          printf './gradlew'
-          printf ' %q' "${gradle_args[@]}"
-          printf '\n'
-
-          ./gradlew "${gradle_args[@]}"
+      - name: Run small tests
+        if: needs.changes.outputs.maintenance_module_only_changes != 'true'
+        run: >-
+          ./gradlew ciSmallTest
+          --max-workers=2
+          -PskipWeb=true
+          -PskipITs
+          -PskipDockerTests=false
+          ${{ needs.changes.outputs.mcp_server_changes != 'true' && '-x :mcp-server:test' || '' }}
 
       - name: Upload coverage data
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v7
         with:
-          name: jacoco-build
+          name: jacoco-test
           # build.gradle.kts anchors the artifact at the repository root, so the report paths keep
           # their module prefix, which jacoco_report.py uses to name modules.
           path: |
@@ -247,6 +270,70 @@ jobs:
             build/reports
             catalogs-contrib/**/*.log
             catalogs-contrib/**/*.tar
+            catalogs/**/*.log
+            catalogs/**/*.tar
+
+  medium-test:
+    name: medium-test (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Shards and their modules are defined in gradle/ci-stages.gradle.kts.
+        include: ${{ fromJSON(needs.build.outputs.medium-shards) }}
+    timeout-minutes: 120
+    needs: [ changes, build, test ]
+    if: >-
+      needs.changes.outputs.source_changes == 'true' &&
+      needs.changes.outputs.maintenance_module_only_changes != 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: 17
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Install dependencies
+        run: |
+          # libssl1.1 is not in the runner's apt sources, so the .deb is fetched directly.
+          deb=libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          for host in archive.ubuntu.com nz2.archive.ubuntu.com security.ubuntu.com; do
+            wget --tries=3 --timeout=30 -O "$deb" "https://$host/ubuntu/pool/main/o/openssl/$deb" && break
+            rm -f "$deb"
+          done
+          [ -s "$deb" ] || { echo "Could not download $deb from any mirror" >&2; exit 1; }
+          sudo dpkg -i "$deb"
+
+      - name: Run medium ${{ matrix.shard }} tests
+        run: >-
+          ./gradlew ${{ matrix.task }}
+          --max-workers=2
+          -PskipWeb=true
+          -PskipITs
+          -PskipDockerTests=false
+
+      - name: Upload coverage data
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-medium-${{ matrix.shard }}
+          path: |
+            build.gradle.kts
+            **/build/reports/jacoco/test/jacocoTestReport.xml
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Upload unit tests report
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: medium test report ${{ matrix.shard }}
+          path: |
+            build/reports
             catalogs/**/*.log
             catalogs/**/*.tar
 
@@ -273,7 +360,7 @@ jobs:
             task: corePostgreSQLTest
             skip-docker-tests: false
     timeout-minutes: 120
-    needs: changes
+    needs: [ changes, test ]
     if: >-
       needs.changes.outputs.source_changes == 'true' &&
       needs.changes.outputs.maintenance_module_only_changes != 'true'
@@ -327,13 +414,13 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [ changes, build, core-test ]
+    needs: [ changes, test, medium-test, core-test ]
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
-      needs.build.result == 'success' &&
+      needs.test.result == 'success' &&
       (needs.changes.outputs.maintenance_module_only_changes == 'true' ||
-      needs['core-test'].result == 'success')
+      (needs['medium-test'].result == 'success' && needs['core-test'].result == 'success'))
     steps:
       - uses: actions/checkout@v4
 

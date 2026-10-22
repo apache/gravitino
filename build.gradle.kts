@@ -422,7 +422,8 @@ allprojects {
       }
 
       kotlinGradle {
-        target("*.gradle.kts")
+        // The root project also owns the script plugins under gradle/.
+        if (project == rootProject) target("*.gradle.kts", "gradle/*.gradle.kts") else target("*.gradle.kts")
         ktlint().editorConfigOverride(mapOf("indent_size" to 2))
       }
     }
@@ -1154,6 +1155,7 @@ tasks.rat {
 tasks.check.get().dependsOn(tasks.rat)
 
 apply(from = "dev/release/maven/test-legal-files.gradle")
+apply(from = "gradle/ci-stages.gradle.kts")
 
 tasks.cyclonedxBom {
   setIncludeConfigs(listOf("runtimeClasspath"))
