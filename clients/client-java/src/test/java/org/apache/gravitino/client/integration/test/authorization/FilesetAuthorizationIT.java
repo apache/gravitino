@@ -17,9 +17,9 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
@@ -50,8 +50,9 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -69,12 +70,13 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@HiveFixture
 public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
+
+  @FixtureContainer private HiveContainer hive;
 
   private static final String CATALOG = "catalog";
   private static final String SCHEMA = "schema";
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private String role = "role";
   private String defaultBaseLocation;
@@ -82,7 +84,6 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startHiveContainer();
     super.startIntegrationTest();
     client
         .loadMetalake(METALAKE)
@@ -92,7 +93,6 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createSchema(SCHEMA, "test", new HashMap<>());
     // try to load the schema as normal user, expect failure
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           normalUserClient
@@ -100,7 +100,8 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadCatalog(CATALOG)
               .asSchemas()
               .loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -113,11 +114,11 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
 
     httpClient = HttpClients.createDefault();
   }
@@ -147,7 +148,6 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     FilesetCatalog filesetCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.createFileset(
@@ -157,12 +157,13 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
               Fileset.Type.MANAGED,
               storageLocation(GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset2")),
               new HashMap<>());
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
 
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
-        () -> filesetCatalogNormalUser.listFilesets(Namespace.of(SCHEMA)));
+        () -> filesetCatalogNormalUser.listFilesets(Namespace.of(SCHEMA)),
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
 
     // grant privileges
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -219,11 +220,11 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
     // normal user can load fileset2 and fileset3, but not fileset1
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
         ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"));
     Fileset fileset2 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset2"));
     assertEquals("fileset2", fileset2.name());
     Fileset fileset3 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset3"));
@@ -249,12 +250,12 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     // normal user cannot alter fileset1 (no privilege)
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
         ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.alterFileset(
               NameIdentifier.of(SCHEMA, "fileset1"), FilesetChange.setProperty("key", "value"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"));
     // grant normal user write privilege on fileset1
     gravitinoMetalake.grantPrivilegesToRole(
         role,
@@ -280,11 +281,11 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     // normal user cannot alter fileset1 (no privilege)
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
         ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"));
     // grant normal user owner privilege on fileset4
     gravitinoMetalake.setOwner(
         MetadataObjects.of(
@@ -315,9 +316,9 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     // normal user cannot alter fileset1 (no privilege)
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
         ForbiddenException.class,
-        () -> getFileInfos("fileset1", "/test", "", NORMAL_USER));
+        () -> getFileInfos("fileset1", "/test", "", NORMAL_USER),
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"));
     // grant normal user owner privilege on fileset4
     gravitinoMetalake.setOwner(
         MetadataObjects.of(
@@ -348,11 +349,11 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         Owner.Type.USER);
     // normal user cannot drop fileset1
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
         ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.dropFileset(NameIdentifier.of(SCHEMA, "fileset1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"));
     // normal user can drop fileset2 and fileset3 (they created them)
     filesetCatalogNormalUser.dropFileset(NameIdentifier.of(SCHEMA, "fileset2"));
     filesetCatalogNormalUser.dropFileset(NameIdentifier.of(SCHEMA, "fileset3"));
@@ -443,7 +444,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
       defaultBaseLocation =
           String.format(
               "hdfs://%s:%d/user/hive/%s",
-              containerSuite.getHiveContainer().getContainerIpAddress(),
+              hive.getContainerIpAddress(),
               HiveContainer.HDFS_DEFAULTFS_PORT,
               SCHEMA.toLowerCase());
     }

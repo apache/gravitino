@@ -57,6 +57,7 @@ dependencies {
   testImplementation(project(":common"))
   // Used to check that the placeholders of the built-in templates resolve the way the server does.
   testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.common) {
     exclude("org.slf4j")
@@ -67,8 +68,6 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.awaitility)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.junit.jupiter)
-  testImplementation(libs.testcontainers.mysql)
   testRuntimeOnly(libs.mysql.driver)
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion") {
     exclude("org.slf4j")

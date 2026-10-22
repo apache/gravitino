@@ -40,8 +40,9 @@ import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
@@ -49,9 +50,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@HiveFixture
 public abstract class FlinkEnvIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
-  private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
+  @FixtureContainer private static HiveContainer hive;
 
   protected static final String icebergRestServiceName = "iceberg-rest";
 
@@ -153,17 +155,13 @@ public abstract class FlinkEnvIT extends BaseIT {
   }
 
   private static void initHiveEnv() {
-    CONTAINER_SUITE.startHiveContainer();
     hiveMetastoreUri =
         String.format(
-            "thrift://%s:%d",
-            CONTAINER_SUITE.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     warehouse =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse",
-            CONTAINER_SUITE.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 
   private static void initHdfsEnv() {
@@ -171,9 +169,7 @@ public abstract class FlinkEnvIT extends BaseIT {
     conf.set(
         "fs.defaultFS",
         String.format(
-            "hdfs://%s:%d",
-            CONTAINER_SUITE.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT));
+            "hdfs://%s:%d", hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
     try {
       hdfs = FileSystem.get(conf);
     } catch (IOException e) {

@@ -25,7 +25,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -35,6 +37,7 @@ import org.junit.jupiter.api.TestInstance;
 /** Kerberos-enabled Hive2 HMS tests. */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture(auth = HiveAuth.KERBEROS)
 public class TestHive2HMSWithKerberos extends TestHive2HMS {
 
   private static final String CLIENT_PRINCIPAL = "cli@HADOOPKRB";
@@ -47,17 +50,14 @@ public class TestHive2HMSWithKerberos extends TestHive2HMS {
   public void startHiveContainer() {
     testPrefix = "hive2_kerberos";
     catalogName = "";
-    containerSuite.startKerberosHiveContainer();
-    hiveContainer = containerSuite.getKerberosHiveContainer();
 
     metastoreUri =
         String.format(
-            "thrift://%s:%d",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     hdfsBasePath =
         String.format(
             "hdfs://%s:%d/tmp/gravitino_test",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     prepareKerberosConfig();
 
@@ -70,16 +70,16 @@ public class TestHive2HMSWithKerberos extends TestHive2HMS {
       tempDir = Files.createTempDirectory(testPrefix).toFile();
       tempDir.deleteOnExit();
 
-      String ip = hiveContainer.getContainerIpAddress();
+      String ip = hive.getContainerIpAddress();
 
       // Copy client keytab (admin keytab is used for metastore client)
       keytabPath = new File(tempDir, "admin.keytab").getAbsolutePath();
-      hiveContainer.getContainer().copyFileFromContainer("/etc/admin.keytab", keytabPath);
+      hive.getContainer().copyFileFromContainer("/etc/admin.keytab", keytabPath);
 
       // Copy and patch krb5.conf
       String tmpKrb5Path = new File(tempDir, "krb5.conf.tmp").getAbsolutePath();
       krb5ConfPath = new File(tempDir, "krb5.conf").getAbsolutePath();
-      hiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+      hive.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
       String content = FileUtils.readFileToString(new File(tmpKrb5Path), StandardCharsets.UTF_8);
       content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
       content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
@@ -117,7 +117,7 @@ public class TestHive2HMSWithKerberos extends TestHive2HMS {
     properties.setProperty("hive.metastore.sasl.enabled", "true");
     properties.setProperty(
         "hive.metastore.kerberos.principal",
-        String.format("hive/%s@HADOOPKRB", hiveContainer.getHostName()));
+        String.format("hive/%s@HADOOPKRB", hive.getHostName()));
     properties.setProperty("authentication.kerberos.principal", CLIENT_PRINCIPAL);
     properties.setProperty("authentication.kerberos.keytab-uri", keytabPath);
     properties.setProperty("authentication.impersonation-enable", "true");

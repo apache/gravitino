@@ -49,6 +49,12 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.integration.test.container.Fixtures;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLSpec;
+import org.apache.gravitino.integration.test.container.MySQLVersion;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
@@ -71,10 +77,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-import org.testcontainers.containers.MySQLContainer;
 
 /** Integration tests for IcebergUpdateStatsAndMetricsJob with a real Spark+Iceberg runtime. */
+// Only two tests need MySQL, so they ask Fixtures for it; a class fixture would start it for all.
+@ExtendWith(CloseContainerExtension.class)
 public class TestIcebergUpdateStatsJobWithSpark {
 
   private static final String SERVER_URI = "http://localhost:8090";
@@ -180,10 +188,9 @@ public class TestIcebergUpdateStatsJobWithSpark {
     SparkSession restSpark = null;
     try {
       restSpark = createRestSparkSession();
-      try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33");
-          GravitinoAdminClient adminClient = GravitinoAdminClient.builder(SERVER_URI).build()) {
-        mysql.start();
-        initializeMySqlMetricsSchema(mysql);
+      MetricsStore mysql =
+          startMetricsStore(TestDatabaseName.MYSQL_ICEBERG_UPDATE_STATS_JOB_VIA_SERVER);
+      try (GravitinoAdminClient adminClient = GravitinoAdminClient.builder(SERVER_URI).build()) {
 
         GravitinoMetalake metalake = loadOrCreateMetalake(adminClient, METALAKE_NAME);
         recreateRestCatalog(metalake);
@@ -423,49 +430,57 @@ public class TestIcebergUpdateStatsJobWithSpark {
   @Test
   @Tag("gravitino-docker-test")
   public void testUpdatePartitionedTableMetricsStoredInMySql() throws Exception {
-    try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33")) {
-      mysql.start();
+    Map<String, String> conf =
+        buildJdbcMetricsConfigs(startMetricsStore(TestDatabaseName.MYSQL_ICEBERG_UPDATE_STATS_JOB));
 
-      Map<String, String> conf = new HashMap<>();
-      conf.put("gravitino.optimizer.jdbcMetrics.jdbcUrl", mysql.getJdbcUrl());
-      conf.put("gravitino.optimizer.jdbcMetrics.jdbcUser", mysql.getUsername());
-      conf.put("gravitino.optimizer.jdbcMetrics.jdbcPassword", mysql.getPassword());
-      conf.put("gravitino.optimizer.jdbcMetrics.jdbcDriver", mysql.getDriverClassName());
-      initializeMySqlMetricsSchema(mysql);
+    GravitinoMetricsUpdater metricsUpdater = new GravitinoMetricsUpdater();
+    metricsUpdater.initialize(new OptimizerEnv(new OptimizerConfig(conf)));
+    try {
+      IcebergUpdateStatsAndMetricsJob.updateStatistics(
+          spark,
+          null,
+          metricsUpdater,
+          IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
+          catalogName,
+          "db.partitioned");
+    } finally {
+      metricsUpdater.close();
+    }
 
-      GravitinoMetricsUpdater metricsUpdater = new GravitinoMetricsUpdater();
-      metricsUpdater.initialize(new OptimizerEnv(new OptimizerConfig(conf)));
-      try {
-        IcebergUpdateStatsAndMetricsJob.updateStatistics(
-            spark,
-            null,
-            metricsUpdater,
-            IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
-            catalogName,
-            "db.partitioned");
-      } finally {
-        metricsUpdater.close();
-      }
+    GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository();
+    repository.initialize(conf);
+    try {
+      NameIdentifier identifier = NameIdentifier.of(catalogName, "db", "partitioned");
+      long now = Instant.now().getEpochSecond();
 
-      GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository();
-      repository.initialize(conf);
-      try {
-        NameIdentifier identifier = NameIdentifier.of(catalogName, "db", "partitioned");
-        long now = Instant.now().getEpochSecond();
-
-        PartitionPath partitionPath =
-            PartitionPath.of(Collections.singletonList(new PartitionEntryImpl("ds", "2026-01-01")));
-        List<MetricPoint> partitionMetrics =
-            repository.getMetrics(
-                DataScope.forPartition(identifier, partitionPath), now - 300, now + 300);
-        assertEquals(9, partitionMetrics.size());
-      } finally {
-        repository.close();
-      }
+      PartitionPath partitionPath =
+          PartitionPath.of(Collections.singletonList(new PartitionEntryImpl("ds", "2026-01-01")));
+      List<MetricPoint> partitionMetrics =
+          repository.getMetrics(
+              DataScope.forPartition(identifier, partitionPath), now - 300, now + 300);
+      assertEquals(9, partitionMetrics.size());
+    } finally {
+      repository.close();
     }
   }
 
-  private static void initializeMySqlMetricsSchema(MySQLContainer<?> mysql) throws Exception {
+  /** The JDBC connection to a MySQL database holding the metrics tables. */
+  record MetricsStore(String jdbcUrl, String username, String password, String driver) {}
+
+  /** Creates the metrics tables in {@code database} on the run's MySQL server. */
+  private static MetricsStore startMetricsStore(TestDatabaseName database) throws Exception {
+    MySQLContainer mysql = Fixtures.get(new MySQLSpec(MySQLVersion.MYSQL_8_0, database));
+    MetricsStore store =
+        new MetricsStore(
+            mysql.getJdbcUrl(database),
+            mysql.getUsername(),
+            mysql.getPassword(),
+            mysql.getDriverClassName(database));
+    initializeMySqlMetricsSchema(store);
+    return store;
+  }
+
+  private static void initializeMySqlMetricsSchema(MetricsStore mysql) throws Exception {
     Path schemaPath =
         findRepoRoot()
             .resolve("scripts")
@@ -473,7 +488,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
             .resolve("schema-" + ConfigConstants.CURRENT_SCRIPT_VERSION + "-mysql.sql");
     String schemaSql = new String(Files.readAllBytes(schemaPath), StandardCharsets.UTF_8);
     try (Connection connection =
-        DriverManager.getConnection(mysql.getJdbcUrl(), mysql.getUsername(), mysql.getPassword())) {
+        DriverManager.getConnection(mysql.jdbcUrl(), mysql.username(), mysql.password())) {
       JdbcSqlScriptUtils.executeSqlScript(connection, schemaSql);
     }
   }
@@ -629,12 +644,12 @@ public class TestIcebergUpdateStatsJobWithSpark {
         DataScope.forPartition(tableIdentifier, partitionPath), now - 1800, now + 1800);
   }
 
-  private static Map<String, String> buildJdbcMetricsConfigs(MySQLContainer<?> mysql) {
+  private static Map<String, String> buildJdbcMetricsConfigs(MetricsStore mysql) {
     Map<String, String> conf = new HashMap<>();
-    conf.put("gravitino.optimizer.jdbcMetrics.jdbcUrl", mysql.getJdbcUrl());
-    conf.put("gravitino.optimizer.jdbcMetrics.jdbcUser", mysql.getUsername());
-    conf.put("gravitino.optimizer.jdbcMetrics.jdbcPassword", mysql.getPassword());
-    conf.put("gravitino.optimizer.jdbcMetrics.jdbcDriver", mysql.getDriverClassName());
+    conf.put("gravitino.optimizer.jdbcMetrics.jdbcUrl", mysql.jdbcUrl());
+    conf.put("gravitino.optimizer.jdbcMetrics.jdbcUser", mysql.username());
+    conf.put("gravitino.optimizer.jdbcMetrics.jdbcPassword", mysql.password());
+    conf.put("gravitino.optimizer.jdbcMetrics.jdbcDriver", mysql.driver());
     return conf;
   }
 
@@ -646,23 +661,23 @@ public class TestIcebergUpdateStatsJobWithSpark {
         + "\",\"statistics_updater\":\"gravitino-statistics-updater\"}";
   }
 
-  private static String buildUpdaterOptionsForMetricsUpdaterOnly(MySQLContainer<?> mysql) {
+  private static String buildUpdaterOptionsForMetricsUpdaterOnly(MetricsStore mysql) {
     return "{\"metrics_updater\":\"gravitino-metrics-updater\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcUrl\":\""
-        + mysql.getJdbcUrl()
+        + mysql.jdbcUrl()
         + "\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcUser\":\""
-        + mysql.getUsername()
+        + mysql.username()
         + "\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\""
-        + mysql.getPassword()
+        + mysql.password()
         + "\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcDriver\":\""
-        + mysql.getDriverClassName()
+        + mysql.driver()
         + "\"}";
   }
 
-  private static String buildUpdaterOptionsForAllMode(MySQLContainer<?> mysql) {
+  private static String buildUpdaterOptionsForAllMode(MetricsStore mysql) {
     return "{\"gravitino_uri\":\""
         + SERVER_URI
         + "\",\"metalake\":\""
@@ -670,16 +685,16 @@ public class TestIcebergUpdateStatsJobWithSpark {
         + "\",\"statistics_updater\":\"gravitino-statistics-updater\","
         + "\"metrics_updater\":\"gravitino-metrics-updater\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcUrl\":\""
-        + mysql.getJdbcUrl()
+        + mysql.jdbcUrl()
         + "\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcUser\":\""
-        + mysql.getUsername()
+        + mysql.username()
         + "\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\""
-        + mysql.getPassword()
+        + mysql.password()
         + "\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcDriver\":\""
-        + mysql.getDriverClassName()
+        + mysql.driver()
         + "\"}";
   }
 
