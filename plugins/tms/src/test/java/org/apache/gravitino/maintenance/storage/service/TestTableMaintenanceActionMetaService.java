@@ -75,6 +75,32 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testMarkFinishedBackfillsAfterSnapshotWhenAlreadyClosed() {
+    TableMaintenanceActionMetaService actionService =
+        TableMaintenanceActionMetaService.getInstance();
+    long jobId = 1999L;
+    OccupancyClaim claim =
+        actionService.insertInFlight(
+            12L, 22L, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
+    actionService.bindJobId(claim, jobId);
+    actionService.recordBeforeSnapshot(jobId, 100L);
+
+    long reclaimFinishedAt = System.currentTimeMillis();
+    // Failsafe reclaim closes with null S1.
+    actionService.markFinished(jobId, null, reclaimFinishedAt);
+    Assertions.assertEquals(reclaimFinishedAt, actionService.getByJobId(jobId).finishedAt());
+    Assertions.assertNull(actionService.getByJobId(jobId).afterSnapshotId());
+
+    // Late finish listener still records the real terminal snapshot.
+    actionService.markFinished(jobId, 200L, System.currentTimeMillis());
+    Assertions.assertEquals(200L, actionService.getByJobId(jobId).afterSnapshotId());
+    Assertions.assertEquals(reclaimFinishedAt, actionService.getByJobId(jobId).finishedAt());
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> actionService.markFinished(jobId, 201L, System.currentTimeMillis()));
+  }
+
+  @TestTemplate
   void testTryAcquireRejectsLiveUnboundAndReclaimsExpired() throws Exception {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long tableId = 11L;

@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -52,6 +53,7 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,6 +87,28 @@ public class PolicyMetaService {
     String metalakeName = ident.namespace().level(0);
     PolicyPO policyPO = getPolicyPOByMetalakeAndName(metalakeName, ident.name());
     return POConverters.fromPolicyPO(policyPO, ident.namespace());
+  }
+
+  /**
+   * Loads one active policy by id, including its current version and metalake name.
+   *
+   * <p>The lookup is a single join across policy, metalake, and the current policy version.
+   *
+   * @param policyId policy id
+   * @return the policy, or {@code null} when the policy or its metalake is not active
+   */
+  @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getPolicyById")
+  public PolicyEntity getPolicyById(long policyId) {
+    PolicyPO policyPO =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class, mapper -> mapper.selectPolicyMetaByPolicyId(policyId));
+    if (policyPO == null || policyPO.getMetalakeName() == null) {
+      return null;
+    }
+    return POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(policyPO.getMetalakeName()));
   }
 
   @Monitored(

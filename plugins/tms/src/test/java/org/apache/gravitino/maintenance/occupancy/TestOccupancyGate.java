@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.maintenance.occupancy;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.function.Function;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
@@ -27,7 +30,9 @@ import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -38,7 +43,7 @@ import org.junit.jupiter.api.TestTemplate;
 class TestOccupancyGate extends TestJDBCBackend {
 
   @TestTemplate
-  void testInFlightReadsJobMetaServiceWithoutBackfillingFinishedAt() throws IOException {
+  void testInFlightReclaimsTerminalBoundJobFinishedAt() throws IOException {
     String metalakeName = "tms_occ_ml";
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, "cat");
@@ -49,7 +54,7 @@ class TestOccupancyGate extends TestJDBCBackend {
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     OccupancyGate gate = new OccupancyGate(actions);
-    long policyId = 22L;
+    long policyId = insertPolicy(metalakeName, "occ-policy").id();
 
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
 
@@ -95,7 +100,7 @@ class TestOccupancyGate extends TestJDBCBackend {
                         .build());
 
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
-    Assertions.assertEquals(0L, actions.getByJobId(started.id()).finishedAt());
+    Assertions.assertEquals(finishedAt, actions.getByJobId(started.id()).finishedAt());
     Assertions.assertTrue(
         gate.withinMinInterval(table.id(), policyId, 3_600_000L, finishedAt + 1_000L));
     Assertions.assertFalse(
@@ -127,7 +132,7 @@ class TestOccupancyGate extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testSoftSlotBlocksNewAcquireUntilMarkFinished() throws IOException {
+  void testTerminalBoundJobIsReclaimedSoSlotCanBeAcquiredAgain() throws IOException {
     String metalakeName = "tms_occ_ml3";
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, "cat");
@@ -138,7 +143,7 @@ class TestOccupancyGate extends TestJDBCBackend {
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     OccupancyGate gate = new OccupancyGate(actions);
-    long policyId = 55L;
+    long policyId = insertPolicy(metalakeName, "occ-policy-3").id();
     long finishedAt = 1_700_000_200_000L;
 
     JobEntity succeeded =
@@ -159,13 +164,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     actions.bindJobId(stale, succeeded.id());
     Assertions.assertEquals(0L, actions.getByJobId(succeeded.id()).finishedAt());
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () ->
-            actions.insertInFlight(
-                table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS));
-
-    actions.markFinished(succeeded.id(), 200L, finishedAt);
+    Assertions.assertEquals(finishedAt, actions.getByJobId(succeeded.id()).finishedAt());
     Assertions.assertEquals(0, actions.listInFlight(table.id(), policyId).size());
 
     JobEntity started =
@@ -189,6 +188,143 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
     Assertions.assertTrue(
         gate.shouldSkip(table.id(), policyId, 3_600_000L, finishedAt + 3_600_001L));
+  }
+
+  @TestTemplate
+  void testMissingJobMetaIsReclaimedSoSlotCanBeAcquiredAgain() throws IOException {
+    String metalakeName = "tms_occ_ml5";
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "cat");
+    createAndInsertSchema(metalakeName, "cat", "sch");
+    TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
+
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    OccupancyGate gate = new OccupancyGate(actions);
+    // Policy id need not exist: job lookup goes through the table's metalake.
+    long policyId = 77L;
+    long orphanJobId = 7005L;
+
+    OccupancyClaim stale =
+        actions.insertInFlight(
+            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actions.bindJobId(stale, orphanJobId);
+    Assertions.assertEquals(0L, actions.getByJobId(orphanJobId).finishedAt());
+    // No JobEntity row for orphanJobId — reclaim must still free the soft slot.
+    Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+    Assertions.assertTrue(actions.getByJobId(orphanJobId).finishedAt() > 0L);
+    Assertions.assertEquals(0, actions.listInFlight(table.id(), policyId).size());
+    Assertions.assertTrue(
+        actions
+            .tryAcquireInFlight(
+                table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS)
+            .isPresent());
+  }
+
+  @TestTemplate
+  void testReclaimDoesNotCopyBeforeSnapshotIdIntoAfter() throws IOException {
+    String metalakeName = "tms_occ_ml6";
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "cat");
+    createAndInsertSchema(metalakeName, "cat", "sch");
+    TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
+    JobTemplateEntity template =
+        createAndInsertShellJobTemplateEntity("occ-template-6", "comment", metalakeName);
+
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    OccupancyGate gate = new OccupancyGate(actions);
+    long policyId = insertPolicy(metalakeName, "occ-policy-6").id();
+    long finishedAt = 1_700_000_300_000L;
+    long beforeSnapshotId = 100L;
+
+    JobEntity succeeded =
+        JobEntity.builder()
+            .withId(7006L)
+            .withJobExecutionId("exec-7006")
+            .withNamespace(NamespaceUtil.ofJob(metalakeName))
+            .withJobTemplateName(template.name())
+            .withStatus(JobHandle.Status.SUCCEEDED)
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(finishedAt - 1_000L)
+            .withFinishedAt(finishedAt)
+            .build();
+    backend.insert(succeeded, false);
+    OccupancyClaim claim =
+        actions.insertInFlight(
+            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actions.bindJobId(claim, succeeded.id());
+    actions.recordBeforeSnapshot(succeeded.id(), beforeSnapshotId);
+    Assertions.assertEquals(
+        beforeSnapshotId, actions.getByJobId(succeeded.id()).beforeSnapshotId());
+    Assertions.assertNull(actions.getByJobId(succeeded.id()).afterSnapshotId());
+
+    Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+    Assertions.assertEquals(finishedAt, actions.getByJobId(succeeded.id()).finishedAt());
+    Assertions.assertEquals(
+        beforeSnapshotId, actions.getByJobId(succeeded.id()).beforeSnapshotId());
+    // Failsafe reclaim must not invent S1 from S0 (§5.2.3).
+    Assertions.assertNull(actions.getByJobId(succeeded.id()).afterSnapshotId());
+
+    // Late finish listener may still backfill a real S1 after reclaim closed the soft slot.
+    long afterSnapshotId = 200L;
+    actions.markFinished(succeeded.id(), afterSnapshotId, System.currentTimeMillis());
+    Assertions.assertEquals(afterSnapshotId, actions.getByJobId(succeeded.id()).afterSnapshotId());
+    Assertions.assertEquals(finishedAt, actions.getByJobId(succeeded.id()).finishedAt());
+  }
+
+  @TestTemplate
+  void testActiveJobNotReclaimedWhenPolicyIdIsUnknown() throws IOException {
+    String metalakeName = "tms_occ_ml7";
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "cat");
+    createAndInsertSchema(metalakeName, "cat", "sch");
+    TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
+    JobTemplateEntity template =
+        createAndInsertShellJobTemplateEntity("occ-template-7", "comment", metalakeName);
+
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    OccupancyGate gate = new OccupancyGate(actions);
+    // Simulate a deleted / unreadable policy: lookup must still use the table metalake.
+    long unknownPolicyId = 9_000_007L;
+
+    JobEntity started =
+        JobEntity.builder()
+            .withId(7007L)
+            .withJobExecutionId("exec-7007")
+            .withNamespace(NamespaceUtil.ofJob(metalakeName))
+            .withJobTemplateName(template.name())
+            .withStatus(JobHandle.Status.STARTED)
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(System.currentTimeMillis())
+            .withFinishedAt(0L)
+            .build();
+    backend.insert(started, false);
+    OccupancyClaim claim =
+        actions.insertInFlight(
+            table.id(), unknownPolicyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actions.bindJobId(claim, started.id());
+
+    Assertions.assertTrue(gate.isInFlight(table.id(), unknownPolicyId));
+    Assertions.assertEquals(0L, actions.getByJobId(started.id()).finishedAt());
+    Assertions.assertEquals(1, actions.listInFlight(table.id(), unknownPolicyId).size());
+  }
+
+  @TestTemplate
+  void testUnresolvedTableMetalakeDoesNotReclaimBoundRow() throws IOException {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    OccupancyGate gate = new OccupancyGate(actions);
+    long missingTableId = 9_999_001L;
+    long policyId = 88L;
+    long orphanJobId = 7008L;
+
+    OccupancyClaim claim =
+        actions.insertInFlight(
+            missingTableId, policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actions.bindJobId(claim, orphanJobId);
+
+    // Table/metalake cannot be resolved — do not treat the job as missing/terminal.
+    Assertions.assertTrue(gate.isInFlight(missingTableId, policyId));
+    Assertions.assertEquals(0L, actions.getByJobId(orphanJobId).finishedAt());
+    Assertions.assertEquals(1, actions.listInFlight(missingTableId, policyId).size());
   }
 
   @TestTemplate
@@ -217,5 +353,14 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertTrue(
         actions.tryAcquireInFlight(table.id(), policyId, claimTimeoutMs).isPresent());
     Assertions.assertEquals(claim.id(), actions.getById(claim.id()).id());
+  }
+
+  private PolicyEntity insertPolicy(String metalakeName, String policyName) throws IOException {
+    return createAndInsertPolicyEntity(
+        policyName,
+        "comment",
+        PolicyContents.custom(
+            ImmutableMap.of("k", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null),
+        metalakeName);
   }
 }

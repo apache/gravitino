@@ -18,13 +18,16 @@
  */
 package org.apache.gravitino.maintenance.injob;
 
+import javax.annotation.Nullable;
+import org.apache.gravitino.meta.PolicyEntity;
+
 /**
  * Decides whether maintenance should run after metrics were sampled at {@code S0}.
  *
- * <p>Production implementations come with the four maintenance executors; callers inject the
- * strategy for the current type.
+ * <p>Production wiring uses {@link TypeDispatchingInJobRecommender}: compaction via {@link
+ * CompactionInJobRecommender}, orphan cleanup via {@link TriggerExprInJobRecommender}, and expire /
+ * rewrite-manifests placeholders via {@link AlwaysMaintainInJobRecommender}.
  */
-@FunctionalInterface
 public interface InJobRecommender {
 
   /**
@@ -36,4 +39,24 @@ public interface InJobRecommender {
    */
   RecommendDecision recommend(
       long tableId, long policyId, long sampledSnapshotId, String metricsJson);
+
+  /**
+   * Same as {@link #recommend(long, long, long, String)} when the caller already loaded the policy
+   * (avoids a second store round-trip in type-dispatching recommenders).
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param sampledSnapshotId Iceberg snapshot id at sample time
+   * @param metricsJson serialized metrics for that snapshot
+   * @param policy already-loaded policy, or {@code null} to fall back to id lookup
+   * @return maintain or skip
+   */
+  default RecommendDecision recommend(
+      long tableId,
+      long policyId,
+      long sampledSnapshotId,
+      String metricsJson,
+      @Nullable PolicyEntity policy) {
+    return recommend(tableId, policyId, sampledSnapshotId, metricsJson);
+  }
 }

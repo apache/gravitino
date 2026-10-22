@@ -241,6 +241,28 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testGetPolicyById() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    Assertions.assertNull(policyMetaService.getPolicyById(404L));
+
+    PolicyEntity policyEntity =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("policy-by-id")
+            .withNamespace(NamespaceUtil.ofPolicy(metalake.name()))
+            .withComment("comment")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withContent(content)
+            .withEnabled(true)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    policyMetaService.insertPolicy(policyEntity, false);
+
+    assertEquals(policyEntity, policyMetaService.getPolicyById(policyEntity.id()));
+  }
+
+  @TestTemplate
   public void testInsertAndGetPolicyByIdentifier() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
 
