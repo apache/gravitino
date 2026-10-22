@@ -40,6 +40,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -94,6 +96,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretProviderRegistry;
@@ -110,6 +113,13 @@ import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -2195,6 +2205,60 @@ public class TestCatalogManager {
                   CatalogChange.setSecretReference(
                       CredentialConstants.CREDENTIAL_PROVIDERS, reference)));
       Assertions.assertTrue(manager.dropCatalog(ident, true));
+    }
+  }
+
+  @Test
+  void testLoadWarnsForSecretCredentialProviders() throws Exception {
+    LoggerContext context =
+        (LoggerContext) LogManager.getContext(CatalogManager.class.getClassLoader(), false);
+    Configuration logConfig = context.getConfiguration();
+    List<LogEvent> events = new ArrayList<>();
+    AbstractAppender appender =
+        new AbstractAppender("credentialProvidersCapture", null, null, true, null) {
+          @Override
+          public void append(LogEvent event) {
+            events.add(event.toImmutable());
+          }
+        };
+    appender.start();
+    LoggerConfig logger = new LoggerConfig(CatalogManager.class.getName(), Level.WARN, false);
+    logger.addAppender(appender, Level.WARN, null);
+    logConfig.addLogger(CatalogManager.class.getName(), logger);
+    context.updateLoggers();
+
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      // A catalog persisted before credential providers were rejected as secrets.
+      NameIdentifier ident = NameIdentifier.of("metalake", "legacy_secret_providers");
+      long id = new RandomIdGenerator().nextId();
+      SecretUrn urn = writeThroughUrn("catalog", id, CredentialConstants.CREDENTIAL_PROVIDERS);
+      secrets.writeSecrets(List.of(new SecretMaterial(urn, "gcs-token")));
+      Map<String, String> props = new HashMap<>(catalogProps());
+      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, urn.toString());
+      entityStore.put(
+          CatalogEntity.builder()
+              .withId(id)
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider(provider)
+              .withComment("comment")
+              .withProperties(props)
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build());
+
+      Assertions.assertDoesNotThrow(() -> manager.loadCatalog(ident));
+      Assertions.assertTrue(
+          events.stream()
+              .anyMatch(e -> e.getMessage().getFormattedMessage().contains("gcs-token")));
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+    } finally {
+      logConfig.removeLogger(CatalogManager.class.getName());
+      context.updateLoggers();
+      appender.stop();
     }
   }
 

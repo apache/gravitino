@@ -250,14 +250,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    * Whether this catalog provides path-based credential contexts, which token credential providers
    * such as {@code s3-token} require to vend credentials.
    *
-   * <p>A catalog whose operations implement {@link SupportsPathBasedCredentials} must override this
-   * method to return {@code true}; otherwise creating or altering the catalog with a token provider
-   * fails.
+   * <p>A catalog that cannot provide path-based contexts, neither through operations implementing
+   * {@link SupportsPathBasedCredentials} nor through another server such as the Iceberg REST
+   * server, should override this method to return {@code false}, so that creating or altering it
+   * with a token provider fails.
    *
-   * @return {@code true} if path-based credentials are supported; {@code false} (default) otherwise
+   * @return {@code true} (default) if path-based credentials are supported; {@code false} otherwise
    */
   public boolean supportsPathBasedCredentials() {
-    return false;
+    return true;
   }
 
   /**

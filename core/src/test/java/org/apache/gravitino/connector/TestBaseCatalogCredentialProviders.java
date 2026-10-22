@@ -93,7 +93,7 @@ public class TestBaseCatalogCredentialProviders {
 
   @Test
   void testValidateCredentialProviders() throws IllegalAccessException {
-    TestCatalogImpl catalog = newCatalog(new HashMap<>());
+    TestCatalogImpl catalog = newCatalog(new NoPathBasedCredentialsCatalogImpl(), new HashMap<>());
     Assertions.assertDoesNotThrow(() -> catalog.validateCredentialProviders(null));
     Assertions.assertDoesNotThrow(
         () ->
@@ -127,20 +127,21 @@ public class TestBaseCatalogCredentialProviders {
     Map<String, String> props = new HashMap<>();
     props.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/tmp/gcs.json");
 
-    Map<String, String> result = newCatalog(props).properties();
+    Map<String, String> result =
+        newCatalog(new NoPathBasedCredentialsCatalogImpl(), props).properties();
     Assertions.assertFalse(result.containsKey(CredentialConstants.CREDENTIAL_PROVIDERS));
 
-    TestCatalogImpl catalog = newCatalog(props);
-    catalog.pathBasedCredentials = true;
     Assertions.assertEquals(
         GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
-        catalog.properties().get(CredentialConstants.CREDENTIAL_PROVIDERS));
+        newCatalog(props).properties().get(CredentialConstants.CREDENTIAL_PROVIDERS));
   }
 
   @Test
-  void testValidateCredentialProvidersWithPathBasedCredentials() throws IllegalAccessException {
+  void testPathBasedCredentialsSupportedByDefault() throws IllegalAccessException {
+    // A catalog that does not override supportsPathBasedCredentials() keeps accepting token
+    // providers.
     TestCatalogImpl catalog = newCatalog(new HashMap<>());
-    catalog.pathBasedCredentials = true;
+    Assertions.assertTrue(catalog.supportsPathBasedCredentials());
     Assertions.assertDoesNotThrow(
         () ->
             catalog.validateCredentialProviders(
@@ -148,6 +149,11 @@ public class TestBaseCatalogCredentialProviders {
   }
 
   private TestCatalogImpl newCatalog(Map<String, String> props) throws IllegalAccessException {
+    return newCatalog(new TestCatalogImpl(), props);
+  }
+
+  private TestCatalogImpl newCatalog(TestCatalogImpl catalog, Map<String, String> props)
+      throws IllegalAccessException {
     CatalogEntity entity =
         CatalogEntity.builder()
             .withId(1L)
@@ -160,19 +166,11 @@ public class TestBaseCatalogCredentialProviders {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
             .build();
-    TestCatalogImpl catalog = new TestCatalogImpl();
     FieldUtils.writeField(catalog, "entity", entity, true);
     return catalog;
   }
 
   private static class TestCatalogImpl extends BaseCatalog<TestCatalogImpl> {
-
-    private boolean pathBasedCredentials = false;
-
-    @Override
-    public boolean supportsPathBasedCredentials() {
-      return pathBasedCredentials;
-    }
 
     @Override
     public String shortName() {
@@ -192,6 +190,14 @@ public class TestBaseCatalogCredentialProviders {
     @Override
     public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
       return BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
+    }
+  }
+
+  private static class NoPathBasedCredentialsCatalogImpl extends TestCatalogImpl {
+
+    @Override
+    public boolean supportsPathBasedCredentials() {
+      return false;
     }
   }
 }

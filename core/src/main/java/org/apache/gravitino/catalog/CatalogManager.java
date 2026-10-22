@@ -1837,9 +1837,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             catalog.validateCredentialProviders(propsToValidate);
             if (propsToValidate == null) {
               // Loading stays lenient for catalogs persisted with unsupported providers, so only
-              // warn about them.
+              // warn about them. Providers persisted as a secret are checked by their plaintext.
               try {
-                catalog.validateCredentialProviders(entity.getProperties());
+                catalog.validateCredentialProviders(
+                    secretManager.toPlaintextProperties(entity.getProperties()));
               } catch (IllegalArgumentException e) {
                 LOG.warn(
                     "Catalog {} has credential providers that cannot vend credentials: {}",
