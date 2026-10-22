@@ -903,6 +903,18 @@ public class TestHologresTableOperations {
   }
 
   @Test
+  void testAlterTableClearCommentsWithNull() {
+    String columnSql =
+        ops.alterTableSql(
+            "public", "test_table", TableChange.updateColumnComment(new String[] {"col1"}, null));
+    assertEquals("COMMENT ON COLUMN \"test_table\".\"col1\" IS '';", columnSql);
+
+    ops.setMockTable(ops.buildFakeTable("test_table"));
+    String tableSql = ops.alterTableSql("public", "test_table", TableChange.updateComment(null));
+    assertEquals("COMMENT ON TABLE \"test_table\" IS '';", tableSql);
+  }
+
+  @Test
   void testAlterTableRenameColumnRejectsNestedField() {
     assertThrows(
         UnsupportedOperationException.class,

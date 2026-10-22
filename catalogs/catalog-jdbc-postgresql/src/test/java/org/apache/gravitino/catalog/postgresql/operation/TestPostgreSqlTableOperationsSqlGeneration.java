@@ -177,6 +177,19 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testClearCommentsWithNull() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+
+    Assertions.assertEquals(
+        "COMMENT ON COLUMN \"test_table\".\"col1\" IS E'';",
+        ops.alterTableSql(
+            "test_table", TableChange.updateColumnComment(new String[] {"col1"}, null)));
+    Assertions.assertEquals(
+        "COMMENT ON TABLE \"test_table\" IS E'';",
+        ops.alterTableSql("test_table", TableChange.updateComment(null)));
+  }
+
+  @Test
   public void testEscapeAddColumnCommentInGeneratedSql() {
     TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
     String comment = "owner\\'s \"comment\"; --";

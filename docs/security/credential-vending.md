@@ -20,7 +20,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 | JDBC         | JDBC user and password          |
 | Paimon       | S3, OSS, JDBC user and password |
 
-S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs, except that the Trino Hive connector does not consume OSS credentials.
+S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs, except that the Trino Hive connector does not consume OSS credentials. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
 
 Token providers (`s3-token`, `oss-token`, `gcs-token`, `adls-token`, and `cos-token`) scope credentials to a path, so only Fileset and Iceberg catalogs support them. Other catalogs vend static keys only, such as `s3-secret-key`, `oss-secret-key`, and `azure-account-key`. Creating or altering such a catalog with a token provider fails.
 
@@ -233,7 +233,7 @@ For Gravitino running on EKS. Instead of an access key, Gravitino uses its pod's
 | `s3-token-expire-in-secs`   | Session lifetime of the vended credentials. Cannot exceed the role's maximum session duration.                                            | 3600          | No       |
 | `s3-token-service-endpoint` | Alternative STS endpoint, for S3-compatible storage.                                                                                      | (none)        | No       |
 
-For path-based requests, Gravitino always scopes the credentials with a session policy covering the requested data, metadata, and write locations. Catalog-level requests do not include a session policy and inherit the selected role's permissions. The role is selected from `s3-role-arn` when configured, or from the pod's `AWS_ROLE_ARN` otherwise.
+For path-based requests, Gravitino always scopes the credentials with a session policy covering the requested data, metadata, and write locations. Catalog-level requests do not vend `aws-irsa` credentials because they provide no paths for a session policy. The role is selected from `s3-role-arn` when configured, or from the pod's `AWS_ROLE_ARN` otherwise.
 
 The selected role needs the same permission policy as `s3-token` above. Its trust policy must allow `sts:AssumeRoleWithWebIdentity` from the pod's Kubernetes service account identity.
 
@@ -478,7 +478,7 @@ For a catalog, `{type}` is `catalog` and `{full_name}` is the catalog name:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
-The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed.
+The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed. These credentials are catalog-level and are not refreshed: token providers such as `s3-token` vend nothing at catalog level, and `aws-irsa` credentials expire after `s3-token-expire-in-secs`.
 
 ### Read or Write Scope
 

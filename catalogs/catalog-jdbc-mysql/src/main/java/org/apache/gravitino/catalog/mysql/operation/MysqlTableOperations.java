@@ -441,7 +441,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -728,12 +728,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append(AFTER).append(afterPosition.getColumn());
+      columnDefinition.append(AFTER).append(quote(afterPosition.getColumn()));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append(AFTER).append(quote(s)));
     }
     return columnDefinition.toString();
   }
