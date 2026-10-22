@@ -177,7 +177,9 @@ export default function CreateTagDialog({ ...props }) {
               ) : (
                 <Space wrap>
                   {cacheData.allowedValues.map((value, index) => (
-                    <Tag className='mr-0' key={index}>{value}</Tag>
+                    <Tag className='mr-0' key={index}>
+                      {value}
+                    </Tag>
                   ))}
                 </Space>
               )}
@@ -212,6 +214,7 @@ export default function CreateTagDialog({ ...props }) {
                         if (new Set(values).size !== values.length) {
                           return Promise.reject(new Error('Allowed values must be unique'))
                         }
+
                         return values.every(value => value.length <= 256)
                           ? Promise.resolve()
                           : Promise.reject(new Error('Each value must be at most 256 characters'))
