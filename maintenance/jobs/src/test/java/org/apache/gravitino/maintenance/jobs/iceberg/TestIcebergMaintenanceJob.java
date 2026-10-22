@@ -118,6 +118,18 @@ public class TestIcebergMaintenanceJob {
     assertTrue(args.contains("--maintenance-types"));
     assertTrue(args.contains("{{maintenance_types}}"));
     assertFalse(args.contains("{{maintenance_types:-}}"));
+    assertTrue(args.contains("--policy-ids"));
+    assertTrue(args.contains("{{policy_ids}}"));
+    assertFalse(args.contains("{{policy_ids:-}}"));
+  }
+
+  @Test
+  public void testParsePolicyIdsMatchesTypes() {
+    assertEquals(List.of(10L, 20L), IcebergMaintenanceJob.parsePolicyIds("10, 20", 2));
+    assertThrows(
+        IllegalArgumentException.class, () -> IcebergMaintenanceJob.parsePolicyIds("10", 2));
+    assertThrows(
+        IllegalArgumentException.class, () -> IcebergMaintenanceJob.parsePolicyIds(null, 1));
   }
 
   @Test

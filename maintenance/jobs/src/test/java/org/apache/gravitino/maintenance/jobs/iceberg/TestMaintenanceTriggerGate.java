@@ -79,12 +79,7 @@ public class TestMaintenanceTriggerGate {
 
   @Test
   public void testTemplateExposesRulesPlaceholder() {
-    assertTrue(
-        new IcebergMaintenanceJob().jobTemplate().arguments().contains("--rules"));
-    assertTrue(
-        new IcebergMaintenanceJob()
-            .jobTemplate()
-            .arguments()
-            .contains("{{rules:-}}"));
+    assertTrue(new IcebergMaintenanceJob().jobTemplate().arguments().contains("--rules"));
+    assertTrue(new IcebergMaintenanceJob().jobTemplate().arguments().contains("{{rules:-}}"));
   }
 }

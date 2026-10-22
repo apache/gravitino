@@ -85,11 +85,12 @@ public class TestMaintenanceActionHttpClient {
     options.put("username", "alice");
     try (MaintenanceActionHttpClient client =
         MaintenanceActionHttpClient.fromUpdaterOptions(options)) {
-      client.reportBeforeMetrics(7L, new MaintenanceActionMetricsRequest(1L, 2L, "{}"));
+      client.reportBeforeMetrics(7L, new MaintenanceActionMetricsRequest(1L, 20L, 2L, "{}"));
     }
     assertEquals("/api/metalakes/demo/maintenance/actions/7/metrics/before", path.get());
     assertEquals(basic("alice", "dummy"), auth.get());
     assertTrue(body.get().contains("\"tableId\":1"));
+    assertTrue(body.get().contains("\"policyId\":20"));
   }
 
   @Test
@@ -100,7 +101,7 @@ public class TestMaintenanceActionHttpClient {
     options.put("password", "secret");
     try (MaintenanceActionHttpClient client =
         MaintenanceActionHttpClient.fromUpdaterOptions(options)) {
-      client.finish(9L, new MaintenanceActionFinishRequest(3L, 11L));
+      client.finish(9L, new MaintenanceActionFinishRequest(3L, 30L, 11L));
     }
     assertEquals("/api/metalakes/demo/maintenance/actions/9/finish", path.get());
     assertEquals(basic("admin", "secret"), auth.get());
@@ -110,7 +111,7 @@ public class TestMaintenanceActionHttpClient {
   public void testNoneAuthOmitsAuthorization() {
     try (MaintenanceActionHttpClient client =
         MaintenanceActionHttpClient.fromUpdaterOptions(baseOptions())) {
-      client.reportAfterMetrics(4L, new MaintenanceActionMetricsRequest(1L, 2L, "{}"));
+      client.reportAfterMetrics(4L, new MaintenanceActionMetricsRequest(1L, 20L, 2L, "{}"));
     }
     assertNull(auth.get());
     assertTrue(path.get().endsWith("/metrics/after"));
@@ -126,7 +127,7 @@ public class TestMaintenanceActionHttpClient {
     options.put("oauth_scope", "openid");
     try (MaintenanceActionHttpClient client =
         MaintenanceActionHttpClient.fromUpdaterOptions(options)) {
-      client.reportBeforeMetrics(1L, new MaintenanceActionMetricsRequest(1L, 2L, "{}"));
+      client.reportBeforeMetrics(1L, new MaintenanceActionMetricsRequest(1L, 20L, 2L, "{}"));
     }
     assertEquals("Bearer tok-1", auth.get());
     assertTrue(path.get().endsWith("/metrics/before"));
@@ -139,7 +140,8 @@ public class TestMaintenanceActionHttpClient {
     MaintenanceActionHttpClient client = MaintenanceActionHttpClient.fromUpdaterOptions(options);
     assertThrows(
         IllegalStateException.class,
-        () -> client.reportBeforeMetrics(1L, new MaintenanceActionMetricsRequest(1L, 2L, "{}")));
+        () ->
+            client.reportBeforeMetrics(1L, new MaintenanceActionMetricsRequest(1L, 20L, 2L, "{}")));
     client.close();
   }
 

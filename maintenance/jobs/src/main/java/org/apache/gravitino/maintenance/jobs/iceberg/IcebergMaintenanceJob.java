@@ -65,10 +65,11 @@ import org.slf4j.LoggerFactory;
  * (snapshot drift and trigger-expr recommend) is decided in-job after S0 sample. Soft slots are
  * closed via the finish callback in {@code finally}.
  *
- * <p>TMS-specific {@code jobConf} keys: {@code maintenance_types}, {@code tables} (JSON targets
- * with system-filled {@code table_id}), {@code updater_options}, {@code rules}. Shared procedure /
- * Spark keys match other Iceberg built-ins. The Gravitino job id is read from the local executor
- * staging directory ({@code job-} plus the numeric id), or from {@link #GRAVITINO_JOB_ID_ENV}.
+ * <p>TMS-specific {@code jobConf} keys: {@code maintenance_types}, {@code policy_ids} (parallel
+ * comma-separated policy entity ids), {@code tables} (JSON targets with system-filled {@code
+ * table_id}), {@code updater_options}, {@code rules}. Shared procedure / Spark keys match other
+ * Iceberg built-ins. The Gravitino job id is read from the local executor staging directory ({@code
+ * job-} plus the numeric id), or from {@link #GRAVITINO_JOB_ID_ENV}.
  */
 public class IcebergMaintenanceJob implements BuiltInJob {
 
@@ -96,6 +97,13 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    * shape; {@code table_id} is system-filled by enqueue/submit.
    */
   public static final String TABLES_KEY = "tables";
+
+  /**
+   * JobConf key for policy entity ids parallel to {@link #MAINTENANCE_TYPES_KEY} (comma-separated).
+   * Required so metrics/finish callbacks can attribute soft slots when one job binds multiple
+   * policies.
+   */
+  public static final String POLICY_IDS_KEY = "policy_ids";
 
   private static final String VERSION = "v1";
 
@@ -178,10 +186,12 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
     List<MaintenanceType> types;
+    List<Long> policyIds;
     long jobId;
     List<TableTarget> tables;
     try {
       types = parseMaintenanceTypes(argMap.get("maintenance-types"));
+      policyIds = parsePolicyIds(argMap.get("policy-ids"), types.size());
       jobId = resolveGravitinoJobId();
       tables = resolveTableTargets(argMap);
     } catch (IllegalArgumentException | IllegalStateException e) {
@@ -208,24 +218,27 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
       try (MaintenanceActionHttpClient client =
           MaintenanceActionHttpClient.fromUpdaterOptions(updaterOptions)) {
-        // All tables in this batch are already bound to jobId; close every soft slot even when a
-        // procedure fails or we never reach a later table.
-        Set<Long> finishedTables = new HashSet<>();
+        // Soft slots are per (tableId, policyId) and already bound to jobId; close every slot even
+        // when a procedure fails or we never reach a later type/table.
+        Set<String> finishedSlots = new HashSet<>();
         try {
           for (TableTarget table : tables) {
-            SnapshotSample lastAfter = null;
-            try {
-              for (MaintenanceType type : types) {
+            for (int i = 0; i < types.size(); i++) {
+              MaintenanceType type = types.get(i);
+              long policyId = policyIds.get(i);
+              Long afterSnapshotId = null;
+              try {
                 SnapshotSample s0 =
                     sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
-                reportBeforeQuietly(client, jobId, table.tableId, s0, /*finish=*/ false);
+                reportBeforeQuietly(client, jobId, table.tableId, policyId, s0);
 
                 if (s0.snapshotId != s0.headSnapshotId) {
                   LOG.info(
-                      "TMS type {} skipped for job {} table {} due to snapshot drift (s0={} head={})",
+                      "TMS type {} skipped for job {} table {} policy {} due to snapshot drift (s0={} head={})",
                       type.wireName,
                       jobId,
                       table.tableId,
+                      policyId,
                       s0.snapshotId,
                       s0.headSnapshotId);
                   continue;
@@ -233,23 +246,23 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
                 if (!MaintenanceTriggerGate.shouldMaintain(type, argMap, s0.metricsJson)) {
                   LOG.info(
-                      "TMS type {} skipped for job {} table {} due to in-Spark recommend skip",
+                      "TMS type {} skipped for job {} table {} policy {} due to in-Spark recommend skip",
                       type.wireName,
                       jobId,
-                      table.tableId);
+                      table.tableId,
+                      policyId);
                   continue;
                 }
 
                 runProcedure(spark, type, table.catalogName, table.tableIdentifier, argMap);
                 SnapshotSample s1 =
                     sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
-                lastAfter = s1;
-                reportAfterQuietly(client, jobId, table.tableId, s1, /*finish=*/ false);
+                afterSnapshotId = s1.snapshotId;
+                reportAfterQuietly(client, jobId, table.tableId, policyId, s1);
+              } finally {
+                finishQuietly(client, jobId, table.tableId, policyId, afterSnapshotId);
+                finishedSlots.add(slotKey(table.tableId, policyId));
               }
-            } finally {
-              finishQuietly(
-                  client, jobId, table.tableId, lastAfter == null ? null : lastAfter.snapshotId);
-              finishedTables.add(table.tableId);
             }
           }
           return 0;
@@ -258,8 +271,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           return 1;
         } finally {
           for (TableTarget table : tables) {
-            if (!finishedTables.contains(table.tableId)) {
-              finishQuietly(client, jobId, table.tableId, /*afterSnapshotId=*/ null);
+            for (long policyId : policyIds) {
+              if (!finishedSlots.contains(slotKey(table.tableId, policyId))) {
+                finishQuietly(client, jobId, table.tableId, policyId, /*afterSnapshotId=*/ null);
+              }
             }
           }
         }
@@ -344,6 +359,46 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       throw new IllegalArgumentException("maintenance_types must not be empty");
     }
     return types;
+  }
+
+  /**
+   * @param policyIds comma-separated policy entity ids parallel to {@code maintenance_types}
+   * @param expectedCount number of maintenance types
+   * @return ordered policy ids
+   */
+  @VisibleForTesting
+  static List<Long> parsePolicyIds(@Nullable String policyIds, int expectedCount) {
+    String raw = IcebergJobUtils.nullIfUnresolvedPlaceholder(policyIds);
+    if (raw == null || raw.trim().isEmpty()) {
+      throw new IllegalArgumentException("policy_ids is required");
+    }
+    List<Long> parsed = new ArrayList<>();
+    for (String part : raw.split(",")) {
+      String trimmed = part.trim();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
+      try {
+        long policyId = Long.parseLong(trimmed);
+        if (policyId <= 0) {
+          throw new IllegalArgumentException("policy_ids must be positive longs: " + trimmed);
+        }
+        parsed.add(policyId);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("policy_ids must be longs: " + trimmed, e);
+      }
+    }
+    if (parsed.size() != expectedCount) {
+      throw new IllegalArgumentException(
+          String.format(
+              "policy_ids count %s must match maintenance_types count %s",
+              parsed.size(), expectedCount));
+    }
+    return parsed;
+  }
+
+  private static String slotKey(long tableId, long policyId) {
+    return tableId + ":" + policyId;
   }
 
   @VisibleForTesting
@@ -538,32 +593,34 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       MaintenanceActionHttpClient client,
       long jobId,
       long tableId,
-      SnapshotSample sample,
-      boolean finish) {
-    reportMetricsQuietly(client, jobId, tableId, sample, finish, /*after=*/ false);
+      long policyId,
+      SnapshotSample sample) {
+    reportMetricsQuietly(client, jobId, tableId, policyId, sample, /*after=*/ false);
   }
 
   private static void reportAfterQuietly(
       MaintenanceActionHttpClient client,
       long jobId,
       long tableId,
-      SnapshotSample sample,
-      boolean finish) {
-    reportMetricsQuietly(client, jobId, tableId, sample, finish, /*after=*/ true);
+      long policyId,
+      SnapshotSample sample) {
+    reportMetricsQuietly(client, jobId, tableId, policyId, sample, /*after=*/ true);
   }
 
   private static void finishQuietly(
       MaintenanceActionHttpClient client,
       long jobId,
       long tableId,
+      long policyId,
       @Nullable Long afterSnapshotId) {
     try {
-      client.finish(jobId, new MaintenanceActionFinishRequest(tableId, afterSnapshotId));
+      client.finish(jobId, new MaintenanceActionFinishRequest(tableId, policyId, afterSnapshotId));
     } catch (Exception e) {
       LOG.warn(
-          "Best-effort TMS finish failed for job {} table {} afterSnapshotId={}",
+          "Best-effort TMS finish failed for job {} table {} policy {} afterSnapshotId={}",
           jobId,
           tableId,
+          policyId,
           afterSnapshotId,
           e);
     }
@@ -573,8 +630,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       MaintenanceActionHttpClient client,
       long jobId,
       long tableId,
+      long policyId,
       SnapshotSample sample,
-      boolean finish,
       boolean after) {
     if (sample == null || sample.metricsJson == null || sample.metricsJson.trim().isEmpty()) {
       return;
@@ -582,7 +639,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     try {
       MaintenanceActionMetricsRequest request =
           new MaintenanceActionMetricsRequest(
-              tableId, sample.snapshotId, sample.metricsJson, finish);
+              tableId, policyId, sample.snapshotId, sample.metricsJson);
       if (after) {
         client.reportAfterMetrics(jobId, request);
       } else {
@@ -590,12 +647,12 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       }
     } catch (Exception e) {
       LOG.warn(
-          "Best-effort TMS {} metrics report failed for job {} table {} snapshot {} finish={}",
+          "Best-effort TMS {} metrics report failed for job {} table {} policy {} snapshot {}",
           after ? "after" : "before",
           jobId,
           tableId,
+          policyId,
           sample.snapshotId,
-          finish,
           e);
     }
   }
@@ -701,6 +758,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     return Arrays.asList(
         "--maintenance-types",
         "{{maintenance_types}}",
+        "--policy-ids",
+        "{{policy_ids}}",
         "--tables",
         "{{tables}}",
         "--updater-options",

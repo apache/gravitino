@@ -117,8 +117,7 @@ final class MaintenanceTriggerGate {
     }
     String raw =
         IcebergJobUtils.nullIfUnresolvedPlaceholder(
-            firstNonNull(
-                argMap.get(RULES_ARG), argMap.get(RULES_KEY)));
+            firstNonNull(argMap.get(RULES_ARG), argMap.get(RULES_KEY)));
     if (raw == null || raw.trim().isEmpty()) {
       return Collections.emptyMap();
     }
