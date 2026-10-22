@@ -102,6 +102,18 @@ public class AuthorizationExpressionConstants {
                   ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
                   """;
 
+  /**
+   * Authorizes creating a table in a schema through the Iceberg REST API: create table, register
+   * table, the destination of a cross-namespace rename, and a staged-create commit (an update
+   * request that carries {@code AssertTableDoesNotExist}).
+   */
+  public static final String ICEBERG_CREATE_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE
+                  """;
+
   public static final String MODIFY_TABLE_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
