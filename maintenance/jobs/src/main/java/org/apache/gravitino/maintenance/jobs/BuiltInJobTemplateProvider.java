@@ -19,11 +19,10 @@
 package org.apache.gravitino.maintenance.jobs;
 
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob;
@@ -47,36 +46,23 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
   private static final Pattern VERSION_PATTERN =
       Pattern.compile(JobTemplateProvider.VERSION_VALUE_PATTERN);
 
-  /**
-   * Lazy suppliers so a linkage failure in one Spark job class does not prevent the provider SPI
-   * class from loading (or other templates from registering).
-   */
-  // Lambdas (not method refs) so job classes are not loaded until jobTemplates() runs.
-  private static final List<Supplier<BuiltInJob>> BUILT_IN_JOB_SUPPLIERS =
+  private static final List<BuiltInJob> BUILT_IN_JOBS =
       ImmutableList.of(
-          () -> new SparkPiJob(),
-          () -> new IcebergRewriteDataFilesJob(),
-          () -> new IcebergRewriteManifestsJob(),
-          () -> new IcebergUpdateStatsAndMetricsJob(),
-          () -> new IcebergUpdateManifestStatsJob(),
-          () -> new IcebergExpireSnapshotsJob(),
-          () -> new IcebergRemoveOrphanFilesJob(),
-          () -> new TmsIcebergMaintenanceJob());
+          new SparkPiJob(),
+          new IcebergRewriteDataFilesJob(),
+          new IcebergRewriteManifestsJob(),
+          new IcebergUpdateStatsAndMetricsJob(),
+          new IcebergUpdateManifestStatsJob(),
+          new IcebergExpireSnapshotsJob(),
+          new IcebergRemoveOrphanFilesJob(),
+          new TmsIcebergMaintenanceJob());
 
   @Override
   public List<? extends JobTemplate> jobTemplates() {
-    List<JobTemplate> templates = new ArrayList<>();
-    for (Supplier<BuiltInJob> supplier : BUILT_IN_JOB_SUPPLIERS) {
-      try {
-        JobTemplate template = supplier.get().jobTemplate();
-        if (isValid(template)) {
-          templates.add(template);
-        }
-      } catch (LinkageError | RuntimeException e) {
-        LOG.warn("Skip built-in job template that failed to load: {}", e.toString());
-      }
-    }
-    return templates;
+    return BUILT_IN_JOBS.stream()
+        .map(BuiltInJob::jobTemplate)
+        .filter(this::isValid)
+        .collect(Collectors.toList());
   }
 
   private boolean isValid(JobTemplate template) {
