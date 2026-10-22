@@ -1101,7 +1101,6 @@ tasks.rat {
     "clients/client-python/gravitino/utils/http_client.py",
     "clients/client-python/tests/unittests/htmlcov/*",
     "clients/client-python/tests/integration/htmlcov/*",
-    "clients/filesystem-fuse/Cargo.lock",
     "dev/charts/gravitino/README.md",
     "dev/charts/gravitino-iceberg-rest-server/README.md",
     "dev/charts/gravitino-lance-rest-server/README.md",
