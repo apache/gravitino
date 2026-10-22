@@ -1,5 +1,5 @@
 name: 'Setup Java Toolchains'
-description: 'Install a primary JDK and JDK 24 (for Trino), register JDK 24 with Gradle toolchain'
+description: 'Install a primary JDK and JDK 24 (for Trino); Gradle finds JDK 24 through fromEnv in gradle.properties'
 
 inputs:
   java-version:
@@ -13,7 +13,6 @@ runs:
   using: composite
   steps:
     - uses: actions/setup-java@v4
-      id: setup-jdk24
       with:
         java-version: 24
         distribution: temurin
@@ -24,14 +23,3 @@ runs:
         distribution: temurin
         cache: ${{ inputs.cache }}
 
-    - name: Register JDK 24 with Gradle toolchain
-      shell: bash
-      run: |
-        mkdir -p ~/.gradle
-        GRADLE_PROPERTIES=~/.gradle/gradle.properties
-        TMP=$(mktemp)
-        if [ -f "${GRADLE_PROPERTIES}" ]; then
-          awk '!/^org\.gradle\.java\.installations\.paths=/' "${GRADLE_PROPERTIES}" > "${TMP}"
-        fi
-        echo "org.gradle.java.installations.paths=${{ steps.setup-jdk24.outputs.path }}" >> "${TMP}"
-        mv "${TMP}" "${GRADLE_PROPERTIES}"

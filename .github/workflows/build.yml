@@ -31,7 +31,6 @@ jobs:
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
         id: filter
         with:
-          list-files: shell
           filters: |
             source_changes:
               - '.github/**'
@@ -61,43 +60,18 @@ jobs:
               - '!docs/**/*.gif'
               - '!docs/**/*.webp'
               - 'mcp-server/**'
+            # A PR is maintenance-only when it changes source and nothing outside maintenance/.
+            outside_maintenance:
+              - '!maintenance/**'
             spark_connector_changes:
               - spark-connector/**
             mcp_server_changes:
               - mcp-server/**
-      - name: Determine maintenance-module-only changes
-        id: maintenance_module_only
-        env:
-          SOURCE_CHANGE_FILES: ${{ steps.filter.outputs.source_changes_files }}
-        run: |
-          # Route to the maintenance-only build path only when every source
-          # change in the PR is under maintenance/. Non-source changes are
-          # already filtered out by source_changes_files.
-          source_files=()
-          if [ -n "${SOURCE_CHANGE_FILES}" ]; then
-            eval "source_files=(${SOURCE_CHANGE_FILES})"
-          fi
-
-          maintenance_module_only=false
-          if [ "${#source_files[@]}" -gt 0 ]; then
-            maintenance_module_only=true
-            for path in "${source_files[@]}"; do
-              case "$path" in
-                maintenance/*) ;;
-                *)
-                  maintenance_module_only=false
-                  break
-                  ;;
-              esac
-            done
-          fi
-
-          echo "maintenance_module_only_changes=${maintenance_module_only}" >> "${GITHUB_OUTPUT}"
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
-      maintenance_module_only_changes: ${{ steps.maintenance_module_only.outputs.maintenance_module_only_changes }}
+      maintenance_module_only_changes: ${{ steps.filter.outputs.source_changes == 'true' && steps.filter.outputs.outside_maintenance != 'true' }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -170,17 +144,6 @@ jobs:
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
-
-      - name: Install dependencies
-        run: |
-          # libssl1.1 is not in the runner's apt sources, so the .deb is fetched directly.
-          deb=libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          for host in archive.ubuntu.com nz2.archive.ubuntu.com security.ubuntu.com; do
-            wget --tries=3 --timeout=30 -O "$deb" "https://$host/ubuntu/pool/main/o/openssl/$deb" && break
-            rm -f "$deb"
-          done
-          [ -s "$deb" ] || { echo "Could not download $deb from any mirror" >&2; exit 1; }
-          sudo dpkg -i "$deb"
 
       - name: Build with Gradle
         run: |
@@ -356,17 +319,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: core-*-test-evidence
-          path: core-test-evidence
+          # Each artifact keeps its workspace-relative paths, so merging into the workspace puts
+          # every lane's core/build/jacoco/<task>.exec back where jacocoTestReport reads it.
+          merge-multiple: true
 
       - name: Generate combined core coverage
         if: needs.changes.outputs.maintenance_module_only_changes != 'true'
         run: |
-          mkdir -p core/build/jacoco
-          for task in coreUnitTest coreH2Test coreMySQLTest corePostgreSQLTest; do
-            exec_file="$(find core-test-evidence -path "*/core/build/jacoco/${task}.exec" -print -quit)"
-            test -n "${exec_file}"
-            install -m 0644 "${exec_file}" "core/build/jacoco/${task}.exec"
-          done
           ./gradlew \
             :core:jacocoTestReport \
             -PcoreSuiteCoverage=true \
