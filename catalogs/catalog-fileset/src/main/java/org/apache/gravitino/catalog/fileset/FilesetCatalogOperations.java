@@ -60,7 +60,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -108,6 +107,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.FileInfo;
@@ -116,7 +116,6 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
@@ -890,11 +889,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         throw new NonEmptySchemaException("Schema %s is not empty", ident);
       }
 
-      SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
-      Map<String, String> properties =
-          Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
-      Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
-
       // Catalog force-drop reaches this method without SchemaOperationDispatcher's fileset
       // cleanup. Drop each fileset before its schema so a storage failure preserves the failed
       // fileset and its parent for retry. Stop at the first failure; earlier drops stay committed.
@@ -904,72 +898,38 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               .ifPresent(
                   deleted -> secretManager.deleteSecretsFromProperties(deleted.properties()));
         }
-
-        // Functions can also live in fileset catalogs. Drop their metadata explicitly before
-        // the non-cascading schema delete so it still protects any unprocessed filesets.
-        for (FunctionEntity function :
-            store.list(filesetNs, FunctionEntity.class, Entity.EntityType.FUNCTION)) {
-          store.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION);
-        }
       }
 
-      // Reject remaining filesets instead of deleting their metadata without storage cleanup.
-      boolean dropped = super.dropSchema(ident, false);
-      // If the schema entity is failed to be deleted, we should not delete the storage location
-      // and return false immediately.
-      if (!dropped || disableFSOps) {
-        return dropped;
-      }
-
-      // Delete the schema path if it exists and is empty.
-      if (!schemaPaths.isEmpty()) {
-        AtomicReference<RuntimeException> exception = new AtomicReference<>();
-        schemaPaths.forEach(
-            (locationName, schemaPath) -> {
-              try {
-                Map<String, String> fsConf =
-                    mergeUpLevelConfigurations(ident, schemaEntity.properties(), schemaPath);
-                FileSystem fs = getFileSystemWithCache(schemaPath, fsConf);
-                if (fs.exists(schemaPath)) {
-                  FileStatus[] statuses = fs.listStatus(schemaPath);
-                  if (statuses.length == 0) {
-                    if (fs.delete(schemaPath, true)) {
-                      LOG.info(
-                          "Deleted schema {} location {} with location name {}",
-                          ident,
-                          schemaPath,
-                          locationName);
-                    } else {
-                      LOG.warn(
-                          "Failed to delete schema {} because it has files/folders under location {} with location name {}",
-                          ident,
-                          schemaPath,
-                          locationName);
+      // Only functions may be deleted with the schema; remaining filesets still reject the drop.
+      // Keep function and schema metadata in one transaction until directory cleanup succeeds.
+      boolean dropped =
+          store
+              .deleteSchemaAndGet(
+                  ident,
+                  cascade,
+                  schemaEntity -> {
+                    if (!disableFSOps) {
+                      try {
+                        deleteEmptySchemaLocations(ident, schemaEntity);
+                      } catch (IOException ioe) {
+                        throw new UncheckedIOException(ioe);
+                      }
                     }
-                  }
-                }
-              } catch (IOException ioe) {
-                LOG.warn(
-                    "Failed to delete schema {} location {} with location name {}",
-                    ident,
-                    schemaPath,
-                    locationName,
-                    ioe);
-                exception.set(
-                    new RuntimeException("Failed to delete schema " + ident + " location", ioe));
-              }
-            });
-        if (exception.get() != null) {
-          throw exception.get();
-        }
+                  })
+              .isPresent();
+      if (dropped) {
+        LOG.info("Deleted schema {}", ident);
       }
+      return dropped;
 
-      LOG.info("Deleted schema {}", ident);
-      return true;
-
+    } catch (NonEmptyEntityException neee) {
+      throw new NonEmptySchemaException(neee, "Schema %s is not empty", ident);
     } catch (NoSuchEntityException ne) {
       LOG.warn("Schema {} does not exist", ident);
       return false;
+    } catch (UncheckedIOException uioe) {
+      throw ExceptionMessages.wrap(
+          "Failed to delete schema " + ident + " location", uioe.getCause());
     } catch (IOException ioe) {
       throw ExceptionMessages.wrap("Failed to delete schema " + ident + " location", ioe);
     }
@@ -1039,6 +999,31 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
+    }
+  }
+
+  private void deleteEmptySchemaLocations(NameIdentifier ident, SchemaEntity schemaEntity)
+      throws IOException {
+    Map<String, String> properties =
+        Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
+    Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
+    for (Map.Entry<String, Path> entry : schemaPaths.entrySet()) {
+      String locationName = entry.getKey();
+      Path schemaPath = entry.getValue();
+      Map<String, String> fsConf = mergeUpLevelConfigurations(ident, properties, schemaPath);
+      FileSystem fs = getFileSystemWithCache(schemaPath, fsConf);
+      // Filesystem changes cannot be rolled back with metadata. A retry may find a location gone.
+      if (!fs.exists(schemaPath) || fs.listStatus(schemaPath).length != 0) {
+        continue;
+      }
+      if (!fs.delete(schemaPath, true) && fs.exists(schemaPath)) {
+        throw new IOException(
+            String.format(
+                "Failed to delete schema %s location %s with location name %s",
+                ident, schemaPath, locationName));
+      }
+      LOG.info(
+          "Deleted schema {} location {} with location name {}", ident, schemaPath, locationName);
     }
   }
 
