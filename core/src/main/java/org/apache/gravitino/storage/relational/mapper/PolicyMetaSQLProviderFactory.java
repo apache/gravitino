@@ -98,6 +98,10 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().selectPolicyMetaByMetalakeIdAndNameForUpdate(metalakeId, policyName);
   }
 
+  public static String selectPolicyMetaByPolicyId(@Param("policyId") Long policyId) {
+    return getProvider().selectPolicyMetaByPolicyId(policyId);
+  }
+
   public static String selectPolicyByPolicyId(@Param("policyId") Long policyId) {
     return getProvider().selectPolicyByPolicyId(policyId);
   }

@@ -36,6 +36,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * QLExpress-backed {@link ExpressionEvaluator} used by optimizer strategy handlers and TMS in-job
+ * recommenders.
+ */
 public class QLExpressionEvaluator implements ExpressionEvaluator {
 
   private static final Logger LOG = LoggerFactory.getLogger(QLExpressionEvaluator.class);
