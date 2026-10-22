@@ -1,13 +1,10 @@
 name: 'Setup Java Toolchains'
-description: 'Install a primary JDK and JDK 24 (for Trino), register JDK 24 with Gradle toolchain'
+description: 'Install a primary JDK and JDK 24 (for Trino), register JDK 24 with Gradle toolchain, and set up Gradle with its dependency cache'
 
 inputs:
   java-version:
     description: 'Primary Java version'
     default: '17'
-  cache:
-    description: 'Gradle cache setting'
-    default: 'gradle'
 
 runs:
   using: composite
@@ -22,7 +19,6 @@ runs:
       with:
         java-version: ${{ inputs.java-version }}
         distribution: temurin
-        cache: ${{ inputs.cache }}
 
     - name: Register JDK 24 with Gradle toolchain
       shell: bash
@@ -35,3 +31,7 @@ runs:
         fi
         echo "org.gradle.java.installations.paths=${{ steps.setup-jdk24.outputs.path }}" >> "${TMP}"
         mv "${TMP}" "${GRADLE_PROPERTIES}"
+
+    # setup-gradle caches the Gradle user home. It writes the cache only on the default branch, so
+    # PR runs read main's cache and cannot fill the repository's 10 GB with per-PR entries.
+    - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0

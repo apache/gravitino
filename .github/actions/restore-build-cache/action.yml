@@ -1,0 +1,11 @@
+name: 'Restore build cache'
+description: "Restores the Gradle build cache that this run's build job saved, so its tasks load FROM-CACHE instead of running again"
+
+runs:
+  using: composite
+  steps:
+    # The key must match the save step in presubmit.yml's build job.
+    - uses: actions/cache/restore@v4
+      with:
+        path: ~/.gradle/caches/build-cache-1
+        key: presubmit-build-cache-${{ github.run_id }}

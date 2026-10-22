@@ -510,6 +510,14 @@ jobs:
         id: shards
         run: ./gradlew ciShards -PskipWeb=true
 
+      # Build once, use many: later stages restore this run's build cache, so the compile tasks
+      # this job ran load FROM-CACHE there. .github/actions/restore-build-cache uses the same key.
+      - name: Save build cache
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: presubmit-build-cache-${{ github.run_id }}
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -524,6 +532,8 @@ jobs:
       - uses: ./.github/actions/setup-java-toolchains
         with:
           java-version: ${{ matrix.java-version }}
+
+      - uses: ./.github/actions/restore-build-cache
 
       - name: Free up disk space
         run: |
@@ -607,6 +617,8 @@ jobs:
         with:
           java-version: 17
 
+      - uses: ./.github/actions/restore-build-cache
+
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
@@ -684,6 +696,8 @@ jobs:
       - uses: ./.github/actions/setup-java-toolchains
         with:
           java-version: ${{ matrix.java-version }}
+
+      - uses: ./.github/actions/restore-build-cache
 
       - name: Free up disk space
         run: |

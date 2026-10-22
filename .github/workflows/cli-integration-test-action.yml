@@ -27,6 +27,8 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
+      - uses: ./.github/actions/restore-build-cache
+
       - name: Package Gravitino
         run: ./gradlew compileDistribution -PskipWeb=true -x test
 
