@@ -113,6 +113,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.spark.sql.SparkSession;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
@@ -160,6 +161,91 @@ public class CatalogHive2IT extends BaseIT {
     return String.format("INSERT INTO %s.%s VALUES (%s)", dbName, tableName, values);
   }
 
+  @Test
+  void testLoadAndAlterSerDeDerivedTable() throws Exception {
+    HiveConf conf = new HiveConf();
+    conf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
+    // The test JVM uses the Hive 2 client even when the server is Hive 3.
+    HiveMetaStoreClient metastore = new HiveMetaStoreClient(conf);
+    try (AutoCloseable closeMetastore = metastore::close) {
+      String csvTableName = GravitinoITUtils.genRandomName("serde_csv");
+      NameIdentifier identifier = NameIdentifier.of(schemaName, csvTableName);
+      // Start with an ordinary external table, then create a separate SerDe-derived table
+      // directly through HMS so the test exercises the stored marker rather than a mock.
+      catalog
+          .asTableCatalog()
+          .createTable(
+              identifier,
+              new Column[] {Column.of("value", Types.StringType.get())},
+              null,
+              ImmutableMap.of(TABLE_TYPE, "EXTERNAL_TABLE"),
+              Transforms.EMPTY_TRANSFORM);
+      HiveTable csvTable =
+          hiveClientPool.run(client -> client.getTable(hmsCatalog, schemaName, csvTableName));
+      catalog.asTableCatalog().dropTable(identifier);
+      csvTable.setOriginalStorageColumns(
+          List.of(
+              Column.of(
+                  "value", Types.UnparsedType.of("<derived from deserializer>"), "CSV column")));
+      csvTable.properties().put(SERDE_LIB, "org.apache.hadoop.hive.serde2.OpenCSVSerde");
+      csvTable.properties().put(INPUT_FORMAT, "org.apache.hadoop.mapred.TextInputFormat");
+      csvTable
+          .properties()
+          .put(OUTPUT_FORMAT, "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
+      hiveClientPool.run(
+          client -> {
+            client.createTable(csvTable);
+            return null;
+          });
+      Assertions.assertEquals(
+          "<derived from deserializer>",
+          metastore
+              .getTable(metastoreDatabaseName(), csvTableName)
+              .getSd()
+              .getCols()
+              .get(0)
+              .getType());
+
+      Table loaded = catalog.asTableCatalog().loadTable(identifier);
+      Assertions.assertEquals(1, loaded.columns().length);
+      Assertions.assertEquals(Types.StringType.get(), loaded.columns()[0].dataType());
+      List<HiveTable> batch =
+          hiveClientPool.run(
+              client ->
+                  client.getTableObjectsByName(hmsCatalog, schemaName, List.of(csvTableName)));
+      Assertions.assertEquals(Types.StringType.get(), batch.get(0).columns()[0].dataType());
+
+      catalog
+          .asTableCatalog()
+          .alterTable(identifier, TableChange.setProperty("serde_test", "value"));
+      catalog.asTableCatalog().alterTable(identifier, TableChange.updateComment("updated"));
+      var stored = metastore.getTable(metastoreDatabaseName(), csvTableName);
+      Assertions.assertEquals(
+          "<derived from deserializer>", stored.getSd().getCols().get(0).getType());
+      Assertions.assertEquals("value", stored.getParameters().get("serde_test"));
+      Assertions.assertEquals("updated", stored.getParameters().get(COMMENT));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              catalog
+                  .asTableCatalog()
+                  .alterTable(
+                      identifier,
+                      TableChange.addColumn(
+                          new String[] {"added"},
+                          Types.StringType.get(),
+                          TableChange.ColumnPosition.defaultPos())));
+      Assertions.assertEquals(
+          1, metastore.getTable(metastoreDatabaseName(), csvTableName).getSd().getColsSize());
+      String renamed = GravitinoITUtils.genRandomName("serde_renamed");
+      catalog.asTableCatalog().alterTable(identifier, TableChange.rename(renamed));
+      Assertions.assertEquals(
+          "<derived from deserializer>",
+          metastore.getTable(metastoreDatabaseName(), renamed).getSd().getCols().get(0).getType());
+      catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, renamed));
+    }
+  }
+
   private static String getInsertWithPartitionSql(
       String dbName, String tableName, String partitionExpressions, String values) {
     return String.format(
@@ -180,7 +266,11 @@ public class CatalogHive2IT extends BaseIT {
 
   protected void startNecessaryContainer() {
     containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2));
+        ImmutableMap.of(
+            HiveContainer.HIVE_RUNTIME_VERSION,
+            HiveContainer.HIVE2,
+            HiveContainer.ENABLE_SERDE_SCHEMA_TESTS,
+            "true"));
 
     hiveMetastoreUris =
         String.format(
@@ -2023,5 +2113,9 @@ public class CatalogHive2IT extends BaseIT {
         .filter(c -> c.name().equals(columnName))
         .findFirst()
         .get();
+  }
+
+  private String metastoreDatabaseName() {
+    return "hive".equals(hmsCatalog) ? schemaName : "@" + hmsCatalog + "#" + schemaName;
   }
 }

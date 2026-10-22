@@ -33,6 +33,7 @@ import org.apache.gravitino.catalog.hive.TableType;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -49,6 +50,7 @@ public class HiveTable extends BaseTable {
   private String catalogName;
   private String databaseName;
   private String viewOriginalText;
+  private List<Column> originalStorageColumns = Collections.emptyList();
 
   protected HiveTable() {}
 
@@ -60,6 +62,24 @@ public class HiveTable extends BaseTable {
    */
   public String viewOriginalText() {
     return viewOriginalText;
+  }
+
+  /**
+   * Returns a copy of the original storage columns for a SerDe-derived schema.
+   *
+   * @return Original columns, or an empty list for an ordinary table.
+   */
+  public List<Column> originalStorageColumns() {
+    return List.copyOf(originalStorageColumns);
+  }
+
+  /**
+   * Records original storage columns so metadata-only alters preserve the SerDe schema marker.
+   *
+   * @param columns The original storage columns, or an empty list for an ordinary table.
+   */
+  public void setOriginalStorageColumns(List<Column> columns) {
+    originalStorageColumns = List.copyOf(columns);
   }
 
   public String catalogName() {
