@@ -76,7 +76,7 @@ public final class TableMaintenanceRESTUtils {
    *
    * @param httpRequest current request
    * @param action work to run
-   * @param op metrics report operation
+   * @param operation short label for logs (e.g. {@code report-before-metrics})
    * @param jobId Gravitino job run id
    * @param metalake metalake name
    * @return success or error response
@@ -84,33 +84,33 @@ public final class TableMaintenanceRESTUtils {
   public static Response doAs(
       HttpServletRequest httpRequest,
       PrivilegedExceptionAction<Response> action,
-      MaintenanceActionOperation op,
+      String operation,
       long jobId,
       String metalake) {
     try {
       return doAs(httpRequest, action);
     } catch (Exception e) {
-      return handleException(op, jobId, metalake, e);
+      return handleException(operation, jobId, metalake, e);
     }
   }
 
   /**
    * Maps a maintenance-action failure to an error response.
    *
-   * @param op metrics report operation
+   * @param operation short label for logs
    * @param jobId Gravitino job run id
    * @param metalake metalake name
    * @param e failure
    * @return error response
    */
   public static Response handleException(
-      MaintenanceActionOperation op, long jobId, String metalake, Exception e) {
+      String operation, long jobId, String metalake, Exception e) {
     ServerHealth.getInstance().recordFailure(e);
     String errorMsg =
         String.format(
             "Failed to operate maintenance action [%s] operation [%s] under metalake [%s], "
                 + "reason [%s]",
-            jobId, op.name(), metalake, e.getMessage());
+            jobId, operation, metalake, e.getMessage());
     LOG.warn(errorMsg, e);
     return toErrorResponse(errorMsg, e);
   }

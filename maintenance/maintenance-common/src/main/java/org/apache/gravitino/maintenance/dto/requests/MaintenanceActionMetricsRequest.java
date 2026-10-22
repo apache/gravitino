@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -31,8 +30,8 @@ import org.apache.gravitino.rest.RESTRequest;
  *
  * <p>Does not decide whether maintenance should continue — that stays in the Spark job. {@code
  * tableId} selects which bound table row to update when one Spark job covers multiple tables.
- * Optional {@code finish} releases that table/policy soft slot after metrics are stored (before:
- * drift/skip; after: maintenance complete). Soft slots are not reclaimed from job terminal state.
+ * Soft-slot release is controlled by the {@code finish} query parameter on the metrics endpoint (or
+ * by {@code POST .../finish} when no metrics are written).
  */
 @Getter
 @EqualsAndHashCode
@@ -47,28 +46,9 @@ public class MaintenanceActionMetricsRequest implements RESTRequest {
   @JsonProperty("metricsJson")
   private final String metricsJson;
 
-  /**
-   * When {@code true}, close the soft slot for this job/table/policy after persisting metrics.
-   * Omitted or {@code false} leaves occupancy open.
-   */
-  @Nullable
-  @JsonProperty("finish")
-  private final Boolean finish;
-
   /** Default constructor for Jackson. */
   public MaintenanceActionMetricsRequest() {
-    this(null, null, null, null);
-  }
-
-  /**
-   * Creates a metrics report that does not release occupancy.
-   *
-   * @param tableId table entity id bound to the job
-   * @param snapshotId Iceberg snapshot id the metrics were collected for
-   * @param metricsJson serialized metrics for {@code table_snapshot_metrics}
-   */
-  public MaintenanceActionMetricsRequest(Long tableId, Long snapshotId, String metricsJson) {
-    this(tableId, snapshotId, metricsJson, null);
+    this(null, null, null);
   }
 
   /**
@@ -77,21 +57,11 @@ public class MaintenanceActionMetricsRequest implements RESTRequest {
    * @param tableId table entity id bound to the job
    * @param snapshotId Iceberg snapshot id the metrics were collected for
    * @param metricsJson serialized metrics for {@code table_snapshot_metrics}
-   * @param finish when {@code true}, mark the action finished after storing metrics
    */
-  public MaintenanceActionMetricsRequest(
-      Long tableId, Long snapshotId, String metricsJson, @Nullable Boolean finish) {
+  public MaintenanceActionMetricsRequest(Long tableId, Long snapshotId, String metricsJson) {
     this.tableId = tableId;
     this.snapshotId = snapshotId;
     this.metricsJson = metricsJson;
-    this.finish = finish;
-  }
-
-  /**
-   * @return whether this report should close the soft slot
-   */
-  public boolean finishAction() {
-    return Boolean.TRUE.equals(finish);
   }
 
   @Override

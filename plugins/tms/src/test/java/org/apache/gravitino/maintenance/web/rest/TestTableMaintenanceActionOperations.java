@@ -66,7 +66,10 @@ class TestTableMaintenanceActionOperations {
 
     Response response =
         ops.reportBeforeMetrics(
-            METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+            METALAKE,
+            JOB_ID,
+            /*finish=*/ false,
+            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}");
@@ -82,7 +85,8 @@ class TestTableMaintenanceActionOperations {
         ops.reportBeforeMetrics(
             METALAKE,
             JOB_ID,
-            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}", true));
+            /*finish=*/ true,
+            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
@@ -96,7 +100,8 @@ class TestTableMaintenanceActionOperations {
         ops.reportAfterMetrics(
             METALAKE,
             JOB_ID,
-            new MaintenanceActionMetricsRequest(TABLE_ID, 200L, "{\"m\":2}", true));
+            /*finish=*/ true,
+            new MaintenanceActionMetricsRequest(TABLE_ID, 200L, "{\"m\":2}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 200L, "{\"m\":2}");
@@ -106,13 +111,52 @@ class TestTableMaintenanceActionOperations {
   @Test
   void testReportBeforeMissingActionReturns404() {
     when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(null);
+    when(actions.bindJobIdIfUnbound(TABLE_ID, JOB_ID)).thenReturn(false);
 
     Response response =
         ops.reportBeforeMetrics(
-            METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+            METALAKE,
+            JOB_ID,
+            /*finish=*/ false,
+            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
+  }
+
+  @Test
+  void testReportBeforeLazyBindsUnboundClaim() {
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID))
+        .thenReturn(null)
+        .thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.bindJobIdIfUnbound(TABLE_ID, JOB_ID)).thenReturn(true);
+
+    Response response =
+        ops.reportBeforeMetrics(
+            METALAKE,
+            JOB_ID,
+            /*finish=*/ false,
+            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    verify(actions).bindJobIdIfUnbound(TABLE_ID, JOB_ID);
+    verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}");
+    verify(actions).recordBeforeSnapshot(JOB_ID, TABLE_ID, 100L);
+  }
+
+  @Test
+  void testFinishLazyBindsUnboundClaim() {
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID))
+        .thenReturn(null)
+        .thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.bindJobIdIfUnbound(TABLE_ID, JOB_ID)).thenReturn(true);
+
+    Response response =
+        ops.finishAction(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, null));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    verify(actions).bindJobIdIfUnbound(TABLE_ID, JOB_ID);
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
   }
 
   @Test
@@ -122,7 +166,10 @@ class TestTableMaintenanceActionOperations {
 
     Response response =
         ops.reportAfterMetrics(
-            METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+            METALAKE,
+            JOB_ID,
+            /*finish=*/ false,
+            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
@@ -130,7 +177,7 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportBeforeNullBodyReturns400() {
-    Response response = ops.reportBeforeMetrics(METALAKE, JOB_ID, null);
+    Response response = ops.reportBeforeMetrics(METALAKE, JOB_ID, /*finish=*/ false, null);
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
   }
 

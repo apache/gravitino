@@ -89,6 +89,17 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
+   * Unbound in-flight claims for a table (any policy). Used by callback lazy-bind when the Spark
+   * job reports before submit-side {@code bindJobId}.
+   *
+   * @param tableId table entity id
+   * @return SELECT statement
+   */
+  public String selectUnboundByTableId(@Param("tableId") long tableId) {
+    return selectColumns() + " WHERE table_id = #{tableId} AND job_id IS NULL AND finished_at = 0";
+  }
+
+  /**
    * Live unbound claim still within TTL on the database clock.
    *
    * @param tableId table entity id

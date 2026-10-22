@@ -25,6 +25,7 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
@@ -157,6 +158,10 @@ public class TableMaintenanceActionMetaService {
    * created_at} from the row: after another node reclaims, that would observe the new fence and
    * defeat reclaim fencing. The CAS matches zero rows for a stale claim.
    *
+   * <p>Idempotent when the row is already bound to the same {@code jobId} and still in-flight
+   * (Spark may lazy-bind before submit-side bind). Still fails when the claim was reclaimed or
+   * bound to a different job.
+   *
    * <p>This CAS does <em>not</em> prevent duplicate Spark submissions if {@code runJob} already
    * ran; see {@link #tryAcquireInFlight} submit contract.
    *
@@ -172,10 +177,57 @@ public class TableMaintenanceActionMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
             mapper -> mapper.bindJobId(claim.id(), jobId, claim.createdAt()));
-    Preconditions.checkState(
-        updated == 1,
-        "expected to bind job_id on exactly one in-flight action, updated=%s",
-        updated);
+    if (updated == 1) {
+      return;
+    }
+    TableMaintenanceActionPO current = getById(claim.id());
+    if (current != null
+        && Objects.equals(current.jobId(), jobId)
+        && current.finishedAt() != null
+        && current.finishedAt() == 0L) {
+      return;
+    }
+    throw new IllegalStateException(
+        String.format(
+            "expected to bind job_id on exactly one in-flight action, updated=%s", updated));
+  }
+
+  /**
+   * Lazy-binds {@code jobId} onto the sole unbound in-flight claim for {@code tableId}.
+   *
+   * <p>Used when a Spark metrics/finish callback arrives before submit-side {@link #bindJobId}.
+   * Does nothing (returns {@code false}) when there is no unbound row, or when more than one
+   * unbound row exists for the table (ambiguous across policies).
+   *
+   * @param tableId table entity id from the callback
+   * @param jobId Gravitino job run id from the callback path
+   * @return {@code true} when a row is now bound to {@code jobId}
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "bindTableMaintenanceActionJobIdIfUnbound")
+  public boolean bindJobIdIfUnbound(long tableId, long jobId) {
+    TableMaintenanceActionPO already = getByJobIdAndTableId(jobId, tableId);
+    if (already != null && already.finishedAt() != null && already.finishedAt() == 0L) {
+      return true;
+    }
+    List<TableMaintenanceActionPO> unbound =
+        SessionUtils.getWithoutCommit(
+            TableMaintenanceActionMapper.class, mapper -> mapper.selectUnboundByTableId(tableId));
+    if (unbound == null || unbound.isEmpty() || unbound.size() != 1) {
+      return false;
+    }
+    TableMaintenanceActionPO row = unbound.get(0);
+    if (row.id() == null || row.createdAt() == null) {
+      return false;
+    }
+    try {
+      bindJobId(new OccupancyClaim(row.id(), row.createdAt()), jobId);
+      return true;
+    } catch (IllegalStateException e) {
+      TableMaintenanceActionPO bound = getByJobIdAndTableId(jobId, tableId);
+      return bound != null && bound.finishedAt() != null && bound.finishedAt() == 0L;
+    }
   }
 
   private static OccupancyClaim readUnboundClaim(long tableId, long policyId) {
