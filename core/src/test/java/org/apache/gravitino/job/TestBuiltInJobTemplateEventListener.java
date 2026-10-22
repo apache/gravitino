@@ -111,8 +111,9 @@ public class TestBuiltInJobTemplateEventListener {
   }
 
   @Test
-  public void testOnPostCreateMetalakeEvent() {
+  public void testOnPostCreateMetalakeEvent() throws IOException {
     String metalakeName = "test_metalake";
+    createMetalake(metalakeName, true);
     NameIdentifier identifier = NameIdentifier.of(metalakeName);
     MetalakeInfo metalakeInfo = new MetalakeInfo(metalakeName, "comment", null, null);
 
@@ -161,31 +162,13 @@ public class TestBuiltInJobTemplateEventListener {
 
   @Test
   public void testCreatedMetalakesAreNotDroppedWhileRegistrationIsBusy() throws Exception {
-    ShellJobTemplate template =
-        ShellJobTemplate.builder()
-            .withName("builtin-test")
-            .withExecutable("/bin/echo")
-            .withCustomFields(Collections.singletonMap("version", "v1"))
-            .build();
+    for (String metalake : Arrays.asList("metalake1", "metalake2", "metalake3")) {
+      createMetalake(metalake, true);
+    }
     CountDownLatch firstLoadStarted = new CountDownLatch(1);
     CountDownLatch releaseFirstLoad = new CountDownLatch(1);
-    AtomicInteger loads = new AtomicInteger();
     BuiltInJobTemplateEventListener busyListener =
-        new BuiltInJobTemplateEventListener(
-            jobManager, entityStore, idGenerator, Executors.newSingleThreadExecutor()) {
-          @Override
-          Map<String, JobTemplate> loadBuiltInJobTemplates() {
-            if (loads.incrementAndGet() == 1) {
-              firstLoadStarted.countDown();
-              try {
-                releaseFirstLoad.await();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
-            }
-            return Collections.singletonMap(template.name(), template);
-          }
-        };
+        newBlockingListener(firstLoadStarted, releaseFirstLoad);
     when(jobManager.listJobTemplates(any())).thenReturn(Collections.emptyList());
 
     // Block the first registration, then create more metalakes while it is busy.
@@ -201,6 +184,46 @@ public class TestBuiltInJobTemplateEventListener {
     for (String metalake : Arrays.asList("metalake1", "metalake2", "metalake3")) {
       verify(jobManager, times(1)).registerJobTemplate(eq(metalake), any());
     }
+  }
+
+  @Test
+  public void testRegistrationFollowsMetalakeRenamedWhileQueued() throws Exception {
+    long metalakeId = createMetalake("metalake_a", true).id();
+    CountDownLatch loadStarted = new CountDownLatch(1);
+    CountDownLatch releaseLoad = new CountDownLatch(1);
+    BuiltInJobTemplateEventListener busyListener = newBlockingListener(loadStarted, releaseLoad);
+    when(jobManager.listJobTemplates(any())).thenReturn(Collections.emptyList());
+
+    busyListener.onPostEvent(createMetalakeEvent("metalake_a"));
+    Assertions.assertTrue(loadStarted.await(30, TimeUnit.SECONDS));
+    // Rename metalake_a to metalake_b before the registration resumes.
+    entityStore.delete(NameIdentifier.of("metalake_a"), Entity.EntityType.METALAKE);
+    putMetalake("metalake_b", metalakeId, true);
+    releaseLoad.countDown();
+    busyListener.stop();
+
+    verify(jobManager, times(1)).registerJobTemplate(eq("metalake_b"), any());
+    verify(jobManager, times(0)).registerJobTemplate(eq("metalake_a"), any());
+  }
+
+  @Test
+  public void testRegistrationSkipsMetalakeDroppedAndRecreatedWhileQueued() throws Exception {
+    createMetalake("metalake_a", true);
+    CountDownLatch loadStarted = new CountDownLatch(1);
+    CountDownLatch releaseLoad = new CountDownLatch(1);
+    BuiltInJobTemplateEventListener busyListener = newBlockingListener(loadStarted, releaseLoad);
+
+    busyListener.onPostEvent(createMetalakeEvent("metalake_a"));
+    Assertions.assertTrue(loadStarted.await(30, TimeUnit.SECONDS));
+    // Drop metalake_a and create another metalake with the same name before the registration
+    // resumes. The old event must not populate the new metalake.
+    entityStore.delete(NameIdentifier.of("metalake_a"), Entity.EntityType.METALAKE);
+    createMetalake("metalake_a", true);
+    releaseLoad.countDown();
+    busyListener.stop();
+
+    verify(jobManager, times(0)).listJobTemplates(any());
+    verify(jobManager, times(0)).registerJobTemplate(any(), any());
   }
 
   @Test
@@ -630,13 +653,17 @@ public class TestBuiltInJobTemplateEventListener {
     Assertions.assertEquals("builtin-existing", updated.name());
   }
 
-  private void createMetalake(String name, boolean inUse) throws IOException {
+  private BaseMetalake createMetalake(String name, boolean inUse) throws IOException {
+    return putMetalake(name, idGenerator.nextId(), inUse);
+  }
+
+  private BaseMetalake putMetalake(String name, long id, boolean inUse) throws IOException {
     Map<String, String> props = new HashMap<>();
     props.put(PROPERTY_IN_USE, String.valueOf(inUse));
 
     BaseMetalake metalake =
         BaseMetalake.builder()
-            .withId(idGenerator.nextId())
+            .withId(id)
             .withName(name)
             .withComment("test metalake")
             .withProperties(props)
@@ -646,6 +673,7 @@ public class TestBuiltInJobTemplateEventListener {
             .build();
 
     entityStore.put(metalake, false);
+    return metalake;
   }
 
   private JobTemplateEntity createJobTemplateEntity(String name, String version) {
@@ -670,6 +698,36 @@ public class TestBuiltInJobTemplateEventListener {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  /**
+   * Creates a listener with a real registration thread, whose first template load blocks until
+   * {@code releaseFirstLoad} is counted down.
+   */
+  private BuiltInJobTemplateEventListener newBlockingListener(
+      CountDownLatch firstLoadStarted, CountDownLatch releaseFirstLoad) {
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("builtin-test")
+            .withExecutable("/bin/echo")
+            .withCustomFields(Collections.singletonMap("version", "v1"))
+            .build();
+    AtomicInteger loads = new AtomicInteger();
+    return new BuiltInJobTemplateEventListener(
+        jobManager, entityStore, idGenerator, Executors.newSingleThreadExecutor()) {
+      @Override
+      Map<String, JobTemplate> loadBuiltInJobTemplates() {
+        if (loads.incrementAndGet() == 1) {
+          firstLoadStarted.countDown();
+          try {
+            releaseFirstLoad.await();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        }
+        return Collections.singletonMap(template.name(), template);
+      }
+    };
   }
 
   private CreateMetalakeEvent createMetalakeEvent(String metalakeName) {

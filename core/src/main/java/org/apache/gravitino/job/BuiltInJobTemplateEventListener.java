@@ -44,6 +44,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -53,6 +54,7 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
@@ -176,13 +178,22 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
     }
 
     CreateMetalakeEvent event = (CreateMetalakeEvent) postEvent;
+    String metalakeName = event.identifier().name();
+    // Capture the id of the created metalake now. By the time the registration runs, the metalake
+    // may be renamed, or dropped and re-created under the same name, so it is looked up by id.
+    Optional<Long> metalakeId = loadMetalakeId(metalakeName);
+    if (!metalakeId.isPresent()) {
+      return;
+    }
+
     try {
-      registrationExecutor.execute(() -> registerBuiltInJobTemplates(event));
+      registrationExecutor.execute(
+          () -> registerBuiltInJobTemplates(metalakeId.get(), metalakeName, event.user()));
     } catch (RejectedExecutionException e) {
       LOG.warn(
           "Skip registering built-in job templates for metalake {} since the listener is stopped, "
               + "they will be registered on the next startup",
-          event.identifier().name());
+          metalakeName);
     }
   }
 
@@ -287,27 +298,69 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
     }
   }
 
-  private void registerBuiltInJobTemplates(CreateMetalakeEvent event) {
-    String metalakeName = event.identifier().name();
+  private Optional<Long> loadMetalakeId(String metalakeName) {
+    NameIdentifier ident = NameIdentifierUtil.ofMetalake(metalakeName);
+    try {
+      BaseMetalake metalake =
+          TreeLockUtils.doWithTreeLock(
+              ident,
+              LockType.READ,
+              () -> entityStore.get(ident, Entity.EntityType.METALAKE, BaseMetalake.class));
+      return Optional.of(metalake.id());
+    } catch (Exception e) {
+      LOG.warn(
+          "Skip registering built-in job templates for metalake {} since it cannot be loaded, "
+              + "they will be registered on the next startup",
+          metalakeName,
+          e);
+      return Optional.empty();
+    }
+  }
+
+  private void registerBuiltInJobTemplates(long metalakeId, String createdName, String creator) {
     try {
       Map<String, JobTemplate> builtInTemplates = loadBuiltInJobTemplates();
       if (builtInTemplates.isEmpty()) {
-        LOG.debug("No built-in job templates to register for metalake: {}", metalakeName);
+        LOG.debug("No built-in job templates to register for metalake: {}", createdName);
         return;
       }
 
-      // The registration thread has no caller principal. Run as the user who created the
-      // metalake, so the templates record that user as the creator.
-      PrincipalUtils.doAs(
-          new UserPrincipal(event.user()),
+      // Renaming or dropping a metalake takes the root write lock, so holding the root read lock
+      // keeps the metalake found by id from being renamed or dropped during the registration.
+      TreeLockUtils.doWithRootTreeLock(
+          LockType.READ,
           () -> {
-            reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
+            Optional<String> currentName = currentMetalakeName(metalakeId);
+            if (!currentName.isPresent()) {
+              LOG.info(
+                  "Skip registering built-in job templates for metalake {} since it was dropped",
+                  createdName);
+              return null;
+            }
+
+            // The registration thread has no caller principal. Run as the user who created the
+            // metalake, so the templates record that user as the creator.
+            PrincipalUtils.doAs(
+                new UserPrincipal(creator),
+                () -> {
+                  reconcileBuiltInJobTemplates(currentName.get(), builtInTemplates);
+                  return null;
+                });
+            LOG.info("Registered built-in job templates for metalake: {}", currentName.get());
             return null;
           });
-      LOG.info("Registered built-in job templates for metalake: {}", metalakeName);
     } catch (Exception e) {
-      LOG.error("Failed to register built-in job templates for metalake: {}", metalakeName, e);
+      LOG.error("Failed to register built-in job templates for metalake: {}", createdName, e);
     }
+  }
+
+  private Optional<String> currentMetalakeName(long metalakeId) throws IOException {
+    return entityStore
+        .list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE)
+        .stream()
+        .filter(metalake -> metalake.id() == metalakeId)
+        .map(BaseMetalake::name)
+        .findFirst();
   }
 
   private boolean isValidBuiltInJobTemplate(JobTemplate jobTemplate) {
