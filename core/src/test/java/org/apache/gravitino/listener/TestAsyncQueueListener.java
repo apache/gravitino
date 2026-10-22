@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -115,6 +116,28 @@ class TestAsyncQueueListener {
     listener.stop();
     listener.stop();
 
+    verify(innerListener, times(1)).stop();
+  }
+
+  @Test
+  void testStopWhenCallerIsInterrupted() {
+    blockingAppender.releaseFirstLog.countDown();
+    EventListenerPlugin innerListener = mock(EventListenerPlugin.class);
+    AsyncQueueListener listener =
+        new AsyncQueueListener(List.of(innerListener), "interrupted-caller", 10, 1);
+    listener.start();
+
+    Thread.currentThread().interrupt();
+    listener.stop();
+
+    // The caller keeps its interrupt status, and the dispatcher thread is still stopped.
+    assertTrue(Thread.interrupted());
+    assertFalse(
+        Thread.getAllStackTraces().keySet().stream()
+            .anyMatch(
+                thread ->
+                    thread.getName().equals("async-queue-listener-interrupted-caller")
+                        && thread.isAlive()));
     verify(innerListener, times(1)).stop();
   }
 

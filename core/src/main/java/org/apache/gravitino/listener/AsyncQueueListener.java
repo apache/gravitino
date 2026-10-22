@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -106,28 +107,29 @@ public class AsyncQueueListener implements EventListenerPlugin {
     }
     long joinMillis = TimeUnit.SECONDS.toMillis(dispatcherJoinSeconds);
     long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(joinMillis);
+    // Give the dispatcher thread up to dispatcherJoinSeconds to drain the queued events. If it
+    // does not finish in time, interrupt it and wait up to another dispatcherJoinSeconds for it to
+    // exit, which is how long stop() waited for the thread before draining was added. So a stuck
+    // dispatcher delays stop() by at most twice dispatcherJoinSeconds.
     try {
-      // Give the dispatcher thread up to dispatcherJoinSeconds to drain the queued events. If it
-      // does not finish in time, interrupt it and wait up to another dispatcherJoinSeconds for it
-      // to exit, which is how long stop() waited for the thread before draining was added. So a
-      // stuck dispatcher delays stop() by at most twice dispatcherJoinSeconds.
       if (asyncProcessor.isAlive()
           && queue.offer(STOP_SIGNAL, remainingMillis(deadlineNanos), TimeUnit.MILLISECONDS)) {
         asyncProcessor.join(remainingMillis(deadlineNanos));
       }
-      if (asyncProcessor.isAlive()) {
-        asyncProcessor.interrupt();
-        asyncProcessor.join(joinMillis);
-      }
-      if (asyncProcessor.isAlive()) {
-        LOG.warn(
-            "{} event dispatcher thread is still running after it was interrupted, stop the "
-                + "listeners anyway.",
-            asyncQueueListenerName);
-      }
     } catch (InterruptedException e) {
-      LOG.warn("{} interrupt async processor failed.", asyncQueueListenerName, e);
+      // Skip the drain, but still stop the dispatcher thread below. The interrupt status is kept.
+      LOG.warn("{} is interrupted while draining the queued events.", asyncQueueListenerName);
       Thread.currentThread().interrupt();
+    }
+    if (asyncProcessor.isAlive()) {
+      asyncProcessor.interrupt();
+      Uninterruptibles.joinUninterruptibly(asyncProcessor, joinMillis, TimeUnit.MILLISECONDS);
+    }
+    if (asyncProcessor.isAlive()) {
+      LOG.warn(
+          "{} event dispatcher thread is still running after it was interrupted, stop the "
+              + "listeners anyway.",
+          asyncQueueListenerName);
     }
     eventListeners.forEach(listenerPlugin -> listenerPlugin.stop());
   }

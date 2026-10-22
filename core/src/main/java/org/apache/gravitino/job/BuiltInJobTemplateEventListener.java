@@ -21,6 +21,7 @@ package org.apache.gravitino.job;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -32,6 +33,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -73,15 +78,38 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
   private static final Pattern VERSION_PATTERN =
       Pattern.compile(JobTemplateProvider.VERSION_VALUE_PATTERN);
 
+  private static final long REGISTRATION_STOP_TIMEOUT_SECONDS = 10;
+
   private final JobManager jobManager;
   private final EntityStore entityStore;
   private final IdGenerator idGenerator;
+  // Registers the templates of created metalakes off the request thread. Its queue is unbounded,
+  // so a created metalake never misses its templates; metalakes are created rarely.
+  private final ExecutorService registrationExecutor;
 
   public BuiltInJobTemplateEventListener(
       JobManager jobManager, EntityStore entityStore, IdGenerator idGenerator) {
+    this(
+        jobManager,
+        entityStore,
+        idGenerator,
+        Executors.newSingleThreadExecutor(
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("builtin-job-template-registration")
+                .build()));
+  }
+
+  @VisibleForTesting
+  BuiltInJobTemplateEventListener(
+      JobManager jobManager,
+      EntityStore entityStore,
+      IdGenerator idGenerator,
+      ExecutorService registrationExecutor) {
     this.jobManager = jobManager;
     this.entityStore = entityStore;
     this.idGenerator = idGenerator;
+    this.registrationExecutor = registrationExecutor;
   }
 
   @Override
@@ -124,41 +152,46 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
 
   @Override
   public void stop() throws RuntimeException {
-    // No resources to clean up
+    // Finish the pending registrations. Any that do not finish in time are registered by start()
+    // on the next startup, which reconciles all the metalakes.
+    registrationExecutor.shutdown();
+    try {
+      if (!registrationExecutor.awaitTermination(
+          REGISTRATION_STOP_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        LOG.warn(
+            "Built-in job template registration did not finish within {} seconds, stop it",
+            REGISTRATION_STOP_TIMEOUT_SECONDS);
+        registrationExecutor.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      registrationExecutor.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
   }
 
   @Override
   public void onPostEvent(Event postEvent) throws RuntimeException {
-    if (postEvent instanceof CreateMetalakeEvent) {
-      CreateMetalakeEvent event = (CreateMetalakeEvent) postEvent;
-      String metalakeName = event.identifier().name();
+    if (!(postEvent instanceof CreateMetalakeEvent)) {
+      return;
+    }
 
-      try {
-        Map<String, JobTemplate> builtInTemplates = loadBuiltInJobTemplates();
-        if (builtInTemplates.isEmpty()) {
-          LOG.debug("No built-in job templates to register for metalake: {}", metalakeName);
-          return;
-        }
-
-        // This listener runs on an async dispatcher thread, which has no caller principal. Run as
-        // the user who created the metalake, so the templates record that user as the creator.
-        PrincipalUtils.doAs(
-            new UserPrincipal(event.user()),
-            () -> {
-              reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
-              return null;
-            });
-        LOG.info("Registered built-in job templates for metalake: {}", metalakeName);
-      } catch (Exception e) {
-        LOG.error("Failed to register built-in job templates for metalake: {}", metalakeName, e);
-      }
+    CreateMetalakeEvent event = (CreateMetalakeEvent) postEvent;
+    try {
+      registrationExecutor.execute(() -> registerBuiltInJobTemplates(event));
+    } catch (RejectedExecutionException e) {
+      LOG.warn(
+          "Skip registering built-in job templates for metalake {} since the listener is stopped, "
+              + "they will be registered on the next startup",
+          event.identifier().name());
     }
   }
 
   @Override
   public Mode mode() {
-    // Use async isolated to avoid blocking metalake creation
-    return Mode.ASYNC_ISOLATED;
+    // onPostEvent only hands created metalakes to the registration executor, which is cheap, so it
+    // runs on the caller thread. Unlike an async listener queue, the executor never drops a
+    // created metalake when it is busy.
+    return Mode.SYNC;
   }
 
   @VisibleForTesting
@@ -251,6 +284,29 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
     } catch (Exception e) {
       LOG.error("Failed to create auxlib classloader", e);
       return Thread.currentThread().getContextClassLoader();
+    }
+  }
+
+  private void registerBuiltInJobTemplates(CreateMetalakeEvent event) {
+    String metalakeName = event.identifier().name();
+    try {
+      Map<String, JobTemplate> builtInTemplates = loadBuiltInJobTemplates();
+      if (builtInTemplates.isEmpty()) {
+        LOG.debug("No built-in job templates to register for metalake: {}", metalakeName);
+        return;
+      }
+
+      // The registration thread has no caller principal. Run as the user who created the
+      // metalake, so the templates record that user as the creator.
+      PrincipalUtils.doAs(
+          new UserPrincipal(event.user()),
+          () -> {
+            reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
+            return null;
+          });
+      LOG.info("Registered built-in job templates for metalake: {}", metalakeName);
+    } catch (Exception e) {
+      LOG.error("Failed to register built-in job templates for metalake: {}", metalakeName, e);
     }
   }
 

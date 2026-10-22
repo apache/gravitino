@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -41,6 +42,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -92,7 +97,10 @@ public class TestBuiltInJobTemplateEventListener {
     idGenerator = new RandomIdGenerator();
 
     jobManager = mock(JobManager.class);
-    listener = new BuiltInJobTemplateEventListener(jobManager, entityStore, idGenerator);
+    // Register on the test thread, since the ServiceLoader static mocks are thread local.
+    listener =
+        new BuiltInJobTemplateEventListener(
+            jobManager, entityStore, idGenerator, MoreExecutors.newDirectExecutorService());
   }
 
   @AfterEach
@@ -149,6 +157,59 @@ public class TestBuiltInJobTemplateEventListener {
       verify(jobManager, times(1)).registerJobTemplate(eq(metalakeName), captor.capture());
       Assertions.assertEquals("user", captor.getValue().auditInfo().creator());
     }
+  }
+
+  @Test
+  public void testCreatedMetalakesAreNotDroppedWhileRegistrationIsBusy() throws Exception {
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("builtin-test")
+            .withExecutable("/bin/echo")
+            .withCustomFields(Collections.singletonMap("version", "v1"))
+            .build();
+    CountDownLatch firstLoadStarted = new CountDownLatch(1);
+    CountDownLatch releaseFirstLoad = new CountDownLatch(1);
+    AtomicInteger loads = new AtomicInteger();
+    BuiltInJobTemplateEventListener busyListener =
+        new BuiltInJobTemplateEventListener(
+            jobManager, entityStore, idGenerator, Executors.newSingleThreadExecutor()) {
+          @Override
+          Map<String, JobTemplate> loadBuiltInJobTemplates() {
+            if (loads.incrementAndGet() == 1) {
+              firstLoadStarted.countDown();
+              try {
+                releaseFirstLoad.await();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+            }
+            return Collections.singletonMap(template.name(), template);
+          }
+        };
+    when(jobManager.listJobTemplates(any())).thenReturn(Collections.emptyList());
+
+    // Block the first registration, then create more metalakes while it is busy.
+    busyListener.onPostEvent(createMetalakeEvent("metalake1"));
+    Assertions.assertTrue(firstLoadStarted.await(30, TimeUnit.SECONDS));
+    busyListener.onPostEvent(createMetalakeEvent("metalake2"));
+    busyListener.onPostEvent(createMetalakeEvent("metalake3"));
+    releaseFirstLoad.countDown();
+
+    // Stop finishes the pending registrations.
+    busyListener.stop();
+
+    for (String metalake : Arrays.asList("metalake1", "metalake2", "metalake3")) {
+      verify(jobManager, times(1)).registerJobTemplate(eq(metalake), any());
+    }
+  }
+
+  @Test
+  public void testOnPostEventAfterStop() {
+    listener.stop();
+
+    // A metalake created after stop is skipped; start() registers its templates on next startup.
+    Assertions.assertDoesNotThrow(() -> listener.onPostEvent(createMetalakeEvent("metalake1")));
+    verify(jobManager, times(0)).listJobTemplates(any());
   }
 
   @Test
@@ -609,5 +670,12 @@ public class TestBuiltInJobTemplateEventListener {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  private CreateMetalakeEvent createMetalakeEvent(String metalakeName) {
+    return new CreateMetalakeEvent(
+        "user",
+        NameIdentifier.of(metalakeName),
+        new MetalakeInfo(metalakeName, "comment", null, null));
   }
 }
