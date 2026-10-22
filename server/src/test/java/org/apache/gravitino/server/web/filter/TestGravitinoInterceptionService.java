@@ -98,6 +98,7 @@ import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
+import org.apache.gravitino.server.web.rest.SemanticModelMetricOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
@@ -172,6 +173,14 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  public void testMetricOperationsIsRegisteredForInterception() {
+    Descriptor descriptor = mock(Descriptor.class);
+    when(descriptor.getImplementation()).thenReturn(SemanticModelMetricOperations.class.getName());
+    Assertions.assertTrue(
+        new GravitinoInterceptionService().getDescriptorFilter().matches(descriptor));
+  }
+
+  @Test
   public void testSemanticModelEndpointAuthorization() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtils = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> providers =
@@ -229,11 +238,18 @@ public class TestGravitinoInterceptionService {
               String.class,
               String.class,
               String.class);
-      for (Method method : List.of(create, load, list, alter, drop, importOssie, exportOssie)) {
+      Method metrics =
+          SemanticModelMetricOperations.class.getMethod(
+              "listMetrics", String.class, String.class, String.class, boolean.class);
+      int metricMode = 0;
+      for (Method method :
+          List.of(create, load, list, alter, drop, importOssie, exportOssie, metrics, metrics)) {
         MethodInvocation invocation = mock(MethodInvocation.class);
         when(invocation.getMethod()).thenReturn(method);
         Object[] args;
-        if (method.equals(list)) {
+        if (method.equals(metrics)) {
+          args = new Object[] {"metalake", "catalog", "schema", metricMode++ == 1};
+        } else if (method.equals(list)) {
           args = new Object[] {"metalake", "catalog", "schema"};
         } else if (method.equals(importOssie)) {
           args =
