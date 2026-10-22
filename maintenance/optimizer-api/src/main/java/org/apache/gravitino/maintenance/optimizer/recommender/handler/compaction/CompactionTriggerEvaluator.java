@@ -47,26 +47,39 @@ public final class CompactionTriggerEvaluator {
   public static boolean shouldMaintain(
       IcebergDataCompactionContent content, Map<String, Object> metricValues) {
     Preconditions.checkNotNull(content, "content");
+    return shouldMaintain(content.rules(), metricValues);
+  }
+
+  /**
+   * Evaluates {@code trigger-expr} from a policy rules map (same QL bindings as the content-based
+   * overload). Usable in Spark jobs that carry enqueue-time rules in jobConf without loading a
+   * policy entity.
+   *
+   * @param rules policy {@code rules()} map including {@code trigger-expr} and numeric thresholds
+   * @param metricValues sampled metric name → value
+   * @return whether maintenance should run
+   */
+  public static boolean shouldMaintain(
+      Map<String, Object> rules, Map<String, Object> metricValues) {
+    Preconditions.checkNotNull(rules, "rules");
     Preconditions.checkNotNull(metricValues, "metricValues");
 
     Map<String, Object> context = new HashMap<>();
     // Mirror BaseExpressionStrategyHandler#getRulesExpressionContext: numeric rules only.
-    content
-        .rules()
-        .forEach(
-            (key, value) -> {
-              if (value == null) {
-                return;
-              }
-              try {
-                context.put(key, Long.parseLong(value.toString()));
-              } catch (NumberFormatException ignored) {
-                // Non-numeric rule values (expressions, strings) are not QL bindings.
-              }
-            });
+    rules.forEach(
+        (key, value) -> {
+          if (value == null) {
+            return;
+          }
+          try {
+            context.put(key, Long.parseLong(value.toString()));
+          } catch (NumberFormatException ignored) {
+            // Non-numeric rule values (expressions, strings) are not QL bindings.
+          }
+        });
     context.putAll(metricValues);
 
-    Object trigger = content.rules().get(IcebergDataCompactionContent.TRIGGER_EXPR_KEY);
+    Object trigger = rules.get(IcebergDataCompactionContent.TRIGGER_EXPR_KEY);
     String expression =
         trigger == null || trigger.toString().trim().isEmpty()
             ? "false"

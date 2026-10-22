@@ -59,8 +59,9 @@ import org.slf4j.LoggerFactory;
  * standalone templates stay unchanged for CLI / optimizer use.
  *
  * <p>Commit-chain runs share one occupancy claim ({@code policy_id} = first type). Continue / stop
- * (snapshot drift) is decided locally in the job. Snapshot metrics may be reported best-effort via
- * the TMS metrics callback; occupancy is released when the Gravitino job reaches a terminal state.
+ * (snapshot drift and trigger-expr recommend) is decided locally in the job after S0 sample.
+ * Snapshot metrics may be reported best-effort via the TMS metrics callback; occupancy is released
+ * when the Gravitino job reaches a terminal state.
  *
  * <p>Template parameters mirror other Iceberg built-ins: {@code maintenance_types}, {@code
  * updater_options} (Gravitino URI / metalake / auth, same name as update-stats), plus catalog /
@@ -223,6 +224,15 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                     table.tableId,
                     s0.snapshotId,
                     s0.headSnapshotId);
+                continue;
+              }
+
+              if (!MaintenanceTriggerGate.shouldMaintain(type, argMap, s0.metricsJson)) {
+                LOG.info(
+                    "TMS type {} skipped for job {} table {} due to in-Spark recommend skip",
+                    type.wireName,
+                    jobId,
+                    table.tableId);
                 continue;
               }
 
@@ -725,7 +735,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         "--dry-run",
         "{{dry_run:-false}}",
         "--spark-conf",
-        "{{spark_conf:-}}");
+        "{{spark_conf:-}}",
+        "--policy-rules-by-type",
+        "{{policy_rules_by_type:-}}");
   }
 
   @VisibleForTesting
