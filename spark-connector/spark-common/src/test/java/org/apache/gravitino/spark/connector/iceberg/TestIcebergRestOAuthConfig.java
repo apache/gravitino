@@ -239,6 +239,46 @@ public class TestIcebergRestOAuthConfig {
     Assertions.assertTrue(exception.getMessage().contains("basic.password"));
   }
 
+  @Test
+  void testKerberosFailsFast() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "kerberos");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergRestOAuthConfig.resolve(sparkConf, Collections.emptyMap()));
+
+    Assertions.assertTrue(exception.getMessage().contains("kerberos"));
+  }
+
+  @Test
+  void testExplicitConfigSkipsKerberosFailure() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "kerberos");
+    Map<String, String> explicit = ImmutableMap.of("token", "irc-token");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+
+    Assertions.assertEquals(explicit, result);
+  }
+
+  @Test
+  void testExplicitLegacyOAuth2SkipsKerberosFailure() {
+    Map<String, String> explicit =
+        ImmutableMap.of(
+            "credential",
+            "irc:secret",
+            "oauth2-server-uri",
+            "https://identity.example.com/oauth/token");
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "kerberos");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+
+    Assertions.assertEquals("irc:secret", result.get(IcebergRestOAuthConfig.CREDENTIAL));
+  }
+
   private SparkConf basicSparkConf(String username, String password) {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "basic");

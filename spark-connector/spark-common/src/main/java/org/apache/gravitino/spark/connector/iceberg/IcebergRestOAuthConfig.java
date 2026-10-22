@@ -83,13 +83,22 @@ class IcebergRestOAuthConfig {
     if (AuthProperties.isBasic(authType)) {
       return applyBasicCredentials(sparkConf, result);
     }
+    boolean hasExplicitLegacyOAuth2 =
+        StringUtils.equalsIgnoreCase(explicitAuthType, AUTH_TYPE_OAUTH2)
+            || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
+    // An explicit legacy OAuth2 configuration already decides how IRC is authenticated.
+    if (!hasExplicitLegacyOAuth2) {
+      // The Iceberg REST client has no SPNEGO support, so Kerberos can't be carried over.
+      Preconditions.checkArgument(
+          !AuthProperties.isKerberos(authType),
+          "Iceberg REST service can't be accessed with %s=kerberos; set"
+              + " spark.sql.gravitino.iceberg.rest.* to configure its authentication explicitly",
+          GravitinoSparkConfig.GRAVITINO_AUTH_TYPE);
+    }
 
     boolean reuseOAuth2 =
         sparkConf.getBoolean(GravitinoSparkConfig.GRAVITINO_ICEBERG_REUSE_OAUTH2, true)
             && AuthProperties.isOAuth2(authType);
-    boolean hasExplicitLegacyOAuth2 =
-        StringUtils.equalsIgnoreCase(explicitAuthType, AUTH_TYPE_OAUTH2)
-            || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
     if (!reuseOAuth2 && !hasExplicitLegacyOAuth2) {
       return result;
     }
