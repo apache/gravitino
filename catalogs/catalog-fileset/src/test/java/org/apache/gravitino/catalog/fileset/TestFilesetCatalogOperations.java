@@ -66,6 +66,7 @@ import java.net.ConnectException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -162,6 +163,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -864,6 +866,139 @@ public class TestFilesetCatalogOperations {
       ops.dropSchema(id, true);
       Assertions.assertTrue(fs.exists(schemaPath));
       Assertions.assertTrue(fs.exists(fs1Path));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDropSchemaStopsOnStorageFailureAndCanRetry(boolean throwException) throws IOException {
+    String schemaName = "schema_cascade_failure_" + generateTestId();
+    String catalogPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, "comment", catalogPath, null);
+    NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
+    Namespace filesetNs = Namespace.of("m1", "c1", schemaName);
+    List<FilesetEntity> filesets = new ArrayList<>();
+    List<SecretUrn> secrets = new ArrayList<>();
+    for (String name : List.of("first", "failed", "last")) {
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(generateTestId()),
+                  SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
+      secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+      secrets.add(urn);
+      createFileset(
+          name,
+          schemaName,
+          "comment",
+          Fileset.Type.MANAGED,
+          catalogPath,
+          null,
+          Map.of("test-secret", urn.toString()));
+      filesets.add(
+          store.get(
+              NameIdentifier.of(filesetNs, name), Entity.EntityType.FILESET, FilesetEntity.class));
+    }
+
+    EntityStore orderedStore = Mockito.spy(store);
+    doReturn(filesets)
+        .when(orderedStore)
+        .list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
+    Path failedPath = new Path(filesets.get(1).storageLocation());
+    FileSystem failingFileSystem = Mockito.mock(FileSystem.class);
+    when(failingFileSystem.exists(failedPath)).thenReturn(true);
+    if (throwException) {
+      when(failingFileSystem.delete(failedPath, true))
+          .thenThrow(new IOException("permission denied"));
+    } else {
+      when(failingFileSystem.delete(failedPath, true)).thenReturn(false);
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(orderedStore, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      doReturn(failingFileSystem)
+          .when(ops)
+          .getFileSystemWithCache(Mockito.eq(failedPath), any(Map.class));
+
+      Assertions.assertThrows(RuntimeException.class, () -> ops.dropSchema(schemaIdent, true));
+      Assertions.assertTrue(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      for (int i = 0; i < filesets.size(); i++) {
+        FilesetEntity fileset = filesets.get(i);
+        Path path = new Path(fileset.storageLocation());
+        Assertions.assertEquals(
+            i != 0, store.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
+        Assertions.assertEquals(i != 0, path.getFileSystem(new Configuration()).exists(path));
+      }
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(secrets.get(0)));
+      Assertions.assertEquals("test-value", secretManager.readSecret(secrets.get(1)));
+      Assertions.assertEquals("test-value", secretManager.readSecret(secrets.get(2)));
+
+      // Retry with the real filesystem after repairing access to the failed location.
+      Mockito.doCallRealMethod()
+          .when(ops)
+          .getFileSystemWithCache(Mockito.eq(failedPath), any(Map.class));
+      Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
+      Assertions.assertFalse(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      for (FilesetEntity fileset : filesets) {
+        Assertions.assertFalse(store.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
+        Path path = new Path(fileset.storageLocation());
+        Assertions.assertFalse(path.getFileSystem(new Configuration()).exists(path));
+      }
+      for (SecretUrn urn : secrets) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> secretManager.readSecret(urn));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"EXTERNAL, false", "MANAGED, true"})
+  void testDropSchemaCleansSecretsWithoutDeletingStorage(Fileset.Type type, boolean disableFSOps)
+      throws IOException {
+    String schemaName = "schema_cascade_metadata_only_" + generateTestId();
+    String catalogPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, "comment", catalogPath, null);
+    NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, "fileset");
+    SecretUrn urn =
+        SecretUrn.buildWriteThrough(
+            "memory",
+            Map.of(
+                SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                SecretConstants.ATTR_ENTITY_ID, String.valueOf(generateTestId()),
+                SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
+    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+    Fileset fileset =
+        createFileset(
+            filesetIdent.name(),
+            schemaName,
+            "comment",
+            type,
+            catalogPath,
+            catalogPath + "/fileset",
+            Map.of("test-secret", urn.toString()));
+    Path path = new Path(fileset.storageLocation());
+    FileSystem fs = path.getFileSystem(new Configuration());
+    Assertions.assertTrue(fs.exists(path));
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(
+              LOCATION, catalogPath, DISABLE_FILESYSTEM_OPS, String.valueOf(disableFSOps)),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
+      Assertions.assertFalse(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(filesetIdent, Entity.EntityType.FILESET));
+      Assertions.assertTrue(fs.exists(path));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secretManager.readSecret(urn));
     }
   }
 
