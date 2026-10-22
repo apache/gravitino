@@ -19,9 +19,7 @@
 package org.apache.gravitino.maintenance.occupancy;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -30,25 +28,32 @@ import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
-import org.apache.gravitino.storage.relational.po.MetalakePO;
-import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
-import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Expand / submit occupancy checks against {@code table_maintenance_action} (§5.2).
  *
  * <p>Unbound rows ({@code job_id} null, {@code finished_at = 0}) are a short claim: occupied while
  * still within TTL on the <strong>database</strong> clock (same timeline as acquire/reclaim). Bound
- * rows consult {@link JobMetaService} and do <strong>not</strong> backfill {@code finished_at}.
+ * rows consult {@link JobMetaService}; when that job is already terminal or confirmed missing,
+ * {@link #reclaimTerminalBound} marks {@code finished_at} so the soft slot can be claimed again
+ * (without inventing stub S1 metrics rows or copying {@code before_snapshot_id} into {@code
+ * after_snapshot_id}). A later finish listener may still backfill a real S1 via {@link
+ * TableMaintenanceActionMetaService#markFinished}.
  */
 public final class OccupancyGate {
 
+  private static final Logger LOG = LoggerFactory.getLogger(OccupancyGate.class);
+
   private static final Set<JobHandle.Status> ACTIVE =
       EnumSet.of(JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING);
+
+  private static final JobMetaService JOB_SERVICE = JobMetaService.getInstance();
+  private static final TableMetaService TABLE_SERVICE = TableMetaService.getInstance();
 
   private final TableMaintenanceActionMetaService actionMetaService;
   private final long claimTimeoutMs;
@@ -78,22 +83,74 @@ public final class OccupancyGate {
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return true when any open row is a live unbound claim or an active Gravitino job
+   * @return true when any open row is a live unbound claim or a still-bound soft-slot row
    */
   public boolean isInFlight(long tableId, long policyId) {
+    reclaimTerminalBound(tableId, policyId);
     if (actionMetaService.hasLiveUnboundClaim(tableId, policyId, claimTimeoutMs)) {
       return true;
     }
+    // After reclaim, any remaining bound open row occupies the soft slot (ACTIVE job, unresolved
+    // lookup, or a terminal/missing job whose markFinished raced/failed). Fail closed so
+    // UNIQUE(table, policy, finished_at=0) cannot be ignored while still blocking
+    // tryAcquireInFlight.
     for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
-      if (open.jobId() == null) {
-        continue;
-      }
-      JobEntity job = loadJob(open.jobId(), tableId);
-      if (job != null && ACTIVE.contains(job.status())) {
+      if (open.jobId() != null) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Job-terminal reconciler failsafe (§5.2.2): when Spark finish callback was missed, mark the
+   * action finished so the soft slot can be reused. Does not invent stub metrics rows (those would
+   * pollute {@code table_snapshot_metrics}), and does not copy {@code before_snapshot_id} into
+   * {@code after_snapshot_id} — only a real S1 (or null) is stored (§5.2.3).
+   *
+   * <p>Only reclaim when the bound job is confirmed terminal or confirmed missing. An unresolved
+   * job lookup (for example the table/metalake cannot be resolved) leaves the row open.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   */
+  public void reclaimTerminalBound(long tableId, long policyId) {
+    for (TableMaintenanceActionPO open : actionMetaService.listInFlight(tableId, policyId)) {
+      if (open.jobId() == null) {
+        continue;
+      }
+      BoundJobLookup lookup = lookupBoundJob(open.jobId(), tableId);
+      if (lookup.kind == BoundJobLookup.Kind.ACTIVE
+          || lookup.kind == BoundJobLookup.Kind.UNRESOLVED) {
+        if (lookup.kind == BoundJobLookup.Kind.UNRESOLVED) {
+          LOG.warn(
+              "Skipping reclaim of job {} for table {} policy {}: metalake could not be resolved",
+              open.jobId(),
+              tableId,
+              policyId);
+        }
+        continue;
+      }
+      JobEntity job = lookup.job;
+      long finishedAt =
+          job != null && job.finishedAt() != null && job.finishedAt() > 0
+              ? job.finishedAt()
+              : System.currentTimeMillis();
+      // Keep a real after snapshot only; never invent S1 from S0.
+      Long afterSnapshotId = open.afterSnapshotId();
+      try {
+        actionMetaService.markFinished(open.jobId(), afterSnapshotId, finishedAt);
+      } catch (RuntimeException e) {
+        // Another node may have finished the row, or DB is unhealthy — log and keep fail-closed
+        // via isInFlight seeing the still-open bound row.
+        LOG.warn(
+            "Failed to reclaim terminal/missing job {} for table {} policy {}: {}",
+            open.jobId(),
+            tableId,
+            policyId,
+            e.toString());
+      }
+    }
   }
 
   /**
@@ -136,11 +193,14 @@ public final class OccupancyGate {
       if (open.jobId() == null) {
         continue;
       }
-      JobEntity job = loadJob(open.jobId(), tableId);
-      if (job == null || ACTIVE.contains(job.status())) {
+      BoundJobLookup lookup = lookupBoundJob(open.jobId(), tableId);
+      if (lookup.kind != BoundJobLookup.Kind.TERMINAL || lookup.job == null) {
         continue;
       }
-      Long fromJob = job.finishedAt() != null && job.finishedAt() > 0 ? job.finishedAt() : null;
+      Long fromJob =
+          lookup.job.finishedAt() != null && lookup.job.finishedAt() > 0
+              ? lookup.job.finishedAt()
+              : null;
       if (fromJob == null) {
         continue;
       }
@@ -151,33 +211,63 @@ public final class OccupancyGate {
     return latest;
   }
 
-  @Nullable
-  private static JobEntity loadJob(long jobId, long tableId) {
-    String metalake = metalakeNameForTable(tableId);
+  /**
+   * Resolves the bound job through the table's metalake, not the current policy. A deleted policy
+   * must not make a still-running job look "missing".
+   */
+  private static BoundJobLookup lookupBoundJob(long jobId, long tableId) {
+    String metalake = TABLE_SERVICE.getMetalakeNameByTableId(tableId);
     if (metalake == null) {
-      return null;
+      return BoundJobLookup.unresolved();
     }
     try {
-      return JobMetaService.getInstance()
-          .getJobByIdentifier(NameIdentifierUtil.ofJob(metalake, JobHandle.JOB_ID_PREFIX + jobId));
+      JobEntity job =
+          JOB_SERVICE.getJobByIdentifier(
+              NameIdentifierUtil.ofJob(metalake, JobHandle.JOB_ID_PREFIX + jobId));
+      if (ACTIVE.contains(job.status())) {
+        return BoundJobLookup.active(job);
+      }
+      return BoundJobLookup.terminal(job);
     } catch (NoSuchEntityException e) {
-      return null;
+      return BoundJobLookup.missing();
     }
   }
 
-  @Nullable
-  private static String metalakeNameForTable(long tableId) {
-    List<TablePO> tables =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.listTablePOsByTableIds(Collections.singletonList(tableId)));
-    if (tables == null || tables.isEmpty()) {
-      return null;
+  /** Outcome of resolving a bound Gravitino job for reclaim / cooldown. */
+  private static final class BoundJobLookup {
+    enum Kind {
+      /** Job meta loaded and still queued/started/cancelling. */
+      ACTIVE,
+      /** Job meta loaded and already terminal. */
+      TERMINAL,
+      /** Metalake resolved but job meta is gone. */
+      MISSING,
+      /** Table/metalake could not be resolved; do not treat as terminal. */
+      UNRESOLVED
     }
-    MetalakePO metalake =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaById(tables.get(0).getMetalakeId()));
-    return metalake == null ? null : metalake.getMetalakeName();
+
+    final Kind kind;
+    @Nullable final JobEntity job;
+
+    private BoundJobLookup(Kind kind, @Nullable JobEntity job) {
+      this.kind = kind;
+      this.job = job;
+    }
+
+    static BoundJobLookup active(JobEntity job) {
+      return new BoundJobLookup(Kind.ACTIVE, job);
+    }
+
+    static BoundJobLookup terminal(JobEntity job) {
+      return new BoundJobLookup(Kind.TERMINAL, job);
+    }
+
+    static BoundJobLookup missing() {
+      return new BoundJobLookup(Kind.MISSING, null);
+    }
+
+    static BoundJobLookup unresolved() {
+      return new BoundJobLookup(Kind.UNRESOLVED, null);
+    }
   }
 }

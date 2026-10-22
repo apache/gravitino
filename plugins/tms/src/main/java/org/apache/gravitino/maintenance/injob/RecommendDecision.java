@@ -20,10 +20,7 @@ package org.apache.gravitino.maintenance.injob;
 
 /**
  * Whether the in-job path should run maintenance work after a successful {@code S0} sample
- * (§5.2.2).
- *
- * <p>Type-specific strategy recommenders are wired in a follow-up subtask; this enum only models
- * the gate outcome.
+ * (§5.2.2). Produced by {@link TypeDispatchingInJobRecommender} and type-specific recommenders.
  */
 public enum RecommendDecision {
   /** Proceed to execute maintenance work. */

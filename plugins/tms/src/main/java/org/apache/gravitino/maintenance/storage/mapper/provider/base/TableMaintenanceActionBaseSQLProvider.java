@@ -183,6 +183,22 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
+   * Backfills a real S1 after failsafe reclaim closed the soft slot with {@code after_snapshot_id}
+   * still null (finish listener raced after reclaim).
+   *
+   * @param jobId Gravitino job run id
+   * @param afterSnapshotId terminal snapshot id; must be non-null
+   * @return UPDATE statement
+   */
+  public String backfillAfterSnapshot(
+      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET after_snapshot_id = #{afterSnapshotId}"
+        + " WHERE job_id = #{jobId} AND finished_at > 0 AND after_snapshot_id IS NULL";
+  }
+
+  /**
    * @param id action row id
    * @return DELETE statement
    */
