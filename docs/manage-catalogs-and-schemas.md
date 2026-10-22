@@ -220,6 +220,15 @@ dropped = client.drop_catalog("sales", force=False)
 
 ### List Catalogs
 
+Detailed catalog listing includes resolved properties by default. To retrieve lightweight catalog
+descriptors without resolving properties or initializing server-side catalog wrappers, use
+`details=true&includeProperties=false` in REST, `listCatalogsInfo(false)` in Java, or
+`list_catalogs_info(include_properties=False)` in Python. Descriptors retain
+the name, type, provider, comment, and audit information. Their properties retain only `in-use`,
+read directly from stored metadata and defaulting to `"true"` when absent, so enabled and disabled
+catalogs remain distinguishable without initializing catalog wrappers. Load a catalog to retrieve
+its complete information when needed.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
@@ -229,6 +238,9 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/example/catalogs?details=true"
+
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/catalogs?details=true&includeProperties=false"
 ```
 
 </TabItem>
@@ -237,6 +249,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 String[] catalogNames = client.listCatalogs();
 Catalog[] catalogs = client.listCatalogsInfo();
+Catalog[] catalogDescriptors = client.listCatalogsInfo(false);
 ```
 
 </TabItem>
@@ -245,6 +258,7 @@ Catalog[] catalogs = client.listCatalogsInfo();
 ```python
 catalog_names = client.list_catalogs()
 catalogs = client.list_catalogs_info()
+catalog_descriptors = client.list_catalogs_info(include_properties=False)
 ```
 
 </TabItem>

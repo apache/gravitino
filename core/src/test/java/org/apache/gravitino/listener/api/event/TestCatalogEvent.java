@@ -20,9 +20,12 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -33,7 +36,9 @@ import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
@@ -185,6 +190,29 @@ public class TestCatalogEvent {
     Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
     Assertions.assertEquals(OperationType.LIST_CATALOG, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testListCatalogInfoWithoutPropertiesPassesThroughDispatcherChain() {
+    Namespace namespace = Namespace.of("metalake");
+    CatalogDispatcher delegate = mock(CatalogDispatcher.class);
+    Catalog[] expected = new Catalog[] {catalog};
+    when(delegate.listCatalogsInfo(eq(namespace), eq(false))).thenReturn(expected);
+    DummyEventListener eventListener = new DummyEventListener();
+    CatalogEventDispatcher chainedDispatcher =
+        new CatalogEventDispatcher(
+            new EventBus(Arrays.asList(eventListener)),
+            new CatalogNormalizeDispatcher(new CatalogHookDispatcher(delegate)));
+
+    Catalog[] actual = chainedDispatcher.listCatalogsInfo(namespace, false);
+
+    Assertions.assertSame(expected, actual);
+    verify(delegate).listCatalogsInfo(namespace, false);
+    verify(delegate, never()).listCatalogsInfo(namespace);
+    Assertions.assertEquals(1, eventListener.getPostEvents().size());
+    Assertions.assertEquals(1, eventListener.getPreEvents().size());
+    Assertions.assertEquals(ListCatalogEvent.class, eventListener.popPostEvent().getClass());
+    Assertions.assertEquals(ListCatalogPreEvent.class, eventListener.popPreEvent().getClass());
   }
 
   @Test
