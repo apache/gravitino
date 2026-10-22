@@ -21,7 +21,6 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,10 +31,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -43,10 +40,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
-import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
-import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
+import org.apache.gravitino.maintenance.jobs.MaintenanceActionHttpClient;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.iceberg.Snapshot;
@@ -71,12 +65,19 @@ import org.slf4j.LoggerFactory;
  * <p>Template parameters mirror other Iceberg built-ins: {@code maintenance_type}, {@code
  * updater_options} (Gravitino URI / metalake / auth, same name as update-stats), plus catalog /
  * table / procedure options. A batch may pass {@code tables} (JSON array) so one Spark job covers
- * multiple tables under the same Gravitino job id. The Gravitino job id is discovered at runtime
- * ({@link JobHandle#GRAVITINO_JOB_ID_ENV} or the staging directory name).
+ * multiple tables under the same Gravitino job id. The Gravitino job id is read from the local
+ * executor staging directory name ({@code job-} plus the numeric id), or from {@link
+ * #GRAVITINO_JOB_ID_ENV} when that directory is not the process working directory.
  */
 public class IcebergMaintenanceJob implements BuiltInJob {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergMaintenanceJob.class);
+
+  /**
+   * Optional job-id override. Not injected by {@code JobManager}; the local executor staging
+   * directory is the default source.
+   */
+  @VisibleForTesting static final String GRAVITINO_JOB_ID_ENV = "GRAVITINO_JOB_ID";
 
   /** Built-in template name submitted by TMS cron / commit. */
   public static final String NAME =
@@ -203,7 +204,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
     try (SparkSession spark = sparkBuilder.getOrCreate()) {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
-      try (GravitinoClient client = openClient(updaterOptions)) {
+      try (MaintenanceActionHttpClient client =
+          MaintenanceActionHttpClient.fromUpdaterOptions(updaterOptions)) {
         try {
           for (TableTarget table : tables) {
             SnapshotSample lastBefore = null;
@@ -528,20 +530,30 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   private static void reportBeforeQuietly(
-      GravitinoClient client, long jobId, long tableId, SnapshotSample sample, boolean finish) {
+      MaintenanceActionHttpClient client,
+      long jobId,
+      long tableId,
+      SnapshotSample sample,
+      boolean finish) {
     reportMetricsQuietly(client, jobId, tableId, sample, finish, /*after=*/ false);
   }
 
   private static void reportAfterQuietly(
-      GravitinoClient client, long jobId, long tableId, SnapshotSample sample, boolean finish) {
+      MaintenanceActionHttpClient client,
+      long jobId,
+      long tableId,
+      SnapshotSample sample,
+      boolean finish) {
     reportMetricsQuietly(client, jobId, tableId, sample, finish, /*after=*/ true);
   }
 
   private static void finishQuietly(
-      GravitinoClient client, long jobId, long tableId, @Nullable Long afterSnapshotId) {
+      MaintenanceActionHttpClient client,
+      long jobId,
+      long tableId,
+      @Nullable Long afterSnapshotId) {
     try {
-      client.finishMaintenanceAction(
-          jobId, new MaintenanceActionFinishRequest(tableId, afterSnapshotId));
+      client.finish(jobId, new MaintenanceActionFinishRequest(tableId, afterSnapshotId));
     } catch (Exception e) {
       LOG.warn(
           "Best-effort TMS finish failed for job {} table {} afterSnapshotId={}",
@@ -553,7 +565,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   private static void reportMetricsQuietly(
-      GravitinoClient client,
+      MaintenanceActionHttpClient client,
       long jobId,
       long tableId,
       SnapshotSample sample,
@@ -567,9 +579,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           new MaintenanceActionMetricsRequest(
               tableId, sample.snapshotId, sample.metricsJson, finish);
       if (after) {
-        client.reportMaintenanceActionAfterMetrics(jobId, request);
+        client.reportAfterMetrics(jobId, request);
       } else {
-        client.reportMaintenanceActionBeforeMetrics(jobId, request);
+        client.reportBeforeMetrics(jobId, request);
       }
     } catch (Exception e) {
       LOG.warn(
@@ -599,40 +611,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  private static GravitinoClient openClient(Map<String, String> updaterOptions) {
-    Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
-    requireGravitinoConfig(optimizerProperties);
-    return GravitinoClientUtils.createClient(
-        new OptimizerEnv(new OptimizerConfig(optimizerProperties)), updaterOptions);
-  }
-
-  @VisibleForTesting
-  static Map<String, String> buildOptimizerProperties(Map<String, String> updaterOptions) {
-    Map<String, String> optimizerProperties = new HashMap<>(updaterOptions);
-    Optional<String> gravitinoUri =
-        firstNonEmpty(
-            updaterOptions.get("gravitino_uri"),
-            updaterOptions.get("gravitino-uri"),
-            updaterOptions.get(OptimizerConfig.GRAVITINO_URI));
-    Optional<String> metalake =
-        firstNonEmpty(
-            updaterOptions.get("metalake"), updaterOptions.get(OptimizerConfig.GRAVITINO_METALAKE));
-    gravitinoUri.ifPresent(uri -> optimizerProperties.put(OptimizerConfig.GRAVITINO_URI, uri));
-    metalake.ifPresent(value -> optimizerProperties.put(OptimizerConfig.GRAVITINO_METALAKE, value));
-    GravitinoAuthSettings.copyAliases(optimizerProperties);
-    return optimizerProperties;
-  }
-
-  private static void requireGravitinoConfig(Map<String, String> optimizerProperties) {
-    String gravitinoUri = optimizerProperties.get(OptimizerConfig.GRAVITINO_URI);
-    String metalake = optimizerProperties.get(OptimizerConfig.GRAVITINO_METALAKE);
-    Preconditions.checkArgument(
-        gravitinoUri != null && !gravitinoUri.trim().isEmpty(),
-        "updater_options must contain gravitino_uri");
-    Preconditions.checkArgument(
-        metalake != null && !metalake.trim().isEmpty(), "updater_options must contain metalake");
-  }
-
   private static Map<String, String> parseUpdaterOptions(@Nullable String json) {
     if (json == null || json.trim().isEmpty()) {
       return Collections.emptyMap();
@@ -647,9 +625,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * Resolves the Gravitino job id injected at submit time.
+   * Resolves the Gravitino job id for TMS callbacks.
    *
-   * <p>Prefers {@link JobHandle#GRAVITINO_JOB_ID_ENV}. Falls back to parsing a {@code job-<id>}
+   * <p>Prefers {@link #GRAVITINO_JOB_ID_ENV}. Falls back to parsing a {@code job-} plus numeric id
    * segment from {@code user.dir} (local executor staging directory).
    *
    * @return numeric Gravitino job id
@@ -657,7 +635,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   @VisibleForTesting
   static long resolveGravitinoJobId() {
     return resolveGravitinoJobId(
-        System.getenv(JobHandle.GRAVITINO_JOB_ID_ENV), System.getProperty("user.dir"));
+        System.getenv(GRAVITINO_JOB_ID_ENV), System.getProperty("user.dir"));
   }
 
   @VisibleForTesting
@@ -667,12 +645,11 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         long parsed = Long.parseLong(envValue.trim());
         if (parsed <= 0) {
           throw new IllegalStateException(
-              JobHandle.GRAVITINO_JOB_ID_ENV + " must be a positive long: " + envValue);
+              GRAVITINO_JOB_ID_ENV + " must be a positive long: " + envValue);
         }
         return parsed;
       } catch (NumberFormatException e) {
-        throw new IllegalStateException(
-            JobHandle.GRAVITINO_JOB_ID_ENV + " must be a long: " + envValue, e);
+        throw new IllegalStateException(GRAVITINO_JOB_ID_ENV + " must be a long: " + envValue, e);
       }
     }
     if (userDir != null && !userDir.trim().isEmpty()) {
@@ -698,7 +675,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
     throw new IllegalStateException(
         "Cannot resolve Gravitino job id: set "
-            + JobHandle.GRAVITINO_JOB_ID_ENV
+            + GRAVITINO_JOB_ID_ENV
             + " or run under a job-<id> staging directory");
   }
 
@@ -712,16 +689,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   private static String firstNonBlank(@Nullable String value, String defaultValue) {
     String normalized = IcebergJobUtils.nullIfUnresolvedPlaceholder(value);
     return normalized == null || normalized.isEmpty() ? defaultValue : normalized;
-  }
-
-  @SafeVarargs
-  private static Optional<String> firstNonEmpty(String... values) {
-    for (String value : values) {
-      if (value != null && !value.trim().isEmpty()) {
-        return Optional.of(value.trim());
-      }
-    }
-    return Optional.empty();
   }
 
   private static List<String> buildArguments() {

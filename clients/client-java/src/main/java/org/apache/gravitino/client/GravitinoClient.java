@@ -36,7 +36,6 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -65,15 +64,12 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.policy.PolicyTagAssociation;
-import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.Tag;
@@ -766,74 +762,6 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public PolicyTagAssociation[] listTagAssociationsForPolicy(String policyName) {
     return getMetalake().listTagAssociationsForPolicy(policyName);
-  }
-
-  /**
-   * Reports S0 (before-maintenance) snapshot metrics for an in-flight TMS action.
-   *
-   * <p><strong>Not a stable public product API</strong> — intended for built-in Spark maintenance
-   * jobs only.
-   *
-   * @param jobId Gravitino job run id
-   * @param request metrics payload ({@code finish} may close the soft slot)
-   */
-  public void reportMaintenanceActionBeforeMetrics(
-      long jobId, MaintenanceActionMetricsRequest request) {
-    postMaintenanceActionMetrics(jobId, "before", request);
-  }
-
-  /**
-   * Reports S1 (after-maintenance) snapshot metrics for an in-flight TMS action.
-   *
-   * <p><strong>Not a stable public product API</strong> — intended for built-in Spark maintenance
-   * jobs only.
-   *
-   * @param jobId Gravitino job run id
-   * @param request metrics payload ({@code finish} may close the soft slot)
-   */
-  public void reportMaintenanceActionAfterMetrics(
-      long jobId, MaintenanceActionMetricsRequest request) {
-    postMaintenanceActionMetrics(jobId, "after", request);
-  }
-
-  /**
-   * Closes the soft slot for one table bound to a TMS job without writing metrics.
-   *
-   * <p><strong>Not a stable public product API</strong> — intended for built-in Spark maintenance
-   * jobs only.
-   *
-   * @param jobId Gravitino job run id
-   * @param request finish payload
-   */
-  public void finishMaintenanceAction(long jobId, MaintenanceActionFinishRequest request) {
-    Preconditions.checkArgument(request != null, "request must not be null");
-    request.validate();
-    BaseResponse response =
-        restClient.post(
-            String.format(
-                "api/metalakes/%s/maintenance/actions/%d/finish",
-                RESTUtils.encodeString(metalakeName), jobId),
-            request,
-            BaseResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.restErrorHandler());
-    response.validate();
-  }
-
-  private void postMaintenanceActionMetrics(
-      long jobId, String phase, MaintenanceActionMetricsRequest request) {
-    Preconditions.checkArgument(request != null, "request must not be null");
-    request.validate();
-    BaseResponse response =
-        restClient.post(
-            String.format(
-                "api/metalakes/%s/maintenance/actions/%d/metrics/%s",
-                RESTUtils.encodeString(metalakeName), jobId, phase),
-            request,
-            BaseResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.restErrorHandler());
-    response.validate();
   }
 
   /** Builder class for constructing a GravitinoClient. */
