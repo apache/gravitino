@@ -17,12 +17,12 @@ const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
 const SUITES = ['build', 'backend', 'spark', 'flink', 'trino', 'iceberg_rest_trino', 'python',
   'frontend', 'access_control', 'idp_basic', 'mcp', 'maintenance', 'web_ui', 'charts',
   'contrib_catalog', 'asf_allowlist'];
-const requiredName = pr => `Required CI / ${pr.base.ref} / ${pr.base.sha} / ${pr.head.sha}`;
+const requiredName = (pr, baseSha = pr.base.sha) => `Required CI / ${pr.base.ref} / ${baseSha} / ${pr.head.sha}`;
 const requiredAction = note => ({ status: 'completed', conclusion: 'action_required',
   title: 'Fork CI needs attention', note });
 
-function evaluate(pr, run, jobs) {
-  const required = jobs.find(job => job.name === requiredName(pr));
+function evaluate(pr, run, jobs, baseSha = pr.base.sha) {
+  const required = jobs.find(job => job.name === requiredName(pr, baseSha));
   if (run.status !== 'completed') return { status: 'in_progress', title: 'Fork CI is running' };
   if (run.conclusion !== 'success') return { status: 'completed',
     conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
@@ -85,6 +85,18 @@ function createService(github) {
     }
     return [...latest.values()];
   }
+  async function testedBase(pr, jobs) {
+    // pr.base.sha is not refreshed by later pushes, so runs usually test a newer base commit.
+    // Accept that commit only if it is on the PR base branch.
+    const prefix = `Required CI / ${pr.base.ref} / `;
+    const suffix = ` / ${pr.head.sha}`;
+    const job = jobs.find(job => job.name.startsWith(prefix) && job.name.endsWith(suffix));
+    const sha = job?.name.slice(prefix.length, -suffix.length);
+    if (!sha || sha === pr.base.sha || !/^[0-9a-f]{40}$/.test(sha)) return pr.base.sha;
+    const { data } = await github.rest.repos.compareCommitsWithBasehead({ ...UPSTREAM,
+      basehead: `${sha}...${pr.base.ref}`, per_page: 1 });
+    return ['ahead', 'identical'].includes(data.status) ? sha : pr.base.sha;
+  }
   async function findRun(pr, trusted) {
     const target = trusted ? UPSTREAM : { owner: pr.head.repo.owner.login, repo: pr.head.repo.name };
     const { data } = await github.rest.actions.listWorkflowRuns({ ...target, workflow_id: 'fork-ci.yml',
@@ -108,7 +120,9 @@ function createService(github) {
       result: requiredAction('CI workflow/action/script definitions or branch protection differ from the base. ' +
         'A committer must dispatch Fork CI from the current upstream default branch with this PR number.') };
     // A manual upstream run uses the workflow definitions at run.head_sha, not the PR definitions.
-    return { ...selected, result: evaluate(pr, run, await jobsFor(owner, repo, run)) };
+    const jobs = await jobsFor(owner, repo, run);
+    const base = selected.trusted ? pr.base.sha : await testedBase(pr, jobs);
+    return { ...selected, base, result: evaluate(pr, run, jobs, base) };
   }
   return { mirror, unchanged, findRun };
 }

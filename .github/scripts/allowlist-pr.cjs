@@ -38,8 +38,10 @@ async function prepare({ github, context, core, fetchImpl = fetch, directory = p
   } else {
     const sha = context.payload.workflow_run.head_sha;
     if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('Invalid signal SHA.');
-    prs = (await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
-      { ...context.repo, commit_sha: sha, per_page: 100 }))
+    // listPullRequestsAssociatedWithCommit does not return PRs whose head commit is in a fork.
+    const run = context.payload.workflow_run;
+    prs = (await github.paginate(github.rest.pulls.list, { ...context.repo, state: 'open',
+      head: `${run.head_repository.owner.login}:${run.head_branch}`, per_page: 100 }))
       .filter(pr => pr.head.sha === sha);
   }
   prs = prs.filter(pr => pr.state === 'open' && pr.head.repo);

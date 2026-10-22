@@ -318,3 +318,56 @@ test('partial reruns retain successful callers but use each job newest result', 
   rerunConclusion = 'failure';
   assert.equal((await createService(github).mirror(p)).result.conclusion, 'action_required');
 });
+
+test('allowlist signals find fork PRs by head branch', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'fork-ci-allowlist-test-'));
+  const output = {};
+  try {
+    const ctx = context('apache/gravitino');ctx.eventName = 'workflow_run';
+    ctx.payload.workflow_run = { head_sha: A, head_branch: 'topic', head_repository: { owner: { login: 'fork' } } };
+    const list = () => {};
+    let head;
+    await prepare({ context: ctx, core: coreFor(output), directory,
+      github: { paginate: async (endpoint, args) => { assert.equal(endpoint, list); head = args.head; return [pr(), { ...pr(), number: 8, head: { ...pr().head, sha: C } }]; },
+        rest: { pulls: { list }, git: { getTree: async args => ({ data: { tree: args.tree_sha === A
+          ? [{ path: '.github', type: 'tree', sha: 'github' }]
+          : [{ path: 'workflows/build.yml', mode: '100644', type: 'blob', size: 8 }] } }) } } },
+      fetchImpl: async () => ({ ok: true, body: [Buffer.from('on: push')] })
+    });
+    assert.equal(head, 'fork:topic');
+    assert.deepEqual(JSON.parse(output.prs), [{ number: 7, sha: A }]);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('a run against a newer commit of the PR base branch is accepted', async () => {
+  for (const [status, conclusion] of [['ahead', 'success'], ['identical', 'success'], ['diverged', 'action_required']]) {
+    const tested = pr(); tested.base.sha = C;
+    const github = serviceMock({ forkJobs: jobs(tested) });
+    let basehead;
+    github.rest.repos = { compareCommitsWithBasehead: async args => { basehead = args.basehead; return { data: { status } }; } };
+    const mirror = await createService(github).mirror(pr());
+    assert.equal(mirror.result.conclusion, conclusion);
+    assert.equal(basehead, `${C}...main`);
+    assert.equal(mirror.base, conclusion === 'success' ? C : B);
+  }
+});
+
+test('scheduled sweeps refresh pending PRs first and link the fork run', async () => withPublisher(async ({ ctx, stateFile, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const { github, writes } = publisherMock();
+  const others = Array.from({ length: 20 }, (_, i) => ({ ...pr(), number: 100 + i,
+    head: { ...pr().head, sha: (100 + i).toString(16).padStart(40, 'd') } }));
+  const listPulls = github.rest.pulls.list;
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => endpoint === listPulls ? [...others, pr()] : paginate(endpoint, args);
+  github.rest.pulls.get = async ({ pull_number }) => ({ data: pull_number === 7 ? pr() : others[pull_number - 100] });
+  github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: 900 } } } });
+  github.rest.search = { issuesAndPullRequests: async ({ q }) => {
+    assert.ok(q.includes('status:pending'));
+    return { data: { items: [{ number: 7 }] } };
+  } };
+  await update({ github, context: ctx, core, stateFile });
+  assert.ok(writes.length > 0);
+  assert.equal(writes[0].create.head_sha, A);
+  assert.match(writes[0].create.output.summary, /^\[See fork CI results\]\(https:\/\/github\.com\/fork\/repo\/actions\/runs\/1\)/);
+}));
