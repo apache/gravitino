@@ -116,6 +116,7 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
@@ -902,6 +903,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           dropFilesetAndGet(fileset.nameIdentifier())
               .ifPresent(
                   deleted -> secretManager.deleteSecretsFromProperties(deleted.properties()));
+        }
+
+        // Functions can also live in fileset catalogs. Drop their metadata explicitly before
+        // the non-cascading schema delete so it still protects any unprocessed filesets.
+        for (FunctionEntity function :
+            store.list(filesetNs, FunctionEntity.class, Entity.EntityType.FUNCTION)) {
+          store.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION);
         }
       }
 

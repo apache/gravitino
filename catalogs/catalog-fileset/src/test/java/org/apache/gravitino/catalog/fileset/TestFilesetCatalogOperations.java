@@ -105,6 +105,7 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.catalog.ManagedFunctionOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
@@ -128,11 +129,17 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
@@ -871,11 +878,49 @@ public class TestFilesetCatalogOperations {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
+  void testDropSchemaWithFunctions(boolean withFileset) throws IOException {
+    String schemaName = "schema_cascade_functions_" + generateTestId();
+    String catalogPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, "comment", catalogPath, null);
+    NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
+    NameIdentifier functionIdent = NameIdentifier.of("m1", "c1", schemaName, "function");
+    createFunction(functionIdent);
+    if (withFileset) {
+      createFileset("fileset", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
+    }
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, "fileset");
+    Path schemaPath = new Path(catalogPath, schemaName);
+    FileSystem fs = schemaPath.getFileSystem(new Configuration());
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      Assertions.assertThrows(
+          NonEmptySchemaException.class, () -> ops.dropSchema(schemaIdent, false));
+      Assertions.assertTrue(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(functionIdent, Entity.EntityType.FUNCTION));
+      Assertions.assertEquals(withFileset, store.exists(filesetIdent, Entity.EntityType.FILESET));
+      Assertions.assertTrue(fs.exists(schemaPath));
+
+      Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
+      Assertions.assertFalse(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(functionIdent, Entity.EntityType.FUNCTION));
+      Assertions.assertFalse(store.exists(filesetIdent, Entity.EntityType.FILESET));
+      Assertions.assertFalse(fs.exists(schemaPath));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
   void testDropSchemaStopsOnStorageFailureAndCanRetry(boolean throwException) throws IOException {
     String schemaName = "schema_cascade_failure_" + generateTestId();
     String catalogPath = TEST_ROOT_PATH + "/" + schemaName;
     createSchema(schemaName, "comment", catalogPath, null);
     NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
+    NameIdentifier functionIdent = NameIdentifier.of("m1", "c1", schemaName, "function");
+    createFunction(functionIdent);
     Namespace filesetNs = Namespace.of("m1", "c1", schemaName);
     List<FilesetEntity> filesets = new ArrayList<>();
     List<SecretUrn> secrets = new ArrayList<>();
@@ -929,6 +974,7 @@ public class TestFilesetCatalogOperations {
 
       Assertions.assertThrows(RuntimeException.class, () -> ops.dropSchema(schemaIdent, true));
       Assertions.assertTrue(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(functionIdent, Entity.EntityType.FUNCTION));
       for (int i = 0; i < filesets.size(); i++) {
         FilesetEntity fileset = filesets.get(i);
         Path path = new Path(fileset.storageLocation());
@@ -947,6 +993,7 @@ public class TestFilesetCatalogOperations {
           .getFileSystemWithCache(Mockito.eq(failedPath), any(Map.class));
       Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
       Assertions.assertFalse(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(functionIdent, Entity.EntityType.FUNCTION));
       for (FilesetEntity fileset : filesets) {
         Assertions.assertFalse(store.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
         Path path = new Path(fileset.storageLocation());
@@ -4204,6 +4251,22 @@ public class TestFilesetCatalogOperations {
 
       return ops.createFileset(filesetIdent, comment, type, storageLocation, filesetProps);
     }
+  }
+
+  private void createFunction(NameIdentifier ident) {
+    new ManagedFunctionOperations(store, idGenerator)
+        .registerFunction(
+            ident,
+            "comment",
+            FunctionType.SCALAR,
+            true,
+            FunctionDefinitions.of(
+                FunctionDefinitions.of(
+                    new FunctionParam[0],
+                    Types.IntegerType.get(),
+                    new FunctionImpl[] {
+                      FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.TestUDF")
+                    })));
   }
 
   private long generateTestId() {
