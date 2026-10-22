@@ -25,6 +25,7 @@ on:
 permissions:
   actions: read
   checks: write
+  contents: read
   pull-requests: read
 
 concurrency:
@@ -143,12 +144,28 @@ jobs:
               return false;
             };
 
+            // Pull requests to a branch without Fork CI, such as a release branch it has not
+            // been backported to, still run that branch's own pull_request workflows.
+            const forkCiBases = new Map();
+            const baseHasForkCi = ref => {
+              if (!forkCiBases.has(ref)) {
+                forkCiBases.set(ref, github.rest.repos.getContent({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  path: '.github/workflows/fork-ci.yml', ref
+                }).then(() => true, error => {
+                  if (error.status === 404) return false;
+                  throw error;
+                }));
+              }
+              return forkCiBases.get(ref);
+            };
+
             const syncPr = async pr => {
               const state = {
                 sha: pr.head.sha, updated_at: pr.updated_at, kind: 'none', checked_at: new Date(now).toISOString()
               };
               next[pr.number] = state;
-              if (!pr.head.repo) return 'none';
+              if (!pr.head.repo || !(await baseHasForkCi(pr.base.ref))) return 'none';
               const owner = pr.head.repo.owner.login;
               const repo = pr.head.repo.name;
 

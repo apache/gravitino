@@ -24,6 +24,7 @@ on:
 permissions:
   actions: read
   checks: write
+  contents: read
 
 jobs:
   notify:
@@ -47,6 +48,18 @@ jobs:
             const branch = pr.head.ref;
             const headSha = pr.head.sha;
             const workflow = 'fork-ci.yml';
+
+            // Pull requests to a branch without Fork CI, such as a release branch it has not
+            // been backported to, still run that branch's own pull_request workflows.
+            try {
+              await github.rest.repos.getContent({
+                owner: context.repo.owner, repo: context.repo.repo,
+                path: `.github/workflows/${workflow}`, ref: pr.base.ref });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.info(`${pr.base.ref} has no Fork CI; no check is created.`);
+              return;
+            }
 
             let run;
             for (let attempt = 0; attempt < 3 && !run; attempt++) {
