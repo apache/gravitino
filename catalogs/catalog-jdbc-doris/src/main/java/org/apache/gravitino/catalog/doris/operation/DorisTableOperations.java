@@ -942,7 +942,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -1043,7 +1043,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   private String updateColumnCommentFieldDefinition(
       TableChange.UpdateColumnComment updateColumnComment) {
-    String newComment = updateColumnComment.getNewComment();
+    String newComment = StringUtils.defaultString(updateColumnComment.getNewComment());
     if (updateColumnComment.fieldName().length > 1) {
       throw new IllegalArgumentException("Doris does not support nested column names.");
     }
@@ -1192,7 +1192,13 @@ public class DorisTableOperations extends JdbcTableOperations {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append("AFTER ").append(s));
+          .ifPresent(
+              s ->
+                  columnDefinition
+                      .append("AFTER ")
+                      .append(BACK_QUOTE)
+                      .append(s)
+                      .append(BACK_QUOTE));
     }
     return columnDefinition.toString();
   }

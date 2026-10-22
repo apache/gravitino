@@ -504,7 +504,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   private String updateCommentDefinition(
       TableChange.UpdateComment updateComment, JdbcTable jdbcTable) {
-    String newComment = updateComment.getNewComment();
+    String newComment = StringUtils.defaultString(updateComment.getNewComment());
     if (null == StringIdentifier.fromComment(newComment)) {
       // Detect and add Gravitino id.
       if (StringUtils.isNotEmpty(jdbcTable.comment())) {
@@ -713,7 +713,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   private String updateColumnCommentFieldDefinition(
       TableChange.UpdateColumnComment updateColumnComment, String tableName) {
-    String newComment = updateColumnComment.getNewComment();
+    String newComment = StringUtils.defaultString(updateColumnComment.getNewComment());
     if (updateColumnComment.fieldName().length > 1) {
       throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
