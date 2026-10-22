@@ -14,6 +14,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 - Supports Gravitino Iceberg REST server.
 - Supports Gravitino server with the following catalog types:
 
+<<<<<<< HEAD
 | Catalog type     | Supported credential types                         |
 |------------------|----------------------------------------------------|
 | Hadoop (Fileset) | S3, OSS, GCS, ADLS                                 |
@@ -28,6 +29,80 @@ Gravitino credential vending is used to generate temporary or static credentials
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
 - Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs.
+=======
+S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
+
+## Quick Start
+
+Vend scoped S3 credentials to Spark through the IRC. Create the catalog through the Gravitino REST catalog API:
+
+```shell
+curl -X POST http://localhost:8090/api/metalakes/{metalake}/catalogs \
+-H "Content-Type: application/json" \
+-d '{
+  "name": "iceberg_catalog",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-iceberg",
+  "properties": {
+    "catalog-backend": "jdbc",
+    "uri": "jdbc:postgresql://{postgres_host}:5432/{database}",
+    "jdbc-driver": "org.postgresql.Driver",
+    "jdbc-user": "{jdbc_user}",
+    "jdbc-password": "{jdbc_password}",
+    "jdbc-initialize": "true",
+    "warehouse": "s3://{bucket_name}/{warehouse_path}",
+    "io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
+    "credential-providers": "s3-token",
+    "s3-access-key-id": "{access_key_id}",
+    "s3-secret-access-key": "{secret_access_key}",
+    "s3-region": "{region_name}",
+    "s3-role-arn": "{role_arn}"
+  }
+}'
+```
+
+Point Spark at the IRC and request vended credentials with the delegation header:
+
+```shell
+./bin/spark-sql -v \
+--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0,org.apache.iceberg:iceberg-aws-bundle:1.10.0 \
+--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+--conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog \
+--conf spark.sql.catalog.rest.type=rest \
+--conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.rest.prefix=iceberg_catalog \
+--conf spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation=vended-credentials
+```
+
+The role in `s3-role-arn` needs a trust policy and S3 permissions before this works. See [`s3-token`](#s3-token).
+
+For Trino instead of Spark:
+
+```properties
+connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=http://127.0.0.1:9001/iceberg/
+iceberg.rest-catalog.prefix=iceberg_catalog
+iceberg.rest-catalog.vended-credentials-enabled=true
+fs.native-s3.enabled=true
+s3.region={region_name}
+```
+
+For the full Trino setup, see [Connect Trino to the IRC](../iceberg-rest-engine/trino.md).
+
+## Setting Properties
+
+Credential vending properties go in the catalog's `properties` map when you create it through the Gravitino REST catalog API, alongside the warehouse location and the other catalog settings.
+
+The Gravitino Iceberg REST Catalog (IRC) is the exception. It can also read a catalog straight from `gravitino.conf`, using the same property names prefixed with `gravitino.iceberg-rest.`:
+
+```properties
+s3-role-arn                             # as a catalog property
+gravitino.iceberg-rest.s3-role-arn      # in gravitino.conf
+```
+
+Catalogs defined in `gravitino.conf` are not registered in a metalake, so Gravitino access control does not apply to them. Privileges are granted on catalogs in a metalake, and there is nothing to grant them on.
+>>>>>>> f55990944 ([#14031] fix(flink-connector): Validate credential providers for Iceberg non-REST backends (#14032))
 
 ## General Configurations
 
@@ -225,7 +300,11 @@ Clients retrieve vended credentials from:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
+<<<<<<< HEAD
 The server returns short-lived or static credentials that the client can use to access the underlying storage directly.
+=======
+The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed. These credentials are catalog-level and are not refreshed: token providers such as `s3-token` vend nothing at catalog level, and `aws-irsa` credentials expire after `s3-token-expire-in-secs`.
+>>>>>>> f55990944 ([#14031] fix(flink-connector): Validate credential providers for Iceberg non-REST backends (#14032))
 
 ### Spark and Flink Connector Integration
 
