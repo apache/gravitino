@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.starrocks.operations;
 
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -609,7 +608,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
