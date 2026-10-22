@@ -66,6 +66,7 @@ import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
@@ -1222,6 +1223,242 @@ public class TestJobManager {
 
     Assertions.assertEquals(
         JobHandle.Status.FAILED, captureUpdatedJobEntity(otherJob, otherJob).status());
+  }
+
+  /** A failure to list the metalakes is logged and does not stop later status polls. */
+  @Test
+  public void testPullJobStatusContinuesAfterFailingToListMetalakes() throws IOException {
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenThrow(new RuntimeException("Failed to list in-use metalakes"))
+        .thenReturn(ImmutableList.of(metalake));
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    stubEntityStoreUpdateToApply(job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+    verify(jobExecutor, never()).getJobStatus(any());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(job).status());
+  }
+
+  /** A metalake disabled after being listed as in use only skips the status poll of itself. */
+  @Test
+  public void testPullJobStatusContinuesAfterFailingOnOneMetalake() throws IOException {
+    String disabledMetalake = "disabled_metalake";
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(disabledMetalake, metalake));
+    doThrow(new MetalakeNotInUseException("Metalake %s is not in use", disabledMetalake))
+        .when(jobManager)
+        .listJobs(disabledMetalake, Optional.empty());
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    stubEntityStoreUpdateToApply(job, job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(job, job).status());
+  }
+
+  /** An Error on one metalake, such as a LinkageError from a plugin, only skips that metalake. */
+  @Test
+  public void testPullJobStatusContinuesAfterErrorOnOneMetalake() throws IOException {
+    String brokenMetalake = "broken_metalake";
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(brokenMetalake, metalake));
+    doThrow(new NoClassDefFoundError("org/example/MissingClass"))
+        .when(jobManager)
+        .listJobs(brokenMetalake, Optional.empty());
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    stubEntityStoreUpdateToApply(job, job);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(job, job).status());
+  }
+
+  /** A failure checking the owner of one job does not stop the status pull of the others. */
+  @Test
+  public void testPullJobStatusContinuesAfterFailingToCheckJobOwner() throws IOException {
+    JobEntity failingJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    JobEntity otherJob = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    mockListActiveJobs(failingJob, otherJob);
+    when(jobExecutor.ownsJob(failingJob.jobExecutionId()))
+        .thenThrow(new AbstractMethodError("ownsJob"));
+    when(jobExecutor.getJobStatus(otherJob.jobExecutionId()))
+        .thenReturn(JobHandle.Status.SUCCEEDED);
+    stubEntityStoreUpdateToApply(otherJob, otherJob);
+
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    verify(jobExecutor, never()).getJobStatus(failingJob.jobExecutionId());
+    Assertions.assertEquals(
+        JobHandle.Status.SUCCEEDED, captureUpdatedJobEntity(otherJob, otherJob).status());
+  }
+
+  /** An Error expiring a stale job still lets the expired jobs found before it be deleted. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterErrorExpiringJob() throws IOException {
+    Instant longAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+    JobEntity expired = expiredJob();
+    JobEntity stale = newJobEntity("local-job-gone-1", JobHandle.Status.STARTED, longAgo, longAgo);
+    mockListActiveJobs(expired, stale);
+    when(jobExecutor.isJobStateNodeLocal()).thenReturn(true);
+    when(entityStore.update(
+            eq(NameIdentifierUtil.ofJob(metalake, stale.name())),
+            eq(JobEntity.class),
+            eq(Entity.EntityType.JOB),
+            any()))
+        .thenThrow(new NoClassDefFoundError("org/example/MissingClass"));
+    NameIdentifier expiredIdent = NameIdentifierUtil.ofJob(metalake, expired.name());
+    when(entityStore.delete(expiredIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File expiredDir = jobStagingDir(expired.id());
+    Assertions.assertTrue(expiredDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(expiredDir.exists());
+    verify(entityStore, times(1)).delete(expiredIdent, Entity.EntityType.JOB);
+  }
+
+  /** A failure checking the job executor still lets the expired jobs found before be deleted. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterFailingToCheckJobExecutor() throws IOException {
+    Instant longAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+    JobEntity expired = expiredJob();
+    JobEntity active = newJobEntity("local-job-gone-1", JobHandle.Status.STARTED, longAgo, longAgo);
+    mockListActiveJobs(expired, active);
+    when(jobExecutor.isJobStateNodeLocal())
+        .thenThrow(new AbstractMethodError("isJobStateNodeLocal"));
+    NameIdentifier expiredIdent = NameIdentifierUtil.ofJob(metalake, expired.name());
+    when(entityStore.delete(expiredIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File expiredDir = jobStagingDir(expired.id());
+    Assertions.assertTrue(expiredDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(expiredDir.exists());
+    verify(entityStore, times(1)).delete(expiredIdent, Entity.EntityType.JOB);
+  }
+
+  /** An Error deleting one expired job does not stop the cleanup of the others. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterErrorDeletingJob() throws IOException {
+    JobEntity failing = expiredJob();
+    JobEntity other = expiredJob();
+    mockListActiveJobs(failing, other);
+    NameIdentifier failingIdent = NameIdentifierUtil.ofJob(metalake, failing.name());
+    NameIdentifier otherIdent = NameIdentifierUtil.ofJob(metalake, other.name());
+    when(entityStore.delete(failingIdent, Entity.EntityType.JOB))
+        .thenThrow(new NoClassDefFoundError("org/example/MissingClass"));
+    when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File otherDir = jobStagingDir(other.id());
+    Assertions.assertTrue(otherDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(otherDir.exists());
+    verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
+  }
+
+  /** A failure to list the metalakes is logged and does not stop later cleanup runs. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterFailingToListMetalakes() throws IOException {
+    JobEntity job = expiredJob();
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenThrow(new RuntimeException("Failed to list in-use metalakes"))
+        .thenReturn(ImmutableList.of(metalake));
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
+    when(entityStore.delete(jobIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File jobDir = jobStagingDir(job.id());
+    Assertions.assertTrue(jobDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+    Assertions.assertTrue(jobDir.exists());
+    verify(entityStore, never()).delete(any(), any());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+    Assertions.assertFalse(jobDir.exists());
+    verify(entityStore, times(1)).delete(jobIdent, Entity.EntityType.JOB);
+  }
+
+  /** A store failure while listing the jobs of one metalake only skips the cleanup of itself. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterFailingOnOneMetalake() throws IOException {
+    String failingMetalake = "failing_metalake";
+    JobEntity job = expiredJob();
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(failingMetalake, metalake));
+    doThrow(new RuntimeException(new IOException("store error")))
+        .when(jobManager)
+        .listJobs(failingMetalake, Optional.empty());
+    doReturn(ImmutableList.of(job)).when(jobManager).listJobs(metalake, Optional.empty());
+    NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
+    when(entityStore.delete(jobIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File jobDir = jobStagingDir(job.id());
+    Assertions.assertTrue(jobDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertFalse(jobDir.exists());
+    verify(entityStore, times(1)).delete(jobIdent, Entity.EntityType.JOB);
+  }
+
+  /** An unexpected failure deleting one expired job does not stop the cleanup of the others. */
+  @Test
+  public void testCleanUpStagingDirsContinuesAfterFailingToDeleteJob() throws IOException {
+    JobEntity failing = expiredJob();
+    JobEntity other = expiredJob();
+    doReturn(ImmutableList.of(failing, other))
+        .when(jobManager)
+        .listJobs(metalake, Optional.empty());
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+    NameIdentifier failingIdent = NameIdentifierUtil.ofJob(metalake, failing.name());
+    NameIdentifier otherIdent = NameIdentifierUtil.ofJob(metalake, other.name());
+    when(entityStore.delete(failingIdent, Entity.EntityType.JOB))
+        .thenThrow(new RuntimeException("store error"));
+    when(entityStore.delete(otherIdent, Entity.EntityType.JOB)).thenReturn(true);
+    File failingDir = jobStagingDir(failing.id());
+    File otherDir = jobStagingDir(other.id());
+    Assertions.assertTrue(failingDir.mkdirs());
+    Assertions.assertTrue(otherDir.mkdirs());
+
+    Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
+
+    Assertions.assertTrue(failingDir.exists());
+    Assertions.assertFalse(otherDir.exists());
+    verify(entityStore, times(1)).delete(failingIdent, Entity.EntityType.JOB);
+    verify(entityStore, times(1)).delete(otherIdent, Entity.EntityType.JOB);
+  }
+
+  private JobEntity expiredJob() {
+    long id = idGenerator.nextId();
+    return JobEntity.builder()
+        .withId(id)
+        .withJobExecutionId(Long.toString(id))
+        .withNamespace(NamespaceUtil.ofJob(metalake))
+        .withJobTemplateName("shell_job")
+        .withFinishedAt(2L)
+        .withStatus(JobHandle.Status.SUCCEEDED)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
+  }
+
+  private File jobStagingDir(long jobId) {
+    return new File(
+        new File(new File(testStagingDir, metalake), "shell_job"), JobHandle.JOB_ID_PREFIX + jobId);
   }
 
   @Test
