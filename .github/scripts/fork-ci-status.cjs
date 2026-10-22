@@ -87,7 +87,8 @@ function createService(github) {
   }
   async function testedBase(pr, jobs) {
     // pr.base.sha is not refreshed by later pushes, so runs usually test a newer base commit.
-    // Accept that commit only if it is on the PR base branch.
+    // Accept that commit only if it is on the PR base branch. The check can stay green after the
+    // branch moves on; strict branch protection, not this check, requires an up-to-date branch.
     const prefix = `Required CI / ${pr.base.ref} / `;
     const suffix = ` / ${pr.head.sha}`;
     const job = jobs.find(job => job.name.startsWith(prefix) && job.name.endsWith(suffix));
@@ -99,9 +100,9 @@ function createService(github) {
   }
   async function findRun(pr, trusted) {
     const target = trusted ? UPSTREAM : { owner: pr.head.repo.owner.login, repo: pr.head.repo.name };
-    const { data } = await github.rest.actions.listWorkflowRuns({ ...target, workflow_id: 'fork-ci.yml',
+    const all = await github.paginate(github.rest.actions.listWorkflowRuns, { ...target, workflow_id: 'fork-ci.yml',
       event: trusted ? 'workflow_dispatch' : 'push', head_sha: trusted ? pr.base.sha : pr.head.sha, per_page: 100 });
-    const runs = data.workflow_runs.filter(run => run.path === '.github/workflows/fork-ci.yml' &&
+    const runs = all.filter(run => run.path === '.github/workflows/fork-ci.yml' &&
       run.head_sha === (trusted ? pr.base.sha : pr.head.sha) &&
       (!trusted || run.display_title === `Trusted Fork CI #${pr.number}`)).sort((a, b) => b.id - a.id);
     return runs[0] && { ...target, run: runs[0], trusted };
@@ -116,13 +117,13 @@ function createService(github) {
       ? trusted : ordinary;
     if (!selected) return { result: requiredAction('Enable Actions in the fork and push the branch, or dispatch trusted Fork CI.') };
     const { owner, repo, run } = selected;
-    if (!selected.trusted && !sameDefinitions) return { ...selected,
+    if (!selected.trusted && !sameDefinitions) return { ...selected, fork: ordinary?.run,
       result: requiredAction('CI workflow/action/script definitions or branch protection differ from the base. ' +
         'A committer must dispatch Fork CI from the current upstream default branch with this PR number.') };
     // A manual upstream run uses the workflow definitions at run.head_sha, not the PR definitions.
     const jobs = await jobsFor(owner, repo, run);
     const base = selected.trusted ? pr.base.sha : await testedBase(pr, jobs);
-    return { ...selected, base, result: evaluate(pr, run, jobs, base) };
+    return { ...selected, fork: ordinary?.run, base, result: evaluate(pr, run, jobs, base) };
   }
   return { mirror, unchanged, findRun };
 }

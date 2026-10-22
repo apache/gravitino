@@ -16,8 +16,6 @@
 const { createService } = require('./fork-ci-status.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
-// Results that change only with a new push or a trusted run, both of which signal a refresh.
-const SETTLED = ['success', 'action_required'];
 
 async function update({ github, context, core }) {
   const signal = context.eventName === 'workflow_run' && context.payload.workflow_run.name === 'Fork CI PR Signal';
@@ -43,13 +41,14 @@ async function update({ github, context, core }) {
   let calls = 0;
   github.hook.before('request', () => { calls++; });
   const failures = [];
+  const recordOf = check => { try { return JSON.parse(check?.output?.text || '{}'); } catch { return {}; } };
   async function latestCheck(pr) {
     const checks = await github.paginate(github.rest.checks.listForRef, {
       ...context.repo, ref: pr.head.sha, check_name: 'Fork CI', per_page: 100, filter: 'all'
     });
     return checks.filter(check => check.app?.slug === 'github-actions').sort((a, b) => b.id - a.id)[0];
   }
-  async function refresh(pr, known) {
+  async function refresh(pr) {
     // Release branches without this CI migration keep their own pull_request workflows.
     if (!availableBases.has(pr.base.sha)) {
       availableBases.set(pr.base.sha, github.rest.repos.getContent({ ...context.repo,
@@ -59,14 +58,14 @@ async function update({ github, context, core }) {
       }));
     }
     if (!(await availableBases.get(pr.base.sha))) return;
-    const latest = known === undefined ? await latestCheck(pr) : known;
     const mirror = await service.mirror(pr);
     const { result, run } = mirror;
     const note = result.note || (result.status !== 'completed' ? 'Waiting for the fork run.'
       : result.conclusion === 'success' ? 'Verified all caller suites.' : 'Open the run to see which jobs did not succeed.');
     const testedBase = mirror.base && mirror.base !== pr.base.sha ? `\nTested base: ${mirror.base}` : '';
     const record = { owner: mirror.owner, repo: mirror.repo, run_id: run?.id,
-      run_attempt: run?.run_attempt, base_ref: pr.base.ref, base_sha: pr.base.sha, trusted: mirror.trusted || false };
+      run_attempt: run?.run_attempt, base_ref: pr.base.ref, base_sha: pr.base.sha, trusted: mirror.trusted || false,
+      fork_run_id: mirror.fork?.id, fork_run_attempt: mirror.fork?.run_attempt };
     const details = run ? `https://github.com/${mirror.owner}/${mirror.repo}/actions/runs/${run.id}` : pr.html_url;
     const output = { title: result.title,
       // GitHub ignores details_url for checks created with GITHUB_TOKEN, so link the run here.
@@ -79,12 +78,18 @@ async function update({ github, context, core }) {
     const params = { ...context.repo, ...result, output, details_url: details };
     delete params.title;
     delete params.note;
-    let oldRecord;
-    try { oldRecord = JSON.parse(latest?.output?.text || '{}'); } catch { oldRecord = {}; }
+    // Signals and sweeps can publish concurrently. Read the check last and never replace a newer
+    // attempt of a run from the same repository, or a completed result with a running one.
+    const latest = await latestCheck(pr);
+    const oldRecord = recordOf(latest);
+    if (oldRecord.owner === record.owner && oldRecord.repo === record.repo && record.run_id &&
+        (oldRecord.run_id > record.run_id || (oldRecord.run_id === record.run_id &&
+          (oldRecord.run_attempt > record.run_attempt ||
+            (oldRecord.run_attempt === record.run_attempt && latest.status === 'completed' && result.status !== 'completed'))))) return;
     const sameRun = oldRecord.run_id === record.run_id && oldRecord.run_attempt === record.run_attempt && oldRecord.base_sha === record.base_sha && oldRecord.base_ref === record.base_ref;
     if (!latest || (latest.status === 'completed' && (!sameRun || result.status !== 'completed'))) {
       await github.rest.checks.create({ ...params, name: 'Fork CI', head_sha: pr.head.sha });
-    } else if (!sameRun || latest.status !== result.status || latest.conclusion !== (result.conclusion || null) || latest.output?.summary !== output.summary) {
+    } else if (!sameRun || latest.status !== result.status || latest.conclusion !== (result.conclusion || null) || latest.output?.summary !== output.summary || latest.output?.text !== output.text) {
       await github.rest.checks.update({ ...params, check_run_id: latest.id });
     }
   }
@@ -101,18 +106,29 @@ async function update({ github, context, core }) {
   }
   let processed = 0;
   const visited = new Set();
-  // Fork runs, including reruns of failed jobs, finish without an upstream event. Such PRs were
-  // updated recently, so probe those first with one call and fully refresh only unsettled checks.
+  // Fork runs, including reruns, finish without an upstream event. Such PRs were updated recently,
+  // so probe those first. A completed result changes only with a push or a trusted run, which both
+  // signal a refresh, or with a fork rerun, so refresh it only when the fork run id or attempt changed.
   const recent = manual ? [] : prs.filter(pr => now - Date.parse(pr.updated_at) < RECENT_MS)
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
+  // Probes take two calls, so rotate them too and keep a third of the budget for older PRs.
+  const recentBudget = Math.floor(budget * 2 / 3);
+  const recentStart = !recent.length ? 0 : (Math.floor(now / 300000) * Math.max(1, Math.floor(recentBudget / 4))) % recent.length;
   let probed = 0;
-  for (const pr of recent) {
-    if (calls + 15 > budget) break; // One PR may need trees, runs, paginated jobs and a check write.
+  for (let offset = 0; offset < recent.length; offset++) {
+    if (calls + 15 > recentBudget) break; // One PR may need trees, runs, paginated jobs and a check write.
+    const pr = recent[(recentStart + offset) % recent.length];
     probed++;
     await visit(pr, async () => {
       const latest = await latestCheck(pr);
-      if (latest?.status === 'completed' && SETTLED.includes(latest.conclusion)) return;
-      await refresh(pr, latest || null);
+      if (latest?.status === 'completed') {
+        if (!pr.head.repo) return;
+        const record = recordOf(latest);
+        const fork = (await service.findRun(pr, false))?.run;
+        if (!fork || (fork.id === (record.fork_run_id ?? record.run_id) &&
+            fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt))) return;
+      }
+      await refresh(pr);
     });
   }
   // Rotate the rest using trusted wall-clock time, so old PRs are eventually visited without

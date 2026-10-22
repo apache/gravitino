@@ -42,7 +42,7 @@ inputs:
   persist-credentials:
     description: Whether to keep the token in the git config of the checkout.
     required: false
-    default: 'true'
+    default: 'false'
 
 outputs:
   base-ref:
