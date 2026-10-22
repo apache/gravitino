@@ -65,6 +65,202 @@ jobs:
               - spark-connector/**
             mcp_server_changes:
               - mcp-server/**
+            access_control_it:
+              - '.github/**'
+              - 'api/**'
+              - 'authorizations/**'
+              - 'bin/**'
+              - 'catalogs/**'
+              - 'clients/client-java/**'
+              - 'clients/client-java-runtime/**'
+              - 'common/**'
+              - 'conf/**'
+              - 'core/**'
+              - 'dev/**'
+              - 'gradle/**'
+              - 'iceberg/**'
+              - 'integration-test-common/**'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
+            backend_it:
+              - '.github/**'
+              - 'api/**'
+              - 'bin/**'
+              - 'catalogs/**'
+              - 'clients/client-java/**'
+              - 'clients/client-java-runtime/**'
+              - 'clients/filesystem-hadoop3/**'
+              - 'clients/cli/**'
+              - 'common/**'
+              - 'conf/**'
+              - 'core/**'
+              - 'lance/**'
+              - 'dev/**'
+              - 'gradle/**'
+              - 'iceberg/**'
+              - 'integration-test-common/**'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'server/**'
+              - 'bundles/**'
+              - 'server-common/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
+            flink_it:
+              - '.github/**'
+              - 'api/**'
+              - 'bin/**'
+              - 'catalogs/**'
+              - 'clients/client-java/**'
+              - 'clients/client-java-runtime/**'
+              - 'common/**'
+              - 'conf/**'
+              - 'core/**'
+              - 'dev/**'
+              - 'flink-connector/**'
+              - 'gradle/**'
+              - 'integration-test-common/**'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
+            iceberg_rest_trino_it:
+              - '.github/**'
+              - 'api/**'
+              - 'catalogs/catalog-common/**'
+              - 'clients/client-java/**'
+              - 'common/**'
+              - 'core/**'
+              - 'server-common/**'
+              - 'iceberg/**'
+              - 'integration-test-common/**'
+              - 'gradle/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
+            idp_basic_it:
+              - 'plugins/idp-basic/**'
+              - 'clients/client-java/**'
+              - 'clients/client-java-runtime/**'
+              - 'integration-test-common/**'
+              - 'core/**'
+              - 'gradle/**'
+              - 'gradlew'
+              - 'dev/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'settings.gradle.kts'
+              - '.github/workflows/presubmit.yml'
+              - '.github/workflows/idp-basic-test-action.yml'
+            maintenance_it:
+              - '.github/**'
+              - 'api/**'
+              - 'bin/**'
+              - 'catalogs/catalog-common/**'
+              - 'clients/client-java/**'
+              - 'clients/client-java-runtime/**'
+              - 'common/**'
+              - 'conf/**'
+              - 'core/**'
+              - 'dev/**'
+              - 'gradle/**'
+              - 'integration-test-common/**'
+              - 'maintenance/**'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
+            mcp_it:
+              - 'mcp-server/**'
+              - 'server/**'
+              - 'core/src/main/java/org/apache/gravitino/authorization/**'
+              - 'server-common/src/main/java/org/apache/gravitino/server/authentication/**'
+              - '.github/workflows/presubmit.yml'
+              - '.github/workflows/mcp-integration-test-action.yml'
+            python_it:
+              - '.github/**'
+              - 'api/**'
+              - 'authorizations/**'
+              - 'bin/**'
+              - 'catalogs/**'
+              - 'clients/client-python/**'
+              - 'common/**'
+              - 'conf/**'
+              - 'core/**'
+              - 'dev/**'
+              - 'gradle/**'
+              - 'iceberg/**'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
+            spark_it:
+              - '.github/**'
+              - 'api/**'
+              - 'bin/**'
+              - 'catalogs/**'
+              - 'clients/client-java/**'
+              - 'clients/client-java-runtime/**'
+              - 'common/**'
+              - 'conf/**'
+              - 'core/**'
+              - 'dev/**'
+              - 'gradle/**'
+              - 'iceberg/**'
+              - 'integration-test-common/**'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'spark-connector/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
+            trino_it:
+              - '.github/**'
+              - 'api/**'
+              - 'bin/**'
+              - 'catalogs/**'
+              - 'clients/client-java/**'
+              - 'clients/client-java-runtime/**'
+              - 'common/**'
+              - 'conf/**'
+              - 'core/**'
+              - 'dev/**'
+              - 'gradle/**'
+              - 'iceberg/**'
+              - 'integration-test-common/**'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'trino-connector/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
       - name: Determine maintenance-module-only changes
         id: maintenance_module_only
         env:
@@ -93,11 +289,25 @@ jobs:
           fi
 
           echo "maintenance_module_only_changes=${maintenance_module_only}" >> "${GITHUB_OUTPUT}"
+      - name: Detect idp-basic module
+        id: idp_basic_module
+        run: echo "exists=${{ hashFiles('plugins/idp-basic/build.gradle.kts') != '' }}" >> "${GITHUB_OUTPUT}"
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
       maintenance_module_only_changes: ${{ steps.maintenance_module_only.outputs.maintenance_module_only_changes }}
+      access_control_it: ${{ steps.filter.outputs.access_control_it }}
+      backend_it: ${{ steps.filter.outputs.backend_it }}
+      flink_it: ${{ steps.filter.outputs.flink_it }}
+      iceberg_rest_trino_it: ${{ steps.filter.outputs.iceberg_rest_trino_it }}
+      idp_basic_it: ${{ steps.filter.outputs.idp_basic_it }}
+      maintenance_it: ${{ steps.filter.outputs.maintenance_it }}
+      mcp_it: ${{ steps.filter.outputs.mcp_it }}
+      python_it: ${{ steps.filter.outputs.python_it }}
+      spark_it: ${{ steps.filter.outputs.spark_it }}
+      trino_it: ${{ steps.filter.outputs.trino_it }}
+      idp_basic_module_exists: ${{ steps.idp_basic_module.outputs.exists }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -146,10 +356,10 @@ jobs:
             build/reports
             spark-connector/**/*.log
 
-  # The pipeline runs in stages, cheapest first: lint, build, small tests, then medium tests
-  # (Docker) next to the core lanes. Each stage needs the one before, so a PR that fails lint stops
-  # there; jobs within a stage run in parallel. The test stages are Gradle tasks defined in
-  # gradle/ci-stages.gradle.kts.
+  # Presubmit runs in stages, cheapest first: lint, build, small tests, medium tests (Docker)
+  # next to the core lanes, then the integration tests. Each stage needs the one before, so a PR
+  # that fails lint stops there; jobs within a stage run in parallel. The unit test stages are
+  # Gradle tasks defined in gradle/ci-stages.gradle.kts.
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -410,6 +620,183 @@ jobs:
           path: |
             build/reports/tests/core
             core/build/test-results
+
+  # Integration tests: each area runs when its paths change, after the unit test stages pass.
+  access-control-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.access_control_it == 'true'
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/access-control-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+
+  backend-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.backend_it == 'true'
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 17 ]
+        backend: [ h2, mysql, postgresql ]
+        test-mode: [ embedded, deploy ]
+        exclude:
+          - test-mode: 'embedded'
+            backend: 'mysql'
+          - test-mode: 'embedded'
+            backend: 'postgresql'
+          - test-mode: 'deploy'
+            backend: 'h2'
+    uses: ./.github/workflows/backend-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+      backend: ${{ matrix.backend }}
+      test-mode: ${{ matrix.test-mode }}
+
+  flink-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.flink_it == 'true'
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/flink-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+
+  iceberg-rest-trino-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.iceberg_rest_trino_it == 'true'
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/iceberg-rest-trino-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+
+  idp-basic-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.idp_basic_it == 'true' &&
+      needs.changes.outputs.idp_basic_module_exists == 'true'
+    uses: ./.github/workflows/idp-basic-test-action.yml
+    with:
+      java-version: '17'
+
+  maintenance-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.maintenance_it == 'true'
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/maintenance-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+
+  mcp-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.mcp_it == 'true'
+    uses: ./.github/workflows/mcp-integration-test-action.yml
+    with:
+      java-version: '17'
+
+  python-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.python_it == 'true'
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/python-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+
+  spark-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.spark_it == 'true'
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 17 ]
+        scala-version: [ 2.12 ]
+        test-mode: [ embedded, deploy ]
+    uses: ./.github/workflows/spark-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+      scala-version: ${{ matrix.scala-version }}
+      test-mode: ${{ matrix.test-mode }}
+
+  trino-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.trino_it == 'true'
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/trino-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
 
   coverage:
     runs-on: ubuntu-latest

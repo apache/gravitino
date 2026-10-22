@@ -48,7 +48,7 @@ val ciMediumShards: Map<String, List<String>> = mapOf(
 )
 
 // Tests these stages do not run: core runs as lanes in the core-test job, the Python client in
-// python-integration-test.yml, and the contrib catalogs below in contrib-catalog-test.yml.
+// the python-it job, and the contrib catalogs below in contrib-catalog-test.yml.
 val ciSkippedTestModules: Set<String> = setOf(
   ":core",
   ":clients:client-python",
