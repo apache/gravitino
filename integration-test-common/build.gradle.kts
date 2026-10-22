@@ -46,6 +46,9 @@ dependencies {
   testImplementation(libs.commons.lang3)
   testImplementation(libs.commons.io)
   testImplementation(libs.guava)
+  testImplementation(libs.jackson.annotations)
+  testImplementation(libs.jackson.databind)
+  testImplementation(libs.jackson.dataformat.yaml)
   testImplementation(libs.httpclient5)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
@@ -60,6 +63,8 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.oceanbase)
   testImplementation(libs.testcontainers.postgresql)
+  testImplementation(libs.victools.jsonschema.generator)
+  testImplementation(libs.victools.jsonschema.module.jackson)
   testImplementation(libs.ranger.intg) {
     exclude("org.apache.hadoop", "hadoop-common")
     exclude("org.apache.hive", "hive-storage-api")

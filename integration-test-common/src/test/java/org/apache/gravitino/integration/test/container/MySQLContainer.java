@@ -44,6 +44,7 @@ public class MySQLContainer extends DatabaseContainer {
   public static final int MYSQL_PORT = 3306;
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
+
   private static final String DATA_DIR = "/var/lib/mysql";
   private static final String DEFAULT_CONFIG = "mysql-conf/default";
   private static final String DISPOSABLE_CONFIG = "mysql-conf/disposable";
@@ -61,6 +62,11 @@ public class MySQLContainer extends DatabaseContainer {
       Map<String, String> envVars,
       Optional<Network> network) {
     super(module(image), hostName, ports, extraHosts, filesToMount, envVars, network);
+  }
+
+  // Wraps a MySQL that runs outside this JVM's Testcontainers; see ExternalEndpoints.
+  private MySQLContainer(TestEndpoints.MySQL endpoints) {
+    super(endpoints, HOST_NAME);
   }
 
   @Override
@@ -90,7 +96,8 @@ public class MySQLContainer extends DatabaseContainer {
    * @throws IllegalStateException if a statement fails
    */
   public void execute(List<String> statements) {
-    try (Connection connection = db.createConnection("");
+    try (Connection connection =
+            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
         Statement statement = connection.createStatement()) {
       for (String sql : statements) {
         statement.execute(sql);
@@ -107,7 +114,8 @@ public class MySQLContainer extends DatabaseContainer {
       throw new IllegalArgumentException("Invalid database name: " + databaseName);
     }
 
-    try (Connection connection = db.createConnection("");
+    try (Connection connection =
+            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
         Statement statement = connection.createStatement()) {
       String query = String.format("CREATE DATABASE IF NOT EXISTS `%s`;", databaseName);
       // FIXME: String, which is used in SQL, can be unsafe
@@ -130,12 +138,21 @@ public class MySQLContainer extends DatabaseContainer {
     return databaseName.matches("^[a-zA-Z0-9_$]+$");
   }
 
+  /**
+   * Returns the JDBC URL the test JVM connects to, without a database: the Docker host and mapped
+   * port for a managed container, or the endpoints file's {@code mysql.jdbc-url} for an external
+   * one.
+   *
+   * @return the URL
+   */
   public String getJdbcUrl() {
-    return format("jdbc:mysql://%s:%d", getContainerIpAddress(), MYSQL_PORT);
+    return isExternal()
+        ? endpoints(TestEndpoints.MySQL.class).jdbcUrl()
+        : format("jdbc:mysql://%s:%d", getHost(), getMappedPort(MYSQL_PORT));
   }
 
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
-    return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, testDatabaseName);
+    return getJdbcUrl() + "/" + testDatabaseName;
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
@@ -171,6 +188,10 @@ public class MySQLContainer extends DatabaseContainer {
 
     @Override
     public MySQLContainer build() {
+      Optional<TestEndpoints.MySQL> external = ExternalEndpoints.forService("mysql", "");
+      if (external.isPresent()) {
+        return new MySQLContainer(external.get());
+      }
       MySQLContainer container =
           new MySQLContainer(
               image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);

@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.integration.test.container;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -32,8 +30,6 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.logging.log4j.util.Strings;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
@@ -43,14 +39,15 @@ import org.testcontainers.utility.DockerImageName;
 /**
  * A single KRaft broker on the official {@code org.testcontainers.kafka.KafkaContainer} module,
  * which runs the {@code apache/kafka} image that {@link TestImages#KAFKA} names. The module owns
- * the listener layout; the mounted {@code run} script only advertises the container IP on {@link
- * #DEFAULT_BROKER_PORT}, which callers use as the bootstrap address.
+ * the listener layout and advertises the Docker host and mapped port, which {@link
+ * #bootstrapServers()} returns; an external broker returns its configured address instead.
  */
 public class KafkaContainer extends BaseContainer {
 
   public static final int DEFAULT_BROKER_PORT = 9092;
   private static final String DEFAULT_KAFKA_IMAGE = TestImages.KAFKA;
   private static final String DEFAULT_HOST_NAME = "gravitino-ci-kafka";
+
   private static final String KAFKA_LOGS_DIR = "/opt/kafka/logs";
   private static final short API_VERSIONS_KEY = 18;
   private static final int PROBE_CORRELATION_ID = 0x6772;
@@ -68,13 +65,34 @@ public class KafkaContainer extends BaseContainer {
     super(module(image), hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
+  // Wraps a Kafka that runs outside this JVM's Testcontainers; see ExternalEndpoints.
+  private KafkaContainer(TestEndpoints.Kafka endpoints) {
+    super(endpoints, DEFAULT_HOST_NAME);
+  }
+
   public static Builder builder() {
     return new Builder();
   }
 
+  /**
+   * Returns the bootstrap address the test JVM connects to: what the Testcontainers module
+   * advertises ({@code host:mappedPort}) for a managed broker, or the endpoints file's {@code
+   * kafka.bootstrap-servers}, comma-joined, for an external one.
+   *
+   * @return the bootstrap servers
+   */
+  public String bootstrapServers() {
+    return isExternal()
+        ? String.join(",", endpoints(TestEndpoints.Kafka.class).bootstrapServers())
+        : ((org.testcontainers.kafka.KafkaContainer) managed("bootstrap servers"))
+            .getBootstrapServers();
+  }
+
   @Override
   public void close() {
-    copyKafkaLogs();
+    if (!isExternal()) {
+      copyKafkaLogs();
+    }
     super.close();
   }
 
@@ -103,12 +121,9 @@ public class KafkaContainer extends BaseContainer {
         .withStrategy(
             new ProbeWaitStrategy(
                 "Kafka to answer an ApiVersions request",
-                target -> {
-                  String address = ipAddress(target.getContainerInfo());
-                  Preconditions.checkArgument(
-                      Strings.isNotBlank(address), "Kafka container IP address is not available.");
-                  return answersApiVersions(address, DEFAULT_BROKER_PORT);
-                }));
+                target ->
+                    answersApiVersions(
+                        target.getHost(), target.getMappedPort(DEFAULT_BROKER_PORT))));
   }
 
   // The log line's five minutes plus the minute the ApiVersions check had before.
@@ -157,22 +172,16 @@ public class KafkaContainer extends BaseContainer {
       this.image = DEFAULT_KAFKA_IMAGE;
       this.hostName = DEFAULT_HOST_NAME;
       this.exposePorts = ImmutableSet.of(DEFAULT_BROKER_PORT);
-      // The run script advertises PLAINTEXT on this port.
-      this.envVars = ImmutableMap.of("DEFAULT_BROKER_PORT", String.valueOf(DEFAULT_BROKER_PORT));
-
-      String rootDir = System.getenv("GRAVITINO_ROOT_DIR");
-      Preconditions.checkArgument(rootDir != null, "GRAVITINO_ROOT_DIR is not set");
-      String initScript =
-          ITUtils.joinPath(rootDir, "integration-test-common", "docker-script/init/kafka/run");
-      String filePath;
-      filePath = Paths.get(initScript).toAbsolutePath().toString();
-      this.filesToMount = ImmutableMap.of("/etc/kafka/docker/run", filePath);
     }
 
     @Override
     public KafkaContainer build() {
-      return new KafkaContainer(
-          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+      return ExternalEndpoints.<TestEndpoints.Kafka>forService("kafka", "")
+          .map(KafkaContainer::new)
+          .orElseGet(
+              () ->
+                  new KafkaContainer(
+                      image, hostName, exposePorts, extraHosts, filesToMount, envVars, network));
     }
   }
 }

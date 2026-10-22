@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.
 import static org.apache.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static org.apache.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.gravitino.integration.test.container.KafkaContainer.DEFAULT_BROKER_PORT;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -92,8 +91,7 @@ public class CatalogKafkaIT extends BaseIT {
 
   @BeforeAll
   public void startUp(KafkaContainer kafka) throws ExecutionException, InterruptedException {
-    kafkaBootstrapServers =
-        String.format("%s:%d", kafka.getContainerIpAddress(), DEFAULT_BROKER_PORT);
+    kafkaBootstrapServers = kafka.bootstrapServers();
     adminClient = AdminClient.create(ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers));
 
     // create topics for testing

@@ -1,0 +1,150 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$comment" : "Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file to you under the Apache License, Version 2.0 (the \"License\"); you may not use this file except in compliance with the License.  You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the specific language governing permissions and limitations under the License. Generated from TestEndpoints by TestExternalEndpoints; do not edit.",
+  "$defs" : {
+    "Hive" : {
+      "type" : "object",
+      "properties" : {
+        "external" : {
+          "type" : "boolean",
+          "description" : "true to reach the service instead of starting a container"
+        },
+        "hadoop-user" : {
+          "type" : "string",
+          "description" : "HDFS user that tests act as; default root"
+        },
+        "hdfs-client-conf" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          },
+          "description" : "Hadoop client settings for the test JVM, such as dfs.client.use.datanode.hostname: \"true\""
+        },
+        "hdfs-uri" : {
+          "type" : "string",
+          "description" : "hdfs:// address of the HDFS NameNode the metastore uses"
+        },
+        "instances" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "$ref" : "#/$defs/Hive"
+          },
+          "description" : "Named instances, for tests that need more than one; an instance not listed uses the service's own keys"
+        },
+        "metastore-uri" : {
+          "type" : "string",
+          "description" : "thrift:// address of the Hive metastore"
+        }
+      },
+      "description" : "A Hive metastore and the HDFS its warehouse lives on",
+      "additionalProperties" : false,
+      "if" : {
+        "properties" : {
+          "external" : {
+            "const" : true
+          }
+        },
+        "required" : [ "external" ]
+      },
+      "then" : {
+        "required" : [ "metastore-uri", "hdfs-uri" ]
+      }
+    },
+    "Kafka" : {
+      "type" : "object",
+      "properties" : {
+        "bootstrap-servers" : {
+          "description" : "host:port of each broker",
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "external" : {
+          "type" : "boolean",
+          "description" : "true to reach the service instead of starting a container"
+        },
+        "instances" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "$ref" : "#/$defs/Kafka"
+          },
+          "description" : "Named instances, for tests that need more than one; an instance not listed uses the service's own keys"
+        }
+      },
+      "description" : "Kafka brokers",
+      "additionalProperties" : false,
+      "if" : {
+        "properties" : {
+          "external" : {
+            "const" : true
+          }
+        },
+        "required" : [ "external" ]
+      },
+      "then" : {
+        "required" : [ "bootstrap-servers" ]
+      }
+    },
+    "MySQL" : {
+      "type" : "object",
+      "properties" : {
+        "external" : {
+          "type" : "boolean",
+          "description" : "true to reach the service instead of starting a container"
+        },
+        "instances" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "$ref" : "#/$defs/MySQL"
+          },
+          "description" : "Named instances, for tests that need more than one; an instance not listed uses the service's own keys"
+        },
+        "jdbc-url" : {
+          "type" : "string",
+          "description" : "jdbc:mysql://host:port of the server, without a database"
+        },
+        "password" : {
+          "type" : "string",
+          "description" : "password of that user"
+        },
+        "user" : {
+          "type" : "string",
+          "description" : "user that tests connect and create databases as"
+        }
+      },
+      "description" : "A MySQL server",
+      "additionalProperties" : false,
+      "if" : {
+        "properties" : {
+          "external" : {
+            "const" : true
+          }
+        },
+        "required" : [ "external" ]
+      },
+      "then" : {
+        "required" : [ "jdbc-url", "user", "password" ]
+      }
+    }
+  },
+  "type" : "object",
+  "properties" : {
+    "containers" : {
+      "type" : "string",
+      "enum" : [ "managed", "external" ],
+      "description" : "external makes every service external, so the run needs no Docker; default managed"
+    },
+    "hive" : {
+      "$ref" : "#/$defs/Hive"
+    },
+    "kafka" : {
+      "$ref" : "#/$defs/Kafka"
+    },
+    "mysql" : {
+      "$ref" : "#/$defs/MySQL"
+    }
+  },
+  "description" : "Services that Gravitino integration tests reach instead of starting Testcontainers",
+  "additionalProperties" : false
+}

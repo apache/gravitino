@@ -20,12 +20,14 @@ package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.KerberosHdfs;
+import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -62,6 +65,7 @@ public class HiveContainer extends BaseContainer {
   public static final String KERBEROS_IMAGE = TestImages.KERBEROS_HIVE;
 
   public static final String HOST_NAME = "gravitino-ci-hive";
+
   public static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   // Specify the Hive version to start the Hive container, currently support `hive2`(default) and
   // `hive3`
@@ -99,6 +103,10 @@ public class HiveContainer extends BaseContainer {
 
   private final boolean kerberosEnabled;
   private final List<String> kerberosPrincipals;
+  // The NameNode and DataNode ports when HDFS is host-reachable (Builder#withHostReachableHdfs);
+  // 0 when the image's defaults stay.
+  private final int namenodePort;
+  private final int datanodePort;
 
   public static Builder builder() {
     return new Builder();
@@ -114,7 +122,42 @@ public class HiveContainer extends BaseContainer {
       Optional<Network> network,
       boolean kerberosEnabled,
       List<String> kerberosPrincipals) {
-    super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+    this(
+        image,
+        hostName,
+        ports,
+        extraHosts,
+        filesToMount,
+        envVars,
+        network,
+        kerberosEnabled,
+        kerberosPrincipals,
+        0,
+        0);
+  }
+
+  private HiveContainer(
+      String image,
+      String hostName,
+      Set<Integer> ports,
+      Map<String, String> extraHosts,
+      Map<String, String> filesToMount,
+      Map<String, String> envVars,
+      Optional<Network> network,
+      boolean kerberosEnabled,
+      List<String> kerberosPrincipals,
+      int namenodePort,
+      int datanodePort) {
+    super(
+        withFixedPorts(image, namenodePort, datanodePort),
+        hostName,
+        ports,
+        extraHosts,
+        filesToMount,
+        envVars,
+        network);
+    this.namenodePort = namenodePort;
+    this.datanodePort = datanodePort;
     this.kerberosEnabled = kerberosEnabled;
     this.kerberosPrincipals = List.copyOf(kerberosPrincipals);
     if (!kerberosEnabled && !this.kerberosPrincipals.isEmpty()) {
@@ -134,8 +177,105 @@ public class HiveContainer extends BaseContainer {
     return "/" + principal + ".keytab";
   }
 
+  // Wraps a Hive that runs outside this JVM's Testcontainers; see ExternalEndpoints.
+  protected HiveContainer(TestEndpoints.Hive endpoints) {
+    super(endpoints, HOST_NAME);
+    this.kerberosEnabled = false;
+    this.kerberosPrincipals = List.of();
+    this.namenodePort = 0;
+    this.datanodePort = 0;
+  }
+
+  // The same port inside and outside the container, because HDFS URIs carry it: the metastore
+  // creates table directories through the URI a test sends, and hands URIs back.
+  private static GenericContainer<?> withFixedPorts(
+      String image, int namenodePort, int datanodePort) {
+    if (namenodePort == 0) {
+      return new GenericContainer<>(image);
+    }
+    return new FixedPortContainer(image, namenodePort, datanodePort);
+  }
+
+  // GenericContainer only lets a subclass bind a fixed host port.
+  private static final class FixedPortContainer extends GenericContainer<FixedPortContainer> {
+    FixedPortContainer(String image, int... ports) {
+      super(image);
+      for (int port : ports) {
+        addFixedExposedPort(port, port);
+      }
+    }
+  }
+
+  private static int freePort() {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot pick a free port", e);
+    }
+  }
+
   public String getHostName() {
     return hostName;
+  }
+
+  /**
+   * Returns the metastore address the test JVM connects to: the Docker host and mapped port for a
+   * managed container, or {@code gravitino.test.hive.metastore-uri} for an external one.
+   *
+   * @return {@code thrift://host:port}
+   */
+  public String metastoreUri() {
+    return isExternal()
+        ? endpoints(TestEndpoints.Hive.class).metastoreUri()
+        : format("thrift://%s:%d", getHost(), getMappedPort(HIVE_METASTORE_PORT));
+  }
+
+  /**
+   * Returns the HDFS address the test JVM connects to: the Docker host and mapped NameNode port for
+   * a managed container, or {@code gravitino.test.hive.hdfs-uri} for an external one. Clients must
+   * also apply {@link #hdfsClientConf()}.
+   *
+   * @return {@code hdfs://host:port}
+   */
+  public String hdfsUri() {
+    if (isExternal()) {
+      return endpoints(TestEndpoints.Hive.class).hdfsUri();
+    }
+    return namenodePort > 0
+        ? format("hdfs://%s:%d", getHost(), namenodePort)
+        : format("hdfs://%s:%d", getHost(), getMappedPort(HDFS_DEFAULTFS_PORT));
+  }
+
+  /**
+   * Returns the Hadoop settings an HDFS client in the test JVM needs besides {@code fs.defaultFS}.
+   * The NameNode hands out DataNode addresses as the DataNode registered them, so a client outside
+   * the container's network must be told how to reach them: {@code
+   * gravitino.test.hive.hdfs-client-conf} ({@code k=v,k=v}) for an external container, such as
+   * {@code dfs.client.use.datanode.hostname=true}; nothing for a managed one, whose DataNode the
+   * Docker host reaches by its registered address.
+   *
+   * @return the settings
+   */
+  public Map<String, String> hdfsClientConf() {
+    if (isExternal()) {
+      return endpoints(TestEndpoints.Hive.class).hdfsClientConf();
+    }
+    // Host-reachable HDFS registers its DataNode as "localhost"; by name, the Docker host's mapped
+    // port serves it, where the DataNode's container IP would not on Docker Desktop.
+    return namenodePort > 0 ? Map.of("dfs.client.use.datanode.hostname", "true") : Map.of();
+  }
+
+  /**
+   * Returns a Hadoop configuration for HDFS in the test JVM: {@link #hdfsUri()} as the default file
+   * system plus {@link #hdfsClientConf()}.
+   *
+   * @return the configuration
+   */
+  public Configuration hdfsConfiguration() {
+    Configuration conf = new Configuration();
+    conf.set("fs.defaultFS", hdfsUri());
+    hdfsClientConf().forEach(conf::set);
+    return conf;
   }
 
   /**
@@ -144,7 +284,9 @@ public class HiveContainer extends BaseContainer {
    * get the same ownership as the old {@code docker exec hive} calls.
    */
   public String getHadoopUser() {
-    return container.getEnvMap().getOrDefault(HADOOP_USER_NAME, "root");
+    return isExternal()
+        ? Optional.ofNullable(endpoints(TestEndpoints.Hive.class).hadoopUser()).orElse("root")
+        : container.getEnvMap().getOrDefault(HADOOP_USER_NAME, "root");
   }
 
   // HDFS has no setting to skip syncing, so its NameNode and DataNode directories go on tmpfs: both
@@ -167,8 +309,16 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   public void start() {
+    if (isExternal()) {
+      super.start();
+      return;
+    }
     if (!kerberosEnabled) {
-      allowHadoopUserToImpersonate();
+      String script = allowHadoopUserToImpersonate() + hostReachableHdfs();
+      if (!script.isEmpty()) {
+        container.withCreateContainerCmdModifier(
+            cmd -> cmd.withEntrypoint("/bin/bash", "-c", script + "exec /bin/bash " + IMAGE_START));
+      }
     } else if (!kerberosPrincipals.isEmpty()) {
       createKerberosPrincipals();
     }
@@ -192,10 +342,10 @@ public class HiveContainer extends BaseContainer {
    * gravitino}. The rule goes into the configuration the launch script copies in, before the
    * NameNode starts.
    */
-  private void allowHadoopUserToImpersonate() {
+  private String allowHadoopUserToImpersonate() {
     String user = getHadoopUser();
     if (USERS_ALLOWED_TO_IMPERSONATE.contains(user)) {
-      return;
+      return "";
     }
     String rule =
         format(
@@ -203,14 +353,36 @@ public class HiveContainer extends BaseContainer {
                 + "<property><name>hadoop.proxyuser.%1$s.groups</name><value>*</value></property>",
             user);
     // Fail the start, rather than let JDBC sessions fail later, if a new image changes the file.
-    String script =
-        format(
-            "sed -i 's|</configuration>|%1$s</configuration>|' %2$s"
-                + " && grep -q 'hadoop.proxyuser.%3$s.hosts' %2$s"
-                + " || { echo 'Cannot add the proxy-user rule to %2$s' >&2; exit 1; }",
-            rule, HADOOP_CONF_TO_COPY, user);
-    container.withCreateContainerCmdModifier(
-        cmd -> cmd.withEntrypoint("/bin/bash", "-c", script + " && exec /bin/bash " + IMAGE_START));
+    return format(
+        "{ sed -i 's|</configuration>|%1$s</configuration>|' %2$s"
+            + " && grep -q 'hadoop.proxyuser.%3$s.hosts' %2$s; }"
+            + " || { echo 'Cannot add the proxy-user rule to %2$s' >&2; exit 1; }; ",
+        rule, HADOOP_CONF_TO_COPY, user);
+  }
+
+  /**
+   * Moves the NameNode and DataNode to the chosen ports and lets them serve a host name of {@code
+   * localhost}: the daemons bind every interface instead of the loopback that name resolves to, and
+   * the NameNode accepts a DataNode whose name does not resolve to its IP. The image's launch
+   * script copies these files into the Hadoop and Hive configuration and substitutes the host name.
+   */
+  private String hostReachableHdfs() {
+    if (namenodePort == 0) {
+      return "";
+    }
+    String hdfsSite = "/tmp/hadoop-conf/hdfs-site.xml";
+    String bindAll =
+        "<property><name>dfs.namenode.rpc-bind-host</name><value>0.0.0.0</value></property>"
+            + "<property><name>dfs.namenode.datanode.registration.ip-hostname-check</name>"
+            + "<value>false</value></property>";
+    return format(
+        "sed -i 's|:%1$d|:%2$d|g' /tmp/hadoop-conf/core-site.xml /tmp/hive-conf/hive-site.xml"
+            + " /tmp/hive-conf/hive-site-for-sql-base-auth.xml"
+            + " && sed -i 's|__REPLACE__HOST_NAME:50010|0.0.0.0:%3$d|' %4$s"
+            + " && sed -i 's|</configuration>|%5$s</configuration>|' %4$s"
+            + " && grep -q 'rpc-bind-host' %4$s"
+            + " || { echo 'Cannot move HDFS to ports %2$d and %3$d' >&2; exit 1; }; ",
+        HDFS_DEFAULTFS_PORT, namenodePort, datanodePort, hdfsSite, bindAll);
   }
 
   /**
@@ -496,6 +668,7 @@ public class HiveContainer extends BaseContainer {
   public static class Builder extends BaseContainer.Builder<Builder, HiveContainer> {
     // Package-private so that tests can read what a spec asked for.
     List<String> kerberosPrincipals = List.of();
+    private boolean hostReachableHdfs;
 
     private Builder() {
       this.image = DEFAULT_IMAGE;
@@ -514,16 +687,53 @@ public class HiveContainer extends BaseContainer {
 
     @Override
     public HiveContainer build() {
+      Optional<TestEndpoints.Hive> external = ExternalEndpoints.forService("hive", "");
+      if (external.isPresent()) {
+        return new HiveContainer(external.get());
+      }
+      if (!hostReachableHdfs) {
+        return new HiveContainer(
+            generateImageName(),
+            hostName,
+            exposePorts,
+            extraHosts,
+            filesToMount,
+            envVars,
+            network,
+            kerberosEnabled,
+            kerberosPrincipals);
+      }
+      Preconditions.checkState(!kerberosEnabled, "Host-reachable HDFS is for the plain Hive");
+      Set<Integer> ports =
+          exposePorts.stream()
+              .filter(port -> port != HDFS_DEFAULTFS_PORT)
+              .collect(ImmutableSet.toImmutableSet());
       return new HiveContainer(
           generateImageName(),
-          hostName,
-          exposePorts,
+          "localhost",
+          ports,
           extraHosts,
           filesToMount,
           envVars,
           network,
-          kerberosEnabled,
-          kerberosPrincipals);
+          false,
+          kerberosPrincipals,
+          freePort(),
+          freePort());
+    }
+
+    /**
+     * Makes HDFS reachable from the test JVM through the Docker host: the NameNode and DataNode
+     * listen on per-run ports that are published unchanged, and the container's host name is {@code
+     * localhost}, so an HDFS URI is valid both in the test JVM and inside the container, where the
+     * metastore creates directories at the URIs tests send. Not for a Hive other containers must
+     * reach by name.
+     *
+     * @return this builder
+     */
+    public Builder withHostReachableHdfs() {
+      this.hostReachableHdfs = true;
+      return this;
     }
 
     /**

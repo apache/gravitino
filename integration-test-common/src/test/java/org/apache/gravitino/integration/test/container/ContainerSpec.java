@@ -31,6 +31,24 @@ import java.util.List;
 public interface ContainerSpec<C extends BaseContainer> {
 
   /**
+   * Returns the service name its external endpoints use, such as {@code hive}; empty for none.
+   *
+   * @return the service name
+   */
+  default String service() {
+    return "";
+  }
+
+  /**
+   * Returns the instance name its external endpoints use; empty for the service's own block.
+   *
+   * @return the instance name
+   */
+  default String instance() {
+    return "";
+  }
+
+  /**
    * Returns the container type a test receives for this spec.
    *
    * @return the container type

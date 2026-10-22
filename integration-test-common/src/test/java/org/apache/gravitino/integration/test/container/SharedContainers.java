@@ -137,6 +137,12 @@ class SharedContainers {
       synchronized (SharedContainers.class) {
         if (!initialized) {
           try {
+            if (ExternalEndpoints.allExternal()) {
+              // Every service is external, so the run needs no Docker.
+              LOG.info("All test containers are external; not checking Docker");
+              initialized = true;
+              return;
+            }
             // Check if docker is available and you should never close the global DockerClient!
             DockerClient dockerClient = DockerClientFactory.instance().client();
             Info info = dockerClient.infoCmd().exec();
@@ -305,6 +311,7 @@ class SharedContainers {
   // The shared Hive and a private one (HiveSpec.startPrivate) are built the same way.
   static HiveContainer.Builder hiveBuilder(Map<String, String> env) {
     return HiveContainer.builder()
+        .withHostReachableHdfs()
         .withHostName("gravitino-ci-hive")
         .withEnvVars(
             ImmutableMap.<String, String>builder()
@@ -921,6 +928,11 @@ class SharedContainers {
   // readiness check times out, and the caller never stores it, so the next start* call would start
   // another one beside it. The closer still holds it; closing it again at run end is a no-op.
   static void startTimed(BaseContainer container) {
+    if (container.isExternal()) {
+      // Nothing to pull, start or time: the service runs elsewhere.
+      container.start();
+      return;
+    }
     long startNanos = System.nanoTime();
     long pullMs = 0;
     boolean ok = false;

@@ -1656,6 +1656,31 @@ gradle.projectsEvaluated {
       }
     }
 
+    // Every -Pgravitino.test.* and -Dgravitino.test.* reaches the test JVMs as a system property,
+    // such as the external endpoints that ExternalEndpoints reads. -Pgravitino.test.profile=<name>
+    // is short for the endpoints file dev/test-endpoints/<name>.yaml, and a relative endpoints file
+    // is resolved against the repository root, since each test JVM runs in its project directory.
+    val testSettings =
+      (gradle.startParameter.systemPropertiesArgs + gradle.startParameter.projectProperties)
+        .filterKeys { it.startsWith("gravitino.test.") }
+        .toMutableMap()
+    testSettings.remove("gravitino.test.profile")?.let { profile ->
+      require(!testSettings.containsKey("gravitino.test.endpoints.file")) {
+        "Set gravitino.test.profile or gravitino.test.endpoints.file, not both"
+      }
+      val file = rootProject.file("dev/test-endpoints/$profile.yaml")
+      require(file.isFile) { "No test endpoints profile $profile: $file does not exist" }
+      testSettings["gravitino.test.endpoints.file"] = file.path
+    }
+    testSettings["gravitino.test.endpoints.file"]?.let {
+      testSettings["gravitino.test.endpoints.file"] = rootProject.file(it).path
+    }
+    if (testSettings.isNotEmpty()) {
+      tasks.withType<Test>().configureEach {
+        systemProperties(testSettings)
+      }
+    }
+
     // Test containers skip durability work (data on tmpfs, no fsync) unless a fixture asks for
     // durable data. -PdurableTestContainers makes every container durable, for example to inspect
     // a container's data after a failure. Read by Durability.runDefault().

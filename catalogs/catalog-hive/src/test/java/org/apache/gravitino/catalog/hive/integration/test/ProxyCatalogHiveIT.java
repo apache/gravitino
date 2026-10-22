@@ -57,7 +57,6 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -109,9 +108,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     super.startIntegrationTest();
-    HIVE_METASTORE_URIS =
-        String.format(
-            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+    HIVE_METASTORE_URIS = hive.metastoreUri();
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
@@ -121,12 +118,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
     // Check if Hive client can connect to Hive metastore
     hiveClientPool = new HiveClientPool("hive", 1, hiveClientProperties);
 
-    Configuration conf = new Configuration();
-    conf.set(
-        "fs.defaultFS",
-        String.format(
-            "hdfs://%s:%d", hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
-    hdfs = FileSystem.get(conf);
+    hdfs = FileSystem.get(hive.hdfsConfiguration());
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
@@ -171,10 +163,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
     properties.put(
         "location",
         String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            hive.getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            anotherSchemaName.toLowerCase()));
+            "%s/user/hive/warehouse/%s.db", hive.hdfsUri(), anotherSchemaName.toLowerCase()));
     SupportsSchemas schemas = anotherCatalog.asSchemas();
     Exception e =
         Assertions.assertThrows(
@@ -191,10 +180,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
 
     // Test the client using `withSimpleAuth(unknownUser)`
     properties.put(
-        "location",
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT, "new_schema"));
+        "location", String.format("%s/user/hive/warehouse/%s.db", hive.hdfsUri(), "new_schema"));
     e =
         Assertions.assertThrows(
             RuntimeException.class,
@@ -276,11 +262,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
     properties.put("key2", "val2");
     properties.put(
         "location",
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            hive.getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            schemaName.toLowerCase()));
+        String.format("%s/user/hive/warehouse/%s.db", hive.hdfsUri(), schemaName.toLowerCase()));
     catalog.asSchemas().createSchema(schemaName, comment, properties);
   }
 

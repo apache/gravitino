@@ -44,8 +44,8 @@ import org.testcontainers.containers.wait.strategy.WaitStrategy;
 public abstract class DatabaseContainer extends BaseContainer {
   private static final Logger LOG = LoggerFactory.getLogger(DatabaseContainer.class);
 
-  /** The Testcontainers module; the same object as {@link #container}. */
-  protected final JdbcDatabaseContainer<?> db;
+  /** The Testcontainers module; the same object as {@link #container}. Null when external. */
+  @Nullable protected final JdbcDatabaseContainer<?> db;
 
   /** Wraps {@code db}, which must not be started yet. */
   protected DatabaseContainer(
@@ -58,6 +58,17 @@ public abstract class DatabaseContainer extends BaseContainer {
       Optional<Network> network) {
     super(db, hostName, ports, extraHosts, filesToMount, envVars, network);
     this.db = db;
+  }
+
+  /**
+   * Wraps a database that runs outside this JVM's Testcontainers.
+   *
+   * @param endpoints its endpoints
+   * @param hostName the host name it would have had as a managed container
+   */
+  protected DatabaseContainer(TestEndpoints.Database endpoints, String hostName) {
+    super(endpoints, hostName);
+    this.db = null;
   }
 
   /**
@@ -82,18 +93,18 @@ public abstract class DatabaseContainer extends BaseContainer {
 
   /** The user tests connect as. */
   public String getUsername() {
-    return db.getUsername();
+    return isExternal() ? endpoints(TestEndpoints.Database.class).user() : db.getUsername();
   }
 
   /** The password of {@link #getUsername()}. */
   public String getPassword() {
-    return db.getPassword();
+    return isExternal() ? endpoints(TestEndpoints.Database.class).password() : db.getPassword();
   }
 
   /** The Testcontainers module waits for the database itself, so there is nothing left to check. */
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    return db.isRunning();
+    return isExternal() || db.isRunning();
   }
 
   /**
@@ -103,6 +114,9 @@ public abstract class DatabaseContainer extends BaseContainer {
    * in the order of {@code names}.
    */
   protected void logDurability(List<String> names, String query) {
+    if (isExternal()) {
+      return;
+    }
     String name = getClass().getSimpleName();
     String[] values = new String[names.size()];
     try (Connection connection = db.createConnection("");

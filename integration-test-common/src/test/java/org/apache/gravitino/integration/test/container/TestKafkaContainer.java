@@ -47,7 +47,6 @@ public class TestKafkaContainer {
     Map<String, String> env = container.getEnvMap();
     Assertions.assertTrue(env.get("KAFKA_LISTENERS").contains("PLAINTEXT://0.0.0.0:9092"));
     Assertions.assertEquals("BROKER", env.get("KAFKA_INTER_BROKER_LISTENER_NAME"));
-    Assertions.assertEquals("9092", env.get("DEFAULT_BROKER_PORT"));
     Assertions.assertTrue(container.getExposedPorts().contains(KafkaContainer.DEFAULT_BROKER_PORT));
     Assertions.assertInstanceOf(WaitAllStrategy.class, kafka.waitStrategy());
   }

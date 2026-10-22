@@ -77,7 +77,11 @@ public abstract class BaseContainer implements Startable {
    */
   protected static final String DISPOSABLE_DATA_TMPFS = "rw,size=2g";
 
-  protected final GenericContainer<?> container;
+  /** The Testcontainers container; null for an external container. */
+  @Nullable protected final GenericContainer<?> container;
+
+  // The endpoints of an external container; null for a managed one.
+  @Nullable private final TestEndpoints.Service endpoints;
 
   private volatile long lastContainerStartMs;
 
@@ -150,8 +154,75 @@ public abstract class BaseContainer implements Startable {
     this.filesToMount = requireNonNull(filesToMount, "filesToMount is null");
     this.envVars = requireNonNull(envVars, "envVars is null");
     this.network = requireNonNull(network, "network is null");
+    this.endpoints = null;
 
     setupContainer();
+  }
+
+  /**
+   * Builds an external container: one that runs outside this JVM's Testcontainers, such as on a
+   * Kubernetes cluster, and is only reached through the addresses in {@code endpoints}. It is never
+   * started or stopped, and the operations that need the Docker container throw.
+   *
+   * @param endpoints the endpoints, from {@link ExternalEndpoints#forService}
+   * @param hostName the host name the service would have had as a managed container
+   */
+  protected BaseContainer(TestEndpoints.Service endpoints, String hostName) {
+    this.container = null;
+    this.endpoints = requireNonNull(endpoints, "endpoints is null");
+    this.hostName = requireNonNull(hostName, "hostName is null");
+    this.ports = Set.of();
+    this.extraHosts = Map.of();
+    this.filesToMount = Map.of();
+    this.envVars = Map.of();
+    this.network = Optional.empty();
+  }
+
+  /**
+   * Returns whether this container runs outside this JVM's Testcontainers.
+   *
+   * @return whether it is external
+   */
+  public final boolean isExternal() {
+    return endpoints != null;
+  }
+
+  /**
+   * Returns the endpoints of an external container, for a subclass's accessors.
+   *
+   * @param type the service's record in {@link TestEndpoints}
+   * @param <T> that record
+   * @return the endpoints
+   * @throws IllegalStateException if the container is managed
+   */
+  protected final <T extends TestEndpoints.Service> T endpoints(Class<T> type) {
+    Preconditions.checkState(endpoints != null, "%s is a managed container", hostName);
+    return type.cast(endpoints);
+  }
+
+  /**
+   * Returns the Docker container, for an operation only a managed container has.
+   *
+   * @param operation what the caller wants to do, for the error
+   * @return the container
+   * @throws UnsupportedOperationException if the container is external
+   */
+  protected final GenericContainer<?> managed(String operation) {
+    if (container == null) {
+      throw new UnsupportedOperationException(
+          String.format("%s is not available for the %s: it is external", operation, endpoints));
+    }
+    return container;
+  }
+
+  /**
+   * Returns the address of the Docker host, through which the test JVM reaches a managed
+   * container's mapped ports: usually {@code localhost}, or the daemon's host on remote Docker.
+   *
+   * @return the host
+   */
+  public String getHost() {
+    return managed("host").getHost();
   }
 
   /**
@@ -245,26 +316,27 @@ public abstract class BaseContainer implements Startable {
 
   // This method is used to set the log output of the container.
   protected void withLogConsumer(Consumer<OutputFrame> logConsumer) {
-    container.withLogConsumer(logConsumer);
+    managed("log consumer").withLogConsumer(logConsumer);
   }
 
   protected void withStartupTimeout(Duration duration) {
-    container.withStartupTimeout(duration);
+    managed("startup timeout").withStartupTimeout(duration);
   }
 
   // This method is used to get the expose port number of the container.
   public Integer getMappedPort(int exposedPort) {
-    return container.getMappedPort(exposedPort);
+    return managed("mapped port").getMappedPort(exposedPort);
   }
 
   public GenericContainer<?> getContainer() {
-    return container;
+    return managed("Docker container");
   }
 
   // This method is used to get the IP address of the container.
   public String getContainerIpAddress() {
     DockerClient dockerClient = DockerClientFactory.instance().client();
-    return ipAddress(dockerClient.inspectContainerCmd(container.getContainerId()).exec());
+    return ipAddress(
+        dockerClient.inspectContainerCmd(managed("container IP").getContainerId()).exec());
   }
 
   /**
@@ -289,6 +361,10 @@ public abstract class BaseContainer implements Startable {
 
   @Override
   public void start() {
+    if (isExternal()) {
+      LOG.info("Not starting {}: {}", hostName, endpoints);
+      return;
+    }
     if (durability == Durability.DISPOSABLE && !disposableDataApplied) {
       applyDisposableData(container);
       disposableDataApplied = true;
@@ -324,7 +400,9 @@ public abstract class BaseContainer implements Startable {
 
   @Override
   public void stop() {
-    container.stop();
+    if (container != null) {
+      container.stop();
+    }
   }
 
   /**
@@ -341,7 +419,7 @@ public abstract class BaseContainer implements Startable {
   // Execute the command in the container.
   public Container.ExecResult executeInContainer(String... commandAndArgs) {
     try {
-      return container.execInContainer(commandAndArgs);
+      return managed("exec").execInContainer(commandAndArgs);
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException(
           "Exception while running command: " + String.join(" ", commandAndArgs), e);
