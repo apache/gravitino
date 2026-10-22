@@ -112,7 +112,7 @@ public class TestBuiltInJobTemplateProvider {
         "builtin-iceberg-rewrite-data-files",
         ImmutableSet.<String>builder().addAll(icebergCatalog).add("where_clause").build());
     expected.put(
-        "builtin-tms-iceberg-maintenance",
+        "builtin-iceberg-maintenance-action",
         ImmutableSet.<String>builder()
             .addAll(icebergCatalog)
             .add("maintenance_type")
