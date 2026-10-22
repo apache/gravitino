@@ -72,7 +72,10 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // First, create the view in the underlying catalog
     LoadViewResponse response = dispatcher.createView(context, namespace, createViewRequest);
 
-    // Then import it into Gravitino so Gravitino is aware of the view
+    // Then import it into Gravitino so Gravitino is aware of the view. The import is not
+    // best-effort here: if it fails, the view has no Gravitino entity, so setting the owner below
+    // would fail with a misleading "not found". Surface the import failure instead, as the table
+    // and namespace hooks do.
     importView(context.catalogName(), namespace, createViewRequest.name());
 
     // Set ownership for the newly created view.
@@ -197,8 +200,8 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
    * catalog's ViewCatalog implementation. This ensures Gravitino is aware of the view and can apply
    * authorization policies to it.
    *
-   * <p>This is a best-effort operation - if it fails, we log a warning but don't fail the Iceberg
-   * REST operation, as the view was successfully created in the underlying catalog.
+   * <p>Failures propagate to the caller. Callers that only reconcile state after a backend
+   * operation wrap this call in {@link #bestEffortReconcileViewEntity}.
    *
    * @param catalogName The name of the Gravitino catalog.
    * @param namespace The Iceberg namespace containing the view.
@@ -207,29 +210,18 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private void importView(String catalogName, Namespace namespace, String viewName) {
     ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
     if (viewDispatcher != null) {
-      try {
-        viewDispatcher.loadView(
-            IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake,
-                catalogName,
-                TableIdentifier.of(namespace, viewName),
-                HierarchicalSchemaUtil.schemaSeparator()));
-        LOG.info(
-            "Successfully imported view into Gravitino: {}.{}.{}.{}",
-            metalake,
-            catalogName,
-            namespace,
-            viewName);
-      } catch (Exception e) {
-        // Log but don't fail - view import is best-effort
-        LOG.warn(
-            "Failed to import view into Gravitino: {}.{}.{}.{} - {}",
-            metalake,
-            catalogName,
-            namespace,
-            viewName,
-            e.getMessage());
-      }
+      viewDispatcher.loadView(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, viewName),
+              HierarchicalSchemaUtil.schemaSeparator()));
+      LOG.info(
+          "Successfully imported view into Gravitino: {}.{}.{}.{}",
+          metalake,
+          catalogName,
+          namespace,
+          viewName);
     }
   }
 

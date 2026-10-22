@@ -42,6 +42,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.ViewEntity;
@@ -196,7 +197,7 @@ public class TestIcebergViewHookDispatcher {
   }
 
   @Test
-  public void testCreateViewHandlesImportFailureGracefully() throws Exception {
+  public void testCreateViewPropagatesImportFailure() throws Exception {
     Namespace namespace = Namespace.of(SCHEMA_NAME);
     CreateViewRequest createRequest =
         ImmutableCreateViewRequest.builder()
@@ -224,11 +225,15 @@ public class TestIcebergViewHookDispatcher {
         .when(mockInternalViewDispatcher)
         .loadView(any(NameIdentifier.class));
 
-    // Should not throw - import is best-effort
-    LoadViewResponse response = hookDispatcher.createView(mockContext, namespace, createRequest);
+    // The view exists in the backend but not in Gravitino, so the create must not report success.
+    RuntimeException thrown =
+        assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createView(mockContext, namespace, createRequest));
 
-    assertEquals(mockResponse, response);
+    assertEquals("Import failed", thrown.getMessage());
     verify(mockExecutor, times(1)).createView(mockContext, namespace, createRequest);
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test
@@ -268,6 +273,48 @@ public class TestIcebergViewHookDispatcher {
     verify(mockInternalViewDispatcher, times(1)).loadView(any(NameIdentifier.class));
     verify(mockViewDispatcher, never()).loadView(any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateViewSurfacesImportFailureInsteadOfOwnerNotFound() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    CreateViewRequest createRequest =
+        ImmutableCreateViewRequest.builder()
+            .name(VIEW_NAME)
+            .schema(VIEW_SCHEMA)
+            .viewVersion(
+                ImmutableViewVersion.builder()
+                    .versionId(1)
+                    .timestampMillis(System.currentTimeMillis())
+                    .schemaId(1)
+                    .defaultNamespace(namespace)
+                    .addRepresentations(
+                        ImmutableSQLViewRepresentation.builder()
+                            .sql("SELECT * FROM test")
+                            .dialect("spark")
+                            .build())
+                    .build())
+            .build();
+    when(mockExecutor.createView(mockContext, namespace, createRequest))
+        .thenReturn(mock(LoadViewResponse.class));
+
+    // The view is committed in the backend, but the import into Gravitino fails.
+    doThrow(new IllegalArgumentException("Import failed"))
+        .when(mockInternalViewDispatcher)
+        .loadView(any(NameIdentifier.class));
+    // Like OwnerManager, the owner dispatcher cannot set an owner on a view with no entity.
+    doThrow(new NotFoundException("Metadata object %s or owner %s is not found", VIEW_NAME, USER))
+        .when(mockInternalOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+
+    // The table and namespace hooks surface the import failure. The view hook should do the
+    // same, and not report a misleading "not found" for a view it has just created.
+    IllegalArgumentException thrown =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> hookDispatcher.createView(mockContext, namespace, createRequest));
+    assertEquals("Import failed", thrown.getMessage());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test
