@@ -111,6 +111,42 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
   }
 
   @Test
+  void testClearCommentsWithNull() {
+    String tableName = RandomNameUtils.genRandomName("clear_comment");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withComment("col comment")
+            .build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnComment(new String[] {"col1"}, null),
+          TableChange.updateComment(null));
+
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertTrue(StringUtils.isEmpty(table.comment()), table.comment());
+      Assertions.assertTrue(
+          StringUtils.isEmpty(table.columns()[0].comment()), table.columns()[0].comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
+  }
+
+  @Test
   public void testOperationTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_op_table";
     String tableComment = "test_comment";

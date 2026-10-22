@@ -280,6 +280,23 @@ public class TestStarRocksTableOperationsSqlGeneration {
             "COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
                 + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
         clearCommentSql);
+    Assertions.assertEquals(
+        clearCommentSql, ops.alterTableSql("test_table", TableChange.updateComment(null)));
+  }
+
+  @Test
+  public void testClearTableCommentWithNull() {
+    TestableStarRocksTableOperations ops =
+        new TestableStarRocksTableOperations() {
+          @Override
+          protected JdbcTable getOrCreateTable(
+              String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+            return JdbcTable.builder().withName(tableName).build();
+          }
+        };
+
+    String alterSql = ops.alterTableSql("test_table", TableChange.updateComment(null));
+    Assertions.assertTrue(alterSql.contains("COMMENT = \"\""), alterSql);
   }
 
   @Test
