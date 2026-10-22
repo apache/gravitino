@@ -252,7 +252,7 @@ class TestOccupancyGate extends TestJDBCBackend {
         actions.insertInFlight(
             table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
     actions.bindJobId(claim, succeeded.id());
-    actions.recordBeforeSnapshot(succeeded.id(), beforeSnapshotId);
+    actions.recordBeforeSnapshot(succeeded.id(), table.id(), beforeSnapshotId);
     Assertions.assertEquals(
         beforeSnapshotId, actions.getByJobId(succeeded.id()).beforeSnapshotId());
     Assertions.assertNull(actions.getByJobId(succeeded.id()).afterSnapshotId());

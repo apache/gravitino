@@ -28,12 +28,15 @@ import org.apache.gravitino.rest.RESTRequest;
 /**
  * Spark callback that persists snapshot metrics for an in-flight maintenance action.
  *
- * <p>Does not decide whether maintenance should continue — that stays in the Spark job. Table and
- * policy ids are taken from the action bound to {@code jobId}.
+ * <p>Does not decide whether maintenance should continue — that stays in the Spark job. {@code
+ * tableId} selects which bound table row to update when one Spark job covers multiple tables.
  */
 @Getter
 @EqualsAndHashCode
 public class MaintenanceActionMetricsRequest implements RESTRequest {
+
+  @JsonProperty("tableId")
+  private final Long tableId;
 
   @JsonProperty("snapshotId")
   private final Long snapshotId;
@@ -43,22 +46,25 @@ public class MaintenanceActionMetricsRequest implements RESTRequest {
 
   /** Default constructor for Jackson. */
   public MaintenanceActionMetricsRequest() {
-    this(null, null);
+    this(null, null, null);
   }
 
   /**
    * Creates a metrics report.
    *
+   * @param tableId table entity id bound to the job
    * @param snapshotId Iceberg snapshot id the metrics were collected for
    * @param metricsJson serialized metrics for {@code table_snapshot_metrics}
    */
-  public MaintenanceActionMetricsRequest(Long snapshotId, String metricsJson) {
+  public MaintenanceActionMetricsRequest(Long tableId, Long snapshotId, String metricsJson) {
+    this.tableId = tableId;
     this.snapshotId = snapshotId;
     this.metricsJson = metricsJson;
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(tableId != null && tableId > 0, "tableId must be a positive long");
     Preconditions.checkArgument(snapshotId != null, "snapshotId must not be null");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metricsJson), "metricsJson must not be blank");

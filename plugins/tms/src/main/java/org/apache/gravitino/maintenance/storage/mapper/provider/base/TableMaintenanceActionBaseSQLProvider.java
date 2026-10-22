@@ -139,10 +139,20 @@ public class TableMaintenanceActionBaseSQLProvider {
 
   /**
    * @param jobId Gravitino job run id
-   * @return SELECT statement
+   * @return SELECT statement (one job may cover multiple tables)
    */
   public String selectByJobId(@Param("jobId") long jobId) {
     return selectColumns() + " WHERE job_id = #{jobId}";
+  }
+
+  /**
+   * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @return SELECT statement
+   */
+  public String selectByJobIdAndTableId(
+      @Param("jobId") long jobId, @Param("tableId") long tableId) {
+    return selectColumns() + " WHERE job_id = #{jobId} AND table_id = #{tableId}";
   }
 
   /**
@@ -150,15 +160,19 @@ public class TableMaintenanceActionBaseSQLProvider {
    * Callers treat an already-matching value as an idempotent no-op in Java.
    *
    * @param jobId Gravitino job run id
+   * @param tableId table entity id (one Spark job may bind multiple tables)
    * @param beforeSnapshotId sampled snapshot id
    * @return UPDATE statement
    */
   public String updateBeforeSnapshot(
-      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId) {
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("beforeSnapshotId") long beforeSnapshotId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET before_snapshot_id = #{beforeSnapshotId}"
-        + " WHERE job_id = #{jobId} AND before_snapshot_id IS NULL AND finished_at = 0";
+        + " WHERE job_id = #{jobId} AND table_id = #{tableId}"
+        + " AND before_snapshot_id IS NULL AND finished_at = 0";
   }
 
   /**

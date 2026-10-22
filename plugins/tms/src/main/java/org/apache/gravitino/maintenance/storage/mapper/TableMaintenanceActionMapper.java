@@ -71,15 +71,23 @@ public interface TableMaintenanceActionMapper {
   @SelectProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "selectById")
   TableMaintenanceActionPO selectById(@Param("id") long id);
 
-  @Nullable
   @SelectProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "selectByJobId")
-  TableMaintenanceActionPO selectByJobId(@Param("jobId") long jobId);
+  List<TableMaintenanceActionPO> selectByJobId(@Param("jobId") long jobId);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectByJobIdAndTableId")
+  TableMaintenanceActionPO selectByJobIdAndTableId(
+      @Param("jobId") long jobId, @Param("tableId") long tableId);
 
   @UpdateProvider(
       type = TableMaintenanceActionSQLProviderFactory.class,
       method = "updateBeforeSnapshot")
   int updateBeforeSnapshot(
-      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId);
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("beforeSnapshotId") long beforeSnapshotId);
 
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "markFinished")
   int markFinished(

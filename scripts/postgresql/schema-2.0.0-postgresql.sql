@@ -1273,7 +1273,7 @@ CREATE TABLE IF NOT EXISTS table_maintenance_action (
     finished_at BIGINT NOT NULL DEFAULT 0,
     created_at BIGINT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_job_id ON table_maintenance_action (job_id);
+CREATE INDEX IF NOT EXISTS idx_tma_job_id ON table_maintenance_action (job_id);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
 CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);

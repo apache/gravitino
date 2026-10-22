@@ -72,14 +72,15 @@ public class MaintenanceMetricsService {
   }
 
   /**
-   * Idempotently stores metrics for the table/policy bound to {@code jobId}.
+   * Idempotently stores metrics for the table/policy bound to {@code jobId} and {@code
+   * request.tableId}.
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id bound to the action
-   * @param request validated metrics payload
+   * @param request validated metrics payload (includes {@code tableId})
    */
   public void reportMetrics(String metalake, long jobId, MaintenanceActionMetricsRequest request) {
-    TableMaintenanceActionPO action = loadInFlight(metalake, jobId);
+    TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
     metricsMetaService.insertMetrics(
         action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
     LOG.info(
@@ -91,10 +92,11 @@ public class MaintenanceMetricsService {
         request.getSnapshotId());
   }
 
-  private TableMaintenanceActionPO loadInFlight(String metalake, long jobId) {
-    TableMaintenanceActionPO action = actionMetaService.getByJobId(jobId);
+  private TableMaintenanceActionPO loadInFlight(String metalake, long jobId, long tableId) {
+    TableMaintenanceActionPO action = actionMetaService.getByJobIdAndTableId(jobId, tableId);
     if (action == null) {
-      throw new NoSuchEntityException("no maintenance action for job_id=%s", jobId);
+      throw new NoSuchEntityException(
+          "no maintenance action for job_id=%s table_id=%s", jobId, tableId);
     }
     requireActionInFlight(action);
     requireActionInMetalake(action, metalake);

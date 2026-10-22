@@ -30,6 +30,7 @@ paths:
       operationId: reportMaintenanceActionMetrics
       description: |
         Spark callback for an in-flight maintenance action: idempotently persists snapshot metrics.
+        `tableId` selects which bound table when one Spark job covers multiple tables.
         Does not gate continue/stop (the job decides locally) and does not mark the action finished
         (occupancy is reclaimed when the Gravitino job is terminal).
       requestBody:
@@ -71,9 +72,14 @@ components:
     MaintenanceActionMetricsRequest:
       type: object
       required:
+        - tableId
         - snapshotId
         - metricsJson
       properties:
+        tableId:
+          type: integer
+          format: int64
+          description: Table entity id bound to this job (required for multi-table jobs)
         snapshotId:
           type: integer
           format: int64
@@ -85,6 +91,7 @@ components:
   examples:
     MaintenanceActionMetricsRequest:
       value: {
+        "tableId": 10,
         "snapshotId": 9001,
         "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5,\"custom-delete-file-number\":3}"
       }
