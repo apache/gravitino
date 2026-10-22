@@ -142,9 +142,11 @@ it recognizes.
 
 Servers behind a load balancer share the entity store but keep local caches. Each server polls the
 entity change log and invalidates entries that another server has modified. The default poll
-interval is three seconds. The poller delivers each batch to every registered listener once and
-then advances its cursor; a listener that cannot invalidate a key must clear its local cache. The
-poller logs query and listener failures and continues polling. Monitor the
+interval is three seconds. The poller delivers each incremental batch to registered listeners
+and advances its cursor. Bounded recent-history replay is enabled by default and can repeat event
+IDs for listeners opting into replay, including the built-in cache listeners. A listener that
+cannot invalidate a key must clear its local cache. The poller logs query and listener failures
+and continues polling. Monitor the
 [entity change log metrics](metrics.md#entity-change-log-metrics), especially record lag, time
 since the last successful poll, listener failures, and fallback clears. Point the load balancer's
 health check at `GET /health/ready` so a server that has lost its database stops receiving traffic.
@@ -279,20 +281,21 @@ PostgreSQL, and the setup procedure for both is in
 
 The driver, user, and password properties are required whenever the URL is not `jdbc:h2`.
 
-| Configuration Item                                 | Description                                                                                                                                                                                                          | Default Value                 |
-|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.entity.store`                           | Entity storage implementation. `relational` is the only supported value.                                                                                                                                             | `relational`                  |
-| `gravitino.entity.store.relational`                | Relational storage implementation. `JDBCBackend` is the only supported value, and it covers H2, MySQL, and PostgreSQL.                                                                                               | `JDBCBackend`                 |
-| `gravitino.entity.store.relational.jdbcUrl`        | Database URL the backend connects to.                                                                                                                                                                                | `jdbc:h2`                     |
-| `gravitino.entity.store.relational.jdbcDriver`     | Driver class name. Place the driver jar in `${GRAVITINO_HOME}/libs/`.                                                                                                                                                | `org.h2.Driver`               |
-| `gravitino.entity.store.relational.jdbcUser`       | Database username.                                                                                                                                                                                                   | `gravitino`                   |
-| `gravitino.entity.store.relational.jdbcPassword`   | Database password.                                                                                                                                                                                                   | `gravitino`                   |
-| `gravitino.entity.store.relational.storagePath`    | Where embedded H2 keeps its files. A relative value resolves against `${GRAVITINO_HOME}`. The default sits inside the deployment directory, so an upgrade that replaces that directory discards the data. Change it. | `${GRAVITINO_HOME}/data/jdbc` |
-| `gravitino.entity.store.relational.maxConnections` | Maximum size of the JDBC connection pool.                                                                                                                                                                            | `100`                         |
-| `gravitino.entity.store.relational.maxWaitMillis`  | Maximum wait in milliseconds for a connection from the pool.                                                                                                                                                         | `1000`                        |
-| `gravitino.entity.store.maxTransactionSkewTimeMs`  | Maximum transaction skew in milliseconds.                                                                                                                                                                            | `2000`                        |
-| `gravitino.entity.store.deleteAfterTimeMs`         | How long in milliseconds deleted and superseded rows are kept. Accepts 10 minutes to 30 days.                                                                                                                        | `604800000` (7 days)          |
-| `gravitino.entity.store.versionRetentionCount`     | Number of entity versions kept, including the current one. Accepts 1 to 10.                                                                                                                                          | `1`                           |
+| Configuration Item                                     | Description                                                                                                                                                                                                          | Default Value                 |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| `gravitino.entity.store`                               | Entity storage implementation. `relational` is the only supported value.                                                                                                                                             | `relational`                  |
+| `gravitino.entity.store.relational`                    | Relational storage implementation. `JDBCBackend` is the only supported value, and it covers H2, MySQL, and PostgreSQL.                                                                                               | `JDBCBackend`                 |
+| `gravitino.entity.store.relational.jdbcUrl`            | Database URL the backend connects to.                                                                                                                                                                                | `jdbc:h2`                     |
+| `gravitino.entity.store.relational.jdbcDriver`         | Driver class name. Place the driver jar in `${GRAVITINO_HOME}/libs/`.                                                                                                                                                | `org.h2.Driver`               |
+| `gravitino.entity.store.relational.jdbcUser`           | Database username.                                                                                                                                                                                                   | `gravitino`                   |
+| `gravitino.entity.store.relational.jdbcPassword`       | Database password.                                                                                                                                                                                                   | `gravitino`                   |
+| `gravitino.entity.store.relational.storagePath`        | Where embedded H2 keeps its files. A relative value resolves against `${GRAVITINO_HOME}`. The default sits inside the deployment directory, so an upgrade that replaces that directory discards the data. Change it. | `${GRAVITINO_HOME}/data/jdbc` |
+| `gravitino.entity.store.relational.maxConnections`     | Maximum size of the JDBC connection pool.                                                                                                                                                                            | `100`                         |
+| `gravitino.entity.store.relational.maxIdleConnections` | Maximum idle connections retained per server; capped by `maxConnections`. Budget for it on every server, plus any JDBC catalog pools that use the same database instance.                                            | `10`                          |
+| `gravitino.entity.store.relational.maxWaitMillis`      | Maximum wait in milliseconds for a connection from the pool.                                                                                                                                                         | `1000`                        |
+| `gravitino.entity.store.maxTransactionSkewTimeMs`      | Maximum transaction skew in milliseconds.                                                                                                                                                                            | `2000`                        |
+| `gravitino.entity.store.deleteAfterTimeMs`             | How long in milliseconds deleted and superseded rows are kept. Accepts 10 minutes to 30 days.                                                                                                                        | `604800000` (7 days)          |
+| `gravitino.entity.store.versionRetentionCount`         | Number of entity versions kept, including the current one. Accepts 1 to 10.                                                                                                                                          | `1`                           |
 
 #### Caching
 
@@ -326,16 +329,91 @@ Caches are local to each server, so a metalake modified on one server would othe
 its neighbors. Every server writes its changes to an entity change log table and polls that table
 to invalidate what other servers have touched. A separate cleaner trims old rows.
 
-| Configuration Item                              | Description                                                                                                                                         | Default Value       |
-|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
-| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls. Must be positive.                                                                                                | `3`                 |
-| `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`. | `2592000` (30 days) |
-| `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                         | `86400` (1 day)     |
+Each poll reads at most `pollBatchSize` incremental records and, when a replay sweep is in
+progress or due, one additional recent-history page of at most `pollBatchSize` records. If either query returns a
+full page, the next poll starts immediately instead of waiting `pollIntervalSecs`, so a backlog is drained as fast as the
+server can read and apply batches rather than at a fixed `pollBatchSize / pollIntervalSecs`
+records per second. Once both queries return fewer records than the batch size, or the cycle
+fails, the server waits `pollIntervalSecs` again. A change written on one server therefore normally becomes visible
+on the others within about `pollIntervalSecs`, plus the time needed to drain any backlog ahead of
+it. Continuous draining deliberately has no minimum delay between batches; a sustained backlog
+can therefore keep the data query running at the rate the database and listeners support. The
+observability-only database-tail query is sampled at most once per `pollIntervalSecs` during a
+full incremental-batch drain; partial and empty incremental queries still sample the tail,
+including each cycle of a replay-only drain. Each poll holds its whole batch
+in memory, so raise `pollBatchSize` in moderate steps.
+
+| Configuration Item                              | Description                                                                                                                                                                                   | Default Value       |
+|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
+| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls once a server has caught up. Must be positive.                                                                                                              | `3`                 |
+| `gravitino.entityChangeLog.pollBatchSize`       | Maximum number of change log records read per poll. A full batch is followed by another poll right away. Must be positive.                                                                    | `2000`              |
+| `gravitino.entityChangeLog.replayWindowSecs`    | Recent-history recorded-age window in seconds, using database time. Replay sweeps start at most once per `max(pollIntervalSecs, replayWindowSecs / 4)`. `0` disables replay; maximum `86400`. | `60`                |
+| `gravitino.entityChangeLog.replayMaxEntries`    | Maximum event IDs remembered locally for deduplication. Must be positive. Capacity eviction permits duplicate invalidations.                                                                  | `100000`            |
+| `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`.                                           | `2592000` (30 days) |
+| `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                                                                   | `86400` (1 day)     |
+
+The built-in entity, catalog, and authorization listeners opt into replay. Third-party
+`EntityChangeLogListener` implementations keep incremental-only delivery by default. Override
+`supportsReplay()` to return `true` only when callbacks tolerate duplicate event IDs.
+
+All valid catalog events invalidate their cache entry, including locally originated events.
+Name-based local mutation markers are not used because polling can race marker registration and
+replay can repeat rows. This may add a local catalog reload; existing operation leases defer
+connection-pool/classloader cleanup until in-flight operations finish. Point reads and insert
+publications also check the entity-cache invalidation epoch so an ancestor invalidation cannot
+leave an old value cached after a concurrent load. An overlapping read can still return its
+original snapshot; this does not introduce linearizable reads.
+
+Auto-increment ID allocation order is not commit order. A transaction can commit a lower ID after
+another row has advanced the incremental cursor. Recent-history replay scans at or behind that
+cursor, ordered by `(created_at, id)` with a fixed ID ceiling per sweep. Each query uses the database
+clock, and the existing `created_at` index supports the time filter; repeated IDs are suppressed
+by a process-local bounded set.
+Full replay pages continue immediately, but every cycle delivers its incremental batch first.
+A new sweep starts at most once per `max(pollIntervalSecs, replayWindowSecs / 4)`, 15 seconds by
+default; the first sweep after startup runs at once. A row that becomes visible behind an already
+scanned replay page, or between sweeps, is considered on the next sweep. Late-commit recovery can
+therefore take up to one extra sweep interval, and a row is guaranteed to be replayed only if it
+becomes visible before its recorded age exceeds the window minus one sweep interval (45 seconds by
+default).
+
+The window measures age of the stored **`created_at`**, not time since commit. PostgreSQL's
+existing writer uses `CURRENT_TIMESTAMP`, which is the transaction start timestamp; a long
+transaction can therefore consume replay headroom even before inserting its log row. Transactions
+that commit outside it, records deleted by retention cleanup, and an overloaded replay sweep can still lose
+invalidations. Keep retention longer than the replay window and allow enough headroom for polling
+and backlog. This is bounded compensation, not a lossless delivery protocol. Replay does not change
+cache TTLs. Each sweep rereads every row in the window; deduplication avoids repeated listener work,
+not the SQL reads. With the sweep interval at a quarter of the window, each row is read by about
+four sweeps per server, so replay reads grow with write rate and server count but not with the
+poll interval. More recent rows than
+`replayMaxEntries` can cause repeated invalidations, including catalog reloads; increase capacity or reduce the window based on measured traffic and memory.
+
+At startup, INFO logs report the window and dedup capacity. A WARN containing
+`Entity change log replay found` reports previously unseen rows behind the cursor, with cursor,
+startup cursor, window, approximate oldest recorded age, and up to 20 event summaries
+(`id:type:operation:name`). DEBUG logs include every replayed row's timestamp and age, and page/sweep
+progress. This is evidence of a **possible** late commit: dedup eviction can also produce unseen
+IDs. The first sweep after startup replays recent history into an empty dedup set, so it logs
+`Entity change log startup replay delivered` at INFO instead. Ages compare JVM and database clocks and are not commit latency.
+`replay failed` logs include page cursors and the exception; incremental delivery is preserved,
+and replay retries are limited to one attempt per polling interval during a failure.
+`replay dedup capacity reached` reports accumulated eviction and possible repeated invalidations,
+at most once per polling interval. The `entity-change-log` metrics `replay-records-total`,
+`replay-failures-total`, and `dedup-evictions-total` count the same events for monitoring. An event never observed because it committed outside the window
+cannot be diagnosed from replay logs alone.
+The `record-lag` gauge compares maximum ID and cursor, so a value of zero does not rule out a
+late lower-ID commit; inspect the replay diagnostics as well.
 
 #### Tree Lock
 
-Gravitino serializes conflicting metadata operations with an in-memory tree lock. It is the only
-lock implementation available, and it is per-server.
+Gravitino serializes some conflicting metadata operations with an in-memory tree lock. It is the
+only lock implementation available, and it is per-server. Partition, tag, policy, owner, model and
+table-level statistic operations do not take it. Partition operations delegate consistency to the
+catalog implementation; the other operations rely on the entity store's transaction and concurrency
+controls. Conflicting writes may return HTTP 409, while an idempotent delete may return `false` if
+another delete or rename wins. Partition statistics still take the tree lock, because a partition
+statistic storage need not update atomically.
 
 | Configuration Item                   | Description                                          | Default Value |
 |--------------------------------------|------------------------------------------------------|---------------|
@@ -551,7 +629,7 @@ server, are documented with those services. See
 
 | Configuration Item                     | Description                                                                                                                                                    | Default Value                 |
 |----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                                                                      | `local`                       |
+| `gravitino.job.executor`               | Executor that runs jobs: the built-in `local` or `k8s`, or the name of a custom executor whose class is set by `gravitino.jobExecutor.<name>.class`.            | `local`                       |
 | `gravitino.job.stagingDir`             | Directory holding staging files for running jobs. With multiple servers, put it on storage shared by all servers so that any server can return a job's output. | `/tmp/gravitino/jobs/staging` |
 | `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing.                                                     | `604800000` (7 days)          |
 | `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                                                                      | `300000` (5 minutes)          |

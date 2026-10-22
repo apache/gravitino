@@ -88,8 +88,9 @@ More details, refer to the [Lance REST API specification](https://lance.org/form
 
 Some operations have specific behaviors and modes. Below are important details to consider:
 
-Mode values are parsed case-insensitively. The examples below use lowercase values as the
-REST-style canonical form.
+Mode values are parsed case-insensitively. The underscore-free PascalCase spelling `ExistOk`
+is accepted as `exist_ok`. The examples below use lowercase snake_case as the REST-style
+canonical form.
 
 #### Namespace Operations
 
@@ -183,14 +184,15 @@ To run Lance REST service independently without Gravitino server (You need to st
 
 Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-server.conf` or passing command-line arguments:
 
-| Configuration Property                    | Description                | Default Value         | Required |
-| ----------------------------------------- | -------------------------- | --------------------- | -------- |
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend | gravitino             | Yes      |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI       | http://localhost:8090 | Yes      |
-| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name    | (none)                | Yes      |
-| `gravitino.lance-rest.httpPort`           | Service port number        | 9101                  | No       |
-| `gravitino.lance-rest.host`               | Service hostname           | 0.0.0.0               | No       |
-| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include stack traces | true | No |
+| Configuration Property                        | Description                                  | Default Value          | Required |
+|-----------------------------------------------|----------------------------------------------|------------------------|----------|
+| `gravitino.lance-rest.namespace-backend`      | Namespace metadata backend                   | gravitino              | Yes      |
+| `gravitino.lance-rest.gravitino-uri`          | Gravitino server URI                         | http://localhost:8090  | Yes      |
+| `gravitino.lance-rest.gravitino-metalake`     | Gravitino metalake name                      | (none)                 | Yes      |
+| `gravitino.lance-rest.httpPort`               | Service port number                          | 9101                   | No       |
+| `gravitino.lance-rest.host`                   | Service hostname                             | 0.0.0.0                | No       |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include stack traces | true                   | No       |
+| `gravitino.lance-rest.metrics.enabled`        | Enable standalone metrics endpoints          | false                  | No       |
 
 :::tip
 In standalone deployments, you only need to configure `gravitino.lance-rest.gravitino-metalake`,

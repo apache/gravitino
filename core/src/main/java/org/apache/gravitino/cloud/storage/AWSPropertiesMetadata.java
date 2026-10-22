@@ -28,7 +28,7 @@ import org.apache.gravitino.storage.AWSProperties;
 /** Shared AWS credential {@link PropertyEntry} definitions for catalog properties metadata. */
 public final class AWSPropertiesMetadata {
 
-  /** AWS access key ID. Not hidden. */
+  /** AWS access key ID. Hidden (identifier half of a static credential pair). */
   public static final PropertyEntry<String> AWS_ACCESS_KEY_ID =
       stringOptionalPropertyEntry(
           AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID,
@@ -36,7 +36,7 @@ public final class AWSPropertiesMetadata {
               + " When omitted the default credential chain is used.",
           false /* immutable */,
           null /* defaultValue */,
-          false /* hidden */);
+          true /* hidden */);
 
   /** AWS secret access key. Hidden. */
   public static final PropertyEntry<String> AWS_SECRET_ACCESS_KEY =

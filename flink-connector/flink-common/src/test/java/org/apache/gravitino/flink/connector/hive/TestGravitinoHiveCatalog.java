@@ -34,7 +34,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -42,7 +42,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestGravitinoHiveCatalog {
+public abstract class TestGravitinoHiveCatalog {
+
+  protected abstract CatalogCompat catalogCompat();
 
   @Test
   public void testGetTableThrowsCatalogExceptionWhenForbidden() throws Exception {
@@ -51,7 +53,8 @@ public class TestGravitinoHiveCatalog {
     ForbiddenException forbiddenException = new ForbiddenException("denied");
     Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
     Mockito.when(tableCatalog.loadTable(Mockito.any())).thenThrow(forbiddenException);
-    TestableGravitinoHiveCatalog catalog = new TestableGravitinoHiveCatalog(gravitinoCatalog);
+    TestableGravitinoHiveCatalog catalog =
+        new TestableGravitinoHiveCatalog(catalogCompat(), gravitinoCatalog);
 
     CatalogException catalogException =
         Assertions.assertThrows(
@@ -79,7 +82,7 @@ public class TestGravitinoHiveCatalog {
     ResolvedCatalogTable newTable = resolvedTable("same comment");
 
     TestableGravitinoHiveCatalog catalog =
-        new TestableGravitinoHiveCatalog(gravitinoCatalog, sameProperties);
+        new TestableGravitinoHiveCatalog(catalogCompat(), gravitinoCatalog, sameProperties);
 
     catalog.applyGenericTableAlter(new ObjectPath("db", "tbl"), existingTable, newTable);
 
@@ -107,7 +110,7 @@ public class TestGravitinoHiveCatalog {
     ResolvedCatalogTable newTable = resolvedTable("comment");
 
     TestableGravitinoHiveCatalog catalog =
-        new TestableGravitinoHiveCatalog(gravitinoCatalog, updatedProperties);
+        new TestableGravitinoHiveCatalog(catalogCompat(), gravitinoCatalog, updatedProperties);
 
     catalog.applyGenericTableAlter(new ObjectPath("db", "tbl"), existingTable, newTable);
 
@@ -115,11 +118,12 @@ public class TestGravitinoHiveCatalog {
     Mockito.verify(tableCatalog, Mockito.times(1)).alterTable(Mockito.any(), Mockito.any());
   }
 
-  private static ResolvedCatalogTable resolvedTable(String comment) {
+  @SuppressWarnings("deprecation")
+  private ResolvedCatalogTable resolvedTable(String comment) {
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
     CatalogTable table =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, comment, Collections.emptyList(), Collections.emptyMap());
+        catalogCompat()
+            .createCatalogTable(schema, comment, Collections.emptyList(), Collections.emptyMap());
     ResolvedSchema resolvedSchema =
         new ResolvedSchema(
             Collections.singletonList(Column.physical("id", DataTypes.INT())),
@@ -129,15 +133,18 @@ public class TestGravitinoHiveCatalog {
   }
 
   private static class TestableGravitinoHiveCatalog extends GravitinoHiveCatalog {
+    private final CatalogCompat catalogCompat;
     private final Catalog gravitinoCatalog;
     private final Map<String, String> genericTableProperties;
 
-    TestableGravitinoHiveCatalog(Catalog gravitinoCatalog) {
-      this(gravitinoCatalog, Collections.emptyMap());
+    TestableGravitinoHiveCatalog(CatalogCompat catalogCompat, Catalog gravitinoCatalog) {
+      this(catalogCompat, gravitinoCatalog, Collections.emptyMap());
     }
 
     TestableGravitinoHiveCatalog(
-        Catalog gravitinoCatalog, Map<String, String> genericTableProperties) {
+        CatalogCompat catalogCompat,
+        Catalog gravitinoCatalog,
+        Map<String, String> genericTableProperties) {
       super(
           "test",
           "default",
@@ -146,8 +153,14 @@ public class TestGravitinoHiveCatalog {
           Mockito.mock(PartitionConverter.class),
           hiveConf(),
           null);
+      this.catalogCompat = catalogCompat;
       this.gravitinoCatalog = gravitinoCatalog;
       this.genericTableProperties = genericTableProperties;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return catalogCompat;
     }
 
     @Override

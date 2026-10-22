@@ -184,8 +184,8 @@ Views can carry tags, and appear in listings alongside tables.
 Opening a schema lists its tables and views. Selecting a table shows its columns with their types,
 its properties, and its tags.
 
-Tags attach from the table row and from individual column rows, which is the fastest way to classify
-a specific field rather than a whole table. Policies attach at the table level.
+Assign tags from the table row and from individual column rows to classify a whole table or
+a specific field. Object policies are derived from those tag assignments.
 
 ## Permissions
 

@@ -26,6 +26,7 @@
 # Suites:
 #   build       Unit tests run by .github/workflows/build.yml.
 #   backend-it  Integration tests run by .github/workflows/backend-integration-test.yml.
+#               The `all` selector preserves the unsharded cron/manual suite.
 #
 # Every suite ends with a catch-all `others` shard that excludes the projects of all named
 # shards, so a new module is always tested by `others` until it is moved to a named shard.
@@ -34,11 +35,7 @@
 set -euo pipefail
 
 # ---- build suite -------------------------------------------------------------------------------
-# `core` holds the shared test environment lock for its whole run, so it gets its own shard.
-BUILD_CORE=(
-  :core
-)
-
+# Core tests run in the dedicated core-test workflow lanes, outside these build shards.
 # Projects with `gravitino-docker-test` tests. Gradle runs them one by one under the shared test
 # environment lock, so they are kept away from the parallel unit tests in `others`.
 BUILD_DOCKER=(
@@ -90,7 +87,7 @@ usage() {
 # Prints the shard names of a suite, in matrix order.
 shards_of() {
   case "$1" in
-    build) echo "core docker others" ;;
+    build) echo "docker others" ;;
     backend-it) echo "hive lakehouse others" ;;
     *) echo "Unknown suite: $1" >&2; usage ;;
   esac
@@ -99,7 +96,6 @@ shards_of() {
 # Prints the variable name holding the projects of a named shard.
 projects_var() {
   case "$1/$2" in
-    build/core) echo BUILD_CORE ;;
     build/docker) echo BUILD_DOCKER ;;
     backend-it/hive) echo BACKEND_IT_HIVE ;;
     backend-it/lakehouse) echo BACKEND_IT_LAKEHOUSE ;;
@@ -107,10 +103,16 @@ projects_var() {
   esac
 }
 
-# Prints `<project>:test` for every project in the array named by $1.
+# Prints the test tasks for every project in the named array, including suite-specific tasks.
 print_test_tasks() {
   local project
-  eval 'for project in "${'"$1"'[@]}"; do echo "${project}:test"; done'
+  eval 'local projects=("${'"$1"'[@]}")'
+  for project in "${projects[@]}"; do
+    echo "${project}:test"
+    if [ "$2" = "backend-it" ] && [ "${project}" = ":iceberg:iceberg-rest-server" ]; then
+      echo "${project}:experimentalTest"
+    fi
+  done
 }
 
 # `others` runs the suite's root task with every named shard's test task excluded.
@@ -119,7 +121,7 @@ print_others() {
   echo "${root_task}"
   for shard in $(shards_of "${suite}"); do
     [ "${shard}" = "others" ] && continue
-    for task in $(print_test_tasks "$(projects_var "${suite}" "${shard}")"); do
+    for task in $(print_test_tasks "$(projects_var "${suite}" "${shard}")" "${suite}"); do
       printf -- '-x\n%s\n' "${task}"
     done
   done
@@ -141,6 +143,11 @@ if [ "${shard}" = "--list" ]; then
   exit 0
 fi
 
+if [ "${suite}/${shard}" = "backend-it/all" ]; then
+  printf '%s\n' test :iceberg:iceberg-rest-server:experimentalTest
+  exit 0
+fi
+
 if [ "${shard}" = "others" ]; then
   case "${suite}" in
     build) print_others build build ;;
@@ -149,5 +156,5 @@ if [ "${shard}" = "others" ]; then
   esac
 else
   projects="$(projects_var "${suite}" "${shard}")"
-  print_test_tasks "${projects}"
+  print_test_tasks "${projects}" "${suite}"
 fi

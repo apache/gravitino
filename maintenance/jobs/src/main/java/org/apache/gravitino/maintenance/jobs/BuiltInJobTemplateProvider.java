@@ -28,6 +28,8 @@ import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRemoveOrphanFilesJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteDataFilesJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateManifestStatsJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateStatsAndMetricsJob;
 import org.apache.gravitino.maintenance.jobs.spark.SparkPiJob;
 import org.slf4j.Logger;
@@ -47,7 +49,9 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
       ImmutableList.of(
           new SparkPiJob(),
           new IcebergRewriteDataFilesJob(),
+          new IcebergRewriteManifestsJob(),
           new IcebergUpdateStatsAndMetricsJob(),
+          new IcebergUpdateManifestStatsJob(),
           new IcebergExpireSnapshotsJob(),
           new IcebergRemoveOrphanFilesJob());
 

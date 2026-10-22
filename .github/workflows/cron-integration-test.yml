@@ -124,6 +124,7 @@ jobs:
       java-version: ${{ needs.select-suites.outputs.java-version }}
       backend: mysql
       test-mode: deploy
+      shard: all
 
   spark:
     name: spark
