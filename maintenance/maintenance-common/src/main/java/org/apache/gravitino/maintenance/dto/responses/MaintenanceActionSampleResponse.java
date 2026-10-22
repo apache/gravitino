@@ -28,7 +28,7 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 /**
  * Gate outcome after TMS persists {@code S0} metrics and {@code before_snapshot_id}.
  *
- * <p>Lives in {@code :maintenance:maintenance-api} so the TMS plugin and built-in jobs share one
+ * <p>Lives in {@code :maintenance:maintenance-common} so the TMS plugin and built-in jobs share one
  * wire type.
  */
 @Getter
