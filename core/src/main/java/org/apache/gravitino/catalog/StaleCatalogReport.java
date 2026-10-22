@@ -111,9 +111,11 @@ public class StaleCatalogReport {
   }
 
   /**
-   * Returns the stale schema entries of this catalog. For hierarchical namespaces the list carries
-   * the outermost stale schemas only: descendants of a stale schema are carried along by its
-   * cascading removal, so they are not listed separately.
+   * Returns the stale schema entries of this catalog. For catalogs that support hierarchical
+   * schemas the list carries the outermost stale schemas only: descendants of a stale schema are
+   * carried along by its cascading removal, so they are not listed separately. Flat catalogs keep
+   * every confirmed stale name, because names joined by the separator are independent schemas
+   * there.
    *
    * @return an unmodifiable list of stale schema entries
    */

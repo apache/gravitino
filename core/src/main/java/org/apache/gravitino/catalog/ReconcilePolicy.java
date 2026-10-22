@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog;
 
 import java.util.Locale;
-import javax.annotation.Nullable;
 
 /**
  * The policy a reconcile run applies to detected stale registrations.
@@ -41,12 +40,12 @@ public enum ReconcilePolicy {
    * enum name.
    *
    * @param value the configuration value, for example {@code report-only} or {@code auto-remove}
-   * @return the resolved policy, or {@code null} if the value is not a valid policy name
+   * @return the resolved policy, or the default {@link #REPORT_ONLY} if the value is null or not a
+   *     valid policy name
    */
-  @Nullable
   public static ReconcilePolicy fromString(String value) {
     if (value == null) {
-      return null;
+      return REPORT_ONLY;
     }
     String normalized = value.trim().replace('-', '_');
     for (ReconcilePolicy policy : values()) {
@@ -54,7 +53,7 @@ public enum ReconcilePolicy {
         return policy;
       }
     }
-    return null;
+    return REPORT_ONLY;
   }
 
   /**

@@ -776,9 +776,12 @@ public class Configs {
   public static final ConfigEntry<Long> RECONCILE_INTERVAL_SECS =
       new ConfigBuilder(RECONCILE_INTERVAL_SECS_KEY)
           .doc(
-              "The interval in seconds between two stale-registration reconcile rounds. A round "
-                  + "enumerates every non-managed catalog of every metalake and probes each "
-                  + "registered object for existence in its source.")
+              "The delay in seconds between the end of one stale-registration reconcile round "
+                  + "and the start of the next. A round enumerates every non-managed catalog of "
+                  + "every metalake and probes each registered object for existence in its "
+                  + "source. Rounds are scheduled with a fixed delay, so a round that takes "
+                  + "longer than this value still leaves a full rest gap before the next round "
+                  + "instead of catching up immediately.")
           .version(ConfigConstants.VERSION_2_0_0)
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -798,15 +801,14 @@ public class Configs {
   public static final ConfigEntry<String> RECONCILE_POLICY =
       new ConfigBuilder(RECONCILE_POLICY_KEY)
           .doc(
-              "The policy the reconcile applies to detected stale registrations: 'report-only' "
-                  + "reports stale registrations without removing anything, 'auto-remove' removes "
-                  + "them through the dispatcher chain so the removal behaves exactly like an "
-                  + "explicit drop. The default is the safe 'report-only'.")
+              "The policy the reconcile applies to detected stale registrations. Only "
+                  + "'report-only' is currently supported: stale registrations are reported "
+                  + "without removing anything. The 'auto-remove' policy is not implemented yet "
+                  + "and will be enabled by a follow-up change.")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .checkValue(
-              value ->
-                  "report-only".equalsIgnoreCase(value) || "auto-remove".equalsIgnoreCase(value),
-              "The value must be either 'report-only' or 'auto-remove'")
+              value -> "report-only".equalsIgnoreCase(value),
+              "The value must be 'report-only'; 'auto-remove' is not implemented yet")
           .createWithDefault(DEFAULT_RECONCILE_POLICY);
 }
