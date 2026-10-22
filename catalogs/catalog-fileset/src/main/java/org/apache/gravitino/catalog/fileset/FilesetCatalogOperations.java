@@ -97,7 +97,6 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.dto.file.FileInfoDTO;
-import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -123,6 +122,7 @@ import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -656,7 +656,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
-      throws NoSuchFilesetException, IllegalArgumentException {
+      throws NoSuchFilesetException, FilesetAlreadyExistsException, IllegalArgumentException {
     try {
       if (!store.exists(ident, Entity.EntityType.FILESET)) {
         throw new NoSuchFilesetException(FILESET_DOES_NOT_EXIST_MSG, ident);
@@ -685,10 +685,26 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw ExceptionMessages.wrap("Failed to update fileset " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
       throw new NoSuchFilesetException(nsee, FILESET_DOES_NOT_EXIST_MSG, ident);
+<<<<<<< HEAD
     } catch (AlreadyExistsException aee) {
       // This is happened when renaming a fileset to an existing fileset name.
       throw ExceptionMessages.wrap(
           "Fileset with the same name " + ident.name() + " already exists", aee);
+=======
+    } catch (EntityAlreadyExistsException e) {
+      String newName =
+          RenameUtils.getLastRenameName(
+              ident.name(),
+              changes,
+              FilesetChange.RenameFileset.class,
+              FilesetChange.RenameFileset::getNewName);
+      throw new FilesetAlreadyExistsException(
+          e, "Fileset %s already exists", NameIdentifier.of(ident.namespace(), newName));
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+      }
+>>>>>>> 5c8c1d99f ([#14039] fix(core): Return consistent conflicts for metadata renames (#14040))
     }
   }
 
