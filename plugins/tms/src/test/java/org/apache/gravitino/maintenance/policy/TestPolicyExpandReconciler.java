@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.policy;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import javax.sql.DataSource;
 import org.apache.gravitino.meta.AuditInfo;
@@ -93,7 +94,8 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
             .build();
     PolicyMetaService.getInstance().insertPolicy(policy, false);
 
-    Instant overdue = Instant.now().minusSeconds(3600);
+    // db-scheduler / JDBC timestamps are microsecond precision; truncate so round-trip equals.
+    Instant overdue = Instant.now().minusSeconds(3600).truncatedTo(ChronoUnit.MICROS);
     PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
     PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
     SessionUtils.doMultipleWithCommit(() -> writer.scheduleAt(policy.id(), overdue));
