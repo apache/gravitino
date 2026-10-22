@@ -32,7 +32,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.client.MaintenanceActionClient;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
@@ -194,7 +193,6 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
     try (SparkSession spark = sparkBuilder.getOrCreate()) {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
       try (GravitinoClient client = openClient(updaterOptions)) {
-        MaintenanceActionClient actionClient = client.maintenanceActionClient();
         Long afterSnapshotId = null;
         String finishMetrics = null;
         boolean shouldFinish = false;
@@ -208,7 +206,7 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
             if (httpGate) {
               MaintenanceActionSampleResponse gate =
-                  actionClient.reportSample(
+                  client.reportMaintenanceActionSample(
                       jobId,
                       new MaintenanceActionSampleRequest(
                           tableId, policyId, s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
@@ -246,7 +244,7 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         } finally {
           // Finish before try-with-resources closes the client.
           if (shouldFinish) {
-            finishQuietly(actionClient, jobId, afterSnapshotId, finishMetrics);
+            finishQuietly(client, jobId, afterSnapshotId, finishMetrics);
           }
         }
       }
@@ -468,12 +466,13 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   }
 
   private static void finishQuietly(
-      MaintenanceActionClient actionClient,
+      GravitinoClient client,
       long jobId,
       @Nullable Long afterSnapshotId,
       @Nullable String metricsJson) {
     try {
-      actionClient.finish(jobId, new MaintenanceActionFinishRequest(afterSnapshotId, metricsJson));
+      client.finishMaintenanceAction(
+          jobId, new MaintenanceActionFinishRequest(afterSnapshotId, metricsJson));
     } catch (Exception e) {
       LOG.warn("Best-effort TMS finish failed for job {} (control plane will reclaim)", jobId, e);
     }
