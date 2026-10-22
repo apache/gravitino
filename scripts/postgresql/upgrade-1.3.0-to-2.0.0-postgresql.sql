@@ -159,6 +159,29 @@ COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model prop
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
 
+CREATE TABLE IF NOT EXISTS semantic_model_metric_meta (
+    metric_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    semantic_model_id BIGINT NOT NULL,
+    metric_name TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (metric_id)
+);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_model_live ON semantic_model_metric_meta (semantic_model_id, deleted_at);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_metalake_id ON semantic_model_metric_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_catalog_id ON semantic_model_metric_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_schema_id ON semantic_model_metric_meta (schema_id);
+COMMENT ON TABLE semantic_model_metric_meta IS 'semantic model metric identities';
+COMMENT ON COLUMN semantic_model_metric_meta.metric_id IS 'stable internal metric id';
+COMMENT ON COLUMN semantic_model_metric_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN semantic_model_metric_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN semantic_model_metric_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN semantic_model_metric_meta.semantic_model_id IS 'containing semantic model id';
+COMMENT ON COLUMN semantic_model_metric_meta.metric_name IS 'metric name';
+COMMENT ON COLUMN semantic_model_metric_meta.deleted_at IS 'metric retired at';
+
 CREATE TABLE IF NOT EXISTS scheduled_expand_tasks (
     task_name VARCHAR(100) NOT NULL,
     task_instance VARCHAR(100) NOT NULL,
