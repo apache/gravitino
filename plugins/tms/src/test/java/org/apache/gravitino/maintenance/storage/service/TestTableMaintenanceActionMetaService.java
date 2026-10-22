@@ -138,6 +138,62 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testBindJobIdIdempotentWhenAlreadyBoundToSameJob() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long tableId = 31L;
+    long policyId = 41L;
+    long jobId = 5100L;
+    OccupancyClaim claim = actions.insertInFlight(tableId, policyId, config);
+    actions.bindJobId(claim, jobId);
+    // Spark lazy-bound first; submit-side bind must not fail.
+    actions.bindJobId(claim, jobId);
+    Assertions.assertEquals(jobId, actions.getByJobIdAndTableId(jobId, tableId).jobId());
+  }
+
+  @TestTemplate
+  void testBindJobIdFailsWhenBoundToDifferentJob() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    OccupancyClaim claim = actions.insertInFlight(32L, 42L, config);
+    actions.bindJobId(claim, 5200L);
+    Assertions.assertThrows(IllegalStateException.class, () -> actions.bindJobId(claim, 5201L));
+  }
+
+  @TestTemplate
+  void testBindJobIdIfUnboundLazyBindsSoleClaim() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long tableId = 33L;
+    long jobId = 5300L;
+    actions.insertInFlight(tableId, 43L, config);
+
+    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, jobId));
+    Assertions.assertEquals(jobId, actions.getByJobIdAndTableId(jobId, tableId).jobId());
+    // Already bound to same job — still reports success via idempotent bind.
+    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, jobId));
+  }
+
+  @TestTemplate
+  void testBindJobIdIfUnboundRejectsAmbiguousTable() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long tableId = 34L;
+    // Two policies → two soft slots on the same table.
+    actions.insertInFlight(tableId, 44L, config);
+    actions.insertInFlight(tableId, 45L, config);
+
+    Assertions.assertFalse(actions.bindJobIdIfUnbound(tableId, 5400L));
+    Assertions.assertNull(actions.getByJobIdAndTableId(5400L, tableId));
+  }
+
+  @TestTemplate
+  void testBindJobIdIfUnboundReturnsFalseWhenNoClaim() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    Assertions.assertFalse(actions.bindJobIdIfUnbound(35L, 5500L));
+  }
+
+  @TestTemplate
   void testTryAcquireRejectsLiveUnboundAndReclaimsExpired() throws Exception {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long tableId = 11L;

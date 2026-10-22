@@ -24,10 +24,12 @@ import com.google.common.annotations.VisibleForTesting;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -36,7 +38,6 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.maintenance.MaintenanceMetricsService;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
-import org.apache.gravitino.maintenance.web.MaintenanceActionOperation;
 import org.apache.gravitino.maintenance.web.TableMaintenanceRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTRequest;
@@ -47,8 +48,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
  * Spark callbacks for before/after snapshot metrics and soft-slot finish on an in-flight
  * maintenance action.
  *
- * <p>Continue / stop stays in the job. Soft-slot release is via {@code finish=true} on metrics, or
- * {@code POST .../finish} when no metrics are written.
+ * <p>Continue / stop stays in the job. Soft-slot release is via {@code finish=true} query param on
+ * metrics, or {@code POST .../finish} when no metrics are written.
  */
 @Path("metalakes/{metalake}/maintenance/actions")
 @Consumes({
@@ -79,6 +80,7 @@ public class TableMaintenanceActionOperations {
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id bound to the action
+   * @param finish when {@code true}, close the soft slot after storing metrics
    * @param request metrics payload
    * @return empty success response
    */
@@ -91,15 +93,16 @@ public class TableMaintenanceActionOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("jobId") long jobId,
+      @QueryParam("finish") @DefaultValue("false") boolean finish,
       MaintenanceActionMetricsRequest request) {
     return TableMaintenanceRESTUtils.doAs(
         httpRequest,
         () -> {
           requireBody(request);
-          metricsService.reportBeforeMetrics(metalake, jobId, request);
+          metricsService.reportBeforeMetrics(metalake, jobId, finish, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
-        MaintenanceActionOperation.REPORT_BEFORE_METRICS,
+        "report-before-metrics",
         jobId,
         metalake);
   }
@@ -109,6 +112,7 @@ public class TableMaintenanceActionOperations {
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id bound to the action
+   * @param finish when {@code true}, close the soft slot after storing metrics
    * @param request metrics payload
    * @return empty success response
    */
@@ -121,15 +125,16 @@ public class TableMaintenanceActionOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("jobId") long jobId,
+      @QueryParam("finish") @DefaultValue("false") boolean finish,
       MaintenanceActionMetricsRequest request) {
     return TableMaintenanceRESTUtils.doAs(
         httpRequest,
         () -> {
           requireBody(request);
-          metricsService.reportAfterMetrics(metalake, jobId, request);
+          metricsService.reportAfterMetrics(metalake, jobId, finish, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
-        MaintenanceActionOperation.REPORT_AFTER_METRICS,
+        "report-after-metrics",
         jobId,
         metalake);
   }
@@ -159,7 +164,7 @@ public class TableMaintenanceActionOperations {
           metricsService.finishAction(metalake, jobId, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
-        MaintenanceActionOperation.FINISH_ACTION,
+        "finish",
         jobId,
         metalake);
   }

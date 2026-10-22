@@ -23,6 +23,7 @@ paths:
     parameters:
       - $ref: "../openapi.yaml#/components/parameters/metalake"
       - $ref: "#/components/parameters/jobId"
+      - $ref: "#/components/parameters/finish"
     post:
       tags:
         - maintenance
@@ -31,8 +32,8 @@ paths:
       description: |
         Spark callback for an in-flight maintenance action at S0: persists snapshot metrics and
         records `before_snapshot_id`. `tableId` selects which bound table when one Spark job covers
-        multiple tables. Optional `finish=true` closes that table/policy soft slot (for example on
-        snapshot drift / skip). Continue / stop stays in the job.
+        multiple tables. Optional query `finish=true` closes that table/policy soft slot (for
+        example on snapshot drift / skip). Continue / stop stays in the job.
       requestBody:
         required: true
         content:
@@ -97,6 +98,7 @@ paths:
     parameters:
       - $ref: "../openapi.yaml#/components/parameters/metalake"
       - $ref: "#/components/parameters/jobId"
+      - $ref: "#/components/parameters/finish"
     post:
       tags:
         - maintenance
@@ -105,7 +107,7 @@ paths:
       description: |
         Spark callback for an in-flight maintenance action at S1: persists snapshot metrics.
         `tableId` selects which bound table when one Spark job covers multiple tables. Optional
-        `finish=true` closes that table/policy soft slot and sets `after_snapshot_id` to
+        query `finish=true` closes that table/policy soft slot and sets `after_snapshot_id` to
         `snapshotId`. Continue / stop stays in the job.
       requestBody:
         required: true
@@ -141,6 +143,18 @@ components:
       schema:
         type: integer
         format: int64
+    finish:
+      name: finish
+      in: query
+      description: |
+        When true, close the soft slot for this job/table/policy after storing metrics.
+        Before: typically on drift/skip (after_snapshot_id left null). After: typically after
+        successful maintenance (after_snapshot_id = snapshotId). Prefer POST .../finish when no
+        metrics are written.
+      required: false
+      schema:
+        type: boolean
+        default: false
 
   schemas:
     MaintenanceActionMetricsRequest:
@@ -161,13 +175,6 @@ components:
         metricsJson:
           type: string
           description: Serialized metrics JSON for table_snapshot_metrics
-        finish:
-          type: boolean
-          description: |
-            When true, close the soft slot for this job/table/policy after storing metrics.
-            Before: typically on drift/skip (after_snapshot_id left null). After: typically after
-            successful maintenance (after_snapshot_id = snapshotId). Prefer POST .../finish when no
-            metrics are written.
     MaintenanceActionFinishRequest:
       type: object
       required:
@@ -188,15 +195,13 @@ components:
       value: {
         "tableId": 10,
         "snapshotId": 9001,
-        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5}",
-        "finish": false
+        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5}"
       }
     MaintenanceActionAfterMetricsRequest:
       value: {
         "tableId": 10,
         "snapshotId": 9002,
-        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9002,\"custom-data-file-mse\":0.2}",
-        "finish": true
+        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9002,\"custom-data-file-mse\":0.2}"
       }
     MaintenanceActionFinishRequest:
       value: {

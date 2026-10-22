@@ -29,7 +29,7 @@ import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMe
  *
  * <p>Unbound rows ({@code job_id} null, {@code finished_at = 0}) are a short claim: occupied while
  * still within TTL on the <strong>database</strong> clock. Bound rows occupy the soft slot until
- * Spark closes them via before/after metrics with {@code finish=true}. This gate does not reclaim
+ * Spark closes them via before/after metrics with {@code ?finish=true}. This gate does not reclaim
  * on Gravitino job terminal state.
  */
 public final class OccupancyGate {

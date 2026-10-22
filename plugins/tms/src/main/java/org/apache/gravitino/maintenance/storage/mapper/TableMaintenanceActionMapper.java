@@ -52,6 +52,11 @@ public interface TableMaintenanceActionMapper {
   TableMaintenanceActionPO selectUnboundByTableAndPolicy(
       @Param("tableId") long tableId, @Param("policyId") long policyId);
 
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectUnboundByTableId")
+  List<TableMaintenanceActionPO> selectUnboundByTableId(@Param("tableId") long tableId);
+
   @Nullable
   @SelectProvider(
       type = TableMaintenanceActionSQLProviderFactory.class,

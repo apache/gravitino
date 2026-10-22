@@ -81,6 +81,14 @@ public class TableMaintenanceActionSQLProviderFactory {
 
   /**
    * @param tableId table entity id
+   * @return SELECT statement for unbound in-flight rows on the table
+   */
+  public static String selectUnboundByTableId(@Param("tableId") long tableId) {
+    return getProvider().selectUnboundByTableId(tableId);
+  }
+
+  /**
+   * @param tableId table entity id
    * @param policyId policy entity id
    * @param claimTimeoutMs unbound claim TTL in milliseconds
    * @return SELECT statement

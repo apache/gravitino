@@ -32,9 +32,12 @@ import org.slf4j.LoggerFactory;
 /**
  * Persists before/after snapshot metrics and closes soft slots for in-flight maintenance actions.
  *
- * <p>Continue / stop stays in the job. Soft-slot release happens via {@code finish=true} on metrics
- * reports, or via {@link #finishAction} when no metrics are needed. There is no job-terminal
- * reclaim path.
+ * <p>Continue / stop stays in the job. Soft-slot release happens via the {@code finish} query
+ * parameter on metrics reports, or via {@link #finishAction} when no metrics are needed. There is
+ * no job-terminal reclaim path.
+ *
+ * <p>Callbacks that arrive before submit-side {@code bindJobId} lazy-bind the sole unbound claim
+ * for the reported {@code tableId} onto the path {@code jobId}.
  */
 public class MaintenanceMetricsService {
 
@@ -79,10 +82,11 @@ public class MaintenanceMetricsService {
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id
+   * @param finish when {@code true}, close the soft slot after storing metrics
    * @param request validated metrics payload
    */
   public void reportBeforeMetrics(
-      String metalake, long jobId, MaintenanceActionMetricsRequest request) {
+      String metalake, long jobId, boolean finish, MaintenanceActionMetricsRequest request) {
     TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
     metricsMetaService.insertMetrics(
         action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
@@ -91,7 +95,7 @@ public class MaintenanceMetricsService {
         jobId,
         action,
         /*afterSnapshotId=*/ null,
-        request.finishAction(),
+        finish,
         "before",
         metalake,
         request.getSnapshotId());
@@ -103,21 +107,16 @@ public class MaintenanceMetricsService {
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id
+   * @param finish when {@code true}, close the soft slot after storing metrics
    * @param request validated metrics payload
    */
   public void reportAfterMetrics(
-      String metalake, long jobId, MaintenanceActionMetricsRequest request) {
+      String metalake, long jobId, boolean finish, MaintenanceActionMetricsRequest request) {
     TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
     metricsMetaService.insertMetrics(
         action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
     maybeFinish(
-        jobId,
-        action,
-        request.getSnapshotId(),
-        request.finishAction(),
-        "after",
-        metalake,
-        request.getSnapshotId());
+        jobId, action, request.getSnapshotId(), finish, "after", metalake, request.getSnapshotId());
   }
 
   /**
@@ -177,6 +176,11 @@ public class MaintenanceMetricsService {
 
   private TableMaintenanceActionPO loadInFlight(String metalake, long jobId, long tableId) {
     TableMaintenanceActionPO action = actionMetaService.getByJobIdAndTableId(jobId, tableId);
+    if (action == null) {
+      if (actionMetaService.bindJobIdIfUnbound(tableId, jobId)) {
+        action = actionMetaService.getByJobIdAndTableId(jobId, tableId);
+      }
+    }
     if (action == null) {
       throw new NoSuchEntityException(
           "no maintenance action for job_id=%s table_id=%s", jobId, tableId);
