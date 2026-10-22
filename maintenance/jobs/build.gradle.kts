@@ -38,7 +38,7 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":clients:client-java"))
-  implementation(project(":maintenance:maintenance-api"))
+  implementation(project(":maintenance:maintenance-common"))
   implementation(project(":maintenance:optimizer-api"))
   implementation(project(":maintenance:updaters"))
 

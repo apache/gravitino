@@ -32,8 +32,8 @@ import org.apache.gravitino.rest.RESTUtils;
 /**
  * Internal TMS cron Spark callbacks for maintenance action sample / finish (§5.2.2).
  *
- * <p>Uses shared wire types from {@code :maintenance:maintenance-api}. Not a stable public product
- * API.
+ * <p>Uses shared wire types from {@code :maintenance:maintenance-common}. Not a stable public
+ * product API.
  */
 public final class MaintenanceActionClient {
 
