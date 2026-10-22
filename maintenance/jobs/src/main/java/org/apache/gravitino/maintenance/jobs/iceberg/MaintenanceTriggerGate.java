@@ -49,16 +49,16 @@ final class MaintenanceTriggerGate {
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceTriggerGate.class);
 
   /** JobConf / CLI key: JSON map of wire maintenance type → policy {@code rules()} object. */
-  static final String POLICY_RULES_BY_TYPE_KEY = "policy_rules_by_type";
+  static final String RULES_KEY = "rules";
 
-  /** CLI flag matching {@link #POLICY_RULES_BY_TYPE_KEY} after {@code --} stripping. */
-  static final String POLICY_RULES_BY_TYPE_ARG = "policy-rules-by-type";
+  /** CLI flag matching {@link #RULES_KEY} after {@code --} stripping. */
+  static final String RULES_ARG = "rules";
 
   private MaintenanceTriggerGate() {}
 
   /**
    * @param type maintenance type for this sample
-   * @param argMap Spark job arguments (includes optional {@link #POLICY_RULES_BY_TYPE_ARG})
+   * @param argMap Spark job arguments (includes optional {@link #RULES_ARG})
    * @param metricsJson S0 metrics JSON
    * @return whether the procedure should run
    */
@@ -118,7 +118,7 @@ final class MaintenanceTriggerGate {
     String raw =
         IcebergJobUtils.nullIfUnresolvedPlaceholder(
             firstNonNull(
-                argMap.get(POLICY_RULES_BY_TYPE_ARG), argMap.get(POLICY_RULES_BY_TYPE_KEY)));
+                argMap.get(RULES_ARG), argMap.get(RULES_KEY)));
     if (raw == null || raw.trim().isEmpty()) {
       return Collections.emptyMap();
     }
@@ -128,7 +128,7 @@ final class MaintenanceTriggerGate {
               .readValue(raw, new TypeReference<Map<String, Map<String, Object>>>() {});
       return parsed == null ? Collections.emptyMap() : parsed;
     } catch (IOException | RuntimeException e) {
-      LOG.warn("Failed to parse {}: {}", POLICY_RULES_BY_TYPE_KEY, e.toString());
+      LOG.warn("Failed to parse {}: {}", RULES_KEY, e.toString());
       return Collections.emptyMap();
     }
   }

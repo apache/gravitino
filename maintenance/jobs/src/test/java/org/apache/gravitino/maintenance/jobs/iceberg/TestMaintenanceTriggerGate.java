@@ -45,7 +45,7 @@ public class TestMaintenanceTriggerGate {
   public void testCompactionUsesEnqueueRules() {
     Map<String, String> args = new HashMap<>();
     args.put(
-        MaintenanceTriggerGate.POLICY_RULES_BY_TYPE_ARG,
+        MaintenanceTriggerGate.RULES_ARG,
         "{\"rewrite_data_files\":{"
             + "\"trigger-expr\":\"custom-data-file-mse >= minDataFileMse\","
             + "\"minDataFileMse\":10}}");
@@ -71,20 +71,20 @@ public class TestMaintenanceTriggerGate {
 
   @Test
   public void testOrphanDefaultRulesMaintain() {
-    // Default orphan trigger-expr is true when policy_rules_by_type is omitted.
+    // Default orphan trigger-expr is true when rules is omitted.
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(
             MaintenanceType.REMOVE_ORPHAN_FILES, new HashMap<>(), "{}"));
   }
 
   @Test
-  public void testTemplateExposesPolicyRulesPlaceholder() {
+  public void testTemplateExposesRulesPlaceholder() {
     assertTrue(
-        new IcebergMaintenanceJob().jobTemplate().arguments().contains("--policy-rules-by-type"));
+        new IcebergMaintenanceJob().jobTemplate().arguments().contains("--rules"));
     assertTrue(
         new IcebergMaintenanceJob()
             .jobTemplate()
             .arguments()
-            .contains("{{policy_rules_by_type:-}}"));
+            .contains("{{rules:-}}"));
   }
 }

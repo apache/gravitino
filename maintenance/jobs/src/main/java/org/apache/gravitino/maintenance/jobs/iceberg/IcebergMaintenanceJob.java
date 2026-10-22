@@ -736,8 +736,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         "{{dry_run:-false}}",
         "--spark-conf",
         "{{spark_conf:-}}",
-        "--policy-rules-by-type",
-        "{{policy_rules_by_type:-}}");
+        "--rules",
+        "{{rules:-}}");
   }
 
   @VisibleForTesting
