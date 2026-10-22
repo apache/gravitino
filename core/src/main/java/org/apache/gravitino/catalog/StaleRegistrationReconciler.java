@@ -39,7 +39,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -101,6 +101,9 @@ public class StaleRegistrationReconciler implements Closeable {
 
   @VisibleForTesting final Random jitterRandom = new Random();
 
+  /** Set by {@link #close()}; checked at the round, catalog and schema boundaries to stop early. */
+  private volatile boolean closed;
+
   /**
    * Creates the reconciler.
    *
@@ -114,8 +117,7 @@ public class StaleRegistrationReconciler implements Closeable {
     this.entityStore = entityStore;
     this.catalogManager = catalogManager;
     this.catalogJitterSecs = config.get(Configs.RECONCILE_CATALOG_JITTER_SECS);
-    ReconcilePolicy resolved = ReconcilePolicy.fromString(config.get(Configs.RECONCILE_POLICY));
-    this.policy = resolved != null ? resolved : ReconcilePolicy.REPORT_ONLY;
+    this.policy = ReconcilePolicy.fromString(config.get(Configs.RECONCILE_POLICY));
   }
 
   /**
@@ -137,25 +139,46 @@ public class StaleRegistrationReconciler implements Closeable {
         catalogJitterSecs,
         policy.configValue());
     reconcilePool.scheduleAtFixedRate(
-        this::reconcileRound, INITIAL_DELAY_SECS, intervalSecs, TimeUnit.SECONDS);
+        this::runScheduledRound, INITIAL_DELAY_SECS, intervalSecs, TimeUnit.SECONDS);
+  }
+
+  /**
+   * Runs one reconcile round and logs its summary. This is the task body scheduled by {@link
+   * #start()}.
+   *
+   * @return the summary of the round
+   */
+  @VisibleForTesting
+  RoundSummary runScheduledRound() {
+    return logRoundSummary(reconcileRound());
   }
 
   /**
    * Runs one reconcile round over all metalakes and their catalogs. A failing catalog is logged and
-   * skipped without aborting the round, so one broken catalog never blocks the reconcile of the
-   * others.
+   * skipped without aborting the round. Returns the reports gathered so far when the reconciler is
+   * closed or the worker thread is interrupted.
    *
    * @return the per-catalog reports produced in this round
    */
   @VisibleForTesting
   public List<StaleCatalogReport> reconcileRound() {
     List<StaleCatalogReport> reports = new ArrayList<>();
+    if (closed) {
+      return reports;
+    }
     try {
       for (String metalakeName : listMetalakeNames()) {
         for (String catalogName : listCatalogNames(metalakeName)) {
+          if (closed) {
+            return reports;
+          }
           try {
             applyCatalogJitter();
             reports.add(reconcileCatalog(metalakeName, catalogName));
+          } catch (InterruptedException e) {
+            // Interrupted, most likely by close(); restore the status and stop the round.
+            Thread.currentThread().interrupt();
+            return reports;
           } catch (Exception e) {
             LOG.warn("Failed to reconcile catalog {}.{}", metalakeName, catalogName, e);
           }
@@ -207,6 +230,10 @@ public class StaleRegistrationReconciler implements Closeable {
     LinkedHashSet<String> staleNames = new LinkedHashSet<>();
 
     for (SchemaEntity registration : registrations) {
+      if (closed) {
+        // The reconciler is closing; discard the partial scan.
+        return StaleCatalogReport.empty(metalakeName, catalogName);
+      }
       ProbeResult result =
           probeSchema(wrapper, NameIdentifier.of(schemaNamespace, registration.name()));
       switch (result) {
@@ -253,13 +280,18 @@ public class StaleRegistrationReconciler implements Closeable {
       return wrapper.doWithSchemaOps(ops -> ops.schemaExists(schemaIdent))
           ? ProbeResult.PRESENT
           : ProbeResult.ABSENT;
-    } catch (NotFoundException e) {
+    } catch (NoSuchSchemaException e) {
       // Defensive: the load-and-catch probe maps a missing object to false, but a custom
-      // implementation may throw instead. NotFoundException covers NoSuchSchemaException,
-      // NoSuchEntityException and other "not found" signals; absence is still unambiguous.
+      // implementation may throw instead; absence of the target schema is still unambiguous.
+      // Other NotFoundException subtypes (missing catalog or entity) do not prove this schema is
+      // gone; they fall through to the infrastructure failure case below.
       return ProbeResult.ABSENT;
     } catch (UnsupportedOperationException e) {
       return ProbeResult.UNSUPPORTED;
+    } catch (InterruptedException e) {
+      // Interrupted by close(); restore the status so the round loop stops.
+      Thread.currentThread().interrupt();
+      return ProbeResult.UNREACHABLE;
     } catch (Exception e) {
       LOG.warn("Existence probe for schema {} failed with an infrastructure error", schemaIdent, e);
       return ProbeResult.UNREACHABLE;
@@ -332,8 +364,50 @@ public class StaleRegistrationReconciler implements Closeable {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Logs one WARN line per unreachable catalog and per stale schema registration, and one INFO
+   * summary line per round.
+   *
+   * @param reports the per-catalog reports of the round
+   * @return the round summary
+   */
+  private RoundSummary logRoundSummary(List<StaleCatalogReport> reports) {
+    int unreachableCatalogs = 0;
+    List<String> staleSchemaIdents = new ArrayList<>();
+    for (StaleCatalogReport report : reports) {
+      if (report.catalogUnreachable()) {
+        unreachableCatalogs++;
+        LOG.warn(
+            "Catalog {}.{} unreachable in this round; skipped",
+            report.metalake(),
+            report.catalog());
+      }
+      for (StaleSchemaEntry entry : report.staleSchemas()) {
+        staleSchemaIdents.add(report.metalake() + "." + report.catalog() + "." + entry.name());
+        LOG.warn(
+            "Stale schema registration {}.{}.{}: the source object no longer exists (reported, "
+                + "nothing removed)",
+            report.metalake(),
+            report.catalog(),
+            entry.name());
+      }
+    }
+    if (reports.isEmpty()) {
+      LOG.debug("Reconcile round completed with no catalogs scanned");
+    } else {
+      LOG.info(
+          "Reconcile round completed: {} catalog(s) scanned, {} unreachable, {} stale schema "
+              + "registration(s) reported",
+          reports.size(),
+          unreachableCatalogs,
+          staleSchemaIdents.size());
+    }
+    return new RoundSummary(reports.size(), unreachableCatalogs, staleSchemaIdents);
+  }
+
   @Override
   public void close() throws IOException {
+    closed = true;
     reconcilePool.shutdown();
     try {
       if (!reconcilePool.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -356,5 +430,42 @@ public class StaleRegistrationReconciler implements Closeable {
     UNREACHABLE,
     /** The catalog does not support schema operations at all. */
     UNSUPPORTED
+  }
+
+  /** Counters and stale identifiers of one reconcile round. */
+  @VisibleForTesting
+  static final class RoundSummary {
+
+    private final int scannedCatalogs;
+
+    private final int unreachableCatalogs;
+
+    private final List<String> staleSchemaIdents;
+
+    private RoundSummary(int scannedCatalogs, int unreachableCatalogs, List<String> idents) {
+      this.scannedCatalogs = scannedCatalogs;
+      this.unreachableCatalogs = unreachableCatalogs;
+      this.staleSchemaIdents = List.copyOf(idents);
+    }
+
+    /** Returns the number of catalogs scanned in the round. */
+    int scannedCatalogs() {
+      return scannedCatalogs;
+    }
+
+    /** Returns the number of catalogs marked unreachable in the round. */
+    int unreachableCatalogs() {
+      return unreachableCatalogs;
+    }
+
+    /** Returns the number of stale schema registrations reported in the round. */
+    int staleSchemas() {
+      return staleSchemaIdents.size();
+    }
+
+    /** Returns the reported stale schema identifiers as {@code metalake.catalog.schema} strings. */
+    List<String> staleSchemaIdents() {
+      return staleSchemaIdents;
+    }
   }
 }

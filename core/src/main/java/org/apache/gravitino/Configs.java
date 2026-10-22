@@ -798,15 +798,14 @@ public class Configs {
   public static final ConfigEntry<String> RECONCILE_POLICY =
       new ConfigBuilder(RECONCILE_POLICY_KEY)
           .doc(
-              "The policy the reconcile applies to detected stale registrations: 'report-only' "
-                  + "reports stale registrations without removing anything, 'auto-remove' removes "
-                  + "them through the dispatcher chain so the removal behaves exactly like an "
-                  + "explicit drop. The default is the safe 'report-only'.")
+              "The policy the reconcile applies to detected stale registrations. Only "
+                  + "'report-only' is currently supported: stale registrations are reported "
+                  + "without removing anything. The 'auto-remove' policy is not implemented yet "
+                  + "and will be enabled by a follow-up change.")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .checkValue(
-              value ->
-                  "report-only".equalsIgnoreCase(value) || "auto-remove".equalsIgnoreCase(value),
-              "The value must be either 'report-only' or 'auto-remove'")
+              value -> "report-only".equalsIgnoreCase(value),
+              "The value must be 'report-only'; 'auto-remove' is not implemented yet")
           .createWithDefault(DEFAULT_RECONCILE_POLICY);
 }

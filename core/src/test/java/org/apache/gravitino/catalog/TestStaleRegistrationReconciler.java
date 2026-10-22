@@ -26,10 +26,10 @@ import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -45,6 +45,9 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
@@ -56,6 +59,7 @@ import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.ThrowableFunction;
@@ -105,6 +109,21 @@ public class TestStaleRegistrationReconciler extends TestOperationDispatcher {
     return config;
   }
 
+  private void createCatalog2() {
+    catalogManager.createCatalog(
+        NameIdentifier.of(metalake, CATALOG2),
+        Catalog.Type.RELATIONAL,
+        "test",
+        "comment",
+        ImmutableMap.of(
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3"));
+  }
+
   private static SchemaEntity createSchemaEntity(String metalake, String catalog, String name) {
     return SchemaEntity.builder()
         .withId(1L)
@@ -121,8 +140,8 @@ public class TestStaleRegistrationReconciler extends TestOperationDispatcher {
     assertEquals(ReconcilePolicy.REPORT_ONLY, ReconcilePolicy.fromString("REPORT_ONLY"));
     assertEquals(ReconcilePolicy.AUTO_REMOVE, ReconcilePolicy.fromString("auto-remove"));
     assertEquals(ReconcilePolicy.AUTO_REMOVE, ReconcilePolicy.fromString(" Auto-Remove "));
-    assertNull(ReconcilePolicy.fromString(null));
-    assertNull(ReconcilePolicy.fromString("unknown"));
+    assertEquals(ReconcilePolicy.REPORT_ONLY, ReconcilePolicy.fromString(null));
+    assertEquals(ReconcilePolicy.REPORT_ONLY, ReconcilePolicy.fromString("unknown"));
     assertEquals("report-only", ReconcilePolicy.REPORT_ONLY.configValue());
     assertEquals("auto-remove", ReconcilePolicy.AUTO_REMOVE.configValue());
   }
@@ -134,6 +153,15 @@ public class TestStaleRegistrationReconciler extends TestOperationDispatcher {
     assertEquals(3600L, config.get(RECONCILE_INTERVAL_SECS));
     assertEquals(60L, config.get(RECONCILE_CATALOG_JITTER_SECS));
     assertEquals("report-only", config.get(Configs.RECONCILE_POLICY));
+  }
+
+  @Test
+  public void testAutoRemovePolicyRejectedUntilImplemented() {
+    Config config = new Config(false) {};
+    config.set(Configs.RECONCILE_POLICY, "auto-remove");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> config.get(Configs.RECONCILE_POLICY));
   }
 
   @Test
@@ -156,6 +184,20 @@ public class TestStaleRegistrationReconciler extends TestOperationDispatcher {
     reconciler.start();
 
     assertTrue(reconciler.reconcilePool.getTaskCount() > 0);
+  }
+
+  @Test
+  public void testScheduledRoundSummarizesReports() throws Exception {
+    reconciler = createReconciler(createConfig());
+    entityStore.put(createSchemaEntity(metalake, catalog, "schema_stale"), true);
+
+    StaleRegistrationReconciler.RoundSummary summary = reconciler.runScheduledRound();
+
+    assertEquals(1, summary.scannedCatalogs());
+    assertEquals(0, summary.unreachableCatalogs());
+    assertEquals(1, summary.staleSchemas());
+    assertEquals(
+        ImmutableList.of(metalake + "." + catalog + ".schema_stale"), summary.staleSchemaIdents());
   }
 
   @Test
@@ -189,6 +231,11 @@ public class TestStaleRegistrationReconciler extends TestOperationDispatcher {
         StaleRegistrationReconciler.probeSchema(wrapper, ident));
 
     doReturn(false).when(schemaOps).schemaExists(ident);
+    assertEquals(
+        StaleRegistrationReconciler.ProbeResult.ABSENT,
+        StaleRegistrationReconciler.probeSchema(wrapper, ident));
+
+    doThrow(new NoSuchSchemaException("schema not found")).when(schemaOps).schemaExists(ident);
     assertEquals(
         StaleRegistrationReconciler.ProbeResult.ABSENT,
         StaleRegistrationReconciler.probeSchema(wrapper, ident));
@@ -302,6 +349,100 @@ public class TestStaleRegistrationReconciler extends TestOperationDispatcher {
             .get(0);
     assertEquals(1, healthyReport.staleSchemas().size());
     assertEquals("schema_stale2", healthyReport.staleSchemas().get(0).name());
+  }
+
+  @Test
+  public void testRunningRoundStopsWhenClosed() throws Exception {
+    reconciler = createReconciler(createConfig());
+    createCatalog2();
+    // Clear the calls made by the @BeforeEach cleanup so verify(never()) sees this round only.
+    clearInvocations(entityStore);
+
+    // Block the first catalog inside its schema listing, like a slow source.
+    CountDownLatch enteredFirstCatalog = new CountDownLatch(1);
+    CountDownLatch releaseFirstCatalog = new CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              enteredFirstCatalog.countDown();
+              releaseFirstCatalog.await(10, TimeUnit.SECONDS);
+              return invocation.callRealMethod();
+            })
+        .when(entityStore)
+        .list(
+            eq(Namespace.of(metalake, catalog)),
+            eq(SchemaEntity.class),
+            eq(Entity.EntityType.SCHEMA));
+
+    AtomicReference<Throwable> workerFailure = new AtomicReference<>();
+    Thread worker =
+        new Thread(
+            () -> {
+              try {
+                reconciler.reconcileRound();
+              } catch (Throwable t) {
+                workerFailure.set(t);
+              }
+            });
+    worker.start();
+    assertTrue(enteredFirstCatalog.await(10, TimeUnit.SECONDS));
+
+    reconciler.close();
+    releaseFirstCatalog.countDown();
+    worker.join(10000);
+
+    assertFalse(worker.isAlive());
+    Assertions.assertNull(workerFailure.get());
+    verify(entityStore, never())
+        .list(
+            eq(Namespace.of(metalake, CATALOG2)),
+            eq(SchemaEntity.class),
+            eq(Entity.EntityType.SCHEMA));
+  }
+
+  @Test
+  public void testRunningRoundStopsOnInterruption() throws Exception {
+    reconciler = createReconciler(createConfig());
+    createCatalog2();
+    // Clear the calls made by the @BeforeEach cleanup so verify(never()) sees this round only.
+    clearInvocations(entityStore);
+
+    CountDownLatch enteredFirstCatalog = new CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              enteredFirstCatalog.countDown();
+              Thread.sleep(30000);
+              return invocation.callRealMethod();
+            })
+        .when(entityStore)
+        .list(
+            eq(Namespace.of(metalake, catalog)),
+            eq(SchemaEntity.class),
+            eq(Entity.EntityType.SCHEMA));
+
+    AtomicReference<Throwable> workerFailure = new AtomicReference<>();
+    Thread worker =
+        new Thread(
+            () -> {
+              try {
+                reconciler.reconcileRound();
+              } catch (Throwable t) {
+                workerFailure.set(t);
+              }
+            });
+    worker.start();
+    assertTrue(enteredFirstCatalog.await(10, TimeUnit.SECONDS));
+
+    worker.interrupt();
+    worker.join(10000);
+
+    assertFalse(worker.isAlive());
+    // The round loop restored the interrupt status.
+    assertTrue(worker.isInterrupted());
+    verify(entityStore, never())
+        .list(
+            eq(Namespace.of(metalake, CATALOG2)),
+            eq(SchemaEntity.class),
+            eq(Entity.EntityType.SCHEMA));
   }
 
   @Test
