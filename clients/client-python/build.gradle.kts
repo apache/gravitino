@@ -167,6 +167,14 @@ tasks {
     args = listOf("./gravitino", "./tests", "./scripts")
   }
 
+  val blackCheck by registering(VenvTask::class) {
+    group = "verification"
+    description = "Fails if black would reformat any Python file; the black task rewrites them"
+    dependsOn(pipInstall)
+    venvExec = "black"
+    args = listOf("--check", "./gravitino", "./tests", "./scripts")
+  }
+
   val pylint by registering(VenvTask::class) {
     dependsOn(pipInstall)
     mustRunAfter(black)

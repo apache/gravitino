@@ -361,6 +361,7 @@ jobs:
   # that fails lint stops there; jobs within a stage run in parallel. The unit test stages are
   # Gradle tasks defined in gradle/ci-stages.gradle.kts.
   lint:
+    name: lint (jvm)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: changes
@@ -375,10 +376,91 @@ jobs:
       - name: Lint
         run: ./gradlew ciLint -PskipWeb=true
 
+  lint-workflows:
+    name: lint (workflows)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      # actionlint runs ShellCheck (on the runner image) on every run: block. Warnings and up only:
+      # the cherry-pick and docker-image workflows have about 70 info and style findings.
+      - name: Lint workflows
+        env:
+          SHELLCHECK_OPTS: --severity=warning
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+
+  lint-shell:
+    name: lint (shell)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # ShellCheck ships on the GitHub runner image; .shellcheckrc holds the settings. Errors only
+      # for now: warnings and below have hundreds of existing findings.
+      - name: Lint shell scripts
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck --severity=error
+
+  lint-docs:
+    name: lint (docs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the CI design docs have a rumdl config so far.
+      - name: Lint Markdown
+        run: pipx run rumdl==0.3.0 check -c design-docs/ci/.rumdl.toml design-docs/ci
+
+  lint-web:
+    name: lint (web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: 17
+
+      # The Gradle node plugin downloads Node and pnpm, so this needs no Node setup step.
+      - name: Lint web UIs
+        run: >-
+          ./gradlew
+          :web:web:lintCheck :web:web:prettierCheck
+          :web-v2:web:lintCheck :web-v2:web:prettierCheck
+
+  lint-python:
+    name: lint (python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: 17
+
+      # Gradle installs its own Python for both projects.
+      - name: Lint Python
+        run: >-
+          ./gradlew -PskipWeb=true
+          :clients:client-python:blackCheck :clients:client-python:pylint
+          :mcp-server:formatCheckPython :mcp-server:pylint
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [ changes, lint ]
+    needs: [ changes, lint, lint-workflows, lint-python, lint-shell, lint-docs, lint-web ]
     if: needs.changes.outputs.source_changes == 'true'
     outputs:
       medium-shards: ${{ steps.shards.outputs.medium-shards }}

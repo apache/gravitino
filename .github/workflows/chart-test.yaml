@@ -161,6 +161,7 @@ jobs:
             REPO_NAME=${t#*:}
             FOLDER_NAME=${t%:*}
             CONTEXT_DIR="${{ github.workspace }}/dev/docker/${FOLDER_NAME}/"
+            # shellcheck source=/dev/null
             . ${CONTEXT_DIR}/${FOLDER_NAME}-dependency.sh
             docker build -t ${KIND_REGISTRY}/${REPO_NAME}:${tag} "${CONTEXT_DIR}"
             docker push ${KIND_REGISTRY}/${REPO_NAME}:${tag}
