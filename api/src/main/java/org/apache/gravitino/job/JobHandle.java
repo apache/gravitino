@@ -32,6 +32,13 @@ public interface JobHandle {
   /** The prefix for job IDs, every job ID returned from Gravitino will be like job-uuid */
   String JOB_ID_PREFIX = "job-";
 
+  /**
+   * Environment variable injected by Gravitino when a job process is launched. The value is the
+   * numeric Gravitino job id (the same id used in {@code job_run_meta} / TMS action callbacks), not
+   * the executor-local execution id.
+   */
+  String GRAVITINO_JOB_ID_ENV = "GRAVITINO_JOB_ID";
+
   /** The status of the job. */
   enum Status {
 

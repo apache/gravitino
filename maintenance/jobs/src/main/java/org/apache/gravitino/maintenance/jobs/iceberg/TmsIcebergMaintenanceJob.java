@@ -22,6 +22,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,6 +34,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
@@ -63,6 +66,12 @@ import org.slf4j.LoggerFactory;
  * <p>Commit-chain runs share one occupancy claim ({@code policy_id} = first type). Only the first
  * type uses the HTTP sample/recommend gate; later types skip the HTTP gate, end early on local
  * snapshot drift, then continue the chain.
+ *
+ * <p>Template parameters mirror other Iceberg built-ins: {@code maintenance_type}, {@code
+ * updater_options} (Gravitino URI / metalake / auth, same name as update-stats), plus catalog /
+ * table / procedure options. The Gravitino job id is discovered at runtime ({@link
+ * JobHandle#GRAVITINO_JOB_ID_ENV} or the staging directory name); table and policy ids are loaded
+ * server-side from the in-flight action bound to that job id.
  */
 public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
@@ -162,15 +171,11 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
     List<MaintenanceType> types;
     long jobId;
-    long tableId;
-    long policyId;
     try {
       types =
           parseMaintenanceTypes(argMap.get("maintenance-types"), argMap.get("maintenance-type"));
-      jobId = requirePositiveLong(argMap.get("gravitino-job-id"), "gravitino-job-id");
-      tableId = requirePositiveLong(argMap.get("tms-table-id"), "tms-table-id");
-      policyId = requirePositiveLong(argMap.get("tms-policy-id"), "tms-policy-id");
-    } catch (IllegalArgumentException e) {
+      jobId = resolveGravitinoJobId();
+    } catch (IllegalArgumentException | IllegalStateException e) {
       LOG.error("Invalid TMS maintenance arguments: {}", e.getMessage());
       return 1;
     }
@@ -209,7 +214,7 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
                   client.reportMaintenanceActionSample(
                       jobId,
                       new MaintenanceActionSampleRequest(
-                          tableId, policyId, s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
+                          s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
               if (!gate.isContinueMaintenance()) {
                 LOG.info(
                     "TMS gate stopped job {} type={} reason={}; continuing chain if any",
@@ -525,20 +530,60 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  private static long requirePositiveLong(@Nullable String raw, String name) {
-    String value = IcebergJobUtils.nullIfUnresolvedPlaceholder(raw);
-    if (value == null || value.trim().isEmpty()) {
-      throw new IllegalArgumentException("--" + name + " is required");
-    }
-    try {
-      long parsed = Long.parseLong(value.trim());
-      if (parsed <= 0) {
-        throw new IllegalArgumentException("--" + name + " must be positive");
+  /**
+   * Resolves the Gravitino job id injected at submit time.
+   *
+   * <p>Prefers {@link JobHandle#GRAVITINO_JOB_ID_ENV}. Falls back to parsing a {@code job-<id>}
+   * segment from {@code user.dir} (local executor staging directory).
+   *
+   * @return numeric Gravitino job id
+   */
+  @VisibleForTesting
+  static long resolveGravitinoJobId() {
+    return resolveGravitinoJobId(
+        System.getenv(JobHandle.GRAVITINO_JOB_ID_ENV), System.getProperty("user.dir"));
+  }
+
+  @VisibleForTesting
+  static long resolveGravitinoJobId(@Nullable String envValue, @Nullable String userDir) {
+    if (envValue != null && !envValue.trim().isEmpty()) {
+      try {
+        long parsed = Long.parseLong(envValue.trim());
+        if (parsed <= 0) {
+          throw new IllegalStateException(
+              JobHandle.GRAVITINO_JOB_ID_ENV + " must be a positive long: " + envValue);
+        }
+        return parsed;
+      } catch (NumberFormatException e) {
+        throw new IllegalStateException(
+            JobHandle.GRAVITINO_JOB_ID_ENV + " must be a long: " + envValue, e);
       }
-      return parsed;
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("--" + name + " must be a long: " + value, e);
     }
+    if (userDir != null && !userDir.trim().isEmpty()) {
+      Path dir = Paths.get(userDir).toAbsolutePath().normalize();
+      for (Path current = dir; current != null; current = current.getParent()) {
+        Path fileName = current.getFileName();
+        if (fileName == null) {
+          continue;
+        }
+        String name = fileName.toString();
+        if (name.startsWith(JobHandle.JOB_ID_PREFIX)) {
+          String idPart = name.substring(JobHandle.JOB_ID_PREFIX.length());
+          try {
+            long parsed = Long.parseLong(idPart);
+            if (parsed > 0) {
+              return parsed;
+            }
+          } catch (NumberFormatException ignored) {
+            // Keep walking parents; staging dirs use job-<numericId>.
+          }
+        }
+      }
+    }
+    throw new IllegalStateException(
+        "Cannot resolve Gravitino job id: set "
+            + JobHandle.GRAVITINO_JOB_ID_ENV
+            + " or run under a job-<id> staging directory");
   }
 
   private static void putIfPresent(Map<String, String> target, String key, @Nullable String raw) {
@@ -573,12 +618,6 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         "{{maintenance_type}}",
         "--maintenance-types",
         "{{maintenance_types:-}}",
-        "--gravitino-job-id",
-        "{{gravitino_job_id}}",
-        "--tms-table-id",
-        "{{tms_table_id}}",
-        "--tms-policy-id",
-        "{{tms_policy_id}}",
         "--updater-options",
         "{{updater_options:-}}",
         "--strategy",

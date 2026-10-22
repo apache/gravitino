@@ -19,10 +19,12 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.iceberg.TmsIcebergMaintenanceJob.MaintenanceType;
@@ -40,10 +42,12 @@ public class TestTmsIcebergMaintenanceJob {
     List<String> args = template.arguments();
     assertTrue(args.contains("--maintenance-type"));
     assertTrue(args.contains("{{maintenance_type}}"));
-    assertTrue(args.contains("--gravitino-job-id"));
-    assertTrue(args.contains("{{gravitino_job_id}}"));
     assertTrue(args.contains("--updater-options"));
     assertTrue(args.contains("{{updater_options:-}}"));
+    assertFalse(args.contains("--gravitino-job-id"));
+    assertFalse(args.contains("{{gravitino_job_id}}"));
+    assertFalse(args.contains("--tms-table-id"));
+    assertFalse(args.contains("--tms-policy-id"));
   }
 
   @Test
@@ -82,6 +86,26 @@ public class TestTmsIcebergMaintenanceJob {
     String json = TmsIcebergMaintenanceJob.stubMetricsJson("expire_snapshots", 42L);
     assertTrue(json.contains("expire_snapshots"));
     assertTrue(json.contains("42"));
+  }
+
+  @Test
+  public void testResolveGravitinoJobIdFromEnv() {
+    assertEquals(99L, TmsIcebergMaintenanceJob.resolveGravitinoJobId("99", "/tmp/other"));
+  }
+
+  @Test
+  public void testResolveGravitinoJobIdFromStagingDir() {
+    assertEquals(
+        42L,
+        TmsIcebergMaintenanceJob.resolveGravitinoJobId(
+            null, "/tmp/gravitino/job-runs/" + JobHandle.JOB_ID_PREFIX + "42"));
+  }
+
+  @Test
+  public void testResolveGravitinoJobIdMissing() {
+    assertThrows(
+        IllegalStateException.class,
+        () -> TmsIcebergMaintenanceJob.resolveGravitinoJobId(null, "/tmp/not-a-job-dir"));
   }
 
   @Test

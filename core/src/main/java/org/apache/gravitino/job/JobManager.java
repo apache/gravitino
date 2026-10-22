@@ -35,6 +35,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -518,10 +519,12 @@ public class JobManager implements JobOperationDispatcher {
     }
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values. Its
-    // resources are kept as URIs, the job executor decides how to handle them.
+    // resources are kept as URIs, the job executor decides how to handle them. Inject the Gravitino
+    // job id into the process environment after allocation so jobs can discover it at runtime
+    // without requiring it as a template placeholder (it cannot be known before checkJobConf).
     JobTemplate jobTemplate;
     try {
-      jobTemplate = jobTemplateResolver.resolve(jobConf);
+      jobTemplate = withGravitinoJobIdEnv(jobTemplateResolver.resolve(jobConf), jobId);
     } catch (RuntimeException e) {
       deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw e;
@@ -956,6 +959,49 @@ public class JobManager implements JobOperationDispatcher {
   @VisibleForTesting
   File jobStagingDir(long jobId) {
     return new File(new File(stagingDir, JOB_RUNS_DIR_NAME), JobHandle.JOB_ID_PREFIX + jobId);
+  }
+
+  /**
+   * Copies {@code template} with {@link JobHandle#GRAVITINO_JOB_ID_ENV} set so in-job code can
+   * discover the Gravitino job id without a template placeholder.
+   *
+   * @param template resolved runtime template
+   * @param jobId Gravitino job id
+   * @return template with the job id environment variable
+   */
+  @VisibleForTesting
+  static JobTemplate withGravitinoJobIdEnv(JobTemplate template, long jobId) {
+    Map<String, String> environments = new HashMap<>(template.environments());
+    environments.put(JobHandle.GRAVITINO_JOB_ID_ENV, Long.toString(jobId));
+    if (template instanceof SparkJobTemplate) {
+      SparkJobTemplate spark = (SparkJobTemplate) template;
+      return SparkJobTemplate.builder()
+          .withName(spark.name())
+          .withComment(spark.comment())
+          .withExecutable(spark.executable())
+          .withArguments(spark.arguments())
+          .withEnvironments(environments)
+          .withCustomFields(spark.customFields())
+          .withClassName(spark.className())
+          .withJars(spark.jars())
+          .withFiles(spark.files())
+          .withArchives(spark.archives())
+          .withConfigs(spark.configs())
+          .build();
+    }
+    if (template instanceof ShellJobTemplate) {
+      ShellJobTemplate shell = (ShellJobTemplate) template;
+      return ShellJobTemplate.builder()
+          .withName(shell.name())
+          .withComment(shell.comment())
+          .withExecutable(shell.executable())
+          .withArguments(shell.arguments())
+          .withEnvironments(environments)
+          .withCustomFields(shell.customFields())
+          .withScripts(shell.scripts())
+          .build();
+    }
+    throw new IllegalArgumentException("Unsupported job type: " + template.jobType());
   }
 
   /**
