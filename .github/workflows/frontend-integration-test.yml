@@ -1,15 +1,11 @@
 name: Frontend Integration Test
 
 # Controls when the workflow will run
+# Runs as the frontend-it stage of presubmit.yml, after the unit test stages pass. Its own changes
+# job still decides whether any web or server source changed.
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   changes:

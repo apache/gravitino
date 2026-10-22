@@ -1,13 +1,10 @@
 name: Test Charts
 
 # Controls when the workflow will run
+# Runs as the chart-test stage of presubmit.yml on pull requests, after the unit test stages pass.
+# Its own changes job still decides whether any chart changed.
 on:
-  pull_request:
-    branches: [ "main", "branch-*" ]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  workflow_call:
 
 jobs:
   changes:

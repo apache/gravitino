@@ -134,6 +134,9 @@ tasks.register("ciVerifyShards") {
   val listed = ciMediumTestModules + ciSkippedTestModules
   val othersSize = ciMediumShards.getValue("others").size
   val projectPaths = subprojects.map { it.path }.toSet()
+  val contribModules = subprojects.filter { isCiContribModule(it.path) }.map { it.name }.sorted()
+  val contribWorkflow = file(".github/workflows/contrib-catalog-test.yml")
+  inputs.file(contribWorkflow)
   inputs.property("listed", listed)
   inputs.property("othersSize", othersSize)
   doLast {
@@ -150,7 +153,13 @@ tasks.register("ciVerifyShards") {
           it.readText().contains(ciDockerTestTag)
       }
     }.keys.sorted()
+    val contribWorkflowText = contribWorkflow.readText()
+    val unfiltered = contribModules.filter { "catalogs-contrib/$it/**" !in contribWorkflowText }
     val problems = mutableListOf<String>()
+    if (unfiltered.isNotEmpty()) {
+      problems += "Contrib catalogs have no paths filter in contrib-catalog-test.yml, so no job " +
+        "tests them: ${unfiltered.joinToString()}."
+    }
     if (unknown.isNotEmpty()) {
       problems += "gradle/ci-stages.gradle.kts lists modules that do not exist: ${unknown.joinToString()}."
     }

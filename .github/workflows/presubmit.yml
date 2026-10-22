@@ -7,12 +7,10 @@ on:
     branches: [ "main", "branch-*" ]
     paths-ignore:
       - 'docs/assets/**'
-      - 'web-v2/**'
   pull_request:
     branches: [ "main", "branch-*" ]
     paths-ignore:
       - 'docs/assets/**'
-      - 'web-v2/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -834,6 +832,35 @@ jobs:
     with:
       java-version: '17'
       test-mode: ${{ matrix.test-mode }}
+
+  # ct compares against the pull request's base branch, so charts are tested on pull requests only.
+  chart-test:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      github.event_name == 'pull_request' &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result)
+    uses: ./.github/workflows/chart-test.yaml
+
+  contrib-catalog-test:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result)
+    uses: ./.github/workflows/contrib-catalog-test.yml
+
+  frontend-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result)
+    uses: ./.github/workflows/frontend-integration-test.yml
 
   idp-basic-it:
     needs: [ changes, test, medium-test, core-test ]

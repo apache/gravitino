@@ -1,32 +1,28 @@
 name: Contrib Catalog Test
 
+# Runs as the contrib-catalog-test stage of presubmit.yml, after the unit test stages pass. One job
+# per contrib catalog whose sources, or the shared code it builds on, changed.
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 jobs:
   changes:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Disable Git automatic maintenance
         run: git config --local maintenance.auto false
+      # One filter per module under catalogs-contrib/ (ciVerifyShards fails if one is missing); the
+      # job matrix is the list of filters that matched. Shared paths are in every module's filter,
+      # so changing them tests every module.
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
         id: filter
         with:
           filters: |
-            source_changes:
+            shared: &shared
               - .github/workflows/contrib-catalog-test.yml
-              - catalogs-contrib/**
+              - catalogs-contrib/build.gradle.kts
               - catalogs/catalog-common/**
               - catalogs/catalog-jdbc-common/**
               - dev/**
@@ -36,43 +32,30 @@ jobs:
               - gradle.properties
               - gradlew
               - settings.gradle.kts
-      - name: Detect changed catalogs-contrib modules
-        id: contrib
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          else
-            BASE_SHA="${{ github.event.before }}"
-            HEAD_SHA="${{ github.sha }}"
-          fi
-
-          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            BASE_SHA="$(git rev-list --max-parents=0 "$HEAD_SHA" | tail -n 1)"
-          fi
-
-          MERGE_BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA" || true)"
-          if [ -z "$MERGE_BASE_SHA" ]; then
-            MERGE_BASE_SHA="$BASE_SHA"
-          fi
-
-          CHANGED_FILES="$(git diff --name-only "$MERGE_BASE_SHA" "$HEAD_SHA")"
-          CHANGED_MODULES="$(echo "$CHANGED_FILES" | awk -F/ '/^catalogs-contrib\/[^/]+\// {print $2}' | sort -u | xargs)"
-
-          if echo "$CHANGED_FILES" | grep -Eq '^(\.github/workflows/contrib-catalog-test.yml|catalogs-contrib/build.gradle.kts|catalogs/catalog-common/|catalogs/catalog-jdbc-common/|dev/|gradle/|integration-test-common/|build.gradle.kts|gradle.properties|gradlew|settings.gradle.kts)'; then
-            CHANGED_MODULES="__all__"
-          fi
-
-          echo "changed_catalogs_contrib_modules=$CHANGED_MODULES" >> "$GITHUB_OUTPUT"
+            catalog-jdbc-clickhouse:
+              - *shared
+              - catalogs-contrib/catalog-jdbc-clickhouse/**
+            catalog-jdbc-hologres:
+              - *shared
+              - catalogs-contrib/catalog-jdbc-hologres/**
+            catalog-jdbc-oceanbase:
+              - *shared
+              - catalogs-contrib/catalog-jdbc-oceanbase/**
     outputs:
-      source_changes: ${{ steps.filter.outputs.source_changes }}
-      changed_catalogs_contrib_modules: ${{ steps.contrib.outputs.changed_catalogs_contrib_modules }}
+      changes: ${{ steps.filter.outputs.changes }}
 
   contrib-catalog-test:
+    name: contrib-catalog-test (${{ matrix.module }})
     needs: changes
-    if: needs.changes.outputs.source_changes == 'true' && needs.changes.outputs.changed_catalogs_contrib_modules != ''
+    if: needs.changes.outputs.changes != '[]'
     runs-on: ubuntu-22.04
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.changes.outputs.changes) }}
+        exclude:
+          - module: shared
     steps:
       - uses: actions/checkout@v4
 
@@ -81,6 +64,8 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'gradle'
+
+      - uses: ./.github/actions/restore-build-cache
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
@@ -108,34 +93,13 @@ jobs:
         id: contribCatalogTest
         env:
           GRAVITINO_CLICKHOUSE_TEST_IMAGE: clickhouse:25.8.14.17
-        run: |
-          CHANGED_CONTRIB_MODULES="${{ needs.changes.outputs.changed_catalogs_contrib_modules }}"
-
-          if [ "$CHANGED_CONTRIB_MODULES" = "__all__" ]; then
-            CONTRIB_MODULES="$(find catalogs-contrib -mindepth 1 -maxdepth 1 -type d -name 'catalog-*' -exec basename {} \; | sort)"
-          else
-            CONTRIB_MODULES="$CHANGED_CONTRIB_MODULES"
-          fi
-
-          gradle_args=()
-          for module in $CONTRIB_MODULES; do
-            if [ -d "catalogs-contrib/$module" ]; then
-              gradle_args+=(":catalogs-contrib:$module:test")
-            fi
-          done
-
-          if [ "${#gradle_args[@]}" -eq 0 ]; then
-            echo "No changed contrib catalog test tasks."
-            exit 0
-          fi
-
-          ./gradlew "${gradle_args[@]}" -PskipDockerTests=false -PskipWeb=true
+        run: ./gradlew :catalogs-contrib:${{ matrix.module }}:test -PskipDockerTests=false -PskipWeb=true
 
       - name: Upload contrib catalog test reports
         uses: actions/upload-artifact@v7
         if: ${{ (failure() && steps.contribCatalogTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: contrib-catalog-test-reports
+          name: contrib-catalog-test-reports-${{ matrix.module }}
           path: |
             build/reports
             catalogs-contrib/**/*.log
