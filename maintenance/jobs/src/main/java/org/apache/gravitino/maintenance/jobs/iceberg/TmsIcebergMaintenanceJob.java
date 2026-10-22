@@ -70,7 +70,7 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
   /** Built-in template name submitted by TMS cron / commit. */
   public static final String NAME =
-      JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-maintenance-action";
+      JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-maintenance-task";
 
   /** JobConf / CLI key for the maintenance kind ({@code maintenance_type}). */
   public static final String MAINTENANCE_TYPE_KEY = "maintenance_type";
@@ -184,7 +184,7 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
             ? types.get(0).wireName
             : "chain:" + types.stream().map(t -> t.wireName).collect(Collectors.joining(","));
     SparkSession.Builder sparkBuilder =
-        SparkSession.builder().appName("Gravitino Iceberg Maintenance Action (" + appLabel + ")");
+        SparkSession.builder().appName("Gravitino Iceberg Maintenance Task (" + appLabel + ")");
     String sparkConfJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("spark-conf"));
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson).forEach(sparkBuilder::config);
