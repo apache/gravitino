@@ -276,6 +276,15 @@ public class TestMysqlTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testClearTableCommentWithNull() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\nCOMMENT '';",
+        ops.alterTableSql("test_table", TableChange.updateComment(null)));
+  }
+
+  @Test
   public void testEscapeAddColumnCommentInGeneratedSql() {
     TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
     String comment = "owner\\'s \"comment\"; --";

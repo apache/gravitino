@@ -49,6 +49,8 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestPostgreSqlTableOperations extends TestPostgreSql {
@@ -265,6 +267,37 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                 TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
     Assertions.assertFalse(TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    String tableName = RandomNameUtils.genRandomName("clear_comment_");
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("col comment").build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          new HashMap<>(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnComment(new String[] {"col_1"}, null),
+          TableChange.updateComment(null));
+
+      JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertTrue(StringUtils.isEmpty(load.comment()), load.comment());
+      Assertions.assertTrue(
+          StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
   }
 
   @Test
@@ -779,5 +812,59 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     Assertions.assertNull(
         TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
         "Non-datetime type should return 0 precision");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"O'Brien", "quote\\' and \\new\\path; \"double\"", "ends with \\"})
+  void testStringDefaultValueRoundTrips(String defaultValue) {
+    String tableName = RandomNameUtils.genRandomName("pg_default_round_trip");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withDefaultValue(Literals.varcharLiteral(255, defaultValue))
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        new JdbcColumn[] {column},
+        null,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[0].defaultValue());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.addColumn(
+              new String[] {"col2"},
+              VARCHAR,
+              null,
+              TableChange.ColumnPosition.defaultPos(),
+              true,
+              false,
+              Literals.varcharLiteral(255, defaultValue)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[1].defaultValue());
+
+      String updated = defaultValue + " updated";
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnDefaultValue(
+              new String[] {"col1"}, Literals.varcharLiteral(255, updated)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, updated), table.columns()[0].defaultValue());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
   }
 }

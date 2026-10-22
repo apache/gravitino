@@ -22,6 +22,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.StringIdentifier;
@@ -54,14 +55,22 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
   private static class TestableStarRocksTableOperations extends StarRocksTableOperations {
 
+    private final String[] columnNames;
+
     public TestableStarRocksTableOperations() {
+      this(new String[0]);
+    }
+
+    private TestableStarRocksTableOperations(String... columnNames) {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new StarRocksTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+      this.columnNames = columnNames;
     }
 
-    private TestableStarRocksTableOperations(ConnectionCountingDataSource connections) {
-      this();
+    private TestableStarRocksTableOperations(
+        ConnectionCountingDataSource connections, String... columnNames) {
+      this(columnNames);
       dataSource = connections.dataSource();
     }
 
@@ -105,6 +114,15 @@ public class TestStarRocksTableOperationsSqlGeneration {
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
       return JdbcTable.builder()
           .withName(tableName)
+          .withColumns(
+              Arrays.stream(columnNames)
+                  .map(
+                      name ->
+                          JdbcColumn.builder()
+                              .withName(name)
+                              .withType(Types.IntegerType.get())
+                              .build())
+                  .toArray(JdbcColumn[]::new))
           .withComment(
               StringIdentifier.addToComment(StringIdentifier.fromId(42), "existing comment"))
           .build();
@@ -288,6 +306,23 @@ public class TestStarRocksTableOperationsSqlGeneration {
             "COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
                 + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
         clearCommentSql);
+    Assertions.assertEquals(
+        clearCommentSql, ops.alterTableSql("test_table", TableChange.updateComment(null)));
+  }
+
+  @Test
+  public void testClearTableCommentWithNull() {
+    TestableStarRocksTableOperations ops =
+        new TestableStarRocksTableOperations() {
+          @Override
+          protected JdbcTable getOrCreateTable(
+              String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+            return JdbcTable.builder().withName(tableName).build();
+          }
+        };
+
+    String alterSql = ops.alterTableSql("test_table", TableChange.updateComment(null));
+    Assertions.assertTrue(alterSql.contains("COMMENT = \"\""), alterSql);
   }
 
   @Test
@@ -302,6 +337,20 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     Assertions.assertTrue(alterSql.contains("ADD COLUMN `col2`"), alterSql);
     Assertions.assertTrue(alterSql.contains("COMMENT 'owner\\\\''s \"comment\"; --'"), alterSql);
+  }
+
+  @Test
+  void testSetPropertyEscapesKeyAndValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.setProperty(
+                "dynamic_partition.key\"name", "owner's \"comment\" C:\\tmp\"); --"));
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\n"
+            + "set ( \"dynamic_partition.key\"\"name\" = \"owner's \"\"comment\"\" C:\\\\tmp\"\"); --\" );",
+        sql);
   }
 
   @Test
@@ -405,5 +454,42 @@ public class TestStarRocksTableOperationsSqlGeneration {
     Assertions.assertEquals(Index.IndexType.VECTOR, indexes.get(2).type());
     Assertions.assertEquals("idx_vector", indexes.get(2).name());
     Assertions.assertArrayEquals(new String[][] {{"embedding"}}, indexes.get(2).fieldNames());
+  }
+
+  @Test
+  void testRenameColumnQuotesIdentifiers() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations("id", "order-id");
+
+    String alterSql =
+        ops.alterTableSql("test_table", TableChange.renameColumn(new String[] {"order-id"}, "key"));
+
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\nRENAME COLUMN `order-id` TO `key`;", alterSql);
+  }
+
+  @Test
+  void testDeleteMissingColumnIfExistsSkipsAlter() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableStarRocksTableOperations ops =
+        new TestableStarRocksTableOperations(connections, "id", "col1");
+    TableChange deleteMissing = TableChange.deleteColumn(new String[] {"missing"}, true);
+
+    Assertions.assertEquals("", ops.alterTableSql("test_table", deleteMissing));
+
+    ops.alterTable("database", "test_table", deleteMissing);
+    Assertions.assertTrue(connections.executedSql().isEmpty());
+  }
+
+  @Test
+  void testDeleteMissingColumnIfExistsWithOtherChanges() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations("id", "col1");
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.deleteColumn(new String[] {"missing"}, true),
+            TableChange.deleteColumn(new String[] {"col1"}, false));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nDROP COLUMN `col1`;", alterSql);
   }
 }

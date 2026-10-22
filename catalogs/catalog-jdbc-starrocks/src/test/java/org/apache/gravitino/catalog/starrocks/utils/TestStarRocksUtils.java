@@ -61,6 +61,11 @@ public class TestStarRocksUtils {
     result = StarRocksUtils.generatePropertiesSql(properties);
     assertEquals(" PROPERTIES (\n\"key\"=\"value\"\n)", result);
 
+    properties = Collections.singletonMap("key\"name", "owner's \"comment\" C:\\tmp; --");
+    result = StarRocksUtils.generatePropertiesSql(properties);
+    assertEquals(
+        " PROPERTIES (\n\"key\"\"name\"=\"owner's \"\"comment\"\" C:\\\\tmp; --\"\n)", result);
+
     // Test when properties has multiple entries
     properties = new HashMap<>();
     properties.put("key1", "value1");
@@ -99,6 +104,55 @@ public class TestStarRocksUtils {
     result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
     assertEquals("value1", result.get("property1"));
     assertEquals("comment", result.get("comment"));
+
+    // Escaped SHOW CREATE output (doubled quotes and backslashes, as generatePropertiesSql
+    // emits) round-trips back to the original key/value text.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n"
+            + "\"key\"\"name\" = \"owner's \"\"comment\"\" D:\\\\data; --\"\n)";
+    result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner's \"comment\" D:\\data; --", result.get("key\"name"));
+
+    // Backslash-style escaping (\" and \\) is unescaped too.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n" + "\"plain\" = \"owner\\\\s \\\"comment\\\"\"\n)";
+    result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner\\s \"comment\"", result.get("plain"));
+  }
+
+  /** Verifies large escaped properties are parsed without recursive regex stack growth. */
+  @Test
+  public void testLongEscapedPropertiesRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key".repeat(10000), "value\" = \"part\\".repeat(2000));
+    assertEquals(
+        properties,
+        StarRocksUtils.extractPropertiesFromSql(StarRocksUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies escaped quotes cannot be mistaken for the property key/value separator. */
+  @Test
+  public void testPropertiesWithQuotedSeparatorsRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("k", "a\" = \"b");
+    properties.put("key\" = \"part", "value\" = \"part\\");
+    properties.put(" spaced key ", " spaced value ");
+    properties.put("empty", "");
+    properties.put("\\\"", "\\\" = \"\\");
+
+    assertEquals(
+        properties,
+        StarRocksUtils.extractPropertiesFromSql(StarRocksUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies backslash-escaped quotes around an equals sign remain in the property value. */
+  @Test
+  public void testPropertiesWithBackslashEscapedSeparators() {
+    String sql = "PROPERTIES (\n\"k\" = \"a\\\" = \\\"b\",\n\"end\" = \"tail\\\\\"\n)";
+    Map<String, String> expected = new HashMap<>();
+    expected.put("k", "a\" = \"b");
+    expected.put("end", "tail\\");
+    assertEquals(expected, StarRocksUtils.extractPropertiesFromSql(sql));
   }
 
   @Test

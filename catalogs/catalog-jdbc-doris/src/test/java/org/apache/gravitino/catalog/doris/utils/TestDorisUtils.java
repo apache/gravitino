@@ -74,6 +74,41 @@ public class TestDorisUtils {
     assertEquals(expectedStr, result);
   }
 
+  /** Verifies large escaped properties are parsed without recursive regex stack growth. */
+  @Test
+  public void testLongEscapedPropertiesRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key".repeat(10000), "value\" = \"part\\".repeat(2000));
+    assertEquals(
+        properties,
+        DorisUtils.extractPropertiesFromSql(DorisUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies escaped quotes cannot be mistaken for the property key/value separator. */
+  @Test
+  public void testPropertiesWithQuotedSeparatorsRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("k", "a\" = \"b");
+    properties.put("key\" = \"part", "value\" = \"part\\");
+    properties.put(" spaced key ", " spaced value ");
+    properties.put("empty", "");
+    properties.put("\\\"", "\\\" = \"\\");
+
+    assertEquals(
+        properties,
+        DorisUtils.extractPropertiesFromSql(DorisUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies backslash-escaped quotes around an equals sign remain in the property value. */
+  @Test
+  public void testPropertiesWithBackslashEscapedSeparators() {
+    String sql = "PROPERTIES (\n\"k\" = \"a\\\" = \\\"b\",\n\"end\" = \"tail\\\\\"\n)";
+    Map<String, String> expected = new HashMap<>();
+    expected.put("k", "a\" = \"b");
+    expected.put("end", "tail\\");
+    assertEquals(expected, DorisUtils.extractPropertiesFromSql(sql));
+  }
+
   @Test
   public void testExtractTablePropertiesFromSql() {
     // Test when properties is null
