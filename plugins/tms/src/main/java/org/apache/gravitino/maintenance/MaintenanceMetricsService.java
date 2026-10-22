@@ -29,10 +29,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Persists snapshot metrics reported by Spark for an in-flight maintenance action.
+ * Persists before/after snapshot metrics reported by Spark for an in-flight maintenance action.
  *
- * <p>Continue / stop decisions stay in the job. Occupancy is released when the Gravitino job
- * reaches a terminal state ({@code OccupancyGate#reclaimTerminalBound}).
+ * <p>Continue / stop stays in the job. Soft-slot release happens only when the request sets {@code
+ * finish=true} (per {@code jobId}/{@code tableId}/{@code policyId}). There is no job-terminal
+ * reclaim path.
  */
 public class MaintenanceMetricsService {
 
@@ -72,24 +73,81 @@ public class MaintenanceMetricsService {
   }
 
   /**
-   * Idempotently stores metrics for the table/policy bound to {@code jobId} and {@code
-   * request.tableId}.
+   * S0 report: stores metrics, records {@code before_snapshot_id}, optionally closes the soft slot
+   * (for example snapshot drift / skip).
    *
    * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id bound to the action
-   * @param request validated metrics payload (includes {@code tableId})
+   * @param jobId Gravitino job run id
+   * @param request validated metrics payload
    */
-  public void reportMetrics(String metalake, long jobId, MaintenanceActionMetricsRequest request) {
+  public void reportBeforeMetrics(
+      String metalake, long jobId, MaintenanceActionMetricsRequest request) {
     TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
     metricsMetaService.insertMetrics(
         action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
+    actionMetaService.recordBeforeSnapshot(jobId, action.tableId(), request.getSnapshotId());
+    maybeFinish(
+        jobId,
+        action,
+        /*afterSnapshotId=*/ null,
+        request.finishAction(),
+        "before",
+        metalake,
+        request.getSnapshotId());
+  }
+
+  /**
+   * S1 report: stores metrics and optionally closes the soft slot with {@code after_snapshot_id} =
+   * {@code snapshotId}.
+   *
+   * @param metalake metalake name from the request path
+   * @param jobId Gravitino job run id
+   * @param request validated metrics payload
+   */
+  public void reportAfterMetrics(
+      String metalake, long jobId, MaintenanceActionMetricsRequest request) {
+    TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
+    metricsMetaService.insertMetrics(
+        action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
+    maybeFinish(
+        jobId,
+        action,
+        request.getSnapshotId(),
+        request.finishAction(),
+        "after",
+        metalake,
+        request.getSnapshotId());
+  }
+
+  private void maybeFinish(
+      long jobId,
+      TableMaintenanceActionPO action,
+      Long afterSnapshotId,
+      boolean finish,
+      String phase,
+      String metalake,
+      long snapshotId) {
+    if (!finish) {
+      LOG.info(
+          "TMS {} metrics reported for job {} metalake {} table {} policy {} snapshot {}",
+          phase,
+          jobId,
+          metalake,
+          action.tableId(),
+          action.policyId(),
+          snapshotId);
+      return;
+    }
+    actionMetaService.markFinished(
+        jobId, action.tableId(), action.policyId(), afterSnapshotId, System.currentTimeMillis());
     LOG.info(
-        "TMS metrics reported for job {} metalake {} table {} policy {} snapshot {}",
+        "TMS {} metrics reported and action finished for job {} metalake {} table {} policy {} snapshot {}",
+        phase,
         jobId,
         metalake,
         action.tableId(),
         action.policyId(),
-        request.getSnapshotId());
+        snapshotId);
   }
 
   private TableMaintenanceActionPO loadInFlight(String metalake, long jobId, long tableId) {
@@ -103,10 +161,6 @@ public class MaintenanceMetricsService {
     return action;
   }
 
-  /**
-   * Soft-slot rows use {@code finished_at = 0} while in flight. Reject reports on completed rows so
-   * a late Spark retry cannot write metrics after reclaim.
-   */
   private static void requireActionInFlight(TableMaintenanceActionPO action) {
     if (action.finishedAt() == null || action.finishedAt() != 0L) {
       throw new NoSuchEntityException(

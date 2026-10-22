@@ -176,24 +176,29 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
-   * Sets terminal snapshot pointers when the Spark Job finishes and releases the soft slot.
+   * Sets terminal snapshot pointers for one bound table/policy row and releases its soft slot.
    *
    * <p>Only one in-flight row exists per {@code (table_id, policy_id)} ({@code finished_at = 0}),
    * so finish timestamps do not contend across concurrent submitters.
    *
    * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param afterSnapshotId terminal snapshot id
    * @param finishedAt finish time millis; must be {@code > 0}
    * @return UPDATE statement
    */
   public String markFinished(
       @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt) {
     return "UPDATE "
         + TABLE_NAME
         + " SET after_snapshot_id = #{afterSnapshotId}, finished_at = #{finishedAt}"
-        + " WHERE job_id = #{jobId} AND finished_at = 0";
+        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND finished_at = 0";
   }
 
   /**
@@ -201,15 +206,21 @@ public class TableMaintenanceActionBaseSQLProvider {
    * still null (finish listener raced after reclaim).
    *
    * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param afterSnapshotId terminal snapshot id; must be non-null
    * @return UPDATE statement
    */
   public String backfillAfterSnapshot(
-      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId) {
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterSnapshotId") long afterSnapshotId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET after_snapshot_id = #{afterSnapshotId}"
-        + " WHERE job_id = #{jobId} AND finished_at > 0 AND after_snapshot_id IS NULL";
+        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND finished_at > 0 AND after_snapshot_id IS NULL";
   }
 
   /**

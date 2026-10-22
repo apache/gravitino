@@ -146,25 +146,34 @@ public class TableMaintenanceActionSQLProviderFactory {
 
   /**
    * @param jobId job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param afterSnapshotId after snapshot
    * @param finishedAt finish millis
    * @return UPDATE statement
    */
   public static String markFinished(
       @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt) {
-    return getProvider().markFinished(jobId, afterSnapshotId, finishedAt);
+    return getProvider().markFinished(jobId, tableId, policyId, afterSnapshotId, finishedAt);
   }
 
   /**
    * @param jobId job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param afterSnapshotId after snapshot
    * @return UPDATE statement
    */
   public static String backfillAfterSnapshot(
-      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId) {
-    return getProvider().backfillAfterSnapshot(jobId, afterSnapshotId);
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterSnapshotId") long afterSnapshotId) {
+    return getProvider().backfillAfterSnapshot(jobId, tableId, policyId, afterSnapshotId);
   }
 
   /**
