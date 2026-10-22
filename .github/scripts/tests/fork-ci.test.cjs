@@ -530,3 +530,20 @@ test('scheduled sweeps scale their budget with the hourly quota', async () => wi
   assert.ok(await probed(1000) < 60);
   assert.equal(await probed(15000), 60);
 }));
+
+test('a missing fork run waits instead of asking the author to act', async () => {
+  const github = serviceMock();
+  github.rest.actions.listWorkflowRuns = async () => ({ data: { workflow_runs: [] } });
+  const { result } = await createService(github).mirror(pr());
+  assert.equal(result.status, 'queued'); assert.equal(result.conclusion, undefined);
+  assert.match(result.note, /enable Actions in your fork/);
+});
+
+test('an incomplete run listing does not replace a recorded run', async () => withPublisher(async ({ ctx, stateFile, core }) => {
+  const green = { id: 55, app: { slug: 'github-actions' }, status: 'completed', conclusion: 'success',
+    output: { text: JSON.stringify({ owner: 'fork', repo: 'repo', run_id: 1, run_attempt: 1 }) } };
+  const { github, writes } = publisherMock({ latest: green });
+  github.rest.actions.listWorkflowRuns = async () => ({ data: { workflow_runs: [] } });
+  await update({ github, context: ctx, core, stateFile });
+  assert.equal(writes.length, 0);
+}));

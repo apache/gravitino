@@ -121,7 +121,11 @@ function createService(github) {
     const trusted = await findRun(pr, true);
     let selected = trusted && (!ordinary || (trusted.run.updated_at || trusted.run.created_at) >= (ordinary.run.updated_at || ordinary.run.created_at) || !sameDefinitions)
       ? trusted : ordinary;
-    if (!selected) return { result: requiredAction('Enable Actions in the fork and push the branch, or dispatch trusted Fork CI.') };
+    // Run listings can lag behind, e.g. right after a push or during GitHub incidents, so keep
+    // waiting instead of asking the author to act.
+    if (!selected) return { result: { status: 'queued', title: 'Waiting for Fork CI',
+      note: 'No Fork CI run was found for this commit yet. If none starts, enable Actions in your fork and push again, ' +
+        'or ask a committer to dispatch trusted Fork CI.' } };
     const { owner, repo, run } = selected;
     if (!selected.trusted && !sameDefinitions) return { ...selected, fork: ordinary?.run,
       result: requiredAction('CI workflow/action/script definitions or branch protection differ from the base. ' +

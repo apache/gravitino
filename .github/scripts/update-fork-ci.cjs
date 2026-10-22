@@ -85,6 +85,8 @@ async function update({ github, context, core }) {
     // attempt of a run from the same repository, or a completed result with a running one.
     const latest = await latestCheck(pr);
     const oldRecord = recordOf(latest);
+    // A run already recorded for this commit still exists; a listing that missed it is incomplete.
+    if (!record.run_id && oldRecord.run_id) return;
     if (oldRecord.owner === record.owner && oldRecord.repo === record.repo && record.run_id &&
         (oldRecord.run_id > record.run_id || (oldRecord.run_id === record.run_id &&
           (oldRecord.run_attempt > record.run_attempt ||
