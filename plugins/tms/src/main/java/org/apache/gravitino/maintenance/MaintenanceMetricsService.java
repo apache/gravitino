@@ -36,8 +36,8 @@ import org.slf4j.LoggerFactory;
  * parameter on metrics reports, or via {@link #finishAction} when no metrics are needed. There is
  * no job-terminal reclaim path.
  *
- * <p>Callbacks that arrive before submit-side {@code bindJobId} lazy-bind the sole unbound claim
- * for the reported {@code tableId} onto the path {@code jobId}.
+ * <p>Callbacks that arrive before submit-side {@code bindJobId} lazy-bind the unbound claim for the
+ * reported {@code (tableId, policyId)} onto the path {@code jobId}.
  */
 public class MaintenanceMetricsService {
 
@@ -87,10 +87,12 @@ public class MaintenanceMetricsService {
    */
   public void reportBeforeMetrics(
       String metalake, long jobId, boolean finish, MaintenanceActionMetricsRequest request) {
-    TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
+    TableMaintenanceActionPO action =
+        loadInFlight(metalake, jobId, request.getTableId(), request.getPolicyId());
     metricsMetaService.insertMetrics(
         action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
-    actionMetaService.recordBeforeSnapshot(jobId, action.tableId(), request.getSnapshotId());
+    actionMetaService.recordBeforeSnapshot(
+        jobId, action.tableId(), action.policyId(), request.getSnapshotId());
     maybeFinish(
         jobId,
         action,
@@ -112,7 +114,8 @@ public class MaintenanceMetricsService {
    */
   public void reportAfterMetrics(
       String metalake, long jobId, boolean finish, MaintenanceActionMetricsRequest request) {
-    TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
+    TableMaintenanceActionPO action =
+        loadInFlight(metalake, jobId, request.getTableId(), request.getPolicyId());
     metricsMetaService.insertMetrics(
         action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
     maybeFinish(
@@ -120,14 +123,16 @@ public class MaintenanceMetricsService {
   }
 
   /**
-   * Closes the soft slot for one bound table without writing metrics.
+   * Closes the soft slot for one bound table/policy without writing metrics.
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id
-   * @param request finish payload ({@code tableId}, optional {@code afterSnapshotId})
+   * @param request finish payload ({@code tableId}, {@code policyId}, optional {@code
+   *     afterSnapshotId})
    */
   public void finishAction(String metalake, long jobId, MaintenanceActionFinishRequest request) {
-    TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
+    TableMaintenanceActionPO action =
+        loadInFlight(metalake, jobId, request.getTableId(), request.getPolicyId());
     actionMetaService.markFinished(
         jobId,
         action.tableId(),
@@ -174,16 +179,18 @@ public class MaintenanceMetricsService {
         snapshotId);
   }
 
-  private TableMaintenanceActionPO loadInFlight(String metalake, long jobId, long tableId) {
-    TableMaintenanceActionPO action = actionMetaService.getByJobIdAndTableId(jobId, tableId);
+  private TableMaintenanceActionPO loadInFlight(
+      String metalake, long jobId, long tableId, long policyId) {
+    TableMaintenanceActionPO action =
+        actionMetaService.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
     if (action == null) {
-      if (actionMetaService.bindJobIdIfUnbound(tableId, jobId)) {
-        action = actionMetaService.getByJobIdAndTableId(jobId, tableId);
+      if (actionMetaService.bindJobIdIfUnbound(tableId, policyId, jobId)) {
+        action = actionMetaService.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
       }
     }
     if (action == null) {
       throw new NoSuchEntityException(
-          "no maintenance action for job_id=%s table_id=%s", jobId, tableId);
+          "no maintenance action for job_id=%s table_id=%s policy_id=%s", jobId, tableId, policyId);
     }
     requireActionInFlight(action);
     requireActionInMetalake(action, metalake);

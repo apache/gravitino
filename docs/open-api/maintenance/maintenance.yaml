@@ -31,9 +31,10 @@ paths:
       operationId: reportMaintenanceActionBeforeMetrics
       description: |
         Spark callback for an in-flight maintenance action at S0: persists snapshot metrics and
-        records `before_snapshot_id`. `tableId` selects which bound table when one Spark job covers
-        multiple tables. Optional query `finish=true` closes that table/policy soft slot (for
-        example on snapshot drift / skip). Continue / stop stays in the job.
+        records `before_snapshot_id`. `tableId` and `policyId` select which bound action row when
+        one Spark job covers multiple tables and/or policies. Optional query `finish=true` closes
+        that table/policy soft slot (for example on snapshot drift / skip). Continue / stop stays
+        in the job.
       requestBody:
         required: true
         content:
@@ -69,8 +70,8 @@ paths:
       description: |
         Closes the soft slot for one bound table/policy without writing snapshot metrics.
         Use when the maintenance type does not sample metrics, or when metrics were already
-        reported and only occupancy release remains. `tableId` is required for multi-table jobs.
-        Optional `afterSnapshotId` sets `after_snapshot_id` when known.
+        reported and only occupancy release remains. `tableId` and `policyId` select the action
+        row. Optional `afterSnapshotId` sets `after_snapshot_id` when known.
       requestBody:
         required: true
         content:
@@ -106,9 +107,9 @@ paths:
       operationId: reportMaintenanceActionAfterMetrics
       description: |
         Spark callback for an in-flight maintenance action at S1: persists snapshot metrics.
-        `tableId` selects which bound table when one Spark job covers multiple tables. Optional
-        query `finish=true` closes that table/policy soft slot and sets `after_snapshot_id` to
-        `snapshotId`. Continue / stop stays in the job.
+        `tableId` and `policyId` select which bound action row when one Spark job covers multiple
+        tables and/or policies. Optional query `finish=true` closes that table/policy soft slot
+        and sets `after_snapshot_id` to `snapshotId`. Continue / stop stays in the job.
       requestBody:
         required: true
         content:
@@ -161,13 +162,18 @@ components:
       type: object
       required:
         - tableId
+        - policyId
         - snapshotId
         - metricsJson
       properties:
         tableId:
           type: integer
           format: int64
-          description: Table entity id bound to this job (required for multi-table jobs)
+          description: Table entity id bound to this job
+        policyId:
+          type: integer
+          format: int64
+          description: Policy entity id bound to this job (required when one job covers multiple policies)
         snapshotId:
           type: integer
           format: int64
@@ -179,11 +185,16 @@ components:
       type: object
       required:
         - tableId
+        - policyId
       properties:
         tableId:
           type: integer
           format: int64
           description: Table entity id bound to this job
+        policyId:
+          type: integer
+          format: int64
+          description: Policy entity id bound to this job
         afterSnapshotId:
           type: integer
           format: int64
@@ -194,17 +205,20 @@ components:
     MaintenanceActionBeforeMetricsRequest:
       value: {
         "tableId": 10,
+        "policyId": 20,
         "snapshotId": 9001,
         "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5}"
       }
     MaintenanceActionAfterMetricsRequest:
       value: {
         "tableId": 10,
+        "policyId": 20,
         "snapshotId": 9002,
         "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9002,\"custom-data-file-mse\":0.2}"
       }
     MaintenanceActionFinishRequest:
       value: {
         "tableId": 10,
+        "policyId": 20,
         "afterSnapshotId": null
       }
