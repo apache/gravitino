@@ -52,6 +52,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -1697,6 +1698,11 @@ public class TestCatalogManager {
             RuntimeException.class, () -> catalogManager.dropCatalog(ident, true));
     if (conflict) {
       Assertions.assertSame(failure, thrown);
+    } else {
+      String schemaError =
+          "Failed to drop schema " + NameIdentifier.of("metalake", ident.name(), "schema_occ");
+      Assertions.assertTrue(thrown.getMessage().contains(schemaError));
+      Assertions.assertTrue(ExceptionUtils.getThrowableList(thrown).contains(failure));
     }
     Assertions.assertTrue(entityStore.exists(ident, EntityType.CATALOG));
     Assertions.assertTrue(

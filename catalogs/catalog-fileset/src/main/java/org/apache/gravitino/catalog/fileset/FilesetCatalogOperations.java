@@ -905,7 +905,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         }
       }
 
-      boolean dropped = super.dropSchema(ident, cascade);
+      // Reject remaining filesets instead of deleting their metadata without storage cleanup.
+      boolean dropped = super.dropSchema(ident, false);
       // If the schema entity is failed to be deleted, we should not delete the storage location
       // and return false immediately.
       if (!dropped || disableFSOps) {

@@ -907,6 +907,7 @@ public class TestFilesetCatalogOperations {
         .when(orderedStore)
         .list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
     Path failedPath = new Path(filesets.get(1).storageLocation());
+    FileSystem realFileSystem = failedPath.getFileSystem(new Configuration());
     FileSystem failingFileSystem = Mockito.mock(FileSystem.class);
     when(failingFileSystem.exists(failedPath)).thenReturn(true);
     if (throwException) {
@@ -933,7 +934,7 @@ public class TestFilesetCatalogOperations {
         Path path = new Path(fileset.storageLocation());
         Assertions.assertEquals(
             i != 0, store.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
-        Assertions.assertEquals(i != 0, path.getFileSystem(new Configuration()).exists(path));
+        Assertions.assertEquals(i != 0, realFileSystem.exists(path));
       }
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> secretManager.readSecret(secrets.get(0)));
@@ -949,12 +950,81 @@ public class TestFilesetCatalogOperations {
       for (FilesetEntity fileset : filesets) {
         Assertions.assertFalse(store.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
         Path path = new Path(fileset.storageLocation());
-        Assertions.assertFalse(path.getFileSystem(new Configuration()).exists(path));
+        Assertions.assertFalse(realFileSystem.exists(path));
       }
       for (SecretUrn urn : secrets) {
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> secretManager.readSecret(urn));
       }
+    }
+  }
+
+  @Test
+  void testDropSchemaRejectsFilesetCreatedAfterListing() throws IOException {
+    String schemaName = "schema_cascade_new_fileset_" + generateTestId();
+    String catalogPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, "comment", catalogPath, null);
+    NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
+    Namespace filesetNs = Namespace.of("m1", "c1", schemaName);
+    Fileset first =
+        createFileset("first", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
+    NameIdentifier remainingIdent = NameIdentifier.of(filesetNs, "remaining");
+    Path remainingPath = new Path(new Path(catalogPath, schemaName), remainingIdent.name());
+    FileSystem fs = remainingPath.getFileSystem(new Configuration());
+    long remainingId = generateTestId();
+    SecretUrn urn =
+        SecretUrn.buildWriteThrough(
+            "memory",
+            Map.of(
+                SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                SecretConstants.ATTR_ENTITY_ID, String.valueOf(remainingId),
+                SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
+    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+    Map<String, String> remainingProperties =
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(remainingId), Map.of("test-secret", urn.toString()));
+
+    EntityStore interleavedStore = Mockito.spy(store);
+    try (FilesetCatalogOperations ops =
+        new FilesetCatalogOperations(interleavedStore, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      Mockito.doAnswer(
+              invocation -> {
+                List<FilesetEntity> listed =
+                    store.list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
+                // Simulate another writer creating a fileset after the deletion snapshot is read.
+                ops.createFileset(
+                    remainingIdent,
+                    "comment",
+                    Fileset.Type.MANAGED,
+                    remainingPath.toString(),
+                    remainingProperties);
+                return listed;
+              })
+          .when(interleavedStore)
+          .list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
+
+      Assertions.assertThrows(
+          NonEmptySchemaException.class, () -> ops.dropSchema(schemaIdent, true));
+      Assertions.assertTrue(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(remainingIdent, Entity.EntityType.FILESET));
+      Assertions.assertTrue(fs.exists(remainingPath));
+      Assertions.assertEquals("test-value", secretManager.readSecret(urn));
+      Assertions.assertFalse(
+          store.exists(NameIdentifier.of(filesetNs, first.name()), Entity.EntityType.FILESET));
+      Assertions.assertFalse(fs.exists(new Path(first.storageLocation())));
+
+      Mockito.doCallRealMethod()
+          .when(interleavedStore)
+          .list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
+      Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
+      Assertions.assertFalse(store.exists(schemaIdent, Entity.EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(remainingIdent, Entity.EntityType.FILESET));
+      Assertions.assertFalse(fs.exists(remainingPath));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secretManager.readSecret(urn));
     }
   }
 
