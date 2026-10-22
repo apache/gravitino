@@ -267,6 +267,21 @@ public class TestIcebergViewHookDispatcher {
   }
 
   @Test
+  public void testDropViewWithAuthorizationOffRemovesFromEntityStore() throws Exception {
+    FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", null, true);
+    IcebergViewHookDispatcher bookkeepingOnly =
+        new IcebergViewHookDispatcher(mockExecutor, mockNamespaceDispatcher, METALAKE, false);
+    TableIdentifier viewIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), VIEW_NAME);
+
+    bookkeepingOnly.dropView(mockContext, viewIdent);
+
+    verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
+    NameIdentifier expectedIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
+    verify(mockEntityStore, times(1)).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
+  }
+
+  @Test
   public void testDropViewRemovesFromEntityStore() throws Exception {
     TableIdentifier viewIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), VIEW_NAME);
 
