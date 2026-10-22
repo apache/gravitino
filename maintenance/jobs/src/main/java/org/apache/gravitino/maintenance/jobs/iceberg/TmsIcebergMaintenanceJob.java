@@ -70,7 +70,8 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   private static final Logger LOG = LoggerFactory.getLogger(TmsIcebergMaintenanceJob.class);
 
   /** Built-in template name submitted by TMS cron / commit. */
-  public static final String NAME = JobTemplateProvider.BUILTIN_TMS_ICEBERG_MAINTENANCE;
+  public static final String NAME =
+      JobTemplateProvider.BUILTIN_NAME_PREFIX + "tms-iceberg-maintenance";
 
   /** JobConf / CLI key for the maintenance kind ({@code maintenance_type}). */
   public static final String MAINTENANCE_TYPE_KEY = "maintenance_type";

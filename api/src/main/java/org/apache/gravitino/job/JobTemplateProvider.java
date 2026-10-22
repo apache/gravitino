@@ -34,12 +34,6 @@ public interface JobTemplateProvider {
   /** Regex to validate built-in job template names. */
   String BUILTIN_NAME_PATTERN = "^" + BUILTIN_NAME_PREFIX + "[\\w-]+$";
 
-  /**
-   * Built-in TMS cron Iceberg maintenance template ({@code TmsIcebergMaintenanceJob}). Shared by
-   * the jobs module and the TMS plugin so the name cannot drift.
-   */
-  String BUILTIN_TMS_ICEBERG_MAINTENANCE = BUILTIN_NAME_PREFIX + "tms-iceberg-maintenance";
-
   /** Property key used to carry the built-in job template version. */
   String PROPERTY_VERSION_KEY = "version";
 
