@@ -22,4 +22,3 @@ runs:
         java-version: ${{ inputs.java-version }}
         distribution: temurin
         cache: ${{ inputs.cache }}
-
