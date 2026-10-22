@@ -47,9 +47,10 @@ stage gated on the one before and fanned out in parallel inside.**
 5. **Integration tests:** one job per area (backend, Spark, Trino, Flink, ...), each only when its
    paths change.
 
-**Why it matters:** today 16 workflows start the moment a PR is pushed, and none waits for
-anything. A PR with a formatting error still starts every integration test, and a red `build (17)`
-can mean a lint error, a unit test or a slow container, because they share one Gradle call.
+**Why it matters:** today 15 build and test workflows start the moment a PR is pushed, and none
+waits for anything. A PR with a formatting error still starts every integration test, and a red
+`build (17)` can mean a lint error, a unit test or a slow container, because they share one Gradle
+call.
 
 ### Today: everything starts at once
 
@@ -62,9 +63,9 @@ flowchart LR
   pr --> rest["contrib, frontend, web UI, chart tests"]
 ```
 
-**Nothing waits for anything.** The push starts 16 workflows together. A Spotless error in one
-file still starts every container, and `build (17)` fails for any of three reasons that the check
-name does not tell apart: a lint error, a unit test, or a container test.
+**Nothing waits for anything.** The push starts 15 build and test workflows together. A Spotless
+error in one file still starts every container, and `build (17)` fails for any of three reasons that
+the check name does not tell apart: a lint error, a unit test, or a container test.
 
 ### Presubmit: stages in order, fan-out inside each
 
@@ -142,7 +143,7 @@ presubmit job locally by typing the same `./gradlew <task>` the job runs.
 
 | What                     | Today                                                                |
 | ------------------------ | -------------------------------------------------------------------- |
-| PR workflows             | 16, all triggered by `pull_request`, none gated on another           |
+| PR workflows             | 15 build and test, all on `pull_request`, none gated on another      |
 | Lint                     | Inside `build (17)`, in the same Gradle call as the tests            |
 | Unit tests               | `build -PskipITs -PskipDockerTests=false` plus `-x` exclusions       |
 | Docker-tagged unit tests | Same call; 9 modules, about 64% of the job's test time               |
@@ -311,7 +312,7 @@ module (`gravitinoTests { itShard = ... }`) instead of one list.
 | Contributor     | A lint error fails in minutes and stops the run               |
 | Reviewer        | A red check names the stage that failed                       |
 | CI maintainers  | One workflow, task names in the matrix, no `gradle_args` bash |
-| ASF runner pool | A broken PR uses one lint job instead of 16 workflows         |
+| ASF runner pool | A broken PR uses one lint job instead of 15 workflows         |
 
 ---
 
