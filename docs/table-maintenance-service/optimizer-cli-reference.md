@@ -182,7 +182,10 @@ Notes:
 - For `stats` or `all`, `--updater-options` must include `gravitino_uri` and `metalake`.
 - If `--updater-options` includes external JDBC metrics settings
   (`gravitino.optimizer.jdbcMetrics.*`), ensure the JDBC driver JAR is available to Spark
-  runtime classpath (for example via `spark.jars` in `--spark-conf`).
+  runtime classpath of the driver: with the k8s job executor, for example via `spark.jars` in
+  `--spark-conf`, which replaces a `spark.jars` default of the k8s job executor, so list the
+  Iceberg runtime there too if that default provides it; with the local job executor, by installing
+  it into `SPARK_HOME/jars`, as the driver applies `--spark-conf` only after it starts.
 - `--spark-conf` and `--updater-options` are flat JSON maps.
 
 ## List Table Metrics
@@ -229,7 +232,7 @@ Examples:
 SUMMARY: statistics totalRecords=3 tableRecords=2 partitionRecords=1 jobRecords=0
 DRY-RUN: strategy=iceberg-data-compaction identifier=rest_catalog.db.t1 score=95 jobTemplate=builtin-iceberg-rewrite-data-files jobOptions={catalog_name=rest_catalog, table_identifier=db.t1}
 SUBMIT: strategy=iceberg-data-compaction identifier=rest_catalog.db.t1 score=95 jobTemplate=builtin-iceberg-rewrite-data-files jobOptions={catalog_name=rest_catalog, table_identifier=db.t1} jobId=1f54c6d3-4e27-4cc8-bdfa-b05ecf59a4c2
-DRY-RUN: identifier=rest_catalog.db.t1 jobTemplate=builtin-iceberg-update-stats jobConfig={catalog_name=rest_catalog, table_identifier=db.t1, update_mode=all, updater_options={"gravitino_uri":"http://localhost:8090","metalake":"test"}, spark_conf={"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}}
+DRY-RUN: identifier=rest_catalog.db.t1 jobTemplate=builtin-iceberg-update-stats jobConfig={catalog_name=rest_catalog, table_identifier=db.t1, update_mode=all, updater_options={"gravitino_uri":"http://localhost:8090","metalake":"test"}, spark_conf={"spark.hadoop.fs.defaultFS":"file:///"}}
 SUMMARY: submit-update-stats-job total=1 submitted=1 dryRun=false
 MetricsResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, metrics={row_count=[{timestamp=1735689600, value=100}]}}
 EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, evaluation=true, evaluatorName=gravitino-metrics-evaluator, actionTimeSeconds=1735689600, rangeSeconds=86400, beforeMetrics={row_count=[MetricSample{timestampSeconds=1735686000, value=120}]}, afterMetrics={row_count=[MetricSample{timestampSeconds=1735689600, value=100}]}}
@@ -254,7 +257,12 @@ These templates set Iceberg Spark session and catalog classes, but they do not l
 runtime in `jars`. `gravitino-jobs` also excludes that runtime from its shaded JAR, so the version
 that runs with your Spark cluster is yours to supply. Provide a matching
 `iceberg-spark-runtime-<sparkMajor>_<scala>` JAR on the Spark classpath used by the job executor —
-commonly through `spark.jars` in `spark_conf`, or by installing it into `SPARK_HOME`. Align the
+commonly by installing it into `SPARK_HOME` or the Spark image, or, with the k8s job executor,
+through `spark.jars` in `spark_conf`, which the k8s job executor sets when it submits the job. It
+replaces a `spark.jars` default of the k8s job executor rather than adding to it, so list every jar
+the job needs there.
+With the local job executor, `spark.jars` in `spark_conf` doesn't add it, as the driver applies
+`spark_conf` only after spark-submit has built its classpath. Align the
 artifact with the Spark, Scala, and Iceberg versions you actually run. A reference coordinate used
 in Gravitino's own jobs tests is `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`.
 Without that runtime, built-in Iceberg jobs fail after Spark starts instead of continuing without
@@ -267,7 +275,7 @@ missing keys. An empty string is a value, not an omission: it overrides the defa
 
 | Job template                         | Required keys                                                                           | Optional keys and defaults                                                                                         |
 |--------------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (`local[*]`), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
+| Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (empty), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
 | `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                   |
 | `builtin-iceberg-rewrite-data-files`  | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                    |
 | `builtin-iceberg-expire-snapshots`    | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                            |
@@ -276,6 +284,13 @@ missing keys. An empty string is a value, not an omission: it overrides the defa
 
 `where_clause` has no default on purpose: an empty where clause compacts every data file in the
 table, so it must be asked for explicitly.
+
+An empty `spark_master` leaves the master to the job executor: the local job executor runs the job
+with the spark-submit default `local[*]`, and the k8s job executor rejects any other master than a
+Kubernetes one. `spark.master` and `spark.submit.deployMode` in `spark_conf` are ignored, as the job
+is submitted with them already set. So are the `spark.kubernetes.*` configurations in `spark_conf`,
+such as the namespace, the image, the service account, Secrets, and volumes: whoever runs a job sets
+`spark_conf`, so only the job executor configurations and job templates may set them.
 
 ## Update Statistics
 

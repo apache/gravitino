@@ -25,6 +25,13 @@ gravitino.job.statusPullIntervalInMs=300000
 gravitino.jobExecutor.local.sparkHome=/path/to/spark
 ```
 
+These settings run the jobs with the [local job executor](../local-job-executor.md). To run them on
+Kubernetes, set `gravitino.job.executor=k8s` and configure the
+[Kubernetes job executor](../k8s-job-executor.md) instead. The examples on this page are for the
+local job executor: on Kubernetes, leave `spark_master` empty, as the Kubernetes job executor
+rejects `local[2]`. See
+[Built-In Jobs](../k8s-job-executor.md#built-in-jobs).
+
 `gravitino.job.statusPullIntervalInMs` defaults to five minutes. Job status is polled rather than pushed, so REST status can lag the real Spark process by a full interval, which makes a working job look hung. Lower it to `10000` for local work and restart the server.
 
 ## CLI Configuration
@@ -50,7 +57,7 @@ gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
 # Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
-gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
+gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS":"file:///"}
 ```
 
 When the Gravitino server has authentication enabled, `builtin-iceberg-update-stats` needs
@@ -89,7 +96,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "table_identifier": "db.t1",
   "update_mode": "all",
   "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
-  "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
+  "spark_conf": "{\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
   "spark_master": "local[2]",
   "spark_executor_instances": "1",
   "spark_executor_cores": "1",
@@ -110,8 +117,11 @@ that lists the missing keys. See
 and the defaults of each template.
 
 Built-in Iceberg templates also need an Iceberg Spark runtime on the Spark classpath. They do not
-ship that JAR or fill template `jars`, so include it yourself — for example
-`"spark.jars":"/path/to/iceberg-spark-runtime-....jar"` inside `spark_conf`. Match the artifact to
+ship that JAR or fill template `jars`, so include it yourself — for example by installing it into
+`SPARK_HOME/jars`, or, with the k8s job executor, by
+`"spark.jars":"https://.../iceberg-spark-runtime-....jar"` inside `spark_conf`. With the local job
+executor, `spark.jars` inside `spark_conf` doesn't add it, as the driver applies `spark_conf` only
+after it starts. Match the artifact to
 your Spark, Scala, and Iceberg versions. Details are under
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 

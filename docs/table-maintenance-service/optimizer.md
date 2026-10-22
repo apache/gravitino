@@ -84,18 +84,25 @@ Each step ends with a check. If a check fails, stop there, since every step depe
 ### Prerequisites
 
 - A running Gravitino server with a metalake. The examples use `test`.
-- Spark available to the job executor, through either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`.
+- Spark available to the job executor. The [local job executor](../local-job-executor.md) needs either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`, and the [Kubernetes job executor](../k8s-job-executor.md) needs a Spark image.
 - An Iceberg Spark runtime on that Spark classpath. Built-in Iceberg templates configure
   `IcebergSparkSessionExtensions` and `SparkCatalog`, but `gravitino-jobs` does not ship the
   Iceberg Spark runtime and the templates leave `jars` empty so your Spark and Iceberg versions
   stay under your control. A stock Spark distribution is not enough. Put a matching
-  `iceberg-spark-runtime-*` JAR on the job classpath — for example with `spark.jars` in
-  `spark_conf`, or by installing it into your Spark environment. Pick the artifact that matches
+  `iceberg-spark-runtime-*` JAR on the job classpath — for example by installing it into
+  `SPARK_HOME/jars`. `spark.jars` in `spark_conf` doesn't add it with the local job executor, as
+  the driver applies `spark_conf` only after it starts. Pick the artifact that matches
   your Spark, Scala, and Iceberg versions. The jobs module is built and tested against Spark 3.5.x
   and Iceberg 1.11.0 (for example
   `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`). Without it, the job fails after
   Spark starts with an error naming the missing Iceberg classes. See
   [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+- With the [Kubernetes job executor](../k8s-job-executor.md), the jobs run in Spark pods: put the
+  Iceberg Spark runtime in the Spark image, in `gravitino.jobExecutor.k8s.spark.conf.spark.jars`,
+  or in `spark.jars` of `spark_conf`; leave `spark_master` empty, as the examples' `local[2]` is
+  rejected; and use catalog URIs, warehouse locations, and a `gravitino_uri` in `updater_options`
+  that the pods can reach, not `localhost`. See
+  [Built-In Jobs](../k8s-job-executor.md#built-in-jobs).
 - `gravitino.job.statusPullIntervalInMs` lowered to `10000` and the server restarted. The default is five minutes, which makes every status check in this walkthrough feel broken.
 
 If your Iceberg REST backend runs in memory, do not restart it partway through. Restarting resets both metadata and data files, and you start over.
@@ -222,7 +229,7 @@ update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+
       "table_identifier": "db.t1",
       "update_mode": "all",
       "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\"}",
-      "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
+      "spark_conf": "{\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
       "spark_master": "local[2]",
       "spark_executor_instances": "1",
       "spark_executor_cores": "1",
@@ -270,7 +277,7 @@ gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
 # Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
-gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
+gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS":"file:///"}
 EOF_CONF
 ```
 

@@ -18,13 +18,20 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Shared utility methods for Iceberg maintenance jobs.
@@ -34,12 +41,34 @@ import org.apache.spark.sql.SparkSession;
  */
 public final class IcebergJobUtils {
 
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergJobUtils.class);
+
   private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
   /**
    * Matches a job template placeholder that no job configuration value replaced, e.g. {@code
    * {{use_caching}}}.
    */
   private static final Pattern UNRESOLVED_PLACEHOLDER_PATTERN = Pattern.compile("^\\{\\{[^{}]*}}$");
+
+  /**
+   * The Spark configurations that spark-submit decides. Set in the custom Spark configurations of a
+   * job, which the driver applies, they would override the submitted value, e.g. run a job in local
+   * mode inside the driver pod of a cluster.
+   *
+   * <p>Keep this and {@link #SPARK_KUBERNETES_PREFIX} aligned with the k8s job executor's {@code
+   * SparkApplicationUtils}, which ignores the same configurations of spark_conf when it submits a
+   * built-in job. The jobs jar runs in the driver without the executor plugin, so the rules can't
+   * be shared as code.
+   */
+  private static final Set<String> SUBMIT_DECIDED_CONFIGS =
+      ImmutableSet.of("spark.master", "spark.submit.deployMode");
+
+  /**
+   * The prefix of the Kubernetes configurations, which a job run may not set in its custom Spark
+   * configurations: the driver creates the executor pods from them, with their image, service
+   * account, Secrets, and volumes. Only the job executor configurations and job templates set them.
+   */
+  private static final String SPARK_KUBERNETES_PREFIX = "spark.kubernetes.";
 
   private IcebergJobUtils() {}
 
@@ -173,7 +202,61 @@ public final class IcebergJobUtils {
    * @throws IllegalArgumentException if JSON parsing fails
    */
   public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, "spark-conf");
+    return filterCustomSparkConfigs(
+        IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, "spark-conf"));
+  }
+
+  /**
+   * Filter the custom Spark configurations of a job, which the driver applies when it creates the
+   * SparkSession, against the configurations spark-submit has already set for the driver.
+   *
+   * <p>{@code spark.master} and {@code spark.submit.deployMode} are dropped if spark-submit has set
+   * them, as the job would otherwise run with another master than it was submitted to. The {@code
+   * spark.kubernetes.*} configurations are dropped, as whoever runs a job sets them here, while the
+   * driver creates the executor pods from them. A blank value leaves a configuration unset.
+   *
+   * @param configs the custom Spark configurations
+   * @return the custom Spark configurations to apply
+   */
+  public static Map<String, String> filterCustomSparkConfigs(Map<String, String> configs) {
+    // new SparkConf() reads the spark.* system properties on purpose: spark-submit sets the
+    // configurations it submitted the job with as system properties before it calls main().
+    return filterCustomSparkConfigs(configs, new SparkConf());
+  }
+
+  @VisibleForTesting
+  static Map<String, String> filterCustomSparkConfigs(
+      Map<String, String> configs, SparkConf submittedConf) {
+    Map<String, String> filtered = new LinkedHashMap<>();
+    configs.forEach(
+        (key, value) -> {
+          // A blank value leaves a configuration unset, as the k8s job executor does.
+          if (value == null || value.trim().isEmpty()) {
+            return;
+          }
+          if (key.startsWith(SPARK_KUBERNETES_PREFIX)) {
+            // The value isn't logged, as it may name a Secret.
+            LOG.warn(
+                "Ignored {} of the custom Spark configurations, as only the job executor"
+                    + " configurations and job templates may set {}*",
+                key,
+                SPARK_KUBERNETES_PREFIX);
+            return;
+          }
+          if (SUBMIT_DECIDED_CONFIGS.contains(key) && submittedConf.contains(key)) {
+            LOG.warn(
+                "Ignored {}={} of the custom Spark configurations, as the job is submitted with"
+                    + " {}={}. Set it when submitting the job instead, for a built-in job by the"
+                    + " spark_master parameter.",
+                key,
+                value,
+                key,
+                submittedConf.get(key));
+            return;
+          }
+          filtered.put(key, value);
+        });
+    return ImmutableMap.copyOf(filtered);
   }
 
   /**
@@ -181,8 +264,7 @@ public final class IcebergJobUtils {
    *
    * <p>Built-in templates configure {@code IcebergSparkSessionExtensions} and {@code SparkCatalog},
    * but Spark only warns when those classes are missing and continues without Iceberg support. Call
-   * this after {@code SparkSession} creation (so {@code spark.jars} from {@code spark_conf} is
-   * visible) and fail the job when the runtime is absent.
+   * this after {@code SparkSession} creation and fail the job when the runtime is absent.
    *
    * @throws IllegalStateException when required Iceberg Spark classes cannot be loaded
    */
@@ -233,8 +315,11 @@ public final class IcebergJobUtils {
       throw new IllegalStateException(
           String.format(
               "Missing %s (%s). Built-in Iceberg jobs need iceberg-spark-runtime on the Spark "
-                  + "classpath (for example via spark.jars in spark_conf, or installed into the "
-                  + "Spark environment). A stock Spark distribution does not include it. Match "
+                  + "classpath, for example installed into the Spark environment or the Spark "
+                  + "image. With the k8s job executor, spark.jars in spark_conf or in "
+                  + "gravitino.jobExecutor.k8s.spark.conf.* adds it too. With the local job "
+                  + "executor, spark.jars in spark_conf doesn't, as the driver applies spark_conf "
+                  + "only after it starts. A stock Spark distribution does not include it. Match "
                   + "the artifact to your Spark, Scala, and Iceberg versions.",
               description, className),
           first);
