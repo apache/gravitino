@@ -16,10 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.client;
+package org.apache.gravitino.maintenance.jobs;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import org.apache.gravitino.client.ErrorHandlers;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.RESTClient;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
@@ -27,12 +30,10 @@ import org.apache.gravitino.maintenance.dto.responses.MaintenanceActionSampleRes
 import org.apache.gravitino.rest.RESTUtils;
 
 /**
- * Internal TMS cron Spark callbacks for maintenance action sample / finish (§5.2.2).
+ * TMS cron Spark callbacks for maintenance action sample / finish (§5.2.2).
  *
- * <p>Uses shared wire types from {@code :maintenance:maintenance-common}. <strong>Not a stable
- * public product API.</strong> Obtain instances only via {@link
- * GravitinoClient#maintenanceActionClient()} from built-in maintenance Spark jobs. The constructor
- * is package-private so external callers cannot treat this as a general client surface.
+ * <p>Lives in {@code :maintenance:jobs} with shared wire types from {@code
+ * :maintenance:maintenance-common}. Not part of the public {@code client-java} API.
  */
 public final class MaintenanceActionClient {
 
@@ -41,11 +42,14 @@ public final class MaintenanceActionClient {
 
   /**
    * @param client metalake-scoped Gravitino client
+   * @param metalakeName metalake used in the callback path
    */
-  MaintenanceActionClient(GravitinoClient client) {
+  public MaintenanceActionClient(GravitinoClient client, String metalakeName) {
     Preconditions.checkArgument(client != null, "client must not be null");
+    Preconditions.checkArgument(
+        metalakeName != null && !metalakeName.trim().isEmpty(), "metalakeName must not be blank");
     this.restClient = client.restClient();
-    this.metalakeName = client.metalakeName();
+    this.metalakeName = metalakeName.trim();
   }
 
   /**

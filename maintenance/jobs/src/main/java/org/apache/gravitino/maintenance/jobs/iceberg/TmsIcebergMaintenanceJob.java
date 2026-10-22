@@ -32,7 +32,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.client.MaintenanceActionClient;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
@@ -40,6 +39,7 @@ import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequ
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
 import org.apache.gravitino.maintenance.dto.responses.MaintenanceActionSampleResponse;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.jobs.MaintenanceActionClient;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
@@ -193,8 +193,11 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
     try (SparkSession spark = sparkBuilder.getOrCreate()) {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
+      Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
       try (GravitinoClient client = openClient(updaterOptions)) {
-        MaintenanceActionClient actionClient = client.maintenanceActionClient();
+        MaintenanceActionClient actionClient =
+            new MaintenanceActionClient(
+                client, optimizerProperties.get(OptimizerConfig.GRAVITINO_METALAKE));
         Long afterSnapshotId = null;
         String finishMetrics = null;
         boolean shouldFinish = false;
