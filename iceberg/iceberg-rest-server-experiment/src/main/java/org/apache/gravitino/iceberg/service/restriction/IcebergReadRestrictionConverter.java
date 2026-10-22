@@ -131,7 +131,7 @@ public final class IcebergReadRestrictionConverter {
     List<IcebergFunction<?, ?>> projections = new ArrayList<>();
     for (Map.Entry<Integer, ColumnMask> entry : orderedMasks) {
       Types.NestedField field = topLevelField(schema, entry.getKey());
-      MaskAction action = resolveMaskAction(entry.getValue(), field, schema, resolutionContext);
+      MaskAction action = resolveMaskAction(entry.getValue(), schema, resolutionContext);
       projections.add(toIcebergFunction(action, field));
     }
 
@@ -553,23 +553,16 @@ public final class IcebergReadRestrictionConverter {
   }
 
   private static MaskAction resolveMaskAction(
-      ColumnMask mask, Types.NestedField field, Schema schema, ResolutionContext context) {
+      ColumnMask mask, Schema schema, ResolutionContext context) {
     mask.validate();
-    List<Boolean> branchMatches = new ArrayList<>();
     for (MaskBranch branch : mask.branches()) {
-      toIcebergFunction(branch.action(), field);
       ResolvedPredicate condition = resolvePredicate(branch.condition(), schema, context);
       if (condition.expression().op() != Expression.Operation.TRUE
           && condition.expression().op() != Expression.Operation.FALSE) {
         throw new IllegalArgumentException("column-mask condition did not resolve to a constant");
       }
-      branchMatches.add(condition.expression().op() == Expression.Operation.TRUE);
-    }
-    toIcebergFunction(mask.fallback(), field);
-
-    for (int index = 0; index < mask.branches().size(); index++) {
-      if (branchMatches.get(index)) {
-        return mask.branches().get(index).action();
+      if (condition.expression().op() == Expression.Operation.TRUE) {
+        return branch.action();
       }
     }
     return mask.fallback();

@@ -152,6 +152,26 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   }
 
   @Test
+  void testUnselectedIncompatibleMaskDoesNotRejectTable() {
+    PolicyEntity mask =
+        maskPolicy(
+            1,
+            "conditional_mask",
+            "mask := action(\"mask-to-fixed-value\") if true "
+                + "else := action(\"replace-with-null\")");
+    Map<Integer, PolicyEntity[]> policiesByField = new LinkedHashMap<>();
+    policiesByField.put(1, new PolicyEntity[] {mask});
+
+    ReadRestrictions restrictions =
+        ExperimentalIcebergReadRestrictionLoader.resolve(
+            new PolicyEntity[0], policiesByField, SCHEMA, context("alice"));
+
+    assertEquals(1, restrictions.columnProjections().size());
+    assertEquals("mask-to-fixed-value", restrictions.columnProjections().get(0).name());
+    assertEquals(1, restrictions.columnProjections().get(0).fieldId());
+  }
+
+  @Test
   void testBindsSubjectForRowFilterAndMask() {
     PolicyEntity[] rowPolicies =
         new PolicyEntity[] {rowPolicy(1, "owner", "filter := col(\"owner\") == session_user()")};

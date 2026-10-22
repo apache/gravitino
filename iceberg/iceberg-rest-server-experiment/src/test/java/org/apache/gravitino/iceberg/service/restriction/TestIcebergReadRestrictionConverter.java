@@ -309,24 +309,56 @@ public class TestIcebergReadRestrictionConverter {
     assertThrows(
         IllegalArgumentException.class,
         () -> convertMasks(Collections.singletonMap(11, stringMask), context("alice")));
+  }
 
+  @Test
+  void testMaskSkipsUnselectedActionsAndConditions() {
     ColumnMask incompatibleFallback =
         RestrictedRegoExpressionParserFacade.parseColumnMask(
             "mask := action(\"mask-to-fixed-value\") if true " + "else := action(\"show-last-4\")");
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> convertMasks(Collections.singletonMap(1, incompatibleFallback), context("alice")));
+    ReadRestrictions selected =
+        convertMasks(Collections.singletonMap(1, incompatibleFallback), context("alice"));
+    assertEquals("mask-to-fixed-value", selected.columnProjections().get(0).name());
 
     ColumnMask unresolvedUnselectedCondition =
         RestrictedRegoExpressionParserFacade.parseColumnMask(
             "mask := action(\"show-last-4\") if true "
                 + "else := action(\"show-first-4\") if is_group_member(\"missing\") "
                 + "else := action(\"replace-with-null\")");
+    ReadRestrictions firstBranch =
+        convertMasks(Collections.singletonMap(2, unresolvedUnselectedCondition), context("alice"));
+    assertEquals("show-last-4", firstBranch.columnProjections().get(0).name());
+
+    ColumnMask incompatibleUnselectedBranch =
+        RestrictedRegoExpressionParserFacade.parseColumnMask(
+            "mask := action(\"show-last-4\") if false "
+                + "else := action(\"mask-to-fixed-value\") if true "
+                + "else := action(\"show-first-4\")");
+    ReadRestrictions laterBranch =
+        convertMasks(Collections.singletonMap(1, incompatibleUnselectedBranch), context("alice"));
+    assertEquals("mask-to-fixed-value", laterBranch.columnProjections().get(0).name());
+  }
+
+  @Test
+  void testSelectedIncompatibleMaskStillFailsClosed() {
+    ColumnMask incompatibleSelectedBranch =
+        RestrictedRegoExpressionParserFacade.parseColumnMask(
+            "mask := action(\"show-last-4\") if true " + "else := action(\"mask-to-fixed-value\")");
     assertThrows(
-        IllegalArgumentException.class,
+        IcebergReadRestrictionConverter.IncompatibleMaskException.class,
         () ->
             convertMasks(
-                Collections.singletonMap(2, unresolvedUnselectedCondition), context("alice")));
+                Collections.singletonMap(1, incompatibleSelectedBranch), context("alice")));
+
+    ColumnMask incompatibleSelectedFallback =
+        RestrictedRegoExpressionParserFacade.parseColumnMask(
+            "mask := action(\"mask-to-fixed-value\") if false "
+                + "else := action(\"show-last-4\")");
+    assertThrows(
+        IcebergReadRestrictionConverter.IncompatibleMaskException.class,
+        () ->
+            convertMasks(
+                Collections.singletonMap(1, incompatibleSelectedFallback), context("alice")));
   }
 
   @Test
