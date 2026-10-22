@@ -764,27 +764,6 @@ public class GravitinoClient extends GravitinoClientBase
     return getMetalake().listTagAssociationsForPolicy(policyName);
   }
 
-  /**
-   * Package-visible metalake name for internal helpers such as {@link MaintenanceActionClient}.
-   *
-   * @return metalake name this client is scoped to
-   */
-  String metalakeName() {
-    return metalakeName;
-  }
-
-  /**
-   * Returns the internal TMS maintenance-action callback helper (§5.2.2).
-   *
-   * <p><strong>Not a stable public product API</strong> — intended for built-in Spark maintenance
-   * jobs only.
-   *
-   * @return callback client scoped to this metalake
-   */
-  public MaintenanceActionClient maintenanceActionClient() {
-    return new MaintenanceActionClient(this);
-  }
-
   /** Builder class for constructing a GravitinoClient. */
   public static class ClientBuilder extends GravitinoClientBase.Builder<GravitinoClient> {
 
