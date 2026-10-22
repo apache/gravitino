@@ -46,6 +46,22 @@ public class SemanticModelMetricSQLProviderFactory {
     return PROVIDERS.get(JDBCBackendType.fromString(databaseId));
   }
 
+  /** Lists live metric and model names in one statement without reading snapshots. */
+  public static String listMetricNames(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().listMetricNames(metalakeName, catalogName, schemaName);
+  }
+
+  /** Lists model names and current metric arrays in one statement without reading identities. */
+  public static String listMetricSnapshots(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().listMetricSnapshots(metalakeName, catalogName, schemaName);
+  }
+
   /** Inserts a new metric identity. */
   public static String insertSemanticModelMetric(@Param("metric") SemanticModelMetricPO metricPO) {
     return getProvider().insertSemanticModelMetric(metricPO);

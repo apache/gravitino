@@ -71,6 +71,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -90,6 +91,7 @@ import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetricService;
 import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -125,6 +127,17 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
+  }
+
+  @Override
+  public List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
+    return SemanticModelMetricService.getInstance().listMetrics(namespace);
+  }
+
+  @Override
+  public List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
+      throws IOException {
+    return SemanticModelMetricService.getInstance().listMetricInfos(namespace);
   }
 
   @Override
