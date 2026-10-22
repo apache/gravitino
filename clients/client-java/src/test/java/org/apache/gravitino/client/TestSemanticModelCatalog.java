@@ -55,9 +55,12 @@ import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetricInfoListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.semantic.MetricDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelMetricDTO;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -91,10 +94,13 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpRequest;
 
@@ -146,6 +152,146 @@ public class TestSemanticModelCatalog extends TestBase {
           NameIdentifier.of(SCHEMA_NAME, "inventory_model")
         },
         actual);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testMetricDiscoveryPreservesNamespacesDefinitionsAndOrder(boolean details)
+      throws JsonProcessingException {
+    String schema = "schema /%? 收入";
+    String path = metricPath(schema);
+    Metric metric = definition().metrics()[0];
+    NameIdentifier[] fullIdentifiers = {
+      NameIdentifier.of(Namespace.of(METALAKE_NAME, CATALOG_NAME, schema, "a"), metric.name()),
+      NameIdentifier.of(Namespace.of(METALAKE_NAME, CATALOG_NAME, schema, "a-b"), metric.name())
+    };
+    SemanticModelMetricDTO[] infos =
+        Arrays.stream(fullIdentifiers)
+            .map(
+                ident ->
+                    new SemanticModelMetricDTO(ident.namespace(), MetricDTO.fromMetric(metric)))
+            .toArray(SemanticModelMetricDTO[]::new);
+    buildMockResource(
+        Method.GET,
+        path,
+        Map.of("details", String.valueOf(details)),
+        null,
+        details ? new MetricInfoListResponse(infos) : new EntityListResponse(fullIdentifiers),
+        SC_OK);
+    int requestsBefore = mockServer.retrieveRecordedRequests(request()).length;
+    NameIdentifier[] expected = {
+      NameIdentifier.of(Namespace.of(schema, "a"), metric.name()),
+      NameIdentifier.of(Namespace.of(schema, "a-b"), metric.name())
+    };
+    if (details) {
+      SemanticModelMetric[] actual =
+          catalog.asSemanticModelCatalog().listMetricInfos(Namespace.of(schema));
+      assertEquals(expected.length, actual.length);
+      for (int i = 0; i < actual.length; i++) {
+        assertEquals(expected[i].namespace(), actual[i].namespace());
+        assertEquals(metric, actual[i].metric());
+        String[] levels = actual[i].namespace().levels();
+        levels[0] = "changed";
+        assertEquals(expected[i].namespace(), actual[i].namespace());
+      }
+    } else {
+      assertArrayEquals(
+          expected, catalog.asSemanticModelCatalog().listMetrics(Namespace.of(schema)));
+    }
+    assertEquals(requestsBefore + 1, mockServer.retrieveRecordedRequests(request()).length);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testMetricDiscoveryEmptyResults(boolean details) throws JsonProcessingException {
+    buildMockResource(
+        Method.GET,
+        metricPath(SCHEMA_NAME),
+        Map.of("details", String.valueOf(details)),
+        null,
+        details
+            ? new MetricInfoListResponse(new SemanticModelMetricDTO[0])
+            : new EntityListResponse(new NameIdentifier[0]),
+        SC_OK);
+    if (details) {
+      assertArrayEquals(
+          new SemanticModelMetric[0],
+          catalog.asSemanticModelCatalog().listMetricInfos(Namespace.of(SCHEMA_NAME)));
+    } else {
+      assertArrayEquals(
+          new NameIdentifier[0],
+          catalog.asSemanticModelCatalog().listMetrics(Namespace.of(SCHEMA_NAME)));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testMetricDiscoveryRejectsInvalidNamespacesAndResponses(boolean details)
+      throws JsonProcessingException {
+    int requestsBefore = mockServer.retrieveRecordedRequests(request()).length;
+    for (Namespace namespace :
+        new Namespace[] {null, Namespace.empty(), Namespace.of(CATALOG_NAME, SCHEMA_NAME)}) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> {
+            if (details) catalog.asSemanticModelCatalog().listMetricInfos(namespace);
+            else catalog.asSemanticModelCatalog().listMetrics(namespace);
+          });
+    }
+    assertEquals(requestsBefore, mockServer.retrieveRecordedRequests(request()).length);
+    buildMockResource(
+        Method.GET,
+        metricPath(SCHEMA_NAME),
+        Map.of("details", String.valueOf(details)),
+        null,
+        Map.of("code", 0),
+        SC_OK);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          if (details) catalog.asSemanticModelCatalog().listMetricInfos(Namespace.of(SCHEMA_NAME));
+          else catalog.asSemanticModelCatalog().listMetrics(Namespace.of(SCHEMA_NAME));
+        });
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testMetricDiscoveryErrorMappings(boolean details) throws JsonProcessingException {
+    List<ErrorResponse> errors =
+        List.of(
+            ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "missing lake"),
+            ErrorResponse.notFound(NoSuchCatalogException.class.getSimpleName(), "missing catalog"),
+            ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "missing schema"),
+            ErrorResponse.forbidden("schema denied", null),
+            ErrorResponse.unsupportedOperation("unsupported catalog", null),
+            ErrorResponse.internalError("metric discovery failed"));
+    List<Class<? extends RuntimeException>> exceptionTypes =
+        List.of(
+            NoSuchMetalakeException.class,
+            NoSuchCatalogException.class,
+            NoSuchSchemaException.class,
+            ForbiddenException.class,
+            UnsupportedOperationException.class,
+            RuntimeException.class);
+    int[] statuses = {404, 404, 404, 403, 501, 500};
+    for (int i = 0; i < errors.size(); i++) {
+      buildMockResource(
+          Method.GET,
+          metricPath(SCHEMA_NAME),
+          Map.of("details", String.valueOf(details)),
+          null,
+          errors.get(i),
+          statuses[i]);
+      RuntimeException failure =
+          assertThrows(
+              exceptionTypes.get(i),
+              () -> {
+                if (details)
+                  catalog.asSemanticModelCatalog().listMetricInfos(Namespace.of(SCHEMA_NAME));
+                else catalog.asSemanticModelCatalog().listMetrics(Namespace.of(SCHEMA_NAME));
+              });
+      assertTrue(failure.getMessage().contains(errors.get(i).getMessage()));
+    }
   }
 
   @Test
@@ -531,6 +677,16 @@ public class TestSemanticModelCatalog extends TestBase {
   private static String semanticModelPath() {
     return SemanticModelCatalogOperations.formatSemanticModelRequestPath(
         Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME));
+  }
+
+  private static String metricPath(String schema) {
+    return "/api/metalakes/"
+        + METALAKE_NAME
+        + "/catalogs/"
+        + CATALOG_NAME
+        + "/schemas/"
+        + RESTUtils.encodeString(schema)
+        + "/semantic-model-metrics";
   }
 
   private static void buildOssieImportResource(
