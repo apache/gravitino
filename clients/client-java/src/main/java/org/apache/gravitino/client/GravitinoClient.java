@@ -65,6 +65,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
@@ -793,6 +794,30 @@ public class GravitinoClient extends GravitinoClientBase
   public void reportMaintenanceActionAfterMetrics(
       long jobId, MaintenanceActionMetricsRequest request) {
     postMaintenanceActionMetrics(jobId, "after", request);
+  }
+
+  /**
+   * Closes the soft slot for one table bound to a TMS job without writing metrics.
+   *
+   * <p><strong>Not a stable public product API</strong> — intended for built-in Spark maintenance
+   * jobs only.
+   *
+   * @param jobId Gravitino job run id
+   * @param request finish payload
+   */
+  public void finishMaintenanceAction(long jobId, MaintenanceActionFinishRequest request) {
+    Preconditions.checkArgument(request != null, "request must not be null");
+    request.validate();
+    BaseResponse response =
+        restClient.post(
+            String.format(
+                "api/metalakes/%s/maintenance/actions/%d/finish",
+                RESTUtils.encodeString(metalakeName), jobId),
+            request,
+            BaseResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.restErrorHandler());
+    response.validate();
   }
 
   private void postMaintenanceActionMetrics(

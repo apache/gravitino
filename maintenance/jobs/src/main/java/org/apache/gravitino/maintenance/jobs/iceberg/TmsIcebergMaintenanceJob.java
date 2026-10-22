@@ -40,6 +40,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -227,11 +228,11 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
               lastAfter = s1;
               reportAfterQuietly(client, jobId, table.tableId, s1, /*finish=*/ false);
             }
-            // Close this table's soft slot once: prefer S1 after; otherwise finish on last S0.
+            // Close soft slot without re-writing metrics (finish API).
             if (lastAfter != null) {
-              reportAfterQuietly(client, jobId, table.tableId, lastAfter, /*finish=*/ true);
+              finishQuietly(client, jobId, table.tableId, lastAfter.snapshotId);
             } else if (lastBefore != null) {
-              reportBeforeQuietly(client, jobId, table.tableId, lastBefore, /*finish=*/ true);
+              finishQuietly(client, jobId, table.tableId, /*afterSnapshotId=*/ null);
             } else {
               LOG.warn(
                   "TMS job {} table {} ended without a metrics sample; soft slot left open",
@@ -531,6 +532,21 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   private static void reportAfterQuietly(
       GravitinoClient client, long jobId, long tableId, SnapshotSample sample, boolean finish) {
     reportMetricsQuietly(client, jobId, tableId, sample, finish, /*after=*/ true);
+  }
+
+  private static void finishQuietly(
+      GravitinoClient client, long jobId, long tableId, @Nullable Long afterSnapshotId) {
+    try {
+      client.finishMaintenanceAction(
+          jobId, new MaintenanceActionFinishRequest(tableId, afterSnapshotId));
+    } catch (Exception e) {
+      LOG.warn(
+          "Best-effort TMS finish failed for job {} table {} afterSnapshotId={}",
+          jobId,
+          tableId,
+          afterSnapshotId,
+          e);
+    }
   }
 
   private static void reportMetricsQuietly(
