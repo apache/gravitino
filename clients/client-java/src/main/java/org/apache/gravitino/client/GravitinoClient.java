@@ -765,16 +765,25 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
-   * Returns the underlying REST client.
+   * Package-visible metalake name for internal helpers such as {@link MaintenanceActionClient}.
    *
-   * <p><strong>Not a stable public product API.</strong> Intended for built-in maintenance Spark
-   * jobs that call control-plane endpoints not wrapped by typed client methods.
-   *
-   * @return REST client used by this Gravitino client
+   * @return metalake name this client is scoped to
    */
-  @Override
-  public RESTClient restClient() {
-    return restClient;
+  String metalakeName() {
+    return metalakeName;
+  }
+
+  /**
+   * Returns the TMS maintenance-action callback helper (§5.2.2).
+   *
+   * <p>Same usage pattern as other built-in maintenance jobs that call typed {@link
+   * GravitinoClient} APIs (for example iceberg-update-stats). <strong>Not a stable public product
+   * API</strong> — intended for built-in Spark maintenance jobs only.
+   *
+   * @return callback client scoped to this metalake
+   */
+  public MaintenanceActionClient maintenanceActionClient() {
+    return new MaintenanceActionClient(this);
   }
 
   /** Builder class for constructing a GravitinoClient. */

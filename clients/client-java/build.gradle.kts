@@ -24,6 +24,7 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":maintenance:maintenance-common"))
   implementation(project(":common")) {
     exclude(group = "org.apache.logging.log4j")
   }
