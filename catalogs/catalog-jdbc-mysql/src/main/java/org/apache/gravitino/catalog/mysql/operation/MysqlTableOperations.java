@@ -654,12 +654,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append(AFTER).append(afterPosition.getColumn());
+      columnDefinition.append(AFTER).append(quote(afterPosition.getColumn()));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append(AFTER).append(quote(s)));
     }
     return columnDefinition.toString();
   }
