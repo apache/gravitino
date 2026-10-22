@@ -42,10 +42,10 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 
 /**
- * Spark callback that persists snapshot metrics for an in-flight maintenance action.
+ * Spark callbacks for before/after snapshot metrics on an in-flight maintenance action.
  *
- * <p>Continue / stop and occupancy release are not handled here: the job decides locally, and
- * {@code OccupancyGate} reclaims when the Gravitino job is terminal.
+ * <p>Continue / stop stays in the job. Soft-slot release is optional via {@code finish} on the
+ * request body.
  */
 @Path("metalakes/{metalake}/maintenance/actions")
 @Consumes({
@@ -72,7 +72,7 @@ public class TableMaintenanceActionOperations {
   }
 
   /**
-   * Persists metrics for the action bound to {@code jobId}.
+   * Persists S0 metrics and {@code before_snapshot_id} for the action bound to {@code jobId}.
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id bound to the action
@@ -80,11 +80,11 @@ public class TableMaintenanceActionOperations {
    * @return empty success response
    */
   @POST
-  @Path("{jobId}/metrics")
-  @Timed(name = "tms-action-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "tms-action-metrics", absolute = true)
+  @Path("{jobId}/metrics/before")
+  @Timed(name = "tms-action-metrics-before." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "tms-action-metrics-before", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::RUN_JOB")
-  public Response reportMetrics(
+  public Response reportBeforeMetrics(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("jobId") long jobId,
@@ -92,16 +92,50 @@ public class TableMaintenanceActionOperations {
     return TableMaintenanceRESTUtils.doAs(
         httpRequest,
         () -> {
-          if (request == null) {
-            throw new IllegalArgumentException("Request body cannot be null");
-          }
-          request.validate();
-          metricsService.reportMetrics(metalake, jobId, request);
+          requireBody(request);
+          metricsService.reportBeforeMetrics(metalake, jobId, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
-        MaintenanceActionOperation.REPORT_METRICS,
+        MaintenanceActionOperation.REPORT_BEFORE_METRICS,
         jobId,
         metalake);
+  }
+
+  /**
+   * Persists S1 metrics for the action bound to {@code jobId}.
+   *
+   * @param metalake metalake name from the request path
+   * @param jobId Gravitino job run id bound to the action
+   * @param request metrics payload
+   * @return empty success response
+   */
+  @POST
+  @Path("{jobId}/metrics/after")
+  @Timed(name = "tms-action-metrics-after." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "tms-action-metrics-after", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::RUN_JOB")
+  public Response reportAfterMetrics(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("jobId") long jobId,
+      MaintenanceActionMetricsRequest request) {
+    return TableMaintenanceRESTUtils.doAs(
+        httpRequest,
+        () -> {
+          requireBody(request);
+          metricsService.reportAfterMetrics(metalake, jobId, request);
+          return TableMaintenanceRESTUtils.ok(new BaseResponse());
+        },
+        MaintenanceActionOperation.REPORT_AFTER_METRICS,
+        jobId,
+        metalake);
+  }
+
+  private static void requireBody(MaintenanceActionMetricsRequest request) {
+    if (request == null) {
+      throw new IllegalArgumentException("Request body cannot be null");
+    }
+    request.validate();
   }
 
   /**

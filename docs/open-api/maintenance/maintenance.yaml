@@ -19,20 +19,20 @@
 
 paths:
 
-  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics:
+  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/before:
     parameters:
       - $ref: "../openapi.yaml#/components/parameters/metalake"
       - $ref: "#/components/parameters/jobId"
     post:
       tags:
         - maintenance
-      summary: Report TMS maintenance snapshot metrics
-      operationId: reportMaintenanceActionMetrics
+      summary: Report TMS before-maintenance (S0) snapshot metrics
+      operationId: reportMaintenanceActionBeforeMetrics
       description: |
-        Spark callback for an in-flight maintenance action: idempotently persists snapshot metrics.
-        `tableId` selects which bound table when one Spark job covers multiple tables.
-        Does not gate continue/stop (the job decides locally) and does not mark the action finished
-        (occupancy is reclaimed when the Gravitino job is terminal).
+        Spark callback for an in-flight maintenance action at S0: persists snapshot metrics and
+        records `before_snapshot_id`. `tableId` selects which bound table when one Spark job covers
+        multiple tables. Optional `finish=true` closes that table/policy soft slot (for example on
+        snapshot drift / skip). Continue / stop stays in the job.
       requestBody:
         required: true
         content:
@@ -41,7 +41,44 @@ paths:
               $ref: "#/components/schemas/MaintenanceActionMetricsRequest"
             examples:
               MaintenanceActionMetricsRequest:
-                $ref: "#/components/examples/MaintenanceActionMetricsRequest"
+                $ref: "#/components/examples/MaintenanceActionBeforeMetricsRequest"
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or maintenance action does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/jobId"
+    post:
+      tags:
+        - maintenance
+      summary: Report TMS after-maintenance (S1) snapshot metrics
+      operationId: reportMaintenanceActionAfterMetrics
+      description: |
+        Spark callback for an in-flight maintenance action at S1: persists snapshot metrics.
+        `tableId` selects which bound table when one Spark job covers multiple tables. Optional
+        `finish=true` closes that table/policy soft slot and sets `after_snapshot_id` to
+        `snapshotId`. Continue / stop stays in the job.
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceActionMetricsRequest"
+            examples:
+              MaintenanceActionMetricsRequest:
+                $ref: "#/components/examples/MaintenanceActionAfterMetricsRequest"
       responses:
         "200":
           $ref: "../openapi.yaml#/components/responses/BaseResponse"
@@ -87,11 +124,25 @@ components:
         metricsJson:
           type: string
           description: Serialized metrics JSON for table_snapshot_metrics
+        finish:
+          type: boolean
+          description: |
+            When true, close the soft slot for this job/table/policy after storing metrics.
+            Before: typically on drift/skip (after_snapshot_id left null). After: typically after
+            successful maintenance (after_snapshot_id = snapshotId).
 
   examples:
-    MaintenanceActionMetricsRequest:
+    MaintenanceActionBeforeMetricsRequest:
       value: {
         "tableId": 10,
         "snapshotId": 9001,
-        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5,\"custom-delete-file-number\":3}"
+        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5}",
+        "finish": false
+      }
+    MaintenanceActionAfterMetricsRequest:
+      value: {
+        "tableId": 10,
+        "snapshotId": 9002,
+        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9002,\"custom-data-file-mse\":0.2}",
+        "finish": true
       }

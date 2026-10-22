@@ -20,6 +20,8 @@ package org.apache.gravitino.maintenance.web.rest;
 
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,23 +60,54 @@ class TestTableMaintenanceActionOperations {
   }
 
   @Test
-  void testReportMetricsPersists() {
+  void testReportBeforePersistsAndRecordsBeforeSnapshot() {
     when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
 
     Response response =
-        ops.reportMetrics(
+        ops.reportBeforeMetrics(
             METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}");
+    verify(actions).recordBeforeSnapshot(JOB_ID, TABLE_ID, 100L);
+    verify(actions, never()).markFinished(anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
   }
 
   @Test
-  void testReportMetricsMissingActionReturns404() {
+  void testReportBeforeWithFinishClosesSoftSlotWithoutAfterSnapshot() {
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+
+    Response response =
+        ops.reportBeforeMetrics(
+            METALAKE,
+            JOB_ID,
+            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}", true));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
+  }
+
+  @Test
+  void testReportAfterWithFinishClosesSoftSlotWithAfterSnapshot() {
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+
+    Response response =
+        ops.reportAfterMetrics(
+            METALAKE,
+            JOB_ID,
+            new MaintenanceActionMetricsRequest(TABLE_ID, 200L, "{\"m\":2}", true));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 200L, "{\"m\":2}");
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), eq(200L), anyLong());
+  }
+
+  @Test
+  void testReportBeforeMissingActionReturns404() {
     when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(null);
 
     Response response =
-        ops.reportMetrics(
+        ops.reportBeforeMetrics(
             METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
@@ -82,12 +115,12 @@ class TestTableMaintenanceActionOperations {
   }
 
   @Test
-  void testReportMetricsAlreadyFinishedReturns404() {
+  void testReportAfterAlreadyFinishedReturns404() {
     when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID))
         .thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
 
     Response response =
-        ops.reportMetrics(
+        ops.reportAfterMetrics(
             METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
@@ -95,22 +128,8 @@ class TestTableMaintenanceActionOperations {
   }
 
   @Test
-  void testReportMetricsWrongMetalakeReturns404() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
-    ops = operations(tableId -> "other-ml");
-    ops.setHttpRequest(mock(HttpServletRequest.class));
-
-    Response response =
-        ops.reportMetrics(
-            METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-    verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
-  }
-
-  @Test
-  void testReportMetricsNullBodyReturns400() {
-    Response response = ops.reportMetrics(METALAKE, JOB_ID, null);
+  void testReportBeforeNullBodyReturns400() {
+    Response response = ops.reportBeforeMetrics(METALAKE, JOB_ID, null);
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
   }
 

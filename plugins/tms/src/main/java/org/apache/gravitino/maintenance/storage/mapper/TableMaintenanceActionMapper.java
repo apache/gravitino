@@ -92,6 +92,8 @@ public interface TableMaintenanceActionMapper {
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "markFinished")
   int markFinished(
       @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt);
 
@@ -99,7 +101,10 @@ public interface TableMaintenanceActionMapper {
       type = TableMaintenanceActionSQLProviderFactory.class,
       method = "backfillAfterSnapshot")
   int backfillAfterSnapshot(
-      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId);
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterSnapshotId") long afterSnapshotId);
 
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteById")
   int deleteById(@Param("id") long id);

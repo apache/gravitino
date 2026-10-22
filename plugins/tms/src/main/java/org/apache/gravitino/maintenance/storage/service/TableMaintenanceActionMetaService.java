@@ -293,54 +293,61 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Marks every in-flight action bound to {@code jobId} finished (one Spark job may cover multiple
-   * tables).
+   * Marks one in-flight action finished for {@code (jobId, tableId, policyId)}.
    *
    * <p>{@code UNIQUE(table_id, policy_id, finished_at)} exists so {@code finished_at = 0} is a
    * single soft slot per pair (like {@code deleted_at}). Only one in-flight row can finish that
    * pair at a time, so two completed rows cannot race to the same millisecond {@code finished_at}.
    *
-   * <p>If failsafe reclaim already closed the rows ({@code finished_at > 0}) with a null after
-   * snapshot, a later finish callback may still backfill a real S1 when {@code afterSnapshotId} is
-   * non-null.
+   * <p>If the row was already closed with a null after snapshot, a later call may still backfill a
+   * real S1 when {@code afterSnapshotId} is non-null. Safe to retry when the row is already
+   * finished with a null after and {@code afterSnapshotId} is also null.
    *
    * @param jobId Gravitino job run id
-   * @param afterSnapshotId terminal snapshot id shared across tables for this finish call, or null
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param afterSnapshotId terminal snapshot id, or null when releasing without an S1
    * @param finishedAt finish timestamp millis
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "markTableMaintenanceActionFinished")
-  public void markFinished(long jobId, Long afterSnapshotId, long finishedAt) {
+  public void markFinished(
+      long jobId, long tableId, long policyId, Long afterSnapshotId, long finishedAt) {
     Preconditions.checkArgument(finishedAt > 0, "finishedAt must be positive");
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.markFinished(jobId, afterSnapshotId, finishedAt));
-    if (updated >= 1) {
+            mapper -> mapper.markFinished(jobId, tableId, policyId, afterSnapshotId, finishedAt));
+    if (updated == 1) {
       return;
     }
     if (afterSnapshotId != null) {
       int backfilled =
           SessionUtils.doWithCommitAndFetchResult(
               TableMaintenanceActionMapper.class,
-              mapper -> mapper.backfillAfterSnapshot(jobId, afterSnapshotId));
+              mapper -> mapper.backfillAfterSnapshot(jobId, tableId, policyId, afterSnapshotId));
       Preconditions.checkState(
-          backfilled >= 1,
-          "expected to finish or backfill at least one action for job_id=%s, finished=%s, backfilled=%s",
+          backfilled == 1,
+          "expected to finish or backfill action for job_id=%s table_id=%s policy_id=%s, finished=%s, backfilled=%s",
           jobId,
+          tableId,
+          policyId,
           updated,
           backfilled);
       return;
     }
-    List<TableMaintenanceActionPO> rows = listByJobId(jobId);
-    boolean allFinished =
-        !rows.isEmpty()
-            && rows.stream().allMatch(row -> row.finishedAt() != null && row.finishedAt() > 0L);
+    TableMaintenanceActionPO current = getByJobIdAndTableId(jobId, tableId);
     Preconditions.checkState(
-        allFinished,
-        "expected to finish at least one in-flight action for job_id=%s, updated=%s",
+        current != null
+            && current.policyId() != null
+            && current.policyId() == policyId
+            && current.finishedAt() != null
+            && current.finishedAt() > 0L,
+        "expected finished action for job_id=%s table_id=%s policy_id=%s, updated=%s",
         jobId,
+        tableId,
+        policyId,
         updated);
   }
 

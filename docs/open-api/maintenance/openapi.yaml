@@ -52,8 +52,10 @@ security:
   - KerberosAuth: []
 
 paths:
-  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics:
-    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1metrics"
+  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/before:
+    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1metrics~1before"
+  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after:
+    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1metrics~1after"
 
 components:
   securitySchemes:
