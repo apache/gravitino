@@ -135,12 +135,37 @@ public class TestClientAddressResolver {
   }
 
   @Test
-  public void testIpv6ZoneIdOnPeerIsIgnored() {
-    ClientAddressResolver resolver = new ClientAddressResolver(ImmutableList.of("fe80::/10"));
+  public void testLinkLocalPeerIsNeverTrusted() {
+    // fe80::1%1 and fe80::1%2 can be different hosts on different links (RFC 4007, section 12),
+    // so a link-local peer must not inherit trust from a wider range that covers it.
+    ClientAddressResolver allIpv6 = new ClientAddressResolver(ImmutableList.of("::/0"));
     Assertions.assertEquals(
-        "2001:db8::1", resolver.resolve(request("[fe80:0:0:0:0:0:0:1%1]", "2001:db8::1")));
+        "fe80::1", allIpv6.resolve(request("[fe80:0:0:0:0:0:0:1%1]", "203.0.113.77")));
     Assertions.assertEquals(
-        "2001:db8::1", resolver.resolve(request("fe80::1%eth0", "2001:db8::1")));
+        "fe80::1", allIpv6.resolve(request("[fe80:0:0:0:0:0:0:1%2]", "203.0.113.77")));
+    Assertions.assertEquals("fe80::1", allIpv6.resolve(request("fe80::1", "203.0.113.77")));
+    // Other IPv6 peers in the same range are still trusted.
+    Assertions.assertEquals(
+        "203.0.113.77", allIpv6.resolve(request("[fd00:0:0:0:0:0:0:1]", "203.0.113.77")));
+    // A link-local entry in the header is reported as the client, never skipped as a proxy.
+    Assertions.assertEquals(
+        "fe80::5", allIpv6.resolve(request("[fd00:0:0:0:0:0:0:1]", "203.0.113.77, fe80::5")));
+  }
+
+  @Test
+  public void testLinkLocalTrustedProxyIsRejected() {
+    for (String invalid : Arrays.asList("fe80::1", "fe80::/10", "febf::1/128", "fe80::/9")) {
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> new ClientAddressResolver(ImmutableList.of(invalid)),
+              "Expected rejection of " + invalid);
+      Assertions.assertTrue(e.getMessage().contains("link-local"), e.getMessage());
+    }
+    // A zone ID is not accepted either.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new ClientAddressResolver(ImmutableList.of("fe80::1%1")));
   }
 
   @Test

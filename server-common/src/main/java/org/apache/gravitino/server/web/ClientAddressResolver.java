@@ -22,6 +22,7 @@ package org.apache.gravitino.server.web;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InetAddresses;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,6 +40,12 @@ import org.apache.commons.lang3.StringUtils;
  * <p>Each trusted proxy is an IP literal or a CIDR block, IPv4 or IPv6. Entries are parsed with
  * {@link InetAddresses#forString(String)}, which never performs a DNS lookup. IPv4 and IPv4-mapped
  * IPv6 forms of the same address match each other.
+ *
+ * <p>IPv6 link-local addresses ({@code fe80::/10}) are never trusted. The same link-local address
+ * can name different hosts on different links, told apart only by the zone ID (RFC 4007, section
+ * 12), and matching zones reliably is not supported. A trusted proxy entry inside {@code fe80::/10}
+ * fails at construction, and a link-local peer is not trusted even when a wider entry such as
+ * {@code ::/0} covers it.
  *
  * <p>The resolution rules are:
  *
@@ -140,7 +147,7 @@ public final class ClientAddressResolver {
   }
 
   private boolean isTrusted(Optional<InetAddress> address) {
-    if (!address.isPresent()) {
+    if (!address.isPresent() || isIpv6LinkLocal(address.get())) {
       return false;
     }
     byte[] bytes = toIpv6Bytes(address.get());
@@ -214,7 +221,8 @@ public final class ClientAddressResolver {
     if (host.length() > 1 && host.charAt(0) == '[' && host.charAt(host.length() - 1) == ']') {
       host = host.substring(1, host.length() - 1);
     }
-    // Strip an IPv6 zone ID, such as "fe80::1%eth0"; it never identifies a different host.
+    // Drop an IPv6 zone ID, such as "fe80::1%eth0". Only link-local addresses carry one, and those
+    // are never trusted, so dropping it cannot make an address trusted.
     int zone = host.indexOf('%');
     if (zone >= 0) {
       host = host.substring(0, zone);
@@ -223,6 +231,10 @@ public final class ClientAddressResolver {
       return Optional.empty();
     }
     return Optional.of(InetAddresses.forString(host));
+  }
+
+  private static boolean isIpv6LinkLocal(InetAddress address) {
+    return address instanceof Inet6Address && address.isLinkLocalAddress();
   }
 
   /** Returns the 16-byte IPv6 form of an address, mapping IPv4 to {@code ::ffff:a.b.c.d}. */
@@ -255,6 +267,12 @@ public final class ClientAddressResolver {
         throw invalid(text, "not an IP literal or CIDR block");
       }
       InetAddress address = InetAddresses.forString(addressPart);
+      if (isIpv6LinkLocal(address)) {
+        throw invalid(
+            text,
+            "IPv6 link-local addresses cannot be trusted proxies, because the same address can"
+                + " name different hosts on different links");
+      }
       // Java turns an IPv4-mapped IPv6 literal into an Inet4Address, so look at how the address
       // was written to decide whether a prefix length counts IPv4 or IPv6 bits.
       boolean writtenAsIpv4 = address instanceof Inet4Address && addressPart.indexOf(':') < 0;

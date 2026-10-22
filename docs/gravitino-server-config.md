@@ -198,7 +198,10 @@ supplied by the client and are ignored. Empty list elements are skipped. If an e
 stops and records the last trusted hop. When `trustedProxies` is empty, the default, `X-Forwarded-For` is
 ignored and the TCP peer address is recorded. Recorded addresses are in canonical form, with IPv6
 compressed and without brackets, for example `::1`. An entry that is not an IP address or CIDR
-block fails server startup.
+block fails server startup. IPv6 link-local addresses (`fe80::/10`) cannot be trusted proxies: the
+same link-local address can name different hosts on different network links, so an entry inside
+`fe80::/10` also fails startup, and a link-local peer is never trusted even when a wider entry such
+as `::/0` covers it. Use a global or unique local address (for example `fd00::/8`) for the proxy.
 
 If Gravitino runs behind a load balancer, ingress controller, or other reverse proxy, list their
 addresses here. Otherwise the audit log records the proxy address for every request. List only
