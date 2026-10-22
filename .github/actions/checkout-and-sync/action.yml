@@ -19,6 +19,26 @@ name: Checkout and sync
 description: Check out the upstream base branch and merge the contributor branch for fork CI.
 
 inputs:
+  base-ref:
+    description: Fixed upstream branch selected by Fork CI.
+    required: false
+    default: ''
+  base-sha:
+    description: Fixed upstream commit selected by Fork CI.
+    required: false
+    default: ''
+  head-repository:
+    description: Repository containing the contributor commit.
+    required: false
+    default: ''
+  head-sha:
+    description: Fixed contributor commit to test.
+    required: false
+    default: ''
+  sync:
+    description: Whether to merge the contributor commit onto the fixed base.
+    required: false
+    default: ''
   persist-credentials:
     description: Whether to keep the token in the git config of the checkout.
     required: false
@@ -52,114 +72,25 @@ runs:
         GH_TOKEN: ${{ github.token }}
         HEAD_OWNER: ${{ github.repository_owner }}
         HEAD_BRANCH: ${{ github.ref_name }}
-        HEAD_REPOSITORY: ${{ github.repository }}
-        HEAD_SHA: ${{ github.sha }}
-        REPOSITORY_FORK: ${{ github.event.repository.fork }}
+        HEAD_REPOSITORY: ${{ inputs.head-repository || github.repository }}
+        HEAD_SHA: ${{ inputs.head-sha || github.sha }}
+        FIXED_BASE_REF: ${{ inputs.base-ref }}
+        FIXED_BASE_SHA: ${{ inputs.base-sha }}
+        FIXED_SYNC: ${{ inputs.sync }}
       run: |
         set -euo pipefail
-
-        if [[ "${GITHUB_REPOSITORY}" == "apache/gravitino" && \
-          ("${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == refs/heads/branch-*) ]]; then
-          echo "base_ref=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
-          echo "should_sync=false" >> "${GITHUB_OUTPUT}"
-          exit 0
-        fi
-
-        # A copy of the repository that is not a fork, such as a private downstream
-        # repository, tests its own pull requests and branches as they are.
-        if [[ "${GITHUB_REPOSITORY}" != "apache/gravitino" && "${REPOSITORY_FORK}" != "true" ]]; then
+        if [[ -n "${FIXED_BASE_SHA}" ]]; then
+          [[ "${FIXED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          git check-ref-format "refs/heads/${FIXED_BASE_REF}"
+          [[ "${FIXED_SYNC}" == "true" || "${FIXED_SYNC}" == "false" ]] || exit 1
+          echo "base_ref=${FIXED_BASE_REF}" >> "${GITHUB_OUTPUT}"
+          echo "should_sync=${FIXED_SYNC}" >> "${GITHUB_OUTPUT}"
+        else
+          # Legacy direct/manual/nightly callers test their own checkout. Fork CI always
+          # supplies the context resolved once by eligibility; suites never re-query PRs.
           echo "base_ref=${EVENT_BASE_REF:-${GITHUB_REF_NAME}}" >> "${GITHUB_OUTPUT}"
           echo "should_sync=false" >> "${GITHUB_OUTPUT}"
-          exit 0
         fi
-
-        repository_response="$(curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --retry-delay 5 \
-          --header "Accept: application/vnd.github+json" \
-          --header "Authorization: Bearer ${GH_TOKEN}" \
-          --header "X-GitHub-Api-Version: 2022-11-28" \
-          "${GITHUB_API_URL}/repos/${HEAD_REPOSITORY}")"
-        source_repository="$(jq -r '.source.full_name // empty' <<< "${repository_response}")"
-
-        if [[ "${HEAD_REPOSITORY}" != "apache/gravitino" && \
-          "${source_repository}" != "apache/gravitino" ]]; then
-          echo "base_ref=${EVENT_BASE_REF:-${GITHUB_REF_NAME}}" >> "${GITHUB_OUTPUT}"
-          echo "should_sync=false" >> "${GITHUB_OUTPUT}"
-          exit 0
-        fi
-
-        response="[]"
-        match_count=0
-        for attempt in 1 2 3; do
-          response="$(curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --retry-delay 5 \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            --get \
-            --data-urlencode "state=open" \
-            --data-urlencode "head=${HEAD_OWNER}:${HEAD_BRANCH}" \
-            --data-urlencode "per_page=10" \
-            "https://api.github.com/repos/apache/gravitino/pulls")"
-          match_count="$(jq -r \
-            --arg head_sha "${HEAD_SHA}" \
-            --arg head_repository "${HEAD_REPOSITORY}" \
-            '[.[] | select(.head.sha == $head_sha and .head.repo.full_name == $head_repository)]
-             | length' \
-            <<< "${response}")"
-          if [[ "${match_count}" == "1" ]]; then
-            break
-          fi
-          if [[ "${attempt}" != "3" ]]; then
-            sleep 3
-          fi
-        done
-
-        if [[ "${match_count}" == "0" ]]; then
-          # No pull request yet: guess the base as the upstream default branch or one of the
-          # latest release branches, whichever the contributor branch is fewest commits ahead of.
-          api() {
-            curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --retry-delay 5 \
-              --header "Accept: application/vnd.github+json" \
-              --header "Authorization: Bearer ${GH_TOKEN}" \
-              --header "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/apache/gravitino$1"
-          }
-          candidates=("$(api "" | jq -r '.default_branch')")
-          while IFS= read -r branch; do
-            candidates+=("${branch}")
-          done < <(api "/branches?per_page=100" \
-            | jq -r '.[].name | select(test("^branch-[0-9]+\\.[0-9]+$"))' | sort -V | tail -n 3)
-          base_ref=""
-          best_ahead=""
-          for candidate in "${candidates[@]}"; do
-            ahead="$(api "/compare/${candidate}...${HEAD_REPOSITORY/\//:}:${HEAD_SHA}?per_page=1" | jq -r '.ahead_by')"
-            echo "${candidate}: contributor branch is ${ahead} commit(s) ahead"
-            if [[ -z "${best_ahead}" || "${ahead}" -lt "${best_ahead}" ]]; then
-              base_ref="${candidate}"
-              best_ahead="${ahead}"
-            fi
-          done
-          echo "::notice::No open pull request yet; testing against ${base_ref}."
-          echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
-          echo "should_sync=true" >> "${GITHUB_OUTPUT}"
-          exit 0
-        fi
-
-        if [[ "${match_count}" != "1" ]]; then
-          echo "::error::Expected one open apache/gravitino pull request for ${HEAD_REPOSITORY}:${HEAD_BRANCH} at ${HEAD_SHA}, found ${match_count}."
-          exit 1
-        fi
-
-        pull_request="$(jq -c \
-          --arg head_sha "${HEAD_SHA}" \
-          --arg head_repository "${HEAD_REPOSITORY}" \
-          '.[]
-           | select(.head.sha == $head_sha and .head.repo.full_name == $head_repository)' \
-          <<< "${response}")"
-        base_ref="$(jq -r '.base.ref' <<< "${pull_request}")"
-        echo "Testing ${HEAD_SHA} for apache/gravitino#$(jq -r '.number' <<< "${pull_request}") against ${base_ref}."
-
-        echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
-        echo "should_sync=true" >> "${GITHUB_OUTPUT}"
 
     - name: Checkout upstream base branch
       if: steps.base.outputs.should_sync == 'true'
@@ -167,7 +98,7 @@ runs:
       with:
         fetch-depth: 0
         repository: apache/gravitino
-        ref: ${{ steps.base.outputs.base_ref }}
+        ref: ${{ inputs.base-sha }}
         persist-credentials: ${{ inputs.persist-credentials }}
 
     - name: Resolve upstream base commit
@@ -180,11 +111,13 @@ runs:
       shell: bash
       env:
         BASE_REF: ${{ steps.base.outputs.base_ref }}
-        HEAD_REPOSITORY: ${{ github.repository }}
-        HEAD_SHA: ${{ github.sha }}
+        HEAD_REPOSITORY: ${{ inputs.head-repository || github.repository }}
+        HEAD_SHA: ${{ inputs.head-sha || github.sha }}
       run: |
         set -euo pipefail
 
+        [[ "${HEAD_SHA}" =~ ^[0-9a-f]{40}$ ]] || exit 1
+        [[ "${HEAD_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || exit 1
         # Fetch the pushed commit rather than the branch tip, which may have moved since.
         git fetch "https://github.com/${HEAD_REPOSITORY}.git" "${HEAD_SHA}"
         if ! git \

@@ -16,284 +16,54 @@
 # limitations under the License.
 
 name: Update Fork CI Status
-
 on:
+  workflow_run:
+    workflows: [Fork CI PR Signal, Fork CI]
+    types: [completed]
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
-
-permissions:
-  actions: read
-  checks: write
-  contents: read
-  pull-requests: read
-
+    inputs:
+      pull-request:
+        description: 'Optional PR number to force-refresh, including settled checks'
+        required: false
+        type: string
+permissions: {}
 concurrency:
   group: fork-ci-status-update
   cancel-in-progress: false
-
 jobs:
   update:
-    name: Update fork CI checks
-    if: github.repository == 'apache/gravitino'
+    if: >-
+      github.repository == 'apache/gravitino' &&
+      (github.event_name != 'workflow_run' ||
+       github.event.workflow_run.event == 'pull_request' ||
+       github.event.workflow_run.event == 'workflow_dispatch' ||
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: write
+      contents: read
+      pull-requests: read
     steps:
-      # The state of the previous sweep lets this sweep skip pull requests that have a
-      # final result and no new activity, without spending API calls on them.
-      - name: Restore previous sweep state
-        uses: actions/cache/restore@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/cache/restore@v4
         with:
           path: .fork-ci-status
           key: fork-ci-status-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: fork-ci-status-
-
-      - name: Synchronize fork CI checks
-        uses: actions/github-script@v7
+      - uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           retries: 3
           script: |
-            const fs = require('fs');
-            const stateFile = '.fork-ci-status/state.json';
-            const HOUR = 60 * 60 * 1000;
-            // A pull request with activity in this window is always checked, which covers
-            // the time between a push and the check created by the Fork CI Status workflow.
-            const RECENT_ACTIVITY = HOUR;
-            // How long a completed check is still watched for a re-run of the fork workflow.
-            // action_required is also set when the fork run had not started when the check was created.
-            const WATCH = { action_required: 24 * HOUR, default: 7 * 24 * HOUR };
-            // Pull requests without a running check are checked at most this often, so sweeping
-            // every 5 minutes spends API calls mainly on the checks that are about to change.
-            const IDLE_INTERVAL = 15 * 60 * 1000;
-            const FINAL = ['success', 'neutral', 'skipped'];
-
-            const rateLimit = async () => (await github.rest.rateLimit.get()).data.resources.core;
-            const budgetBefore = await rateLimit();
-            let calls = 0;
-            github.hook.before('request', () => { calls++; });
-
-            let previous = {};
-            try {
-              previous = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-            } catch (error) {
-              core.info('No previous sweep state; checking every pull request.');
-            }
-            const next = {};
-            const now = Date.now();
-
-            // The check mirrors the Required CI job rather than the run conclusion: a run whose
-            // suites were all skipped (no pull request yet, or Fork CI disabled in the fork)
-            // still concludes as success. Failed jobs are listed while the run is still going,
-            // so reviewers and contributors can open their logs without waiting for the run.
-            const mirror = async (owner, repo, run) => {
-              const jobs = await github.paginate(
-                'GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/jobs',
-                { owner, repo, run_id: run.id, attempt_number: run.run_attempt, per_page: 100 });
-              const failed = jobs.filter(job =>
-                job.name !== 'Required CI' && ['failure', 'timed_out'].includes(job.conclusion));
-              const failedNote = failed.length
-                ? `Failed jobs:\n${failed.map(job => `- [${job.name}](${job.html_url})`).join('\n')}`
-                : '';
-              if (run.status !== 'completed') {
-                // A run stays queued while any of its jobs waits for a runner, even after other
-                // jobs have finished, so report it as in progress once any job has started.
-                const started = jobs.some(job => ['in_progress', 'completed'].includes(job.status));
-                return {
-                  status: started ? 'in_progress' : 'queued',
-                  title: failed.length ? `Running, ${failed.length} job(s) failed so far` : 'Running',
-                  note: failedNote
-                };
-              }
-              if (run.conclusion !== 'success') {
-                // Check runs reject some run conclusions, such as startup_failure.
-                const conclusion =
-                  ['action_required', 'cancelled', 'failure', 'timed_out'].includes(run.conclusion)
-                    ? run.conclusion
-                    : (['neutral', 'skipped'].includes(run.conclusion) ? 'action_required' : 'failure');
-                return {
-                  status: 'completed', conclusion,
-                  title: failed.length ? `${failed.length} job(s) failed` : `Fork CI ${run.conclusion}`,
-                  note: [`The fork workflow run concluded with ${run.conclusion}.`, failedNote]
-                    .filter(Boolean).join('\n\n')
-                };
-              }
-              const required = jobs.find(job => job.name === 'Required CI');
-              if (required && required.conclusion === 'success') {
-                return { status: 'completed', conclusion: 'success', title: 'All required suites passed' };
-              }
-              return {
-                status: 'completed', conclusion: 'action_required',
-                title: 'No suites were verified',
-                note: `Required CI was ${required ? required.conclusion : 'not run'}, so no suites were verified. ` +
-                  'Open the pull request first and check that Fork CI is enabled in the fork, then push the branch again.'
-              };
-            };
-            const NOT_AVAILABLE = 'Enable GitHub Actions in the fork, merge or rebase the branch onto the latest ' +
-              'base branch so it contains fork-ci.yml, and push it again.';
-
-            const skippable = (pr, state) => {
-              if (!state || state.sha !== pr.head.sha || state.updated_at !== pr.updated_at) return false;
-              if (state.kind === 'active') return false;
-              if (state.checked_at && now - Date.parse(state.checked_at) < IDLE_INTERVAL) return true;
-              if (now - Date.parse(pr.updated_at) < RECENT_ACTIVITY) return false;
-              if (state.kind === 'none' || state.kind === 'final') return true;
-              if (state.kind === 'watch') {
-                const window = WATCH[state.conclusion] || WATCH.default;
-                return now - Date.parse(state.completed_at) > window;
-              }
-              return false;
-            };
-
-            // Pull requests to a branch without Fork CI, such as a release branch it has not
-            // been backported to, still run that branch's own pull_request workflows.
-            const forkCiBases = new Map();
-            const baseHasForkCi = ref => {
-              if (!forkCiBases.has(ref)) {
-                forkCiBases.set(ref, github.rest.repos.getContent({
-                  owner: context.repo.owner, repo: context.repo.repo,
-                  path: '.github/workflows/fork-ci.yml', ref
-                }).then(() => true, error => {
-                  if (error.status === 404) return false;
-                  throw error;
-                }));
-              }
-              return forkCiBases.get(ref);
-            };
-
-            const syncPr = async pr => {
-              const state = {
-                sha: pr.head.sha, updated_at: pr.updated_at, kind: 'none', checked_at: new Date(now).toISOString()
-              };
-              next[pr.number] = state;
-              if (!pr.head.repo || !(await baseHasForkCi(pr.base.ref))) return 'none';
-              const owner = pr.head.repo.owner.login;
-              const repo = pr.head.repo.name;
-
-              const { data: { check_runs: checks } } = await github.rest.checks.listForRef({
-                owner: context.repo.owner, repo: context.repo.repo, ref: pr.head.sha,
-                check_name: 'Fork CI', filter: 'all', per_page: 100 });
-              const latest = checks.sort((a, b) => b.id - a.id)[0];
-              // The Fork CI Status workflow creates the first check for each head commit.
-              // Only recently active pull requests without one are looked up, to recover
-              // from a failed notification.
-              if (!latest && now - Date.parse(pr.updated_at) >= RECENT_ACTIVITY) return 'none';
-
-              let run;
-              try {
-                const { data } = await github.rest.actions.listWorkflowRuns({
-                  owner, repo, workflow_id: 'fork-ci.yml', head_sha: pr.head.sha, per_page: 10 });
-                run = data.workflow_runs.sort((a, b) => b.id - a.id)[0];
-              } catch (error) {
-                core.warning(`Unable to read ${owner}/${repo}: ${error.message}`);
-                if (!latest) return 'none';
-              }
-              if (!latest && !run) return 'none';
-
-              let recorded = {};
-              try {
-                recorded = JSON.parse((latest && latest.output && latest.output.text) || '{}');
-              } catch (error) {
-                recorded = {};
-              }
-              const sameRun = !run ? recorded.run_id === undefined :
-                recorded.run_id === run.id && recorded.run_attempt === run.run_attempt;
-
-              const detailsUrl = run
-                ? `https://github.com/${owner}/${repo}/actions/runs/${run.id}`
-                : `https://github.com/${owner}/${repo}/actions/workflows/fork-ci.yml`;
-              // A completed check of the same completed run attempt cannot change, so skip the
-              // job lookup that mirroring a run needs.
-              const settled = latest && latest.status === 'completed' && sameRun &&
-                (!run || run.status === 'completed');
-              const result = settled ? { status: 'completed', conclusion: latest.conclusion } :
-                (run ? await mirror(owner, repo, run) : { status: 'completed', conclusion: 'action_required' });
-              const status = result.status;
-              const conclusion = result.conclusion || null;
-              const output = run
-                ? {
-                    title: result.title || 'Fork CI results',
-                    summary: `[See fork CI results](${detailsUrl})` + (result.note ? `\n\n${result.note}` : ''),
-                    text: JSON.stringify({ owner, repo, run_id: run.id, run_attempt: run.run_attempt })
-                  }
-                : {
-                    title: 'Fork CI is not available',
-                    summary: NOT_AVAILABLE,
-                    text: JSON.stringify({ owner, repo, workflow: 'fork-ci.yml' })
-                  };
-
-              const params = {
-                owner: context.repo.owner, repo: context.repo.repo,
-                status, ...(conclusion ? { conclusion } : {}),
-                details_url: detailsUrl, output
-              };
-              let action = 'unchanged';
-              if (!latest) {
-                await github.rest.checks.create({ ...params, name: 'Fork CI', head_sha: pr.head.sha });
-                action = 'created';
-              } else if (latest.status === 'completed' && !sameRun) {
-                // A completed check run cannot go back to in progress, so a re-run of the
-                // fork workflow gets a new check run; the pull request shows the newest one.
-                await github.rest.checks.create({ ...params, name: 'Fork CI', head_sha: pr.head.sha });
-                action = 'created';
-              } else if (latest.status !== status || (latest.conclusion || null) !== conclusion || !sameRun ||
-                  // Newly failed jobs of a running fork workflow change only the output.
-                  (!settled && latest.output && latest.output.summary !== output.summary)) {
-                await github.rest.checks.update({ ...params, check_run_id: latest.id });
-                action = 'updated';
-              }
-
-              if (status !== 'completed') {
-                state.kind = 'active';
-              } else if (FINAL.includes(conclusion)) {
-                state.kind = 'final';
-              } else {
-                state.kind = 'watch';
-                state.conclusion = conclusion;
-                state.completed_at = action === 'unchanged' && latest.completed_at
-                  ? latest.completed_at : new Date().toISOString();
-              }
-              return action;
-            };
-
-            const prs = await github.paginate(
-              'GET /repos/{owner}/{repo}/pulls',
-              { owner: context.repo.owner, repo: context.repo.repo, state: 'open', per_page: 100 });
-
-            // Keep one pull request's failure from stopping the rest of the sweep.
-            const failed = [];
-            const counts = {};
-            for (const pr of prs) {
-              let result;
-              if (skippable(pr, previous[pr.number])) {
-                next[pr.number] = previous[pr.number];
-                result = 'skipped';
-              } else {
-                try {
-                  result = await syncPr(pr);
-                } catch (error) {
-                  // Drop the state so the next sweep checks this pull request again.
-                  delete next[pr.number];
-                  failed.push(pr.number);
-                  result = 'failed';
-                  core.warning(`Unable to update Fork CI for #${pr.number}: ${error.message}`);
-                }
-              }
-              counts[result] = (counts[result] || 0) + 1;
-            }
-
-            fs.mkdirSync('.fork-ci-status', { recursive: true });
-            fs.writeFileSync(stateFile, JSON.stringify(next));
-            core.info(`Pull requests: ${prs.length} ${JSON.stringify(counts)}; API calls: ${calls}`);
-            const budgetAfter = await rateLimit();
-            core.info(`GITHUB_TOKEN core rate limit: ${budgetAfter.used}/${budgetAfter.limit} used ` +
-              `(${budgetBefore.used} before this sweep), resets at ${new Date(budgetAfter.reset * 1000).toISOString()}`);
-            if (failed.length) {
-              core.setFailed(`Fork CI checks were not updated for: ${failed.map(n => `#${n}`).join(', ')}`);
-            }
-
-      - name: Save sweep state
+            await require('./.github/scripts/update-fork-ci.cjs').update({ github, context, core });
+      - uses: actions/cache/save@v4
         if: always()
-        uses: actions/cache/save@v4
         with:
           path: .fork-ci-status
           key: fork-ci-status-${{ github.run_id }}-${{ github.run_attempt }}

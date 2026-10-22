@@ -20,12 +20,28 @@
 name: "ASF Allowlist Check"
 
 on:
-  # Also run upstream for pull requests that change workflows or actions, so the
-  # allowlist does not depend on the self-reported Fork CI result.
-  pull_request:
-    paths:
-      - '.github/**'
   workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
   workflow_dispatch:
 
 permissions:
@@ -38,10 +54,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      # A pull request run already checks out the merge commit.
-      - if: github.event_name != 'pull_request'
-        uses: ./.github/actions/checkout-and-sync
+      - uses: ./.github/actions/checkout-and-sync
         with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
           persist-credentials: false
       - uses: apache/infrastructure-actions/allowlist-check@main
         with:

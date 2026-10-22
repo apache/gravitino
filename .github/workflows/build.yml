@@ -3,9 +3,30 @@ name: build
 # Controls when the workflow will run
 on:
   workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: fork-ci-build-${{ github.ref }}
+  group: fork-ci-build-${{ inputs.head-sha || github.ref }}
   cancel-in-progress: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -14,10 +35,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
         id: checkout
       - name: Test source license-reference checker
         run: bash dev/release/test-check-license.sh
+      - name: Test Fork CI contracts
+        run: node --test .github/scripts/tests/*.test.cjs
       - name: Disable Git automatic maintenance
         run: git config --local maintenance.auto false
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
@@ -99,7 +130,15 @@ jobs:
     if: needs.changes.outputs.source_changes != 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: ./.github/actions/setup-java-toolchains
         with:
@@ -117,7 +156,15 @@ jobs:
     if: needs.changes.outputs.spark_connector_changes == 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: actions/setup-java@v4
         with:
@@ -155,7 +202,15 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
         id: build-checkout
 
       - uses: ./.github/actions/setup-java-toolchains
@@ -277,7 +332,15 @@ jobs:
       needs.changes.outputs.maintenance_module_only_changes != 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: ./.github/actions/setup-java-toolchains
         with:
@@ -334,7 +397,15 @@ jobs:
       needs['core-test'].result == 'success')
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
         id: coverage-checkout
 
       - uses: ./.github/actions/setup-java-toolchains
