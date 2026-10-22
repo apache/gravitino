@@ -21,7 +21,7 @@ paths:
 
   /metalakes/{metalake}/maintenance/actions/{jobId}/sample:
     parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "../openapi.yaml#/components/parameters/metalake"
       - $ref: "#/components/parameters/jobId"
     post:
       tags:
@@ -51,19 +51,19 @@ paths:
                 MaintenanceActionSampleResponse:
                   $ref: "#/components/examples/MaintenanceActionSampleResponse"
         "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
           description: Not Found - The specified metalake or maintenance action does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/maintenance/actions/{jobId}/finish:
     parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "../openapi.yaml#/components/parameters/metalake"
       - $ref: "#/components/parameters/jobId"
     post:
       tags:
@@ -84,17 +84,17 @@ paths:
                 $ref: "#/components/examples/MaintenanceActionFinishRequest"
       responses:
         "200":
-          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+          $ref: "../openapi.yaml#/components/responses/BaseResponse"
         "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
           description: Not Found - The specified metalake or maintenance action does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
 
