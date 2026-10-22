@@ -603,11 +603,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      // Overwrite only with the id stored in the catalog: it identifies the table, so a row under
-      // the same name with another id is stale and gets replaced. A generated id identifies
-      // nothing, so a row that appeared meanwhile, e.g. from a concurrent import on another node,
-      // must win. The plain insert then conflicts, and loadTable reloads that row.
-      store.put(tableEntity, reuseStringId);
+      // Overwrite only when the catalog stores a Gravitino id: the table was managed by
+      // Gravitino, so a row under the same name with another id is stale and gets replaced. The
+      // uid is the stored id only for an in-place rename, otherwise a fresh one, so the overwrite
+      // never lands on another entity's row. Without a stored id, a row that appeared meanwhile,
+      // e.g. from a concurrent import on another node, must win. The plain insert then conflicts,
+      // and loadTable reloads that row.
+      store.put(tableEntity, stringId != null);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (OptimisticLockException e) {

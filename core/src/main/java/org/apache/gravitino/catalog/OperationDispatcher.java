@@ -323,9 +323,9 @@ public abstract class OperationDispatcher {
    * <p>Any client of the external system can set that property, so it is not proof of identity.
    * Reusing the id is right only when the external system renamed an object that Gravitino already
    * tracks: the stored entity with that id sits under the same parent, and its old name is gone
-   * from the catalog. In every other case the id belongs to another object, or to none, and
-   * reusing it would rename or move another live entity, with its owner and grants, onto this
-   * object. The caller then imports the object under a fresh id.
+   * from the catalog. In every other case the id belongs to another object, or to none, and reusing
+   * it would rename or move another live entity, with its owner and grants, onto this object. The
+   * caller then imports the object under a fresh id.
    *
    * @param id The id from the external object's {@link StringIdentifier} property.
    * @param ident The identifier of the external object being imported.

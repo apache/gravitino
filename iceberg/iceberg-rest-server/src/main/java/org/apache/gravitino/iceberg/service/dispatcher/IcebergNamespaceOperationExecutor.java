@@ -96,8 +96,7 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       IcebergRequestContext context,
       Namespace namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
-    IcebergReservedPropertyValidator.validateProperties(
-        updateNamespacePropertiesRequest.updates());
+    IcebergReservedPropertyValidator.validateProperties(updateNamespacePropertiesRequest.updates());
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .updateNamespaceProperties(namespace, updateNamespacePropertiesRequest);
