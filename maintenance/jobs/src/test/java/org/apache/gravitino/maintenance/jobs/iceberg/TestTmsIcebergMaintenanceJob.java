@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -46,8 +48,36 @@ public class TestTmsIcebergMaintenanceJob {
     assertTrue(args.contains("{{updater_options:-}}"));
     assertFalse(args.contains("--gravitino-job-id"));
     assertFalse(args.contains("{{gravitino_job_id}}"));
-    assertFalse(args.contains("--tms-table-id"));
+    assertTrue(args.contains("--tms-table-id"));
+    assertTrue(args.contains("{{tms_table_id:-}}"));
+    assertTrue(args.contains("--tms-tables"));
+    assertTrue(args.contains("{{tms_tables:-}}"));
     assertFalse(args.contains("--tms-policy-id"));
+  }
+
+  @Test
+  public void testResolveTableTargetsSingleAndBatch() {
+    Map<String, String> single = new HashMap<>();
+    single.put("catalog", "iceberg");
+    single.put("table", "db.t1");
+    single.put("tms-table-id", "10");
+    List<TmsIcebergMaintenanceJob.TableTarget> one =
+        TmsIcebergMaintenanceJob.resolveTableTargets(single);
+    assertEquals(1, one.size());
+    assertEquals(10L, one.get(0).tableId);
+    assertEquals("iceberg", one.get(0).catalogName);
+    assertEquals("db.t1", one.get(0).tableIdentifier);
+
+    Map<String, String> batch = new HashMap<>();
+    batch.put(
+        "tms-tables",
+        "[{\"table_id\":10,\"catalog_name\":\"iceberg\",\"table_identifier\":\"db.t1\"},"
+            + "{\"table_id\":11,\"catalog_name\":\"iceberg\",\"table_identifier\":\"db.t2\"}]");
+    List<TmsIcebergMaintenanceJob.TableTarget> many =
+        TmsIcebergMaintenanceJob.resolveTableTargets(batch);
+    assertEquals(2, many.size());
+    assertEquals(11L, many.get(1).tableId);
+    assertEquals("db.t2", many.get(1).tableIdentifier);
   }
 
   @Test

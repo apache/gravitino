@@ -65,9 +65,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
-import org.apache.gravitino.maintenance.dto.responses.MaintenanceActionSampleResponse;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
@@ -770,50 +768,42 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
-   * Reports an in-job S0 sample and returns the continue / stop gate outcome (§5.2.2).
-   *
-   * <p>Same usage pattern as other built-in maintenance jobs that call typed {@link
-   * GravitinoClient} APIs (for example iceberg-update-stats). <strong>Not a stable public product
-   * API</strong> — intended for built-in Spark maintenance jobs only.
-   *
-   * @param jobId Gravitino job run id
-   * @param request sample payload
-   * @return gate outcome
-   */
-  public MaintenanceActionSampleResponse reportMaintenanceActionSample(
-      long jobId, MaintenanceActionSampleRequest request) {
-    Preconditions.checkArgument(request != null, "request must not be null");
-    request.validate();
-    MaintenanceActionSampleResponse response =
-        restClient.post(
-            String.format(
-                "api/metalakes/%s/maintenance/actions/%d/sample",
-                RESTUtils.encodeString(metalakeName), jobId),
-            request,
-            MaintenanceActionSampleResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.restErrorHandler());
-    response.validate();
-    return response;
-  }
-
-  /**
-   * Finishes a TMS cron maintenance action, optionally persisting S1 metrics (§5.2.2).
+   * Reports S0 (before-maintenance) snapshot metrics for an in-flight TMS action.
    *
    * <p><strong>Not a stable public product API</strong> — intended for built-in Spark maintenance
    * jobs only.
    *
    * @param jobId Gravitino job run id
-   * @param request finish payload
+   * @param request metrics payload ({@code finish} may close the soft slot)
    */
-  public void finishMaintenanceAction(long jobId, MaintenanceActionFinishRequest request) {
+  public void reportMaintenanceActionBeforeMetrics(
+      long jobId, MaintenanceActionMetricsRequest request) {
+    postMaintenanceActionMetrics(jobId, "before", request);
+  }
+
+  /**
+   * Reports S1 (after-maintenance) snapshot metrics for an in-flight TMS action.
+   *
+   * <p><strong>Not a stable public product API</strong> — intended for built-in Spark maintenance
+   * jobs only.
+   *
+   * @param jobId Gravitino job run id
+   * @param request metrics payload ({@code finish} may close the soft slot)
+   */
+  public void reportMaintenanceActionAfterMetrics(
+      long jobId, MaintenanceActionMetricsRequest request) {
+    postMaintenanceActionMetrics(jobId, "after", request);
+  }
+
+  private void postMaintenanceActionMetrics(
+      long jobId, String phase, MaintenanceActionMetricsRequest request) {
     Preconditions.checkArgument(request != null, "request must not be null");
     request.validate();
     BaseResponse response =
         restClient.post(
             String.format(
-                "api/metalakes/%s/maintenance/actions/%d/finish",
-                RESTUtils.encodeString(metalakeName), jobId),
+                "api/metalakes/%s/maintenance/actions/%d/metrics/%s",
+                RESTUtils.encodeString(metalakeName), jobId, phase),
             request,
             BaseResponse.class,
             Collections.emptyMap(),

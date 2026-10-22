@@ -19,11 +19,13 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,9 +40,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
-import org.apache.gravitino.maintenance.dto.responses.MaintenanceActionSampleResponse;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
@@ -63,15 +63,15 @@ import org.slf4j.LoggerFactory;
  * (comma-separated commit chain). Reuses procedure SQL builders from the four standalone {@code
  * Iceberg*Job} classes. Those standalone templates stay unchanged for CLI / optimizer use.
  *
- * <p>Commit-chain runs share one occupancy claim ({@code policy_id} = first type). Only the first
- * type uses the HTTP sample/recommend gate; later types skip the HTTP gate, end early on local
- * snapshot drift, then continue the chain.
+ * <p>Commit-chain runs share one occupancy claim ({@code policy_id} = first type). Continue / stop
+ * (snapshot drift) is decided locally in the job. Snapshot metrics may be reported best-effort via
+ * the TMS metrics callback; occupancy is released when the Gravitino job reaches a terminal state.
  *
  * <p>Template parameters mirror other Iceberg built-ins: {@code maintenance_type}, {@code
  * updater_options} (Gravitino URI / metalake / auth, same name as update-stats), plus catalog /
- * table / procedure options. The Gravitino job id is discovered at runtime ({@link
- * JobHandle#GRAVITINO_JOB_ID_ENV} or the staging directory name); table and policy ids are loaded
- * server-side from the in-flight action bound to that job id.
+ * table / procedure options. A batch may pass {@code tms_tables} (JSON array) so one Spark job
+ * covers multiple tables under the same Gravitino job id. The Gravitino job id is discovered at
+ * runtime ({@link JobHandle#GRAVITINO_JOB_ID_ENV} or the staging directory name).
  */
 public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
@@ -86,6 +86,12 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
 
   /** JobConf / CLI key for a commit-chain of wire types ({@code maintenance_types}). */
   public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";
+
+  /**
+   * JobConf / CLI key for a multi-table batch ({@code tms_tables}): JSON array of {@code table_id},
+   * {@code catalog_name}, {@code table_identifier}.
+   */
+  public static final String TMS_TABLES_KEY = "tms_tables";
 
   private static final String VERSION = "v1";
 
@@ -162,19 +168,15 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   @VisibleForTesting
   static int run(String[] args) {
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
-    String catalogName = argMap.get("catalog");
-    String tableIdentifier = argMap.get("table");
-    if (catalogName == null || tableIdentifier == null) {
-      LOG.error("--catalog and --table are required");
-      return 1;
-    }
 
     List<MaintenanceType> types;
     long jobId;
+    List<TableTarget> tables;
     try {
       types =
           parseMaintenanceTypes(argMap.get("maintenance-types"), argMap.get("maintenance-type"));
       jobId = resolveGravitinoJobId();
+      tables = resolveTableTargets(argMap);
     } catch (IllegalArgumentException | IllegalStateException e) {
       LOG.error("Invalid TMS maintenance arguments: {}", e.getMessage());
       return 1;
@@ -198,61 +200,112 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
     try (SparkSession spark = sparkBuilder.getOrCreate()) {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
       try (GravitinoClient client = openClient(updaterOptions)) {
-        Long afterSnapshotId = null;
-        String finishMetrics = null;
-        boolean shouldFinish = false;
         try {
-          for (int i = 0; i < types.size(); i++) {
-            MaintenanceType type = types.get(i);
-            boolean httpGate = i == 0;
-            SnapshotSample s0 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
-            afterSnapshotId = s0.snapshotId;
-            finishMetrics = s0.metricsJson;
+          for (TableTarget table : tables) {
+            SnapshotSample lastBefore = null;
+            SnapshotSample lastAfter = null;
+            for (MaintenanceType type : types) {
+              SnapshotSample s0 =
+                  sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
+              lastBefore = s0;
+              reportBeforeQuietly(client, jobId, table.tableId, s0, /*finish=*/ false);
 
-            if (httpGate) {
-              MaintenanceActionSampleResponse gate =
-                  client.reportMaintenanceActionSample(
-                      jobId,
-                      new MaintenanceActionSampleRequest(
-                          s0.snapshotId, s0.headSnapshotId, s0.metricsJson));
-              if (!gate.isContinueMaintenance()) {
+              if (s0.snapshotId != s0.headSnapshotId) {
                 LOG.info(
-                    "TMS gate stopped job {} type={} reason={}; continuing chain if any",
-                    jobId,
+                    "TMS type {} skipped for job {} table {} due to snapshot drift (s0={} head={})",
                     type.wireName,
-                    gate.getStopReason());
+                    jobId,
+                    table.tableId,
+                    s0.snapshotId,
+                    s0.headSnapshotId);
                 continue;
               }
-            } else if (s0.snapshotId != s0.headSnapshotId) {
-              // End this type on local drift; continue with the next type in the same Job.
-              LOG.info(
-                  "TMS commit-chain type {} skipped for job {} due to snapshot drift (s0={} head={})",
-                  type.wireName,
-                  jobId,
-                  s0.snapshotId,
-                  s0.headSnapshotId);
-              continue;
-            }
 
-            runProcedure(spark, type, catalogName, tableIdentifier, argMap);
-            SnapshotSample s1 = sampleSnapshot(spark, catalogName, tableIdentifier, type);
-            afterSnapshotId = s1.snapshotId;
-            finishMetrics = s1.metricsJson;
+              runProcedure(spark, type, table.catalogName, table.tableIdentifier, argMap);
+              SnapshotSample s1 =
+                  sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
+              lastAfter = s1;
+              reportAfterQuietly(client, jobId, table.tableId, s1, /*finish=*/ false);
+            }
+            // Close this table's soft slot once: prefer S1 after; otherwise finish on last S0.
+            if (lastAfter != null) {
+              reportAfterQuietly(client, jobId, table.tableId, lastAfter, /*finish=*/ true);
+            } else if (lastBefore != null) {
+              reportBeforeQuietly(client, jobId, table.tableId, lastBefore, /*finish=*/ true);
+            } else {
+              LOG.warn(
+                  "TMS job {} table {} ended without a metrics sample; soft slot left open",
+                  jobId,
+                  table.tableId);
+            }
           }
-          // Finish only on a clean exit (including gate-stop / drift-skip). Procedure failures
-          // leave the action open so OccupancyGate can reclaim when the Gravitino job is terminal.
-          shouldFinish = true;
           return 0;
         } catch (Exception e) {
           LOG.error("TMS Iceberg maintenance failed for job {}", jobId, e);
           return 1;
-        } finally {
-          // Finish before try-with-resources closes the client.
-          if (shouldFinish) {
-            finishQuietly(client, jobId, afterSnapshotId, finishMetrics);
-          }
         }
       }
+    }
+  }
+
+  /**
+   * Resolves one or more table targets. Prefers {@code --tms-tables} JSON when present; otherwise
+   * requires {@code --catalog}, {@code --table}, and {@code --tms-table-id}.
+   */
+  @VisibleForTesting
+  static List<TableTarget> resolveTableTargets(Map<String, String> argMap) {
+    String tablesJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("tms-tables"));
+    if (tablesJson != null && !tablesJson.trim().isEmpty()) {
+      return parseTmsTables(tablesJson);
+    }
+    String catalogName = argMap.get("catalog");
+    String tableIdentifier = argMap.get("table");
+    if (catalogName == null || tableIdentifier == null) {
+      throw new IllegalArgumentException(
+          "--catalog and --table are required when --tms-tables is omitted");
+    }
+    long tableId = parsePositiveLongArg(argMap.get("tms-table-id"), "tms-table-id");
+    return ImmutableList.of(new TableTarget(tableId, catalogName, tableIdentifier));
+  }
+
+  @VisibleForTesting
+  static List<TableTarget> parseTmsTables(String tablesJson) {
+    try {
+      List<Map<String, Object>> raw =
+          JsonUtils.anyFieldMapper()
+              .readValue(tablesJson, new TypeReference<List<Map<String, Object>>>() {});
+      if (raw == null || raw.isEmpty()) {
+        throw new IllegalArgumentException("tms_tables must not be empty");
+      }
+      List<TableTarget> tables = new ArrayList<>(raw.size());
+      for (Map<String, Object> entry : raw) {
+        if (entry == null) {
+          throw new IllegalArgumentException("tms_tables entry must not be null");
+        }
+        Object tableIdObj = entry.get("table_id");
+        Object catalogObj = entry.get("catalog_name");
+        Object tableObj = entry.get("table_identifier");
+        if (tableIdObj == null || catalogObj == null || tableObj == null) {
+          throw new IllegalArgumentException(
+              "tms_tables entry requires table_id, catalog_name, table_identifier");
+        }
+        long tableId = Long.parseLong(String.valueOf(tableIdObj));
+        if (tableId <= 0) {
+          throw new IllegalArgumentException("tms_tables table_id must be positive: " + tableId);
+        }
+        String catalogName = String.valueOf(catalogObj).trim();
+        String tableIdentifier = String.valueOf(tableObj).trim();
+        if (catalogName.isEmpty() || tableIdentifier.isEmpty()) {
+          throw new IllegalArgumentException(
+              "tms_tables catalog_name and table_identifier must not be blank");
+        }
+        tables.add(new TableTarget(tableId, catalogName, tableIdentifier));
+      }
+      return tables;
+    } catch (JsonProcessingException e) {
+      throw new IllegalArgumentException("tms_tables must be valid JSON: " + e.getMessage(), e);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("tms_tables table_id must be a long", e);
     }
   }
 
@@ -470,16 +523,60 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  private static void finishQuietly(
+  private static void reportBeforeQuietly(
+      GravitinoClient client, long jobId, long tableId, SnapshotSample sample, boolean finish) {
+    reportMetricsQuietly(client, jobId, tableId, sample, finish, /*after=*/ false);
+  }
+
+  private static void reportAfterQuietly(
+      GravitinoClient client, long jobId, long tableId, SnapshotSample sample, boolean finish) {
+    reportMetricsQuietly(client, jobId, tableId, sample, finish, /*after=*/ true);
+  }
+
+  private static void reportMetricsQuietly(
       GravitinoClient client,
       long jobId,
-      @Nullable Long afterSnapshotId,
-      @Nullable String metricsJson) {
+      long tableId,
+      SnapshotSample sample,
+      boolean finish,
+      boolean after) {
+    if (sample == null || sample.metricsJson == null || sample.metricsJson.trim().isEmpty()) {
+      return;
+    }
     try {
-      client.finishMaintenanceAction(
-          jobId, new MaintenanceActionFinishRequest(afterSnapshotId, metricsJson));
+      MaintenanceActionMetricsRequest request =
+          new MaintenanceActionMetricsRequest(
+              tableId, sample.snapshotId, sample.metricsJson, finish);
+      if (after) {
+        client.reportMaintenanceActionAfterMetrics(jobId, request);
+      } else {
+        client.reportMaintenanceActionBeforeMetrics(jobId, request);
+      }
     } catch (Exception e) {
-      LOG.warn("Best-effort TMS finish failed for job {} (control plane will reclaim)", jobId, e);
+      LOG.warn(
+          "Best-effort TMS {} metrics report failed for job {} table {} snapshot {} finish={}",
+          after ? "after" : "before",
+          jobId,
+          tableId,
+          sample.snapshotId,
+          finish,
+          e);
+    }
+  }
+
+  private static long parsePositiveLongArg(@Nullable String raw, String argName) {
+    String value = IcebergJobUtils.nullIfUnresolvedPlaceholder(raw);
+    if (value == null || value.trim().isEmpty()) {
+      throw new IllegalArgumentException("--" + argName + " is required");
+    }
+    try {
+      long parsed = Long.parseLong(value.trim());
+      if (parsed <= 0) {
+        throw new IllegalArgumentException("--" + argName + " must be a positive long: " + value);
+      }
+      return parsed;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("--" + argName + " must be a long: " + value, e);
     }
   }
 
@@ -618,6 +715,10 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         "{{maintenance_type}}",
         "--maintenance-types",
         "{{maintenance_types:-}}",
+        "--tms-table-id",
+        "{{tms_table_id:-}}",
+        "--tms-tables",
+        "{{tms_tables:-}}",
         "--updater-options",
         "{{updater_options:-}}",
         "--strategy",
@@ -644,6 +745,19 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         "{{dry_run:-false}}",
         "--spark-conf",
         "{{spark_conf:-}}");
+  }
+
+  @VisibleForTesting
+  static final class TableTarget {
+    final long tableId;
+    final String catalogName;
+    final String tableIdentifier;
+
+    TableTarget(long tableId, String catalogName, String tableIdentifier) {
+      this.tableId = tableId;
+      this.catalogName = catalogName;
+      this.tableIdentifier = tableIdentifier;
+    }
   }
 
   @VisibleForTesting
