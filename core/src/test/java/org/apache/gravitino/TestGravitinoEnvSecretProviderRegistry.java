@@ -43,7 +43,7 @@ public class TestGravitinoEnvSecretProviderRegistry {
 
     env.shutdown();
 
-    Assertions.assertSame(secretManager, env.secretManager());
+    Assertions.assertThrows(IllegalStateException.class, env::secretManager);
     Assertions.assertThrows(
         IllegalStateException.class, () -> secretManager.getRegistry().listProviders());
   }
@@ -70,7 +70,7 @@ public class TestGravitinoEnvSecretProviderRegistry {
 
     env.shutdown();
 
-    Assertions.assertSame(secretManager, env.secretManager());
+    Assertions.assertThrows(IllegalStateException.class, env::secretManager);
     Assertions.assertThrows(IllegalStateException.class, registry::listProviders);
   }
 
