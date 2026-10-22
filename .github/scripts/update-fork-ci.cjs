@@ -36,8 +36,11 @@ async function update({ github, context, core }) {
   const availableBases = new Map();
   const rate = (await github.rest.rateLimit.get()).data.resources.core;
   // Bound work even while settled successes are watched. Rotate the starting PR to avoid starving
-  // older PRs, and leave quota for signal workflows and other repository automation.
-  const budget = manual ? Math.max(0, rate.remaining - 100) : Math.min(60, Math.max(0, rate.remaining - 100));
+  // older PRs, and leave quota for signal workflows and other repository automation. Organizations on
+  // GitHub Enterprise Cloud, such as apache, get 15,000 requests per hour: spend at most about half of
+  // the hourly quota across five-minute sweeps, and never less than 60 calls per sweep.
+  const perSweep = Math.max(60, Math.floor(rate.limit / 24));
+  const budget = manual ? Math.max(0, rate.remaining - 100) : Math.min(perSweep, Math.max(0, rate.remaining - 100));
   let calls = 0;
   github.hook.before('request', () => { calls++; });
   const failures = [];

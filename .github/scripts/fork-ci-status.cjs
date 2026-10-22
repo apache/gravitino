@@ -24,9 +24,15 @@ const requiredAction = note => ({ status: 'completed', conclusion: 'action_requi
 function evaluate(pr, run, jobs, baseSha = pr.base.sha) {
   const required = jobs.find(job => job.name === requiredName(pr, baseSha));
   if (run.status !== 'completed') return { status: 'in_progress', title: 'Fork CI is running' };
-  if (run.conclusion !== 'success') return { status: 'completed',
-    conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
-      ? run.conclusion : 'action_required', title: `Fork CI ${run.conclusion}` };
+  if (run.conclusion !== 'success') {
+    // Fork CI cancels its own run on the first failed job, so report that job, not the cancellation.
+    const failed = jobs.filter(job => ['failure', 'timed_out'].includes(job.conclusion)).map(job => job.name);
+    if (failed.length) return { status: 'completed', conclusion: 'failure',
+      title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
+    return { status: 'completed',
+      conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
+        ? run.conclusion : 'action_required', title: `Fork CI ${run.conclusion}` };
+  }
   if (!required || required.conclusion !== 'success') {
     return requiredAction('The run did not finish Required CI for this exact head, base branch and base SHA. ' +
       'Update the branch and push again, or ask a committer to dispatch a trusted Fork CI run.');

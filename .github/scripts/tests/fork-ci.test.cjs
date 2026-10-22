@@ -451,3 +451,82 @@ test('checkout-and-sync does not persist credentials by default', async () => {
   const action = await readFile(path.join(__dirname, '../../actions/checkout-and-sync/action.yml'), 'utf8');
   assert.match(action, /persist-credentials:\n(?:\s+.*\n)*?\s+default: 'false'/);
 });
+
+const { watch } = require('../fail-fast.cjs');
+function watcherMock(polls) {
+  const calls = { cancel: 0, polls: 0 };
+  const github = { rest: { actions: { listJobsForWorkflowRunAttempt() {},
+    cancelWorkflowRun: async args => { calls.cancel++; calls.run_id = args.run_id; } } },
+  paginate: async (endpoint, args) => { calls.attempt = args.attempt_number; return polls[Math.min(calls.polls++, polls.length - 1)]; } };
+  const errors = [];
+  return { github, calls, errors, context: { repo: { owner: 'fork', repo: 'repo' }, runId: 42 },
+    core: { error: message => errors.push(message), info: message => errors.push(message) }, self: 'Stop on first failure', sleep: async () => {} };
+}
+const job = (name, status, conclusion = null) => ({ name, status, conclusion });
+
+test('the first failed job cancels the rest of the fork run', async () => {
+  const mock = watcherMock([
+    [job('Stop on first failure', 'in_progress'), job('build / build', 'in_progress')],
+    [job('Stop on first failure', 'in_progress'), job('build / build', 'in_progress'),
+      job('backend / BackendIT (h2)', 'completed', 'failure')]]);
+  assert.deepEqual(await watch(mock), ['backend / BackendIT (h2)']);
+  assert.equal(mock.calls.cancel, 1); assert.equal(mock.calls.run_id, 42);
+  // Every poll reports progress, so the watcher is never a black box.
+  assert.match(mock.errors[0], /0\/1 jobs completed, 0 failed; waiting for build \/ build$/);
+  assert.match(mock.errors.at(-1), /Cancelling the run because these jobs failed: backend \/ BackendIT \(h2\)/);
+});
+
+test('the watcher ignores itself and exits without cancelling once all jobs pass', async () => {
+  process.env.GITHUB_RUN_ATTEMPT = '2';
+  try {
+    const done = [job('Stop on first failure', 'completed', 'failure'), job('build / build', 'completed', 'success'),
+      job('charts / lint-test', 'completed', 'skipped')];
+    const mock = watcherMock([[job('build / build', 'in_progress')], done, done]);
+    assert.deepEqual(await watch(mock), []);
+    assert.equal(mock.calls.cancel, 0); assert.equal(mock.calls.polls, 3); assert.equal(mock.calls.attempt, 2);
+    assert.equal(mock.errors.at(-1), 'All jobs completed without a failure.');
+  } finally { delete process.env.GITHUB_RUN_ATTEMPT; }
+});
+
+test('a run cancelled by fail-fast is reported as the failed job', () => {
+  const p = pr();
+  const failed = [...jobs(p), { name: 'backend / BackendIT (h2)', conclusion: 'failure' }, { name: 'spark / SparkIT', conclusion: 'cancelled' }];
+  const result = evaluate(p, { ...run(), conclusion: 'cancelled' }, failed);
+  assert.equal(result.conclusion, 'failure'); assert.equal(result.title, 'Failed: backend / BackendIT (h2)');
+  assert.equal(evaluate(p, { ...run(), conclusion: 'cancelled' }, jobs(p)).conclusion, 'cancelled');
+});
+
+test('only the fail-fast job can cancel the run', async () => {
+  const workflow = await readFile(path.join(__dirname, '../../workflows/fork-ci.yml'), 'utf8');
+  assert.equal(workflow.match(/actions: write/g).length, 1);
+  assert.match(workflow, /fail_fast:\n(?:.*\n)*?\s+permissions:\n\s+contents: read\n\s+actions: write\n/);
+  assert.match(workflow, /^permissions:\n\s+contents: read\n\s+actions: read\n/m);
+  // ubuntu-slim cancels jobs after 15 minutes; the watcher must outlive the slowest suite.
+  assert.match(workflow, /fail_fast:\n(?:.*\n)*?\s+runs-on: ubuntu-latest\n/);
+});
+
+test('scheduled sweeps scale their budget with the hourly quota', async () => withPublisher(async ({ ctx, stateFile, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const probed = async limit => {
+    const { github } = publisherMock();
+    const recent = Array.from({ length: 60 }, (_, i) => ({ ...pr(), number: 200 + i, updated_at: new Date().toISOString(),
+      head: { ...pr().head, sha: (200 + i).toString(16).padStart(40, 'f') } }));
+    const listPulls = github.rest.pulls.list, listForRef = github.rest.checks.listForRef, paginate = github.paginate;
+    // Count paginated requests, which is what each probe makes.
+    let count = () => {};
+    github.hook = { before(_, hook) { count = hook; } };
+    github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: limit, limit } } } });
+    const seen = new Set();
+    github.paginate = async (endpoint, args) => {
+      count();
+      if (endpoint === listPulls) return recent;
+      if (endpoint === listForRef) { seen.add(args.ref); return [{ id: 1, app: { slug: 'github-actions' }, status: 'completed',
+        conclusion: 'success', output: { text: JSON.stringify({ run_id: 1, run_attempt: 1 }) } }]; }
+      return paginate(endpoint, args);
+    };
+    await update({ github, context: ctx, core, stateFile });
+    return seen.size;
+  };
+  assert.ok(await probed(1000) < 60);
+  assert.equal(await probed(15000), 60);
+}));

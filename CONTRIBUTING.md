@@ -99,7 +99,7 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 3. Open the pull request. Its **Fork CI** check verifies the suite jobs and the exact tested head, base branch and base SHA. A pre-PR run is accepted only if its inferred base matches the PR. After retargeting a PR, push again or ask a committer for a trusted run. The separate **ASF Allowlist Check** scans the PR's workflow YAML using reviewed upstream code.
 4. Keep your branch up to date before merging. Required checks use strict branch protection. If the base changes, update your branch and run CI again. The **Fork CI** check can stay green after the base branch moves on; strict branch protection, not the check, blocks the merge until the branch is updated.
 
-If the check asks you to enable Fork CI, enable Actions in your fork, merge or rebase your branch onto the latest base branch, and push again. To re-run flaky tests, re-run the failed jobs in your fork; reviewers cannot re-run them for you. Please fix failures before requesting a review.
+If the check asks you to enable Fork CI, enable Actions in your fork, merge or rebase your branch onto the latest base branch, and push again. Fork CI cancels the rest of the run as soon as one job fails, so you can re-run failed jobs in your fork right away; this also re-runs the jobs it cancelled. Reviewers cannot re-run them for you. Please fix failures before requesting a review.
 
 Known limitations of Fork CI:
 
