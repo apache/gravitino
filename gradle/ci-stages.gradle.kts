@@ -17,7 +17,7 @@
  * under the License.
  */
 
-// CI stages for .github/workflows/build.yml. Each stage is one task, so a CI job and a local
+// CI stages for .github/workflows/presubmit.yml. Each stage is one task, so a CI job and a local
 // run use the same command:
 //
 //   ./gradlew ciLint

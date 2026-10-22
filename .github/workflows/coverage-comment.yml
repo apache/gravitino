@@ -2,7 +2,7 @@ name: Coverage Comment
 
 on:
   workflow_run:
-    workflows: ["build"]
+    workflows: ["presubmit"]
     types: [completed]
 
 permissions:

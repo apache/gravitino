@@ -19,7 +19,7 @@
 
 # Apache Gravitino™
 
-[![GitHub Actions Build](https://github.com/apache/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/build.yml)
+[![GitHub Actions Presubmit](https://github.com/apache/gravitino/actions/workflows/presubmit.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/presubmit.yml)
 [![GitHub Actions Integration Test](https://github.com/apache/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/integration-test.yml)
 [![License](https://img.shields.io/github/license/apache/gravitino)](https://github.com/apache/gravitino/blob/main/LICENSE)
 [![Contributors](https://img.shields.io/github/contributors/apache/gravitino)](https://github.com/apache/gravitino/graphs/contributors)

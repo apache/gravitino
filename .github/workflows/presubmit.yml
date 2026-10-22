@@ -1,4 +1,4 @@
-name: build
+name: presubmit
 
 # Controls when the workflow will run
 on:
