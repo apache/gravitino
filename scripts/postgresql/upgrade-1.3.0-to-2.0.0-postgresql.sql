@@ -125,7 +125,11 @@ CREATE TABLE IF NOT EXISTS semantic_model_version_info (
     version INT NOT NULL,
     semantic_model_name VARCHAR(128) NOT NULL,
     semantic_model_comment TEXT DEFAULT NULL,
-    semantic_model_definition TEXT NOT NULL,
+    datasets TEXT NOT NULL,
+    relationships TEXT DEFAULT NULL,
+    metrics TEXT DEFAULT NULL,
+    ai_context TEXT DEFAULT NULL,
+    custom_extensions TEXT DEFAULT NULL,
     properties TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -146,7 +150,11 @@ COMMENT ON COLUMN semantic_model_version_info.semantic_model_id IS 'semantic mod
 COMMENT ON COLUMN semantic_model_version_info.version IS 'semantic model version';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_name IS 'semantic model name snapshot';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_comment IS 'semantic model comment snapshot';
-COMMENT ON COLUMN semantic_model_version_info.semantic_model_definition IS 'structured definition snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.datasets IS 'dataset definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.relationships IS 'relationship definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.metrics IS 'metric definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.ai_context IS 'model AI context snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.custom_extensions IS 'model custom extensions snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model properties snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';

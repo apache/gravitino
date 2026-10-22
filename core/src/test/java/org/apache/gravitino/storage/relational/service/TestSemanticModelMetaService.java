@@ -183,10 +183,10 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     assertEquals(2, versions.size());
     assertEquals(oldName, versions.get(1).name);
     assertEquals("v1 comment", versions.get(1).comment);
-    assertTrue(versions.get(1).definition.contains("orders_v1"));
+    assertTrue(versions.get(1).datasets.contains("orders_v1"));
     assertEquals(newName, versions.get(2).name);
     assertEquals("v2 comment", versions.get(2).comment);
-    assertTrue(versions.get(2).definition.contains("orders_v2"));
+    assertTrue(versions.get(2).datasets.contains("orders_v2"));
     assertEquals(0L, versions.get(1).deletedAt);
     assertEquals(0L, versions.get(2).deletedAt);
 
@@ -594,7 +594,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
             statement.executeQuery(
                 String.format(
                     "SELECT version, semantic_model_name, semantic_model_comment,"
-                        + " semantic_model_definition, deleted_at"
+                        + " datasets, deleted_at"
                         + " FROM semantic_model_version_info WHERE semantic_model_id = %d",
                     semanticModelId))) {
       while (resultSet.next()) {
@@ -603,7 +603,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
             new VersionState(
                 resultSet.getString("semantic_model_name"),
                 resultSet.getString("semantic_model_comment"),
-                resultSet.getString("semantic_model_definition"),
+                resultSet.getString("datasets"),
                 resultSet.getLong("deleted_at")));
       }
       return versions;
@@ -674,13 +674,13 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
   private static class VersionState {
     private final String name;
     private final String comment;
-    private final String definition;
+    private final String datasets;
     private final long deletedAt;
 
-    private VersionState(String name, String comment, String definition, long deletedAt) {
+    private VersionState(String name, String comment, String datasets, long deletedAt) {
       this.name = name;
       this.comment = comment;
-      this.definition = definition;
+      this.datasets = datasets;
       this.deletedAt = deletedAt;
     }
   }
