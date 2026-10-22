@@ -129,6 +129,7 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PooledClassLoaderEntry;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1166,11 +1167,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param changes The changes to apply to the catalog.
    * @return A metadata snapshot of the altered catalog.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
+   * @throws CatalogAlreadyExistsException If the new name is already used by another catalog.
    * @throws IllegalArgumentException If an unsupported catalog change is provided.
    */
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
-      throws NoSuchCatalogException, IllegalArgumentException {
+      throws NoSuchCatalogException, CatalogAlreadyExistsException, IllegalArgumentException {
 
     TreeLockUtils.doWithTreeLock(
         ident,
@@ -1253,6 +1255,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           } catch (NoSuchEntityException ne) {
             LOG.warn("Catalog {} does not exist", ident, ne);
             throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
+
+          } catch (EntityAlreadyExistsException e) {
+            String newName =
+                RenameUtils.getLastRenameName(
+                    ident.name(),
+                    changes,
+                    CatalogChange.RenameCatalog.class,
+                    CatalogChange.RenameCatalog::getNewName);
+            throw new CatalogAlreadyExistsException(
+                e, "Catalog %s already exists", NameIdentifier.of(ident.namespace(), newName));
 
           } catch (IOException ioe) {
             LOG.error("Failed to alter catalog {}", ident, ioe);

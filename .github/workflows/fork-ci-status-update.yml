@@ -1,0 +1,63 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.
+#
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Update Fork CI Status
+on:
+  workflow_run:
+    workflows: [Fork CI PR Signal, Fork CI]
+    types: [completed]
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: 'Optional PR number to force-refresh, including settled checks'
+        required: false
+        type: string
+permissions: {}
+# A group keeps only one pending run, so each PR signal gets its own group: a burst of
+# signals must not cancel each other. Sweeps share one group.
+concurrency:
+  group: >-
+    fork-ci-status-update-${{ github.event.workflow_run.name == 'Fork CI PR Signal' &&
+    github.event.workflow_run.head_sha || 'sweep' }}
+  cancel-in-progress: false
+jobs:
+  update:
+    if: >-
+      github.repository == 'apache/gravitino' &&
+      (github.event_name != 'workflow_run' ||
+       github.event.workflow_run.event == 'pull_request' ||
+       github.event.workflow_run.event == 'workflow_dispatch' ||
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: write
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        with:
+          retries: 3
+          script: |
+            await require('./.github/scripts/update-fork-ci.cjs').update({ github, context, core });
