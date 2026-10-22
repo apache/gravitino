@@ -54,23 +54,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TMS Spark entry for cron (§5.2.2) and commit-chain (§5.2.3) submits.
+ * TMS Spark entry for cron (§5.2.2) and commit-chain (§5.2.3) {@code runJob} submits.
  *
- * <p>Dispatches by {@code --maintenance-types}: one wire name, or a comma-separated commit chain.
- * Reuses procedure SQL builders from the four standalone {@code Iceberg*Job} classes. Those
- * standalone templates stay unchanged for CLI / optimizer use.
+ * <p>Not a user-facing CLI. Operators / optimizer keep using the four standalone {@code
+ * Iceberg*Job} templates. This class is launched only via the built-in job template; program
+ * arguments are template-expanded {@code jobConf} values.
  *
- * <p>Commit-chain runs share one occupancy claim ({@code policy_id} = first type). Continue / stop
- * (snapshot drift and trigger-expr recommend) is decided locally in the job after S0 sample.
- * Snapshot metrics may be reported best-effort via the TMS metrics callback; occupancy is released
- * when the Gravitino job reaches a terminal state.
+ * <p>Dispatches by {@code maintenance_types} (one wire name or a comma-separated commit chain).
+ * Reuses procedure SQL builders from the standalone {@code Iceberg*Job} classes. Continue / stop
+ * (snapshot drift and trigger-expr recommend) is decided in-job after S0 sample. Soft slots are
+ * closed via the finish callback in {@code finally}.
  *
- * <p>Template parameters mirror other Iceberg built-ins: {@code maintenance_types}, {@code
- * updater_options} (Gravitino URI / metalake / auth, same name as update-stats), plus catalog /
- * table / procedure options. A batch may pass {@code tables} (JSON array) so one Spark job covers
- * multiple tables under the same Gravitino job id. The Gravitino job id is read from the local
- * executor staging directory name ({@code job-} plus the numeric id), or from {@link
- * #GRAVITINO_JOB_ID_ENV} when that directory is not the process working directory.
+ * <p>TMS-specific {@code jobConf} keys: {@code maintenance_types}, {@code tables} (JSON targets
+ * with system-filled {@code table_id}), {@code updater_options}, {@code rules}. Shared procedure /
+ * Spark keys match other Iceberg built-ins. The Gravitino job id is read from the local executor
+ * staging directory ({@code job-} plus the numeric id), or from {@link #GRAVITINO_JOB_ID_ENV}.
  */
 public class IcebergMaintenanceJob implements BuiltInJob {
 
@@ -87,15 +85,15 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-maintenance-task";
 
   /**
-   * JobConf / CLI key for procedure dispatch ({@code maintenance_types}). One wire name, or a
+   * JobConf key for procedure dispatch ({@code maintenance_types}). One wire name, or a
    * comma-separated commit chain. Required; no template default.
    */
   public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";
 
   /**
-   * JobConf / CLI key for table targets ({@code tables}): JSON array of {@code table_id}, {@code
-   * catalog_name}, {@code table_identifier}. Used for both single-table and multi-table TMS
-   * submits. Entity {@code table_id} is not a template placeholder.
+   * JobConf key for table targets ({@code tables}): JSON array of {@code table_id}, {@code
+   * catalog_name}, {@code table_identifier}. Single- and multi-table TMS submits use the same
+   * shape; {@code table_id} is system-filled by enqueue/submit.
    */
   public static final String TABLES_KEY = "tables";
 
@@ -115,14 +113,14 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
 
     /**
-     * @return wire value used in jobConf / CLI
+     * @return wire value used in jobConf
      */
     public String wireName() {
       return wireName;
     }
 
     /**
-     * @param raw jobConf or CLI value
+     * @param raw jobConf {@code maintenance_types} segment
      * @return parsed type
      */
     public static MaintenanceType fromWire(@Nullable String raw) {
@@ -160,9 +158,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * TMS cron / commit entry point.
+   * Spark application entry used by the job executor after template expansion. Not a supported
+   * operator CLI.
    *
-   * @param args named arguments from the job template
+   * @param args template-expanded jobConf as named arguments
    */
   public static void main(String[] args) {
     int code = run(args);
@@ -171,6 +170,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
+  /**
+   * @param args template-expanded jobConf as named arguments
+   */
   @VisibleForTesting
   static int run(String[] args) {
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
@@ -266,15 +268,15 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * Resolves table targets from {@code --tables} JSON (required for TMS sample/finish). Single and
-   * multi-table submits use the same payload shape.
+   * Resolves table targets from jobConf {@code tables} JSON (required for TMS sample/finish).
+   * Single- and multi-table submits use the same payload shape.
    */
   @VisibleForTesting
   static List<TableTarget> resolveTableTargets(Map<String, String> argMap) {
     String tablesJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("tables"));
     if (tablesJson == null || tablesJson.trim().isEmpty()) {
       throw new IllegalArgumentException(
-          "--tables JSON is required (array of table_id, catalog_name, table_identifier)");
+          "tables JSON is required (array of table_id, catalog_name, table_identifier)");
     }
     return parseTables(tablesJson);
   }
@@ -695,11 +697,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   private static List<String> buildArguments() {
+    // Named args are the Spark job-executor wiring for expanded jobConf — not a user CLI.
     return Arrays.asList(
-        "--catalog",
-        "{{catalog_name}}",
-        "--table",
-        "{{table_identifier:-}}",
         "--maintenance-types",
         "{{maintenance_types}}",
         "--tables",

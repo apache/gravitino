@@ -148,13 +148,8 @@ public class TestIcebergMaintenanceJob {
   }
 
   @Test
-  public void testMissingRequiredArgsReturnsError() {
-    assertEquals(1, IcebergMaintenanceJob.run(new String[] {"--catalog", "c"}));
+  public void testRunRejectsMissingTablesJobConf() {
     assertEquals(
-        1,
-        IcebergMaintenanceJob.run(
-            new String[] {
-              "--catalog", "c", "--table", "db.t", "--maintenance-types", "expire_snapshots"
-            }));
+        1, IcebergMaintenanceJob.run(new String[] {"--maintenance-types", "expire_snapshots"}));
   }
 }
