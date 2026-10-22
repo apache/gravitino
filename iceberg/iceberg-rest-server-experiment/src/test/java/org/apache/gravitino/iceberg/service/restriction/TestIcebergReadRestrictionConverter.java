@@ -345,7 +345,7 @@ public class TestIcebergReadRestrictionConverter {
         RestrictedRegoExpressionParserFacade.parseColumnMask(
             "mask := action(\"show-last-4\") if true " + "else := action(\"mask-to-fixed-value\")");
     assertThrows(
-        IcebergReadRestrictionConverter.IncompatibleMaskException.class,
+        IllegalArgumentException.class,
         () ->
             convertMasks(
                 Collections.singletonMap(1, incompatibleSelectedBranch), context("alice")));
@@ -355,7 +355,7 @@ public class TestIcebergReadRestrictionConverter {
             "mask := action(\"mask-to-fixed-value\") if false "
                 + "else := action(\"show-last-4\")");
     assertThrows(
-        IcebergReadRestrictionConverter.IncompatibleMaskException.class,
+        IllegalArgumentException.class,
         () ->
             convertMasks(
                 Collections.singletonMap(1, incompatibleSelectedFallback), context("alice")));

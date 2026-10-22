@@ -580,7 +580,7 @@ public final class IcebergReadRestrictionConverter {
         break;
       case REPLACE_WITH_NULL:
         if (field.isRequired()) {
-          throw new IncompatibleMaskException(
+          throw new IllegalArgumentException(
               "replace-with-null is invalid for required field " + field.fieldId());
         }
         function = IcebergFunctions.replaceWithNull(field.fieldId());
@@ -607,18 +607,12 @@ public final class IcebergReadRestrictionConverter {
         throw new IllegalArgumentException("Unsupported mask action: " + action);
     }
     if (!function.canBind(field.type())) {
-      throw new IncompatibleMaskException(
+      throw new IllegalArgumentException(
           String.format(
               "Mask action %s is incompatible with field %s of type %s",
               action.value(), field.fieldId(), field.type()));
     }
     return function;
-  }
-
-  static final class IncompatibleMaskException extends IllegalArgumentException {
-    private IncompatibleMaskException(String message) {
-      super(message);
-    }
   }
 
   private static Types.NestedField topLevelField(Schema schema, String name) {

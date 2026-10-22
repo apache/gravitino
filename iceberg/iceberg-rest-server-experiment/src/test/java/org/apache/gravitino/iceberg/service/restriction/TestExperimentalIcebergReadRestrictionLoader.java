@@ -166,7 +166,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
     policiesByField.put(2, new PolicyEntity[] {mask});
 
     assertThrows(
-        IcebergReadRestrictionConverter.IncompatibleMaskException.class,
+        IllegalArgumentException.class,
         () ->
             ExperimentalIcebergReadRestrictionLoader.resolve(
                 new PolicyEntity[0], policiesByField, SCHEMA, context("alice")));
