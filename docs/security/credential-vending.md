@@ -85,6 +85,7 @@ A credential with static S3 access key id and secret access key.
 
 An S3 token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html). To use an S3 token credential, you should create a role and grant it proper privileges.
 
+<<<<<<< HEAD
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                                                                                 | Default value | Required |
 |-------------------------------------|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `s3-token` for S3 token credential provider.                                                                                                                | (none)        | Yes      |
@@ -95,6 +96,9 @@ An S3 token is a token credential with scoped privileges, by leveraging STS [Ass
 | `s3-external-id`                    | `gravitino.iceberg-rest.s3-external-id`            | The S3 external id to generate token.                                                                                                                       | (none)        | No       |
 | `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | The S3 session token expire time in secs, it couldn't exceed the max session time of the assumed role.                                                      | 3600          | No       |
 | `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | An alternative endpoint of the S3 token service, This could be used with s3-compatible object storage service like MINIO that has a different STS endpoint. | (none)        | No       |
+=======
+For path-based requests, Gravitino always scopes the credentials with a session policy covering the requested data, metadata, and write locations. Catalog-level requests do not vend `aws-irsa` credentials because they provide no paths for a session policy. The role is selected from `s3-role-arn` when configured, or from the pod's `AWS_ROLE_ARN` otherwise.
+>>>>>>> bbb73f1a6 ([#13977] fix(credential): Scope and validate cloud credentials (#13987))
 
 ### OSS Credentials
 

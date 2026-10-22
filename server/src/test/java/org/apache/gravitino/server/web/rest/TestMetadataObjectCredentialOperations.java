@@ -34,6 +34,7 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.dto.responses.CredentialResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -92,6 +93,29 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
   public void testGetCredentialsForFileset() {
     testGetCredentialsForObject(
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET));
+  }
+
+  @Test
+  public void testInvalidCredentialLocationResponse() {
+    String path = "wasbs://container@account.blob.core.windows.net/warehouse/table";
+    when(credentialOperationDispatcher.getCredentials(any(), any()))
+        .thenThrow(
+            new IllegalArgumentException(
+                "adls-token requires an abfs or abfss location; unsupported location: " + path));
+
+    Response response =
+        target(basePath(metalake))
+            .path("fileset")
+            .path("catalog.schema.fileset")
+            .path("credentials")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertTrue(error.getMessage().contains("abfs or abfss"));
+    Assertions.assertTrue(error.getMessage().contains(path));
   }
 
   private void testGetCredentialsForObject(MetadataObject metadataObject) {
