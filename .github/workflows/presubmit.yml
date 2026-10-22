@@ -595,6 +595,23 @@ jobs:
             catalogs/**/*.log
             catalogs/**/*.tar
 
+  test-web:
+    name: test (web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [ changes, build ]
+    if: needs.changes.outputs.source_changes == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: 17
+
+      # The web UI unit tests (vitest) for both UIs; the Gradle node plugin brings Node and pnpm.
+      - name: Test web UIs
+        run: ./gradlew :web:web:webTest :web-v2:web:webTest
+
   medium-test:
     name: medium-test (${{ matrix.shard }})
     runs-on: ubuntu-latest
@@ -854,10 +871,11 @@ jobs:
     uses: ./.github/workflows/contrib-catalog-test.yml
 
   frontend-it:
-    needs: [ changes, test, medium-test, core-test ]
+    needs: [ changes, test, test-web, medium-test, core-test ]
     if: >-
       !cancelled() &&
       needs.test.result == 'success' &&
+      needs['test-web'].result == 'success' &&
       contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
       contains(fromJSON('["success", "skipped"]'), needs['core-test'].result)
     uses: ./.github/workflows/frontend-integration-test.yml

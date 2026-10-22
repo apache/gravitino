@@ -39,6 +39,7 @@ jobs:
               - meta/**
               - server-common/**
               - integration-test-common/**
+              - web/**
               - web-v2/**
               - '**/*.kts'
               - '**/*.py'
@@ -103,3 +104,57 @@ jobs:
             catalogs/**/*.log
             catalogs/**/*.tar
             web-v2/integration-test/build/*.log
+
+  FrontendITWebV1:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        # Integration test for AMD64 architecture
+        architecture: [linux/amd64]
+        java-version: [ 17 ]
+    env:
+      PLATFORM: ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: ${{ matrix.java-version }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
+      - name: Package Gravitino
+        run: |
+          ./gradlew compileDistribution compileTrinoConnector -x test
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      # Web UI v1 is still the default in the distribution, but its tests ran in no PR job.
+      - name: Frontend Integration Test (web UI v1)
+        id: integrationTest
+        run: |
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :web:integration-test:test
+
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v7
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        with:
+          name: integrate-test-reports-web-v1-${{ matrix.java-version }}
+          path: |
+            build/reports
+            integration-test-common/build/*.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
+            catalogs/**/*.log
+            catalogs/**/*.tar
+            web/integration-test/build/*.log

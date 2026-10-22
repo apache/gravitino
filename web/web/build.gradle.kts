@@ -45,6 +45,12 @@ tasks {
     args = listOf("prettier:check")
   }
 
+  // Run the web UI unit tests (vitest)
+  val webTest by registering(PnpmTask::class) {
+    dependsOn(installDeps)
+    args = listOf("test")
+  }
+
   val webpack by registering(PnpmTask::class) {
     dependsOn(lintCheck, prettierCheck)
     args = listOf("dist")
