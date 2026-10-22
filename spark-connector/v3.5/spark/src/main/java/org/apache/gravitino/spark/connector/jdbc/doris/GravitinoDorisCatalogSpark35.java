@@ -98,7 +98,18 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
     return DorisPropertiesConverter35.getInstance();
   }
 
-  /** Rejects Spark's write-aware load path because this PR exposes batch read only. */
+  /** Loads the physical JDBC schema with redacted failure diagnostics. */
+  @Override
+  protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(Identifier ident) {
+    try {
+      return super.loadSparkTable(ident);
+    } catch (RuntimeException e) {
+      throw DorisPhysicalSchemaValidator35.physicalAccessFailure(
+          ident, "Spark JDBC schema load", e);
+    }
+  }
+
+  /** Rejects Spark's write-aware load path for this read-only catalog. */
   @Override
   public org.apache.spark.sql.connector.catalog.Table loadTable(
       Identifier ident, Set<TableWritePrivilege> writePrivileges) throws NoSuchTableException {

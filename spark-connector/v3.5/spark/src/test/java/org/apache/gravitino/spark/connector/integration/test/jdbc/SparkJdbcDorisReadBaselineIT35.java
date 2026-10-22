@@ -102,6 +102,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     properties.put(GRAVITINO_JDBC_DRIVER, JDBC_DRIVER);
     properties.put("credential-providers", JdbcCredential.JDBC_CREDENTIAL_TYPE);
     properties.put("spark.bypass.pushDownPredicate", "false");
+    properties.put("spark.bypass.connectTimeout", "10000");
     return properties;
   }
 
@@ -144,7 +145,11 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
 
   @Override
   protected Map<String, String> getExtraSparkConfigs() {
-    return Collections.singletonMap(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, "true");
+    return Map.of(
+        GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT,
+        "true",
+        "spark.sql.catalog." + CATALOG_NAME + ".connectTimeout",
+        "20000");
   }
 
   @Test

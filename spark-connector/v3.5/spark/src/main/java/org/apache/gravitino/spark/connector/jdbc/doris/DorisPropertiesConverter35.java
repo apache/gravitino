@@ -43,6 +43,8 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
           "jdbc-password",
           "jdbc-driver",
           "dbtable",
+          "dbname",
+          "createdatabaseifnotexist",
           "query",
           "preparequery",
           "sessioninitstatement");
@@ -72,7 +74,7 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
     converted.remove("user");
     converted.remove("password");
     if (options != null) {
-      for (Map.Entry<String, String> option : options.entrySet()) {
+      for (Map.Entry<String, String> option : options.asCaseSensitiveMap().entrySet()) {
         converted.keySet().removeIf(key -> key.equalsIgnoreCase(option.getKey()));
         converted.put(option.getKey(), option.getValue());
       }

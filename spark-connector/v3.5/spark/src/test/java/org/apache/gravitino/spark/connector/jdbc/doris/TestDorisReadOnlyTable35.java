@@ -65,7 +65,15 @@ public class TestDorisReadOnlyTable35 {
   void testProtectedScanOptionsAreRejectedBeforeCallingTheDelegate() {
     SparkJdbcTable jdbcTable = mock(SparkJdbcTable.class);
     DorisReadOnlyTable35 table = new DorisReadOnlyTable35(jdbcTable);
-    for (String key : List.of("URL", "password", "query", "prepareQuery", "sessionInitStatement")) {
+    for (String key :
+        List.of(
+            "URL",
+            "password",
+            "query",
+            "prepareQuery",
+            "sessionInitStatement",
+            "DBNAME",
+            "createDatabaseIfNotExist")) {
       assertThrows(
           IllegalArgumentException.class,
           () -> table.newScanBuilder(new CaseInsensitiveStringMap(Map.of(key, "override"))));

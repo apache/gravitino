@@ -64,6 +64,8 @@ public class TestDorisPropertiesConverter35 {
             "jdbc-password",
             "jdbc-driver",
             "dbtable",
+            "DBNAME",
+            "createDatabaseIfNotExist",
             "query",
             "prepareQuery",
             "sessionInitStatement")) {
@@ -97,19 +99,24 @@ public class TestDorisPropertiesConverter35 {
             "jdbc-driver", "com.mysql.cj.jdbc.Driver",
             "spark.bypass.fetchSize", "100",
             "spark.bypass.pushDownPredicate", "false",
-            "spark.bypass.sslMode", "VERIFY_IDENTITY");
-    CaseInsensitiveStringMap converted =
-        new CaseInsensitiveStringMap(
-            DorisPropertiesConverter35.getInstance()
-                .toSparkCatalogProperties(
-                    new CaseInsensitiveStringMap(
-                        Map.of("fetchSize", "200", "connectTimeout", "5000")),
-                    properties));
+            "spark.bypass.sslMode", "PREFERRED");
+    Map<String, String> converted =
+        DorisPropertiesConverter35.getInstance()
+            .toSparkCatalogProperties(
+                new CaseInsensitiveStringMap(
+                    Map.of(
+                        "fetchSize", "200",
+                        "connectTimeout", "5000",
+                        "sslMode", "VERIFY_IDENTITY")),
+                properties);
 
-    assertEquals("200", converted.get("fetchsize"));
+    assertEquals("200", converted.get("fetchSize"));
     assertEquals("5000", converted.get("connectTimeout"));
     assertEquals("false", converted.get("pushDownPredicate"));
     assertEquals("VERIFY_IDENTITY", converted.get("sslMode"));
+    assertFalse(converted.containsKey("connecttimeout"));
+    assertFalse(converted.containsKey("sslmode"));
+    assertFalse(converted.containsKey("fetchsize"));
     assertEquals(
         "100",
         DorisPropertiesConverter35.getInstance()

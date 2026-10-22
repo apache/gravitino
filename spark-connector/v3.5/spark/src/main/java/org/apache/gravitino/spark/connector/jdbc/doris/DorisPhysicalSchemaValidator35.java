@@ -187,8 +187,10 @@ final class DorisPhysicalSchemaValidator35 {
         throw mismatch(identifier, "unsupported Doris type for " + logical.name());
       }
       DataType expected = typeConverter.toSparkType(logical.dataType());
-      // Spark 3.5 reports SMALLINT as IntegerType in JDBC metadata. The existing JDBC table
-      // still scans it with the logical ShortType schema and JDBC getShort().
+      // Spark 3.5.3 JdbcUtils.getCatalystType maps SMALLINT to IntegerType:
+      // https://github.com/apache/spark/blob/v3.5.3/sql/core/src/main/scala/org/apache/spark/sql/execution/datasources/jdbc/JdbcUtils.scala
+      // The existing JDBC table still scans it with the logical ShortType schema and JDBC
+      // getShort().
       boolean compatibleSmallInt =
           "smallint".equals(baseType(jdbc.typeName()))
               && "smallint".equals(baseType(fe.typeName()))
@@ -321,7 +323,7 @@ final class DorisPhysicalSchemaValidator35 {
     return new IllegalArgumentException("Doris schema mismatch for " + identifier + ": " + reason);
   }
 
-  private static IllegalArgumentException physicalAccessFailure(
+  static IllegalArgumentException physicalAccessFailure(
       Identifier identifier, String stage, Exception cause) {
     String diagnostics = "";
     if (cause instanceof SQLException) {
