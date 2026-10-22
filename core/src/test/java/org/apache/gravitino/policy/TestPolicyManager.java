@@ -607,6 +607,38 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testCreateColumnMaskPolicyWithNullBranch() {
+    String policyName = "column_mask_null_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent conditionalNullFallback =
+        PolicyContents.columnMask(
+            "mask := action(\"show-last-4\") if session_user() == \"A\" else := null");
+
+    PolicyEntity created =
+        policyManager.createPolicy(
+            METALAKE,
+            policyName,
+            Policy.BuiltInType.COLUMN_MASK,
+            null,
+            true,
+            conditionalNullFallback);
+
+    Assertions.assertEquals(conditionalNullFallback, created.content());
+    Assertions.assertEquals(
+        conditionalNullFallback, policyManager.getPolicy(METALAKE, policyName).content());
+
+    PolicyContent unconditionalNull = PolicyContents.columnMask("mask := null");
+    PolicyEntity updated =
+        policyManager.alterPolicy(
+            METALAKE,
+            policyName,
+            PolicyChange.updateContent("system_column_mask", unconditionalNull));
+
+    Assertions.assertEquals(unconditionalNull, updated.content());
+    Assertions.assertEquals(
+        unconditionalNull, policyManager.getPolicy(METALAKE, policyName).content());
+  }
+
+  @Test
   public void testDeletePolicy() {
     String policyName = "policy1" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");

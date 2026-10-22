@@ -53,7 +53,7 @@ do not restrict data access.
 Row-filter and column-mask expressions use `restricted-rego-v1`, a small, fail-closed Rego-like
 syntax owned by Gravitino. Each expression is one complete rule, not an arbitrary Rego module. A
 row filter starts with `filter :=` and produces a Boolean predicate. A column mask starts with
-`mask := action("...")` and produces an allowlisted masking action.
+`mask :=` and produces an allowlisted masking action or `null` to contribute no mask.
 
 The complete grammar is:
 
@@ -65,10 +65,11 @@ conditionalFilter := "filter" ":=" expr "if" expr filterElse* filterFallback
 filterElse  := "else" ":=" expr "if" expr
 filterFallback := "else" ":=" expr
 maskRule    := unconditionalMask | conditionalMask
-unconditionalMask := "mask" ":=" maskAction
-conditionalMask := "mask" ":=" maskAction "if" contextExpr maskElse* maskFallback
-maskElse    := "else" ":=" maskAction "if" contextExpr
-maskFallback := "else" ":=" maskAction
+unconditionalMask := "mask" ":=" maskResult
+conditionalMask := "mask" ":=" maskResult "if" contextExpr maskElse* maskFallback
+maskElse    := "else" ":=" maskResult "if" contextExpr
+maskFallback := "else" ":=" maskResult
+maskResult  := maskAction | "null"
 maskAction  := "action" "(" string ")"
 contextExpr := expr
 expr        := orExpr
@@ -101,6 +102,13 @@ This column-mask program selects a masking action in the same way:
 ```restricted-rego-v1
 mask := action("show-last-4") if is_group_member("support")
 else := action("replace-with-null")
+```
+
+A branch returning `null` means that the policy contributes no mask for the current request:
+
+```restricted-rego-v1
+mask := action("show-last-4") if is_group_member("support")
+else := null
 ```
 
 Conditional branches are evaluated from left to right. The first true condition selects its result,

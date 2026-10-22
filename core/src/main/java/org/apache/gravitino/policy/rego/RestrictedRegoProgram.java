@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 
 /** A parsed, unresolved program in the {@code restricted-rego-v1} source dialect. */
 interface RestrictedRegoProgram {
@@ -273,19 +274,20 @@ interface RestrictedRegoProgram {
 
   /** One guarded action in a conditional column-mask rule. */
   final class MaskBranch {
-    private final MaskAction action;
+    @Nullable private final MaskAction action;
     private final CanonicalExpression condition;
 
-    MaskBranch(MaskAction action, CanonicalExpression condition) {
+    MaskBranch(@Nullable MaskAction action, CanonicalExpression condition) {
       this.action = action;
       this.condition = condition;
     }
 
     /**
-     * Returns the action selected by this branch.
+     * Returns the action selected by this branch, or {@code null} if no mask is contributed.
      *
-     * @return mask action
+     * @return mask action or {@code null}
      */
+    @Nullable
     public MaskAction action() {
       return action;
     }
@@ -302,10 +304,9 @@ interface RestrictedRegoProgram {
     /**
      * Validates the branch.
      *
-     * @throws IllegalArgumentException if the action or condition is invalid
+     * @throws IllegalArgumentException if the condition is invalid
      */
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(action != null, "mask branch action cannot be null");
       Preconditions.checkArgument(condition != null, "mask branch condition cannot be null");
       condition.validate();
       Preconditions.checkArgument(
@@ -335,12 +336,12 @@ interface RestrictedRegoProgram {
     }
   }
 
-  /** A complete {@code mask := action(...)} column-mask rule. */
+  /** A complete {@code mask := ...} column-mask rule. */
   final class ColumnMask implements RestrictedRegoProgram {
     private final List<MaskBranch> branches;
-    private final MaskAction fallback;
+    @Nullable private final MaskAction fallback;
 
-    ColumnMask(List<MaskBranch> branches, MaskAction fallback) {
+    ColumnMask(List<MaskBranch> branches, @Nullable MaskAction fallback) {
       this.branches =
           branches == null ? null : Collections.unmodifiableList(new ArrayList<>(branches));
       this.fallback = fallback;
@@ -361,10 +362,12 @@ interface RestrictedRegoProgram {
     }
 
     /**
-     * Returns the unconditional action or final {@code else} action.
+     * Returns the unconditional action or final {@code else} action, or {@code null} if no mask is
+     * contributed.
      *
-     * @return fallback mask action
+     * @return fallback mask action or {@code null}
      */
+    @Nullable
     public MaskAction fallback() {
       return fallback;
     }
@@ -381,7 +384,6 @@ interface RestrictedRegoProgram {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(branches != null, "mask branches cannot be null");
-      Preconditions.checkArgument(fallback != null, "mask fallback cannot be null");
       for (MaskBranch branch : branches) {
         Preconditions.checkArgument(branch != null, "mask branch cannot be null");
         branch.validate();

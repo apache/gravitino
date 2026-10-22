@@ -42,7 +42,7 @@ public final class RestrictedRegoExpressionParserFacade {
   }
 
   /**
-   * Validates one complete {@code mask := action(...)} program.
+   * Validates one complete {@code mask := ...} program.
    *
    * @param source column-mask program in {@code restricted-rego-v1}
    * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
@@ -89,7 +89,7 @@ public final class RestrictedRegoExpressionParserFacade {
   }
 
   /**
-   * Parses and validates one complete {@code mask := action(...)} program.
+   * Parses and validates one complete {@code mask := ...} program.
    *
    * @param source column-mask program in {@code restricted-rego-v1}
    * @return validated unresolved column-mask rule

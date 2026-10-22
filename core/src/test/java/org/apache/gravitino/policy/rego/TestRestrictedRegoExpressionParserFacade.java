@@ -41,6 +41,12 @@ public class TestRestrictedRegoExpressionParserFacade {
         () ->
             RestrictedRegoExpressionParserFacade.validateColumnMask(
                 "mask := action(\"show-last-4\")"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            RestrictedRegoExpressionParserFacade.validateColumnMask(
+                "mask := action(\"show-last-4\") if session_user() == \"A\" else := null"));
+    Assertions.assertDoesNotThrow(
+        () -> RestrictedRegoExpressionParserFacade.validateColumnMask("mask := null"));
 
     RowFilter filter =
         RestrictedRegoExpressionParserFacade.parseRowFilter(
@@ -54,6 +60,18 @@ public class TestRestrictedRegoExpressionParserFacade {
     Assertions.assertEquals(RuleType.MASK, mask.ruleType());
     Assertions.assertFalse(mask.isConditional());
     Assertions.assertEquals(MaskAction.SHOW_LAST_4, mask.fallback());
+
+    ColumnMask nullFallbackMask =
+        RestrictedRegoExpressionParserFacade.parseColumnMask(
+            "mask := action(\"show-last-4\") if session_user() == \"A\" else := null");
+    Assertions.assertEquals(RuleType.MASK, nullFallbackMask.ruleType());
+    Assertions.assertTrue(nullFallbackMask.isConditional());
+    Assertions.assertNull(nullFallbackMask.fallback());
+
+    ColumnMask nullMask = RestrictedRegoExpressionParserFacade.parseColumnMask("mask := null");
+    Assertions.assertEquals(RuleType.MASK, nullMask.ruleType());
+    Assertions.assertFalse(nullMask.isConditional());
+    Assertions.assertNull(nullMask.fallback());
 
     Assertions.assertInstanceOf(
         RowFilter.class, RestrictedRegoExpressionParserFacade.parse("filter := true"));

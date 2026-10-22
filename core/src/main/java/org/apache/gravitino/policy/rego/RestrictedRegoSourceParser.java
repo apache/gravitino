@@ -78,7 +78,7 @@ final class RestrictedRegoSourceParser {
   private ColumnMask parseColumnMask() {
     expect(TokenType.MASK, "expected mask");
     expect(TokenType.ASSIGN, "expected := after mask");
-    MaskAction action = parseMaskAction();
+    MaskAction action = parseMaskResult();
     if (!match(TokenType.IF)) {
       return new ColumnMask(new ArrayList<>(), action);
     }
@@ -88,7 +88,7 @@ final class RestrictedRegoSourceParser {
     while (true) {
       expect(TokenType.ELSE, "expected final else branch");
       expect(TokenType.ASSIGN, "expected := after else");
-      MaskAction nextAction = parseMaskAction();
+      MaskAction nextAction = parseMaskResult();
       if (!match(TokenType.IF)) {
         return new ColumnMask(branches, nextAction);
       }
@@ -96,8 +96,15 @@ final class RestrictedRegoSourceParser {
     }
   }
 
+  private MaskAction parseMaskResult() {
+    if (match(TokenType.NULL)) {
+      return null;
+    }
+    return parseMaskAction();
+  }
+
   private MaskAction parseMaskAction() {
-    expect(TokenType.ACTION, "expected action");
+    expect(TokenType.ACTION, "expected action or null");
     expect(TokenType.LPAREN, "expected ( after action");
     Token actionToken = expect(TokenType.STRING, "expected mask action string");
     String action = decodeString(actionToken);
