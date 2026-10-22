@@ -26,48 +26,40 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
 /**
- * Spark callback after sampling Iceberg snapshot {@code S0} for a cron maintenance action.
+ * Spark callback that persists snapshot metrics for an in-flight maintenance action.
  *
- * <p>Lives in {@code :maintenance:maintenance-common} so the TMS plugin and built-in jobs share one
- * wire type. Table and policy ids are not part of this payload: the server loads them from the
- * in-flight action bound to {@code jobId}.
+ * <p>Does not decide whether maintenance should continue — that stays in the Spark job. Table and
+ * policy ids are taken from the action bound to {@code jobId}.
  */
 @Getter
 @EqualsAndHashCode
-public class MaintenanceActionSampleRequest implements RESTRequest {
+public class MaintenanceActionMetricsRequest implements RESTRequest {
 
-  @JsonProperty("sampledSnapshotId")
-  private final Long sampledSnapshotId;
-
-  @JsonProperty("headSnapshotId")
-  private final Long headSnapshotId;
+  @JsonProperty("snapshotId")
+  private final Long snapshotId;
 
   @JsonProperty("metricsJson")
   private final String metricsJson;
 
   /** Default constructor for Jackson. */
-  public MaintenanceActionSampleRequest() {
-    this(null, null, null);
+  public MaintenanceActionMetricsRequest() {
+    this(null, null);
   }
 
   /**
-   * Creates a sample callback.
+   * Creates a metrics report.
    *
-   * @param sampledSnapshotId Iceberg snapshot id at sample time ({@code S0})
-   * @param headSnapshotId HEAD snapshot id observed after the sample
+   * @param snapshotId Iceberg snapshot id the metrics were collected for
    * @param metricsJson serialized metrics for {@code table_snapshot_metrics}
    */
-  public MaintenanceActionSampleRequest(
-      Long sampledSnapshotId, Long headSnapshotId, String metricsJson) {
-    this.sampledSnapshotId = sampledSnapshotId;
-    this.headSnapshotId = headSnapshotId;
+  public MaintenanceActionMetricsRequest(Long snapshotId, String metricsJson) {
+    this.snapshotId = snapshotId;
     this.metricsJson = metricsJson;
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(sampledSnapshotId != null, "sampledSnapshotId must not be null");
-    Preconditions.checkArgument(headSnapshotId != null, "headSnapshotId must not be null");
+    Preconditions.checkArgument(snapshotId != null, "snapshotId must not be null");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metricsJson), "metricsJson must not be blank");
   }

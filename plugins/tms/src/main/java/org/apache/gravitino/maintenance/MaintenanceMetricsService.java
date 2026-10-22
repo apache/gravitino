@@ -19,14 +19,8 @@
 package org.apache.gravitino.maintenance;
 
 import java.util.function.LongFunction;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
-import org.apache.gravitino.maintenance.injob.InJobGateOutcome;
-import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobPipeline;
-import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobSampler;
-import org.apache.gravitino.maintenance.injob.TypeDispatchingInJobRecommender;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
@@ -35,106 +29,66 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Domain service for Spark sample and finish callbacks.
+ * Persists snapshot metrics reported by Spark for an in-flight maintenance action.
  *
- * <p>REST resources stay thin and delegate here, the same split {@code idp-basic} uses between
- * {@code IdpUserOperations} and {@code IdpUserGroupManager}.
+ * <p>Continue / stop decisions stay in the job. Occupancy is released when the Gravitino job
+ * reaches a terminal state ({@code OccupancyGate#reclaimTerminalBound}).
  */
-public class MaintenanceActionManager {
+public class MaintenanceMetricsService {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceActionManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceMetricsService.class);
   private static final TableMetaService TABLE_SERVICE = TableMetaService.getInstance();
 
-  private final TableMaintenanceInJobPipeline pipeline;
   private final TableMaintenanceActionMetaService actionMetaService;
   private final TableSnapshotMetricsMetaService metricsMetaService;
   private final LongFunction<String> metalakeLookup;
 
   /**
-   * Production wiring with the default sampler and type-dispatching recommender.
+   * Production wiring.
    *
-   * @return manager bound into the TMS Jersey feature
+   * @return service bound into the TMS Jersey feature
    */
-  public static MaintenanceActionManager create() {
-    return new MaintenanceActionManager(
-        new TableMaintenanceInJobPipeline(
-            new TableMaintenanceInJobSampler(), new TypeDispatchingInJobRecommender()),
+  public static MaintenanceMetricsService create() {
+    return new MaintenanceMetricsService(
         TableMaintenanceActionMetaService.getInstance(),
         TableSnapshotMetricsMetaService.getInstance(),
         TABLE_SERVICE::getMetalakeNameByTableId);
   }
 
   /**
-   * Creates a manager with explicit collaborators.
+   * Creates a service with explicit collaborators.
    *
-   * @param pipeline in-job sample and gate pipeline
    * @param actionMetaService action rows
    * @param metricsMetaService snapshot metrics rows
    * @param metalakeLookup resolves a table id to its metalake name
    */
-  public MaintenanceActionManager(
-      TableMaintenanceInJobPipeline pipeline,
+  public MaintenanceMetricsService(
       TableMaintenanceActionMetaService actionMetaService,
       TableSnapshotMetricsMetaService metricsMetaService,
       LongFunction<String> metalakeLookup) {
-    this.pipeline = pipeline;
     this.actionMetaService = actionMetaService;
     this.metricsMetaService = metricsMetaService;
     this.metalakeLookup = metalakeLookup;
   }
 
   /**
-   * Persists S0 metrics and returns whether the job should continue.
+   * Idempotently stores metrics for the table/policy bound to {@code jobId}.
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id bound to the action
-   * @param request validated sample payload
-   * @return gate outcome
+   * @param request validated metrics payload
    */
-  public InJobGateOutcome sample(
-      String metalake, long jobId, MaintenanceActionSampleRequest request) {
+  public void reportMetrics(String metalake, long jobId, MaintenanceActionMetricsRequest request) {
     TableMaintenanceActionPO action = loadInFlight(metalake, jobId);
-    // tableId / policyId come from the in-flight action bound at submit time — Spark discovers
-    // only jobId at runtime and does not pass entity ids in the sample body.
-    InJobGateOutcome outcome =
-        pipeline.gateCronJob(
-            jobId,
-            action.tableId(),
-            action.policyId(),
-            request.getSampledSnapshotId(),
-            request.getMetricsJson(),
-            request::getHeadSnapshotId);
+    metricsMetaService.insertMetrics(
+        action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
     LOG.info(
-        "TMS action sample for job {} metalake {}: continue={} stopReason={}",
+        "TMS metrics reported for job {} metalake {} table {} policy {} snapshot {}",
         jobId,
         metalake,
-        outcome.continueMaintenance(),
-        outcome.stopReason());
-    return outcome;
-  }
-
-  /**
-   * Optionally persists S1 metrics, then marks the action finished.
-   *
-   * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id bound to the action
-   * @param request validated finish payload
-   */
-  public void finish(String metalake, long jobId, MaintenanceActionFinishRequest request) {
-    TableMaintenanceActionPO action = loadInFlight(metalake, jobId);
-    if (request.getAfterSnapshotId() != null && StringUtils.isNotBlank(request.getMetricsJson())) {
-      metricsMetaService.insertMetrics(
-          action.tableId(),
-          action.policyId(),
-          request.getAfterSnapshotId(),
-          request.getMetricsJson());
-    }
-    actionMetaService.markFinished(jobId, request.getAfterSnapshotId(), System.currentTimeMillis());
-    LOG.info(
-        "TMS action finished for job {} metalake {} afterSnapshotId={}",
-        jobId,
-        metalake,
-        request.getAfterSnapshotId());
+        action.tableId(),
+        action.policyId(),
+        request.getSnapshotId());
   }
 
   private TableMaintenanceActionPO loadInFlight(String metalake, long jobId) {
@@ -148,8 +102,8 @@ public class MaintenanceActionManager {
   }
 
   /**
-   * Soft-slot rows use {@code finished_at = 0} while in flight. Reject sample/finish on completed
-   * rows so a late Spark retry cannot re-gate or re-run maintenance after reclaim/finish.
+   * Soft-slot rows use {@code finished_at = 0} while in flight. Reject reports on completed rows so
+   * a late Spark retry cannot write metrics after reclaim.
    */
   private static void requireActionInFlight(TableMaintenanceActionPO action) {
     if (action.finishedAt() == null || action.finishedAt() != 0L) {

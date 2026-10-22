@@ -18,10 +18,8 @@
  */
 package org.apache.gravitino.maintenance.web.rest;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,12 +28,8 @@ import static org.mockito.Mockito.when;
 import java.util.function.LongFunction;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.maintenance.MaintenanceActionManager;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
-import org.apache.gravitino.maintenance.dto.responses.MaintenanceActionSampleResponse;
-import org.apache.gravitino.maintenance.injob.InJobGateOutcome;
-import org.apache.gravitino.maintenance.injob.TableMaintenanceInJobPipeline;
+import org.apache.gravitino.maintenance.MaintenanceMetricsService;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
@@ -51,120 +45,73 @@ class TestTableMaintenanceActionOperations {
   private static final long TABLE_ID = 10L;
   private static final long POLICY_ID = 20L;
 
-  private TableMaintenanceInJobPipeline pipeline;
   private TableMaintenanceActionMetaService actions;
   private TableSnapshotMetricsMetaService metrics;
-  private LongFunction<String> metalakeLookup;
   private TableMaintenanceActionOperations ops;
 
   @BeforeEach
   void setUp() {
-    pipeline = mock(TableMaintenanceInJobPipeline.class);
     actions = mock(TableMaintenanceActionMetaService.class);
     metrics = mock(TableSnapshotMetricsMetaService.class);
-    metalakeLookup = tableId -> METALAKE;
-    ops = operations(metalakeLookup);
+    ops = operations(tableId -> METALAKE);
     ops.setHttpRequest(mock(HttpServletRequest.class));
   }
 
   @Test
-  void testSampleContinue() {
+  void testReportMetricsPersists() {
     when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
-    when(pipeline.gateCronJob(
-            eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), eq(100L), anyString(), any()))
-        .thenReturn(InJobGateOutcome.continueMaintenance(100L));
 
     Response response =
-        ops.sample(METALAKE, JOB_ID, new MaintenanceActionSampleRequest(100L, 100L, "{\"m\":1}"));
+        ops.reportMetrics(METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    MaintenanceActionSampleResponse body = (MaintenanceActionSampleResponse) response.getEntity();
-    Assertions.assertTrue(body.isContinueMaintenance());
-    Assertions.assertNull(body.getStopReason());
+    verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}");
   }
 
   @Test
-  void testSampleMissingActionReturns404() {
+  void testReportMetricsMissingActionReturns404() {
     when(actions.getByJobId(JOB_ID)).thenReturn(null);
 
     Response response =
-        ops.sample(METALAKE, JOB_ID, new MaintenanceActionSampleRequest(100L, 100L, "{\"m\":1}"));
+        ops.reportMetrics(METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-    verify(pipeline, never())
-        .gateCronJob(anyLong(), anyLong(), anyLong(), anyLong(), anyString(), any());
+    verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
   }
 
   @Test
-  void testSampleAlreadyFinishedReturns404() {
+  void testReportMetricsAlreadyFinishedReturns404() {
     when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
 
     Response response =
-        ops.sample(METALAKE, JOB_ID, new MaintenanceActionSampleRequest(100L, 100L, "{\"m\":1}"));
+        ops.reportMetrics(METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-    verify(pipeline, never())
-        .gateCronJob(anyLong(), anyLong(), anyLong(), anyLong(), anyString(), any());
+    verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
   }
 
   @Test
-  void testSampleWrongMetalakeReturns404() {
+  void testReportMetricsWrongMetalakeReturns404() {
     when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
     ops = operations(tableId -> "other-ml");
     ops.setHttpRequest(mock(HttpServletRequest.class));
 
     Response response =
-        ops.sample(METALAKE, JOB_ID, new MaintenanceActionSampleRequest(100L, 100L, "{\"m\":1}"));
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-    verify(pipeline, never())
-        .gateCronJob(anyLong(), anyLong(), anyLong(), anyLong(), anyString(), any());
-  }
-
-  @Test
-  void testSampleNullBodyReturns400() {
-    Response response = ops.sample(METALAKE, JOB_ID, null);
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
-  }
-
-  @Test
-  void testFinishPersistsMetricsAndMarksFinished() {
-    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
-
-    Response response =
-        ops.finish(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(200L, "{\"s1\":1}"));
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 200L, "{\"s1\":1}");
-    verify(actions).markFinished(eq(JOB_ID), eq(200L), anyLong());
-  }
-
-  @Test
-  void testFinishMissingActionReturns404() {
-    when(actions.getByJobId(JOB_ID)).thenReturn(null);
-
-    Response response =
-        ops.finish(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(200L, null));
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-    verify(actions, never()).markFinished(anyLong(), any(), anyLong());
-  }
-
-  @Test
-  void testFinishAlreadyFinishedReturns404() {
-    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
-
-    Response response =
-        ops.finish(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(200L, "{\"s1\":1}"));
+        ops.reportMetrics(METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
-    verify(actions, never()).markFinished(anyLong(), any(), anyLong());
+  }
+
+  @Test
+  void testReportMetricsNullBodyReturns400() {
+    Response response = ops.reportMetrics(METALAKE, JOB_ID, null);
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
   }
 
   private TableMaintenanceActionOperations operations(LongFunction<String> lookup) {
     return new TableMaintenanceActionOperations(
-        new MaintenanceActionManager(pipeline, actions, metrics, lookup));
+        new MaintenanceMetricsService(actions, metrics, lookup));
   }
 
   private static TableMaintenanceActionPO action(long tableId, long policyId) {

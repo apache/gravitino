@@ -20,8 +20,6 @@ package org.apache.gravitino.maintenance.web;
 
 /** Operation types for TMS maintenance-action REST error handling. */
 public enum MaintenanceActionOperation {
-  /** Persist S0 metrics and return the gate outcome. */
-  SAMPLE,
-  /** Persist optional S1 metrics and mark the action finished. */
-  FINISH
+  /** Persist snapshot metrics for an in-flight action. */
+  REPORT_METRICS
 }
