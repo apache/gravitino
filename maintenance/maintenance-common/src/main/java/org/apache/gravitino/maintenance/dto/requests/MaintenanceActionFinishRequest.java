@@ -26,7 +26,8 @@ import lombok.Getter;
 import org.apache.gravitino.rest.RESTRequest;
 
 /**
- * Closes the soft slot for one table bound to a maintenance job without writing snapshot metrics.
+ * Closes the soft slot for one table/policy bound to a maintenance job without writing snapshot
+ * metrics.
  *
  * <p>Use when a maintenance type does not sample metrics, or when metrics were already reported and
  * only occupancy release remains.
@@ -38,6 +39,9 @@ public class MaintenanceActionFinishRequest implements RESTRequest {
   @JsonProperty("tableId")
   private final Long tableId;
 
+  @JsonProperty("policyId")
+  private final Long policyId;
+
   /**
    * Optional Iceberg snapshot id to store as {@code after_snapshot_id}. Omit or null when releasing
    * without an S1 (for example skipped work with no rewrite).
@@ -48,31 +52,37 @@ public class MaintenanceActionFinishRequest implements RESTRequest {
 
   /** Default constructor for Jackson. */
   public MaintenanceActionFinishRequest() {
-    this(null, null);
+    this(null, null, null);
   }
 
   /**
    * Creates a finish request that leaves {@code after_snapshot_id} null.
    *
    * @param tableId table entity id bound to the job
+   * @param policyId policy entity id bound to the job
    */
-  public MaintenanceActionFinishRequest(Long tableId) {
-    this(tableId, null);
+  public MaintenanceActionFinishRequest(Long tableId, Long policyId) {
+    this(tableId, policyId, null);
   }
 
   /**
    * Creates a finish request.
    *
    * @param tableId table entity id bound to the job
+   * @param policyId policy entity id bound to the job
    * @param afterSnapshotId terminal snapshot id, or null
    */
-  public MaintenanceActionFinishRequest(Long tableId, @Nullable Long afterSnapshotId) {
+  public MaintenanceActionFinishRequest(
+      Long tableId, Long policyId, @Nullable Long afterSnapshotId) {
     this.tableId = tableId;
+    this.policyId = policyId;
     this.afterSnapshotId = afterSnapshotId;
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(tableId != null && tableId > 0, "tableId must be a positive long");
+    Preconditions.checkArgument(
+        policyId != null && policyId > 0, "policyId must be a positive long");
   }
 }

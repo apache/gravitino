@@ -62,31 +62,33 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportBeforePersistsAndRecordsBeforeSnapshot() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID))
+        .thenReturn(action(TABLE_ID, POLICY_ID));
 
     Response response =
         ops.reportBeforeMetrics(
             METALAKE,
             JOB_ID,
             /*finish=*/ false,
-            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+            new MaintenanceActionMetricsRequest(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}");
-    verify(actions).recordBeforeSnapshot(JOB_ID, TABLE_ID, 100L);
+    verify(actions).recordBeforeSnapshot(JOB_ID, TABLE_ID, POLICY_ID, 100L);
     verify(actions, never()).markFinished(anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
   }
 
   @Test
   void testReportBeforeWithFinishClosesSoftSlotWithoutAfterSnapshot() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID))
+        .thenReturn(action(TABLE_ID, POLICY_ID));
 
     Response response =
         ops.reportBeforeMetrics(
             METALAKE,
             JOB_ID,
             /*finish=*/ true,
-            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+            new MaintenanceActionMetricsRequest(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
@@ -94,14 +96,15 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportAfterWithFinishClosesSoftSlotWithAfterSnapshot() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID))
+        .thenReturn(action(TABLE_ID, POLICY_ID));
 
     Response response =
         ops.reportAfterMetrics(
             METALAKE,
             JOB_ID,
             /*finish=*/ true,
-            new MaintenanceActionMetricsRequest(TABLE_ID, 200L, "{\"m\":2}"));
+            new MaintenanceActionMetricsRequest(TABLE_ID, POLICY_ID, 200L, "{\"m\":2}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 200L, "{\"m\":2}");
@@ -110,15 +113,15 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportBeforeMissingActionReturns404() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(null);
-    when(actions.bindJobIdIfUnbound(TABLE_ID, JOB_ID)).thenReturn(false);
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID)).thenReturn(null);
+    when(actions.bindJobIdIfUnbound(TABLE_ID, POLICY_ID, JOB_ID)).thenReturn(false);
 
     Response response =
         ops.reportBeforeMetrics(
             METALAKE,
             JOB_ID,
             /*finish=*/ false,
-            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+            new MaintenanceActionMetricsRequest(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
@@ -126,42 +129,43 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportBeforeLazyBindsUnboundClaim() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID))
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID))
         .thenReturn(null)
         .thenReturn(action(TABLE_ID, POLICY_ID));
-    when(actions.bindJobIdIfUnbound(TABLE_ID, JOB_ID)).thenReturn(true);
+    when(actions.bindJobIdIfUnbound(TABLE_ID, POLICY_ID, JOB_ID)).thenReturn(true);
 
     Response response =
         ops.reportBeforeMetrics(
             METALAKE,
             JOB_ID,
             /*finish=*/ false,
-            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+            new MaintenanceActionMetricsRequest(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    verify(actions).bindJobIdIfUnbound(TABLE_ID, JOB_ID);
+    verify(actions).bindJobIdIfUnbound(TABLE_ID, POLICY_ID, JOB_ID);
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}");
-    verify(actions).recordBeforeSnapshot(JOB_ID, TABLE_ID, 100L);
+    verify(actions).recordBeforeSnapshot(JOB_ID, TABLE_ID, POLICY_ID, 100L);
   }
 
   @Test
   void testFinishLazyBindsUnboundClaim() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID))
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID))
         .thenReturn(null)
         .thenReturn(action(TABLE_ID, POLICY_ID));
-    when(actions.bindJobIdIfUnbound(TABLE_ID, JOB_ID)).thenReturn(true);
+    when(actions.bindJobIdIfUnbound(TABLE_ID, POLICY_ID, JOB_ID)).thenReturn(true);
 
     Response response =
-        ops.finishAction(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, null));
+        ops.finishAction(
+            METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, POLICY_ID, null));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    verify(actions).bindJobIdIfUnbound(TABLE_ID, JOB_ID);
+    verify(actions).bindJobIdIfUnbound(TABLE_ID, POLICY_ID, JOB_ID);
     verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
   }
 
   @Test
   void testReportAfterAlreadyFinishedReturns404() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID))
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID))
         .thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
 
     Response response =
@@ -169,7 +173,7 @@ class TestTableMaintenanceActionOperations {
             METALAKE,
             JOB_ID,
             /*finish=*/ false,
-            new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
+            new MaintenanceActionMetricsRequest(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
@@ -183,10 +187,12 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testFinishClosesSoftSlotWithoutMetrics() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID))
+        .thenReturn(action(TABLE_ID, POLICY_ID));
 
     Response response =
-        ops.finishAction(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, null));
+        ops.finishAction(
+            METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, POLICY_ID, null));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
@@ -195,10 +201,12 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testFinishWithAfterSnapshotId() {
-    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.getByJobIdAndTableIdAndPolicyId(JOB_ID, TABLE_ID, POLICY_ID))
+        .thenReturn(action(TABLE_ID, POLICY_ID));
 
     Response response =
-        ops.finishAction(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, 300L));
+        ops.finishAction(
+            METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, POLICY_ID, 300L));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), eq(300L), anyLong());

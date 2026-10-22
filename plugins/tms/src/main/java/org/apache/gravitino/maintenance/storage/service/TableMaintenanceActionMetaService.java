@@ -193,39 +193,36 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Lazy-binds {@code jobId} onto the sole unbound in-flight claim for {@code tableId}.
+   * Lazy-binds {@code jobId} onto the unbound in-flight claim for {@code (tableId, policyId)}.
    *
    * <p>Used when a Spark metrics/finish callback arrives before submit-side {@link #bindJobId}.
-   * Does nothing (returns {@code false}) when there is no unbound row, or when more than one
-   * unbound row exists for the table (ambiguous across policies).
+   * Does nothing (returns {@code false}) when there is no unbound row for that pair.
    *
    * @param tableId table entity id from the callback
+   * @param policyId policy entity id from the callback
    * @param jobId Gravitino job run id from the callback path
    * @return {@code true} when a row is now bound to {@code jobId}
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "bindTableMaintenanceActionJobIdIfUnbound")
-  public boolean bindJobIdIfUnbound(long tableId, long jobId) {
-    TableMaintenanceActionPO already = getByJobIdAndTableId(jobId, tableId);
+  public boolean bindJobIdIfUnbound(long tableId, long policyId, long jobId) {
+    TableMaintenanceActionPO already = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
     if (already != null && already.finishedAt() != null && already.finishedAt() == 0L) {
       return true;
     }
-    List<TableMaintenanceActionPO> unbound =
+    TableMaintenanceActionPO unbound =
         SessionUtils.getWithoutCommit(
-            TableMaintenanceActionMapper.class, mapper -> mapper.selectUnboundByTableId(tableId));
-    if (unbound == null || unbound.isEmpty() || unbound.size() != 1) {
-      return false;
-    }
-    TableMaintenanceActionPO row = unbound.get(0);
-    if (row.id() == null || row.createdAt() == null) {
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
+    if (unbound == null || unbound.id() == null || unbound.createdAt() == null) {
       return false;
     }
     try {
-      bindJobId(new OccupancyClaim(row.id(), row.createdAt()), jobId);
+      bindJobId(new OccupancyClaim(unbound.id(), unbound.createdAt()), jobId);
       return true;
     } catch (IllegalStateException e) {
-      TableMaintenanceActionPO bound = getByJobIdAndTableId(jobId, tableId);
+      TableMaintenanceActionPO bound = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
       return bound != null && bound.finishedAt() != null && bound.finishedAt() == 0L;
     }
   }
@@ -287,8 +284,26 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Convenience for single-table jobs. Prefer {@link #getByJobIdAndTableId} or {@link #listByJobId}
-   * when a job may cover multiple tables.
+   * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return action row for that job/table/policy or null
+   */
+  @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableMaintenanceActionByJobIdAndTableIdAndPolicyId")
+  public TableMaintenanceActionPO getByJobIdAndTableIdAndPolicyId(
+      long jobId, long tableId, long policyId) {
+    return SessionUtils.getWithoutCommit(
+        TableMaintenanceActionMapper.class,
+        mapper -> mapper.selectByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId));
+  }
+
+  /**
+   * Convenience for single-table jobs. Prefer {@link #getByJobIdAndTableIdAndPolicyId}, {@link
+   * #getByJobIdAndTableId}, or {@link #listByJobId} when a job may cover multiple tables or
+   * policies.
    *
    * @param jobId Gravitino job run id
    * @return the sole action row, or null when none
@@ -305,38 +320,40 @@ public class TableMaintenanceActionMetaService {
     }
     Preconditions.checkState(
         rows.size() == 1,
-        "multiple maintenance actions for job_id=%s; use getByJobIdAndTableId or listByJobId",
+        "multiple maintenance actions for job_id=%s; use getByJobIdAndTableIdAndPolicyId or listByJobId",
         jobId);
     return rows.get(0);
   }
 
   /**
-   * Records the sampled Iceberg snapshot id ({@code S0}) for a running action on one table.
+   * Records the sampled Iceberg snapshot id ({@code S0}) for a running action on one table/policy.
    *
    * <p>Safe to retry with the same {@code beforeSnapshotId} (cron / in-job re-entry after a partial
    * sample). A different snapshot id on an already-set row fails.
    *
    * @param jobId Gravitino job run id
-   * @param tableId table entity id (required when one job binds multiple tables)
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param beforeSnapshotId sampled snapshot id
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "recordTableMaintenanceActionBeforeSnapshot")
-  public void recordBeforeSnapshot(long jobId, long tableId, long beforeSnapshotId) {
+  public void recordBeforeSnapshot(long jobId, long tableId, long policyId, long beforeSnapshotId) {
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.updateBeforeSnapshot(jobId, tableId, beforeSnapshotId));
+            mapper -> mapper.updateBeforeSnapshot(jobId, tableId, policyId, beforeSnapshotId));
     if (updated == 1) {
       return;
     }
-    TableMaintenanceActionPO current = getByJobIdAndTableId(jobId, tableId);
+    TableMaintenanceActionPO current = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
     Preconditions.checkState(
         current != null && current.finishedAt() != null && current.finishedAt() == 0L,
-        "expected an unfinished action for job_id=%s table_id=%s",
+        "expected an unfinished action for job_id=%s table_id=%s policy_id=%s",
         jobId,
-        tableId);
+        tableId,
+        policyId);
     Preconditions.checkState(
         current.beforeSnapshotId() != null && current.beforeSnapshotId() == beforeSnapshotId,
         "before_snapshot_id already set to %s, refusing %s",
@@ -389,13 +406,9 @@ public class TableMaintenanceActionMetaService {
           backfilled);
       return;
     }
-    TableMaintenanceActionPO current = getByJobIdAndTableId(jobId, tableId);
+    TableMaintenanceActionPO current = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
     Preconditions.checkState(
-        current != null
-            && current.policyId() != null
-            && current.policyId() == policyId
-            && current.finishedAt() != null
-            && current.finishedAt() > 0L,
+        current != null && current.finishedAt() != null && current.finishedAt() > 0L,
         "expected finished action for job_id=%s table_id=%s policy_id=%s, updated=%s",
         jobId,
         tableId,

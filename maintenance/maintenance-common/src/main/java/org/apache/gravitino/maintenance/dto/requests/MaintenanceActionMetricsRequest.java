@@ -29,9 +29,9 @@ import org.apache.gravitino.rest.RESTRequest;
  * Spark callback that persists snapshot metrics for an in-flight maintenance action.
  *
  * <p>Does not decide whether maintenance should continue — that stays in the Spark job. {@code
- * tableId} selects which bound table row to update when one Spark job covers multiple tables.
- * Soft-slot release is controlled by the {@code finish} query parameter on the metrics endpoint (or
- * by {@code POST .../finish} when no metrics are written).
+ * tableId} and {@code policyId} select which bound action row to update when one Spark job covers
+ * multiple tables and/or policies. Soft-slot release is controlled by the {@code finish} query
+ * parameter on the metrics endpoint (or by {@code POST .../finish} when no metrics are written).
  */
 @Getter
 @EqualsAndHashCode
@@ -39,6 +39,9 @@ public class MaintenanceActionMetricsRequest implements RESTRequest {
 
   @JsonProperty("tableId")
   private final Long tableId;
+
+  @JsonProperty("policyId")
+  private final Long policyId;
 
   @JsonProperty("snapshotId")
   private final Long snapshotId;
@@ -48,18 +51,21 @@ public class MaintenanceActionMetricsRequest implements RESTRequest {
 
   /** Default constructor for Jackson. */
   public MaintenanceActionMetricsRequest() {
-    this(null, null, null);
+    this(null, null, null, null);
   }
 
   /**
    * Creates a metrics report.
    *
    * @param tableId table entity id bound to the job
+   * @param policyId policy entity id bound to the job
    * @param snapshotId Iceberg snapshot id the metrics were collected for
    * @param metricsJson serialized metrics for {@code table_snapshot_metrics}
    */
-  public MaintenanceActionMetricsRequest(Long tableId, Long snapshotId, String metricsJson) {
+  public MaintenanceActionMetricsRequest(
+      Long tableId, Long policyId, Long snapshotId, String metricsJson) {
     this.tableId = tableId;
+    this.policyId = policyId;
     this.snapshotId = snapshotId;
     this.metricsJson = metricsJson;
   }
@@ -67,6 +73,8 @@ public class MaintenanceActionMetricsRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(tableId != null && tableId > 0, "tableId must be a positive long");
+    Preconditions.checkArgument(
+        policyId != null && policyId > 0, "policyId must be a positive long");
     Preconditions.checkArgument(snapshotId != null, "snapshotId must not be null");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metricsJson), "metricsJson must not be blank");
