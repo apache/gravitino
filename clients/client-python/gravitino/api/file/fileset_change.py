@@ -216,7 +216,7 @@ class FilesetChange(ABC):
     class UpdateFilesetType:
         """A fileset change to update the type without changing data or locations."""
 
-        _new_type: Fileset.Type = field(metadata=config(field_name="newType"))
+        _new_type: Fileset.Type = field(metadata=config(field_name="new_type"))
 
         def __post_init__(self):
             if not isinstance(self._new_type, Fileset.Type):
@@ -225,6 +225,12 @@ class FilesetChange(ABC):
         def new_type(self) -> Fileset.Type:
             """Returns the new fileset type."""
             return self._new_type
+
+        def __eq__(self, other) -> bool:
+            """Compares fileset type changes by their target type."""
+            if not isinstance(other, FilesetChange.UpdateFilesetType):
+                return False
+            return self._new_type == other.new_type()
 
         def __hash__(self):
             return hash(self._new_type)

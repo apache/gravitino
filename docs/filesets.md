@@ -58,14 +58,16 @@ See [How to use GVFS](./how-to-use-gvfs.md).
 A managed fileset belongs to Gravitino. Creating it creates the directory if needed, and deleting
 it deletes the data.
 
-An external fileset points at a location that already exists and stays under someone else's control.
-Deleting it removes the Gravitino record and leaves the files alone.
+An external fileset leaves data lifecycle management to the user. Deleting it removes only the
+Gravitino record and preserves the files. With filesystem operations enabled, creating either
+type creates the storage directory if it does not exist.
 
 An existing fileset can be converted between the two types using
 [`FilesetChange.updateType`](./manage-fileset-metadata-using-gravitino.md#change-the-fileset-type).
 Conversion changes metadata only and preserves its identity, locations, and files. Converting to
 external relinquishes management of the data; converting to managed accepts deletion of the data
-when the fileset is dropped.
+when the fileset is dropped. With `disable-filesystem-ops=true`, dropping a fileset removes only
+its metadata, even after conversion to `MANAGED`.
 
 ### Storage Locations
 

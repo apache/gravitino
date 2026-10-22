@@ -196,6 +196,14 @@ deleting that data when the fileset is dropped. The same type semantics apply wh
 schema with cascade. Conversion does not move, create, or delete files, and does not protect data
 from deletion through another managed fileset with an overlapping location.
 
+With `disable-filesystem-ops=true`, dropping a fileset removes only its metadata, even after
+conversion to `MANAGED`.
+
+Type conversion follows the existing [fileset alter authorization](security/access-control.md#data-objects).
+A caller with `WRITE_FILESET` and the required catalog and schema use privileges can convert in
+either direction, including changing whether a subsequent drop deletes the data. This does not
+grant permission to drop the fileset; drop retains its existing ownership requirements.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
