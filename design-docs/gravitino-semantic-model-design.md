@@ -611,8 +611,7 @@ tables because they do not have independent identity, lifecycle, or authorizatio
 
 These Semantic Model tables are introduced in 2.0.0. Before that release, storage changes update the
 2.0.0 schema and 1.3.0-to-2.0.0 upgrade scripts in place for all supported databases. Released versions
-have no Semantic Model data to migrate; databases initialized with an earlier 2.0.0 development
-schema need to be recreated or migrated separately.
+have no Semantic Model data to migrate.
 
 #### Version and Lifecycle Behavior
 
