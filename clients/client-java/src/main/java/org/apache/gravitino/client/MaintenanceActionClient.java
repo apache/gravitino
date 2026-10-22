@@ -20,10 +20,7 @@ package org.apache.gravitino.client;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import org.apache.gravitino.dto.requests.MaintenanceActionFinishRequest;
-import org.apache.gravitino.dto.requests.MaintenanceActionSampleRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
-import org.apache.gravitino.dto.responses.MaintenanceActionSampleResponse;
 import org.apache.gravitino.rest.RESTUtils;
 
 /**

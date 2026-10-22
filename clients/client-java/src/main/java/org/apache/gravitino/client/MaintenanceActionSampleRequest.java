@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.dto.requests;
+package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -26,8 +26,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
 /**
- * Spark → TMS callback after sampling Iceberg snapshot {@code S0} for a cron maintenance action
- * (§5.2.2).
+ * Client wire type for TMS S0 sample callback. Server DTO lives in {@code plugins/tms} ({@code
+ * org.apache.gravitino.maintenance.dto}); this class must stay JSON-compatible.
+ *
+ * <p><strong>Not a stable public product API.</strong>
  */
 @Getter
 @EqualsAndHashCode

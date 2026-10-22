@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.dto.requests;
+package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -25,7 +25,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Spark → TMS callback when a cron maintenance Spark job reaches a terminal outcome (§5.2.2). */
+/**
+ * Client wire type for TMS finish callback. Server DTO lives in {@code plugins/tms} ({@code
+ * org.apache.gravitino.maintenance.dto}); this class must stay JSON-compatible.
+ *
+ * <p><strong>Not a stable public product API.</strong>
+ */
 @Getter
 @EqualsAndHashCode
 public class MaintenanceActionFinishRequest implements RESTRequest {

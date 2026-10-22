@@ -16,15 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.dto.responses;
+package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.gravitino.dto.responses.BaseResponse;
 
-/** Gate outcome after TMS persists {@code S0} metrics / {@code before_snapshot_id}. */
+/**
+ * Client wire type for TMS sample gate response. Server DTO lives in {@code plugins/tms} ({@code
+ * org.apache.gravitino.maintenance.dto}); this class must stay JSON-compatible.
+ *
+ * <p><strong>Not a stable public product API.</strong>
+ */
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
