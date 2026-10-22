@@ -600,7 +600,13 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append("AFTER ").append(s));
+          .ifPresent(
+              s ->
+                  columnDefinition
+                      .append("AFTER ")
+                      .append(BACK_QUOTE)
+                      .append(s)
+                      .append(BACK_QUOTE));
     }
     return columnDefinition.toString();
   }
