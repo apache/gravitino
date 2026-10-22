@@ -180,7 +180,6 @@ public class PolicyManager implements PolicyDispatcher {
       throws NoSuchPolicyException, PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
-<<<<<<< HEAD
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.WRITE,
@@ -195,39 +194,19 @@ public class PolicyManager implements PolicyDispatcher {
             throw new NoSuchPolicyException(
                 "Policy with name %s under metalake %s does not exist", policyName, metalake);
           } catch (EntityAlreadyExistsException e) {
-            throw new RuntimeException(
-                String.format(
-                    "Trying to alter policy %s under metalake %s, but the new name already exists",
-                    policyName, metalake));
+            String newName =
+                RenameUtils.getLastRenameName(
+                    policyName,
+                    changes,
+                    PolicyChange.RenamePolicy.class,
+                    PolicyChange.RenamePolicy::getNewName);
+            throw new PolicyAlreadyExistsException(
+                e, "Policy with name %s under metalake %s already exists", newName, metalake);
           } catch (IOException ioe) {
             LOG.error("Failed to alter policy {} under metalake {}", policyName, metalake, ioe);
             throw new RuntimeException(ioe);
           }
         });
-=======
-    try {
-      return entityStore.update(
-          NameIdentifierUtil.ofPolicy(metalake, policyName),
-          PolicyEntity.class,
-          Entity.EntityType.POLICY,
-          policyEntity -> updatePolicyEntity(policyEntity, changes));
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchPolicyException(
-          "Policy with name %s under metalake %s does not exist", policyName, metalake);
-    } catch (EntityAlreadyExistsException e) {
-      String newName =
-          RenameUtils.getLastRenameName(
-              policyName,
-              changes,
-              PolicyChange.RenamePolicy.class,
-              PolicyChange.RenamePolicy::getNewName);
-      throw new PolicyAlreadyExistsException(
-          e, "Policy with name %s under metalake %s already exists", newName, metalake);
-    } catch (IOException ioe) {
-      LOG.error("Failed to alter policy {} under metalake {}", policyName, metalake, ioe);
-      throw new RuntimeException(ioe);
-    }
->>>>>>> 5c8c1d99f ([#14039] fix(core): Return consistent conflicts for metadata renames (#14040))
   }
 
   @Override

@@ -1256,12 +1256,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
             throw iae;
 
-<<<<<<< HEAD
-=======
-          } catch (NoSuchEntityException ne) {
-            LOG.warn("Catalog {} does not exist", ident, ne);
-            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
-
           } catch (EntityAlreadyExistsException e) {
             String newName =
                 RenameUtils.getLastRenameName(
@@ -1272,7 +1266,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw new CatalogAlreadyExistsException(
                 e, "Catalog %s already exists", NameIdentifier.of(ident.namespace(), newName));
 
->>>>>>> 5c8c1d99f ([#14039] fix(core): Return consistent conflicts for metadata renames (#14040))
           } catch (IOException ioe) {
             LOG.error("Failed to alter catalog {}", ident, ioe);
             throw new RuntimeException(ioe);

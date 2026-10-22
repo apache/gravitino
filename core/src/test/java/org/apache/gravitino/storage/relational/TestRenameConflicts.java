@@ -53,7 +53,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Indexes;
-import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.AfterEach;
@@ -134,8 +133,7 @@ public class TestRenameConflicts extends TestJDBCBackend {
             "value2",
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
-    try (CatalogManager manager =
-        new CatalogManager(config, store, RandomIdGenerator.INSTANCE, new SecretManager(config))) {
+    try (CatalogManager manager = new CatalogManager(config, store, RandomIdGenerator.INSTANCE)) {
       manager.createCatalog(source, Catalog.Type.RELATIONAL, "test", "source comment", properties);
       manager.createCatalog(target, Catalog.Type.RELATIONAL, "test", "target comment", properties);
       CatalogEntity originalSource = store.get(source, EntityType.CATALOG, CatalogEntity.class);

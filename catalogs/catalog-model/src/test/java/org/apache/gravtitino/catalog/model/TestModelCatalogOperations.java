@@ -951,9 +951,13 @@ public class TestModelCatalogOperations {
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, "source");
     NameIdentifier target = NameIdentifier.of(source.namespace(), "target");
     ops.registerModel(
-        source, "source comment", StringIdentifier.newPropertiesWithId(newStringId(), null));
+        source,
+        "source comment",
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
     ops.registerModel(
-        target, "target comment", StringIdentifier.newPropertiesWithId(newStringId(), null));
+        target,
+        "target comment",
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
 
     for (ModelChange[] changes :
         new ModelChange[][] {

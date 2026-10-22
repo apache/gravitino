@@ -162,7 +162,6 @@ public class TagManager implements TagDispatcher {
   public Tag alterTag(String metalake, String name, TagChange... changes)
       throws NoSuchTagException, IllegalArgumentException {
     checkMetalake(NameIdentifier.of(metalake), entityStore);
-<<<<<<< HEAD
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofTag(metalake, name),
         LockType.WRITE,
@@ -178,11 +177,8 @@ public class TagManager implements TagDispatcher {
                 "Tag with name %s under metalake %s does not exist", name, metalake);
           } catch (EntityAlreadyExistsException e) {
             String newName =
-                Arrays.stream(changes)
-                    .filter(c -> c instanceof TagChange.RenameTag)
-                    .map(c -> ((TagChange.RenameTag) c).getNewName())
-                    .findFirst()
-                    .orElse(name);
+                RenameUtils.getLastRenameName(
+                    name, changes, TagChange.RenameTag.class, TagChange.RenameTag::getNewName);
             throw new TagAlreadyExistsException(
                 e, "Tag with name %s under metalake %s already exists", newName, metalake);
           } catch (IOException ioe) {
@@ -190,37 +186,6 @@ public class TagManager implements TagDispatcher {
             throw new RuntimeException(ioe);
           }
         });
-=======
-    try {
-      return entityStore.update(
-          NameIdentifierUtil.ofTag(metalake, name),
-          TagEntity.class,
-          Entity.EntityType.TAG,
-          tagEntity -> updateTagEntity(tagEntity, changes));
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchTagException(
-          "Tag with name %s under metalake %s does not exist", name, metalake);
-    } catch (EntityAlreadyExistsException e) {
-      String newName =
-          RenameUtils.getLastRenameName(
-              name, changes, TagChange.RenameTag.class, TagChange.RenameTag::getNewName);
-      throw new TagAlreadyExistsException(
-          e, "Tag with name %s under metalake %s already exists", newName, metalake);
-    } catch (OptimisticLockException ole) {
-      // The store now rejects a stale alter with this exception instead of an IOException,
-      // and the REST layer maps it to a conflict. Log it here so the operator-facing record
-      // still names the tag and the metalake.
-      LOG.warn(
-          "Failed to alter tag {} under metalake {} because of a concurrent operation",
-          name,
-          metalake,
-          ole);
-      throw ole;
-    } catch (IOException ioe) {
-      LOG.error("Failed to alter tag {} under metalake {}", name, metalake, ioe);
-      throw new RuntimeException(ioe);
-    }
->>>>>>> 5c8c1d99f ([#14039] fix(core): Return consistent conflicts for metadata renames (#14040))
   }
 
   public boolean deleteTag(String metalake, String name) {

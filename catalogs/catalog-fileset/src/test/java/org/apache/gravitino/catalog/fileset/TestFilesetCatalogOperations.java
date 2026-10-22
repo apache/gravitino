@@ -74,11 +74,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
->>>>>>> 5c8c1d99f ([#14039] fix(core): Return consistent conflicts for metadata renames (#14040))
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
@@ -104,6 +100,7 @@ import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -1163,9 +1160,10 @@ public class TestFilesetCatalogOperations {
   @ParameterizedTest
   @EnumSource(Fileset.Type.class)
   void testRenameFilesetToExistingName(Fileset.Type type) throws IOException {
-    String schemaName = "rename_conflict_" + generateTestId();
+    long testId = generateTestId();
+    String schemaName = "rename_conflict_" + testId;
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    createSchema(schemaName, "schema", null, schemaPath);
+    createSchema(testId, schemaName, "schema", null, schemaPath);
     Fileset source =
         createFileset("source", schemaName, "source comment", type, null, schemaPath + "/source");
     Fileset target =
@@ -1173,7 +1171,7 @@ public class TestFilesetCatalogOperations {
     NameIdentifier sourceIdent = NameIdentifier.of("m1", "c1", schemaName, "source");
     NameIdentifier targetIdent = NameIdentifier.of("m1", "c1", schemaName, "target");
 
-    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       for (FilesetChange[] changes :
           new FilesetChange[][] {

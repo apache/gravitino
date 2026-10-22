@@ -68,6 +68,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -685,12 +686,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw ExceptionMessages.wrap("Failed to update fileset " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
       throw new NoSuchFilesetException(nsee, FILESET_DOES_NOT_EXIST_MSG, ident);
-<<<<<<< HEAD
-    } catch (AlreadyExistsException aee) {
-      // This is happened when renaming a fileset to an existing fileset name.
-      throw ExceptionMessages.wrap(
-          "Fileset with the same name " + ident.name() + " already exists", aee);
-=======
     } catch (EntityAlreadyExistsException e) {
       String newName =
           RenameUtils.getLastRenameName(
@@ -700,11 +695,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               FilesetChange.RenameFileset::getNewName);
       throw new FilesetAlreadyExistsException(
           e, "Fileset %s already exists", NameIdentifier.of(ident.namespace(), newName));
-    } finally {
-      if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials.get());
-      }
->>>>>>> 5c8c1d99f ([#14039] fix(core): Return consistent conflicts for metadata renames (#14040))
     }
   }
 
