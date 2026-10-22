@@ -65,6 +65,56 @@ val ciOthersShardBaseline = 4
 
 val ciDockerTestTag = "gravitino-docker-test"
 
+// Integration-test jobs: job in presubmit.yml (or its own workflow) -> modules whose `test` task it
+// owns. Some listed modules have no integration tests; they are listed because their `test` task
+// must not run in backend-it. Every other module's integration tests run in backend-it, the
+// catch-all, through ciBackendIntegrationTest; the contrib catalogs run in contrib-catalog-test.yml.
+val ciIntegrationTestJobs: Map<String, List<String>> = mapOf(
+  "access-control-it" to listOf(
+    ":authorizations",
+    ":authorizations:authorization-chain",
+    ":authorizations:authorization-ranger"
+  ),
+  "cli-it" to listOf(":clients:cli"),
+  "flink-it" to listOf(
+    ":flink-connector:flink-common",
+    ":flink-connector:flink-1.19",
+    ":flink-connector:flink-runtime-1.19",
+    ":flink-connector:flink-1.20",
+    ":flink-connector:flink-runtime-1.20",
+    ":flink-connector:flink-2.1",
+    ":flink-connector:flink-runtime-2.1",
+    ":flink-connector:flink-2.2",
+    ":flink-connector:flink-runtime-2.2"
+  ),
+  "frontend-it" to listOf(":web:web", ":web:integration-test", ":web-v2:web", ":web-v2:integration-test"),
+  "iceberg-rest-trino-it" to listOf(":iceberg:iceberg-rest-trino-it"),
+  "idp-basic-it" to listOf(":plugins:idp-basic"),
+  "maintenance-it" to listOf(":maintenance:jobs", ":maintenance:optimizer"),
+  "python-it" to listOf(":clients:client-python"),
+  "spark-it" to listOf(
+    ":spark-connector:spark-3.5",
+    ":spark-connector:spark-4.0",
+    ":spark-connector:spark-runtime-3.5",
+    ":spark-connector:spark-runtime-4.0"
+  ),
+  "trino-it" to listOf(":trino-connector:integration-test", ":trino-connector:trino-connector"),
+  // integration-test-common's own tests are small; ciSmallTest runs them.
+  "test" to listOf(":integration-test-common")
+)
+
+val ciIntegrationTestJobModules: Set<String> = ciIntegrationTestJobs.values.flatten().toSet()
+
+// backend-it may shrink freely; more modules with integration tests in it than this fails
+// ciVerifyShards, so a new module either joins a named job or gets its own.
+val ciBackendItBaseline = 17
+
+fun isCiContribModule(path: String): Boolean = path.startsWith(":catalogs-contrib:")
+
+fun hasIntegrationTests(testDir: File): Boolean = testDir.walkTopDown().any {
+  it.isFile && it.extension == "java" && "/integration/test/" in it.invariantSeparatorsPath
+}
+
 fun ciMediumTaskName(shard: String): String = "ciMediumTest" + shard.replaceFirstChar { it.uppercase() }
 
 // Lint stage: static checks that compile nothing. Checkstyle tasks join when a module applies the
@@ -77,14 +127,23 @@ val ciLint = tasks.register("ciLint") {
 
 tasks.register("ciVerifyShards") {
   group = "verification"
-  description = "Fails if a module with Docker-tagged unit tests is in no medium shard, " +
-    "or if the 'others' shard grows past its baseline."
+  description = "Fails if a module with Docker-tagged unit tests is in no medium shard, if a " +
+    "catch-all (the 'others' shard or backend-it) grows past its baseline, or if a listed module " +
+    "is unknown or in two integration-test jobs."
   val testDirs = subprojects.associate { it.path to it.file("src/test") }
   val listed = ciMediumTestModules + ciSkippedTestModules
   val othersSize = ciMediumShards.getValue("others").size
+  val projectPaths = subprojects.map { it.path }.toSet()
   inputs.property("listed", listed)
   inputs.property("othersSize", othersSize)
   doLast {
+    val unknown = (ciMediumTestModules + ciSkippedTestModules + ciIntegrationTestJobModules)
+      .filter { it !in projectPaths }.sorted()
+    val duplicated = ciIntegrationTestJobs.values.flatten().groupingBy { it }.eachCount()
+      .filterValues { it > 1 }.keys.sorted()
+    val backendIt = testDirs.filter { (path, dir) ->
+      path !in ciIntegrationTestJobModules && !isCiContribModule(path) && hasIntegrationTests(dir)
+    }.keys.sorted()
     val unlisted = testDirs.filter { (path, dir) ->
       path !in listed && dir.walkTopDown().any {
         it.isFile && it.extension == "java" && "/integration/test/" !in it.invariantSeparatorsPath &&
@@ -92,6 +151,17 @@ tasks.register("ciVerifyShards") {
       }
     }.keys.sorted()
     val problems = mutableListOf<String>()
+    if (unknown.isNotEmpty()) {
+      problems += "gradle/ci-stages.gradle.kts lists modules that do not exist: ${unknown.joinToString()}."
+    }
+    if (duplicated.isNotEmpty()) {
+      problems += "Modules are in more than one integration-test job: ${duplicated.joinToString()}."
+    }
+    if (backendIt.size > ciBackendItBaseline) {
+      problems += "backend-it runs integration tests of ${backendIt.size} modules, over its baseline " +
+        "of $ciBackendItBaseline: ${backendIt.joinToString()}. Give new modules a named job in " +
+        "ciIntegrationTestJobs, or raise the baseline with a reason."
+    }
     if (unlisted.isNotEmpty()) {
       problems += "Modules with '$ciDockerTestTag' unit tests are in no medium shard: " +
         "${unlisted.joinToString()}. Add each to a shard in gradle/ci-stages.gradle.kts."
@@ -119,7 +189,18 @@ ciMediumShards.forEach { (shard, modules) ->
   }
 }
 
+val ciBackendIntegrationTest = tasks.register("ciBackendIntegrationTest") {
+  group = "verification"
+  description = "Runs the backend-it job: the test task of every module that no other " +
+    "integration-test job owns. Run it with -PskipTests."
+  dependsOn(":iceberg:iceberg-rest-server:experimentalTest", tasks.matching { it.name == "test" })
+}
+
 subprojects {
+  if (path !in ciIntegrationTestJobModules && !isCiContribModule(path)) {
+    ciBackendIntegrationTest.configure { dependsOn(tasks.matching { it.name == "test" }) }
+  }
+
   val moduleLints = tasks.matching { it.name == "spotlessCheck" || it.name.startsWith("checkstyle") }
   ciLint.configure { dependsOn(moduleLints) }
 

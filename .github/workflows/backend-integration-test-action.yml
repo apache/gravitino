@@ -66,27 +66,15 @@ jobs:
 
       - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
         id: integrationTest
-        run: |
-          EXCLUDE_CONTRIB_TESTS=""
-          for module in $(find catalogs-contrib -mindepth 1 -maxdepth 1 -type d -name 'catalog-*' -exec basename {} \; | sort); do
-            EXCLUDE_CONTRIB_TESTS="$EXCLUDE_CONTRIB_TESTS -x :catalogs-contrib:$module:test"
-          done
-
-          ./gradlew test :iceberg:iceberg-rest-server:experimentalTest -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
-            -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test \
-            -x :flink-connector:flink-common:test \
-            -x :flink-connector:flink-1.19:test -x :flink-connector:flink-runtime-1.19:test \
-            -x :flink-connector:flink-1.20:test -x :flink-connector:flink-runtime-1.20:test \
-            -x :flink-connector:flink-2.1:test -x :flink-connector:flink-runtime-2.1:test \
-            -x :flink-connector:flink-2.2:test -x :flink-connector:flink-runtime-2.2:test \
-            -x :spark-connector:spark-3.5:test -x :spark-connector:spark-4.0:test \
-            -x :spark-connector:spark-runtime-3.5:test -x :spark-connector:spark-runtime-4.0:test \
-            -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test \
-            -x :iceberg:iceberg-rest-trino-it:test \
-            -x :plugins:idp-basic:test \
-            -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test \
-            -x :clients:cli:test -x :maintenance:jobs:test -x :maintenance:optimizer:test \
-            $EXCLUDE_CONTRIB_TESTS
+        # ciBackendIntegrationTest owns the module list: every module that no other integration-test
+        # job claims (see ciIntegrationTestJobs in gradle/ci-stages.gradle.kts).
+        run: >-
+          ./gradlew ciBackendIntegrationTest
+          -PskipTests
+          -PtestMode=${{ inputs.test-mode }}
+          -PjdbcBackend=${{ inputs.backend }}
+          -PskipDockerTests=false
+          -PskipWeb=true
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
