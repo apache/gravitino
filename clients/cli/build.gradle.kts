@@ -78,5 +78,6 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
+    dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
   }
 }

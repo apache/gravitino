@@ -187,6 +187,27 @@ jobs:
               - 'gradle.properties'
               - 'gradlew'
               - 'settings.gradle.kts'
+            cli_it:
+              - '.github/workflows/presubmit.yml'
+              - '.github/workflows/cli-integration-test-action.yml'
+              - 'api/**'
+              - 'bin/**'
+              - 'catalogs/catalog-common/**'
+              - 'catalogs/catalog-jdbc-common/**'
+              - 'catalogs/catalog-jdbc-postgresql/**'
+              - 'clients/cli/**'
+              - 'clients/client-java/**'
+              - 'common/**'
+              - 'conf/**'
+              - 'core/**'
+              - 'gradle/**'
+              - 'integration-test-common/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
             mcp_it:
               - 'mcp-server/**'
               - 'server/**'
@@ -299,6 +320,7 @@ jobs:
       maintenance_module_only_changes: ${{ steps.maintenance_module_only.outputs.maintenance_module_only_changes }}
       access_control_it: ${{ steps.filter.outputs.access_control_it }}
       backend_it: ${{ steps.filter.outputs.backend_it }}
+      cli_it: ${{ steps.filter.outputs.cli_it }}
       flink_it: ${{ steps.filter.outputs.flink_it }}
       iceberg_rest_trino_it: ${{ steps.filter.outputs.iceberg_rest_trino_it }}
       idp_basic_it: ${{ steps.filter.outputs.idp_basic_it }}
@@ -782,6 +804,22 @@ jobs:
     with:
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
+
+  cli-it:
+    needs: [ changes, test, medium-test, core-test ]
+    if: >-
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs['medium-test'].result) &&
+      contains(fromJSON('["success", "skipped"]'), needs['core-test'].result) &&
+      needs.changes.outputs.cli_it == 'true'
+    strategy:
+      matrix:
+        test-mode: [ embedded, deploy ]
+    uses: ./.github/workflows/cli-integration-test-action.yml
+    with:
+      java-version: '17'
+      test-mode: ${{ matrix.test-mode }}
 
   idp-basic-it:
     needs: [ changes, test, medium-test, core-test ]
