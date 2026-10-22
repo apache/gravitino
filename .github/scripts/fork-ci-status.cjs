@@ -17,23 +17,9 @@ const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
 const SUITES = ['build', 'backend', 'spark', 'flink', 'trino', 'iceberg_rest_trino', 'python',
   'frontend', 'access_control', 'idp_basic', 'mcp', 'maintenance', 'web_ui', 'charts',
   'contrib_catalog', 'asf_allowlist'];
-const HOUR = 3600000;
-const IDLE = 15 * 60000;
-const WATCH = 7 * 24 * HOUR;
 const requiredName = pr => `Required CI / ${pr.base.ref} / ${pr.base.sha} / ${pr.head.sha}`;
 const requiredAction = note => ({ status: 'completed', conclusion: 'action_required',
   title: 'Fork CI needs attention', note });
-
-function skippable(pr, state, now, manual) {
-  if (manual || !state || state.sha !== pr.head.sha || state.base !== pr.base.sha ||
-      state.base_ref !== pr.base.ref || state.updated_at !== pr.updated_at) return false;
-  if (state.status !== 'completed') return false;
-  // Successes remain watched too: a fork re-run changes run_attempt, not PR.updated_at.
-  const age = now - Date.parse(state.completed_at);
-  if (!Number.isFinite(age) || age < 0) return false;
-  if (age > WATCH && now - Date.parse(pr.updated_at) > WATCH) return true;
-  return now - Date.parse(state.checked_at) < IDLE;
-}
 
 function evaluate(pr, run, jobs) {
   const required = jobs.find(job => job.name === requiredName(pr));
@@ -55,7 +41,8 @@ function evaluate(pr, run, jobs) {
   return { status: 'completed', conclusion: 'success', title: 'All required suites passed' };
 }
 
-function createService(github, definitions = new Map()) {
+function createService(github) {
+  const definitions = new Map();
   const trees = new Map();
   async function ciTree(owner, repo, sha) {
     const key = `${owner}/${repo}@${sha}`;
@@ -83,8 +70,20 @@ function createService(github, definitions = new Map()) {
     return same;
   }
   async function jobsFor(owner, repo, run) {
-    return github.paginate('GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/jobs',
-      { owner, repo, run_id: run.id, attempt_number: run.run_attempt, per_page: 100 });
+    // Partial re-runs retain earlier successful jobs. Take each named job's newest
+    // execution, rather than requiring every caller to execute in the latest attempt.
+    const jobs = await github.paginate('GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs',
+      { owner, repo, run_id: run.id, filter: 'all', per_page: 100 });
+    const latest = new Map();
+    for (const job of jobs) {
+      if ((job.run_attempt || 1) > run.run_attempt) continue;
+      const previous = latest.get(job.name);
+      if (!previous || (job.run_attempt || 1) > (previous.run_attempt || 1) ||
+          ((job.run_attempt || 1) === (previous.run_attempt || 1) && job.id > previous.id)) {
+        latest.set(job.name, job);
+      }
+    }
+    return [...latest.values()];
   }
   async function findRun(pr, trusted) {
     const target = trusted ? UPSTREAM : { owner: pr.head.repo.owner.login, repo: pr.head.repo.name };
@@ -113,4 +112,4 @@ function createService(github, definitions = new Map()) {
   }
   return { mirror, unchanged, findRun };
 }
-module.exports = { SUITES, WATCH, IDLE, requiredName, skippable, evaluate, createService };
+module.exports = { SUITES, requiredName, evaluate, createService };

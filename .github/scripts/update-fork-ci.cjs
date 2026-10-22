@@ -13,10 +13,9 @@
  * limitations under the License.
  */
 'use strict';
-const fs = require('node:fs');
-const { createService, skippable } = require('./fork-ci-status.cjs');
+const { createService } = require('./fork-ci-status.cjs');
 
-async function update({ github, context, core, stateFile = '.fork-ci-status/state.json' }) {
+async function update({ github, context, core }) {
   const signal = context.eventName === 'workflow_run' && context.payload.workflow_run.name === 'Fork CI PR Signal';
   const trustedSignal = context.eventName === 'workflow_run' &&
     context.payload.workflow_run.event === 'workflow_dispatch' &&
@@ -24,40 +23,32 @@ async function update({ github, context, core, stateFile = '.fork-ci-status/stat
   const manual = context.eventName === 'workflow_dispatch' || !!trustedSignal || signal;
   const requested = context.payload.inputs?.['pull-request'] || (trustedSignal && trustedSignal[1]);
   if (requested && !/^[1-9][0-9]*$/.test(requested)) throw new Error('Invalid PR number.');
-  let previous = { prs: {}, cursor: 0 };
-  try { previous = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { /* Cold cache. */ }
-  if (!previous.prs || !Number.isInteger(previous.cursor)) previous = { prs: {}, cursor: 0 };
   let prs = requested
     ? [(await github.rest.pulls.get({ ...context.repo, pull_number: Number(requested) })).data]
     : await github.paginate(github.rest.pulls.list, { ...context.repo, state: 'open', per_page: 100 });
   if (signal) prs = prs.filter(pr => pr.head.sha === context.payload.workflow_run.head_sha);
   const now = Date.now();
-  const definitions = new Map();
-  for (const state of Object.values(previous.prs)) {
-    if (typeof state.definitions_equal === 'boolean' && state.repository) {
-      definitions.set(`${state.repository}@${state.sha}:${state.base}`, state.definitions_equal);
-    }
-  }
-  const service = createService(github, definitions);
-  const next = { prs: { ...previous.prs }, cursor: previous.cursor };
+  // Never restore decisions or scheduling state from Actions caches: PR code dispatched
+  // on the default branch can write those caches using its runner runtime token.
+  const service = createService(github);
   const availableBases = new Map();
   const rate = (await github.rest.rateLimit.get()).data.resources.core;
-  // Bound work even while settled successes are watched. Preserve a cursor to avoid starving
+  // Bound work even while settled successes are watched. Rotate the starting PR to avoid starving
   // older PRs, and leave quota for signal workflows and other repository automation.
   const budget = manual ? Math.max(0, rate.remaining - 100) : Math.min(60, Math.max(0, rate.remaining - 100));
   let calls = 0;
   github.hook.before('request', () => { calls++; });
   const failures = [];
-  const start = manual || !prs.length ? 0 : previous.cursor % prs.length;
+  // Rotate using trusted wall-clock time, so old PRs are eventually visited without
+  // accepting a contributor-writable cursor or freezing settled successful checks.
+  const start = manual || !prs.length ? 0 : Math.floor(now / 300000) % prs.length;
   let processed = 0;
   for (let offset = 0; offset < prs.length; offset++) {
     if (calls + 15 > budget) break; // One PR may need trees, runs, paginated jobs and a check write.
     const index = (start + offset) % prs.length;
     const pr = prs[index];
     processed++;
-    if (!manual) next.cursor = (index + 1) % prs.length;
     if (pr.state !== 'open') continue;
-    if (skippable(pr, previous.prs[pr.number], now, manual)) continue;
     try {
       // Release branches without this CI migration keep their own pull_request workflows.
       if (!availableBases.has(pr.base.sha)) {
@@ -94,20 +85,12 @@ async function update({ github, context, core, stateFile = '.fork-ci-status/stat
       } else if (!sameRun || latest.status !== result.status || latest.conclusion !== (result.conclusion || null) || latest.output?.summary !== output.summary) {
         await github.rest.checks.update({ ...params, check_run_id: latest.id });
       }
-      next.prs[pr.number] = { sha: pr.head.sha, base: pr.base.sha, base_ref: pr.base.ref,
-        repository: pr.head.repo?.full_name,
-        definitions_equal: pr.head.repo ? definitions.get(`${pr.head.repo.full_name}@${pr.head.sha}:${pr.base.sha}`) : undefined,
-        updated_at: pr.updated_at, status: result.status, checked_at: new Date(now).toISOString(),
-        completed_at: run?.updated_at || new Date(now).toISOString() };
     } catch (error) {
-      delete next.prs[pr.number];
       failures.push(pr.number);
       core.warning(`Could not refresh #${pr.number}: ${error.message}`);
     }
   }
-  fs.mkdirSync(require('node:path').dirname(stateFile), { recursive: true });
-  fs.writeFileSync(stateFile, JSON.stringify(next));
-  core.info(`Visited ${processed}/${prs.length} PRs; ${calls}/${budget} API calls; next cursor ${next.cursor}.`);
+  core.info(`Visited ${processed}/${prs.length} PRs; ${calls}/${budget} API calls; starting index ${start}.`);
   if (manual && processed < prs.length) core.setFailed('API budget exhausted; dispatch again for a specific PR after the quota resets.');
   if (failures.length) core.setFailed(`Unable to refresh: ${failures.map(n => `#${n}`).join(', ')}`);
 }

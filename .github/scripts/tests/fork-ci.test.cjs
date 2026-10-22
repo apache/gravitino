@@ -19,7 +19,7 @@ const assert = require('node:assert/strict');
 const { mkdtemp, readFile, rm } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { SUITES, requiredName, evaluate, skippable, createService, WATCH } = require('../fork-ci-status.cjs');
+const { SUITES, requiredName, evaluate, createService } = require('../fork-ci-status.cjs');
 const { resolve } = require('../resolve-fork-ci.cjs');
 const { yamlEntries, prepare } = require('../allowlist-pr.cjs');
 const A = 'a'.repeat(40), B = 'b'.repeat(40), C = 'c'.repeat(40);
@@ -57,17 +57,6 @@ test('running and failed reruns cannot remain successful', () => {
     assert.equal(evaluate(pr(), { ...run(), conclusion }, jobs(pr())).conclusion, conclusion);
   }
 });
-test('idle successes are watched and manual dispatch always bypasses the cache', () => {
-  const p = pr(), now = Date.parse('2026-01-02T00:00:00Z');
-  const state = { sha: A, base: B, base_ref: 'main', updated_at: p.updated_at, status: 'completed',
-    completed_at: new Date(now - 2 * 3600000).toISOString(), checked_at: new Date(now - 1800000).toISOString() };
-  assert.equal(skippable(p, state, now, false), false);
-  assert.equal(skippable(p, { ...state, checked_at: new Date(now).toISOString() }, now, false), true);
-  assert.equal(skippable(p, { ...state, checked_at: new Date(now).toISOString() }, now, true), false);
-  assert.equal(skippable(p, { ...state, base: C }, now, false), false);
-  assert.equal(skippable(p, { ...state, completed_at: new Date(now - WATCH - 1).toISOString() }, now + WATCH, true), false);
-});
-
 function serviceMock({ changed = false, trusted = false, forkJobs = jobs(pr()), trustedJobs = jobs(pr()), trustedSha = B } = {}) {
   return { rest: {
     git: { getTree: async ({ owner, tree_sha }) => ({ data: { tree: tree_sha.length === 40
@@ -210,14 +199,16 @@ test('immutable CI definition comparisons are cached by repository, head and bas
   const github = serviceMock(); let calls = 0;
   const get = github.rest.git.getTree;
   github.rest.git.getTree = async args => { calls++; return get(args); };
-  const definitions = new Map();
-  assert.equal(await createService(github, definitions).unchanged(pr()), true);
+  const service = createService(github);
+  assert.equal(await service.unchanged(pr()), true);
   assert.equal(calls, 4);
-  assert.equal(await createService(github, definitions).unchanged(pr()), true);
+  assert.equal(await service.unchanged(pr()), true);
   assert.equal(calls, 4);
   const changedBase = pr(); changedBase.base.sha = C;
-  await createService(github, definitions).unchanged(changedBase);
-  assert.equal(calls, 8);
+  await service.unchanged(changedBase);
+  assert.equal(calls, 6);
+  assert.equal(await createService(github).unchanged(pr()), true);
+  assert.equal(calls, 10);
 });
 
 const { update } = require('../update-fork-ci.cjs');
@@ -283,7 +274,7 @@ test('publisher failures remain observable and are retried instead of cached', a
   const { github, writes } = publisherMock({ failTrees: true });
   await update({ github, context: ctx, core, stateFile });
   assert.equal(writes.length, 0); assert.equal(failures.length, 1);
-  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).prs[7], undefined);
+  await assert.rejects(readFile(stateFile, 'utf8'), { code: 'ENOENT' });
 }));
 test('PR signals prioritize their head and bypass settled state', async () => withPublisher(async ({ ctx, stateFile, core }) => {
   ctx.eventName = 'workflow_run';delete ctx.payload.inputs;
@@ -292,3 +283,38 @@ test('PR signals prioritize their head and bypass settled state', async () => wi
   await update({ github, context: ctx, core, stateFile });
   assert.equal(writes.length, 1);
 }));
+
+test('scheduled publication ignores poisoned cache state and recomputes definitions', async () => withPublisher(async ({ ctx, stateFile, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  await require('node:fs/promises').writeFile(stateFile, JSON.stringify({ cursor: 0, prs: { 7: {
+    sha: A, base: B, base_ref: 'main', repository: 'fork/repo', definitions_equal: true,
+    updated_at: pr().updated_at, status: 'completed', checked_at: new Date().toISOString(), completed_at: new Date().toISOString()
+  } } }));
+  const { github, writes } = publisherMock();
+  github.rest.git = serviceMock({ changed: true }).rest.git;
+  await update({ github, context: ctx, core, stateFile });
+  assert.equal(writes[0].create.conclusion, 'action_required');
+  const workflow = await readFile(path.join(__dirname, '../../workflows/fork-ci-status-update.yml'), 'utf8');
+  assert.ok(!workflow.includes('actions/cache/'));
+}));
+
+test('partial reruns retain successful callers but use each job newest result', async () => {
+  const p = pr();
+  const github = serviceMock();
+  github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: {
+    workflow_runs: event === 'push' ? [{ ...run(), run_attempt: 2 }] : []
+  } });
+  let rerunConclusion = 'success';
+  github.paginate = async (endpoint, args) => {
+    assert.equal(endpoint, 'GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs');
+    assert.equal(args.filter, 'all');
+    return [
+      ...jobs(p).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+      { name: requiredName(p), id: 100, run_attempt: 2, conclusion: 'success' },
+      { name: 'backend / changes', id: 101, run_attempt: 2, conclusion: rerunConclusion }
+    ].reverse();
+  };
+  assert.equal((await createService(github).mirror(p)).result.conclusion, 'success');
+  rerunConclusion = 'failure';
+  assert.equal((await createService(github).mirror(p)).result.conclusion, 'action_required');
+});

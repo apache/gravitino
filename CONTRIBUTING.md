@@ -103,7 +103,7 @@ If the check asks you to enable Fork CI, enable Actions in your fork, merge or r
 
 Known limitations of Fork CI:
 
-* New/edited PR notifications wake a default-branch publisher. Fork run completions and reruns are polled on a five-minute schedule, subject to GitHub scheduling delays and a bounded API budget. Completed results, including successes, are watched for seven days; idle results are polled no more often than every 15 minutes. Large queues can take longer. Committers can force-refresh a particular PR using **Update Fork CI Status** with its PR number, even after the watch window expires.
+* New/edited PR notifications wake a default-branch publisher. Fork run completions and reruns are polled on a five-minute schedule, subject to GitHub scheduling delays and a bounded API budget. All open PRs, including settled successes, remain watched. The starting PR rotates on each scheduled interval; large queues can take longer. Committers can force-refresh a particular PR using **Update Fork CI Status** with its PR number.
 * A pull request last pushed before this migration needs an update and another push. Old runs without the tested-context metadata cannot satisfy the new check.
 * Coverage comments remain available for release branches. For PRs to `main`, inspect the fork run's `build / coverage` log and `coverage-report` artifact.
 * Release branches (`branch-*`) keep their own upstream CI until this change is backported.
