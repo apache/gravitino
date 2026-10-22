@@ -25,8 +25,8 @@ import org.apache.gravitino.secret.SecretReference;
 
 /**
  * A fileset change is a change to a fileset. It can be used to rename a fileset, update the comment
- * or type of a fileset, set a property and value pair for a fileset, or remove a property from a
- * fileset.
+ * of a fileset, update the type of a fileset, set a property and value pair for a fileset, or
+ * remove a property from a fileset.
  */
 @Evolving
 public interface FilesetChange {
