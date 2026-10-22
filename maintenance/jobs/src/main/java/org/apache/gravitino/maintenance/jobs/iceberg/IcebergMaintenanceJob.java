@@ -54,15 +54,15 @@ import org.slf4j.LoggerFactory;
 /**
  * TMS Spark entry for cron (§5.2.2) and commit-chain (§5.2.3) submits.
  *
- * <p>Dispatches by {@code --maintenance-type} (single type) or {@code --maintenance-types}
- * (comma-separated commit chain). Reuses procedure SQL builders from the four standalone {@code
- * Iceberg*Job} classes. Those standalone templates stay unchanged for CLI / optimizer use.
+ * <p>Dispatches by {@code --maintenance-types}: one wire name, or a comma-separated commit chain.
+ * Reuses procedure SQL builders from the four standalone {@code Iceberg*Job} classes. Those
+ * standalone templates stay unchanged for CLI / optimizer use.
  *
  * <p>Commit-chain runs share one occupancy claim ({@code policy_id} = first type). Continue / stop
  * (snapshot drift) is decided locally in the job. Snapshot metrics may be reported best-effort via
  * the TMS metrics callback; occupancy is released when the Gravitino job reaches a terminal state.
  *
- * <p>Template parameters mirror other Iceberg built-ins: {@code maintenance_type}, {@code
+ * <p>Template parameters mirror other Iceberg built-ins: {@code maintenance_types}, {@code
  * updater_options} (Gravitino URI / metalake / auth, same name as update-stats), plus catalog /
  * table / procedure options. A batch may pass {@code tables} (JSON array) so one Spark job covers
  * multiple tables under the same Gravitino job id. The Gravitino job id is read from the local
@@ -83,10 +83,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   public static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-maintenance-task";
 
-  /** JobConf / CLI key for the maintenance kind ({@code maintenance_type}). */
-  public static final String MAINTENANCE_TYPE_KEY = "maintenance_type";
-
-  /** JobConf / CLI key for a commit-chain of wire types ({@code maintenance_types}). */
+  /**
+   * JobConf / CLI key for procedure dispatch ({@code maintenance_types}). One wire name, or a
+   * comma-separated commit chain. Required; no template default.
+   */
   public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";
 
   /** JobConf / CLI key for a single-table run ({@code table_id}). */
@@ -100,7 +100,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
   private static final String VERSION = "v1";
 
-  /** Supported {@code maintenance_type} values. */
+  /** Supported {@code maintenance_types} wire values. */
   public enum MaintenanceType {
     REWRITE_DATA_FILES("rewrite_data_files"),
     REWRITE_MANIFESTS("rewrite_manifests"),
@@ -126,7 +126,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
      */
     public static MaintenanceType fromWire(@Nullable String raw) {
       if (raw == null || raw.trim().isEmpty()) {
-        throw new IllegalArgumentException("maintenance_type is required");
+        throw new IllegalArgumentException("maintenance_types is required");
       }
       String normalized = raw.trim().toLowerCase(Locale.ROOT);
       for (MaintenanceType type : values()) {
@@ -135,7 +135,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         }
       }
       throw new IllegalArgumentException(
-          "Unknown maintenance_type '"
+          "Unknown maintenance_types value '"
               + raw
               + "'. Expected one of: rewrite_data_files, rewrite_manifests, expire_snapshots,"
               + " remove_orphan_files");
@@ -178,8 +178,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     long jobId;
     List<TableTarget> tables;
     try {
-      types =
-          parseMaintenanceTypes(argMap.get("maintenance-types"), argMap.get("maintenance-type"));
+      types = parseMaintenanceTypes(argMap.get("maintenance-types"));
       jobId = resolveGravitinoJobId();
       tables = resolveTableTargets(argMap);
     } catch (IllegalArgumentException | IllegalStateException e) {
@@ -316,29 +315,27 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * @param maintenanceTypes comma-separated wire names from commit-chain submit (may be blank)
-   * @param maintenanceType single wire name (cron path)
+   * @param maintenanceTypes one wire name, or a comma-separated commit chain
    * @return ordered types to run
    */
   @VisibleForTesting
-  static ImmutableList<MaintenanceType> parseMaintenanceTypes(
-      @Nullable String maintenanceTypes, @Nullable String maintenanceType) {
+  static ImmutableList<MaintenanceType> parseMaintenanceTypes(@Nullable String maintenanceTypes) {
     String chain = IcebergJobUtils.nullIfUnresolvedPlaceholder(maintenanceTypes);
-    if (chain != null && !chain.trim().isEmpty()) {
-      ImmutableList.Builder<MaintenanceType> parsed = ImmutableList.builder();
-      for (String part : chain.split(",")) {
-        String trimmed = part.trim();
-        if (!trimmed.isEmpty()) {
-          parsed.add(MaintenanceType.fromWire(trimmed));
-        }
-      }
-      ImmutableList<MaintenanceType> types = parsed.build();
-      if (types.isEmpty()) {
-        throw new IllegalArgumentException("maintenance_types must not be empty");
-      }
-      return types;
+    if (chain == null || chain.trim().isEmpty()) {
+      throw new IllegalArgumentException("maintenance_types is required");
     }
-    return ImmutableList.of(MaintenanceType.fromWire(maintenanceType));
+    ImmutableList.Builder<MaintenanceType> parsed = ImmutableList.builder();
+    for (String part : chain.split(",")) {
+      String trimmed = part.trim();
+      if (!trimmed.isEmpty()) {
+        parsed.add(MaintenanceType.fromWire(trimmed));
+      }
+    }
+    ImmutableList<MaintenanceType> types = parsed.build();
+    if (types.isEmpty()) {
+      throw new IllegalArgumentException("maintenance_types must not be empty");
+    }
+    return types;
   }
 
   @VisibleForTesting
@@ -697,10 +694,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         "{{catalog_name}}",
         "--table",
         "{{table_identifier}}",
-        "--maintenance-type",
-        "{{maintenance_type}}",
         "--maintenance-types",
-        "{{maintenance_types:-}}",
+        "{{maintenance_types}}",
         "--table-id",
         "{{table_id:-}}",
         "--tables",

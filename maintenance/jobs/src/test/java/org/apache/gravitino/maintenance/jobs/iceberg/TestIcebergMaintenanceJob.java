@@ -42,8 +42,10 @@ public class TestIcebergMaintenanceJob {
     assertEquals(IcebergMaintenanceJob.class.getName(), template.className());
     assertEquals("v1", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
     List<String> args = template.arguments();
-    assertTrue(args.contains("--maintenance-type"));
-    assertTrue(args.contains("{{maintenance_type}}"));
+    assertFalse(args.contains("--maintenance-type"));
+    assertFalse(args.contains("{{maintenance_type}}"));
+    assertTrue(args.contains("--maintenance-types"));
+    assertTrue(args.contains("{{maintenance_types}}"));
     assertTrue(args.contains("--updater-options"));
     assertTrue(args.contains("{{updater_options:-}}"));
     assertFalse(args.contains("--gravitino-job-id"));
@@ -91,22 +93,22 @@ public class TestIcebergMaintenanceJob {
   public void testParseMaintenanceTypesChainAndSingle() {
     List<MaintenanceType> chain =
         IcebergMaintenanceJob.parseMaintenanceTypes(
-            "rewrite_data_files, rewrite_manifests, expire_snapshots", null);
+            "rewrite_data_files, rewrite_manifests, expire_snapshots");
     assertEquals(3, chain.size());
     assertEquals(MaintenanceType.REWRITE_DATA_FILES, chain.get(0));
     assertEquals(MaintenanceType.REWRITE_MANIFESTS, chain.get(1));
     assertEquals(MaintenanceType.EXPIRE_SNAPSHOTS, chain.get(2));
 
-    List<MaintenanceType> single =
-        IcebergMaintenanceJob.parseMaintenanceTypes(null, "expire_snapshots");
+    List<MaintenanceType> single = IcebergMaintenanceJob.parseMaintenanceTypes("expire_snapshots");
     assertEquals(List.of(MaintenanceType.EXPIRE_SNAPSHOTS), single);
   }
 
   @Test
-  public void testTemplateIncludesMaintenanceTypesPlaceholder() {
+  public void testTemplateRequiresMaintenanceTypes() {
     List<String> args = new IcebergMaintenanceJob().jobTemplate().arguments();
     assertTrue(args.contains("--maintenance-types"));
-    assertTrue(args.contains("{{maintenance_types:-}}"));
+    assertTrue(args.contains("{{maintenance_types}}"));
+    assertFalse(args.contains("{{maintenance_types:-}}"));
   }
 
   @Test
@@ -143,7 +145,7 @@ public class TestIcebergMaintenanceJob {
         1,
         IcebergMaintenanceJob.run(
             new String[] {
-              "--catalog", "c", "--table", "db.t", "--maintenance-type", "expire_snapshots"
+              "--catalog", "c", "--table", "db.t", "--maintenance-types", "expire_snapshots"
             }));
   }
 }

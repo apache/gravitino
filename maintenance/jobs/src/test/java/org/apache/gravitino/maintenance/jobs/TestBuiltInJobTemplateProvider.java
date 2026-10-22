@@ -113,7 +113,7 @@ public class TestBuiltInJobTemplateProvider {
         ImmutableSet.<String>builder().addAll(icebergCatalog).add("where_clause").build());
     expected.put(
         "builtin-iceberg-maintenance-task",
-        ImmutableSet.<String>builder().addAll(icebergCatalog).add("maintenance_type").build());
+        ImmutableSet.<String>builder().addAll(icebergCatalog).add("maintenance_types").build());
 
     for (JobTemplate template : new BuiltInJobTemplateProvider().jobTemplates()) {
       Set<String> required = new JobTemplateResolver(toEntity(template)).requiredParameters();
