@@ -92,12 +92,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    */
   public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";
 
-  /** JobConf / CLI key for a single-table run ({@code table_id}). */
-  public static final String TABLE_ID_KEY = "table_id";
-
   /**
-   * JobConf / CLI key for a multi-table batch ({@code tables}): JSON array of {@code table_id},
-   * {@code catalog_name}, {@code table_identifier}.
+   * JobConf / CLI key for table targets ({@code tables}): JSON array of {@code table_id}, {@code
+   * catalog_name}, {@code table_identifier}. Used for both single-table and multi-table TMS
+   * submits. Entity {@code table_id} is not a template placeholder.
    */
   public static final String TABLES_KEY = "tables";
 
@@ -268,23 +266,17 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * Resolves one or more table targets. Prefers {@code --tables} JSON when present; otherwise
-   * requires {@code --catalog}, {@code --table}, and {@code --table-id}.
+   * Resolves table targets from {@code --tables} JSON (required for TMS sample/finish). Single and
+   * multi-table submits use the same payload shape.
    */
   @VisibleForTesting
   static List<TableTarget> resolveTableTargets(Map<String, String> argMap) {
     String tablesJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("tables"));
-    if (tablesJson != null && !tablesJson.trim().isEmpty()) {
-      return parseTables(tablesJson);
-    }
-    String catalogName = argMap.get("catalog");
-    String tableIdentifier = argMap.get("table");
-    if (catalogName == null || tableIdentifier == null) {
+    if (tablesJson == null || tablesJson.trim().isEmpty()) {
       throw new IllegalArgumentException(
-          "--catalog and --table are required when --tables is omitted");
+          "--tables JSON is required (array of table_id, catalog_name, table_identifier)");
     }
-    long tableId = parsePositiveLongArg(argMap.get("table-id"), "table-id");
-    return ImmutableList.of(new TableTarget(tableId, catalogName, tableIdentifier));
+    return parseTables(tablesJson);
   }
 
   @VisibleForTesting
@@ -707,13 +699,11 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         "--catalog",
         "{{catalog_name}}",
         "--table",
-        "{{table_identifier}}",
+        "{{table_identifier:-}}",
         "--maintenance-types",
         "{{maintenance_types}}",
-        "--table-id",
-        "{{table_id:-}}",
         "--tables",
-        "{{tables:-}}",
+        "{{tables}}",
         "--updater-options",
         "{{updater_options:-}}",
         "--strategy",

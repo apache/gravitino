@@ -50,19 +50,19 @@ public class TestIcebergMaintenanceJob {
     assertTrue(args.contains("{{updater_options:-}}"));
     assertFalse(args.contains("--gravitino-job-id"));
     assertFalse(args.contains("{{gravitino_job_id}}"));
-    assertTrue(args.contains("--table-id"));
-    assertTrue(args.contains("{{table_id:-}}"));
+    assertFalse(args.contains("--table-id"));
+    assertFalse(args.contains("{{table_id:-}}"));
     assertTrue(args.contains("--tables"));
-    assertTrue(args.contains("{{tables:-}}"));
+    assertTrue(args.contains("{{tables}}"));
     assertFalse(args.contains("--policy-id"));
   }
 
   @Test
   public void testResolveTableTargetsSingleAndBatch() {
     Map<String, String> single = new HashMap<>();
-    single.put("catalog", "iceberg");
-    single.put("table", "db.t1");
-    single.put("table-id", "10");
+    single.put(
+        "tables",
+        "[{\"table_id\":10,\"catalog_name\":\"iceberg\",\"table_identifier\":\"db.t1\"}]");
     List<IcebergMaintenanceJob.TableTarget> one = IcebergMaintenanceJob.resolveTableTargets(single);
     assertEquals(1, one.size());
     assertEquals(10L, one.get(0).tableId);
@@ -78,6 +78,15 @@ public class TestIcebergMaintenanceJob {
     assertEquals(2, many.size());
     assertEquals(11L, many.get(1).tableId);
     assertEquals("db.t2", many.get(1).tableIdentifier);
+  }
+
+  @Test
+  public void testResolveTableTargetsRequiresTables() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            IcebergMaintenanceJob.resolveTableTargets(
+                Map.of("catalog", "iceberg", "table", "db.t1")));
   }
 
   @Test
