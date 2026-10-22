@@ -28,7 +28,8 @@ import org.apache.gravitino.rest.RESTRequest;
 /**
  * Spark callback after sampling Iceberg snapshot {@code S0} for a cron maintenance action.
  *
- * <p>Lives in {@code :maintenance:maintenance-api} so the TMS plugin and built-in jobs share one wire type.
+ * <p>Lives in {@code :maintenance:maintenance-api} so the TMS plugin and built-in jobs share one
+ * wire type.
  */
 @Getter
 @EqualsAndHashCode

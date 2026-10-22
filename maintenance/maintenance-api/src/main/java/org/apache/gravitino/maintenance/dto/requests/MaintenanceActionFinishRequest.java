@@ -28,7 +28,8 @@ import org.apache.gravitino.rest.RESTRequest;
 /**
  * Spark callback when a cron maintenance job reaches a terminal outcome.
  *
- * <p>Lives in {@code :maintenance:maintenance-api} so the TMS plugin and built-in jobs share one wire type.
+ * <p>Lives in {@code :maintenance:maintenance-api} so the TMS plugin and built-in jobs share one
+ * wire type.
  */
 @Getter
 @EqualsAndHashCode
