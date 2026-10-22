@@ -59,10 +59,11 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportMetricsPersists() {
-    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
 
     Response response =
-        ops.reportMetrics(METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(100L, "{\"m\":1}"));
+        ops.reportMetrics(
+            METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}");
@@ -70,10 +71,11 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportMetricsMissingActionReturns404() {
-    when(actions.getByJobId(JOB_ID)).thenReturn(null);
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(null);
 
     Response response =
-        ops.reportMetrics(METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(100L, "{\"m\":1}"));
+        ops.reportMetrics(
+            METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
@@ -81,10 +83,12 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportMetricsAlreadyFinishedReturns404() {
-    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID))
+        .thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
 
     Response response =
-        ops.reportMetrics(METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(100L, "{\"m\":1}"));
+        ops.reportMetrics(
+            METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
@@ -92,12 +96,13 @@ class TestTableMaintenanceActionOperations {
 
   @Test
   void testReportMetricsWrongMetalakeReturns404() {
-    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
     ops = operations(tableId -> "other-ml");
     ops.setHttpRequest(mock(HttpServletRequest.class));
 
     Response response =
-        ops.reportMetrics(METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(100L, "{\"m\":1}"));
+        ops.reportMetrics(
+            METALAKE, JOB_ID, new MaintenanceActionMetricsRequest(TABLE_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());

@@ -123,12 +123,25 @@ public class TableMaintenanceActionSQLProviderFactory {
 
   /**
    * @param jobId job run id
+   * @param tableId table entity id
+   * @return SELECT statement
+   */
+  public static String selectByJobIdAndTableId(
+      @Param("jobId") long jobId, @Param("tableId") long tableId) {
+    return getProvider().selectByJobIdAndTableId(jobId, tableId);
+  }
+
+  /**
+   * @param jobId job run id
+   * @param tableId table entity id
    * @param beforeSnapshotId snapshot id
    * @return UPDATE statement
    */
   public static String updateBeforeSnapshot(
-      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId) {
-    return getProvider().updateBeforeSnapshot(jobId, beforeSnapshotId);
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("beforeSnapshotId") long beforeSnapshotId) {
+    return getProvider().updateBeforeSnapshot(jobId, tableId, beforeSnapshotId);
   }
 
   /**
