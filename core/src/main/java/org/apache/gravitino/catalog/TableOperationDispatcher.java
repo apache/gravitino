@@ -549,8 +549,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
     }
 
+    // Reuse the id only for a table the external system renamed in place: a client of that system
+    // can copy another table's id into the properties, and adopting it would take that entity over.
+    boolean reuseStringId =
+        stringId != null
+            && canReuseStringId(
+                stringId.id(),
+                identifier,
+                TABLE,
+                TableEntity.class,
+                ident ->
+                    doWithCatalog(
+                        getCatalogIdentifier(ident),
+                        c -> c.doWithTableOps(t -> t.tableExists(ident)),
+                        NoSuchTableException.class));
     long uid;
-    if (stringId != null) {
+    if (reuseStringId) {
       // If the entity in the store doesn't match the external system, we use the data
       // of external system to correct it.
       LOG.warn(
@@ -560,6 +574,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           stringId);
       uid = stringId.id();
     } else {
+      if (stringId != null) {
+        LOG.warn(
+            "Table {} carries uid {} that belongs to another or no stored table, import it "
+                + "with a new uid",
+            identifier,
+            stringId);
+      }
       // If entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
     }
@@ -586,7 +607,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       // the same name with another id is stale and gets replaced. A generated id identifies
       // nothing, so a row that appeared meanwhile, e.g. from a concurrent import on another node,
       // must win. The plain insert then conflicts, and loadTable reloads that row.
-      store.put(tableEntity, stringId != null);
+      store.put(tableEntity, reuseStringId);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (OptimisticLockException e) {

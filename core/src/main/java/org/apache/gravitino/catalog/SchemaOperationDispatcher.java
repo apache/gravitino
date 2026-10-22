@@ -637,8 +637,23 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
     }
 
+    // Reuse the id only for a schema the external system renamed in place: a client of that system
+    // can copy another schema's id into the properties, and adopting it would take that entity
+    // over.
+    boolean reuseStringId =
+        stringId != null
+            && canReuseStringId(
+                stringId.id(),
+                identifier,
+                SCHEMA,
+                SchemaEntity.class,
+                ident ->
+                    doWithCatalog(
+                        getCatalogIdentifier(ident),
+                        c -> c.doWithSchemaOps(s -> s.schemaExists(ident)),
+                        NoSuchSchemaException.class));
     long uid;
-    if (stringId != null) {
+    if (reuseStringId) {
       // If the entity in the store doesn't match the one in the external system, we use the data
       // of external system to correct it.
       LOG.warn(
@@ -648,6 +663,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           stringId);
       uid = stringId.id();
     } else {
+      if (stringId != null) {
+        LOG.warn(
+            "Schema {} carries uid {} that belongs to another or no stored schema, import it "
+                + "with a new uid",
+            identifier,
+            stringId);
+      }
       // If the entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
     }

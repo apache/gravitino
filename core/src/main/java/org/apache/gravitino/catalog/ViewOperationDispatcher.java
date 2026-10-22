@@ -538,8 +538,22 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     StringIdentifier stringId =
         getStringIdFromProperties(entityCombinedView.viewFromCatalog().properties());
 
+    // Reuse the id only for a view the external system renamed in place: a client of that system
+    // can copy another view's id into the properties, and adopting it would take that entity over.
+    boolean reuseStringId =
+        stringId != null
+            && canReuseStringId(
+                stringId.id(),
+                ident,
+                VIEW,
+                ViewEntity.class,
+                oldIdent ->
+                    doWithCatalog(
+                        getCatalogIdentifier(oldIdent),
+                        c -> c.doWithViewOps(v -> v.viewExists(oldIdent)),
+                        NoSuchViewException.class));
     long uid;
-    if (stringId != null) {
+    if (reuseStringId) {
       // If the entity in the store doesn't match the external system, we use the data
       // of external system to correct it.
       LOG.warn(
@@ -549,6 +563,13 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
           stringId);
       uid = stringId.id();
     } else {
+      if (stringId != null) {
+        LOG.warn(
+            "View {} carries uid {} that belongs to another or no stored view, import it "
+                + "with a new uid",
+            ident,
+            stringId);
+      }
       // If entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
     }

@@ -40,6 +40,7 @@ public class IcebergViewOperationExecutor implements IcebergViewOperationDispatc
   @Override
   public LoadViewResponse createView(
       IcebergRequestContext context, Namespace namespace, CreateViewRequest createViewRequest) {
+    IcebergReservedPropertyValidator.validateProperties(createViewRequest.properties());
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .createView(namespace, createViewRequest);
@@ -50,6 +51,7 @@ public class IcebergViewOperationExecutor implements IcebergViewOperationDispatc
       IcebergRequestContext context,
       TableIdentifier viewIdentifier,
       UpdateTableRequest replaceViewRequest) {
+    IcebergReservedPropertyValidator.validateUpdate(replaceViewRequest);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .updateView(viewIdentifier, replaceViewRequest);

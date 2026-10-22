@@ -63,6 +63,7 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
   @Override
   public CreateNamespaceResponse createNamespace(
       IcebergRequestContext context, CreateNamespaceRequest createNamespaceRequest) {
+    IcebergReservedPropertyValidator.validateProperties(createNamespaceRequest.properties());
     String authenticatedUser = context.userName();
     if (!AuthConstants.ANONYMOUS_USER.equals(authenticatedUser)) {
       String existingOwner = createNamespaceRequest.properties().get(IcebergConstants.OWNER);
@@ -95,6 +96,8 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       IcebergRequestContext context,
       Namespace namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+    IcebergReservedPropertyValidator.validateProperties(
+        updateNamespacePropertiesRequest.updates());
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .updateNamespaceProperties(namespace, updateNamespacePropertiesRequest);
