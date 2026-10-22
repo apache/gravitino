@@ -54,8 +54,9 @@ public final class HttpRequestFailureEvent extends FailureEvent {
    * Constructs an {@code HttpRequestFailureEvent}.
    *
    * @param user the authenticated user, or {@code "unknown"} if authentication had not completed.
-   * @param remoteAddress the client IP resolved by the filter (X-Forwarded-For or raw socket
-   *     address). Stored explicitly, rather than relying on the base {@link
+   * @param remoteAddress the client IP resolved by the filter (the TCP peer address, or the
+   *     right-most untrusted X-Forwarded-For entry behind a configured trusted proxy). Stored
+   *     explicitly, rather than relying on the base {@link
    *     org.apache.gravitino.listener.api.event.Event} behaviour of reading {@code
    *     RequestContext.getRemoteAddress()} at construction time, so this event still carries a
    *     correct address even on a server that does not install {@code RequestContextFilter} at all

@@ -57,6 +57,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -92,7 +93,8 @@ public class RESTService implements GravitinoAuxiliaryService {
   private boolean auxMode;
 
   private void initServer(IcebergConfig icebergConfig) {
-    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
+    JettyServerConfig serverConfig =
+        JettyServerConfig.fromServiceConfig(icebergConfig, IcebergConfig.ICEBERG_CONFIG_PREFIX);
     IcebergRESTUtils.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
     server =
         new JettyServer() {
@@ -217,28 +219,14 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addServlet(servlet, ICEBERG_SPEC);
     // Registered before HttpAuditFilter so audit events dispatched during this request carry the
     // request's query parameters and remote address, exactly as on the main server.
-    server.addFilter(new RequestContextFilter(eventBus), ICEBERG_SPEC);
-    server.addFilter(
-        new HttpAuditFilter(
-            eventBus,
-            EventSource.GRAVITINO_ICEBERG_REST_SERVER,
-            new IcebergHealthCheckPathMatcher()),
-        ICEBERG_SPEC);
+    ClientAddressResolver clientAddressResolver = serverConfig.getClientAddressResolver();
+    server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), ICEBERG_SPEC);
+    server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), ICEBERG_SPEC);
     if (metricsEnabled) {
-      server.addFilter(new RequestContextFilter(eventBus), JettyServer.METRICS_PATH_SPECS.get(0));
-      server.addFilter(new RequestContextFilter(eventBus), JettyServer.METRICS_PATH_SPECS.get(1));
-      server.addFilter(
-          new HttpAuditFilter(
-              eventBus,
-              EventSource.GRAVITINO_ICEBERG_REST_SERVER,
-              new IcebergHealthCheckPathMatcher()),
-          JettyServer.METRICS_PATH_SPECS.get(0));
-      server.addFilter(
-          new HttpAuditFilter(
-              eventBus,
-              EventSource.GRAVITINO_ICEBERG_REST_SERVER,
-              new IcebergHealthCheckPathMatcher()),
-          JettyServer.METRICS_PATH_SPECS.get(1));
+      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+        server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), pathSpec);
+        server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), pathSpec);
+      }
     }
     server.addSystemFilters(ICEBERG_SPEC);
 
@@ -327,5 +315,14 @@ public class RESTService implements GravitinoAuxiliaryService {
     List<String> packages = Lists.newArrayList(ICEBERG_REST_SPEC_PACKAGE);
     packages.addAll(icebergConfig.get(IcebergConfig.REST_API_EXTENSION_PACKAGES));
     return packages.toArray(new String[0]);
+  }
+
+  private static HttpAuditFilter createHttpAuditFilter(
+      EventBus eventBus, ClientAddressResolver clientAddressResolver) {
+    return new HttpAuditFilter(
+        eventBus,
+        EventSource.GRAVITINO_ICEBERG_REST_SERVER,
+        new IcebergHealthCheckPathMatcher(),
+        clientAddressResolver);
   }
 }
