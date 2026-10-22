@@ -37,6 +37,9 @@ outputs:
   synced:
     description: Whether contributor changes were merged onto the upstream base.
     value: ${{ steps.base.outputs.should_sync }}
+  pull-request:
+    description: Whether a pull request is tested, through Fork CI or a pull_request event.
+    value: ${{ steps.base.outputs.should_sync == 'true' || github.event_name == 'pull_request' }}
 
 runs:
   using: composite
@@ -51,12 +54,21 @@ runs:
         HEAD_BRANCH: ${{ github.ref_name }}
         HEAD_REPOSITORY: ${{ github.repository }}
         HEAD_SHA: ${{ github.sha }}
+        REPOSITORY_FORK: ${{ github.event.repository.fork }}
       run: |
         set -euo pipefail
 
         if [[ "${GITHUB_REPOSITORY}" == "apache/gravitino" && \
           ("${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == refs/heads/branch-*) ]]; then
           echo "base_ref=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "should_sync=false" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+
+        # A copy of the repository that is not a fork, such as a private downstream
+        # repository, tests its own pull requests and branches as they are.
+        if [[ "${GITHUB_REPOSITORY}" != "apache/gravitino" && "${REPOSITORY_FORK}" != "true" ]]; then
+          echo "base_ref=${EVENT_BASE_REF:-${GITHUB_REF_NAME}}" >> "${GITHUB_OUTPUT}"
           echo "should_sync=false" >> "${GITHUB_OUTPUT}"
           exit 0
         fi

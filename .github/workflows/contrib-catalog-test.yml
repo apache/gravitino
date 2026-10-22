@@ -43,6 +43,9 @@ jobs:
           if [ "${{ steps.checkout.outputs.synced }}" = "true" ]; then
             BASE_SHA="${{ steps.checkout.outputs.base-sha }}"
             HEAD_SHA="$(git rev-parse HEAD)"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           else
             BASE_SHA="${{ github.event.before }}"
             HEAD_SHA="${{ github.sha }}"
