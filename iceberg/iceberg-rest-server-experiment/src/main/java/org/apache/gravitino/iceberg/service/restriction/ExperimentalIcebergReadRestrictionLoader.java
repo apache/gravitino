@@ -70,6 +70,11 @@ public final class ExperimentalIcebergReadRestrictionLoader
   public ExperimentalIcebergReadRestrictionLoader() {}
 
   @Override
+  public boolean enabled() {
+    return GravitinoEnv.getInstance().internalPolicyDispatcher() != null;
+  }
+
+  @Override
   public Result load(
       IcebergRequestContext context, TableIdentifier tableIdentifier, LoadTableResponse response) {
     GravitinoEnv environment = GravitinoEnv.getInstance();

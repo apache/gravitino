@@ -33,6 +33,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
@@ -41,6 +43,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.Labels;
@@ -68,6 +71,24 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   void testServiceLoaderDiscoversExperimentalImplementation() {
     assertInstanceOf(
         ExperimentalIcebergReadRestrictionLoader.class, IcebergReadRestrictionLoader.load());
+  }
+
+  @Test
+  void testEnabledOnlyWhenPolicyDispatcherIsAvailable() throws Exception {
+    GravitinoEnv environment = GravitinoEnv.getInstance();
+    PolicyDispatcher original = environment.internalPolicyDispatcher();
+    ExperimentalIcebergReadRestrictionLoader loader =
+        new ExperimentalIcebergReadRestrictionLoader();
+    try {
+      FieldUtils.writeField(environment, "internalPolicyDispatcher", null, true);
+      assertFalse(loader.enabled());
+
+      FieldUtils.writeField(
+          environment, "internalPolicyDispatcher", mock(PolicyDispatcher.class), true);
+      assertTrue(loader.enabled());
+    } finally {
+      FieldUtils.writeField(environment, "internalPolicyDispatcher", original, true);
+    }
   }
 
   @Test
