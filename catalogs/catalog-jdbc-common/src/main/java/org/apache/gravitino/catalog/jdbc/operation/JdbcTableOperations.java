@@ -677,15 +677,19 @@ public abstract class JdbcTableOperations implements TableOperation {
    * value and nullability changes to it in the same alter request are applied. Dialects that
    * regenerate the whole column definition for one change use it, so that the regenerated
    * definition does not revert another change to the same column. A NULL default conflicts with NOT
-   * NULL, so it is dropped when the column ends up non-nullable.
+   * NULL: the existing NULL default is dropped when the column ends up non-nullable, while a NULL
+   * default requested in the same alter request is rejected.
    *
    * @param column the current column
    * @param changes all changes in the alter request
    * @return the column with the pending default value and nullability
+   * @throws IllegalArgumentException if the request sets a NULL default on a column that ends up
+   *     non-nullable
    */
   protected static JdbcColumn withPendingDefaultValueAndNullability(
       JdbcColumn column, TableChange... changes) {
     Expression defaultValue = column.defaultValue();
+    boolean defaultValueChanged = false;
     boolean nullable = column.nullable();
     for (TableChange change : changes) {
       if (!(change instanceof TableChange.ColumnChange)) {
@@ -697,11 +701,16 @@ public abstract class JdbcTableOperations implements TableOperation {
       }
       if (change instanceof TableChange.UpdateColumnDefaultValue) {
         defaultValue = ((TableChange.UpdateColumnDefaultValue) change).getNewDefaultValue();
+        defaultValueChanged = true;
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         nullable = ((TableChange.UpdateColumnNullability) change).nullable();
       }
     }
     if (!nullable && Literals.NULL.equals(defaultValue)) {
+      Preconditions.checkArgument(
+          !defaultValueChanged,
+          "Column %s cannot have a NULL default value because it is not nullable",
+          column.name());
       defaultValue = DEFAULT_VALUE_NOT_SET;
     }
     return JdbcColumn.builder()

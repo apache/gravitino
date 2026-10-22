@@ -287,6 +287,27 @@ public class TestJdbcTableOperations {
                 new String[] {"col_2"}, Literals.integerLiteral(5)));
     Assertions.assertTrue(pending.nullable());
     Assertions.assertEquals(Literals.NULL, pending.defaultValue());
+
+    // A NULL default requested for a column that ends up not null is rejected.
+    TableChange setNullDefault = TableChange.updateColumnDefaultValue(fieldName, Literals.NULL);
+    for (TableChange[] changes :
+        new TableChange[][] {{setNullDefault, setNotNull}, {setNotNull, setNullDefault}}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> JdbcTableOperations.withPendingDefaultValueAndNullability(column, changes));
+    }
+    JdbcColumn notNullColumn =
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .withDefaultValue(Literals.integerLiteral(5))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            JdbcTableOperations.withPendingDefaultValueAndNullability(
+                notNullColumn, setNullDefault));
   }
 
   private static JdbcColumn[] generateRandomColumn(int minSize, int maxSize) {
