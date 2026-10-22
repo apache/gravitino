@@ -38,7 +38,6 @@ import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.AwsIrsaCredential;
-import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.GCSTokenCredential;
@@ -49,11 +48,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
-<<<<<<< HEAD
-import org.apache.iceberg.flink.FlinkCatalogFactory;
-=======
 import org.apache.gravitino.storage.GCSProperties;
->>>>>>> f55990944 ([#14031] fix(flink-connector): Validate credential providers for Iceberg non-REST backends (#14032))
+import org.apache.iceberg.flink.FlinkCatalogFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,8 +63,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
           S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
           GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
           ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE,
-          OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE,
-          COSTokenCredential.COS_TOKEN_CREDENTIAL_TYPE);
+          OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE);
 
   private final String icebergCatalogName;
   // Mutable copy so credential injection in open() propagates to the inner Iceberg catalog.

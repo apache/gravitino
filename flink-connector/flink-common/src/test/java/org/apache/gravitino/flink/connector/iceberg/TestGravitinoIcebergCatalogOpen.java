@@ -19,15 +19,12 @@
 
 package org.apache.gravitino.flink.connector.iceberg;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
@@ -48,29 +45,11 @@ class TestGravitinoIcebergCatalogOpen {
           "aws-irsa");
 
   @Test
-  void testOpenAllowsAwsIrsaWhenEffectiveCatalogTypeIsRestWithVendedCredentials() {
-    AbstractCatalog innerCatalog = mock(AbstractCatalog.class);
-    TestableIcebergCatalog catalog =
-        new TestableIcebergCatalog(
-            ImmutableMap.of(
-                IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
-                "rest",
-                IcebergPropertiesConstants.ICEBERG_ACCESS_DELEGATION,
-                IcebergPropertiesConstants.ICEBERG_DATA_ACCESS_VENDED_CREDENTIALS),
-            mockGravitinoCatalog(HIVE_BACKEND_WITH_AWS_IRSA),
-            innerCatalog);
-
-    assertDoesNotThrow(catalog::open);
-    verify(innerCatalog).open();
-  }
-
-  @Test
   void testOpenRejectsAwsIrsaWhenEffectiveCatalogTypeIsNotRest() {
     TestableIcebergCatalog catalog =
         new TestableIcebergCatalog(
             ImmutableMap.of(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, "hive"),
-            mockGravitinoCatalog(HIVE_BACKEND_WITH_AWS_IRSA),
-            mock(AbstractCatalog.class));
+            mockGravitinoCatalog(HIVE_BACKEND_WITH_AWS_IRSA));
 
     assertThrows(CatalogException.class, catalog::open);
   }
@@ -80,8 +59,7 @@ class TestGravitinoIcebergCatalogOpen {
     TestableIcebergCatalog catalog =
         new TestableIcebergCatalog(
             ImmutableMap.of(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, "rest"),
-            mockGravitinoCatalog(HIVE_BACKEND_WITH_AWS_IRSA),
-            mock(AbstractCatalog.class));
+            mockGravitinoCatalog(HIVE_BACKEND_WITH_AWS_IRSA));
 
     assertThrows(CatalogException.class, catalog::open);
   }
@@ -98,12 +76,8 @@ class TestGravitinoIcebergCatalogOpen {
   private static class TestableIcebergCatalog extends GravitinoIcebergCatalog {
 
     private final Catalog gravitinoCatalog;
-    private final AbstractCatalog innerCatalog;
 
-    TestableIcebergCatalog(
-        Map<String, String> icebergProperties,
-        Catalog gravitinoCatalog,
-        AbstractCatalog innerCatalog) {
+    TestableIcebergCatalog(Map<String, String> icebergProperties, Catalog gravitinoCatalog) {
       super(
           "c1",
           "default",
@@ -112,17 +86,11 @@ class TestGravitinoIcebergCatalogOpen {
           icebergProperties,
           icebergProperties);
       this.gravitinoCatalog = gravitinoCatalog;
-      this.innerCatalog = innerCatalog;
     }
 
     @Override
     protected Catalog catalog() {
       return gravitinoCatalog;
-    }
-
-    @Override
-    protected Object createInnerIcebergCatalog(String catalogName, Map<String, String> properties) {
-      return innerCatalog;
     }
 
     @Override

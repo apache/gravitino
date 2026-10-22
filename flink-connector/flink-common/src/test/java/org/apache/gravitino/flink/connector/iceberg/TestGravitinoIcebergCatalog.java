@@ -76,7 +76,7 @@ class TestGravitinoIcebergCatalog {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"s3-token", "gcs-token", "adls-token", "oss-token", "cos-token"})
+  @ValueSource(strings = {"s3-token", "gcs-token", "adls-token", "oss-token"})
   void testCheckCredentialProvidersReturnsTokenProvidersForNonRestBackend(String provider) {
     String upperCaseProvider = provider.toUpperCase(Locale.ROOT);
     Map<String, String> properties =
