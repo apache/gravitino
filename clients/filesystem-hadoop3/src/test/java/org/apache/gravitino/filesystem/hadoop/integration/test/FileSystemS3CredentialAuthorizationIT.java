@@ -21,6 +21,7 @@ package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.s3.fs.S3FileSystemProvider;
@@ -28,7 +29,6 @@ import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.junit.platform.commons.util.StringUtils;
 
 /**
  * GVFS integration test that verifies credential vending with authorization enabled on S3. <br>

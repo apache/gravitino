@@ -16,7 +16,7 @@
  */
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -35,8 +35,9 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -58,22 +59,22 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@HiveFixture
 public class StatisticAuthorizationIT extends BaseRestApiAuthorizationIT {
+
+  @FixtureContainer private HiveContainer hive;
+
   private static final String CATALOG = "catalog_stats";
   private static final String SCHEMA = "schema_stats";
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String hmsUri;
   private static String role = "role_stats";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startHiveContainer();
     super.startIntegrationTest();
     hmsUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
     GravitinoMetalake metalake = client.loadMetalake(METALAKE);
@@ -107,11 +108,11 @@ public class StatisticAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     // normal user can't load table1
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
 
     // grant normal user privilege to use table1
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -143,37 +144,37 @@ public class StatisticAuthorizationIT extends BaseRestApiAuthorizationIT {
     SupportsPartitionStatistics supportsPartitionStatistics = table.supportsPartitionStatistics();
 
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           supportsStatistics.updateStatistics(statistics);
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
 
     List<PartitionStatisticsUpdate> updates =
         Lists.newArrayList(PartitionStatisticsModification.update("p1", statistics));
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           supportsPartitionStatistics.updatePartitionStatistics(updates);
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
 
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           supportsStatistics.dropStatistics(Lists.newArrayList("custom-k1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
 
     List<PartitionStatisticsDrop> drops =
         Lists.newArrayList(
             PartitionStatisticsModification.drop("p1", Lists.newArrayList("custom-k1")));
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           supportsPartitionStatistics.dropPartitionStatistics(drops);
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
 
     // grant normal user owner privilege on table1
     gravitinoMetalake.setOwner(
