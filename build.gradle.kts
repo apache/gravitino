@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import com.autonomousapps.DependencyAnalysisSubExtension
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.NodePlugin
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
@@ -72,6 +73,7 @@ plugins {
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
   alias(libs.plugins.errorprone)
+  alias(libs.plugins.dependency.analysis)
 }
 
 val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
@@ -582,6 +584,23 @@ fun excludePackagesForSparkConnector(project: Project) {
   }
 }
 
+// Issue #14106: "declare what you use", checked by `buildHealth`. Every issue is a warning, so the
+// build never fails on advice; checkBuildHealthBaseline (gradle/build-health.gradle.kts) fails
+// only when a module exceeds its entry in gradle/build-health-baseline.json.
+dependencyAnalysis {
+  issues {
+    all {
+      onAny {
+        severity("warn")
+      }
+      // DAGP mis-attributes test-fixtures usage (open upstream bugs); :common is the only user.
+      ignoreSourceSet("testFixtures")
+    }
+  }
+}
+
+apply(from = "gradle/build-health.gradle.kts")
+
 val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
 
 subprojects {
@@ -597,6 +616,17 @@ subprojects {
 
   apply(plugin = "jacoco")
   apply(plugin = "java")
+  // Container projects without sources (`tasks.all { enabled = false }`) have nothing to analyse.
+  if (project.file("src").isDirectory) {
+    // DAGP analyses a plain `java` project only when it is marked as an app. Registered before
+    // the plugin is applied, so it runs before DAGP's own afterEvaluate hook.
+    afterEvaluate {
+      if (!plugins.hasPlugin("java-library")) {
+        extensions.getByType<DependencyAnalysisSubExtension>().app()
+      }
+    }
+    apply(plugin = "com.autonomousapps.dependency-analysis")
+  }
   if (!isHiveMetastoreLib) {
     apply(plugin = "maven-publish")
   }
@@ -1110,6 +1140,7 @@ tasks.rat {
     "dev/docker/kerberos-hive/kadm5.acl",
     "docs/**/*.md",
     ".claude/**",
+    "gradle/build-health-baseline.json",
     "gradle/wrapper/gradle-wrapper.properties",
     "lineage/src/test/java/org/apache/gravitino/lineage/source/TestLineageOperations.java",
     "spark-connector/spark-common/src/test/resources/**",
