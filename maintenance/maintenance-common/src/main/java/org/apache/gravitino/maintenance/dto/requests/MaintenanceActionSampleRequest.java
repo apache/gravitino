@@ -29,17 +29,12 @@ import org.apache.gravitino.rest.RESTRequest;
  * Spark callback after sampling Iceberg snapshot {@code S0} for a cron maintenance action.
  *
  * <p>Lives in {@code :maintenance:maintenance-common} so the TMS plugin and built-in jobs share one
- * wire type.
+ * wire type. Table and policy ids are not part of this payload: the server loads them from the
+ * in-flight action bound to {@code jobId}.
  */
 @Getter
 @EqualsAndHashCode
 public class MaintenanceActionSampleRequest implements RESTRequest {
-
-  @JsonProperty("tableId")
-  private final Long tableId;
-
-  @JsonProperty("policyId")
-  private final Long policyId;
 
   @JsonProperty("sampledSnapshotId")
   private final Long sampledSnapshotId;
@@ -52,26 +47,18 @@ public class MaintenanceActionSampleRequest implements RESTRequest {
 
   /** Default constructor for Jackson. */
   public MaintenanceActionSampleRequest() {
-    this(null, null, null, null, null);
+    this(null, null, null);
   }
 
   /**
    * Creates a sample callback.
    *
-   * @param tableId table entity id
-   * @param policyId policy entity id
    * @param sampledSnapshotId Iceberg snapshot id at sample time ({@code S0})
    * @param headSnapshotId HEAD snapshot id observed after the sample
    * @param metricsJson serialized metrics for {@code table_snapshot_metrics}
    */
   public MaintenanceActionSampleRequest(
-      Long tableId,
-      Long policyId,
-      Long sampledSnapshotId,
-      Long headSnapshotId,
-      String metricsJson) {
-    this.tableId = tableId;
-    this.policyId = policyId;
+      Long sampledSnapshotId, Long headSnapshotId, String metricsJson) {
     this.sampledSnapshotId = sampledSnapshotId;
     this.headSnapshotId = headSnapshotId;
     this.metricsJson = metricsJson;
@@ -79,8 +66,6 @@ public class MaintenanceActionSampleRequest implements RESTRequest {
 
   @Override
   public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(tableId != null && tableId > 0, "tableId must be positive");
-    Preconditions.checkArgument(policyId != null && policyId > 0, "policyId must be positive");
     Preconditions.checkArgument(sampledSnapshotId != null, "sampledSnapshotId must not be null");
     Preconditions.checkArgument(headSnapshotId != null, "headSnapshotId must not be null");
     Preconditions.checkArgument(

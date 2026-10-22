@@ -30,7 +30,6 @@ import static org.mockito.Mockito.when;
 import java.util.function.LongFunction;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
@@ -76,10 +75,7 @@ class TestTableMaintenanceActionOperations {
         .thenReturn(InJobGateOutcome.continueMaintenance(100L));
 
     Response response =
-        ops.sample(
-            METALAKE,
-            JOB_ID,
-            new MaintenanceActionSampleRequest(TABLE_ID, POLICY_ID, 100L, 100L, "{\"m\":1}"));
+        ops.sample(METALAKE, JOB_ID, new MaintenanceActionSampleRequest(100L, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     MaintenanceActionSampleResponse body = (MaintenanceActionSampleResponse) response.getEntity();
@@ -92,10 +88,7 @@ class TestTableMaintenanceActionOperations {
     when(actions.getByJobId(JOB_ID)).thenReturn(null);
 
     Response response =
-        ops.sample(
-            METALAKE,
-            JOB_ID,
-            new MaintenanceActionSampleRequest(TABLE_ID, POLICY_ID, 100L, 100L, "{\"m\":1}"));
+        ops.sample(METALAKE, JOB_ID, new MaintenanceActionSampleRequest(100L, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(pipeline, never())
@@ -107,10 +100,7 @@ class TestTableMaintenanceActionOperations {
     when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID, /*finishedAt=*/ 9L));
 
     Response response =
-        ops.sample(
-            METALAKE,
-            JOB_ID,
-            new MaintenanceActionSampleRequest(TABLE_ID, POLICY_ID, 100L, 100L, "{\"m\":1}"));
+        ops.sample(METALAKE, JOB_ID, new MaintenanceActionSampleRequest(100L, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(pipeline, never())
@@ -124,29 +114,11 @@ class TestTableMaintenanceActionOperations {
     ops.setHttpRequest(mock(HttpServletRequest.class));
 
     Response response =
-        ops.sample(
-            METALAKE,
-            JOB_ID,
-            new MaintenanceActionSampleRequest(TABLE_ID, POLICY_ID, 100L, 100L, "{\"m\":1}"));
+        ops.sample(METALAKE, JOB_ID, new MaintenanceActionSampleRequest(100L, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     verify(pipeline, never())
         .gateCronJob(anyLong(), anyLong(), anyLong(), anyLong(), anyString(), any());
-  }
-
-  @Test
-  void testSampleMismatchedIdsReturns400() {
-    when(actions.getByJobId(JOB_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
-
-    Response response =
-        ops.sample(
-            METALAKE,
-            JOB_ID,
-            new MaintenanceActionSampleRequest(999L, POLICY_ID, 100L, 100L, "{\"m\":1}"));
-
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
-    ErrorResponse error = (ErrorResponse) response.getEntity();
-    Assertions.assertTrue(error.getMessage().contains("do not match"));
   }
 
   @Test
