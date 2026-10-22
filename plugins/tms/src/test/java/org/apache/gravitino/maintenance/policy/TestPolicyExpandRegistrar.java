@@ -18,8 +18,13 @@
  */
 package org.apache.gravitino.maintenance.policy;
 
+import com.github.kagkarlsson.scheduler.SchedulerClient;
+import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import javax.sql.DataSource;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -84,6 +89,34 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
         () -> SessionUtils.doMultipleWithCommit(() -> writer.sync(100L, true, "not a cron")));
 
     Assertions.assertTrue(reader.scheduledExecutionTime(100L).isEmpty());
+  }
+
+  @TestTemplate
+  void testRunningPoolsLeaveOverdueExpandRowsUnpicked() throws Exception {
+    Instant overdue = Instant.now().minusSeconds(30).truncatedTo(ChronoUnit.MICROS);
+    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    DataSource dataSource = entityStoreDataSource();
+    SessionUtils.doMultipleWithCommit(() -> writer.scheduleAt(11L, overdue));
+
+    SchedulerClient client =
+        SchedulerClient.Builder.create(
+                dataSource, TableMaintenanceSchedulerPools.policyExpandTask())
+            .tableName(TableMaintenanceSchedulerPools.EXPAND_TASKS_TABLE)
+            .build();
+    TaskInstanceId instanceId =
+        TaskInstanceId.of(TableMaintenanceSchedulerPools.POLICY_EXPAND, "11");
+    Instant stored = client.getScheduledExecution(instanceId).orElseThrow().getExecutionTime();
+
+    TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();
+    pools.start(dataSource, TableMaintenanceConfig.forTest(1, 1, 1, 100L, 1_000L, 4, 10));
+    try {
+      Thread.sleep(400L);
+      Assertions.assertFalse(client.getScheduledExecution(instanceId).orElseThrow().isPicked());
+      Assertions.assertEquals(
+          stored, client.getScheduledExecution(instanceId).orElseThrow().getExecutionTime());
+    } finally {
+      pools.stop();
+    }
   }
 
   private static DataSource entityStoreDataSource() {

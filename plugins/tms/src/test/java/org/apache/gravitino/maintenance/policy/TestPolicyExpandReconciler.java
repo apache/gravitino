@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.policy;
 
+import com.github.kagkarlsson.scheduler.task.ExecutionComplete;
+import com.github.kagkarlsson.scheduler.task.ExecutionOperations;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -185,6 +187,39 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
     PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
     new PolicyExpandReconciler(aligner, writer, metalakes, policies).reconcileAll();
     Assertions.assertTrue(reader.scheduledExecutionTime(99L).isEmpty());
+  }
+
+  @TestTemplate
+  void testCompletePickReschedulesEnabledPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE + "_pick");
+    String metalake = METALAKE + "_pick";
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("picked")
+            .withNamespace(NamespaceUtil.ofPolicy(metalake))
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withContent(compaction(CRON))
+            .withEnabled(true)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    PolicyMetaService.getInstance().insertPolicy(policy, false);
+
+    ExecutionOperations<Void> operations = Mockito.mock(ExecutionOperations.class);
+    ExecutionComplete complete = ExecutionComplete.simulatedSuccess(Instant.now());
+    PolicyExpandLifecycleHook.completePick(Long.toString(policy.id()), complete, operations);
+
+    Mockito.verify(operations)
+        .reschedule(Mockito.eq(complete), Mockito.argThat(due -> due.isAfter(Instant.now())));
+    Mockito.verify(operations, Mockito.never()).remove();
+  }
+
+  @TestTemplate
+  void testCompletePickRemovesMissingPolicy() {
+    ExecutionOperations<Void> operations = Mockito.mock(ExecutionOperations.class);
+    ExecutionComplete complete = ExecutionComplete.simulatedSuccess(Instant.now());
+    PolicyExpandLifecycleHook.completePick("424242", complete, operations);
+    Mockito.verify(operations).remove();
   }
 
   private static DataSource entityStoreDataSource() {

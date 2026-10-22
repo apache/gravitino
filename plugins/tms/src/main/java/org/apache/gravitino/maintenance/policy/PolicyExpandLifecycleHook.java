@@ -18,14 +18,20 @@
  */
 package org.apache.gravitino.maintenance.policy;
 
+import com.github.kagkarlsson.scheduler.task.ExecutionComplete;
+import com.github.kagkarlsson.scheduler.task.ExecutionOperations;
 import java.time.Instant;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
+import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,6 +115,48 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
     registrar.scheduleAt(policy.id(), expectedNext);
   }
 
+  /**
+   * Finishes one pick of {@code policy-expand}.
+   *
+   * <p>Reloads the policy and either removes the row or moves it to the next cron fire. An empty
+   * completion would leave the row picked, and db-scheduler then rejects alter and delete of that
+   * policy.
+   *
+   * @param instanceId db-scheduler task instance id, the policy id
+   * @param complete the pick that just finished
+   * @param operations completion actions for that pick
+   */
+  public static void completePick(
+      String instanceId, ExecutionComplete complete, ExecutionOperations<Void> operations) {
+    long policyId;
+    try {
+      policyId = Long.parseLong(instanceId);
+    } catch (NumberFormatException ignored) {
+      operations.remove();
+      return;
+    }
+    PolicyEntity policy = findPolicy(policyId);
+    if (policy == null || !isMaintenance(policy.content())) {
+      operations.remove();
+      return;
+    }
+    String trigger = timeTrigger(policy.content());
+    if (!policy.enabled() || trigger == null || trigger.isBlank()) {
+      operations.remove();
+      return;
+    }
+    try {
+      operations.reschedule(complete, PolicyExpandRegistrar.nextExecution(trigger));
+    } catch (IllegalArgumentException e) {
+      LOG.error(
+          "Removing policy-expand {} after invalid timeTrigger on policy {}",
+          policyId,
+          policy.name(),
+          e);
+      operations.remove();
+    }
+  }
+
   private void syncExpandRow(PolicyEntity policy) {
     if (!isMaintenance(policy.content())) {
       registrar.remove(policy.id());
@@ -128,6 +176,21 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
       }
     }
     return false;
+  }
+
+  @Nullable
+  private static PolicyEntity findPolicy(long policyId) {
+    MetalakeMetaService metalakes = MetalakeMetaService.getInstance();
+    PolicyMetaService policies = PolicyMetaService.getInstance();
+    for (BaseMetalake metalake : metalakes.listMetalakes()) {
+      for (PolicyEntity policy :
+          policies.listPoliciesByNamespace(NamespaceUtil.ofPolicy(metalake.name()))) {
+        if (policy.id() == policyId) {
+          return policy;
+        }
+      }
+    }
+    return null;
   }
 
   @Nullable

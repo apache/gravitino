@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.policy;
 
 import com.github.kagkarlsson.scheduler.SchedulerClient;
+import com.github.kagkarlsson.scheduler.exceptions.TaskInstanceCurrentlyExecutingException;
 import com.github.kagkarlsson.scheduler.task.ExecutionComplete;
 import com.github.kagkarlsson.scheduler.task.TaskInstance;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
@@ -42,6 +43,8 @@ import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Registers {@code policy-expand} tasks in {@link
@@ -58,6 +61,14 @@ import org.apache.gravitino.storage.relational.session.SqlSessions;
  * together.
  */
 public final class PolicyExpandRegistrar {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandRegistrar.class);
+
+  /** Attempts while a pick still owns the expand row. */
+  private static final int EXECUTING_ATTEMPTS = 10;
+
+  /** Pause between attempts, so a short pick can finish inside the policy transaction. */
+  private static final long EXECUTING_WAIT_MS = 50L;
 
   private final DataSource dataSource;
 
@@ -120,18 +131,7 @@ public final class PolicyExpandRegistrar {
    */
   @VisibleForTesting
   void scheduleAt(long policyId, Instant due) {
-    TaskInstanceId instanceId = instanceId(policyId);
-    boolean scheduled =
-        client()
-            .schedule(
-                new TaskInstance<>(
-                    TableMaintenanceSchedulerPools.POLICY_EXPAND, instanceId.getId()),
-                due,
-                SchedulerClient.ScheduleOptions.WHEN_EXISTS_RESCHEDULE);
-    if (!scheduled) {
-      throw new IllegalStateException(
-          "Failed to schedule policy-expand instance " + instanceId.getId() + " at " + due);
-    }
+    runDespiteExecution(() -> scheduleOnce(policyId, due));
   }
 
   /**
@@ -191,10 +191,60 @@ public final class PolicyExpandRegistrar {
     return TaskInstanceId.of(TableMaintenanceSchedulerPools.POLICY_EXPAND, Long.toString(policyId));
   }
 
+  private void scheduleOnce(long policyId, Instant due) {
+    TaskInstanceId instanceId = instanceId(policyId);
+    boolean scheduled =
+        client()
+            .schedule(
+                new TaskInstance<>(
+                    TableMaintenanceSchedulerPools.POLICY_EXPAND, instanceId.getId()),
+                due,
+                SchedulerClient.ScheduleOptions.WHEN_EXISTS_RESCHEDULE);
+    if (!scheduled) {
+      throw new IllegalStateException(
+          "Failed to schedule policy-expand instance " + instanceId.getId() + " at " + due);
+    }
+  }
+
   private void cancelIfPresent(TaskInstanceId instanceId) {
-    SchedulerClient client = client();
-    if (client.getScheduledExecution(instanceId).isPresent()) {
-      client.cancel(instanceId);
+    runDespiteExecution(
+        () -> {
+          SchedulerClient client = client();
+          if (client.getScheduledExecution(instanceId).isPresent()) {
+            client.cancel(instanceId);
+          }
+        });
+  }
+
+  /**
+   * Retries while db-scheduler reports the expand row as picked.
+   *
+   * <p>A pick rejects both reschedule and cancel. Failing the attempt here would roll the policy
+   * transaction back. After the retry window the in-flight execution applies the committed policy
+   * from {@link PolicyExpandLifecycleHook#completePick}.
+   *
+   * @param action one scheduler write
+   */
+  private static void runDespiteExecution(Runnable action) {
+    for (int attempt = 1; ; attempt++) {
+      try {
+        action.run();
+        return;
+      } catch (TaskInstanceCurrentlyExecutingException e) {
+        if (attempt >= EXECUTING_ATTEMPTS) {
+          LOG.warn(
+              "policy-expand row is still executing; leaving the in-flight pick to apply the policy",
+              e);
+          return;
+        }
+        try {
+          Thread.sleep(EXECUTING_WAIT_MS);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          e.addSuppressed(interrupted);
+          throw e;
+        }
+      }
     }
   }
 
