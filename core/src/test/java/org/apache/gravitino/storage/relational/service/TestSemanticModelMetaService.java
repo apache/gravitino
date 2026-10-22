@@ -52,6 +52,9 @@ import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.CustomExtension;
 import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.DialectExpression;
+import org.apache.gravitino.semantic.Expression;
+import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
@@ -59,6 +62,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
@@ -306,6 +310,11 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
 
     assertEquals(0, countSemanticModelIdentities(semanticModel.id()));
     assertTrue(listSemanticModelVersions(semanticModel.id()).isEmpty());
+    assertTrue(
+        SessionUtils.getWithoutCommit(
+                SemanticModelMetricMapper.class,
+                mapper -> mapper.selectSemanticModelMetricsByModelIdForUpdate(semanticModel.id()))
+            .isEmpty());
   }
 
   @TestTemplate
@@ -362,6 +371,11 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     Map<Integer, VersionState> versions = listSemanticModelVersions(original.id());
     assertEquals(1, versions.size());
     assertTrue(versions.get(1).deletedAt > 0L);
+    assertTrue(
+        SessionUtils.getWithoutCommit(
+                SemanticModelMetricMapper.class,
+                mapper -> mapper.selectSemanticModelMetricsByModelIdForUpdate(original.id()))
+            .isEmpty());
   }
 
   @TestTemplate
@@ -496,7 +510,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     int deleted =
         SemanticModelMetaService.getInstance()
             .deleteSemanticModelMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 100);
-    assertEquals(4, deleted);
+    assertEquals(7, deleted);
     assertEquals(0, listSemanticModelVersions(finalCurrent.id()).size());
     assertEquals(0, countSemanticModelIdentities(finalCurrent.id()));
   }
@@ -516,6 +530,22 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
                       Dataset.builder()
                           .withName(datasetName)
                           .withSource(NameIdentifier.of("sales", "mart", datasetName))
+                          .build()
+                    })
+                .withMetrics(
+                    new Metric[] {
+                      Metric.builder()
+                          .withName("metric_" + datasetName)
+                          .withExpression(
+                              Expression.builder()
+                                  .withDialects(
+                                      new DialectExpression[] {
+                                        DialectExpression.builder()
+                                            .withDialect("ansi")
+                                            .withExpression("COUNT(*)")
+                                            .build()
+                                      })
+                                  .build())
                           .build()
                     })
                 .withCustomExtensions(
@@ -576,6 +606,12 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
                         SemanticModelVersionInfoMapper.class,
                         mapper ->
                             mapper.softDeleteSemanticModelVersionsBySchemaIds(
+                                List.of(observedSchemaPO.getSchemaId()))),
+                () ->
+                    SessionUtils.doWithoutCommit(
+                        SemanticModelMetricMapper.class,
+                        mapper ->
+                            mapper.softDeleteSemanticModelMetricsBySchemaIds(
                                 List.of(observedSchemaPO.getSchemaId()))));
             return null;
           } catch (Throwable throwable) {
