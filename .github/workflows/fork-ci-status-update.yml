@@ -29,8 +29,12 @@ on:
         required: false
         type: string
 permissions: {}
+# A group keeps only one pending run, so each PR signal gets its own group: a burst of
+# signals must not cancel each other. Sweeps share one group.
 concurrency:
-  group: fork-ci-status-update
+  group: >-
+    fork-ci-status-update-${{ github.event.workflow_run.name == 'Fork CI PR Signal' &&
+    github.event.workflow_run.head_sha || 'sweep' }}
   cancel-in-progress: false
 jobs:
   update:
