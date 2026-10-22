@@ -28,9 +28,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobHandle;
@@ -206,58 +208,60 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
       try (MaintenanceActionHttpClient client =
           MaintenanceActionHttpClient.fromUpdaterOptions(updaterOptions)) {
+        // All tables in this batch are already bound to jobId; close every soft slot even when a
+        // procedure fails or we never reach a later table.
+        Set<Long> finishedTables = new HashSet<>();
         try {
           for (TableTarget table : tables) {
-            SnapshotSample lastBefore = null;
             SnapshotSample lastAfter = null;
-            for (MaintenanceType type : types) {
-              SnapshotSample s0 =
-                  sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
-              lastBefore = s0;
-              reportBeforeQuietly(client, jobId, table.tableId, s0, /*finish=*/ false);
+            try {
+              for (MaintenanceType type : types) {
+                SnapshotSample s0 =
+                    sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
+                reportBeforeQuietly(client, jobId, table.tableId, s0, /*finish=*/ false);
 
-              if (s0.snapshotId != s0.headSnapshotId) {
-                LOG.info(
-                    "TMS type {} skipped for job {} table {} due to snapshot drift (s0={} head={})",
-                    type.wireName,
-                    jobId,
-                    table.tableId,
-                    s0.snapshotId,
-                    s0.headSnapshotId);
-                continue;
+                if (s0.snapshotId != s0.headSnapshotId) {
+                  LOG.info(
+                      "TMS type {} skipped for job {} table {} due to snapshot drift (s0={} head={})",
+                      type.wireName,
+                      jobId,
+                      table.tableId,
+                      s0.snapshotId,
+                      s0.headSnapshotId);
+                  continue;
+                }
+
+                if (!MaintenanceTriggerGate.shouldMaintain(type, argMap, s0.metricsJson)) {
+                  LOG.info(
+                      "TMS type {} skipped for job {} table {} due to in-Spark recommend skip",
+                      type.wireName,
+                      jobId,
+                      table.tableId);
+                  continue;
+                }
+
+                runProcedure(spark, type, table.catalogName, table.tableIdentifier, argMap);
+                SnapshotSample s1 =
+                    sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
+                lastAfter = s1;
+                reportAfterQuietly(client, jobId, table.tableId, s1, /*finish=*/ false);
               }
-
-              if (!MaintenanceTriggerGate.shouldMaintain(type, argMap, s0.metricsJson)) {
-                LOG.info(
-                    "TMS type {} skipped for job {} table {} due to in-Spark recommend skip",
-                    type.wireName,
-                    jobId,
-                    table.tableId);
-                continue;
-              }
-
-              runProcedure(spark, type, table.catalogName, table.tableIdentifier, argMap);
-              SnapshotSample s1 =
-                  sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
-              lastAfter = s1;
-              reportAfterQuietly(client, jobId, table.tableId, s1, /*finish=*/ false);
-            }
-            // Close soft slot without re-writing metrics (finish API).
-            if (lastAfter != null) {
-              finishQuietly(client, jobId, table.tableId, lastAfter.snapshotId);
-            } else if (lastBefore != null) {
-              finishQuietly(client, jobId, table.tableId, /*afterSnapshotId=*/ null);
-            } else {
-              LOG.warn(
-                  "TMS job {} table {} ended without a metrics sample; soft slot left open",
-                  jobId,
-                  table.tableId);
+            } finally {
+              finishQuietly(
+                  client, jobId, table.tableId, lastAfter == null ? null : lastAfter.snapshotId);
+              finishedTables.add(table.tableId);
             }
           }
           return 0;
         } catch (Exception e) {
           LOG.error("TMS Iceberg maintenance failed for job {}", jobId, e);
           return 1;
+        } finally {
+          for (TableTarget table : tables) {
+            if (!finishedTables.contains(table.tableId)) {
+              finishQuietly(client, jobId, table.tableId, /*afterSnapshotId=*/ null);
+            }
+          }
         }
       }
     }
