@@ -37,6 +37,7 @@ public class CredentialUtils {
   public static final Set<String> PATH_BASED_CREDENTIAL_TYPES =
       ImmutableSet.of(
           S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
+          AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE,
           OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE,
           GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
           ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE,
