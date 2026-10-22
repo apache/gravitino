@@ -87,6 +87,12 @@ public interface TableMaintenanceActionMapper {
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt);
 
+  @UpdateProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "backfillAfterSnapshot")
+  int backfillAfterSnapshot(
+      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId);
+
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteById")
   int deleteById(@Param("id") long id);
 

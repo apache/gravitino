@@ -100,6 +100,24 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testGetMetalakeNameByTableId() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_metalake_by_id",
+            AUDIT_INFO);
+    TableMetaService.getInstance().insertTable(table, false);
+
+    Assertions.assertEquals(
+        metalakeName, TableMetaService.getInstance().getMetalakeNameByTableId(table.id()));
+    Assertions.assertNull(TableMetaService.getInstance().getMetalakeNameByTableId(table.id() + 1));
+  }
+
+  @TestTemplate
   public void testLegacyTimelineDeleteKeepsLiveVersionsOfSameTable() throws Exception {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
