@@ -18,14 +18,14 @@
  */
 package org.apache.gravitino.maintenance.web.rest;
 
-import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.MaintenanceMetricsService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 
-/** Registers TMS maintenance-action REST dependencies for Jersey/HK2 injection. */
+/** Registers TMS maintenance metrics REST dependencies for Jersey/HK2 injection. */
 public class TableMaintenanceBinder extends AbstractBinder {
 
   @Override
   protected void configure() {
-    bind(MaintenanceActionManager.create()).to(MaintenanceActionManager.class);
+    bind(MaintenanceMetricsService.create()).to(MaintenanceMetricsService.class);
   }
 }

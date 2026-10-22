@@ -33,11 +33,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.dto.responses.BaseResponse;
-import org.apache.gravitino.maintenance.MaintenanceActionManager;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
-import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionSampleRequest;
-import org.apache.gravitino.maintenance.dto.responses.MaintenanceActionSampleResponse;
-import org.apache.gravitino.maintenance.injob.InJobGateOutcome;
+import org.apache.gravitino.maintenance.MaintenanceMetricsService;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.web.MaintenanceActionOperation;
 import org.apache.gravitino.maintenance.web.TableMaintenanceRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
@@ -45,11 +42,10 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 
 /**
- * Spark callbacks for cron maintenance actions: sample {@code S0} / gate, then finish with optional
- * S1 metrics.
+ * Spark callback that persists snapshot metrics for an in-flight maintenance action.
  *
- * <p>The resource validates the request and delegates to {@link MaintenanceActionManager}. Jersey
- * injects that manager from {@link TableMaintenanceBinder}.
+ * <p>Continue / stop and occupancy release are not handled here: the job decides locally, and
+ * {@code OccupancyGate} reclaims when the Gravitino job is terminal.
  */
 @Path("metalakes/{metalake}/maintenance/actions")
 @Consumes({
@@ -61,77 +57,38 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 @Produces("application/vnd.gravitino.v1+json")
 public class TableMaintenanceActionOperations {
 
-  private final MaintenanceActionManager manager;
+  private final MaintenanceMetricsService metricsService;
 
   @Context private HttpServletRequest httpRequest;
 
   /**
    * Creates the resource.
    *
-   * @param manager sample and finish domain service
+   * @param metricsService metrics report domain service
    */
   @Inject
-  public TableMaintenanceActionOperations(MaintenanceActionManager manager) {
-    this.manager = manager;
+  public TableMaintenanceActionOperations(MaintenanceMetricsService metricsService) {
+    this.metricsService = metricsService;
   }
 
   /**
-   * Persists S0 metrics and returns continue vs stop.
+   * Persists metrics for the action bound to {@code jobId}.
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id bound to the action
-   * @param request sample payload
-   * @return gate outcome
-   */
-  @POST
-  @Path("{jobId}/sample")
-  @Timed(name = "tms-action-sample." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "tms-action-sample", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::RUN_JOB")
-  public Response sample(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("jobId") long jobId,
-      MaintenanceActionSampleRequest request) {
-    return TableMaintenanceRESTUtils.doAs(
-        httpRequest,
-        () -> {
-          if (request == null) {
-            throw new IllegalArgumentException("Request body cannot be null");
-          }
-          request.validate();
-          InJobGateOutcome outcome = manager.sample(metalake, jobId, request);
-          String stopReason = outcome.stopReason() == null ? null : outcome.stopReason().name();
-          return TableMaintenanceRESTUtils.ok(
-              new MaintenanceActionSampleResponse(
-                  outcome.continueMaintenance(),
-                  stopReason,
-                  outcome.sampledSnapshotId(),
-                  outcome.headSnapshotId()));
-        },
-        MaintenanceActionOperation.SAMPLE,
-        jobId,
-        metalake);
-  }
-
-  /**
-   * Optionally persists S1 metrics, then marks the action finished.
-   *
-   * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id bound to the action
-   * @param request finish payload
+   * @param request metrics payload
    * @return empty success response
    */
   @POST
-  @Path("{jobId}/finish")
-  @Timed(name = "tms-action-finish." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "tms-action-finish", absolute = true)
+  @Path("{jobId}/metrics")
+  @Timed(name = "tms-action-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "tms-action-metrics", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::RUN_JOB")
-  public Response finish(
+  public Response reportMetrics(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("jobId") long jobId,
-      MaintenanceActionFinishRequest request) {
+      MaintenanceActionMetricsRequest request) {
     return TableMaintenanceRESTUtils.doAs(
         httpRequest,
         () -> {
@@ -139,10 +96,10 @@ public class TableMaintenanceActionOperations {
             throw new IllegalArgumentException("Request body cannot be null");
           }
           request.validate();
-          manager.finish(metalake, jobId, request);
+          metricsService.reportMetrics(metalake, jobId, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
-        MaintenanceActionOperation.FINISH,
+        MaintenanceActionOperation.REPORT_METRICS,
         jobId,
         metalake);
   }

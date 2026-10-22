@@ -76,7 +76,7 @@ public final class TableMaintenanceRESTUtils {
    *
    * @param httpRequest current request
    * @param action work to run
-   * @param op sample or finish
+   * @param op metrics report operation
    * @param jobId Gravitino job run id
    * @param metalake metalake name
    * @return success or error response
@@ -97,7 +97,7 @@ public final class TableMaintenanceRESTUtils {
   /**
    * Maps a maintenance-action failure to an error response.
    *
-   * @param op sample or finish
+   * @param op metrics report operation
    * @param jobId Gravitino job run id
    * @param metalake metalake name
    * @param e failure
