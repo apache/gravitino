@@ -70,13 +70,13 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Template parameters mirror other Iceberg built-ins: {@code maintenance_type}, {@code
  * updater_options} (Gravitino URI / metalake / auth, same name as update-stats), plus catalog /
- * table / procedure options. A batch may pass {@code tms_tables} (JSON array) so one Spark job
- * covers multiple tables under the same Gravitino job id. The Gravitino job id is discovered at
- * runtime ({@link JobHandle#GRAVITINO_JOB_ID_ENV} or the staging directory name).
+ * table / procedure options. A batch may pass {@code tables} (JSON array) so one Spark job covers
+ * multiple tables under the same Gravitino job id. The Gravitino job id is discovered at runtime
+ * ({@link JobHandle#GRAVITINO_JOB_ID_ENV} or the staging directory name).
  */
-public class TmsIcebergMaintenanceJob implements BuiltInJob {
+public class IcebergMaintenanceJob implements BuiltInJob {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TmsIcebergMaintenanceJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergMaintenanceJob.class);
 
   /** Built-in template name submitted by TMS cron / commit. */
   public static final String NAME =
@@ -88,11 +88,14 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   /** JobConf / CLI key for a commit-chain of wire types ({@code maintenance_types}). */
   public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";
 
+  /** JobConf / CLI key for a single-table run ({@code table_id}). */
+  public static final String TABLE_ID_KEY = "table_id";
+
   /**
-   * JobConf / CLI key for a multi-table batch ({@code tms_tables}): JSON array of {@code table_id},
+   * JobConf / CLI key for a multi-table batch ({@code tables}): JSON array of {@code table_id},
    * {@code catalog_name}, {@code table_identifier}.
    */
-  public static final String TMS_TABLES_KEY = "tms_tables";
+  public static final String TABLES_KEY = "tables";
 
   private static final String VERSION = "v1";
 
@@ -145,8 +148,8 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         .withComment(
             "TMS Iceberg maintenance: S0 sample/gate, procedure dispatch (single or commit-chain),"
                 + " S1 finish")
-        .withExecutable(resolveExecutable(TmsIcebergMaintenanceJob.class))
-        .withClassName(TmsIcebergMaintenanceJob.class.getName())
+        .withExecutable(resolveExecutable(IcebergMaintenanceJob.class))
+        .withClassName(IcebergMaintenanceJob.class.getName())
         .withArguments(buildArguments())
         .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
@@ -250,63 +253,63 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * Resolves one or more table targets. Prefers {@code --tms-tables} JSON when present; otherwise
-   * requires {@code --catalog}, {@code --table}, and {@code --tms-table-id}.
+   * Resolves one or more table targets. Prefers {@code --tables} JSON when present; otherwise
+   * requires {@code --catalog}, {@code --table}, and {@code --table-id}.
    */
   @VisibleForTesting
   static List<TableTarget> resolveTableTargets(Map<String, String> argMap) {
-    String tablesJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("tms-tables"));
+    String tablesJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("tables"));
     if (tablesJson != null && !tablesJson.trim().isEmpty()) {
-      return parseTmsTables(tablesJson);
+      return parseTables(tablesJson);
     }
     String catalogName = argMap.get("catalog");
     String tableIdentifier = argMap.get("table");
     if (catalogName == null || tableIdentifier == null) {
       throw new IllegalArgumentException(
-          "--catalog and --table are required when --tms-tables is omitted");
+          "--catalog and --table are required when --tables is omitted");
     }
-    long tableId = parsePositiveLongArg(argMap.get("tms-table-id"), "tms-table-id");
+    long tableId = parsePositiveLongArg(argMap.get("table-id"), "table-id");
     return ImmutableList.of(new TableTarget(tableId, catalogName, tableIdentifier));
   }
 
   @VisibleForTesting
-  static List<TableTarget> parseTmsTables(String tablesJson) {
+  static List<TableTarget> parseTables(String tablesJson) {
     try {
       List<Map<String, Object>> raw =
           JsonUtils.anyFieldMapper()
               .readValue(tablesJson, new TypeReference<List<Map<String, Object>>>() {});
       if (raw == null || raw.isEmpty()) {
-        throw new IllegalArgumentException("tms_tables must not be empty");
+        throw new IllegalArgumentException("tables must not be empty");
       }
       List<TableTarget> tables = new ArrayList<>(raw.size());
       for (Map<String, Object> entry : raw) {
         if (entry == null) {
-          throw new IllegalArgumentException("tms_tables entry must not be null");
+          throw new IllegalArgumentException("tables entry must not be null");
         }
         Object tableIdObj = entry.get("table_id");
         Object catalogObj = entry.get("catalog_name");
         Object tableObj = entry.get("table_identifier");
         if (tableIdObj == null || catalogObj == null || tableObj == null) {
           throw new IllegalArgumentException(
-              "tms_tables entry requires table_id, catalog_name, table_identifier");
+              "tables entry requires table_id, catalog_name, table_identifier");
         }
         long tableId = Long.parseLong(String.valueOf(tableIdObj));
         if (tableId <= 0) {
-          throw new IllegalArgumentException("tms_tables table_id must be positive: " + tableId);
+          throw new IllegalArgumentException("tables table_id must be positive: " + tableId);
         }
         String catalogName = String.valueOf(catalogObj).trim();
         String tableIdentifier = String.valueOf(tableObj).trim();
         if (catalogName.isEmpty() || tableIdentifier.isEmpty()) {
           throw new IllegalArgumentException(
-              "tms_tables catalog_name and table_identifier must not be blank");
+              "tables catalog_name and table_identifier must not be blank");
         }
         tables.add(new TableTarget(tableId, catalogName, tableIdentifier));
       }
       return tables;
     } catch (JsonProcessingException e) {
-      throw new IllegalArgumentException("tms_tables must be valid JSON: " + e.getMessage(), e);
+      throw new IllegalArgumentException("tables must be valid JSON: " + e.getMessage(), e);
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("tms_tables table_id must be a long", e);
+      throw new IllegalArgumentException("tables table_id must be a long", e);
     }
   }
 
@@ -731,10 +734,10 @@ public class TmsIcebergMaintenanceJob implements BuiltInJob {
         "{{maintenance_type}}",
         "--maintenance-types",
         "{{maintenance_types:-}}",
-        "--tms-table-id",
-        "{{tms_table_id:-}}",
-        "--tms-tables",
-        "{{tms_tables:-}}",
+        "--table-id",
+        "{{table_id:-}}",
+        "--tables",
+        "{{tables:-}}",
         "--updater-options",
         "{{updater_options:-}}",
         "--strategy",

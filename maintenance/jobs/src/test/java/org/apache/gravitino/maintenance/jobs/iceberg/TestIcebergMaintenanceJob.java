@@ -29,17 +29,17 @@ import java.util.Map;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
-import org.apache.gravitino.maintenance.jobs.iceberg.TmsIcebergMaintenanceJob.MaintenanceType;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for {@link TmsIcebergMaintenanceJob}. */
-public class TestTmsIcebergMaintenanceJob {
+/** Unit tests for {@link IcebergMaintenanceJob}. */
+public class TestIcebergMaintenanceJob {
 
   @Test
   public void testTemplateNameAndPlaceholders() {
-    SparkJobTemplate template = new TmsIcebergMaintenanceJob().jobTemplate();
-    assertEquals(TmsIcebergMaintenanceJob.NAME, template.name());
-    assertEquals(TmsIcebergMaintenanceJob.class.getName(), template.className());
+    SparkJobTemplate template = new IcebergMaintenanceJob().jobTemplate();
+    assertEquals(IcebergMaintenanceJob.NAME, template.name());
+    assertEquals(IcebergMaintenanceJob.class.getName(), template.className());
     assertEquals("v1", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
     List<String> args = template.arguments();
     assertTrue(args.contains("--maintenance-type"));
@@ -48,11 +48,11 @@ public class TestTmsIcebergMaintenanceJob {
     assertTrue(args.contains("{{updater_options:-}}"));
     assertFalse(args.contains("--gravitino-job-id"));
     assertFalse(args.contains("{{gravitino_job_id}}"));
-    assertTrue(args.contains("--tms-table-id"));
-    assertTrue(args.contains("{{tms_table_id:-}}"));
-    assertTrue(args.contains("--tms-tables"));
-    assertTrue(args.contains("{{tms_tables:-}}"));
-    assertFalse(args.contains("--tms-policy-id"));
+    assertTrue(args.contains("--table-id"));
+    assertTrue(args.contains("{{table_id:-}}"));
+    assertTrue(args.contains("--tables"));
+    assertTrue(args.contains("{{tables:-}}"));
+    assertFalse(args.contains("--policy-id"));
   }
 
   @Test
@@ -60,9 +60,8 @@ public class TestTmsIcebergMaintenanceJob {
     Map<String, String> single = new HashMap<>();
     single.put("catalog", "iceberg");
     single.put("table", "db.t1");
-    single.put("tms-table-id", "10");
-    List<TmsIcebergMaintenanceJob.TableTarget> one =
-        TmsIcebergMaintenanceJob.resolveTableTargets(single);
+    single.put("table-id", "10");
+    List<IcebergMaintenanceJob.TableTarget> one = IcebergMaintenanceJob.resolveTableTargets(single);
     assertEquals(1, one.size());
     assertEquals(10L, one.get(0).tableId);
     assertEquals("iceberg", one.get(0).catalogName);
@@ -70,11 +69,10 @@ public class TestTmsIcebergMaintenanceJob {
 
     Map<String, String> batch = new HashMap<>();
     batch.put(
-        "tms-tables",
+        "tables",
         "[{\"table_id\":10,\"catalog_name\":\"iceberg\",\"table_identifier\":\"db.t1\"},"
             + "{\"table_id\":11,\"catalog_name\":\"iceberg\",\"table_identifier\":\"db.t2\"}]");
-    List<TmsIcebergMaintenanceJob.TableTarget> many =
-        TmsIcebergMaintenanceJob.resolveTableTargets(batch);
+    List<IcebergMaintenanceJob.TableTarget> many = IcebergMaintenanceJob.resolveTableTargets(batch);
     assertEquals(2, many.size());
     assertEquals(11L, many.get(1).tableId);
     assertEquals("db.t2", many.get(1).tableIdentifier);
@@ -92,7 +90,7 @@ public class TestTmsIcebergMaintenanceJob {
   @Test
   public void testParseMaintenanceTypesChainAndSingle() {
     List<MaintenanceType> chain =
-        TmsIcebergMaintenanceJob.parseMaintenanceTypes(
+        IcebergMaintenanceJob.parseMaintenanceTypes(
             "rewrite_data_files, rewrite_manifests, expire_snapshots", null);
     assertEquals(3, chain.size());
     assertEquals(MaintenanceType.REWRITE_DATA_FILES, chain.get(0));
@@ -100,34 +98,34 @@ public class TestTmsIcebergMaintenanceJob {
     assertEquals(MaintenanceType.EXPIRE_SNAPSHOTS, chain.get(2));
 
     List<MaintenanceType> single =
-        TmsIcebergMaintenanceJob.parseMaintenanceTypes(null, "expire_snapshots");
+        IcebergMaintenanceJob.parseMaintenanceTypes(null, "expire_snapshots");
     assertEquals(List.of(MaintenanceType.EXPIRE_SNAPSHOTS), single);
   }
 
   @Test
   public void testTemplateIncludesMaintenanceTypesPlaceholder() {
-    List<String> args = new TmsIcebergMaintenanceJob().jobTemplate().arguments();
+    List<String> args = new IcebergMaintenanceJob().jobTemplate().arguments();
     assertTrue(args.contains("--maintenance-types"));
     assertTrue(args.contains("{{maintenance_types:-}}"));
   }
 
   @Test
   public void testStubMetricsJson() {
-    String json = TmsIcebergMaintenanceJob.stubMetricsJson("expire_snapshots", 42L);
+    String json = IcebergMaintenanceJob.stubMetricsJson("expire_snapshots", 42L);
     assertTrue(json.contains("expire_snapshots"));
     assertTrue(json.contains("42"));
   }
 
   @Test
   public void testResolveGravitinoJobIdFromEnv() {
-    assertEquals(99L, TmsIcebergMaintenanceJob.resolveGravitinoJobId("99", "/tmp/other"));
+    assertEquals(99L, IcebergMaintenanceJob.resolveGravitinoJobId("99", "/tmp/other"));
   }
 
   @Test
   public void testResolveGravitinoJobIdFromStagingDir() {
     assertEquals(
         42L,
-        TmsIcebergMaintenanceJob.resolveGravitinoJobId(
+        IcebergMaintenanceJob.resolveGravitinoJobId(
             null, "/tmp/gravitino/job-runs/" + JobHandle.JOB_ID_PREFIX + "42"));
   }
 
@@ -135,15 +133,15 @@ public class TestTmsIcebergMaintenanceJob {
   public void testResolveGravitinoJobIdMissing() {
     assertThrows(
         IllegalStateException.class,
-        () -> TmsIcebergMaintenanceJob.resolveGravitinoJobId(null, "/tmp/not-a-job-dir"));
+        () -> IcebergMaintenanceJob.resolveGravitinoJobId(null, "/tmp/not-a-job-dir"));
   }
 
   @Test
   public void testMissingRequiredArgsReturnsError() {
-    assertEquals(1, TmsIcebergMaintenanceJob.run(new String[] {"--catalog", "c"}));
+    assertEquals(1, IcebergMaintenanceJob.run(new String[] {"--catalog", "c"}));
     assertEquals(
         1,
-        TmsIcebergMaintenanceJob.run(
+        IcebergMaintenanceJob.run(
             new String[] {
               "--catalog", "c", "--table", "db.t", "--maintenance-type", "expire_snapshots"
             }));
