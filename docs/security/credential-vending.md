@@ -38,6 +38,8 @@ Gravitino credential vending is used to generate temporary or static credentials
 | `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       |
 | `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       |
 
+If a catalog does not set `credential-providers`, Gravitino infers providers from the credential properties present. The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
+
 ## Build-in Credentials Configurations
 
 ### S3 Credentials
