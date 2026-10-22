@@ -34,18 +34,21 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.maintenance.MaintenanceMetricsService;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.web.MaintenanceActionOperation;
 import org.apache.gravitino.maintenance.web.TableMaintenanceRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 
 /**
- * Spark callbacks for before/after snapshot metrics on an in-flight maintenance action.
+ * Spark callbacks for before/after snapshot metrics and soft-slot finish on an in-flight
+ * maintenance action.
  *
- * <p>Continue / stop stays in the job. Soft-slot release is optional via {@code finish} on the
- * request body.
+ * <p>Continue / stop stays in the job. Soft-slot release is via {@code finish=true} on metrics, or
+ * {@code POST .../finish} when no metrics are written.
  */
 @Path("metalakes/{metalake}/maintenance/actions")
 @Consumes({
@@ -131,7 +134,37 @@ public class TableMaintenanceActionOperations {
         metalake);
   }
 
-  private static void requireBody(MaintenanceActionMetricsRequest request) {
+  /**
+   * Closes the soft slot for one bound table without writing metrics.
+   *
+   * @param metalake metalake name from the request path
+   * @param jobId Gravitino job run id bound to the action
+   * @param request finish payload
+   * @return empty success response
+   */
+  @POST
+  @Path("{jobId}/finish")
+  @Timed(name = "tms-action-finish." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "tms-action-finish", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::RUN_JOB")
+  public Response finishAction(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("jobId") long jobId,
+      MaintenanceActionFinishRequest request) {
+    return TableMaintenanceRESTUtils.doAs(
+        httpRequest,
+        () -> {
+          requireBody(request);
+          metricsService.finishAction(metalake, jobId, request);
+          return TableMaintenanceRESTUtils.ok(new BaseResponse());
+        },
+        MaintenanceActionOperation.FINISH_ACTION,
+        jobId,
+        metalake);
+  }
+
+  private static void requireBody(RESTRequest request) {
     if (request == null) {
       throw new IllegalArgumentException("Request body cannot be null");
     }

@@ -24,5 +24,8 @@ public enum MaintenanceActionOperation {
   REPORT_BEFORE_METRICS,
 
   /** Persist S1 (after-maintenance) snapshot metrics. */
-  REPORT_AFTER_METRICS
+  REPORT_AFTER_METRICS,
+
+  /** Close the soft slot without writing metrics. */
+  FINISH_ACTION
 }
