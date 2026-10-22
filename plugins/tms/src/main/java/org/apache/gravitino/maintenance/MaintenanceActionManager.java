@@ -94,12 +94,13 @@ public class MaintenanceActionManager {
   public InJobGateOutcome sample(
       String metalake, long jobId, MaintenanceActionSampleRequest request) {
     TableMaintenanceActionPO action = loadInFlight(metalake, jobId);
-    requireActionMatchesRequest(action, request.getTableId(), request.getPolicyId());
+    // tableId / policyId come from the in-flight action bound at submit time — Spark discovers
+    // only jobId at runtime and does not pass entity ids in the sample body.
     InJobGateOutcome outcome =
         pipeline.gateCronJob(
             jobId,
-            request.getTableId(),
-            request.getPolicyId(),
+            action.tableId(),
+            action.policyId(),
             request.getSampledSnapshotId(),
             request.getMetricsJson(),
             request::getHeadSnapshotId);
@@ -144,16 +145,6 @@ public class MaintenanceActionManager {
     requireActionInFlight(action);
     requireActionInMetalake(action, metalake);
     return action;
-  }
-
-  private static void requireActionMatchesRequest(
-      TableMaintenanceActionPO action, long tableId, long policyId) {
-    if (!action.tableId().equals(tableId) || !action.policyId().equals(policyId)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "request tableId/policyId (%s/%s) do not match action for job_id=%s (%s/%s)",
-              tableId, policyId, action.jobId(), action.tableId(), action.policyId()));
-    }
   }
 
   /**

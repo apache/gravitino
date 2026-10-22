@@ -112,20 +112,10 @@ components:
     MaintenanceActionSampleRequest:
       type: object
       required:
-        - tableId
-        - policyId
         - sampledSnapshotId
         - headSnapshotId
         - metricsJson
       properties:
-        tableId:
-          type: integer
-          format: int64
-          description: Table entity id
-        policyId:
-          type: integer
-          format: int64
-          description: Policy entity id
         sampledSnapshotId:
           type: integer
           format: int64
@@ -182,8 +172,6 @@ components:
   examples:
     MaintenanceActionSampleRequest:
       value: {
-        "tableId": 1001,
-        "policyId": 2002,
         "sampledSnapshotId": 9001,
         "headSnapshotId": 9001,
         "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5,\"custom-delete-file-number\":3}"
