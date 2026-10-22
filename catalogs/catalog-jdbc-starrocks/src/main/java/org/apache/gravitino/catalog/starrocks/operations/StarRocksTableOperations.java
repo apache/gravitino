@@ -271,7 +271,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         String starRocksIndexType = resultSet.getString("Index_type");
         Index.IndexType indexType = mapStarRocksIndexType(starRocksIndexType);
         if (indexType == null) {
-          LOG.debug(
+          LOG.warn(
               "Skip StarRocks index '{}' on table {}.{} with unsupported type '{}'",
               indexName,
               databaseName,
@@ -647,7 +647,9 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
   /**
    * Maps the {@code Index_type} value of StarRocks {@code SHOW INDEX} to a Gravitino index type.
-   * The value may carry index properties, e.g. {@code GIN("parser" = "english")}.
+   * The value may carry index properties, e.g. {@code GIN("parser" = "english")}; only the type
+   * name is used and the properties are not kept, since StarRocks indexes cannot be created or
+   * altered through Gravitino.
    *
    * @param indexType the {@code Index_type} value returned by StarRocks
    * @return the Gravitino index type, or null if the type has no Gravitino equivalent
