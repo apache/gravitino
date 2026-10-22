@@ -56,6 +56,8 @@ paths:
     $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1metrics~1before"
   /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after:
     $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1metrics~1after"
+  /metalakes/{metalake}/maintenance/actions/{jobId}/finish:
+    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1finish"
 
 components:
   securitySchemes:

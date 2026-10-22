@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance;
 
 import java.util.function.LongFunction;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
@@ -29,10 +30,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Persists before/after snapshot metrics reported by Spark for an in-flight maintenance action.
+ * Persists before/after snapshot metrics and closes soft slots for in-flight maintenance actions.
  *
- * <p>Continue / stop stays in the job. Soft-slot release happens only when the request sets {@code
- * finish=true} (per {@code jobId}/{@code tableId}/{@code policyId}). There is no job-terminal
+ * <p>Continue / stop stays in the job. Soft-slot release happens via {@code finish=true} on metrics
+ * reports, or via {@link #finishAction} when no metrics are needed. There is no job-terminal
  * reclaim path.
  */
 public class MaintenanceMetricsService {
@@ -117,6 +118,30 @@ public class MaintenanceMetricsService {
         "after",
         metalake,
         request.getSnapshotId());
+  }
+
+  /**
+   * Closes the soft slot for one bound table without writing metrics.
+   *
+   * @param metalake metalake name from the request path
+   * @param jobId Gravitino job run id
+   * @param request finish payload ({@code tableId}, optional {@code afterSnapshotId})
+   */
+  public void finishAction(String metalake, long jobId, MaintenanceActionFinishRequest request) {
+    TableMaintenanceActionPO action = loadInFlight(metalake, jobId, request.getTableId());
+    actionMetaService.markFinished(
+        jobId,
+        action.tableId(),
+        action.policyId(),
+        request.getAfterSnapshotId(),
+        System.currentTimeMillis());
+    LOG.info(
+        "TMS action finished for job {} metalake {} table {} policy {} afterSnapshotId={}",
+        jobId,
+        metalake,
+        action.tableId(),
+        action.policyId(),
+        request.getAfterSnapshotId());
   }
 
   private void maybeFinish(

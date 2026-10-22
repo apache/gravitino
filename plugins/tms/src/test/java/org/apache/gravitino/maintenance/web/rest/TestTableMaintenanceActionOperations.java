@@ -31,6 +31,7 @@ import java.util.function.LongFunction;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.maintenance.MaintenanceMetricsService;
+import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
@@ -131,6 +132,29 @@ class TestTableMaintenanceActionOperations {
   void testReportBeforeNullBodyReturns400() {
     Response response = ops.reportBeforeMetrics(METALAKE, JOB_ID, null);
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  void testFinishClosesSoftSlotWithoutMetrics() {
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+
+    Response response =
+        ops.finishAction(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, null));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
+  }
+
+  @Test
+  void testFinishWithAfterSnapshotId() {
+    when(actions.getByJobIdAndTableId(JOB_ID, TABLE_ID)).thenReturn(action(TABLE_ID, POLICY_ID));
+
+    Response response =
+        ops.finishAction(METALAKE, JOB_ID, new MaintenanceActionFinishRequest(TABLE_ID, 300L));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), eq(300L), anyLong());
   }
 
   private TableMaintenanceActionOperations operations(LongFunction<String> lookup) {

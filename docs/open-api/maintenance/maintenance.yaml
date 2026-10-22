@@ -56,6 +56,43 @@ paths:
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/maintenance/actions/{jobId}/finish:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/jobId"
+    post:
+      tags:
+        - maintenance
+      summary: Finish TMS maintenance action soft slot without metrics
+      operationId: finishMaintenanceAction
+      description: |
+        Closes the soft slot for one bound table/policy without writing snapshot metrics.
+        Use when the maintenance type does not sample metrics, or when metrics were already
+        reported and only occupancy release remains. `tableId` is required for multi-table jobs.
+        Optional `afterSnapshotId` sets `after_snapshot_id` when known.
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceActionFinishRequest"
+            examples:
+              MaintenanceActionFinishRequest:
+                $ref: "#/components/examples/MaintenanceActionFinishRequest"
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or maintenance action does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after:
     parameters:
       - $ref: "../openapi.yaml#/components/parameters/metalake"
@@ -129,7 +166,22 @@ components:
           description: |
             When true, close the soft slot for this job/table/policy after storing metrics.
             Before: typically on drift/skip (after_snapshot_id left null). After: typically after
-            successful maintenance (after_snapshot_id = snapshotId).
+            successful maintenance (after_snapshot_id = snapshotId). Prefer POST .../finish when no
+            metrics are written.
+    MaintenanceActionFinishRequest:
+      type: object
+      required:
+        - tableId
+      properties:
+        tableId:
+          type: integer
+          format: int64
+          description: Table entity id bound to this job
+        afterSnapshotId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Optional terminal snapshot id stored as after_snapshot_id
 
   examples:
     MaintenanceActionBeforeMetricsRequest:
@@ -145,4 +197,9 @@ components:
         "snapshotId": 9002,
         "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9002,\"custom-data-file-mse\":0.2}",
         "finish": true
+      }
+    MaintenanceActionFinishRequest:
+      value: {
+        "tableId": 10,
+        "afterSnapshotId": null
       }
