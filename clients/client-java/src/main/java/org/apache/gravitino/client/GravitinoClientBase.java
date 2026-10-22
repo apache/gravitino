@@ -220,15 +220,8 @@ public abstract class GravitinoClientBase implements Closeable {
     }
   }
 
-  /**
-   * Returns the underlying REST client.
-   *
-   * <p>Intended for built-in maintenance jobs and tests that need to call endpoints not yet wrapped
-   * by typed client APIs.
-   *
-   * @return REST client used by this Gravitino client
-   */
-  public RESTClient restClient() {
+  @VisibleForTesting
+  RESTClient restClient() {
     return restClient;
   }
 
