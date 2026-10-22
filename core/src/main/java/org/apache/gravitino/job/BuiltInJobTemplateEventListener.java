@@ -50,6 +50,7 @@ import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.CreateMetalakeEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -67,8 +68,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Event listener that automatically registers built-in job templates when metalakes are created.
  *
- * <p>This listener monitors metalake creation events and registers all discovered built-in job
- * templates (via JobTemplateProvider SPI) into the newly created metalake. It also handles
+ * <p>This listener monitors metalake creation and enablement events and registers all discovered
+ * built-in job templates (via JobTemplateProvider SPI) into the metalake. It also handles
  * registration for existing metalakes on first startup.
  */
 public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
@@ -173,14 +174,17 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
 
   @Override
   public void onPostEvent(Event postEvent) throws RuntimeException {
-    if (!(postEvent instanceof CreateMetalakeEvent)) {
+    // Register the templates when a metalake is created, and again when it is enabled: a
+    // registration that runs while the metalake is disabled is skipped. Reconciling is idempotent.
+    if (!(postEvent instanceof CreateMetalakeEvent)
+        && !(postEvent instanceof EnableMetalakeEvent)) {
       return;
     }
 
-    CreateMetalakeEvent event = (CreateMetalakeEvent) postEvent;
-    String metalakeName = event.identifier().name();
-    // Capture the id of the created metalake now. By the time the registration runs, the metalake
-    // may be renamed, or dropped and re-created under the same name, so it is looked up by id.
+    String metalakeName = postEvent.identifier().name();
+    String user = postEvent.user();
+    // Capture the id of the metalake now. By the time the registration runs, the metalake may be
+    // renamed, or dropped and re-created under the same name, so it is looked up by id.
     Optional<Long> metalakeId = loadMetalakeId(metalakeName);
     if (!metalakeId.isPresent()) {
       return;
@@ -188,7 +192,7 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
 
     try {
       registrationExecutor.execute(
-          () -> registerBuiltInJobTemplates(metalakeId.get(), metalakeName, event.user()));
+          () -> registerBuiltInJobTemplates(metalakeId.get(), metalakeName, user));
     } catch (RejectedExecutionException e) {
       LOG.warn(
           "Skip registering built-in job templates for metalake {} since the listener is stopped, "
@@ -317,11 +321,11 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
     }
   }
 
-  private void registerBuiltInJobTemplates(long metalakeId, String createdName, String creator) {
+  private void registerBuiltInJobTemplates(long metalakeId, String eventName, String user) {
     try {
       Map<String, JobTemplate> builtInTemplates = loadBuiltInJobTemplates();
       if (builtInTemplates.isEmpty()) {
-        LOG.debug("No built-in job templates to register for metalake: {}", createdName);
+        LOG.debug("No built-in job templates to register for metalake: {}", eventName);
         return;
       }
 
@@ -334,23 +338,39 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
             if (!currentName.isPresent()) {
               LOG.info(
                   "Skip registering built-in job templates for metalake {} since it was dropped",
-                  createdName);
+                  eventName);
               return null;
             }
 
-            // The registration thread has no caller principal. Run as the user who created the
-            // metalake, so the templates record that user as the creator.
-            PrincipalUtils.doAs(
-                new UserPrincipal(creator),
+            // Disabling or enabling a metalake takes its write lock, so it stays in the same state
+            // while its templates are registered.
+            NameIdentifier ident = NameIdentifierUtil.ofMetalake(currentName.get());
+            return TreeLockUtils.doWithTreeLock(
+                ident,
+                LockType.READ,
                 () -> {
-                  reconcileBuiltInJobTemplates(currentName.get(), builtInTemplates);
+                  if (!MetalakeManager.metalakeInUse(entityStore, ident)) {
+                    LOG.info(
+                        "Skip registering built-in job templates for metalake {} since it is "
+                            + "disabled, they will be registered when it is enabled",
+                        currentName.get());
+                    return null;
+                  }
+
+                  // The registration thread has no caller principal. Run as the user from the
+                  // event, so the templates record that user as the creator.
+                  PrincipalUtils.doAs(
+                      new UserPrincipal(user),
+                      () -> {
+                        reconcileBuiltInJobTemplates(currentName.get(), builtInTemplates);
+                        return null;
+                      });
+                  LOG.info("Registered built-in job templates for metalake: {}", currentName.get());
                   return null;
                 });
-            LOG.info("Registered built-in job templates for metalake: {}", currentName.get());
-            return null;
           });
     } catch (Exception e) {
-      LOG.error("Failed to register built-in job templates for metalake: {}", createdName, e);
+      LOG.error("Failed to register built-in job templates for metalake: {}", eventName, e);
     }
   }
 

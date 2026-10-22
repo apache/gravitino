@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -55,6 +56,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.listener.api.event.CreateMetalakeEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.info.MetalakeInfo;
 import org.apache.gravitino.lock.LockManager;
@@ -65,6 +67,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -224,6 +227,33 @@ public class TestBuiltInJobTemplateEventListener {
 
     verify(jobManager, times(0)).listJobTemplates(any());
     verify(jobManager, times(0)).registerJobTemplate(any(), any());
+  }
+
+  @Test
+  public void testRegistrationSkipsDisabledMetalakeAndRetriesOnEnable() throws Exception {
+    long metalakeId = createMetalake("metalake_a", true).id();
+    CountDownLatch loadStarted = new CountDownLatch(1);
+    CountDownLatch releaseLoad = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    BuiltInJobTemplateEventListener busyListener =
+        newBlockingListener(loadStarted, releaseLoad, executor);
+    when(jobManager.listJobTemplates(any())).thenReturn(Collections.emptyList());
+
+    busyListener.onPostEvent(createMetalakeEvent("metalake_a"));
+    Assertions.assertTrue(loadStarted.await(30, TimeUnit.SECONDS));
+    // Disable metalake_a before the registration resumes, then wait for the registration to end.
+    replaceMetalake("metalake_a", metalakeId, false);
+    releaseLoad.countDown();
+    executor.submit(() -> {}).get(30, TimeUnit.SECONDS);
+    verify(jobManager, times(0)).registerJobTemplate(any(), any());
+
+    // Enabling metalake_a registers its templates.
+    replaceMetalake("metalake_a", metalakeId, true);
+    busyListener.onPostEvent(
+        new EnableMetalakeEvent("user", NameIdentifierUtil.ofMetalake("metalake_a")));
+    busyListener.stop();
+
+    verify(jobManager, times(1)).registerJobTemplate(eq("metalake_a"), any());
   }
 
   @Test
@@ -657,6 +687,11 @@ public class TestBuiltInJobTemplateEventListener {
     return putMetalake(name, idGenerator.nextId(), inUse);
   }
 
+  private void replaceMetalake(String name, long id, boolean inUse) throws IOException {
+    entityStore.delete(NameIdentifier.of(name), Entity.EntityType.METALAKE);
+    putMetalake(name, id, inUse);
+  }
+
   private BaseMetalake putMetalake(String name, long id, boolean inUse) throws IOException {
     Map<String, String> props = new HashMap<>();
     props.put(PROPERTY_IN_USE, String.valueOf(inUse));
@@ -706,6 +741,14 @@ public class TestBuiltInJobTemplateEventListener {
    */
   private BuiltInJobTemplateEventListener newBlockingListener(
       CountDownLatch firstLoadStarted, CountDownLatch releaseFirstLoad) {
+    return newBlockingListener(
+        firstLoadStarted, releaseFirstLoad, Executors.newSingleThreadExecutor());
+  }
+
+  private BuiltInJobTemplateEventListener newBlockingListener(
+      CountDownLatch firstLoadStarted,
+      CountDownLatch releaseFirstLoad,
+      ExecutorService registrationExecutor) {
     ShellJobTemplate template =
         ShellJobTemplate.builder()
             .withName("builtin-test")
@@ -714,7 +757,7 @@ public class TestBuiltInJobTemplateEventListener {
             .build();
     AtomicInteger loads = new AtomicInteger();
     return new BuiltInJobTemplateEventListener(
-        jobManager, entityStore, idGenerator, Executors.newSingleThreadExecutor()) {
+        jobManager, entityStore, idGenerator, registrationExecutor) {
       @Override
       Map<String, JobTemplate> loadBuiltInJobTemplates() {
         if (loads.incrementAndGet() == 1) {
