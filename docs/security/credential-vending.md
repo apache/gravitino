@@ -20,7 +20,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 | JDBC         | JDBC user and password          |
 | Paimon       | S3, OSS, JDBC user and password |
 
-S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs.
+S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
 
 ## Quick Start
 
@@ -130,11 +130,14 @@ If a catalog does not set `credential-providers`, Gravitino infers providers fro
 | `s3-access-key-id` and `s3-secret-access-key`                | `s3-secret-key`     |
 | `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
 | `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
+| `cos-access-key-id` and `cos-secret-access-key`              | `cos-secret-key`    |
 | `gcs-service-account-file`                                   | `gcs-token`         |
 | `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
 | `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
 
 JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc-password`.
+
+The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
 
 Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
 
@@ -227,7 +230,7 @@ For Gravitino running on EKS. Instead of an access key, Gravitino uses its pod's
 | `s3-token-expire-in-secs`   | Session lifetime of the vended credentials. Cannot exceed the role's maximum session duration.                                            | 3600          | No       |
 | `s3-token-service-endpoint` | Alternative STS endpoint, for S3-compatible storage.                                                                                      | (none)        | No       |
 
-For path-based requests, Gravitino always scopes the credentials with a session policy covering the requested data, metadata, and write locations. Catalog-level requests do not include a session policy and inherit the selected role's permissions. The role is selected from `s3-role-arn` when configured, or from the pod's `AWS_ROLE_ARN` otherwise.
+For path-based requests, Gravitino always scopes the credentials with a session policy covering the requested data, metadata, and write locations. Catalog-level requests do not vend `aws-irsa` credentials because they provide no paths for a session policy. The role is selected from `s3-role-arn` when configured, or from the pod's `AWS_ROLE_ARN` otherwise.
 
 The selected role needs the same permission policy as `s3-token` above. Its trust policy must allow `sts:AssumeRoleWithWebIdentity` from the pod's Kubernetes service account identity.
 
@@ -472,7 +475,7 @@ For a catalog, `{type}` is `catalog` and `{full_name}` is the catalog name:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
-The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed.
+The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed. These credentials are catalog-level and are not refreshed: token providers such as `s3-token` vend nothing at catalog level, and `aws-irsa` credentials expire after `s3-token-expire-in-secs`.
 
 ### Read or Write Scope
 

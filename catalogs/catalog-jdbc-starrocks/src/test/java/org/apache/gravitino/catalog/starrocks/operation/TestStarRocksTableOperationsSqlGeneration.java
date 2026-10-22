@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.starrocks.operation;
 
 import java.sql.Connection;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.StringIdentifier;
@@ -29,6 +30,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.ConnectionCountingDataSource;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTableOperations;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -49,14 +51,22 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
   private static class TestableStarRocksTableOperations extends StarRocksTableOperations {
 
+    private final String[] columnNames;
+
     public TestableStarRocksTableOperations() {
+      this(new String[0]);
+    }
+
+    private TestableStarRocksTableOperations(String... columnNames) {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new StarRocksTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+      this.columnNames = columnNames;
     }
 
-    private TestableStarRocksTableOperations(ConnectionCountingDataSource connections) {
-      this();
+    private TestableStarRocksTableOperations(
+        ConnectionCountingDataSource connections, String... columnNames) {
+      this(columnNames);
       dataSource = connections.dataSource();
     }
 
@@ -95,6 +105,15 @@ public class TestStarRocksTableOperationsSqlGeneration {
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
       return JdbcTable.builder()
           .withName(tableName)
+          .withColumns(
+              Arrays.stream(columnNames)
+                  .map(
+                      name ->
+                          JdbcColumn.builder()
+                              .withName(name)
+                              .withType(Types.IntegerType.get())
+                              .build())
+                  .toArray(JdbcColumn[]::new))
           .withComment(
               StringIdentifier.addToComment(StringIdentifier.fromId(42), "existing comment"))
           .build();
@@ -278,6 +297,23 @@ public class TestStarRocksTableOperationsSqlGeneration {
             "COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
                 + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
         clearCommentSql);
+    Assertions.assertEquals(
+        clearCommentSql, ops.alterTableSql("test_table", TableChange.updateComment(null)));
+  }
+
+  @Test
+  public void testClearTableCommentWithNull() {
+    TestableStarRocksTableOperations ops =
+        new TestableStarRocksTableOperations() {
+          @Override
+          protected JdbcTable getOrCreateTable(
+              String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+            return JdbcTable.builder().withName(tableName).build();
+          }
+        };
+
+    String alterSql = ops.alterTableSql("test_table", TableChange.updateComment(null));
+    Assertions.assertTrue(alterSql.contains("COMMENT = \"\""), alterSql);
   }
 
   @Test
@@ -292,5 +328,122 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     Assertions.assertTrue(alterSql.contains("ADD COLUMN `col2`"), alterSql);
     Assertions.assertTrue(alterSql.contains("COMMENT 'owner\\\\''s \"comment\"; --'"), alterSql);
+  }
+
+  @Test
+  void testSetPropertyEscapesKeyAndValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.setProperty(
+                "dynamic_partition.key\"name", "owner's \"comment\" C:\\tmp\"); --"));
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\n"
+            + "set ( \"dynamic_partition.key\"\"name\" = \"owner's \"\"comment\"\" C:\\\\tmp\"\"); --\" );",
+        sql);
+  }
+
+  @Test
+  public void testAddColumnWithNotNullAndDefaultValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"created_at"},
+                Types.TimestampType.withoutTimeZone(),
+                "create time",
+                TableChange.ColumnPosition.after("id"),
+                false,
+                false,
+                Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP));
+
+    Assertions.assertTrue(
+        alterSql.contains(
+            "ADD COLUMN `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP "
+                + "COMMENT 'create time' AFTER `id`"),
+        alterSql);
+  }
+
+  @Test
+  public void testAddNullableColumnWithStringDefaultValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"col2"},
+                Types.VarCharType.of(10),
+                null,
+                TableChange.ColumnPosition.after("col1"),
+                true,
+                false,
+                Literals.of("abc", Types.VarCharType.of(10))));
+
+    Assertions.assertTrue(
+        alterSql.contains("ADD COLUMN `col2` varchar(10) NULL DEFAULT 'abc' AFTER `col1`"),
+        alterSql);
+  }
+
+  @Test
+  public void testAddAutoIncrementColumnIsRejected() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.addColumn(
+                        new String[] {"col2"},
+                        Types.LongType.get(),
+                        null,
+                        TableChange.ColumnPosition.defaultPos(),
+                        false,
+                        true)));
+
+    Assertions.assertEquals(
+        "StarRocks does not support adding an auto-increment column: col2", exception.getMessage());
+  }
+
+  @Test
+  void testRenameColumnQuotesIdentifiers() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations("id", "order-id");
+
+    String alterSql =
+        ops.alterTableSql("test_table", TableChange.renameColumn(new String[] {"order-id"}, "key"));
+
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\nRENAME COLUMN `order-id` TO `key`;", alterSql);
+  }
+
+  @Test
+  void testDeleteMissingColumnIfExistsSkipsAlter() {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableStarRocksTableOperations ops =
+        new TestableStarRocksTableOperations(connections, "id", "col1");
+    TableChange deleteMissing = TableChange.deleteColumn(new String[] {"missing"}, true);
+
+    Assertions.assertEquals("", ops.alterTableSql("test_table", deleteMissing));
+
+    ops.alterTable("database", "test_table", deleteMissing);
+    Assertions.assertTrue(connections.executedSql().isEmpty());
+  }
+
+  @Test
+  void testDeleteMissingColumnIfExistsWithOtherChanges() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations("id", "col1");
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.deleteColumn(new String[] {"missing"}, true),
+            TableChange.deleteColumn(new String[] {"col1"}, false));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nDROP COLUMN `col1`;", alterSql);
   }
 }

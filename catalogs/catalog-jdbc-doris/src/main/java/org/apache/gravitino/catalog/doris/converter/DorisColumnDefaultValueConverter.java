@@ -90,6 +90,44 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
   }
 
   /**
+   * Converts a CREATE TABLE default value to Doris SQL.
+   *
+   * <p>Doris 2.1 and later keep the text of a string default unchanged when the table is created
+   * and parse it again as a double-quoted literal when a row takes the default, so string defaults
+   * must use that form there. Earlier versions decode the literal when the table is created and use
+   * the shared single-quoted form.
+   *
+   * @param defaultValue the Gravitino default value
+   * @param useDoubleQuotedLiteral whether string literals use double quotes with backslash escapes
+   * @return the Doris SQL representation, or {@code null} when the default is unset
+   */
+  @Nullable
+  public String fromGravitinoForCreateTable(
+      Expression defaultValue, boolean useDoubleQuotedLiteral) {
+    if (useDoubleQuotedLiteral && isNonNullStringLiteral(defaultValue)) {
+      return quoteDorisLiteral(String.valueOf(((Literal<?>) defaultValue).value()), false, false);
+    }
+    return super.fromGravitino(defaultValue);
+  }
+
+  /**
+   * Returns whether a default value is a non-null string, varchar or char literal.
+   *
+   * @param defaultValue the Gravitino default value
+   * @return whether the value is a non-null string literal
+   */
+  public static boolean isNonNullStringLiteral(Expression defaultValue) {
+    if (!(defaultValue instanceof Literal)) {
+      return false;
+    }
+    Literal<?> literal = (Literal<?>) defaultValue;
+    return literal.value() != null
+        && (literal.dataType() instanceof Types.StringType
+            || literal.dataType() instanceof Types.VarCharType
+            || literal.dataType() instanceof Types.FixedCharType);
+  }
+
+  /**
    * Converts a loaded default value for a Doris MODIFY COLUMN definition.
    *
    * <p>String literals containing quote or backslash characters need Doris-specific escaping.

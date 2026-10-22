@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValue
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -49,6 +48,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -65,6 +65,8 @@ import org.apache.gravitino.rel.types.Types;
 /** Table operations for MySQL. */
 public class MysqlTableOperations extends JdbcTableOperations {
 
+  private static final MysqlTablePropertiesMetadata TABLE_PROPERTIES_METADATA =
+      new MysqlTablePropertiesMetadata();
   private static final String BACK_QUOTE = "`";
   private static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
@@ -134,7 +136,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     if (MapUtils.isNotEmpty(properties)) {
       sqlBuilder.append(
           properties.entrySet().stream()
-              .map(entry -> String.format("%s = %s", entry.getKey(), entry.getValue()))
+              .map(entry -> generateTableProperty(entry.getKey(), entry.getValue()))
               .collect(Collectors.joining(",\n", "\n", "")));
     }
 
@@ -439,7 +441,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -578,9 +580,22 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
     return setProperties.stream()
         .map(
-            setProperty ->
-                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
+            setProperty -> generateTableProperty(setProperty.getProperty(), setProperty.getValue()))
         .collect(Collectors.joining(",\n"));
+  }
+
+  private String generateTableProperty(String key, String value) {
+    Map<String, String> logicalProperties =
+        TABLE_PROPERTIES_METADATA.convertFromJdbcProperties(Collections.singletonMap(key, value));
+    Preconditions.checkArgument(
+        !logicalProperties.isEmpty(),
+        "Unsupported MySQL table option: %s. Supported options: %s",
+        key,
+        String.join(", ", MysqlTablePropertiesMetadata.GRAVITINO_CONFIG_TO_MYSQL.values()));
+    String encoded =
+        TABLE_PROPERTIES_METADATA.transformToJdbcProperties(logicalProperties).get(key);
+    Preconditions.checkArgument(encoded != null, "MySQL table option %s cannot be null", key);
+    return key + " = " + encoded;
   }
 
   private String updateColumnCommentFieldDefinition(
@@ -713,12 +728,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append(AFTER).append(afterPosition.getColumn());
+      columnDefinition.append(AFTER).append(quote(afterPosition.getColumn()));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append(AFTER).append(quote(s)));
     }
     return columnDefinition.toString();
   }
@@ -759,6 +774,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withType(column.dataType())
             .withNullable(column.nullable())
             .withComment(column.comment())
+            .withAutoIncrement(column.autoIncrement())
             .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
@@ -777,7 +793,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();

@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.oceanbase.operation;
 
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -306,7 +305,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -608,6 +607,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
             .withType(column.dataType())
             .withNullable(column.nullable())
             .withComment(column.comment())
+            .withAutoIncrement(column.autoIncrement())
             .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
@@ -626,7 +626,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
