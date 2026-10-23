@@ -24,9 +24,15 @@ const requiredAction = note => ({ status: 'completed', conclusion: 'action_requi
 function evaluate(pr, run, jobs, baseSha = pr.base.sha) {
   const required = jobs.find(job => job.name === requiredName(pr, baseSha));
   if (run.status !== 'completed') return { status: 'in_progress', title: 'Fork CI is running' };
-  if (run.conclusion !== 'success') return { status: 'completed',
-    conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
-      ? run.conclusion : 'action_required', title: `Fork CI ${run.conclusion}` };
+  if (run.conclusion !== 'success') {
+    // Fork CI cancels its own run on the first failed job, so report that job, not the cancellation.
+    const failed = jobs.filter(job => ['failure', 'timed_out'].includes(job.conclusion)).map(job => job.name);
+    if (failed.length) return { status: 'completed', conclusion: 'failure',
+      title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
+    return { status: 'completed',
+      conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
+        ? run.conclusion : 'action_required', title: `Fork CI ${run.conclusion}` };
+  }
   if (!required || required.conclusion !== 'success') {
     return requiredAction('The run did not finish Required CI for this exact head, base branch and base SHA. ' +
       'Update the branch and push again, or ask a committer to dispatch a trusted Fork CI run.');
@@ -115,7 +121,11 @@ function createService(github) {
     const trusted = await findRun(pr, true);
     let selected = trusted && (!ordinary || (trusted.run.updated_at || trusted.run.created_at) >= (ordinary.run.updated_at || ordinary.run.created_at) || !sameDefinitions)
       ? trusted : ordinary;
-    if (!selected) return { result: requiredAction('Enable Actions in the fork and push the branch, or dispatch trusted Fork CI.') };
+    // Run listings can lag behind, e.g. right after a push or during GitHub incidents, so keep
+    // waiting instead of asking the author to act.
+    if (!selected) return { result: { status: 'queued', title: 'Waiting for Fork CI',
+      note: 'No Fork CI run was found for this commit yet. If none starts, enable Actions in your fork and push again, ' +
+        'or ask a committer to dispatch trusted Fork CI.' } };
     const { owner, repo, run } = selected;
     if (!selected.trusted && !sameDefinitions) return { ...selected, fork: ordinary?.run,
       result: requiredAction('CI workflow/action/script definitions or branch protection differ from the base. ' +
