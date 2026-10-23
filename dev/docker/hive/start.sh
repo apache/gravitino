@@ -43,7 +43,7 @@ sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
 if [[ -n "${ENABLE_SQL_BASE_AUTHORIZATION}" ]]; then
   if [[ -n "${RANGER_HIVE_REPOSITORY_NAME}" && -n "${RANGER_SERVER_URL}" ]]; then
     echo "You can't set ENABLE_SQL_BASE_AUTHORIZATION and RANGER_HIVE_REPOSITORY_NAME at the same time."
-    exit -1
+    exit 1
   fi
   cp -f ${HIVE_CONF_DIR}/hive-site-for-sql-base-auth.xml ${HIVE_CONF_DIR}/hive-site.xml
   cp -f ${HIVE_CONF_DIR}/hiveserver2-site-for-sql-base-auth.xml ${HIVE_CONF_DIR}/hiveserver2-site.xml

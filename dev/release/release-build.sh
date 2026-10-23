@@ -55,7 +55,7 @@ if [ $# -eq 0 ]; then
   exit_with_usage
 fi
 
-if [[ $@ == *"help"* ]]; then
+if [[ $* == *"help"* ]]; then
   exit_with_usage
 fi
 
