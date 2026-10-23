@@ -328,10 +328,26 @@ public class TestMetalakeManager {
               .build(),
           true);
 
+<<<<<<< HEAD
       manager.disableMetalake(metalakeIdent);
       Assertions.assertTrue(manager.dropMetalake(metalakeIdent, true));
       Mockito.verify(catalogManager)
           .dropCatalog(NameIdentifier.of(metalakeIdent.name(), "leftover_catalog"), true);
+=======
+      Mockito.doThrow(new RuntimeException("catalog drop failed"))
+          .when(catalogManager)
+          .dropCatalog(Mockito.any(), Mockito.anyBoolean());
+
+      Assertions.assertThrows(RuntimeException.class, () -> manager.dropMetalake(ident, true));
+
+      // A failed force drop must not leave a user-disabled metalake re-enabled.
+      Assertions.assertFalse(
+          MetalakeManager.metalakeInUse(entityStore, ident),
+          "failed force drop must keep the user-disabled metalake disabled");
+      Assertions.assertTrue(entityStore.exists(ident, EntityType.METALAKE));
+      Assertions.assertTrue(
+          entityStore.exists(NameIdentifier.of(ident.name(), "catalog1"), EntityType.CATALOG));
+>>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
