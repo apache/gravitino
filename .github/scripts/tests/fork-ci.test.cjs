@@ -408,7 +408,8 @@ test('a failed fork run is not summarized as verified', async () => withPublishe
 
 test('PR signals do not share a concurrency group', async () => {
   const workflow = await readFile(path.join(__dirname, '../../workflows/fork-ci-status-update.yml'), 'utf8');
-  assert.match(workflow, /github\.event\.workflow_run\.head_sha \|\| 'sweep'/);
+  assert.match(workflow, /^  group: fork-ci-status-update$/m);
+  assert.match(workflow, /^  queue: max$/m);
 });
 
 test('scheduled sweeps refresh a settled check when its fork run is rerun', async () => withPublisher(async ({ ctx, stateFile, core }) => {
@@ -531,15 +532,15 @@ test('scheduled sweeps scale their budget with the hourly quota', async () => wi
         conclusion: 'success', output: { text: JSON.stringify({ run_id: 1, run_attempt: 1 }) } }]; }
       return paginate(endpoint, args);
     };
-    // Each pass waits two minutes of fake time, which also advances the rotation.
+    // A short sweep spends its bounded budget once and never sleeps on the writer queue.
     let t = Date.now(), passes = 0;
     await update({ github, context: ctx, core, stateFile, clock: () => t, sleep: async ms => { t += ms; passes++; } });
     return { seen: seen.size, passes: passes + 1 };
   };
-  // A small quota keeps a single pass; a large one keeps polling within the loop window.
+  // Larger quotas cover more PRs without extending the sweep into a polling loop.
   const small = await probed(1000), large = await probed(15000);
   assert.equal(small.passes, 1); assert.ok(small.seen < 60);
-  assert.equal(large.passes, 6); assert.equal(large.seen, 60);
+  assert.equal(large.passes, 1); assert.equal(large.seen, 60);
 }));
 
 test('a missing fork run waits instead of asking the author to act', async () => {
@@ -559,7 +560,7 @@ test('an incomplete run listing does not replace a recorded run', async () => wi
   assert.equal(writes.length, 0);
 }));
 
-test('a scheduled sweep mirrors a fork run that finishes during its polling window', async () => withPublisher(async ({ ctx, stateFile, core }) => {
+test('successive short scheduled sweeps mirror a fork run from running to success', async () => withPublisher(async ({ ctx, stateFile, core }) => {
   ctx.eventName = 'schedule'; delete ctx.payload.inputs;
   const recent = { ...pr(), updated_at: new Date().toISOString() };
   const { github, writes } = publisherMock({ rerun: { ...run(), status: 'in_progress', conclusion: null } });
@@ -577,7 +578,9 @@ test('a scheduled sweep mirrors a fork run that finishes during its polling wind
     if (finished) response.data.workflow_runs = response.data.workflow_runs.map(r => ({ ...r, status: 'completed', conclusion: 'success' }));
     return response;
   };
-  await update({ github, context: ctx, core, stateFile, clock: () => t, sleep: async ms => { t += ms; finished = true; } });
+  await update({ github, context: ctx, core, stateFile, clock: () => t });
+  finished = true; t += 300000;
+  await update({ github, context: ctx, core, stateFile, clock: () => t });
   assert.equal((writes[0].create || writes[0].update).status, 'in_progress');
   assert.equal((writes.at(-1).create || writes.at(-1).update).conclusion, 'success');
 }));
@@ -735,3 +738,22 @@ test('scheduled probes repair a settled metadata check whose commit status was n
   assert.equal(statuses.length, 1);
   assert.equal(statuses[0].state, 'success');
 }));
+
+
+test('all canonical status writers share serialized queues and scheduled sweeps never sleep', async () => {
+  for (const [workflow, group] of [['fork-ci-status-update.yml', 'fork-ci-status-update'],
+    ['asf-allowlist-trusted.yml', 'asf-allowlist-publish']]) {
+    const yaml = await readFile(path.join(__dirname, '../../workflows', workflow), 'utf8');
+    assert.match(yaml, new RegExp(`^  group: ${group}$`, 'm'));
+    assert.match(yaml, /^  queue: max$/m);
+    assert.match(yaml, /^  cancel-in-progress: false$/m);
+  }
+  await withPublisher(async ({ ctx, core }) => {
+    ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+    const { github } = publisherMock();
+    let sleeps = 0;
+    github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: 15000, limit: 15000 } } } });
+    await update({ github, context: ctx, core, sleep: async () => sleeps++ });
+    assert.equal(sleeps, 0, 'a sweep must not hold the global writer queue while sleeping');
+  });
+});

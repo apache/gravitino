@@ -17,13 +17,9 @@ const { createService } = require('./fork-ci-status.cjs');
 const { publishStatus, statusState } = require('./publish-ci-status.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
-// Fork runs finish without an upstream event, and GitHub fires five-minute schedules only every
-// 10-20 minutes on busy repositories. A scheduled sweep therefore keeps polling for LOOP_MS, one
-// pass every PASS_MS, staying below the 15-minute job limit of ubuntu-slim.
-const LOOP_MS = 11 * 60 * 1000;
-const PASS_MS = 2 * 60 * 1000;
-
-async function update({ github, context, core, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), clock = Date.now }) {
+// Publishers share one workflow concurrency group. Keep sweeps short so signals do not
+// wait behind a runner sleeping between polls; later schedules read current fork metadata.
+async function update({ github, context, core, clock = Date.now }) {
   const signal = context.eventName === 'workflow_run' && context.payload.workflow_run.name === 'Fork CI PR Signal';
   const trustedSignal = context.eventName === 'workflow_run' &&
     context.payload.workflow_run.event === 'workflow_dispatch' &&
@@ -48,9 +44,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   // the hourly quota across five-minute sweeps, and never less than 60 calls per sweep.
   const perSweep = Math.max(60, Math.floor(rate.limit / 24));
   const budget = manual ? Math.max(0, rate.remaining - 100) : Math.min(perSweep, Math.max(0, rate.remaining - 100));
-  // Small quotas keep one pass per sweep; larger ones split the sweep budget across passes.
-  const passes = manual ? 1 : Math.max(1, Math.min(Math.ceil(LOOP_MS / PASS_MS), Math.floor(budget / 60)));
-  const slotMs = passes > 1 ? PASS_MS : 300000;
+  const slotMs = 300000;
   let calls = 0;
   github.hook.before('request', () => { calls++; });
   const failures = new Set();
@@ -91,7 +85,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     const params = { ...context.repo, ...result, output, details_url: details };
     delete params.title;
     delete params.note;
-    // Signals and sweeps can publish concurrently. Read the check last and never replace a newer
+    // Workflow concurrency serializes signal and sweep writers. Also never replace a newer
     // attempt of a run from the same repository, or a completed result with a running one.
     const latest = await latestCheck(pr);
     const oldRecord = recordOf(latest);
@@ -176,15 +170,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     core.info(`Visited ${processed}/${prs.length} PRs (probed ${probed}/${recent.length} recently updated); ` +
       `${calls}/${budget} API calls; starting index ${start}.`);
   }
-  const deadline = clock() + LOOP_MS;
-  for (let i = 0; i < passes; i++) {
-    if (i) {
-      if (clock() + PASS_MS > deadline) break;
-      await sleep(PASS_MS);
-      calls = 0;
-    }
-    await pass(Math.floor(budget / passes));
-  }
+  await pass(budget);
   if (manual && processed < prs.length) core.setFailed('API budget exhausted; dispatch again for a specific PR after the quota resets.');
   if (failures.size) core.setFailed(`Unable to refresh: ${[...failures].map(n => `#${n}`).join(', ')}`);
 }

@@ -27,6 +27,11 @@ on:
         required: true
         type: string
 permissions: {}
+# Serialize scan verdicts too: an older scan must not append success after a newer failure.
+concurrency:
+  group: asf-allowlist-publish
+  queue: max
+  cancel-in-progress: false
 jobs:
   scan:
     name: Scan PR workflow files
