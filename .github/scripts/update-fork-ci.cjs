@@ -16,8 +16,13 @@
 const { createService } = require('./fork-ci-status.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
+// Fork runs finish without an upstream event, and GitHub fires five-minute schedules only every
+// 10-20 minutes on busy repositories. A scheduled sweep therefore keeps polling for LOOP_MS, one
+// pass every PASS_MS, staying below the 15-minute job limit of ubuntu-slim.
+const LOOP_MS = 11 * 60 * 1000;
+const PASS_MS = 2 * 60 * 1000;
 
-async function update({ github, context, core }) {
+async function update({ github, context, core, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), clock = Date.now }) {
   const signal = context.eventName === 'workflow_run' && context.payload.workflow_run.name === 'Fork CI PR Signal';
   const trustedSignal = context.eventName === 'workflow_run' &&
     context.payload.workflow_run.event === 'workflow_dispatch' &&
@@ -25,11 +30,12 @@ async function update({ github, context, core }) {
   const manual = context.eventName === 'workflow_dispatch' || !!trustedSignal || signal;
   const requested = context.payload.inputs?.['pull-request'] || (trustedSignal && trustedSignal[1]);
   if (requested && !/^[1-9][0-9]*$/.test(requested)) throw new Error('Invalid PR number.');
-  let prs = requested
-    ? [(await github.rest.pulls.get({ ...context.repo, pull_number: Number(requested) })).data]
-    : await github.paginate(github.rest.pulls.list, { ...context.repo, state: 'open', per_page: 100 });
-  if (signal) prs = prs.filter(pr => pr.head.sha === context.payload.workflow_run.head_sha);
-  const now = Date.now();
+  async function listPrs() {
+    const prs = requested
+      ? [(await github.rest.pulls.get({ ...context.repo, pull_number: Number(requested) })).data]
+      : await github.paginate(github.rest.pulls.list, { ...context.repo, state: 'open', per_page: 100 });
+    return signal ? prs.filter(pr => pr.head.sha === context.payload.workflow_run.head_sha) : prs;
+  }
   // Never restore decisions or scheduling state from Actions caches: PR code dispatched
   // on the default branch can write those caches using its runner runtime token.
   const service = createService(github);
@@ -41,9 +47,12 @@ async function update({ github, context, core }) {
   // the hourly quota across five-minute sweeps, and never less than 60 calls per sweep.
   const perSweep = Math.max(60, Math.floor(rate.limit / 24));
   const budget = manual ? Math.max(0, rate.remaining - 100) : Math.min(perSweep, Math.max(0, rate.remaining - 100));
+  // Small quotas keep one pass per sweep; larger ones split the sweep budget across passes.
+  const passes = manual ? 1 : Math.max(1, Math.min(Math.ceil(LOOP_MS / PASS_MS), Math.floor(budget / 60)));
+  const slotMs = passes > 1 ? PASS_MS : 300000;
   let calls = 0;
   github.hook.before('request', () => { calls++; });
-  const failures = [];
+  const failures = new Set();
   const recordOf = check => { try { return JSON.parse(check?.output?.text || '{}'); } catch { return {}; } };
   async function latestCheck(pr) {
     const checks = await github.paginate(github.rest.checks.listForRef, {
@@ -104,51 +113,68 @@ async function update({ github, context, core }) {
     if (pr.state !== 'open') return;
     try {
       await work();
+      failures.delete(pr.number);
     } catch (error) {
-      failures.push(pr.number);
+      failures.add(pr.number);
       core.warning(`Could not refresh #${pr.number}: ${error.message}`);
     }
   }
   let processed = 0;
-  const visited = new Set();
-  // Fork runs, including reruns, finish without an upstream event. Such PRs were updated recently,
-  // so probe those first. A completed result changes only with a push or a trusted run, which both
-  // signal a refresh, or with a fork rerun, so refresh it only when the fork run id or attempt changed.
-  const recent = manual ? [] : prs.filter(pr => now - Date.parse(pr.updated_at) < RECENT_MS)
-    .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
-  // Probes take two calls, so rotate them too and keep a third of the budget for older PRs.
-  const recentBudget = Math.floor(budget * 2 / 3);
-  const recentStart = !recent.length ? 0 : (Math.floor(now / 300000) * Math.max(1, Math.floor(recentBudget / 4))) % recent.length;
-  let probed = 0;
-  for (let offset = 0; offset < recent.length; offset++) {
-    if (calls + 15 > recentBudget) break; // One PR may need trees, runs, paginated jobs and a check write.
-    const pr = recent[(recentStart + offset) % recent.length];
-    probed++;
-    await visit(pr, async () => {
-      const latest = await latestCheck(pr);
-      if (latest?.status === 'completed') {
-        if (!pr.head.repo) return;
-        const record = recordOf(latest);
-        const fork = (await service.findRun(pr, false))?.run;
-        if (!fork || (fork.id === (record.fork_run_id ?? record.run_id) &&
-            fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt))) return;
-      }
-      await refresh(pr);
-    });
+  let visited = new Set();
+  let prs = [];
+  async function pass(budget) {
+    const now = clock();
+    prs = await listPrs();
+    processed = 0;
+    visited = new Set();
+    // Fork runs, including reruns, finish without an upstream event. Such PRs were updated recently,
+    // so probe those first. A completed result changes only with a push or a trusted run, which both
+    // signal a refresh, or with a fork rerun, so refresh it only when the fork run id or attempt changed.
+    const recent = manual ? [] : prs.filter(pr => now - Date.parse(pr.updated_at) < RECENT_MS)
+      .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
+    // Probes take two calls, so rotate them too and keep a third of the budget for older PRs.
+    const recentBudget = Math.floor(budget * 2 / 3);
+    const recentStart = !recent.length ? 0 : (Math.floor(now / slotMs) * Math.max(1, Math.floor(recentBudget / 4))) % recent.length;
+    let probed = 0;
+    for (let offset = 0; offset < recent.length; offset++) {
+      if (calls + 15 > recentBudget) break; // One PR may need trees, runs, paginated jobs and a check write.
+      const pr = recent[(recentStart + offset) % recent.length];
+      probed++;
+      await visit(pr, async () => {
+        const latest = await latestCheck(pr);
+        if (latest?.status === 'completed') {
+          if (!pr.head.repo) return;
+          const record = recordOf(latest);
+          const fork = (await service.findRun(pr, false))?.run;
+          if (!fork || (fork.id === (record.fork_run_id ?? record.run_id) &&
+              fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt))) return;
+        }
+        await refresh(pr);
+      });
+    }
+    // Rotate the rest using trusted wall-clock time, so old PRs are eventually visited without
+    // accepting a contributor-writable cursor. Advance by about one sweep's capacity.
+    const step = Math.max(1, Math.floor(budget / 20));
+    const start = manual || !prs.length ? 0 : (Math.floor(now / slotMs) * step) % prs.length;
+    for (let offset = 0; offset < prs.length; offset++) {
+      if (calls + 15 > budget) break;
+      const pr = prs[(start + offset) % prs.length];
+      if (visited.has(pr.number)) continue;
+      await visit(pr, () => refresh(pr));
+    }
+    core.info(`Visited ${processed}/${prs.length} PRs (probed ${probed}/${recent.length} recently updated); ` +
+      `${calls}/${budget} API calls; starting index ${start}.`);
   }
-  // Rotate the rest using trusted wall-clock time, so old PRs are eventually visited without
-  // accepting a contributor-writable cursor. Advance by about one sweep's capacity.
-  const step = Math.max(1, Math.floor(budget / 20));
-  const start = manual || !prs.length ? 0 : (Math.floor(now / 300000) * step) % prs.length;
-  for (let offset = 0; offset < prs.length; offset++) {
-    if (calls + 15 > budget) break;
-    const pr = prs[(start + offset) % prs.length];
-    if (visited.has(pr.number)) continue;
-    await visit(pr, () => refresh(pr));
+  const deadline = clock() + LOOP_MS;
+  for (let i = 0; i < passes; i++) {
+    if (i) {
+      if (clock() + PASS_MS > deadline) break;
+      await sleep(PASS_MS);
+      calls = 0;
+    }
+    await pass(Math.floor(budget / passes));
   }
-  core.info(`Visited ${processed}/${prs.length} PRs (probed ${probed}/${recent.length} recently updated); ` +
-    `${calls}/${budget} API calls; starting index ${start}.`);
   if (manual && processed < prs.length) core.setFailed('API budget exhausted; dispatch again for a specific PR after the quota resets.');
-  if (failures.length) core.setFailed(`Unable to refresh: ${failures.map(n => `#${n}`).join(', ')}`);
+  if (failures.size) core.setFailed(`Unable to refresh: ${[...failures].map(n => `#${n}`).join(', ')}`);
 }
 module.exports = { update };
