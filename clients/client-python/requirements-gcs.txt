@@ -15,4 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-gcsfs==2026.2.0
+gcsfs==2026.10.1
