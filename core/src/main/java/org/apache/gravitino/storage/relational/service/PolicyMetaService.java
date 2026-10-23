@@ -40,6 +40,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
+import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -172,8 +174,10 @@ public class PolicyMetaService {
       PolicyPO newPolicyPO =
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
       SessionUtils.doMultipleWithCommit(
+          () -> beforeUpdate(updatedPolicyEntity),
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
-          () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO));
+          () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
+          () -> afterUpdate(updatedPolicyEntity));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
@@ -212,6 +216,7 @@ public class PolicyMetaService {
 
     try {
       SessionUtils.doMultipleWithCommit(
+          () -> beforeRemove(policyId),
           () -> deletePolicyWithVersion(ident, policyPO),
           () ->
               SessionUtils.doWithoutCommit(
@@ -237,7 +242,8 @@ public class PolicyMetaService {
                   SecurableObjectMapper.class,
                   mapper ->
                       mapper.softDeleteObjectRelsByMetadataObject(
-                          policyId, MetadataObject.Type.POLICY.name())));
+                          policyId, MetadataObject.Type.POLICY.name())),
+          () -> afterRemove(policyId));
       return true;
     } catch (NoSuchEntityException e) {
       return false;
@@ -363,7 +369,12 @@ public class PolicyMetaService {
   }
 
   /**
-   * Writes the policy row and its content snapshot.
+   * Writes the policy row and its content snapshot without committing, and fires the matching
+   * lifecycle hooks around the DML.
+   *
+   * <p>A plain create (or an overwrite that finds no row) uses persist hooks. An overwrite that
+   * replaces an existing row uses update hooks and passes the entity as stored — including the
+   * retained policy id when the caller supplied a different id for the same name.
    *
    * <p>An overwrite is not an upsert any more: the existing row is located and locked first, and
    * the replacement is written as the next version of that row, so the snapshot history survives
@@ -378,7 +389,9 @@ public class PolicyMetaService {
   private void insertPolicyWithoutCommit(
       PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
     if (!overwritten) {
+      beforePersist(policyEntity);
       insertNewPolicyWithoutCommit(initializedPolicyPO);
+      afterPersist(policyEntity);
       return;
     }
 
@@ -392,16 +405,22 @@ public class PolicyMetaService {
             "The policy ID %s is reserved by a deleted policy; use a new ID",
             initializedPolicyPO.getPolicyId());
       }
+      beforePersist(policyEntity);
       insertNewPolicyWithoutCommit(initializedPolicyPO);
+      afterPersist(policyEntity);
       return;
     }
 
     PolicyPO replacementPolicyPO =
         POConverters.updatePolicyPOWithVersion(existingPolicyPO, initializedPolicyPO);
+    PolicyEntity storedPolicy =
+        POConverters.fromPolicyPO(replacementPolicyPO, policyEntity.namespace());
     NameIdentifier observedIdentifier =
         NameIdentifier.of(policyEntity.namespace(), existingPolicyPO.getPolicyName());
+    beforeUpdate(storedPolicy);
     updatePolicyRootWithVersion(observedIdentifier, existingPolicyPO, replacementPolicyPO);
     insertPolicyVersionIfAllocated(existingPolicyPO, replacementPolicyPO);
+    afterUpdate(storedPolicy);
   }
 
   /**
@@ -569,5 +588,47 @@ public class PolicyMetaService {
           policyName);
     }
     return policyPO;
+  }
+
+  private static void beforePersist(PolicyEntity policy) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.beforePersist(policy);
+    }
+  }
+
+  private static void afterPersist(PolicyEntity policy) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.afterPersist(policy);
+    }
+  }
+
+  private static void beforeUpdate(PolicyEntity policy) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.beforeUpdate(policy);
+    }
+  }
+
+  private static void afterUpdate(PolicyEntity policy) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.afterUpdate(policy);
+    }
+  }
+
+  private static void beforeRemove(long policyId) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.beforeRemove(policyId);
+    }
+  }
+
+  private static void afterRemove(long policyId) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.afterRemove(policyId);
+    }
   }
 }
