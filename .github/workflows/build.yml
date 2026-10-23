@@ -259,8 +259,10 @@ jobs:
             -x :catalogs-contrib:catalog-jdbc-clickhouse:test
             -x :catalogs-contrib:catalog-jdbc-hologres:test
             -x :catalogs-contrib:catalog-jdbc-oceanbase:test
-            # Core's tests run in the core-test job, one lane per job; :core:test is deprecated.
+            # Core's tests run in the core-test job, one job per core test task.
             -x :core:test
+            -x :core:coreMySQLTest
+            -x :core:corePostgreSQLTest
           )
 
           if [ "${{ needs.changes.outputs.mcp_server_changes }}" != "true" ]; then
@@ -309,15 +311,12 @@ jobs:
       fail-fast: false
       matrix:
         java-version: [ 17 ]
-        # One job per core test lane, so each lane's results and coverage inputs are inspectable on
-        # their own. Lanes are defined in core/build.gradle.kts.
-        lane: [ unit, h2, mysql, postgresql ]
+        # One job per core test task, so each task's results and coverage inputs are inspectable on
+        # their own. The tasks are defined in core/build.gradle.kts.
+        lane: [ h2, mysql, postgresql ]
         include:
-          - lane: unit
-            task: coreUnitTest
-            skip-docker-tests: true
           - lane: h2
-            task: coreH2Test
+            task: test
             skip-docker-tests: true
           - lane: mysql
             task: coreMySQLTest
@@ -350,7 +349,7 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Run core ${{ matrix.lane }} lane
+      - name: Run core ${{ matrix.task }}
         run: |
           ./gradlew :core:${{ matrix.task }} \
             -PskipWeb=true \
@@ -441,14 +440,13 @@ jobs:
           needs.changes.outputs.maintenance_module_only_changes != 'true'
         run: |
           mkdir -p core/build/jacoco
-          for task in coreUnitTest coreH2Test coreMySQLTest corePostgreSQLTest; do
+          for task in test coreMySQLTest corePostgreSQLTest; do
             exec_file="$(find core-test-evidence -path "*/core/build/jacoco/${task}.exec" -print -quit)"
             test -n "${exec_file}"
             install -m 0644 "${exec_file}" "core/build/jacoco/${task}.exec"
           done
           ./gradlew \
             :core:jacocoTestReport \
-            -PcoreSuiteCoverage=true \
             -PskipWeb=true
           test -s core/build/reports/jacoco/test/jacocoTestReport.xml
 

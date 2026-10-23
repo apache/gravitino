@@ -27,30 +27,30 @@ import java.lang.annotation.Target;
 import org.junit.jupiter.api.Tag;
 
 /**
- * Annotations that choose which core database test lane(s) a class runs in. Each lane task ({@code
- * coreH2Test}, {@code coreMySQLTest}, {@code corePostgreSQLTest}) includes only classes with its
- * tag; stack annotations to join several lanes, or use {@link All}. A class with none of them is a
- * unit test and runs in {@code coreUnitTest}. {@code TestCoreLaneMembership} fails if a class
- * carries {@code gravitino-docker-test} but no backend tag, since it would run in no lane.
+ * Annotations that choose which core database backends a class runs against. {@code test} runs
+ * classes with no backend tag and classes tagged for H2; {@code coreMySQLTest} and {@code
+ * corePostgreSQLTest} run only classes tagged for their backend. Stack annotations to join several
+ * backends, or use {@link All}. {@code TestCoreLaneMembership} fails if a class carries {@code
+ * gravitino-docker-test} but no backend tag, since it would run in no task.
  *
- * <p>The lane, not the class, decides whether Docker is needed: MySQL and PostgreSQL require it and
+ * <p>The task, not the class, decides whether Docker is needed: MySQL and PostgreSQL require it and
  * H2 does not, so a class tagged for H2 must not need a container itself. The tag strings must stay
  * in sync with {@code coreBackendTestTags} in {@code core/build.gradle.kts}.
  */
 public final class CoreBackend {
 
-  /** The JUnit tag that selects the H2 lane. */
+  /** The JUnit tag for H2. */
   public static final String H2_TAG = "gravitino-core-h2-test";
 
-  /** The JUnit tag that selects the MySQL lane. */
+  /** The JUnit tag for MySQL. */
   public static final String MYSQL_TAG = "gravitino-core-mysql-test";
 
-  /** The JUnit tag that selects the PostgreSQL lane. */
+  /** The JUnit tag for PostgreSQL. */
   public static final String POSTGRESQL_TAG = "gravitino-core-postgresql-test";
 
   private CoreBackend() {}
 
-  /** Pins a core database test class to the H2 lane ({@code coreH2Test}). */
+  /** Runs a core database test class against H2, in {@code test}. */
   @Documented
   @Inherited
   @Retention(RetentionPolicy.RUNTIME)
@@ -58,7 +58,7 @@ public final class CoreBackend {
   @Tag(H2_TAG)
   public @interface H2 {}
 
-  /** Pins a core database test class to the MySQL lane ({@code coreMySQLTest}). */
+  /** Runs a core database test class against MySQL, in {@code coreMySQLTest}. */
   @Documented
   @Inherited
   @Retention(RetentionPolicy.RUNTIME)
@@ -66,7 +66,7 @@ public final class CoreBackend {
   @Tag(MYSQL_TAG)
   public @interface MySQL {}
 
-  /** Pins a core database test class to the PostgreSQL lane ({@code corePostgreSQLTest}). */
+  /** Runs a core database test class against PostgreSQL, in {@code corePostgreSQLTest}. */
   @Documented
   @Inherited
   @Retention(RetentionPolicy.RUNTIME)
@@ -74,7 +74,7 @@ public final class CoreBackend {
   @Tag(POSTGRESQL_TAG)
   public @interface PostgreSQL {}
 
-  /** Runs a core database test class under every backend lane. */
+  /** Runs a core database test class against every backend. */
   @Documented
   @Inherited
   @Retention(RetentionPolicy.RUNTIME)

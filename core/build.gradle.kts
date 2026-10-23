@@ -106,9 +106,10 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-// Core's tests run in four lanes: coreUnitTest, plus coreH2Test/coreMySQLTest/corePostgreSQLTest.
-// A class joins a backend lane through its @CoreBackend.* annotation; see CoreBackend.java.
-// Backend name -> the JUnit tag that admits a class to that lane. Keep in sync with CoreBackend.
+// Core's tests run in three tasks: `test` (unit tests and H2, no Docker), coreMySQLTest and
+// corePostgreSQLTest. A class joins a backend through its @CoreBackend.* annotation; see
+// CoreBackend.java.
+// Backend name -> the JUnit tag that admits a class to that task. Keep in sync with CoreBackend.
 val coreBackendTestTags =
   linkedMapOf(
     "h2" to "gravitino-core-h2-test",
@@ -119,59 +120,40 @@ val coreTestBackendProperty = "gravitino.core.test.backend"
 
 fun registerCoreTestTask(
   taskName: String,
-  backend: String? = null
+  backend: String
 ) = tasks.register<Test>(taskName) {
   group = "verification"
-  description =
-    if (backend == null) {
-      "Runs core unit tests."
-    } else {
-      "Runs core database tests against $backend."
-    }
+  description = "Runs core database tests against $backend."
 
   testClassesDirs = sourceSets["test"].output.classesDirs
   classpath = sourceSets["test"].runtimeClasspath
 
-  reports.html.outputLocation.set(
-    rootProject.layout.buildDirectory.dir("reports/tests/core/$taskName")
-  )
-
   useJUnitPlatform {
-    if (backend == null) {
-      // Whatever carries no backend tag (and no Docker tag) is the unit suite.
-      excludeTags(*coreBackendTestTags.values.toTypedArray(), "gravitino-docker-test")
-    } else {
-      val ownBackendTag =
-        coreBackendTestTags[backend]
-          ?: throw GradleException("Unsupported core test backend: $backend")
-      // Plain tag include, applied by JUnit at discovery time, so classes not tagged for this
-      // backend never show up in this lane's JUnit XML. A class tagged for several backends
-      // runs under each of them.
-      includeTags(ownBackendTag)
-    }
+    // Plain tag include, applied by JUnit at discovery time, so classes not tagged for this
+    // backend never show up in this task's JUnit XML. A class tagged for several backends runs
+    // under each of them.
+    includeTags(
+      coreBackendTestTags[backend] ?: throw GradleException("Unsupported core test backend: $backend")
+    )
   }
 
-  if (backend != null) {
-    systemProperty(coreTestBackendProperty, backend)
-    // Read by the root setTestEnvironment inside doFirst, i.e. at execution time, after every
-    // configuration action has run - so it doesn't depend on register/configureEach ordering.
-    extensions.extraProperties["includeDockerTaggedTests"] = true
+  systemProperty(coreTestBackendProperty, backend)
+  // Read by the root setTestEnvironment inside doFirst, i.e. at execution time, after every
+  // configuration action has run - so it doesn't depend on register/configureEach ordering.
+  extensions.extraProperties["includeDockerTaggedTests"] = true
+  // The test databases are thrown away, so their containers can skip durability work.
+  // Read by DatabaseContainer.Durability.fromSystemProperty(); keep the name in sync.
+  systemProperty("gravitino.test.db.disposableData", "true")
 
-    // Database tests mutate process-wide state and must remain sequential within each lane.
-    maxParallelForks = 1
-    systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+  // Database tests mutate process-wide state and must remain sequential within each task.
+  maxParallelForks = 1
+  systemProperty("junit.jupiter.execution.parallel.enabled", "false")
 
-    if (backend != "h2") {
-      // The test databases are thrown away, so their containers can skip durability work.
-      // Read by DatabaseContainer.Durability.fromSystemProperty(); keep the name in sync.
-      systemProperty("gravitino.test.db.disposableData", "true")
-      doFirst {
-        if (rootProject.extra["dockerTest"] != true) {
-          throw GradleException(
-            "$path requires Docker; use -PskipDockerTests=false with Docker running."
-          )
-        }
-      }
+  doFirst {
+    if (rootProject.extra["dockerTest"] != true) {
+      throw GradleException(
+        "$path requires Docker; use -PskipDockerTests=false with Docker running."
+      )
     }
   }
 }
@@ -182,48 +164,58 @@ tasks.withType<Test>().configureEach {
   useJUnitPlatform { excludeTags("gravitino-test-fixture") }
 }
 
-registerCoreTestTask("coreUnitTest")
-registerCoreTestTask("coreH2Test", "h2")
 registerCoreTestTask("coreMySQLTest", "mysql")
 registerCoreTestTask("corePostgreSQLTest", "postgresql")
 
-val coreSuiteCoverage =
-  providers.gradleProperty("coreSuiteCoverage").map(String::toBoolean).orElse(false)
-val coreSuiteTaskNames =
-  listOf("coreUnitTest", "coreH2Test", "coreMySQLTest", "corePostgreSQLTest")
-val coreSuiteExecutionData =
-  coreSuiteTaskNames.map { layout.buildDirectory.file("jacoco/$it.exec") }
-tasks.named<JacocoReport>("jacocoTestReport") {
-  if (coreSuiteCoverage.get()) {
-    dependsOn(tasks.named("classes"))
-    executionData.setFrom(coreSuiteExecutionData)
-  }
-}
-
-// :core:test is kept for IDEs and local habit, and is deprecated: run a lane instead. CI skips it
-// (`build` passes `-x :core:test`) and runs each lane in its own `core-test` job.
-// TestRestrictedRegoGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
-// the legacy :core:test run it; the database lanes don't need the input.
-listOf("coreUnitTest", "test").forEach {
-  tasks.named<Test>(it) {
-    inputs.file(rootProject.file("docs/policies.md"))
-    systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
-  }
-}
-
+// `test` is the Docker-free task: every class the H2 tag admits plus every class with no backend or
+// Docker tag. Docker-tagged classes with no backend tag run nowhere; TestCoreLaneMembership catches
+// them.
 tasks.test {
-  doFirst {
-    logger.warn(
-      "WARNING: :core:test is deprecated and does not correspond to any CI lane. Use " +
-        "coreUnitTest, coreH2Test, coreMySQLTest, or corePostgreSQLTest instead."
+  description = "Runs core unit tests and H2-backed tests; needs no Docker."
+  // TestRestrictedRegoGoldenFile reads docs/policies.md.
+  inputs.file(rootProject.file("docs/policies.md"))
+  systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
+  systemProperty(coreTestBackendProperty, "h2")
+  // Read by the root setTestEnvironment inside doFirst; lets H2 run the Docker-tagged backend
+  // classes, which need no container on H2.
+  extensions.extraProperties["includeDockerTaggedTests"] = true
+  useJUnitPlatform {
+    includeTags(
+      "${coreBackendTestTags.getValue("h2")} | " +
+        "!(${coreBackendTestTags.getValue("mysql")} | " +
+        "${coreBackendTestTags.getValue("postgresql")} | gravitino-docker-test)"
     )
   }
+  maxParallelForks = 1
+  systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode == "embedded") {
     environment("GRAVITINO_HOME", project.rootDir.path)
   } else {
     environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
   }
+}
+
+val coreDatabaseTestTasks = listOf("coreMySQLTest", "corePostgreSQLTest")
+// `check` (and so `build`) also runs the database tasks when Docker tests are on.
+tasks.check {
+  if (rootProject.extra["dockerTest"] == true) {
+    dependsOn(coreDatabaseTestTasks)
+  }
+}
+// -PskipTests selects integration tests only, and core has none.
+val skipTests = rootProject.hasProperty("skipTests")
+coreDatabaseTestTasks.forEach { tasks.named(it) { onlyIf("-PskipTests") { !skipTests } } }
+
+// One core report from whichever of the three exec files exist. Listing files, not tasks, keeps the
+// report from running them: CI's coverage job copies the exec files in and only renders.
+tasks.named<JacocoReport>("jacocoTestReport") {
+  // `build` with Docker runs the database tasks too; report only after they finish.
+  mustRunAfter(coreDatabaseTestTasks)
+  executionData.setFrom(
+    (listOf("test") + coreDatabaseTestTasks).map { layout.buildDirectory.file("jacoco/$it.exec") }
+  )
 }
 
 tasks.withType<JavaCompile>().configureEach {
