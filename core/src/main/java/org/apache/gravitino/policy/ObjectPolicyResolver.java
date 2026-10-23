@@ -19,7 +19,9 @@
 package org.apache.gravitino.policy;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,19 +77,54 @@ public class ObjectPolicyResolver {
    */
   public PolicyEntity[] resolve(String metalake, MetadataObject metadataObject) {
     TagEntity[] effectiveTags = effectiveTagResolver.resolve(metalake, metadataObject);
-    if (effectiveTags.length == 0) {
+    List<NameIdentifier> tagIdentifiers =
+        Arrays.stream(effectiveTags)
+            .map(TagEntity::name)
+            .distinct()
+            .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
+            .collect(Collectors.toList());
+    if (tagIdentifiers.isEmpty()) {
       return new PolicyEntity[0];
     }
 
-    Map<String, TagEntity> tagsByName =
-        Arrays.stream(effectiveTags)
-            .collect(
-                Collectors.toMap(
-                    TagEntity::name, tag -> tag, (left, right) -> left, LinkedHashMap::new));
-    List<NameIdentifier> tagIdentifiers =
-        tagsByName.keySet().stream()
-            .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
-            .collect(Collectors.toList());
+    return selectPolicies(effectiveTags, loadRelations(tagIdentifiers, metadataObject));
+  }
+
+  /**
+   * Resolves effective policies for multiple objects using shared tag and policy reads.
+   *
+   * @param metalake the metalake name
+   * @param metadataObjects the objects to resolve
+   * @return policies keyed by requested object
+   */
+  public Map<MetadataObject, PolicyEntity[]> resolve(
+      String metalake, List<MetadataObject> metadataObjects) {
+    if (metadataObjects.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+    Map<MetadataObject, TagEntity[]> tagsByObject =
+        effectiveTagResolver.resolve(metalake, metadataObjects);
+    Map<String, NameIdentifier> tagIdentifiers = new LinkedHashMap<>();
+    tagsByObject
+        .values()
+        .forEach(
+            tags -> {
+              for (TagEntity tag : tags) {
+                tagIdentifiers.putIfAbsent(
+                    tag.name(), NameIdentifierUtil.ofTag(metalake, tag.name()));
+              }
+            });
+    List<RelationalEntity<?>> relations =
+        tagIdentifiers.isEmpty()
+            ? Collections.emptyList()
+            : loadRelations(new ArrayList<>(tagIdentifiers.values()), metadataObjects);
+    Map<MetadataObject, PolicyEntity[]> result = new LinkedHashMap<>();
+    tagsByObject.forEach((object, tags) -> result.put(object, selectPolicies(tags, relations)));
+    return result;
+  }
+
+  private List<RelationalEntity<?>> loadRelations(
+      List<NameIdentifier> tagIdentifiers, Object request) {
 
     List<RelationalEntity<?>> relations;
     try {
@@ -99,9 +136,19 @@ public class ObjectPolicyResolver {
                   tagIdentifiers,
                   Entity.EntityType.TAG);
     } catch (IOException e) {
-      LOG.error("Failed to resolve policies for metadata object {}", metadataObject, e);
+      LOG.error("Failed to resolve policies for metadata objects {}", request, e);
       throw new RuntimeException(e);
     }
+    return relations;
+  }
+
+  private static PolicyEntity[] selectPolicies(
+      TagEntity[] effectiveTags, List<RelationalEntity<?>> relations) {
+    Map<String, TagEntity> tagsByName =
+        Arrays.stream(effectiveTags)
+            .collect(
+                Collectors.toMap(
+                    TagEntity::name, tag -> tag, (left, right) -> left, LinkedHashMap::new));
 
     Map<Long, MatchState> matchStates = new LinkedHashMap<>();
     for (RelationalEntity<?> relation : relations) {

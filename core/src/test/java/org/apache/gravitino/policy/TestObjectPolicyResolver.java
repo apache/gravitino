@@ -19,6 +19,8 @@
 package org.apache.gravitino.policy;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -26,6 +28,9 @@ import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -148,6 +153,37 @@ public class TestObjectPolicyResolver {
                 relation(classified, policy, TagValueSelector.of("pii"))));
 
     Assertions.assertArrayEquals(new PolicyEntity[] {policy}, resolver.resolve(METALAKE, OBJECT));
+  }
+
+  @Test
+  public void testBatchSharesPolicyReadAndPreservesSelectors() throws Exception {
+    MetadataObject column =
+        MetadataObjects.of(
+            Arrays.asList("catalog", "schema", "table", "column"), MetadataObject.Type.COLUMN);
+    TagEntity tableTag = tag(1L, "domain", TagAssignment.ofValues("finance"));
+    TagEntity columnTag = tag(1L, "domain", TagAssignment.ofValues("engineering"));
+    PolicyEntity policy = policy(10L, "selected", true);
+    Map<MetadataObject, TagEntity[]> tags = new LinkedHashMap<>();
+    tags.put(OBJECT, new TagEntity[] {tableTag.copyWithInherited(false)});
+    tags.put(column, new TagEntity[] {columnTag.copyWithInherited(true)});
+    when(effectiveTagResolver.resolve(METALAKE, List.of(OBJECT, column))).thenReturn(tags);
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            List.of(NameIdentifierUtil.ofTag(METALAKE, "domain")),
+            Entity.EntityType.TAG))
+        .thenReturn(List.of(relation(tableTag, policy, TagValueSelector.of("finance"))));
+
+    Map<MetadataObject, PolicyEntity[]> result =
+        resolver.resolve(METALAKE, List.of(OBJECT, column));
+
+    Assertions.assertEquals(1, result.get(OBJECT).length);
+    Assertions.assertFalse(result.get(OBJECT)[0].inherited().orElseThrow());
+    Assertions.assertEquals(0, result.get(column).length);
+    verify(relationOperations, times(1))
+        .batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            List.of(NameIdentifierUtil.ofTag(METALAKE, "domain")),
+            Entity.EntityType.TAG);
   }
 
   private static RelationalEntity<PolicyEntity> relation(
