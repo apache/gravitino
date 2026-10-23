@@ -48,7 +48,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.testcontainers.containers.Container.ExecResult;
 
 /** Integration tests for Hive catalog view CRUD operations. */
 @Tag("gravitino-docker-test")
@@ -60,6 +59,7 @@ public class CatalogHiveViewIT extends BaseIT {
   private static final String HIVE_DIALECT = "hive";
 
   private final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private HiveServer2Sql hiveSql;
   private String metalakeName;
   private String catalogName;
   private String schemaName;
@@ -95,6 +95,7 @@ public class CatalogHiveViewIT extends BaseIT {
             catalogName, Catalog.Type.RELATIONAL, PROVIDER, "comment", catalogProperties);
     viewCatalog = catalog.asViewCatalog();
     catalog.asSchemas().createSchema(schemaName, "schema comment", Maps.newHashMap());
+    hiveSql = new HiveServer2Sql(containerSuite.getHiveContainer());
   }
 
   @AfterEach
@@ -107,7 +108,7 @@ public class CatalogHiveViewIT extends BaseIT {
 
   @AfterAll
   public void teardown() throws Exception {
-    try {
+    try (HiveServer2Sql sql = hiveSql) {
       catalog.asSchemas().dropSchema(schemaName, true);
       metalake.disableCatalog(catalogName);
       metalake.dropCatalog(catalogName, true);
@@ -535,50 +536,14 @@ public class CatalogHiveViewIT extends BaseIT {
   }
 
   private void executeHiveSql(String sql) {
-    ExecResult result =
-        containerSuite.getHiveContainer().executeInContainer("hive", "-S", "-e", sql);
-    Assertions.assertEquals(
-        0,
-        result.getExitCode(),
-        String.format(
-            "Failed to execute SQL with hive cli. SQL: %s, stdout: %s, stderr: %s",
-            sql, result.getStdout(), result.getStderr()));
+    hiveSql.run(sql);
   }
 
   private long querySingleLong(String sql) {
-    ExecResult result =
-        containerSuite.getHiveContainer().executeInContainer("hive", "-S", "-e", sql);
-    Assertions.assertEquals(
-        0,
-        result.getExitCode(),
-        String.format(
-            "Failed to query SQL with hive cli. SQL: %s, stdout: %s, stderr: %s",
-            sql, result.getStdout(), result.getStderr()));
-
-    String[] lines = result.getStdout().split("\\R");
-    for (int index = lines.length - 1; index >= 0; index--) {
-      String line = lines[index].trim();
-      if (line.matches("-?\\d+")) {
-        return Long.parseLong(line);
-      }
-    }
-    throw new IllegalStateException(
-        String.format(
-            "Cannot parse numeric result from query output. SQL: %s, stdout: %s",
-            sql, result.getStdout()));
+    return Long.parseLong(hiveSql.run(sql).trim());
   }
 
   private String describeHiveObject(String qualifiedObjectName) {
-    ExecResult result =
-        containerSuite
-            .getHiveContainer()
-            .executeInContainer("hive", "-S", "-e", "DESCRIBE FORMATTED " + qualifiedObjectName);
-    Assertions.assertEquals(
-        0,
-        result.getExitCode(),
-        String.format(
-            "Failed to describe Hive object. Object: %s, stdout: %s, stderr: %s",
-            qualifiedObjectName, result.getStdout(), result.getStderr()));
-    return result.getStdout();
+    return hiveSql.run("DESCRIBE FORMATTED " + qualifiedObjectName);
   }
 }

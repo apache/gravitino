@@ -122,7 +122,7 @@ public class TestClickHouseEngineIT {
         new ClickHouseColumnDefaultValueConverter(),
         Collections.emptyMap());
 
-    schemaName = "engine_it_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    schemaName = "engine_it_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     databaseOperations.create(schemaName, null, Collections.emptyMap());
   }
 
@@ -139,7 +139,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testTinyLogEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "tinylog_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "tinylog_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.TINYLOG);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -160,7 +160,8 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testStripeLogEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "stripelog_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName =
+        "stripelog_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.STRIPELOG);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -181,7 +182,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testLogEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "log_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "log_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.LOG);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -204,7 +205,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testMemoryEngineIsVolatileAfterRestart() throws Exception {
-    String tableName = "memory_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "memory_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.MEMORY);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -233,7 +234,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testNullEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "null_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "null_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.NULL);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -251,7 +252,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testSetEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "set_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "set_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.SET);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);

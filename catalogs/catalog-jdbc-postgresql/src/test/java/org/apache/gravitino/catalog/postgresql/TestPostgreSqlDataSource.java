@@ -33,12 +33,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /** Exercises default validation against a real PostgreSQL server. */
 @Tag("gravitino-docker-test")
 public class TestPostgreSqlDataSource {
-  private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:13");
+  private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:13");
 
   /** Starts PostgreSQL and creates a schema for connection state changes. */
   @BeforeAll

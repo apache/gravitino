@@ -45,9 +45,8 @@ public class IcebergRestKerberosJdbcWithUserImpersonationCatalogIT
     // Change the ownership of /user/hive to normal user for user impersonation test. If we do not
     // change the ownership, the normal user will not have the permission to create table on HDFS
     // warehouse as the /user/hive is owned by user `cli`.
-    containerSuite
-        .getKerberosHiveContainer()
-        .executeInContainer("hadoop", "fs", "-chown", "-R", NORMAL_USER, "/user/hive/");
+    IcebergRestKerberosTestEnv.hdfs(containerSuite.getKerberosHiveContainer())
+        .setOwner("/user/hive/", NORMAL_USER, true);
 
     super.prepareSQLContext();
   }

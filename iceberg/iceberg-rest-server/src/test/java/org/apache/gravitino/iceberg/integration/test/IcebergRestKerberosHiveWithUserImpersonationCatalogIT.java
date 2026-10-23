@@ -48,9 +48,8 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
     // change the ownership, the normal user will not have the permission to create table in Hive
     // as the /user/hive is owned by user `cli`, please see what's done in `initEnv` method in
     // superclass.
-    containerSuite
-        .getKerberosHiveContainer()
-        .executeInContainer("hadoop", "fs", "-chown", "-R", NORMAL_USER, "/user/hive/");
+    IcebergRestKerberosTestEnv.hdfs(containerSuite.getKerberosHiveContainer())
+        .setOwner("/user/hive/", NORMAL_USER, true);
 
     super.prepareSQLContext();
   }

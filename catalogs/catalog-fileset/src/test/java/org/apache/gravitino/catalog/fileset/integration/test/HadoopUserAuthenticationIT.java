@@ -49,6 +49,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.KerberosHdfs;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -92,6 +93,8 @@ public class HadoopUserAuthenticationIT extends BaseIT {
 
   private static GravitinoAdminClient adminClient;
 
+  private static KerberosHdfs hdfs;
+
   private static HiveContainer kerberosHiveContainer;
 
   private static final String METALAKE_NAME =
@@ -117,6 +120,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
 
     // Prepare kerberos related-config;
     prepareKerberosConfig();
+    hdfs = KerberosHdfs.of(kerberosHiveContainer, TMP_DIR + HADOOP_CLIENT_KEYTAB);
 
     // Config kerberos configuration for Gravitino server
     addKerberosConfig();
@@ -255,7 +259,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put("location", HDFS_URL + "/user/hadoop/");
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hadoop");
+    hdfs.mkdirs("/user/hadoop");
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -286,7 +290,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         CATALOG_NAME, CatalogChange.setProperty(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL));
 
     // Now try to give the user the permission to create schema again
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");
+    hdfs.setPermission("/user/hadoop", "777", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -342,8 +346,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put("location", location);
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+    hdfs.mkdirs("/user/hadoop/" + catalogName);
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -387,8 +390,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to give the user the permission to create schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "gravitino_client", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "gravitino_client", false);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
 
@@ -406,8 +408,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     // END of test schema creation
     Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "cli_schema", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_schema", false);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
 
@@ -446,8 +447,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put("location", location);
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+    hdfs.mkdirs("/user/hadoop/" + catalogName);
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -460,8 +460,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     schemaProperty.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
     schemaProperty.put(PRINCIPAL_KEY, HADOOP_SCHEMA_PRINCIPAL + "@" + REALM);
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli_schema", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_schema", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
 
@@ -499,8 +498,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=cli_fileset, access=WRITE"));
 
     // Now change the owner of schema directory to 'cli_fileset'
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli_fileset", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_fileset", true);
     Assertions.assertDoesNotThrow(
         () ->
             catalog
@@ -532,8 +530,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now change the owner of schema directory to 'gravitino_client'
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "gravitino_client", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "gravitino_client", true);
     Assertions.assertDoesNotThrow(
         () ->
             catalog
@@ -550,8 +547,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     Assertions.assertThrows(
         Exception.class,
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset1)));
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli_fileset", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_fileset", true);
     // Now try to drop fileset
     Assertions.assertDoesNotThrow(
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset1)));
@@ -559,15 +555,13 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     Assertions.assertThrows(
         Exception.class,
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "gravitino_client", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "gravitino_client", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
 
     Assertions.assertThrows(
         Exception.class, () -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli_schema", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_schema", true);
     Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
   }
 
@@ -596,8 +590,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put("location", localtion);
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+    hdfs.mkdirs("/user/hadoop/" + catalogName);
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -628,8 +621,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     exceptionMessage = Throwables.getStackTraceAsString(exception);
     Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
 

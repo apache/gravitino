@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -116,15 +120,24 @@ public abstract class DatabaseContainer extends BaseContainer {
   /**
    * Logs whether lower durability is enabled and the settings the server reports, so each run's
    * output shows which mode it ran in. Warns when lower durability is enabled but the data
-   * directory is not on {@code tmpfs}. The query must print tab-separated values, the data
-   * directory first, in the order of {@code names}.
+   * directory is not on {@code tmpfs}. The query must return one row with the data directory first,
+   * in the order of {@code names}.
    */
-  protected void logDurability(List<String> names, String... query) {
+  protected void logDurability(List<String> names, String query) {
     String name = getClass().getSimpleName();
-    Container.ExecResult settings = executeInContainer(query);
-    String[] values = settings.getStdout().trim().split("\t");
-    if (settings.getExitCode() != 0 || values.length != names.size()) {
-      LOG.warn("{}: could not read the durability settings: {}", name, settings.getStderr());
+    String[] values = new String[names.size()];
+    try (Connection connection = db.createConnection("");
+        Statement statement = connection.createStatement();
+        ResultSet row = statement.executeQuery(query)) {
+      if (!row.next() || row.getMetaData().getColumnCount() != names.size()) {
+        LOG.warn("{}: could not read the durability settings from: {}", name, query);
+        return;
+      }
+      for (int i = 0; i < values.length; i++) {
+        values[i] = row.getString(i + 1);
+      }
+    } catch (SQLException e) {
+      LOG.warn("{}: could not read the durability settings: {}", name, e.getMessage());
       return;
     }
     String report =
