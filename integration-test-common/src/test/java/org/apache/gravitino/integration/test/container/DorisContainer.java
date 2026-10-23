@@ -128,8 +128,7 @@ public class DorisContainer extends BaseContainer {
             .withExposedService(FE_SERVICE, FE_HTTP_PORT)
             .withScaledService(BE_SERVICE, BE_SCALE)
             .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS))
-            .withTailChildContainers(true)
-            .withLocalCompose(true);
+            .withTailChildContainers(true);
 
     // Expose ports for each BE instance (1-indexed)
     for (int i = 1; i <= BE_SCALE; i++) {

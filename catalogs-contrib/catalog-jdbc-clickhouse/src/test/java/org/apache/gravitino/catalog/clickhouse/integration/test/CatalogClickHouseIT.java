@@ -51,6 +51,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -562,8 +563,7 @@ public class CatalogClickHouseIT extends BaseIT {
             String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, sourceTableName));
     String normalizedSourceCreateSql = sourceCreateSql.replace("`", "").replaceAll("\\s+", "");
     Assertions.assertTrue(
-        StringUtils.containsIgnoreCase(
-            normalizedSourceCreateSql, "INDEXidx_lowerlower(name)TYPEminmax"),
+        Strings.CI.contains(normalizedSourceCreateSql, "INDEXidx_lowerlower(name)TYPEminmax"),
         "Source table should retain its expression index: " + sourceCreateSql);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -595,10 +595,10 @@ public class CatalogClickHouseIT extends BaseIT {
     String normalizedRecreatedCreateSql =
         recreatedCreateSql.replace("`", "").replaceAll("\\s+", "");
     Assertions.assertTrue(
-        StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "INDEXidx_namenametypeMINMAX"),
+        Strings.CI.contains(normalizedRecreatedCreateSql, "INDEXidx_namenametypeMINMAX"),
         "Recreated table should retain the simple index: " + recreatedCreateSql);
     Assertions.assertFalse(
-        StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "idx_lower"),
+        Strings.CI.contains(normalizedRecreatedCreateSql, "idx_lower"),
         "Recreated table must not contain a fabricated replacement index: " + recreatedCreateSql);
   }
 
@@ -700,8 +700,7 @@ public class CatalogClickHouseIT extends BaseIT {
               String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, createdTableName));
       String normalizedShowCreateSql = StringUtils.deleteWhitespace(showCreateSql).replace("`", "");
       Assertions.assertTrue(
-          StringUtils.containsIgnoreCase(
-              normalizedShowCreateSql, "PARTITIONBY" + expectedPartitionKey),
+          Strings.CI.contains(normalizedShowCreateSql, "PARTITIONBY" + expectedPartitionKey),
           "CREATE should emit the ClickHouse partition function: " + showCreateSql);
     }
   }
@@ -1096,7 +1095,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
       Assertions.assertEquals("annoy", nativeType);
       Assertions.assertTrue(
-          StringUtils.startsWithIgnoreCase(nativeTypeFull, "annoy"),
+          Strings.CI.startsWith(nativeTypeFull, "annoy"),
           "Expected ClickHouse to preserve the Annoy type expression, but got: " + nativeTypeFull);
       Assertions.assertTrue(nativeGranularity > 0);
 
