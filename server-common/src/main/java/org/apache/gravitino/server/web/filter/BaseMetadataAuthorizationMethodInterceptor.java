@@ -19,18 +19,21 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import javax.ws.rs.HttpMethod;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -196,6 +199,18 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   }
 
   /**
+   * Returns whether authorization may be delegated for this operation.
+   *
+   * @param method invoked protocol method
+   * @param nameIdentifierMap identifiers resolved from the request
+   * @return {@code true} if the local authorization pipeline may be skipped
+   */
+  protected boolean shouldSkipAuthorization(
+      Method method, Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    return shouldSkipAuthorization(nameIdentifierMap);
+  }
+
+  /**
    * Hook for requests that must validate the current user and active roles but do not have a
    * metadata object on which to evaluate an expression. A protocol root-list request is a typical
    * example: its returned children are filtered separately.
@@ -222,6 +237,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
    */
   protected final Object authorizeMethod(Method method, Object[] args, MethodInvoker methodInvoker)
       throws Throwable {
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      return authorizeMethodInScope(method, args, methodInvoker, scope);
+    }
+  }
+
+  private Object authorizeMethodInScope(
+      Method method, Object[] args, MethodInvoker methodInvoker, AuthorizationRequestScope scope)
+      throws Throwable {
     try {
       Parameter[] parameters = method.getParameters();
       AuthorizationExpression expressionAnnotation =
@@ -231,7 +254,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         AuthorizationTarget target =
             resolveAuthorizationTarget(method, expressionAnnotation, parameters, args);
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = target.nameIdentifiers();
-        boolean skipStandardCheck = shouldSkipAuthorization(nameIdentifierMap);
+        boolean skipStandardCheck = shouldSkipAuthorization(method, nameIdentifierMap);
 
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
         AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
@@ -314,6 +337,16 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
                     currentUser, methodName, accessMetadataName, expression);
             LOG.info(notAuthzMessage);
             throw new ForbiddenException(notAuthzMessage);
+          }
+        }
+        // A skipped standard check authorized nothing that list filtering could reuse.
+        scope.bindIfRead(
+            method, skipStandardCheck ? null : metalakeIdent, authorizationRequestContext);
+      } else {
+        for (Annotation annotation : method.getAnnotations()) {
+          if (annotation.annotationType().isAnnotationPresent(HttpMethod.class)) {
+            throw new ForbiddenException(
+                "Authorization expression is missing for operation '%s'", method.getName());
           }
         }
       }

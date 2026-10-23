@@ -22,10 +22,12 @@ import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.p
 import static org.apache.gravitino.server.authorization.PrincipalListTestUtils.principalManagementPrivilege;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -36,6 +38,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.stream.IntStream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -413,15 +416,117 @@ public class TestMetadataAuthzHelper {
         });
   }
 
-  /** Roles still preload owners when no parent path authorizes the whole list. */
+  /**
+   * Owner relations are never batch-loaded ahead of the per-object loop: the entity store no longer
+   * caches them, so the batch call was a discarded round trip that resolved every listed
+   * identifier's id one by one.
+   */
   @Test
-  public void testRoleListFallbackPreloadsOwners() throws Exception {
+  public void testRoleListFallbackDoesNotPreloadOwners() {
     EntityStore store = mock(EntityStore.class);
     SupportsRelationOperations relations = mock(SupportsRelationOperations.class);
     when(gravitinoEnv.entityStore()).thenReturn(store);
     when(gravitinoEnv.cacheEnabled()).thenReturn(true);
-    when(store.relationOperations()).thenReturn(relations);
+    lenient().when(store.relationOperations()).thenReturn(relations);
     NameIdentifier[] identifiers = principalIdentifiers(Entity.EntityType.ROLE, 3);
+    try {
+      withAuthorizer(
+          mock(GravitinoAuthorizer.class),
+          () ->
+              Assertions.assertEquals(
+                  0,
+                  MetadataAuthzHelper.filterByExpression(
+                          "testMetalake",
+                          principalListExpression(Entity.EntityType.ROLE),
+                          Entity.EntityType.ROLE,
+                          identifiers)
+                      .length));
+      verifyNoInteractions(relations);
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+    }
+  }
+
+  /**
+   * A USE_MODEL grant on the schema makes every model in it visible, so the list returns without
+   * touching the entity store or authorizing any single model.
+   */
+  @Test
+  public void testListShortCircuitModelViaSchemaGrant() {
+    EntityStore store = mock(EntityStore.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    when(gravitinoEnv.internalAccessControlDispatcher())
+        .thenReturn(mock(AccessControlDispatcher.class));
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.USE_MODEL);
+    NameIdentifier[] models = models(2000);
+    try {
+      withAuthorizer(
+          authorizer,
+          () -> {
+            NameIdentifier[] filtered =
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake",
+                    AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.MODEL,
+                    models);
+            Assertions.assertSame(models, filtered);
+            verify(authorizer, never())
+                .authorize(
+                    any(),
+                    eq("testMetalake"),
+                    argThat(object -> object.type() == MetadataObject.Type.MODEL),
+                    any(),
+                    any());
+            verifyNoInteractions(store);
+          });
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
+    }
+  }
+
+  /** A possible USE_MODEL deny disables the schema-grant path and each model is checked. */
+  @Test
+  public void testListShortCircuitModelFallsBackWhenDenyMayExist() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.USE_MODEL);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
+    when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              return object.type() == MetadataObject.Type.MODEL && "m1".equals(object.name());
+            });
+    NameIdentifier[] models = models(3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.MODEL,
+                  models);
+          Assertions.assertArrayEquals(new NameIdentifier[] {models[0], models[2]}, filtered);
+        });
+  }
+
+  /**
+   * Models are not cacheable, so even the per-object fallback never issues the batch get whose
+   * result the cache would drop.
+   */
+  @Test
+  public void testModelListFallbackDoesNotBatchLoadEntities() {
+    EntityStore store = mock(EntityStore.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    when(gravitinoEnv.internalAccessControlDispatcher())
+        .thenReturn(mock(AccessControlDispatcher.class));
+    NameIdentifier[] models = models(3);
     try {
       withAuthorizer(
           mock(GravitinoAuthorizer.class),
@@ -430,20 +535,85 @@ public class TestMetadataAuthzHelper {
                 0,
                 MetadataAuthzHelper.filterByExpression(
                         "testMetalake",
-                        principalListExpression(Entity.EntityType.ROLE),
-                        Entity.EntityType.ROLE,
-                        identifiers)
+                        AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
+                        Entity.EntityType.MODEL,
+                        models)
                     .length);
+            verifyNoInteractions(store);
           });
-      verify(relations)
-          .batchListEntitiesByRelation(
-              SupportsRelationOperations.Type.OWNER_REL,
-              Arrays.asList(identifiers),
-              Entity.EntityType.ROLE);
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
+    }
+  }
+
+  /** A USE_JOB_TEMPLATE grant on the metalake lists every job template with constant work. */
+  @Test
+  public void testListShortCircuitJobTemplateViaMetalakeGrant() {
+    EntityStore store = mock(EntityStore.class);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, Privilege.Name.USE_JOB_TEMPLATE);
+    NameIdentifier[] templates =
+        IntStream.range(0, 500)
+            .mapToObj(i -> NameIdentifierUtil.ofJobTemplate("testMetalake", "tpl" + i))
+            .toArray(NameIdentifier[]::new);
+    try {
+      withAuthorizer(
+          authorizer,
+          () -> {
+            NameIdentifier[] filtered =
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake",
+                    AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.JOB_TEMPLATE,
+                    templates);
+            Assertions.assertSame(templates, filtered);
+            verify(authorizer, times(1))
+                .authorize(
+                    any(), eq("testMetalake"), any(), eq(Privilege.Name.USE_JOB_TEMPLATE), any());
+            verifyNoInteractions(store);
+          });
     } finally {
       when(gravitinoEnv.cacheEnabled()).thenReturn(false);
       when(gravitinoEnv.entityStore()).thenReturn(null);
     }
+  }
+
+  /** Without a metalake-scope grant, job templates are still filtered one by one. */
+  @Test
+  public void testJobTemplateListNoParentGrantFallsBackToPerObject() {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    NameIdentifier[] templates =
+        new NameIdentifier[] {
+          NameIdentifierUtil.ofJobTemplate("testMetalake", "tpl1"),
+          NameIdentifierUtil.ofJobTemplate("testMetalake", "tpl2")
+        };
+    when(authorizer.isOwner(any(), eq("testMetalake"), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              return object.type() == MetadataObject.Type.JOB_TEMPLATE
+                  && "tpl2".equals(object.name());
+            });
+    withAuthorizer(
+        authorizer,
+        () ->
+            Assertions.assertArrayEquals(
+                new NameIdentifier[] {templates[1]},
+                MetadataAuthzHelper.filterByExpression(
+                    "testMetalake",
+                    AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.JOB_TEMPLATE,
+                    templates)));
+  }
+
+  private static NameIdentifier[] models(int count) {
+    return IntStream.range(0, count)
+        .mapToObj(i -> NameIdentifierUtil.ofModel("testMetalake", "testCatalog", "s1", "m" + i))
+        .toArray(NameIdentifier[]::new);
   }
 
   /** A role expression without MANAGE_GRANTS must not inherit that list shortcut. */

@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -76,6 +77,23 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+  }
+
+  @Test
+  public void testDropTopicDoesNotRemovePrivilegesWhenTopicDoesNotExist() {
+    TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
+    TopicHookDispatcher hook = new TopicHookDispatcher(dispatcher);
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "topic");
+    Mockito.when(dispatcher.dropTopic(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertFalse(hook.dropTopic(ident));
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.TOPIC, null),
+          Mockito.never());
+    }
   }
 
   @Test

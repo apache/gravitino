@@ -32,6 +32,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -47,6 +53,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -197,6 +204,12 @@ public class CatalogDorisIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
   }
 
+  @Test
+  void testDropMissingTableReturnsFalse() {
+    String missingTable = GravitinoITUtils.genRandomName("missing_table");
+    assertFalse(catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, missingTable)));
+  }
+
   private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     String propKey = "key";
@@ -209,6 +222,41 @@ public class CatalogDorisIT extends BaseIT {
     assertEquals(createdSchema.name(), loadSchema.name());
 
     assertEquals(createdSchema.properties().get(propKey), propValue);
+  }
+
+  @Test
+  void testTableCommentRoundTrip() throws Exception {
+    TableCatalog tables = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("comment_roundtrip"));
+    String comment = "crud probe";
+
+    tables.createTable(
+        tableIdentifier,
+        createColumns(),
+        comment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null);
+
+    assertEquals(comment, tables.loadTable(tableIdentifier).comment());
+
+    String sql =
+        "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableIdentifier.name());
+      try (ResultSet result = statement.executeQuery()) {
+        assertTrue(result.next());
+        String storedComment = result.getString("TABLE_COMMENT");
+        assertTrue(StringIdentifier.fromComment(storedComment) != null);
+        assertEquals(comment, StringIdentifier.removeIdFromComment(storedComment));
+      }
+    }
   }
 
   @Test
@@ -672,6 +720,195 @@ public class CatalogDorisIT extends BaseIT {
             () ->
                 assertEquals(
                     "true", tableCatalog.loadTable(tableIdentifier).properties().get("in_memory")));
+  }
+
+  @Test
+  void testAddColumnPreservesDefaultValue() throws SQLException {
+    String defaultedColumnName = "defaulted_col";
+    String nullableDefaultColumnName = "nullable_default_col";
+    String requestedDefaultValue = "owner's a\"\"b \"value\"\\path";
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("test_add_column_preserves_default"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        table_comment,
+        createTableProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null,
+        Indexes.EMPTY_INDEXES);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {defaultedColumnName},
+            Types.VarCharType.of(255),
+            "defaulted column",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            false,
+            Literals.of(requestedDefaultValue, Types.VarCharType.of(255))));
+
+    String diagnosticQualifiedTableName = schemaName + "." + tableIdentifier.name();
+    String[] rawDefaults = new String[3];
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              try (Connection connection =
+                      DriverManager.getConnection(
+                          jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+                  Statement statement = connection.createStatement();
+                  ResultSet columns =
+                      connection
+                          .getMetaData()
+                          .getColumns(
+                              schemaName, null, tableIdentifier.name(), defaultedColumnName)) {
+                String jdbcColumnDefault = null;
+                while (columns.next()) {
+                  if (defaultedColumnName.equals(columns.getString("COLUMN_NAME"))) {
+                    jdbcColumnDefault = columns.getString("COLUMN_DEF");
+                    break;
+                  }
+                }
+                Assertions.assertNotNull(jdbcColumnDefault, "JDBC COLUMN_DEF was not returned");
+                rawDefaults[0] = jdbcColumnDefault;
+
+                try (ResultSet showColumns =
+                    statement.executeQuery(
+                        "SHOW FULL COLUMNS FROM " + diagnosticQualifiedTableName)) {
+                  while (showColumns.next()) {
+                    if (defaultedColumnName.equals(showColumns.getString("Field"))) {
+                      rawDefaults[1] = showColumns.getString("Default");
+                      break;
+                    }
+                  }
+                }
+                Assertions.assertNotNull(
+                    rawDefaults[1], "SHOW FULL COLUMNS did not return the string default");
+
+                String infoSchemaQuery =
+                    String.format(
+                        "SELECT COLUMN_DEFAULT FROM information_schema.columns "
+                            + "WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' "
+                            + "AND COLUMN_NAME = '%s'",
+                        schemaName, tableIdentifier.name(), defaultedColumnName);
+                try (ResultSet infoSchema = statement.executeQuery(infoSchemaQuery)) {
+                  Assertions.assertTrue(
+                      infoSchema.next(), "information_schema.columns row was not returned");
+                  rawDefaults[2] = infoSchema.getString("COLUMN_DEFAULT");
+                }
+              }
+            });
+
+    String metadataDiagnostic =
+        String.format(
+            "JDBC COLUMN_DEF=[%s], SHOW FULL COLUMNS Default=[%s], "
+                + "information_schema.COLUMN_DEFAULT=[%s]",
+            rawDefaults[0], rawDefaults[1], rawDefaults[2]);
+    DorisContainer.LOG.info("Doris default metadata diagnostic: {}", metadataDiagnostic);
+    String[] insertedDefaultValue = new String[1];
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (%s, %s, %s, %s) " + "VALUES (102, 'data-1', 'data-2', '2024-01-01')",
+              diagnosticQualifiedTableName,
+              DORIS_COL_NAME1,
+              DORIS_COL_NAME2,
+              DORIS_COL_NAME3,
+              DORIS_COL_NAME4));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT %s FROM %s WHERE %s = 102",
+                  defaultedColumnName, diagnosticQualifiedTableName, DORIS_COL_NAME1))) {
+        Assertions.assertTrue(resultSet.next());
+        insertedDefaultValue[0] = resultSet.getString(1);
+        Assertions.assertFalse(resultSet.next());
+      }
+    }
+    Assertions.assertEquals(
+        requestedDefaultValue,
+        insertedDefaultValue[0],
+        metadataDiagnostic + "; inserted value=[" + insertedDefaultValue[0] + "]");
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn =
+                  findColumn(tableCatalog.loadTable(tableIdentifier), defaultedColumnName);
+              Assertions.assertEquals(Types.VarCharType.of(255), addedColumn.dataType());
+              Assertions.assertFalse(addedColumn.nullable());
+              Assertions.assertEquals("defaulted column", addedColumn.comment());
+              Assertions.assertEquals(
+                  Literals.of(requestedDefaultValue, Types.VarCharType.of(255)),
+                  addedColumn.defaultValue(),
+                  metadataDiagnostic + "; inserted value=[" + insertedDefaultValue[0] + "]");
+            });
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {nullableDefaultColumnName},
+            Types.IntegerType.get(),
+            "nullable default column",
+            TableChange.ColumnPosition.defaultPos(),
+            true,
+            false,
+            Literals.integerLiteral(9)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn =
+                  findColumn(tableCatalog.loadTable(tableIdentifier), nullableDefaultColumnName);
+              Assertions.assertEquals(Types.IntegerType.get(), addedColumn.dataType());
+              Assertions.assertTrue(addedColumn.nullable());
+              Assertions.assertEquals("nullable default column", addedColumn.comment());
+              Assertions.assertEquals(Literals.integerLiteral(9), addedColumn.defaultValue());
+            });
+
+    String qualifiedTableName = String.format("`%s`.`%s`", schemaName, tableIdentifier.name());
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO %s (`%s`, `%s`, `%s`, `%s`) "
+                  + "VALUES (101, 'data-1', 'data-2', '2024-01-01')",
+              qualifiedTableName,
+              DORIS_COL_NAME1,
+              DORIS_COL_NAME2,
+              DORIS_COL_NAME3,
+              DORIS_COL_NAME4));
+
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format(
+                  "SELECT `%s`, `%s` FROM %s WHERE `%s` = 101",
+                  defaultedColumnName,
+                  nullableDefaultColumnName,
+                  qualifiedTableName,
+                  DORIS_COL_NAME1))) {
+        Assertions.assertTrue(resultSet.next());
+        Assertions.assertEquals(requestedDefaultValue, resultSet.getString(1));
+        Assertions.assertEquals(9, resultSet.getInt(2));
+        Assertions.assertFalse(resultSet.wasNull());
+        Assertions.assertFalse(resultSet.next());
+      }
+    }
   }
 
   @Test
@@ -1308,5 +1545,12 @@ public class CatalogDorisIT extends BaseIT {
     assertEquals(2, partitions.size());
     assertPartition(Partitions.list("p1", p1Values, Collections.emptyMap()), partitions.get("p1"));
     assertPartition(Partitions.list("p2", p2Values, Collections.emptyMap()), partitions.get("p2"));
+  }
+
+  private Column findColumn(Table table, String columnName) {
+    return Arrays.stream(table.columns())
+        .filter(column -> column.name().equals(columnName))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("Column not found: " + columnName));
   }
 }

@@ -19,9 +19,11 @@
 package org.apache.gravitino.dto.rel.partitioning;
 
 import com.google.common.base.Preconditions;
+import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Represents the year partitioning. */
+@EqualsAndHashCode(callSuper = true)
 public final class YearPartitioningDTO extends Partitioning.SingleFieldPartitioning {
 
   /**

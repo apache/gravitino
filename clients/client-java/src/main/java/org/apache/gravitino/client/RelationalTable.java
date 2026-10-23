@@ -43,12 +43,11 @@ import org.apache.gravitino.dto.responses.PartitionNameListResponse;
 import org.apache.gravitino.dto.responses.PartitionResponse;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -70,6 +69,7 @@ import org.apache.gravitino.stats.SupportsPartitionStatistics;
 import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a relational table. */
@@ -394,8 +394,18 @@ class RelationalTable
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override
@@ -419,19 +429,18 @@ class RelationalTable
   }
 
   @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
+  }
+
+  @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
   }
 
   @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException {
-    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   @Override

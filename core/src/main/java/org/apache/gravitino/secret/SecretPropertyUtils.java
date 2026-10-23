@@ -25,11 +25,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -38,14 +40,6 @@ import org.apache.gravitino.connector.PropertyEntry;
  * (build/write/rollback) and secret-key uniqueness checks rather than property assembly.
  */
 public final class SecretPropertyUtils {
-
-  /**
-   * Property keys whose names look like credentials. Matching is case-insensitive. Used to mask API
-   * responses and to expose plaintext via {@code getSecrets} for undeclared / mistyped credential
-   * properties.
-   */
-  private static final Pattern SENSITIVE_PROPERTY_KEY_PATTERN =
-      Pattern.compile(".*(secret|password|token|credential|access|account).*");
 
   /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
@@ -59,34 +53,49 @@ public final class SecretPropertyUtils {
   private SecretPropertyUtils() {}
 
   /**
+   * Replaces the sensitive property key keywords from server configuration.
+   *
+   * @param config server configuration
+   */
+  public static void configureSensitiveKeyKeywords(Config config) {
+    SensitivePropertyKeyMatcher.configure(config);
+  }
+
+  /**
    * Returns whether a property key name looks sensitive (credential-like).
    *
-   * <p>A key matches when, after lower-casing, it contains {@code secret}, {@code password}, {@code
-   * token}, {@code credential}, {@code access}, or {@code account} as a substring (covers Azure
-   * storage account key/name and GCS service-account file paths). Underscores and hyphens are not
-   * normalized; they are irrelevant because the matched keywords contain neither.
+   * <p>A key matches when, after lower-casing, it contains one of the active keywords as a literal
+   * substring. The default keywords are {@code secret}, {@code password}, {@code token}, {@code
+   * credential}, {@code access}, and {@code account} (covers Azure storage account key/name and GCS
+   * service-account file paths). {@link Configs#SENSITIVE_KEY_KEYWORDS} replaces that set, so a
+   * deployment can drop a default keyword or add another. Underscores and hyphens are not
+   * normalized; they are irrelevant because the default keywords contain neither.
    *
    * @param key the property key
-   * @return true when the key name matches the sensitive pattern
+   * @return true when the key name matches an active keyword
    */
   public static boolean isSensitivePropertyKey(@Nullable String key) {
     if (key == null || key.isEmpty()) {
       return false;
     }
-    return SENSITIVE_PROPERTY_KEY_PATTERN.matcher(key.toLowerCase(Locale.ROOT)).matches();
+    return SensitivePropertyKeyMatcher.matches(key.toLowerCase(Locale.ROOT));
   }
 
   /**
-   * Returns whether a sensitive-named inline property should be recovered via {@code getSecrets}.
+   * Returns whether an inline (non-URN) property should be recovered via {@code getSecrets}.
    *
    * <p>Secret-manager URNs are always recovered separately. For inline plaintext:
    *
    * <ul>
    *   <li>{@code metadata == null}: do <strong>not</strong> recover (URN-only). Used when the
    *       catalog does not expose properties metadata for the entity type.
-   *   <li>otherwise: recover only undeclared keys or declared {@code hidden} keys. Declared
-   *       non-hidden configuration (for example {@code credential-providers}, {@code
-   *       s3-access-key-id}) stays in {@code properties()} and is excluded here.
+   *   <li>declared {@code hidden}: always recover, without the sensitive-keyword gate — so
+   *       shortening {@link Configs#SENSITIVE_KEY_KEYWORDS} cannot leave a masked property without
+   *       a recovery path.
+   *   <li>undeclared: recover only when the key name matches {@link #isSensitivePropertyKey}
+   *       (historical fuzzy recovery).
+   *   <li>declared non-hidden: never recover here (for example {@code credential-providers} stays
+   *       in {@code properties()}).
    * </ul>
    *
    * <p>Callers that need historical fuzzy recovery without real metadata should pass an empty
@@ -99,13 +108,13 @@ public final class SecretPropertyUtils {
    */
   public static boolean shouldRecoverSensitiveNamedSecret(
       String key, @Nullable PropertiesMetadata metadata) {
-    if (!isSensitivePropertyKey(key)) {
-      return false;
-    }
     if (metadata == null) {
       return false;
     }
-    return !metadata.containsProperty(key) || metadata.isHiddenProperty(key);
+    if (metadata.containsProperty(key)) {
+      return metadata.isHiddenProperty(key);
+    }
+    return isSensitivePropertyKey(key);
   }
 
   /**
@@ -144,21 +153,15 @@ public final class SecretPropertyUtils {
    * <ol>
    *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
    *       {@link SecretManager#readSecret}.
-   *   <li>Include every entry whose key matches {@link #isSensitivePropertyKey} and whose value is
-   *       not a secret URN, when {@link #shouldRecoverSensitiveNamedSecret} is true (undeclared or
-   *       declared hidden). Declared non-hidden keys are excluded even when the name looks
-   *       sensitive. When {@code metadata} is {@code null}, sensitive-named plaintext is not
-   *       recovered (URN-only).
+   *   <li>Include every inline entry when {@link #shouldRecoverSensitiveNamedSecret} is true:
+   *       declared {@code hidden} (no keyword gate), or undeclared with a sensitive-looking name.
+   *       Declared non-hidden keys are excluded even when the name looks sensitive. When {@code
+   *       metadata} is {@code null}, inline plaintext is not recovered (URN-only).
    * </ol>
    *
-   * <p>Declared {@code hidden} properties are <strong>not</strong> included merely because they are
-   * hidden. A hidden key is recovered only when it is a secret URN or its name matches {@link
-   * #isSensitivePropertyKey} (for example {@code jdbc-password}). A hidden key whose name does not
-   * look sensitive (for example a path-like {@code auth-file}) stays masked as {@code ******} on
-   * list/get and is absent from this map.
-   *
-   * <p>Normal non-sensitive properties are not included. Clients merge this map over masked {@code
-   * properties()} so undeclared credential keys remain usable without leaking on list/get.
+   * <p>Normal non-sensitive, non-hidden properties are not included. Clients merge this map over
+   * masked {@code properties()} so hidden and undeclared credential keys remain usable without
+   * leaking on list/get.
    *
    * @param secretManager secret manager used to resolve URNs
    * @param rawProperties raw entity properties (may be null)
@@ -360,5 +363,18 @@ public final class SecretPropertyUtils {
       Preconditions.checkArgument(
           entry.getValue() != null, "secretReferences[%s] must not be null", key);
     }
+  }
+
+  /**
+   * Omits cloud access-key pair properties from a plaintext secrets map for {@code USE_SECRETS}
+   * callers. Delegates to {@link
+   * CloudStorageCredentialPropertyKeys#omitCloudAccessKeyPairProperties}.
+   *
+   * @param secrets plaintext secrets
+   * @return secrets without cloud AK/SK pairs
+   */
+  public static Map<String, String> omitCloudAccessKeyPairSecrets(
+      @Nullable Map<String, String> secrets) {
+    return CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
   }
 }

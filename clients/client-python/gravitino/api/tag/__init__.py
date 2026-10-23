@@ -19,8 +19,10 @@ from __future__ import annotations
 
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_change import TagChange
+from gravitino.api.tag.tag_list import TagList
 
 __all__ = [
     "Tag",
     "TagChange",
+    "TagList",
 ]

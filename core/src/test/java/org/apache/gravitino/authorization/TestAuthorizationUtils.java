@@ -22,6 +22,7 @@ import static org.apache.gravitino.Catalog.Type.FILESET;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -40,6 +41,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -55,6 +57,24 @@ import org.mockito.Mockito;
 class TestAuthorizationUtils {
 
   String metalake = "metalake";
+
+  @Test
+  void testCheckCurrentUserUsesNeutralMembershipMessage() {
+    try (MockedStatic<GravitinoEnv> envMock = Mockito.mockStatic(GravitinoEnv.class)) {
+      GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+      GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+      envMock.when(GravitinoEnv::getInstance).thenReturn(env);
+      Mockito.when(env.gravitinoAuthorizer()).thenReturn(authorizer);
+
+      ForbiddenException exception =
+          Assertions.assertThrows(
+              ForbiddenException.class,
+              () -> AuthorizationUtils.checkCurrentUser(metalake, "tester"));
+      Assertions.assertEquals(
+          "Current user tester is not a member of metalake metalake, or the metalake does not exist",
+          exception.getMessage());
+    }
+  }
 
   @Test
   void testCreateNameIdentifier() {
@@ -426,6 +446,42 @@ class TestAuthorizationUtils {
   }
 
   @Test
+  void testRenameTableAcrossSchemasNotifiesAuthorizationPluginWithNewSchema() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog", "new_schema", "new_table");
+    List<String> locations = Lists.newArrayList("/warehouse/schema/table");
+
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, baseCatalog);
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.TABLE, newIdent, locations);
+    }
+
+    ArgumentCaptor<MetadataObjectChange[]> changesCaptor =
+        ArgumentCaptor.forClass(MetadataObjectChange[].class);
+    Mockito.verify(authorizationPlugin).onMetadataUpdated(changesCaptor.capture());
+    MetadataObjectChange.RenameMetadataObject renameChange =
+        Assertions.assertInstanceOf(
+            MetadataObjectChange.RenameMetadataObject.class, changesCaptor.getValue()[0]);
+    Assertions.assertEquals("catalog.schema.table", renameChange.metadataObject().fullName());
+    Assertions.assertEquals(
+        "catalog.new_schema.new_table", renameChange.newMetadataObject().fullName());
+    Assertions.assertEquals(locations, renameChange.locations());
+  }
+
+  @Test
   void testRemoveTablePrivilegesNotifiesAuthorizationPluginWithExpectedChange() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
     List<String> locations = Lists.newArrayList("/warehouse/schema/table");
@@ -459,6 +515,104 @@ class TestAuthorizationUtils {
     Assertions.assertEquals(MetadataObject.Type.TABLE, removeChange.metadataObject().type());
     Assertions.assertEquals("catalog.schema.table", removeChange.metadataObject().fullName());
     Assertions.assertEquals(locations, removeChange.getLocations());
+  }
+
+  @Test
+  void testSemanticModelParentAndMixedPrivileges() {
+    CatalogManager catalogs = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin plugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogs, catalog);
+    Mockito.when(catalog.name()).thenReturn("catalog");
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(plugin);
+    Mockito.when(catalogs.listCatalogs(Namespace.of(metalake)))
+        .thenReturn(new NameIdentifier[] {NameIdentifier.of(metalake, "catalog")});
+    GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(env.catalogManager()).thenReturn(catalogs);
+    try (MockedStatic<GravitinoEnv> mocked = Mockito.mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      for (MetadataObject.Type type :
+          List.of(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA)) {
+        String name =
+            type == MetadataObject.Type.METALAKE
+                ? metalake
+                : type == MetadataObject.Type.CATALOG ? "catalog" : "catalog.schema";
+        for (Privilege semantic :
+            List.of(
+                Privileges.CreateSemanticModel.allow(),
+                Privileges.UseSemanticModel.deny(),
+                Privileges.ModifySemanticModel.allow())) {
+          SecurableObject semanticOnly = SecurableObjects.parse(name, type, List.of(semantic));
+          AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+              metalake,
+              List.of(semanticOnly),
+              (p, c) -> Assertions.fail("Semantic-only grant dispatched"));
+          RoleEntity role =
+              RoleEntity.builder()
+                  .withId(1L)
+                  .withName("mixed")
+                  .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
+                  .withAuditInfo(
+                      AuditInfo.builder()
+                          .withCreator("tester")
+                          .withCreateTime(Instant.now())
+                          .build())
+                  .withSecurableObjects(
+                      List.of(
+                          SecurableObjects.parse(
+                              name, type, List.of(semantic, Privileges.SelectTable.allow())),
+                          SecurableObjects.parse(
+                              "catalog.schema.model",
+                              MetadataObject.Type.SEMANTIC_MODEL,
+                              List.of(Privileges.ManageGrants.allow()))))
+                  .build();
+          AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+              metalake,
+              role.securableObjects(),
+              (p, c) ->
+                  p.onRoleCreated(AuthorizationUtils.filterSecurableObjects(role, metalake, c)));
+          ArgumentCaptor<Role> captured = ArgumentCaptor.forClass(Role.class);
+          Mockito.verify(plugin).onRoleCreated(captured.capture());
+          Assertions.assertEquals(1, captured.getValue().securableObjects().size());
+          Assertions.assertEquals(
+              List.of(Privileges.SelectTable.allow()),
+              captured.getValue().securableObjects().get(0).privileges());
+          Mockito.clearInvocations(plugin);
+        }
+      }
+    }
+  }
+
+  @Test
+  void testSemanticModelPrivilegesAreNotPushedToAuthorizationPlugin() {
+    // Semantic Models exist only in Gravitino, so underlying connectors have nothing to revoke or
+    // rename. Rename and remove must leave the authorization plugin untouched.
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "sales_model");
+
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, baseCatalog);
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.SEMANTIC_MODEL, "renamed_model");
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.SEMANTIC_MODEL, null);
+    }
+
+    Mockito.verifyNoInteractions(authorizationPlugin);
   }
 
   @Test

@@ -18,25 +18,39 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.ANNOY_DISTANCE_FUNCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.ANNOY_TREES;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.CLICKHOUSE_TYPE_FULL;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_DISTANCE_FUNCTION;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_SCALAR_KIND;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_PROJECTIONS_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -45,6 +59,14 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.AbstractConfiguration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -52,7 +74,29 @@ import org.mockito.Mockito;
 
 public class TestClickHouseTableOperationsUnit {
 
+  private static final class CaptureAppender extends AbstractAppender {
+    private final List<LogEvent> events = new ArrayList<>();
+
+    CaptureAppender(String name) {
+      super(name, null, PatternLayout.createDefaultLayout(), true, null);
+    }
+
+    @Override
+    public void append(LogEvent event) {
+      events.add(event.toImmutable());
+    }
+
+    List<LogEvent> getEvents() {
+      return events;
+    }
+  }
+
+  private static final String JDBC_TABLE_OPERATIONS_LOGGER_NAME =
+      JdbcTableOperations.class.getName();
+
   private static final class ExposedClickHouseTableOperations extends ClickHouseTableOperations {
+    private JdbcTable table;
+
     List<Index> callGetIndexes(Connection connection, String databaseName, String tableName)
         throws Exception {
       return getIndexes(connection, databaseName, tableName);
@@ -61,6 +105,11 @@ public class TestClickHouseTableOperationsUnit {
     SystemTableMetadata callGetSystemTableMetadata(
         Connection connection, String databaseName, String tableName) throws Exception {
       return getSystemTableMetadata(connection, databaseName, tableName);
+    }
+
+    String callGetProjectionProperty(Connection connection, String databaseName, String tableName)
+        throws Exception {
+      return getProjectionProperty(connection, databaseName, tableName);
     }
 
     Map<String, String> callGetTableProperties(Connection connection, String tableName)
@@ -77,6 +126,15 @@ public class TestClickHouseTableOperationsUnit {
                 .withNullable(false)
                 .build()
           };
+      return callGenerateCreateTableSql(columns, properties);
+    }
+
+    String callGenerateCreateTableSql(JdbcColumn[] columns, Map<String, String> properties) {
+      return callGenerateCreateTableSql(columns, properties, Indexes.EMPTY_INDEXES);
+    }
+
+    String callGenerateCreateTableSql(
+        JdbcColumn[] columns, Map<String, String> properties, Index[] indexes) {
       return generateCreateTableSql(
           "test_table",
           columns,
@@ -84,13 +142,187 @@ public class TestClickHouseTableOperationsUnit {
           properties,
           Transforms.EMPTY_TRANSFORM,
           Distributions.NONE,
-          Indexes.EMPTY_INDEXES,
+          indexes,
           getSortOrders("id"));
+    }
+
+    String callGenerateCreateTableSqlWithoutSort(JdbcColumn[] columns, Index[] indexes) {
+      return generateCreateTableSql(
+          "test_table",
+          columns,
+          "",
+          Map.of(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          indexes);
+    }
+
+    Index.IndexType callGetClickHouseIndexType(String rawType) {
+      return getClickHouseIndexType(rawType);
+    }
+
+    void setTable(JdbcTable table) {
+      this.table = table;
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      return table;
+    }
+
+    String callGenerateAlterTableSql(TableChange... changes) {
+      return generateAlterTableSql("db", "test_table", changes);
     }
   }
 
   private ExposedClickHouseTableOperations newOps() {
     return newOps(null);
+  }
+
+  @Test
+  void testCreateTableRejectsVarchar() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("name")
+              .withType(Types.VarCharType.of(64))
+              .withNullable(true)
+              .build()
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> newOps().callGenerateCreateTableSql(columns, Map.of()));
+    Assertions.assertTrue(exception.getMessage().contains("ClickHouse does not support varchar"));
+  }
+
+  @Test
+  void testLegacyAnnUsearchTypesAreDistinctAndParameterizedFormsAreRecognized() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_ANNOY, ops.callGetClickHouseIndexType("annoy"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_ANNOY, ops.callGetClickHouseIndexType("annoy(100)"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_USEARCH, ops.callGetClickHouseIndexType("usearch"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_USEARCH,
+        ops.callGetClickHouseIndexType("usearch(cosineDistance)"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+        ops.callGetClickHouseIndexType("vector_similarity"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.callGetClickHouseIndexType("unknown_index"));
+  }
+
+  @Test
+  void testCreateAndAlterRejectLegacyAnnUsearchIndexesWithContext() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build()
+        };
+
+    for (Index.IndexType indexType :
+        List.of(Index.IndexType.DATA_SKIPPING_ANNOY, Index.IndexType.DATA_SKIPPING_USEARCH)) {
+      Index index = Indexes.of(indexType, "idx_legacy", new String[][] {{"id"}});
+      IllegalArgumentException createException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> newOps().callGenerateCreateTableSql(columns, Map.of(), new Index[] {index}));
+      assertLegacyWriteError(createException, indexType);
+
+      IllegalArgumentException createWithoutSortException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> newOps().callGenerateCreateTableSqlWithoutSort(columns, new Index[] {index}));
+      assertLegacyWriteError(createWithoutSortException, indexType);
+
+      IllegalArgumentException alterException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  newAlterOps(Map.of())
+                      .callGenerateAlterTableSql(
+                          TableChange.addIndex(indexType, "idx_legacy", new String[][] {{"id"}})));
+      assertLegacyWriteError(alterException, indexType);
+    }
+  }
+
+  @Test
+  void testToPartitionExpressionSupportsStartFunctions() {
+    Assertions.assertEquals(
+        "toStartOfWeek(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(
+            Transforms.apply(
+                "toStartOfWeek", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertEquals(
+        "toStartOfMonth(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(
+            Transforms.apply(
+                "toStartOfMonth", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertEquals(
+        "toStartOfQuarter(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(
+            Transforms.apply(
+                "toStartOfQuarter", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertEquals(
+        "toStartOfYear(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(
+            Transforms.apply(
+                "toStartOfYear", new Expression[] {NamedReference.field("event_time")})));
+  }
+
+  @Test
+  void testToPartitionExpressionRejectsUnsupportedFunctionTransforms() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfDay", new Expression[] {NamedReference.field("event_time")})));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfQuarter",
+                    new Expression[] {
+                      NamedReference.field("event_time"), NamedReference.field("tenant_id")
+                    })));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfYear",
+                    new Expression[] {
+                      FunctionExpression.of("toDate", NamedReference.field("event_time"))
+                    })));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfWeek",
+                    new Expression[] {
+                      NamedReference.field("event_time"), NamedReference.field("tenant_id")
+                    })));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.toPartitionExpression(
+                Transforms.apply(
+                    "toStartOfWeek",
+                    new Expression[] {
+                      FunctionExpression.of("toDate", NamedReference.field("event_time"))
+                    })));
   }
 
   private ExposedClickHouseTableOperations newOps(DataSource dataSource) {
@@ -102,6 +334,77 @@ public class TestClickHouseTableOperationsUnit {
         new ClickHouseColumnDefaultValueConverter(),
         new HashMap<>());
     return ops;
+  }
+
+  private static List<Index> getIndexesWithoutWarnings(
+      ExposedClickHouseTableOperations ops,
+      Connection connection,
+      String databaseName,
+      String tableName)
+      throws Exception {
+    return getIndexesExpectingWarnings(ops, connection, databaseName, tableName, 0);
+  }
+
+  private static List<Index> getIndexesExpectingWarnings(
+      ExposedClickHouseTableOperations ops,
+      Connection connection,
+      String databaseName,
+      String tableName,
+      int expectedWarningCount)
+      throws Exception {
+    LoggerContext loggerContext =
+        (LoggerContext)
+            LogManager.getContext(ClickHouseTableOperations.class.getClassLoader(), false);
+    AbstractConfiguration configuration = (AbstractConfiguration) loggerContext.getConfiguration();
+    CaptureAppender warningCapture = new CaptureAppender("clickhouseMetadataWarningCapture");
+    warningCapture.start();
+    configuration.addAppender(warningCapture);
+    LoggerConfig loggerConfig =
+        new LoggerConfig(JDBC_TABLE_OPERATIONS_LOGGER_NAME, Level.WARN, false);
+    loggerConfig.addAppender(warningCapture, Level.WARN, null);
+    configuration.addLogger(JDBC_TABLE_OPERATIONS_LOGGER_NAME, loggerConfig);
+    loggerContext.updateLoggers();
+
+    try {
+      List<Index> indexes = ops.callGetIndexes(connection, databaseName, tableName);
+      Assertions.assertEquals(
+          expectedWarningCount,
+          warningCapture.getEvents().size(),
+          "Unexpected warning count while loading legacy Annoy and USearch metadata");
+      Assertions.assertTrue(
+          warningCapture.getEvents().stream()
+              .allMatch(event -> Level.WARN.equals(event.getLevel())),
+          "Legacy Annoy and USearch metadata warnings should use WARN level");
+      return indexes;
+    } finally {
+      configuration.removeLogger(JDBC_TABLE_OPERATIONS_LOGGER_NAME);
+      warningCapture.stop();
+      configuration.removeAppender(warningCapture.getName());
+      loggerContext.updateLoggers();
+    }
+  }
+
+  private ExposedClickHouseTableOperations newAlterOps(Map<String, String> properties) {
+    ExposedClickHouseTableOperations ops = newOps();
+    JdbcColumn idColumn =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    ops.setTable(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {idColumn})
+            .withIndexes(Indexes.EMPTY_INDEXES)
+            .withProperties(properties)
+            .withTableOperation(null)
+            .build());
+    return ops;
+  }
+
+  private static String settingProperty(String name) {
+    return TableConstants.SETTINGS_PREFIX + name;
   }
 
   private Map<String, String> loadTableProperties(String engine, String engineFull)
@@ -380,6 +683,384 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testProjectionPropertyRoundTripAndDeterministicOrdering() {
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> definitions =
+        List.of(
+            new ClickHouseTableSqlUtils.ProjectionDefinition(
+                "z_aggregate",
+                "Aggregate",
+                "SELECT region, count() GROUP BY region",
+                Map.of("index_granularity", "128")),
+            new ClickHouseTableSqlUtils.ProjectionDefinition(
+                "a projection", "Normal", "SELECT concat(name, ')') ORDER BY name", Map.of()));
+
+    String property = ClickHouseTableSqlUtils.serializeProjectionDefinitions(definitions);
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> parsed =
+        ClickHouseTableSqlUtils.parseProjectionDefinitions(property);
+
+    Assertions.assertEquals("a projection", parsed.get(0).name());
+    Assertions.assertEquals("z_aggregate", parsed.get(1).name());
+    Assertions.assertEquals(Map.of("index_granularity", "128"), parsed.get(1).settings());
+    String clauses = ClickHouseTableSqlUtils.formatProjectionClauses(parsed);
+    Assertions.assertTrue(clauses.contains("PROJECTION `a projection`"), clauses);
+    Assertions.assertTrue(clauses.contains("PROJECTION `z_aggregate`"), clauses);
+    Assertions.assertTrue(clauses.contains("WITH SETTINGS (index_granularity = 128)"), clauses);
+    Assertions.assertTrue(
+        clauses.indexOf("a projection") < clauses.indexOf("z_aggregate"), clauses);
+  }
+
+  @Test
+  void testProjectionPropertyParserRejectsMalformedOrUnsafeValues() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> ClickHouseTableSqlUtils.parseProjectionDefinitions("not json"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\","
+                    + "\"query\":\"SELECT x\"}] trailing content"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\",\"query\":\"SELECT x)\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\","
+                    + "\"query\":\"SELECT x; DROP TABLE t\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\",\"query\":\"SELECT x\","
+                    + "\"settings\":{\"index_granularity\":\"1; DROP TABLE t\"}}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Lightweight\",\"query\":\"SELECT x\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\"," + "\"query\":\"SELECT x WHERE x > 0\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\","
+                    + "\"query\":\"SELECT _part_offset ORDER BY _part_offset\"}]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableSqlUtils.parseProjectionDefinitions(
+                "[{\"name\":\"p\",\"type\":\"Normal\","
+                    + "\"query\":\"SELECT `_part_offset` ORDER BY tuple()\"}]"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlAppendsProjectionInsideDefinition() {
+    String property =
+        ClickHouseTableSqlUtils.serializeProjectionDefinitions(
+            List.of(
+                new ClickHouseTableSqlUtils.ProjectionDefinition(
+                    "by_name", "Normal", "SELECT name ORDER BY name", Map.of())));
+
+    String sql = newOps().callGenerateCreateTableSql(Map.of(CLICKHOUSE_PROJECTIONS_KEY, property));
+
+    Assertions.assertTrue(
+        sql.contains(",\n PROJECTION `by_name` (\n  SELECT name ORDER BY name\n )"), sql);
+    Assertions.assertTrue(sql.indexOf("PROJECTION") < sql.indexOf("\n)"), sql);
+    Assertions.assertFalse(newOps().callGenerateCreateTableSql(Map.of()).contains("PROJECTION"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            newOps()
+                .callGenerateCreateTableSql(
+                    Map.of(
+                        CLICKHOUSE_PROJECTIONS_KEY,
+                        property,
+                        TableConstants.ENGINE,
+                        ENGINE.LOG.getValue())));
+  }
+
+  @Test
+  void testGetProjectionPropertyReads24_9SchemaWithoutSettings() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe)
+        .thenReturn(columns)
+        .thenReturn(projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(probeResult.next()).thenReturn(false);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, false);
+    Mockito.when(projectionResult.getString("name")).thenReturn("by_name");
+    Mockito.when(projectionResult.getString("type")).thenReturn("Normal");
+    Mockito.when(projectionResult.getString("query")).thenReturn("SELECT name ORDER BY name");
+
+    String property = ops.callGetProjectionProperty(connection, "db", "table");
+
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> definitions =
+        ClickHouseTableSqlUtils.parseProjectionDefinitions(property);
+    Assertions.assertEquals(1, definitions.size());
+    Assertions.assertEquals("by_name", definitions.get(0).name());
+    Assertions.assertTrue(definitions.get(0).settings().isEmpty());
+    Mockito.verify(connection, Mockito.times(3)).prepareStatement(sqlCaptor.capture());
+    Assertions.assertFalse(sqlCaptor.getAllValues().get(2).contains("settings"));
+    Mockito.verify(projections).setString(1, "db");
+    Mockito.verify(projections).setString(2, "table");
+  }
+
+  @Test
+  void testGetProjectionPropertyReadsSettingsWhenSystemTableExposesColumn() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe)
+        .thenReturn(columns)
+        .thenReturn(projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(probeResult.next()).thenReturn(false);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query", "settings");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, false);
+    Mockito.when(projectionResult.getString("name")).thenReturn("by_name");
+    Mockito.when(projectionResult.getString("type")).thenReturn("Normal");
+    Mockito.when(projectionResult.getString("query")).thenReturn("SELECT name ORDER BY name");
+    Mockito.when(projectionResult.getString("settings_json"))
+        .thenReturn("{\"index_granularity\":\"128\"}");
+
+    String property = ops.callGetProjectionProperty(connection, "db", "table");
+
+    List<ClickHouseTableSqlUtils.ProjectionDefinition> definitions =
+        ClickHouseTableSqlUtils.parseProjectionDefinitions(property);
+    Assertions.assertEquals(Map.of("index_granularity", "128"), definitions.get(0).settings());
+    Mockito.verify(connection, Mockito.times(3)).prepareStatement(sqlCaptor.capture());
+    Assertions.assertTrue(sqlCaptor.getAllValues().get(2).contains("toJSONString(settings)"));
+  }
+
+  @Test
+  void testGetProjectionPropertySkipsAllDefinitionsForUnsupportedQuery() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe, columns, projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, true, false);
+    Mockito.when(projectionResult.getString("name")).thenReturn("by_name", "by_offset");
+    Mockito.when(projectionResult.getString("type")).thenReturn("Normal", "Normal");
+    Mockito.when(projectionResult.getString("query"))
+        .thenReturn("SELECT name ORDER BY name", "SELECT _part_offset ORDER BY b");
+
+    Assertions.assertNull(ops.callGetProjectionProperty(connection, "db", "table"));
+  }
+
+  @Test
+  void testGetProjectionPropertySkipsUnsupportedSettings() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe, columns, projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query", "settings");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, false);
+    Mockito.when(projectionResult.getString("settings_json"))
+        .thenReturn("{\"index_granularity\":\"1 + 1\"}");
+
+    Assertions.assertNull(ops.callGetProjectionProperty(connection, "db", "table"));
+  }
+
+  @Test
+  void testLoadKeepsOtherPropertiesWhenProjectionIsUnsupported() throws Exception {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    DatabaseMetaData metadata = Mockito.mock(DatabaseMetaData.class);
+    ResultSet tableResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    PreparedStatement systemTable = Mockito.mock(PreparedStatement.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projectionColumns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet systemTableResult = Mockito.mock(ResultSet.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionColumnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.getCatalog()).thenReturn("db");
+    Mockito.when(connection.getMetaData()).thenReturn(metadata);
+    Mockito.when(metadata.getTables("db", null, "t", null)).thenReturn(tableResult);
+    Mockito.when(metadata.getColumns("db", "db", "t", null)).thenReturn(columnResult);
+    Mockito.when(tableResult.next()).thenReturn(true, false);
+    Mockito.when(tableResult.getString("TABLE_NAME")).thenReturn("t");
+    Mockito.when(columnResult.next()).thenReturn(true, false);
+    Mockito.when(columnResult.getString("TABLE_NAME")).thenReturn("t");
+    Mockito.when(columnResult.getString("COLUMN_NAME")).thenReturn("a");
+    Mockito.when(columnResult.getString("TYPE_NAME")).thenReturn("Int32");
+    Mockito.when(columnResult.getString("IS_AUTOINCREMENT")).thenReturn("NO");
+
+    ClickHouseTableOperations ops = Mockito.spy(new ClickHouseTableOperations());
+    ops.initialize(
+        dataSource,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    Mockito.doReturn(Map.of()).when(ops).getDefaultKinds(connection, "db", "t");
+    Mockito.doReturn(List.of()).when(ops).getIndexes(connection, "db", "t");
+    Mockito.doReturn("").when(ops).getPartitionKey(connection, "db", "t");
+    Mockito.doReturn(Map.of(TableConstants.ENGINE, "MergeTree"))
+        .when(ops)
+        .getTableProperties(connection, "t");
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(systemTable, probe, projectionColumns, projections);
+    Mockito.when(systemTable.executeQuery()).thenReturn(systemTableResult);
+    Mockito.when(systemTableResult.next()).thenReturn(true, false);
+    Mockito.when(systemTableResult.getString("sorting_key")).thenReturn("a");
+    Mockito.when(systemTableResult.getString("engine_full")).thenReturn("MergeTree ORDER BY a");
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(projectionColumns.executeQuery()).thenReturn(projectionColumnResult);
+    Mockito.when(projectionColumnResult.next()).thenReturn(true, true, true, false);
+    Mockito.when(projectionColumnResult.getString("name")).thenReturn("name", "type", "query");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(true, false);
+    Mockito.when(projectionResult.getString("name")).thenReturn("p");
+    Mockito.when(projectionResult.getString("type")).thenReturn("Normal");
+    Mockito.when(projectionResult.getString("query")).thenReturn("SELECT _part_offset ORDER BY a");
+
+    JdbcTable table = ops.load("db", "t");
+
+    Mockito.verify(metadata).getDriverVersion();
+    Assertions.assertEquals(1, table.columns().length);
+    Assertions.assertEquals("MergeTree", table.properties().get(TableConstants.ENGINE));
+    Assertions.assertEquals("", table.properties().get(TableConstants.PARTITION_KEY));
+    Assertions.assertFalse(table.properties().containsKey(CLICKHOUSE_PROJECTIONS_KEY));
+  }
+
+  @Test
+  void testGetProjectionPropertyReturnsNullWhenAvailableTableHasNoRows() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    PreparedStatement projections = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+    ResultSet projectionResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe)
+        .thenReturn(columns)
+        .thenReturn(projections);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(probeResult.next()).thenReturn(false);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type", "query");
+    Mockito.when(projections.executeQuery()).thenReturn(projectionResult);
+    Mockito.when(projectionResult.next()).thenReturn(false);
+
+    Assertions.assertNull(ops.callGetProjectionProperty(connection, "db", "table"));
+  }
+
+  @Test
+  void testGetProjectionPropertyRejectsMissingRequiredSystemColumn() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement probe = Mockito.mock(PreparedStatement.class);
+    PreparedStatement columns = Mockito.mock(PreparedStatement.class);
+    ResultSet probeResult = Mockito.mock(ResultSet.class);
+    ResultSet columnResult = Mockito.mock(ResultSet.class);
+
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(probe)
+        .thenReturn(columns);
+    Mockito.when(probe.executeQuery()).thenReturn(probeResult);
+    Mockito.when(probeResult.next()).thenReturn(false);
+    Mockito.when(columns.executeQuery()).thenReturn(columnResult);
+    Mockito.when(columnResult.next()).thenReturn(true, true, false);
+    Mockito.when(columnResult.getString("name")).thenReturn("name", "type");
+
+    SQLException exception =
+        Assertions.assertThrows(
+            SQLException.class, () -> ops.callGetProjectionProperty(connection, "db", "table"));
+
+    Assertions.assertTrue(exception.getMessage().contains("query"));
+    Mockito.verify(connection, Mockito.times(2)).prepareStatement(Mockito.anyString());
+  }
+
+  @Test
+  void testGetProjectionPropertyHandlesUnavailableSystemTableAndPropagatesOtherErrors()
+      throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection missingConnection = Mockito.mock(Connection.class);
+    PreparedStatement missingProbe = Mockito.mock(PreparedStatement.class);
+    Mockito.when(missingConnection.prepareStatement(Mockito.anyString())).thenReturn(missingProbe);
+    Mockito.when(missingProbe.executeQuery())
+        .thenThrow(new SQLException("Unknown table system.projections", "", 60));
+    Assertions.assertNull(ops.callGetProjectionProperty(missingConnection, "db", "table"));
+
+    Connection deniedConnection = Mockito.mock(Connection.class);
+    PreparedStatement deniedProbe = Mockito.mock(PreparedStatement.class);
+    Mockito.when(deniedConnection.prepareStatement(Mockito.anyString())).thenReturn(deniedProbe);
+    SQLException permissionError = new SQLException("Not enough privileges", "", 497);
+    Mockito.when(deniedProbe.executeQuery()).thenThrow(permissionError);
+    Assertions.assertSame(
+        permissionError,
+        Assertions.assertThrows(
+            SQLException.class,
+            () -> ops.callGetProjectionProperty(deniedConnection, "db", "table")));
+  }
+
+  @Test
   void testGetSystemTableMetadataParsesSettingsFromEngineFull() throws Exception {
     ExposedClickHouseTableOperations ops = newOps();
     Connection connection = Mockito.mock(Connection.class);
@@ -403,6 +1084,114 @@ public class TestClickHouseTableOperationsUnit {
         "4096", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
     Assertions.assertEquals(
         "0", settings.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+  }
+
+  @Test
+  void testParseSettingsPreservesQuotedAndNestedValues() {
+    ExposedClickHouseTableOperations ops = newOps();
+    Map<String, String> settings =
+        ops.parseSettingsFromEngineFull(
+            "MergeTree ORDER BY id SETTINGS "
+                + "quoted =  'id,COMMENT,name,val', "
+                + "escaped = 'a\\'b\\\\c', "
+                + "doubled = 'a''b,c', "
+                + "double_quoted = \"a,b\"\"c\", "
+                + "nested = custom(`a,b`, tuple(1, 2), 'x=y,z')");
+
+    Assertions.assertEquals(5, settings.size());
+    Assertions.assertEquals(
+        "'id,COMMENT,name,val'", settings.get(TableConstants.SETTINGS_PREFIX + "quoted"));
+    Assertions.assertEquals(
+        "'a\\'b\\\\c'", settings.get(TableConstants.SETTINGS_PREFIX + "escaped"));
+    Assertions.assertEquals("'a''b,c'", settings.get(TableConstants.SETTINGS_PREFIX + "doubled"));
+    Assertions.assertEquals(
+        "\"a,b\"\"c\"", settings.get(TableConstants.SETTINGS_PREFIX + "double_quoted"));
+    Assertions.assertEquals(
+        "custom(`a,b`, tuple(1, 2), 'x=y,z')",
+        settings.get(TableConstants.SETTINGS_PREFIX + "nested"));
+  }
+
+  @Test
+  void testParseSettingsFindsLastTopLevelClause() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Map<String, String> settings =
+        ops.parseSettingsFromEngineFull(
+            "ReplacingMergeTree(`SETTINGS version`) ORDER BY id SETTINGS index_granularity = 8192");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "8192", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    settings =
+        ops.parseSettingsFromEngineFull(
+            "ReplicatedMergeTree('path SETTINGS ignored') ORDER BY id "
+                + "SETTINGS index_granularity = 4096");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "4096", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    settings =
+        ops.parseSettingsFromEngineFull(
+            "MergeTree ORDER BY settings SETTINGS index_granularity = 8192");
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "8192", settings.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+  }
+
+  @Test
+  void testParseSettingsRejectsMalformedMetadataBeforeClause() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] malformedEngineFull = {
+      "MergeTree(broken SETTINGS index_granularity = 8192",
+      "MergeTree('broken SETTINGS index_granularity = 8192",
+      "MergeTree ORDER BY 'oops SETTINGS index_granularity = 1",
+      "MergeTree() ORDER BY id) SETTINGS index_granularity = 8192"
+    };
+
+    for (String engineFull : malformedEngineFull) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> ops.parseSettingsFromEngineFull(engineFull));
+      Assertions.assertEquals("Invalid ClickHouse table SETTINGS metadata", exception.getMessage());
+    }
+  }
+
+  @Test
+  void testParseSettingsPreservesLastDuplicateValue() {
+    Map<String, String> settings =
+        newOps()
+            .parseSettingsFromEngineFull(
+                "MergeTree ORDER BY id SETTINGS duplicate = 1, duplicate = 'last,value'");
+
+    Assertions.assertEquals(1, settings.size());
+    Assertions.assertEquals(
+        "'last,value'", settings.get(TableConstants.SETTINGS_PREFIX + "duplicate"));
+  }
+
+  @Test
+  void testParseSettingsRejectsStructurallyInvalidMetadata() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] invalidSettings = {
+      "missing_equals",
+      "= 1",
+      "key = ",
+      ", key = 1",
+      "key = 1,",
+      "key = 1,, other = 2",
+      "key = 'unterminated",
+      "key = custom(1, 2",
+      "key = value)"
+    };
+
+    for (String invalidSetting : invalidSettings) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.parseSettingsFromEngineFull(
+                      "MergeTree ORDER BY id SETTINGS " + invalidSetting));
+      Assertions.assertEquals("Invalid ClickHouse table SETTINGS metadata", exception.getMessage());
+    }
   }
 
   @Test
@@ -746,6 +1535,185 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testParseSetPropertiesNormalizesValuesAndOmitsDefault() {
+    Assertions.assertEquals(
+        Map.of("set_max_values", "100"),
+        ClickHouseTableOperations.parseSetProperties(
+            Index.IndexType.DATA_SKIPPING_SET, " set ( 00100 ) ", "idx_set"));
+    Assertions.assertTrue(
+        ClickHouseTableOperations.parseSetProperties(
+                Index.IndexType.DATA_SKIPPING_SET, "set(0)", "idx_set")
+            .isEmpty());
+    Assertions.assertTrue(
+        ClickHouseTableOperations.parseSetProperties(
+                Index.IndexType.DATA_SKIPPING_MINMAX, "minmax", "idx_minmax")
+            .isEmpty());
+  }
+
+  @Test
+  void testParseVectorSimilarityPropertiesAndNormalizesDefaults() {
+    Assertions.assertEquals(
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"),
+        ClickHouseTableOperations.parseVectorSimilarityProperties(
+            " vector_similarity ( 'hnsw' , 'L2Distance' , 003 ) ", "idx_vector"));
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "768",
+            "quantization", "i8"),
+        ClickHouseTableOperations.parseVectorSimilarityProperties(
+            "vector_similarity('hnsw', 'cosineDistance', 768, 'i8')", "idx_vector"));
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "hnsw_max_connections_per_layer", "16"),
+        ClickHouseTableOperations.parseVectorSimilarityProperties(
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 16)", "idx_vector"));
+    for (String quantization : List.of("f64", "f32", "f16", "i8", "b1")) {
+      Assertions.assertEquals(
+          quantization,
+          ClickHouseTableOperations.parseVectorSimilarityProperties(
+                  "vector_similarity('hnsw', 'L2Distance', 3, '" + quantization + "')",
+                  "idx_vector")
+              .get("quantization"));
+    }
+    Assertions.assertEquals(
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"),
+        ClickHouseTableOperations.parseVectorSimilarityProperties(
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 0, 0)", "idx_vector"));
+    ExposedClickHouseTableOperations ops = newOps();
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+        ops.getClickHouseIndexType("vector_similarity"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+        ops.getClickHouseIndexType("vector_similarity('hnsw', 'L2Distance', 3)"));
+  }
+
+  @Test
+  void testParseVectorSimilarityPropertiesRejectsMalformedAndUnsupportedParameters() {
+    List<String> invalidTypeFullValues =
+        List.of(
+            "vector_similarity",
+            "wrong_type('hnsw', 'L2Distance', 3)",
+            "vector_similarity('ivf', 'L2Distance', 3)",
+            "vector_similarity('hnsw', 'euclidean', 3)",
+            "vector_similarity('hnsw', 'dotProduct', 384, 'bf16', 16, 64)",
+            "vector_similarity('hnsw', , 3)",
+            "vector_similarity('hnsw', 'L2Distance', 0)",
+            "vector_similarity('hnsw', 'L2Distance', not_an_integer)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'float8')",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', -1)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32, -1)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32, 128, 1)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32, 2147483648)",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32",
+            "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 32, 128) trailing");
+
+    for (String typeFull : invalidTypeFullValues) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ClickHouseTableOperations.parseVectorSimilarityProperties(
+                      typeFull, "idx_vector_bad"),
+              typeFull);
+      Assertions.assertTrue(exception.getMessage().contains("idx_vector_bad"), typeFull);
+    }
+  }
+
+  @Test
+  void testParseSetPropertiesAcceptsIntegerMaxValue() {
+    Assertions.assertEquals(
+        Map.of("set_max_values", String.valueOf(Integer.MAX_VALUE)),
+        ClickHouseTableOperations.parseSetProperties(
+            Index.IndexType.DATA_SKIPPING_SET, "set(" + Integer.MAX_VALUE + ")", "idx_set"));
+  }
+
+  @Test
+  void testParseSetPropertiesRejectsValuesOutsideIntegerRange() {
+    for (String value : List.of("-1", "2147483648", "18446744073709551615")) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ClickHouseTableOperations.parseSetProperties(
+                      Index.IndexType.DATA_SKIPPING_SET, "set(" + value + ")", "idx_set"));
+      Assertions.assertTrue(exception.getMessage().contains("outside supported range"));
+      Assertions.assertTrue(exception.getMessage().contains(value));
+      Assertions.assertTrue(exception.getMessage().contains("[0, 2147483647]"));
+      Assertions.assertTrue(exception.getMessage().contains("idx_set"));
+    }
+  }
+
+  @Test
+  void testParseSetPropertiesRejectsMalformedMetadata() {
+    for (String typeFull : List.of("set()", "set(100, 200)", "set(abc)", "set(100")) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ClickHouseTableOperations.parseSetProperties(
+                      Index.IndexType.DATA_SKIPPING_SET, typeFull, "idx_bad"));
+      Assertions.assertTrue(exception.getMessage().contains("idx_bad"));
+    }
+
+    IllegalArgumentException wrongTypeException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ClickHouseTableOperations.parseSetProperties(
+                    Index.IndexType.DATA_SKIPPING_SET, "tokenbf_v1(100)", "idx_bad"));
+    Assertions.assertTrue(wrongTypeException.getMessage().contains("idx_bad"));
+  }
+
+  @Test
+  void testGetIndexesFailsOnOutOfRangeSetMetadata() throws Exception {
+    for (String value : List.of("2147483648", "18446744073709551615")) {
+      IllegalArgumentException exception = getIndexesFailureForSetTypeFull("set(" + value + ")");
+      Assertions.assertTrue(exception.getMessage().contains("idx_overflow"));
+      Assertions.assertTrue(exception.getMessage().contains("type_full"));
+      Assertions.assertTrue(exception.getMessage().contains(value));
+      Assertions.assertTrue(exception.getMessage().contains("outside supported range"));
+      Assertions.assertTrue(exception.getMessage().contains("[0, 2147483647]"));
+    }
+  }
+
+  @Test
+  void testGetIndexesReadsSetPropertiesWithGranularity() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_set");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("set");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn("set(100)");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(3L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertEquals(
+        Map.of("set_max_values", "100", "granularity", "3"), indexes.get(0).properties());
+  }
+
+  @Test
   void testGetIndexesSkipsUnsupportedExpressionForParameterizedIndex() throws Exception {
     ExposedClickHouseTableOperations ops = newOps();
 
@@ -756,14 +1724,16 @@ public class TestClickHouseTableOperationsUnit {
 
     Mockito.when(primaryKeyRs.next()).thenReturn(false);
     Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
-    Mockito.when(secondaryRs.next()).thenReturn(true, true, false);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, false);
     Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
-    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_bad_expr", "idx_valid");
-    Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1", "tokenbf_v1");
+    Mockito.when(secondaryRs.getString("name"))
+        .thenReturn("idx_bad_expr", "idx_valid", "idx_set_bad_expr");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1", "tokenbf_v1", "set");
     Mockito.when(secondaryRs.getString("type_full"))
-        .thenReturn("ngrambf_v1(3, 512, 3, 0)", "tokenbf_v1(256, 2, 0)");
-    Mockito.when(secondaryRs.getString("expr")).thenReturn("lower(col_1)", "col_2");
-    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L);
+        .thenReturn("ngrambf_v1(3, 512, 3, 0)", "tokenbf_v1(256, 2, 0)", "set(100)");
+    Mockito.when(secondaryRs.getString("expr"))
+        .thenReturn("lower(col_1)", "col_2", "cityHash64(col_3) % 16");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L, 1L);
 
     Connection connection = Mockito.mock(Connection.class);
     Mockito.when(connection.prepareStatement(Mockito.anyString()))
@@ -782,6 +1752,63 @@ public class TestClickHouseTableOperationsUnit {
             "hash_functions", "2",
             "random_seed", "0"),
         indexes.get(0).properties());
+    Assertions.assertFalse(
+        indexes.stream().anyMatch(index -> "idx_set_bad_expr".equals(index.name())));
+  }
+
+  @Test
+  void testGetIndexesFailsOnMalformedSetMetadataWithSupportedExpression() throws Exception {
+    IllegalArgumentException exception = getIndexesFailureForSetMetadata("set(abc)", "col_1");
+
+    Assertions.assertTrue(exception.getMessage().contains("idx_bad_set_metadata"));
+    Assertions.assertTrue(exception.getMessage().contains("type_full"));
+    Assertions.assertTrue(exception.getMessage().contains("set(abc)"));
+    Assertions.assertTrue(exception.getMessage().contains("SET metadata"));
+  }
+
+  @Test
+  void testGetIndexesSkipsUnsupportedExpressionBeforeParsingOutOfRangeSetMetadata()
+      throws Exception {
+    List<Index> indexes = getIndexesForSetMetadata("set(2147483648)", "cityHash64(col_1) % 16");
+
+    Assertions.assertTrue(indexes.isEmpty());
+  }
+
+  @Test
+  void testGetIndexesFailsOnMalformedLegacySetMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, false);
+    Mockito.when(legacySecondaryRs.getString("name")).thenReturn("idx_legacy_bad");
+    Mockito.when(legacySecondaryRs.getString("type")).thenReturn("set(abc)");
+    Mockito.when(legacySecondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_legacy_bad"));
+    Assertions.assertTrue(exception.getMessage().contains("legacy type"));
+    Assertions.assertTrue(exception.getMessage().contains("set(abc)"));
+    Assertions.assertTrue(exception.getMessage().contains("SET metadata"));
+    Assertions.assertFalse(exception.getMessage().contains("type_full"));
   }
 
   @Test
@@ -825,6 +1852,688 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testGetIndexesPreservesLegacyAnnUsearchMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, true, true, true, true, false);
+    Mockito.when(secondaryRs.getString("name"))
+        .thenReturn(
+            "idx_annoy",
+            "idx_usearch",
+            "idx_annoy_without_parameters",
+            "idx_annoy_distance_only",
+            "idx_annoy_distance_and_trees",
+            "idx_usearch_without_parameters",
+            "idx_usearch_distance_and_scalar_kind");
+    Mockito.when(secondaryRs.getString("type"))
+        .thenReturn("annoy", "usearch", "annoy", "annoy", "annoy", "usearch", "usearch");
+    // The native metadata DDL in ClickHouse issue #41729 uses annoy(100) with GRANULARITY 1.
+    // This is a parser fixture only; it does not validate a successful system-table read path.
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn(
+            "annoy(100)",
+            "usearch('cosineDistance')",
+            "annoy()",
+            "annoy('L2Distance')",
+            "annoy('cosineDistance', 100)",
+            "usearch()",
+            "usearch('L2Distance', 'f16')");
+    Mockito.when(secondaryRs.getString("expr"))
+        .thenReturn(
+            "embedding",
+            "tuple(embedding)",
+            "embedding",
+            "embedding",
+            "embedding",
+            "embedding",
+            "embedding");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L, 1L, 1L, 1L, 1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = getIndexesWithoutWarnings(ops, connection, "db", "tbl");
+
+    Assertions.assertEquals(7, indexes.size());
+    Index annoy = indexes.get(0);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_ANNOY, annoy.type());
+    Assertions.assertEquals("idx_annoy", annoy.name());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, annoy.fieldNames());
+    Assertions.assertEquals(
+        Map.of(ANNOY_TREES, "100", CLICKHOUSE_TYPE_FULL, "annoy(100)", GRANULARITY, "1"),
+        annoy.properties());
+
+    Index usearch = indexes.get(1);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_USEARCH, usearch.type());
+    Assertions.assertEquals("idx_usearch", usearch.name());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, usearch.fieldNames());
+    Assertions.assertEquals(
+        Map.of(
+            USEARCH_DISTANCE_FUNCTION,
+            "cosineDistance",
+            CLICKHOUSE_TYPE_FULL,
+            "usearch('cosineDistance')",
+            GRANULARITY,
+            "1"),
+        usearch.properties());
+
+    Index annoyWithoutParameters = indexes.get(2);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_ANNOY, annoyWithoutParameters.type());
+    Assertions.assertEquals("idx_annoy_without_parameters", annoyWithoutParameters.name());
+    Assertions.assertArrayEquals(
+        new String[][] {{"embedding"}}, annoyWithoutParameters.fieldNames());
+    Assertions.assertEquals(
+        Map.of(CLICKHOUSE_TYPE_FULL, "annoy()", GRANULARITY, "1"),
+        annoyWithoutParameters.properties());
+
+    Index annoyDistanceOnly = indexes.get(3);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_ANNOY, annoyDistanceOnly.type());
+    Assertions.assertEquals(
+        Map.of(
+            ANNOY_DISTANCE_FUNCTION,
+            "L2Distance",
+            CLICKHOUSE_TYPE_FULL,
+            "annoy('L2Distance')",
+            GRANULARITY,
+            "1"),
+        annoyDistanceOnly.properties());
+
+    Index annoyDistanceAndTrees = indexes.get(4);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_ANNOY, annoyDistanceAndTrees.type());
+    Assertions.assertEquals(
+        Map.of(
+            ANNOY_DISTANCE_FUNCTION,
+            "cosineDistance",
+            ANNOY_TREES,
+            "100",
+            CLICKHOUSE_TYPE_FULL,
+            "annoy('cosineDistance', 100)",
+            GRANULARITY,
+            "1"),
+        annoyDistanceAndTrees.properties());
+
+    Index usearchWithoutParameters = indexes.get(5);
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_USEARCH, usearchWithoutParameters.type());
+    Assertions.assertEquals(
+        Map.of(CLICKHOUSE_TYPE_FULL, "usearch()", GRANULARITY, "1"),
+        usearchWithoutParameters.properties());
+
+    Index usearchDistanceAndScalarKind = indexes.get(6);
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_USEARCH, usearchDistanceAndScalarKind.type());
+    Assertions.assertEquals(
+        Map.of(
+            USEARCH_DISTANCE_FUNCTION,
+            "L2Distance",
+            USEARCH_SCALAR_KIND,
+            "f16",
+            CLICKHOUSE_TYPE_FULL,
+            "usearch('L2Distance', 'f16')",
+            GRANULARITY,
+            "1"),
+        usearchDistanceAndScalarKind.properties());
+  }
+
+  @Test
+  void testGetIndexesWarnsAndPreservesMalformedLegacyAnnUsearchParameters() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+
+    String[] typeFullExpressions = {
+      "annoy('bogus')",
+      "annoy('L2Distance', 'not-a-number')",
+      "annoy('L2Distance', 10, 20)",
+      "usearch('bogus')",
+      "usearch('L2Distance', 'invalid-kind')",
+      "usearch('L2Distance', 'f16', 'extra')"
+    };
+    String[] indexNames = {
+      "idx_annoy_invalid_distance",
+      "idx_annoy_invalid_trees",
+      "idx_annoy_extra_parameters",
+      "idx_usearch_invalid_distance",
+      "idx_usearch_invalid_scalar_kind",
+      "idx_usearch_extra_parameters"
+    };
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, true, true, true, false);
+    Mockito.when(secondaryRs.getString("name"))
+        .thenReturn(
+            indexNames[0],
+            indexNames[1],
+            indexNames[2],
+            indexNames[3],
+            indexNames[4],
+            indexNames[5]);
+    Mockito.when(secondaryRs.getString("type"))
+        .thenReturn("annoy", "annoy", "annoy", "usearch", "usearch", "usearch");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn(
+            typeFullExpressions[0],
+            typeFullExpressions[1],
+            typeFullExpressions[2],
+            typeFullExpressions[3],
+            typeFullExpressions[4],
+            typeFullExpressions[5]);
+    Mockito.when(secondaryRs.getString("expr"))
+        .thenReturn("embedding", "embedding", "embedding", "embedding", "embedding", "embedding");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L, 1L, 1L, 1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes =
+        getIndexesExpectingWarnings(ops, connection, "db", "tbl", typeFullExpressions.length);
+
+    Assertions.assertEquals(typeFullExpressions.length, indexes.size());
+    for (int i = 0; i < typeFullExpressions.length; i++) {
+      Assertions.assertEquals(indexNames[i], indexes.get(i).name());
+      Assertions.assertEquals(
+          Map.of(CLICKHOUSE_TYPE_FULL, typeFullExpressions[i], GRANULARITY, "1"),
+          indexes.get(i).properties());
+    }
+  }
+
+  @Test
+  void testGetIndexesFallsBackAndPreservesLegacyAnnUsearchTypes() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(legacySecondaryRs.getString("name"))
+        .thenReturn("idx_legacy_annoy", "idx_legacy_usearch", "idx_unknown");
+    Mockito.when(legacySecondaryRs.getString("type"))
+        .thenReturn("annoy", "usearch", "vector_similarity");
+    Mockito.when(legacySecondaryRs.getString("expr"))
+        .thenReturn("embedding", "embedding", "embedding");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L, 1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = getIndexesExpectingWarnings(ops, connection, "db", "tbl", 2);
+
+    Assertions.assertEquals(2, indexes.size());
+    Assertions.assertEquals(
+        Map.of(CLICKHOUSE_TYPE_FULL, "annoy", GRANULARITY, "1"), indexes.get(0).properties());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_USEARCH, indexes.get(1).type());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, indexes.get(1).fieldNames());
+    Assertions.assertEquals(
+        Map.of(CLICKHOUSE_TYPE_FULL, "usearch", GRANULARITY, "1"), indexes.get(1).properties());
+  }
+
+  @Test
+  void testGetIndexesReportsUnrepresentableLegacyExpressionByOmittingIt() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_annoy_expr");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("annoy");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn("annoy(100)");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("lower(embedding)");
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    Assertions.assertTrue(ops.callGetIndexes(connection, "db", "tbl").isEmpty());
+  }
+
+  @Test
+  void testGetIndexesFallsBackAndReadsLegacySetParameters() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, true, false);
+    Mockito.when(legacySecondaryRs.getString("name"))
+        .thenReturn("idx_legacy_set", "idx_legacy_bare");
+    Mockito.when(legacySecondaryRs.getString("type")).thenReturn("set(100)", "set");
+    Mockito.when(legacySecondaryRs.getString("expr")).thenReturn("col_1", "col_2");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Index parameterized =
+        indexes.stream()
+            .filter(index -> "idx_legacy_set".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals("idx_legacy_set", parameterized.name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_SET, parameterized.type());
+    Assertions.assertEquals(Map.of("set_max_values", "100"), parameterized.properties());
+
+    Index bare =
+        indexes.stream()
+            .filter(index -> "idx_legacy_bare".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals("idx_legacy_bare", bare.name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_SET, bare.type());
+    Assertions.assertTrue(bare.properties().isEmpty());
+  }
+
+  @Test
+  void testGetIndexesFallsBackAndReadsLegacyVectorSimilarityParameters() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(legacySecondaryRs.getString("name"))
+        .thenReturn("idx_legacy_vector", "idx_legacy_vector_custom", "idx_legacy_vector_bare");
+    Mockito.when(legacySecondaryRs.getString("type"))
+        .thenReturn(
+            "vector_similarity('hnsw', 'cosineDistance', 3, 'i8', 16, 64)",
+            "vector_similarity('hnsw', 'L2Distance', 3)",
+            "vector_similarity");
+    Mockito.when(legacySecondaryRs.getString("expr"))
+        .thenReturn("embedding", "embedding_custom", "embedding_bare");
+    Mockito.when(legacySecondaryRs.getLong("granularity"))
+        .thenReturn(100_000_000L, 7L, 100_000_000L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Index legacyIndex =
+        indexes.stream()
+            .filter(index -> "idx_legacy_vector".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, legacyIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, legacyIndex.fieldNames());
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "i8",
+            "hnsw_max_connections_per_layer", "16",
+            "hnsw_candidate_list_size_for_construction", "64"),
+        legacyIndex.properties());
+
+    Index customGranularityIndex =
+        indexes.stream()
+            .filter(index -> "idx_legacy_vector_custom".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "granularity", "7"),
+        customGranularityIndex.properties());
+  }
+
+  @Test
+  void testGetIndexesReadsVectorSimilarityTypeFullAndUsesItsDefaultGranularity() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name"))
+        .thenReturn("idx_vector_default", "idx_vector_custom", "idx_vector_expression");
+    Mockito.when(secondaryRs.getString("type"))
+        .thenReturn("vector_similarity", "vector_similarity", "vector_similarity");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn(
+            "vector_similarity('hnsw', 'L2Distance', 3)",
+            "vector_similarity('hnsw', 'cosineDistance', 3, 'i8', 16, 64)",
+            "vector_similarity('hnsw', 'L2Distance', 3)");
+    Mockito.when(secondaryRs.getString("expr"))
+        .thenReturn("embedding", "embedding_custom", "lower(embedding)");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(100_000_000L, 7L, 100_000_000L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(2, indexes.size());
+    Index defaultIndex =
+        indexes.stream()
+            .filter(index -> "idx_vector_default".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, defaultIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, defaultIndex.fieldNames());
+    Assertions.assertEquals(
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"),
+        defaultIndex.properties());
+
+    Index customIndex =
+        indexes.stream()
+            .filter(index -> "idx_vector_custom".equals(index.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "i8",
+            "hnsw_max_connections_per_layer", "16",
+            "hnsw_candidate_list_size_for_construction", "64",
+            "granularity", "7"),
+        customIndex.properties());
+    Assertions.assertFalse(
+        indexes.stream().anyMatch(index -> "idx_vector_expression".equals(index.name())));
+  }
+
+  @Test
+  void testGetIndexesSkipsUnsupportedVectorSimilarityWithoutDroppingOtherIndexes()
+      throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_dot", "idx_l2", "idx_minmax");
+    Mockito.when(secondaryRs.getString("type"))
+        .thenReturn("vector_similarity", "vector_similarity", "minmax");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn(
+            "vector_similarity('hnsw', 'dotProduct', 3)",
+            "vector_similarity('hnsw', 'L2Distance', 3)",
+            "minmax");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("embedding_dot", "embedding_l2", "id");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(100_000_000L, 100_000_000L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+    Assertions.assertEquals(2, indexes.size());
+    Assertions.assertEquals("idx_l2", indexes.get(0).name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, indexes.get(0).type());
+    Assertions.assertEquals("idx_minmax", indexes.get(1).name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_MINMAX, indexes.get(1).type());
+  }
+
+  @Test
+  void testGetIndexesRejectsMalformedVectorSimilarityMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_malformed");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("vector_similarity");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn("vector_similarity('hnsw', 'L2Distance', not_an_integer)");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("embedding");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(100_000_000L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_malformed"));
+    Assertions.assertTrue(exception.getMessage().contains("type_full"));
+  }
+
+  @Test
+  void testVectorSimilarityCreateAndAlterDdlUseTheSameTypeClause() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+          JdbcColumn.builder()
+              .withName("embedding")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+    Map<String, String> defaultProperties =
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3");
+    Map<String, String> customProperties =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "i8",
+            "hnsw_candidate_list_size_for_construction", "64",
+            "granularity", "7");
+    Map<String, String> zeroHnswProperties =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "hnsw_max_connections_per_layer", "0",
+            "hnsw_candidate_list_size_for_construction", "0");
+
+    String createSql =
+        newOps()
+            .callGenerateCreateTableSql(
+                columns,
+                Map.of(),
+                new Index[] {
+                  Indexes.of(
+                      Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                      "idx_vector_default",
+                      new String[][] {{"embedding"}},
+                      defaultProperties),
+                  Indexes.of(
+                      Index.IndexType.DATA_SKIPPING_MINMAX, "idx_minmax", new String[][] {{"id"}})
+                });
+    ExposedClickHouseTableOperations alterOps = newAlterOps(Map.of());
+    String alterSql =
+        alterOps.callGenerateAlterTableSql(
+            TableChange.addIndex(
+                Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                "idx_vector_custom",
+                new String[][] {{"embedding"}},
+                customProperties));
+    String zeroHnswAlterSql =
+        alterOps.callGenerateAlterTableSql(
+            TableChange.addIndex(
+                Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                "idx_vector_zero_hnsw",
+                new String[][] {{"embedding"}},
+                zeroHnswProperties));
+
+    Assertions.assertTrue(
+        createSql.contains(
+            "INDEX `idx_vector_default` `embedding` TYPE "
+                + "vector_similarity('hnsw', 'L2Distance', 3) GRANULARITY 100000000"),
+        createSql);
+    Assertions.assertTrue(
+        createSql.contains("INDEX `idx_minmax` `id` TYPE minmax GRANULARITY 1"), createSql);
+    Assertions.assertTrue(
+        alterSql.contains(
+            "ADD INDEX `idx_vector_custom` `embedding` TYPE "
+                + "vector_similarity('hnsw', 'cosineDistance', 3, 'i8', 32, 64) GRANULARITY 7"),
+        alterSql);
+    Assertions.assertTrue(
+        zeroHnswAlterSql.contains(
+            "ADD INDEX `idx_vector_zero_hnsw` `embedding` TYPE "
+                + "vector_similarity('hnsw', 'L2Distance', 3) GRANULARITY 100000000"),
+        zeroHnswAlterSql);
+  }
+
+  @Test
+  void testVectorSimilarityInvalidPropertiesFailBeforeCreateOrAlterDdl() {
+    Map<String, String> missingRequiredProperty = Map.of("type", "hnsw", "dimensions", "3");
+    Map<String, String> unsupportedDistance =
+        Map.of("type", "hnsw", "distance_function", "dotProduct", "dimensions", "3");
+    Map<String, String> unsupportedQuantization =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "quantization", "float8");
+    Map<String, String> negativeHnswValue =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "hnsw_max_connections_per_layer", "-1");
+    Map<String, String> zeroGranularity =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "granularity", "0");
+    Map<String, String> unknownProperty =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "L2Distance",
+            "dimensions", "3",
+            "unexpected_property", "value");
+
+    List<Map.Entry<String, Map<String, String>>> invalidCases =
+        List.of(
+            Map.entry("distance_function", missingRequiredProperty),
+            Map.entry("distance_function", unsupportedDistance),
+            Map.entry("quantization", unsupportedQuantization),
+            Map.entry("hnsw_max_connections_per_layer", negativeHnswValue),
+            Map.entry("granularity", zeroGranularity),
+            Map.entry("unexpected_property", unknownProperty));
+    for (Map.Entry<String, Map<String, String>> invalid : invalidCases) {
+      Map<String, String> properties = invalid.getValue();
+      Index[] indexes =
+          new Index[] {
+            Indexes.of(
+                Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                "idx_vector_invalid",
+                new String[][] {{"embedding"}},
+                properties)
+          };
+      IllegalArgumentException createException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  newOps()
+                      .callGenerateCreateTableSql(
+                          new JdbcColumn[] {
+                            JdbcColumn.builder()
+                                .withName("id")
+                                .withType(Types.IntegerType.get())
+                                .withNullable(false)
+                                .build(),
+                            JdbcColumn.builder()
+                                .withName("embedding")
+                                .withType(Types.StringType.get())
+                                .withNullable(true)
+                                .build(),
+                          },
+                          Map.of(),
+                          indexes));
+      Assertions.assertTrue(createException.getMessage().contains("idx_vector_invalid"));
+      Assertions.assertTrue(createException.getMessage().contains(invalid.getKey()));
+
+      IllegalArgumentException alterException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  newAlterOps(Map.of())
+                      .callGenerateAlterTableSql(
+                          TableChange.addIndex(
+                              Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                              "idx_vector_invalid",
+                              new String[][] {{"embedding"}},
+                              properties)));
+      Assertions.assertTrue(alterException.getMessage().contains("idx_vector_invalid"));
+      Assertions.assertTrue(alterException.getMessage().contains(invalid.getKey()));
+    }
+  }
+
+  @Test
   void testGetIndexesDoesNotFallbackForOtherSqlErrors() throws Exception {
     ExposedClickHouseTableOperations ops = newOps();
 
@@ -846,6 +2555,222 @@ public class TestClickHouseTableOperationsUnit {
             GravitinoRuntimeException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
     Assertions.assertTrue(exception.getCause() instanceof SQLException);
     Mockito.verify(connection, Mockito.times(2)).prepareStatement(Mockito.anyString());
+  }
+
+  @Test
+  void testGenerateModifyAndResetTableSettingsSql() {
+    ExposedClickHouseTableOperations ops = newAlterOps(Map.of());
+
+    String modifySql =
+        ops.callGenerateAlterTableSql(
+            TableChange.setProperty(settingProperty("z_setting"), "2"),
+            TableChange.setProperty(settingProperty("a_setting"), "1"));
+    Assertions.assertTrue(
+        modifySql.contains("MODIFY SETTING a_setting = 1, z_setting = 2"), modifySql);
+
+    String resetSql =
+        ops.callGenerateAlterTableSql(
+            TableChange.removeProperty(settingProperty("z_setting")),
+            TableChange.removeProperty(settingProperty("a_setting")));
+    Assertions.assertTrue(resetSql.contains("RESET SETTING a_setting, z_setting"), resetSql);
+  }
+
+  @Test
+  void testGenerateTableSettingsSqlOnCluster() {
+    ExposedClickHouseTableOperations ops =
+        newAlterOps(
+            Map.of(
+                ClusterConstants.ON_CLUSTER,
+                "true",
+                ClusterConstants.CLUSTER_NAME,
+                "test_cluster"));
+
+    String sql =
+        ops.callGenerateAlterTableSql(
+            TableChange.setProperty(settingProperty("merge_with_ttl_timeout"), "3600"));
+
+    Assertions.assertTrue(
+        sql.startsWith("ALTER TABLE `test_table` ON CLUSTER `test_cluster`"), sql);
+    Assertions.assertTrue(sql.contains("MODIFY SETTING merge_with_ttl_timeout = 3600"), sql);
+  }
+
+  @Test
+  void testAcceptValidTableSettingLiterals() {
+    ExposedClickHouseTableOperations ops = newAlterOps(Map.of());
+    String[] validLiterals = {
+      "0", "-1", "+1.5", ".25", "1e3", "true", "FALSE", "'default'", "'a,b\\\\c''d'"
+    };
+
+    for (String literal : validLiterals) {
+      String sql =
+          ops.callGenerateAlterTableSql(
+              TableChange.setProperty(settingProperty("test_setting"), literal));
+      Assertions.assertTrue(sql.contains("test_setting = " + literal), sql);
+    }
+  }
+
+  @Test
+  void testRejectInvalidTableSettingNamesAndLiterals() {
+    ExposedClickHouseTableOperations ops = newOps();
+    String[] invalidNames = {
+      null,
+      settingProperty(""),
+      settingProperty("1setting"),
+      settingProperty("bad-setting"),
+      settingProperty("bad setting"),
+      settingProperty("setting;DROP")
+    };
+    for (String property : invalidNames) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> ops.callGenerateAlterTableSql(TableChange.setProperty(property, "1")));
+    }
+
+    String[] invalidLiterals = {
+      "",
+      "value",
+      "'unterminated",
+      "'bad\\'",
+      "1, RESET SETTING other",
+      "1; DROP TABLE t",
+      "'ok' OR 1"
+    };
+    for (String literal : invalidLiterals) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.callGenerateAlterTableSql(
+                      TableChange.setProperty(settingProperty("test_setting"), literal)));
+      if (!literal.isEmpty()) {
+        Assertions.assertFalse(exception.getMessage().contains(literal));
+      }
+    }
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.setProperty(settingProperty("test_setting"), null)));
+  }
+
+  @Test
+  void testRejectUnsupportedAndMixedTablePropertyChanges() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ops.callGenerateAlterTableSql(TableChange.setProperty("engine", "MergeTree")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ops.callGenerateAlterTableSql(TableChange.removeProperty("engine")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.removeProperty(settingProperty("b"))));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.updateComment("new comment")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.removeProperty(settingProperty("a")),
+                TableChange.updateComment("new comment")));
+  }
+
+  @Test
+  void testClearCommentsWithNull() {
+    ExposedClickHouseTableOperations ops = newAlterOps(new HashMap<>());
+
+    String tableSql = ops.callGenerateAlterTableSql(TableChange.updateComment(null));
+    Assertions.assertTrue(tableSql.contains("MODIFY COMMENT ''"), tableSql);
+
+    String columnSql =
+        ops.callGenerateAlterTableSql(TableChange.updateColumnComment(new String[] {"id"}, null));
+    Assertions.assertTrue(columnSql.contains("COMMENT COLUMN `id` ''"), columnSql);
+  }
+
+  @Test
+  void testClearCommentsWithNullOnCluster() {
+    ExposedClickHouseTableOperations ops =
+        newAlterOps(
+            Map.of(
+                ClusterConstants.ON_CLUSTER,
+                "true",
+                ClusterConstants.CLUSTER_NAME,
+                "test_cluster"));
+
+    String tableSql = ops.callGenerateAlterTableSql(TableChange.updateComment(null));
+    Assertions.assertTrue(
+        tableSql.startsWith("ALTER TABLE `test_table` ON CLUSTER `test_cluster`"), tableSql);
+    String clusterComment =
+        ClickHouseClusterUtils.escapeSingleQuotes(
+            ClickHouseClusterUtils.embedClusterInComment("", "test_cluster"));
+    Assertions.assertTrue(tableSql.contains("MODIFY COMMENT '" + clusterComment + "'"), tableSql);
+
+    String columnSql =
+        ops.callGenerateAlterTableSql(TableChange.updateColumnComment(new String[] {"id"}, null));
+    Assertions.assertTrue(
+        columnSql.startsWith("ALTER TABLE `test_table` ON CLUSTER `test_cluster`"), columnSql);
+    Assertions.assertTrue(columnSql.contains("COMMENT COLUMN `id` ''"), columnSql);
+  }
+
+  @Test
+  void testRejectDuplicateTableSettingChanges() {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.setProperty(settingProperty("a"), "2")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.callGenerateAlterTableSql(
+                TableChange.removeProperty(settingProperty("a")),
+                TableChange.removeProperty(settingProperty("a"))));
+  }
+
+  @Test
+  void testInvalidTableSettingChangesFailBeforeJdbcConnection() {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    ClickHouseTableOperations ops = new ClickHouseTableOperations();
+    ops.initialize(
+        dataSource,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ops.alterTable("db", "test_table", TableChange.setProperty("engine", "MergeTree")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.alterTable(
+                "db",
+                "test_table",
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.removeProperty(settingProperty("b"))));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                "db",
+                "test_table",
+                TableChange.setProperty(settingProperty("a"), "1"),
+                TableChange.setProperty(settingProperty("a"), "2")));
+
+    Mockito.verifyNoInteractions(dataSource);
   }
 
   private RenameMocks renameMocks(String storedComment, String engineFull) throws Exception {
@@ -880,5 +2805,72 @@ public class TestClickHouseTableOperationsUnit {
       this.connection = connection;
       this.updateStatement = updateStatement;
     }
+  }
+
+  private IllegalArgumentException getIndexesFailureForSetTypeFull(String typeFull)
+      throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_overflow");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("set");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn(typeFull);
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    return Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+  }
+
+  private List<Index> getIndexesForSetMetadata(String typeFull, String expression)
+      throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_bad_set_metadata");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("set");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn(typeFull);
+    Mockito.when(secondaryRs.getString("expr")).thenReturn(expression);
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    return ops.callGetIndexes(connection, "db", "tbl");
+  }
+
+  private IllegalArgumentException getIndexesFailureForSetMetadata(
+      String typeFull, String expression) throws Exception {
+    return Assertions.assertThrows(
+        IllegalArgumentException.class, () -> getIndexesForSetMetadata(typeFull, expression));
+  }
+
+  private static void assertLegacyWriteError(
+      IllegalArgumentException exception, Index.IndexType indexType) {
+    Assertions.assertTrue(exception.getMessage().contains("test_table"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_legacy"));
+    Assertions.assertTrue(exception.getMessage().contains(indexType.name()));
+    Assertions.assertTrue(exception.getMessage().contains("metadata-only"));
   }
 }

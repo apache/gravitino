@@ -32,6 +32,10 @@ The catalog automatically loads the Amazon S3 filesystem provider once the bundl
 classpath. The deprecated `filesystem-providers` and `default-filesystem-provider` catalog
 properties do not need to be set.
 
+The bundle uses JSSE for TLS and does not include the optional WildFly OpenSSL provider.
+If you explicitly set Hadoop's `fs.s3a.ssl.channel.mode` to `OpenSSL`, install a compatible
+provider separately on the catalog or client classpath. The default mode does not require it.
+
 ## Amazon S3 Properties
 
 These properties are needed in addition to the shared
@@ -47,6 +51,10 @@ underscores while the catalog and the Java client use hyphens.
 | `credential-providers`  | (n/a)                  | The credential provider types, separated by comma. Possible values are `s3-token`, `s3-secret-key`, `aws-irsa`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#s3) for the extra properties each provider takes. | No                                               |
 
 :::note
+- `s3-access-key-id` and `s3-secret-access-key` are hidden from the default load/list catalog
+  response (`******`). Recover them via the [credential vending API](./security/credential-vending.md)
+  (`getCredentials` / `S3SecretKeyCredential`). Other non-credential secrets use
+  `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 - The location must start with `s3a://`, not `s3://`. The `hadoop-aws` library does not support the
   `s3://` scheme.
 - For MinIO and other S3-compatible services, set `s3-endpoint` to that service. If it requires

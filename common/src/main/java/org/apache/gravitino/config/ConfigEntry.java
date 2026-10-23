@@ -316,6 +316,11 @@ public class ConfigEntry<T> {
     }
 
     T convertedValue = valueConverter.apply(value);
+    if (convertedValue == null && defaultValue != null) {
+      // A present-but-blank value is converted to null by the typed converters (int/long/double/
+      // boolean); fall back to the configured default instead of returning null.
+      return defaultValue;
+    }
     if (validator != null) {
       validator.accept(convertedValue);
     }

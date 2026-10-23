@@ -20,10 +20,10 @@
 # ==============================================================================
 # Apache Gravitino Flink Connector — UBI 10-based, certification-oriented image
 # Contains the Apache Gravitino Flink connector runtime jars for every
-# supported Flink version present in the source tree (Scala 2.12; Flink does
-# not support Scala 2.13). The connector code is Apache-2.0; the shaded runtime
-# jar bundles third-party open source components (see
-# licenses/THIRD_PARTY_LICENSES.txt).
+# supported Flink version present in the source tree. Flink 1.x jars use the
+# Scala 2.12 suffix; Flink 2.x jars have no Scala suffix. The connector code is
+# Apache-2.0; the shaded runtime jar bundles third-party open source components
+# (see the licenses/ directory).
 # Used as a Kubernetes init-container to inject connector jars into Flink pods.
 #
 # The set of Flink versions is discovered at build time from the Gravitino
@@ -35,7 +35,7 @@
 # Red Hat UBI / certification-oriented properties:
 #   - Based on UBI 10 (registry.access.redhat.com)
 #   - Required LABELs present
-#   - /licenses directory with LICENSE, NOTICE and THIRD_PARTY_LICENSES.txt
+#   - /licenses directory with a LICENSE and NOTICE per runtime variant
 #   - Runs as non-root user (UID 1000, GID 0) with a passwd entry
 #   - OpenShift arbitrary UID compatible (GID 0 group permissions)
 # ==============================================================================
@@ -57,8 +57,8 @@ LABEL name="gravitino-flink-connector" \
       vendor="The Apache Software Foundation" \
       version="${IMAGE_VERSION}" \
       release="${IMAGE_RELEASE}" \
-      summary="Apache Gravitino Flink Connector (Scala 2.12)" \
-      description="Apache Gravitino Flink connector runtime jars for all supported Flink versions (Scala 2.12), for Kubernetes init-container deployment. The version is selected at runtime via the FLINK_VERSION environment variable." \
+      summary="Apache Gravitino Flink Connector" \
+      description="Apache Gravitino Flink connector runtime jars for all supported Flink versions, for Kubernetes init-container deployment. Flink 1.x jars use the Scala 2.12 suffix; Flink 2.x jars have no Scala suffix. The version is selected at runtime via the FLINK_VERSION environment variable." \
       maintainer="Apache Gravitino <dev@gravitino.apache.org>"
 
 # Default Flink version (can be overridden at runtime)
@@ -72,6 +72,9 @@ COPY --chmod=755 copy-connector.sh /copy-connector.sh
 
 # --- licenses directory (LICENSE + NOTICE + third-party summary) ---
 COPY licenses /licenses
+
+# --- Connector image usage documentation ---
+COPY README.md /README.md
 
 # --- Drop source-control artifacts, OpenShift arbitrary UID compatibility,
 #     and a passwd entry for UID 1000 ---

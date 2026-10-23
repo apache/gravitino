@@ -18,26 +18,50 @@
  */
 package org.apache.gravitino.job;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JobExecutorFactory {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JobExecutorFactory.class);
+
+  /** The name of the built-in k8s job executor. */
+  public static final String K8S_JOB_EXECUTOR_NAME = "k8s";
+
+  /**
+   * The class name of the built-in k8s job executor. The job executor is a plugin that depends on
+   * core, so core can only refer to its class by name. The plugin uses these constants and checks
+   * that the name is the one of its class.
+   */
+  public static final String K8S_JOB_EXECUTOR_CLASS_NAME =
+      "org.apache.gravitino.job.k8s.K8sJobExecutor";
 
   private static final String JOB_EXECUTOR_CONF_PREFIX = "gravitino.jobExecutor.";
 
   private static final String JOB_EXECUTOR_CLASS_SUFFIX = ".class";
 
+  private static final String K8S_JOB_EXECUTOR_JAR = "gravitino-k8s-job-executor-<version>.jar";
+
   private static final Map<String, String> BUILTIN_EXECUTORS =
       ImmutableMap.of(
           LocalJobExecutorConfigs.LOCAL_JOB_EXECUTOR_NAME,
-          LocalJobExecutor.class.getCanonicalName());
+          LocalJobExecutor.class.getCanonicalName(),
+          K8S_JOB_EXECUTOR_NAME,
+          K8S_JOB_EXECUTOR_CLASS_NAME);
 
   private JobExecutorFactory() {
     // Private constructor to prevent instantiation
@@ -46,11 +70,21 @@ public class JobExecutorFactory {
   public static JobExecutor create(Config config) {
     String jobExecutorName = config.get(Configs.JOB_EXECUTOR);
     String clzName;
+    String jobExecutorClassKey =
+        JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + JOB_EXECUTOR_CLASS_SUFFIX;
     if (BUILTIN_EXECUTORS.containsKey(jobExecutorName)) {
       clzName = BUILTIN_EXECUTORS.get(jobExecutorName);
+      String configuredClzName = StringUtils.trimToNull(config.getRawString(jobExecutorClassKey));
+      if (configuredClzName != null && !configuredClzName.equals(clzName)) {
+        LOG.warn(
+            "Job executor {} is built in, so {} = {} is ignored and {} is used. Give a custom job"
+                + " executor another name.",
+            jobExecutorName,
+            jobExecutorClassKey,
+            configuredClzName,
+            clzName);
+      }
     } else {
-      String jobExecutorClassKey =
-          JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + JOB_EXECUTOR_CLASS_SUFFIX;
       clzName = config.getRawString(jobExecutorClassKey);
     }
 
@@ -60,15 +94,117 @@ public class JobExecutorFactory {
         jobExecutorName);
 
     Map<String, String> configs =
-        config.getConfigsWithPrefix(JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + ".");
+        Maps.newHashMap(
+            config.getConfigsWithPrefix(JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + "."));
+    Class<?> jobExecutorClass = loadJobExecutorClass(jobExecutorName, clzName);
     try {
+      checkJobExecutorClass(jobExecutorClass);
       JobExecutor jobExecutor =
-          (JobExecutor) Class.forName(clzName).getDeclaredConstructor().newInstance();
+          (JobExecutor) jobExecutorClass.getDeclaredConstructor().newInstance();
+      if (jobExecutor instanceof LocalJobExecutor) {
+        // The local job executor, and any subclass of it, keeps its output index under the job
+        // staging directory, so it must resolve paths against exactly the directory JobManager
+        // stages jobs in.
+        configs.put(LocalJobExecutorConfigs.STAGING_DIR, config.get(Configs.JOB_STAGING_DIR));
+      }
       jobExecutor.initialize(configs);
       return jobExecutor;
 
     } catch (Exception e) {
       throw new RuntimeException("Failed to create job executor: " + jobExecutorName, e);
+    }
+  }
+
+  /**
+   * Checks that the job executor class implements all the methods Gravitino requires. A class
+   * compiled against an older version of {@link JobExecutor} still loads, but calling a method it
+   * doesn't implement throws {@link AbstractMethodError} later, so it is rejected up front.
+   *
+   * @param jobExecutorClass The job executor class to check.
+   * @throws IllegalArgumentException If the class isn't a job executor, or misses a required
+   *     method.
+   */
+  @VisibleForTesting
+  static void checkJobExecutorClass(Class<?> jobExecutorClass) {
+    Preconditions.checkArgument(
+        JobExecutor.class.isAssignableFrom(jobExecutorClass),
+        "%s doesn't implement %s",
+        jobExecutorClass.getName(),
+        JobExecutor.class.getName());
+
+    Method getJobExecutionInfo;
+    try {
+      getJobExecutionInfo = jobExecutorClass.getMethod("getJobExecutionInfo", String.class);
+    } catch (NoSuchMethodException e) {
+      // Never happens for a JobExecutor, as the interface declares the method.
+      throw new IllegalArgumentException(e);
+    }
+    Preconditions.checkArgument(
+        !Modifier.isAbstract(getJobExecutionInfo.getModifiers()),
+        "Job executor %s doesn't implement JobExecutor#getJobExecutionInfo(String), which "
+            + "Gravitino uses to track the jobs. It was likely built against an older version of "
+            + "Gravitino, rebuild it against this version and implement the method.",
+        jobExecutorClass.getName());
+
+    // Both submit methods have a default implementation, one delegating to the other, so a job
+    // executor must implement at least one of them.
+    Preconditions.checkArgument(
+        implementsMethod(jobExecutorClass, "submitJob", JobContext.class, JobTemplate.class)
+            || implementsMethod(jobExecutorClass, "submitJob", JobTemplate.class),
+        "Job executor %s implements neither JobExecutor#submitJob(JobContext, JobTemplate) nor "
+            + "JobExecutor#submitJob(JobTemplate), implement one of them to submit jobs.",
+        jobExecutorClass.getName());
+
+    // LocalJobExecutor submits jobs through submitJob(JobContext, JobTemplate) and never calls the
+    // deprecated submitJob(JobTemplate), so a subclass that overrides only the latter would have
+    // its override silently skipped.
+    Preconditions.checkArgument(
+        !LocalJobExecutor.class.isAssignableFrom(jobExecutorClass)
+            || !implementsMethod(jobExecutorClass, "submitJob", JobTemplate.class)
+            || declaringClassOf(jobExecutorClass, "submitJob", JobContext.class, JobTemplate.class)
+                != LocalJobExecutor.class,
+        "Job executor %s extends LocalJobExecutor and overrides the deprecated "
+            + "JobExecutor#submitJob(JobTemplate), which LocalJobExecutor never calls. Override "
+            + "submitJob(JobContext, JobTemplate) instead.",
+        jobExecutorClass.getName());
+  }
+
+  private static Class<?> loadJobExecutorClass(String jobExecutorName, String clzName) {
+    try {
+      return Class.forName(clzName);
+    } catch (ClassNotFoundException | LinkageError e) {
+      // A LinkageError is thrown when the class is there, but a class it depends on isn't.
+      String hint =
+          K8S_JOB_EXECUTOR_CLASS_NAME.equals(clzName)
+              ? String.format(
+                  "It is shipped in %s, make sure the jar is in the libs directory of the"
+                      + " Gravitino server",
+                  K8S_JOB_EXECUTOR_JAR)
+              : String.format(
+                  "Check %s%s%s, and make sure the jar of the job executor is on the classpath"
+                      + " of the Gravitino server",
+                  JOB_EXECUTOR_CONF_PREFIX, jobExecutorName, JOB_EXECUTOR_CLASS_SUFFIX);
+      throw new RuntimeException(
+          String.format(
+              "Failed to create job executor %s: its class %s can't be loaded. %s",
+              jobExecutorName, clzName, hint),
+          e);
+    }
+  }
+
+  private static boolean implementsMethod(
+      Class<?> jobExecutorClass, String name, Class<?>... parameterTypes) {
+    // An inherited default method of the interface is declared by the interface itself.
+    return declaringClassOf(jobExecutorClass, name, parameterTypes) != JobExecutor.class;
+  }
+
+  private static Class<?> declaringClassOf(
+      Class<?> jobExecutorClass, String name, Class<?>... parameterTypes) {
+    try {
+      return jobExecutorClass.getMethod(name, parameterTypes).getDeclaringClass();
+    } catch (NoSuchMethodException e) {
+      // Never happens for a JobExecutor, as the interface declares the method.
+      throw new IllegalArgumentException(e);
     }
   }
 }

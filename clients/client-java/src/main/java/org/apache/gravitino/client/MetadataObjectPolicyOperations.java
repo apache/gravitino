@@ -18,19 +18,15 @@
  */
 package org.apache.gravitino.client;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
-import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.PolicyListResponse;
-import org.apache.gravitino.dto.responses.PolicyResponse;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rest.RESTUtils;
 
@@ -40,15 +36,12 @@ import org.apache.gravitino.rest.RESTUtils;
  */
 class MetadataObjectPolicyOperations implements SupportsPolicies {
 
-  private final String metalakeName;
-
   private final RESTClient restClient;
 
   private final String policyRequestPath;
 
   MetadataObjectPolicyOperations(
       String metalakeName, MetadataObject metadataObject, RESTClient restClient) {
-    this.metalakeName = metalakeName;
     this.restClient = restClient;
     this.policyRequestPath =
         String.format(
@@ -60,64 +53,40 @@ class MetadataObjectPolicyOperations implements SupportsPolicies {
 
   @Override
   public String[] listPolicies() {
-    NameListResponse resp =
+    return listPoliciesWithVisibility().policies();
+  }
+
+  @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    PolicyNameListResponse resp =
         restClient.get(
             policyRequestPath,
-            NameListResponse.class,
+            PolicyNameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.policyErrorHandler());
 
     resp.validate();
-    return resp.getNames();
+    return new PolicyList<>(resp.getNames(), resp.hasInaccessiblePolicies());
   }
 
   @Override
   public Policy[] listPolicyInfos() {
-    PolicyListResponse resp =
+    return listPolicyInfosWithVisibility().policies();
+  }
+
+  @Override
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    MetadataObjectPolicyListResponse resp =
         restClient.get(
             policyRequestPath,
             ImmutableMap.of("details", "true"),
-            PolicyListResponse.class,
+            MetadataObjectPolicyListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.policyErrorHandler());
 
     resp.validate();
-    return Arrays.stream(resp.getPolicies())
-        .map(policyDTO -> new GenericPolicy(policyDTO, restClient, metalakeName))
-        .toArray(Policy[]::new);
-  }
-
-  @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(name), "Policy name must not be null or empty");
-
-    PolicyResponse resp =
-        restClient.get(
-            policyRequestPath + "/" + RESTUtils.encodeString(name),
-            PolicyResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.policyErrorHandler());
-
-    resp.validate();
-    return new GenericPolicy(resp.getPolicy(), restClient, metalakeName);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove) {
-    PoliciesAssociateRequest request =
-        new PoliciesAssociateRequest(policiesToAdd, policiesToRemove);
-    request.validate();
-
-    NameListResponse resp =
-        restClient.post(
-            policyRequestPath,
-            request,
-            NameListResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.policyErrorHandler());
-
-    resp.validate();
-    return resp.getNames();
+    Policy[] policies =
+        Arrays.stream(resp.getPolicies()).map(GenericPolicy::new).toArray(Policy[]::new);
+    return new PolicyList<>(policies, resp.hasInaccessiblePolicies());
   }
 }

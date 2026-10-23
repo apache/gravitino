@@ -86,6 +86,71 @@ public class TestGravitinoSystemStatusTables {
   }
 
   @Test
+  public void testCatalogTableReportsEveryMetalakeWithoutConfiguredMetalake() {
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    when(manager.getUsedMetalakes()).thenReturn(Set.of("prod", "dev"));
+    for (String metalakeName : List.of("prod", "dev")) {
+      GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+      Catalog catalog = mock(Catalog.class);
+      when(catalog.name()).thenReturn(metalakeName + "_memory");
+      when(catalog.provider()).thenReturn("memory");
+      when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+      when(catalog.properties()).thenReturn(Map.of());
+      Audit audit = mock(Audit.class);
+      when(audit.createTime()).thenReturn(Instant.now());
+      when(catalog.auditInfo()).thenReturn(audit);
+      when(metalake.listCatalogsInfo()).thenReturn(new Catalog[] {catalog});
+      when(manager.getMetalake(metalakeName)).thenReturn(metalake);
+      when(manager.getTrinoCatalogName(metalakeName, metalakeName + "_memory"))
+          .thenReturn(metalakeName + "_memory");
+    }
+
+    Page page = new GravitinoSystemTableCatalog(manager, null).loadPageData();
+
+    assertEquals(2, page.getPositionCount());
+    assertEquals(
+        Set.of("prod_memory", "dev_memory"), Set.of(varchar(page, 0), varchar(page, 0, 1)));
+    // The metalake column tells same-named catalogs of different metalakes apart.
+    for (int position = 0; position < 2; position++) {
+      String name = varchar(page, 0, position);
+      assertEquals(name.substring(0, name.indexOf('_')), varchar(page, 3, position));
+    }
+  }
+
+  @Test
+  public void testCatalogStatusTableReportsEveryMetalakeWithoutConfiguredMetalake() {
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    List<CatalogRegistrationState> states =
+        List.of(
+            CatalogRegistrationState.failed("prod", "memory", "memory", null, "boom"),
+            CatalogRegistrationState.failed("dev", "memory", "memory", null, "boom"));
+    when(manager.getCatalogRegistrationStates(null)).thenReturn(states);
+
+    Page page = new GravitinoSystemTableCatalogStatus(manager, null).loadPageData();
+
+    assertEquals(2, page.getPositionCount());
+    assertEquals(Set.of("prod", "dev"), Set.of(varchar(page, 0), varchar(page, 0, 1)));
+  }
+
+  @Test
+  public void testLoadStatusTableReportsEveryMetalakeErrorWithoutConfiguredMetalake() {
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
+    when(manager.getLoadOutcome())
+        .thenReturn(
+            new CatalogConnectorManager.LoadOutcome(
+                true,
+                0L,
+                "1 of 2 metalakes failed",
+                1L,
+                Map.of("test", "Connection refused", "dev", "Access Denied")));
+
+    Page page = new GravitinoSystemTableLoadStatus(manager, null).loadPageData();
+
+    assertEquals("{\"dev\":\"Access Denied\",\"test\":\"Connection refused\"}", varchar(page, 5));
+  }
+
+  @Test
   public void testCatalogStatusTableRendersRegisteredCatalog() {
     GravitinoCatalog catalog =
         new GravitinoCatalog("test", "memory", "memory", ImmutableMap.of(), 0L);
@@ -313,7 +378,11 @@ public class TestGravitinoSystemStatusTables {
   }
 
   private static String varchar(Page page, int channel) {
+    return varchar(page, channel, 0);
+  }
+
+  private static String varchar(Page page, int channel, int position) {
     Block block = page.getBlock(channel);
-    return VARCHAR.getSlice(block, 0).toStringUtf8();
+    return VARCHAR.getSlice(block, position).toStringUtf8();
   }
 }

@@ -52,18 +52,19 @@ A topic name is unique within its schema, and matches the topic name in the clus
 
 Two properties are settable at creation. `partition-count` sets the number of partitions and can be
 changed afterward. `replication-factor` sets the replication and is immutable once the topic exists.
-Leaving either unset takes the broker's own default, from `num.partition` and
+Leaving either unset takes the broker's own default, from `num.partitions` and
 `default.replication.factor` respectively.
 
 ### What Gravitino Stores and What It Does Not
 
-Gravitino stores the topic's place in the hierarchy and anything attached to it, including tags,
-policies, and ownership. Message content, offsets, consumer groups, and lag stay entirely in the
-cluster.
+Gravitino stores the topic's place in the hierarchy, its tag assignments, and ownership. Policies
+are derived from effective tags when they are read. Message content, offsets, consumer groups, and
+lag stay entirely in the cluster.
 
 Message schemas are also outside the catalog. Gravitino does not integrate with a schema registry,
 so the structure of the messages in a topic is not described here and cannot be classified per field
-the way table columns can. Tags and policies attach to the topic as a whole.
+the way table columns can. Tags are assigned to the topic as a whole, and matching policies
+are derived from those tags.
 
 ## Working With Topics in the UI
 
@@ -76,7 +77,7 @@ the UI today. Attaching a tag to a topic goes through the API.
 
 | Privilege       | Grantable on                        | What it allows        |
 |-----------------|-------------------------------------|-----------------------|
-| `CREATE_TOPIC`  | Metalake, catalog, schema, or topic | Creating topics       |
+| `CREATE_TOPIC`  | Metalake, catalog, or schema        | Creating topics       |
 | `PRODUCE_TOPIC` | Metalake, catalog, schema, or topic | Writing to a topic    |
 | `CONSUME_TOPIC` | Metalake, catalog, schema, or topic | Reading from a topic  |
 

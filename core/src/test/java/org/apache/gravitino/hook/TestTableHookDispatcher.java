@@ -222,10 +222,60 @@ public class TestTableHookDispatcher {
           .when(() -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE))
           .thenReturn(locations);
       assertSame(alteredTable, hook.alterTable(ident, renameChange));
+      NameIdentifier newIdent = NameIdentifier.of(METALAKE, CATALOG, "schema", "newName");
       authorizationUtils.verify(
           () ->
               AuthorizationUtils.authorizationPluginRenamePrivileges(
-                  ident, Entity.EntityType.TABLE, "newName", locations));
+                  ident, Entity.EntityType.TABLE, newIdent, locations));
+    }
+  }
+
+  @Test
+  public void testRenameAcrossSchemasPassesNewSchemaToAuthorization() {
+    TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null);
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "schema", "table");
+    Table alteredTable = Mockito.mock(Table.class);
+    TableChange renameChange = TableChange.rename("newName", "newSchema");
+    List<String> locations = ImmutableList.of("/test");
+    Mockito.when(dispatcher.alterTable(ident, renameChange)).thenReturn(alteredTable);
+
+    try (MockedStatic<AuthorizationUtils> authorizationUtils =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      authorizationUtils
+          .when(() -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE))
+          .thenReturn(locations);
+      assertSame(alteredTable, hook.alterTable(ident, renameChange));
+      NameIdentifier newIdent = NameIdentifier.of(METALAKE, CATALOG, "newSchema", "newName");
+      authorizationUtils.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  ident, Entity.EntityType.TABLE, newIdent, locations));
+    }
+  }
+
+  @Test
+  public void testRenameTwiceKeepsSchemaFromEarlierRename() {
+    TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null);
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "schema", "table");
+    Table alteredTable = Mockito.mock(Table.class);
+    // The table dispatcher moves the table to the last schema set by any rename.
+    TableChange moveChange = TableChange.rename("t2", "newSchema");
+    TableChange renameChange = TableChange.rename("t3");
+    Mockito.when(dispatcher.alterTable(ident, moveChange, renameChange)).thenReturn(alteredTable);
+
+    try (MockedStatic<AuthorizationUtils> authorizationUtils =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      authorizationUtils
+          .when(() -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE))
+          .thenReturn(ImmutableList.of());
+      assertSame(alteredTable, hook.alterTable(ident, moveChange, renameChange));
+      NameIdentifier newIdent = NameIdentifier.of(METALAKE, CATALOG, "newSchema", "t3");
+      authorizationUtils.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  ident, Entity.EntityType.TABLE, newIdent, ImmutableList.of()));
     }
   }
 

@@ -75,6 +75,12 @@ paths:
   /metalakes/{metalake}/tags/{tag}:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D"
 
+  /metalakes/{metalake}/tags/{tag}/policies:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1policies"
+
+  /metalakes/{metalake}/tags/{tag}/policies/{policy}:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1policies~1%7Bpolicy%7D"
+
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags"
 
@@ -93,8 +99,8 @@ paths:
   /metalakes/{metalake}/policies/{policy}:
     $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D"
 
-  /metalakes/{metalake}/policies/{policy}/objects:
-    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D~1objects"
+  /metalakes/{metalake}/policies/{policy}/tags:
+    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D~1tags"
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/roles:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1roles"
@@ -107,9 +113,6 @@ paths:
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags/{tag}:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags~1%7Btag%7D"
-
-  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies/{policy}:
-    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1policies~1%7Bpolicy%7D"
 
   /metalakes/{metalake}/tags/{tag}/objects:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1objects"
@@ -164,6 +167,18 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}:
     $ref: "./views.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1views~1%7Bview%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/ossie:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1ossie"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ossie:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ossie"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
     $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions"
@@ -566,6 +581,14 @@ components:
       schema:
         type: string
 
+    semanticModel:
+      name: semanticModel
+      in: path
+      description: The name of the Semantic Model
+      required: true
+      schema:
+        type: string
+
     model:
       name: model
       in: path
@@ -634,11 +657,11 @@ components:
           - "SCHEMA"
           - "TABLE"
           - "VIEW"
+          - "SEMANTIC_MODEL"
           - "COLUMN"
           - "FILESET"
           - "TOPIC"
           - "MODEL"
-          - "MODEL_VERSION"
           - "FUNCTION"
           - "ROLE"
     metadataObjectFullName:
