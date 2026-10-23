@@ -44,7 +44,6 @@ import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITIN
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
-import static org.apache.gravitino.file.Fileset.PROPERTY_DELETE_DATA_ON_DROP;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -155,6 +154,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -1026,6 +1026,7 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  /** Checks that managed filesets reject existing data without registering metadata. */
   @Test
   public void testCreateManagedFilesetRejectsNonEmptyExistingLocation() throws IOException {
     String schemaName = "schema_managed_non_empty";
@@ -1065,6 +1066,7 @@ public class TestFilesetCatalogOperations {
     FileUtils.deleteDirectory(existingLocation);
   }
 
+  /** Checks that an empty existing directory can still be adopted by a managed fileset. */
   @Test
   public void testCreateManagedFilesetAdoptsEmptyExistingLocation() throws IOException {
     String schemaName = "schema_managed_empty";
@@ -1088,6 +1090,7 @@ public class TestFilesetCatalogOperations {
     FileUtils.deleteDirectory(existingLocation);
   }
 
+  /** Checks that explicitly allowing adoption permits a managed fileset over existing data. */
   @Test
   public void testCreateManagedFilesetOnNonEmptyLocationWithOverride() throws IOException {
     String schemaName = "schema_managed_override";
@@ -1111,6 +1114,129 @@ public class TestFilesetCatalogOperations {
     Assertions.assertEquals(Fileset.Type.MANAGED, fileset.type());
 
     FileUtils.deleteDirectory(existingLocation);
+  }
+
+  /** Checks that creating one location does not invalidate another location in the same request. */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCreateManagedFilesetWithNestedNewLocations(boolean childFirst)
+      throws IOException {
+    String schemaName = "schema_nested_locations_" + childFirst;
+    createSchema(schemaName, "comment", null, null);
+    File parent = new File(UNFORMALIZED_TEST_ROOT_PATH, "nested_locations_" + childFirst);
+    File child = new File(parent, "child");
+    Map<String, String> locations =
+        ImmutableMap.of(
+            "a", (childFirst ? child : parent).toURI().toString(),
+            "b", (childFirst ? parent : child).toURI().toString());
+
+    Fileset fileset =
+        createMultiLocationFileset(
+            "nested",
+            schemaName,
+            "comment",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(),
+            locations,
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "a"));
+
+    Assertions.assertTrue(parent.isDirectory());
+    Assertions.assertTrue(child.isDirectory());
+    locations.forEach(
+        (name, location) ->
+            Assertions.assertEquals(
+                new Path(location).toString(), fileset.storageLocations().get(name)));
+    Assertions.assertTrue(
+        store.exists(
+            NameIdentifier.of("m1", "c1", schemaName, "nested"), Entity.EntityType.FILESET));
+  }
+
+  /** Checks that a rejected later location leaves both the filesystem and metadata unchanged. */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCreateManagedFilesetPreflightsAllLocations(boolean existingFile)
+      throws IOException {
+    String schemaName = "schema_preflight_locations_" + existingFile;
+    createSchema(schemaName, "comment", null, null);
+    File newLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "new_location_" + existingFile);
+    File existingLocation =
+        new File(UNFORMALIZED_TEST_ROOT_PATH, "existing_location_" + existingFile);
+    File existingData = existingFile ? existingLocation : new File(existingLocation, "report.csv");
+    FileUtils.touch(existingData);
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", schemaName, "preflight");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createMultiLocationFileset(
+                    ident.name(),
+                    schemaName,
+                    "comment",
+                    Fileset.Type.MANAGED,
+                    ImmutableMap.of(),
+                    ImmutableMap.of(
+                        "a", newLocation.toURI().toString(),
+                        "b", existingLocation.toURI().toString()),
+                    ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "a")));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(existingFile ? "cannot be a file" : "already exists and is not empty"));
+    Assertions.assertFalse(newLocation.exists(), "Preflight must not create earlier locations");
+    Assertions.assertTrue(existingData.isFile());
+    Assertions.assertFalse(store.exists(ident, Entity.EntityType.FILESET));
+  }
+
+  /** Checks that external filesets can still register existing data and retain it on drop. */
+  @Test
+  public void testCreateExternalFilesetOnNonEmptyLocation() throws IOException {
+    String schemaName = "schema_external_non_empty";
+    createSchema(schemaName, "comment", null, null);
+    File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "external_reports");
+    File existingData = new File(location, "report.csv");
+    FileUtils.touch(existingData);
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", schemaName, "external");
+
+    Fileset fileset =
+        createFileset(
+            ident.name(),
+            schemaName,
+            "comment",
+            Fileset.Type.EXTERNAL,
+            null,
+            location.toURI().toString());
+
+    Assertions.assertEquals(Fileset.Type.EXTERNAL, fileset.type());
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      Assertions.assertTrue(ops.dropFileset(ident));
+    }
+    Assertions.assertTrue(existingData.isFile());
+  }
+
+  /** Checks that metadata-only catalogs do not inspect or change existing storage. */
+  @Test
+  public void testCreateManagedFilesetOnNonEmptyLocationWhenFSOpsDisabled() throws IOException {
+    String schemaName = "schema_managed_non_empty_disabled";
+    createSchema(schemaName, "comment", null, null, true);
+    File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "managed_reports_disabled");
+    File existingData = new File(location, "report.csv");
+    FileUtils.touch(existingData);
+
+    Fileset fileset =
+        createFileset(
+            "managed",
+            schemaName,
+            "comment",
+            Fileset.Type.MANAGED,
+            null,
+            location.toURI().toString(),
+            true);
+
+    Assertions.assertEquals(Fileset.Type.MANAGED, fileset.type());
+    Assertions.assertTrue(existingData.isFile());
   }
 
   /** Checks independent catalog instances cannot both create the same fileset. */
@@ -3713,112 +3839,6 @@ public class TestFilesetCatalogOperations {
       Assertions.assertTrue(ops.dropFileset(filesetIdent));
       Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
     }
-  }
-
-  @Test
-  public void testDropFilesetKeepsStorageWhenDeleteDataOnDropIsFalse() throws IOException {
-    String schemaName = "schema_drop_keep_data";
-    String filesetName = "fileset_drop_keep_data";
-    String catalogPath = TEST_ROOT_PATH + "/catalog_drop_keep_data";
-    createSchema(schemaName, "comment", catalogPath, null);
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            schemaName,
-            "comment",
-            Fileset.Type.MANAGED,
-            catalogPath,
-            null,
-            ImmutableMap.of(PROPERTY_DELETE_DATA_ON_DROP, "false"));
-
-    Path filesetPath = new Path(fileset.storageLocation());
-    FileSystem fs = filesetPath.getFileSystem(new Configuration());
-    Assertions.assertTrue(fs.exists(filesetPath));
-
-    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
-    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
-      ops.initialize(
-          ImmutableMap.of(LOCATION, catalogPath),
-          randomCatalogInfo("m1", "c1"),
-          FILESET_PROPERTIES_METADATA);
-      Assertions.assertTrue(ops.dropFileset(filesetIdent));
-      Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
-    }
-
-    // The metadata is gone but the property asked for the data to stay behind.
-    Assertions.assertTrue(fs.exists(filesetPath));
-
-    fs.delete(filesetPath, true);
-  }
-
-  @Test
-  public void testDropFilesetKeepsStorageWhenDeleteDataOnDropIsSetAfterCreation()
-      throws IOException {
-    String schemaName = "schema_drop_keep_data_later";
-    String filesetName = "fileset_drop_keep_data_later";
-    String catalogPath = TEST_ROOT_PATH + "/catalog_drop_keep_data_later";
-    createSchema(schemaName, "comment", catalogPath, null);
-    Fileset fileset =
-        createFileset(filesetName, schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
-
-    Path filesetPath = new Path(fileset.storageLocation());
-    FileSystem fs = filesetPath.getFileSystem(new Configuration());
-    Assertions.assertTrue(fs.exists(filesetPath));
-
-    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
-    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
-      ops.initialize(
-          ImmutableMap.of(LOCATION, catalogPath),
-          randomCatalogInfo("m1", "c1"),
-          FILESET_PROPERTIES_METADATA);
-      // A fileset that was created as managed by mistake can still be protected before the drop.
-      ops.alterFileset(
-          filesetIdent, FilesetChange.setProperty(PROPERTY_DELETE_DATA_ON_DROP, "false"));
-      Assertions.assertTrue(ops.dropFileset(filesetIdent));
-    }
-
-    Assertions.assertTrue(fs.exists(filesetPath));
-
-    fs.delete(filesetPath, true);
-  }
-
-  @Test
-  public void testDropSchemaCascadeKeepsStorageWhenDeleteDataOnDropIsFalse() throws IOException {
-    String schemaName = "schema_cascade_keep_data";
-    String catalogPath = TEST_ROOT_PATH + "/catalog_cascade_keep_data";
-    createSchema(schemaName, "comment", catalogPath, null);
-    Fileset kept =
-        createFileset(
-            "fileset_kept",
-            schemaName,
-            "comment",
-            Fileset.Type.MANAGED,
-            catalogPath,
-            null,
-            ImmutableMap.of(PROPERTY_DELETE_DATA_ON_DROP, "false"));
-    Fileset deleted =
-        createFileset(
-            "fileset_deleted", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
-
-    Path keptPath = new Path(kept.storageLocation());
-    Path deletedPath = new Path(deleted.storageLocation());
-    FileSystem fs = keptPath.getFileSystem(new Configuration());
-    Assertions.assertTrue(fs.exists(keptPath));
-    Assertions.assertTrue(fs.exists(deletedPath));
-
-    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
-      ops.initialize(
-          ImmutableMap.of(LOCATION, catalogPath),
-          randomCatalogInfo("m1", "c1"),
-          FILESET_PROPERTIES_METADATA);
-      Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
-    }
-
-    Assertions.assertTrue(fs.exists(keptPath));
-    Assertions.assertFalse(fs.exists(deletedPath));
-
-    fs.delete(keptPath, true);
   }
 
   private Schema createSchema(String name, String comment, String catalogPath, String schemaPath)
