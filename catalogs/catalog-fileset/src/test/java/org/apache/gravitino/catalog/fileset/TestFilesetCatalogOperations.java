@@ -163,6 +163,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -1395,6 +1396,123 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(fileset.storageLocation(), fileset2.storageLocation());
       Map<String, String> props2 = fileset2.properties();
       Assertions.assertFalse(props2.containsKey("k1"));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"EXTERNAL,false", "MANAGED,false", "EXTERNAL,true", "MANAGED,true"})
+  void testUpdateFilesetTypePreservesDataAndControlsDrop(
+      Fileset.Type targetType, boolean cascade, @TempDir File root) throws IOException {
+    String schemaName = "schema" + generateTestId();
+    createSchema(schemaName, "schema comment", null, null);
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", schemaName, "fileset");
+    Fileset.Type originalType =
+        targetType == Fileset.Type.MANAGED ? Fileset.Type.EXTERNAL : Fileset.Type.MANAGED;
+    File primary = new File(root, "primary");
+    File backup = new File(root, "backup");
+    Files.createDirectories(primary.toPath());
+    Files.createDirectories(backup.toPath());
+    Map<String, String> locations =
+        ImmutableMap.of("primary", primary.toURI().toString(), "backup", backup.toURI().toString());
+    Map<String, String> props =
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "primary", "k1", "v1"));
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
+      ops.createMultipleLocationFileset(ident, "comment", originalType, locations, props);
+      for (File directory : Arrays.asList(primary, backup)) {
+        Files.writeString(new File(directory, "data.txt").toPath(), "existing data");
+      }
+      FilesetEntity before = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+
+      // Repeating the conversion must preserve both metadata and existing data.
+      for (int attempt = 0; attempt < 2; attempt++) {
+        Fileset updated = ops.alterFileset(ident, FilesetChange.updateType(targetType));
+        Assertions.assertEquals(targetType, updated.type());
+        Assertions.assertEquals(before.name(), updated.name());
+        Assertions.assertEquals(before.comment(), updated.comment());
+        Assertions.assertEquals(before.storageLocations(), updated.storageLocations());
+        Assertions.assertEquals(before.properties(), updated.properties());
+        FilesetEntity persisted = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+        Assertions.assertEquals(before.id(), persisted.id());
+        Assertions.assertEquals(before.namespace(), persisted.namespace());
+        Assertions.assertEquals(targetType, persisted.filesetType());
+        Assertions.assertEquals(before.auditInfo().creator(), persisted.auditInfo().creator());
+        Assertions.assertEquals(
+            before.auditInfo().createTime(), persisted.auditInfo().createTime());
+        Assertions.assertNotNull(persisted.auditInfo().lastModifiedTime());
+        for (File directory : Arrays.asList(primary, backup)) {
+          Assertions.assertEquals(
+              "existing data", Files.readString(new File(directory, "data.txt").toPath()));
+        }
+      }
+
+      if (cascade) {
+        Assertions.assertTrue(ops.dropSchema(NameIdentifier.of("m1", "c1", schemaName), true));
+      } else {
+        Assertions.assertTrue(ops.dropFileset(ident));
+      }
+      Assertions.assertFalse(store.exists(ident, Entity.EntityType.FILESET));
+      for (File directory : Arrays.asList(primary, backup)) {
+        if (targetType == Fileset.Type.EXTERNAL) {
+          Assertions.assertEquals(
+              "existing data", Files.readString(new File(directory, "data.txt").toPath()));
+        } else {
+          Assertions.assertFalse(directory.exists());
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testUpdateFilesetTypeWithOtherChanges(boolean disableFsOps) throws IOException {
+    String schemaName = "schema" + generateTestId();
+    createSchema(schemaName, "comment", null, null, true);
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", schemaName, "fileset");
+    File missingLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "missing-" + schemaName);
+    createFileset(
+        "fileset",
+        schemaName,
+        "comment",
+        Fileset.Type.EXTERNAL,
+        null,
+        missingLocation.toURI().toString(),
+        true);
+    FilesetEntity before = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(DISABLE_FILESYSTEM_OPS, Boolean.toString(disableFsOps)),
+          randomCatalogInfo(),
+          FILESET_PROPERTIES_METADATA);
+      Fileset updated =
+          ops.alterFileset(
+              ident,
+              FilesetChange.updateType(Fileset.Type.MANAGED),
+              FilesetChange.rename("renamed"),
+              FilesetChange.updateComment("updated"),
+              FilesetChange.setProperty("k1", "v1"));
+      NameIdentifier renamed = NameIdentifier.of(ident.namespace(), "renamed");
+      Assertions.assertEquals(Fileset.Type.MANAGED, updated.type());
+      Assertions.assertEquals("renamed", updated.name());
+      Assertions.assertEquals("updated", updated.comment());
+      Assertions.assertEquals("v1", updated.properties().get("k1"));
+      Assertions.assertFalse(store.exists(ident, Entity.EntityType.FILESET));
+      Assertions.assertEquals(
+          before.id(), store.get(renamed, Entity.EntityType.FILESET, FilesetEntity.class).id());
+      Assertions.assertEquals(before.storageLocations(), updated.storageLocations());
+      Assertions.assertFalse(missingLocation.exists());
+
+      // Multiple type changes follow request order, like other fileset changes.
+      Fileset reverted =
+          ops.alterFileset(
+              renamed,
+              FilesetChange.updateType(Fileset.Type.MANAGED),
+              FilesetChange.updateType(Fileset.Type.EXTERNAL));
+      Assertions.assertEquals(Fileset.Type.EXTERNAL, reverted.type());
+      Assertions.assertTrue(ops.dropFileset(renamed));
     }
   }
 

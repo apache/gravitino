@@ -83,7 +83,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
@@ -516,6 +518,37 @@ public class TestFilesetOperations extends BaseOperationsTest {
         mockFileset(
             "fileset1", Fileset.Type.MANAGED, "new comment", "mock location", ImmutableMap.of());
     assertUpdateFileset(new FilesetUpdatesRequest(ImmutableList.of(req)), fileset);
+  }
+
+  @ParameterizedTest
+  @EnumSource(Fileset.Type.class)
+  void testUpdateFilesetType(Fileset.Type type) {
+    FilesetUpdateRequest req = new FilesetUpdateRequest.UpdateFilesetTypeRequest(type);
+    Fileset fileset =
+        mockFileset("fileset1", type, "comment", "mock location", ImmutableMap.of("k1", "v1"));
+    assertUpdateFileset(new FilesetUpdatesRequest(ImmutableList.of(req)), fileset);
+    Mockito.verify(dispatcher)
+        .alterFileset(
+            NameIdentifier.of(metalake, catalog, schema, "fileset1"),
+            FilesetChange.updateType(type));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"updates\":[{\"@type\":\"updateType\"}]}",
+        "{\"updates\":[{\"@type\":\"updateType\",\"newType\":null}]}",
+        "{\"updates\":[{\"@type\":\"updateType\",\"newType\":\"unknown\"}]}"
+      })
+  void testUpdateFilesetTypeRejectsInvalidRequest(String json) {
+    try (Response response =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(400, response.getStatus());
+      Mockito.verifyNoInteractions(dispatcher);
+    }
   }
 
   @Test
