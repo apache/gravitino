@@ -23,8 +23,9 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.RustFSContainer;
+import org.apache.gravitino.integration.test.container.RustFSFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
@@ -41,22 +42,20 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
  * {@code MODIFY_TABLE} is observable without a cloud account.
  */
 @Tag("gravitino-docker-test")
+@RustFSFixture
 public class IcebergRESTRustFSTokenAuthorizationIT
     extends IcebergRESTCloudTokenAuthorizationBaseIT {
+  @FixtureContainer private RustFSContainer rustFSContainer;
 
   private static final String BUCKET_NAME = "gravitino-rustfs-it";
 
   private static final String BUNDLE_NAME = "iceberg-aws-bundle";
-
-  private final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private String s3Endpoint;
   private String warehouse;
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startRustFSContainer();
-    RustFSContainer rustFSContainer = containerSuite.getRustFSContainer();
     rustFSContainer.createBucket(BUCKET_NAME);
     this.s3Endpoint = rustFSContainer.getS3Endpoint();
     this.warehouse = String.format("s3://%s/test1", BUCKET_NAME);

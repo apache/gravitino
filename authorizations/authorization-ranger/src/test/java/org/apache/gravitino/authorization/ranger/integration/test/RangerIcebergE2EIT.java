@@ -66,7 +66,7 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init(RangerBaseE2EIT.metalakeName, true);
+    RangerITEnv.init(ranger, RangerBaseE2EIT.metalakeName, true);
     RangerITEnv.startHiveRangerContainer();
 
     HIVE_METASTORE_URIS =

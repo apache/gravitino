@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
@@ -63,7 +64,7 @@ public class TestMysqlTableOperations extends TestMysql {
 
   @Test
   public void testOperationTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_op_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -201,7 +202,7 @@ public class TestMysqlTableOperations extends TestMysql {
 
   @Test
   public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_type_default_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_type_default_table";
     JdbcColumn col_1 =
         JdbcColumn.builder().withName("col_1").withType(INT).withNullable(false).build();
     JdbcColumn col_2 =
@@ -234,7 +235,7 @@ public class TestMysqlTableOperations extends TestMysql {
 
   @Test
   public void testUpdateColumnPositionWithSpecialReferenceColumn() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_position_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_position_table";
     JdbcColumn[] columns =
         new JdbcColumn[] {
           JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build(),
@@ -275,7 +276,7 @@ public class TestMysqlTableOperations extends TestMysql {
 
   @Test
   public void testAlterTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_al_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_al_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     JdbcColumn col_1 =
@@ -666,7 +667,7 @@ public class TestMysqlTableOperations extends TestMysql {
 
   @Test
   public void testCreateAndLoadTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_cl_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_cl_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -727,7 +728,7 @@ public class TestMysqlTableOperations extends TestMysql {
 
   @Test
   public void testClearCommentsWithNull() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_clear_comment";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_clear_comment";
     JdbcColumn column =
         JdbcColumn.builder().withName("col_1").withType(INT).withComment("col comment").build();
     try {
@@ -1104,7 +1105,7 @@ public class TestMysqlTableOperations extends TestMysql {
                     Distributions.NONE,
                     Indexes.EMPTY_INDEXES));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             exception.getMessage(),
             "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
 
@@ -1140,7 +1141,7 @@ public class TestMysqlTableOperations extends TestMysql {
                     Distributions.NONE,
                     primaryIndex));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             exception.getMessage(),
             "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: [col_1,col_4]"));
   }
@@ -1209,7 +1210,7 @@ public class TestMysqlTableOperations extends TestMysql {
     sql = MysqlTableOperations.addIndexDefinition(successIndex);
     Assertions.assertEquals("ADD PRIMARY KEY  (`col_1`, `col_2`)", sql);
 
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_op_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -1300,7 +1301,8 @@ public class TestMysqlTableOperations extends TestMysql {
     // MySQL Connector/J before 8.0.16 reports a COLUMN_SIZE the fractional seconds precision
     // cannot be derived from, which calculateDatetimePrecision signals by returning null. The
     // precision must then be recovered from information_schema instead of being left unset.
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_datetime_precision_table";
+    String tableName =
+        RandomStringUtils.insecure().nextAlphabetic(16) + "_datetime_precision_table";
     DataSource dataSource = DataSourceUtils.createDataSource(getMySQLCatalogProperties());
     try {
       try (Connection connection = dataSource.getConnection()) {
@@ -1357,7 +1359,7 @@ public class TestMysqlTableOperations extends TestMysql {
     // These types either drop their parameters (VARBINARY/ENUM/SET) or collapse distinct widths
     // into the same Gravitino type (BIT/BINARY) when only JDBC's TYPE_NAME/COLUMN_SIZE metadata
     // is used.
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_lossy_type_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_lossy_type_table";
     DataSource dataSource = DataSourceUtils.createDataSource(getMySQLCatalogProperties());
     try {
       try (Connection connection = dataSource.getConnection()) {
