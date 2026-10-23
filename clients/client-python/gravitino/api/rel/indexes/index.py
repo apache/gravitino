@@ -52,6 +52,15 @@ class Index(ABC):
         columns that are not designated as the primary key. The uniqueness constraint imposed by
         UNIQUE KEY helps in avoiding redundancy and ensuring data accuracy in the database."""
 
+        BITMAP = "BITMAP"
+        """Bitmap index, which uses bit arrays to represent the presence of values in a column."""
+
+        INVERTED = "INVERTED"
+        """Inverted index, which maps terms to their locations to speed up full-text searches."""
+
+        VECTOR = "VECTOR"
+        """Vector index, which speeds up similarity searches in high-dimensional vector spaces."""
+
         DATA_SKIPPING_ANNOY = "DATA_SKIPPING_ANNOY"
         """Legacy ClickHouse Annoy index metadata. This type is metadata-only."""
 
