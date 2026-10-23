@@ -41,8 +41,9 @@ import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -69,6 +70,7 @@ import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture
 public class ProxyCatalogHiveIT extends BaseIT {
 
   public static final String METALAKE_NAME =
@@ -81,7 +83,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
   private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   private static final String HMS_CATALOG = "";
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private static HiveContainer hive;
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
   private static HiveClientPool hiveClientPool;
@@ -107,12 +109,9 @@ public class ProxyCatalogHiveIT extends BaseIT {
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     super.startIntegrationTest();
-    containerSuite.startHiveContainer();
     HIVE_METASTORE_URIS =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
@@ -126,9 +125,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
     conf.set(
         "fs.defaultFS",
         String.format(
-            "hdfs://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT));
+            "hdfs://%s:%d", hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
     hdfs = FileSystem.get(conf);
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -175,7 +172,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
         "location",
         String.format(
             "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
+            hive.getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             anotherSchemaName.toLowerCase()));
     SupportsSchemas schemas = anotherCatalog.asSchemas();
@@ -197,9 +194,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
         "location",
         String.format(
             "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            "new_schema"));
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT, "new_schema"));
     e =
         Assertions.assertThrows(
             RuntimeException.class,
@@ -283,7 +278,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
         "location",
         String.format(
             "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
+            hive.getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
     catalog.asSchemas().createSchema(schemaName, comment, properties);

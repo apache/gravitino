@@ -52,8 +52,10 @@ import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
+import org.apache.gravitino.integration.test.container.RangerFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -73,6 +75,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@RangerFixture
 public class RangerFilesetIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerFilesetIT.class);
 
@@ -85,6 +88,8 @@ public class RangerFilesetIT extends BaseIT {
   private FileSystem fileSystem;
   private GravitinoMetalake metalake;
   private Catalog catalog;
+  @FixtureContainer private RangerContainer ranger;
+  private static HiveContainer hiveRanger;
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -100,13 +105,11 @@ public class RangerFilesetIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.init(metalakeName, false);
-    RangerITEnv.startHiveRangerContainer();
+    RangerITEnv.init(ranger, metalakeName, false);
+    hiveRanger = RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =
-        String.format(
-            "http://%s:%d",
-            containerSuite.getRangerContainer().getContainerIpAddress(), RANGER_SERVER_PORT);
+        String.format("http://%s:%d", ranger.getContainerIpAddress(), RANGER_SERVER_PORT);
 
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultBaseLocation());
@@ -599,7 +602,7 @@ public class RangerFilesetIT extends BaseIT {
       defaultBaseLocation =
           String.format(
               "hdfs://%s:%d/user/hadoop/%s",
-              containerSuite.getHiveRangerContainer().getContainerIpAddress(),
+              hiveRanger.getContainerIpAddress(),
               HiveContainer.HDFS_DEFAULTFS_PORT,
               schemaName.toLowerCase());
     }
