@@ -21,6 +21,9 @@ managed and external, how storage locations and placeholders work, and how GVFS 
 
 A fileset needs a name, a type, and a storage location. A `MANAGED` fileset is created and deleted
 with its data; an `EXTERNAL` one points at a location that already exists.
+Creating a `MANAGED` fileset on an existing non-empty location is rejected by default. Set
+`allow-existing-location-as-managed=true` at creation to explicitly adopt that data, including
+deleting it when the fileset is dropped. An existing empty directory needs no override.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

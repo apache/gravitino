@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
@@ -542,10 +543,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           });
     } else {
       try {
-        // formalize the path to avoid path without scheme, uri, authority, etc.
+        boolean allowExistingLocationAsManaged =
+            (boolean)
+                propertiesMetadata
+                    .filesetPropertiesMetadata()
+                    .getOrDefault(properties, PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED);
+        Map<String, Map<String, String>> fileSystemConfigurations = Maps.newHashMap();
+        // Formalize and validate every location before creating any directories. Otherwise,
+        // creating a child location can make another location in the request non-empty.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
           Map<String, String> fsConf =
               mergeUpLevelConfigurations(ident, properties, entry.getValue());
+          fileSystemConfigurations.put(entry.getKey(), fsConf);
           FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), fsConf);
           Path formalizePath =
               entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
@@ -553,14 +562,39 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           filesetPathsBuilder.put(entry.getKey(), formalizePath);
           FileSystem fs = getFileSystemWithCache(formalizePath, fsConf);
 
-          if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
-            throw new IllegalArgumentException(
-                "Fileset location cannot be a file: "
-                    + formalizePath
-                    + ", location name: "
-                    + entry.getKey());
+          if (fs.exists(formalizePath)) {
+            if (fs.getFileStatus(formalizePath).isFile()) {
+              throw new IllegalArgumentException(
+                  "Fileset location cannot be a file: "
+                      + formalizePath
+                      + ", location name: "
+                      + entry.getKey());
+            }
+            // A managed fileset takes its data with it on drop, so silently adopting a location
+            // that already holds files would put data Gravitino never created at risk.
+            if (type == Fileset.Type.MANAGED
+                && !allowExistingLocationAsManaged
+                && fs.listStatusIterator(formalizePath).hasNext()) {
+              throw new IllegalArgumentException(
+                  "Location "
+                      + formalizePath
+                      + " for managed fileset "
+                      + ident
+                      + " already exists and is not empty, location name: "
+                      + entry.getKey()
+                      + ". Register it as an "
+                      + Fileset.Type.EXTERNAL
+                      + " fileset, or set "
+                      + PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED
+                      + "=true to manage it anyway");
+            }
           }
+        }
 
+        for (Map.Entry<String, Path> entry : filesetPathsBuilder.build().entrySet()) {
+          Path formalizePath = entry.getValue();
+          FileSystem fs =
+              getFileSystemWithCache(formalizePath, fileSystemConfigurations.get(entry.getKey()));
           if (!fs.exists(formalizePath)) {
             if (!fs.mkdirs(formalizePath)) {
               throw new RuntimeException(
