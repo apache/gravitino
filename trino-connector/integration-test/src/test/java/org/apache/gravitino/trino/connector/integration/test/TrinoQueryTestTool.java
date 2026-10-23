@@ -291,7 +291,11 @@ public class TrinoQueryTestTool {
         System.out.println("  Gravitino URI : " + TrinoQueryITBase.gravitinoUri);
         System.out.println("  Trino URI     : " + TrinoQueryITBase.trinoUri);
         System.out.println("Connect to Trino CLI:");
-        System.out.println("  docker exec -it trino-ci-trino trino");
+        String coordinator =
+            TrinoQueryITBase.trinoCluster != null
+                ? TrinoQueryITBase.trinoCluster.getContainer().getContainerId()
+                : "<trino coordinator container>";
+        System.out.println("  docker exec -it " + coordinator + " trino");
         System.out.println("Press Ctrl+C to shutdown the environment.");
         System.out.println("=======================================================");
         try {

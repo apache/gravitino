@@ -30,8 +30,9 @@ import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.Schema;
@@ -55,9 +56,10 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 /** Docker IT for default table metadata cache in {@link IcebergCatalogWrapper}. */
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@HiveFixture
 public class IcebergCacheIT {
 
-  private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
+  @FixtureContainer private HiveContainer hive;
 
   private static final Schema TABLE_SCHEMA =
       new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
@@ -66,7 +68,6 @@ public class IcebergCacheIT {
 
   @BeforeAll
   void startDockerEnv() throws Exception {
-    CONTAINER_SUITE.startHiveContainer();
     restServer = IcebergRESTServerManager.create();
     Map<String, String> serverConfigs = new HashMap<>();
     serverConfigs.put(
@@ -173,20 +174,16 @@ public class IcebergCacheIT {
     }
   }
 
-  private static String hiveMetastoreUri() {
+  private String hiveMetastoreUri() {
     return String.format(
-        "thrift://%s:%d",
-        CONTAINER_SUITE.getHiveContainer().getContainerIpAddress(),
-        HiveContainer.HIVE_METASTORE_PORT);
+        "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
   }
 
-  private static String hdfsWarehouse(String suffix) {
+  private String hdfsWarehouse(String suffix) {
     return GravitinoITUtils.genRandomName(
         String.format(
             "hdfs://%s:%d/user/hive/warehouse-%s",
-            CONTAINER_SUITE.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            suffix));
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT, suffix));
   }
 
   private int restPort() {

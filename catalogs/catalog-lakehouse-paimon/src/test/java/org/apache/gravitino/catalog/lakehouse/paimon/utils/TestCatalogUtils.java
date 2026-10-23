@@ -29,8 +29,9 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.FileSystemCatalog;
 import org.apache.paimon.factories.FactoryException;
@@ -41,7 +42,10 @@ import org.junit.jupiter.api.Test;
 
 /** Tests for {@link org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils}. */
 @Tag("gravitino-docker-test")
+@HiveFixture
 public class TestCatalogUtils {
+
+  @FixtureContainer private static HiveContainer hive;
 
   @Test
   void testLoadCatalogBackend() throws Exception {
@@ -92,13 +96,9 @@ public class TestCatalogUtils {
     if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(metastore)) {
       uri = "jdbc:h2:mem:testdb";
     } else if (PaimonCatalogBackend.HIVE.name().equalsIgnoreCase(metastore)) {
-      ContainerSuite containerSuite = ContainerSuite.getInstance();
-      containerSuite.startHiveContainer();
       uri =
           String.format(
-              "thrift://%s:%d",
-              containerSuite.getHiveContainer().getContainerIpAddress(),
-              HiveContainer.HIVE_METASTORE_PORT);
+              "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     }
     return uri;
   }
