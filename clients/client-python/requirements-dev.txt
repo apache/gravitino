@@ -20,7 +20,7 @@ dataclasses-json==0.6.7
 simplejson==3.20.1
 pylint==4.0.5
 black==26.3.1
-flake8==7.0.0
+flake8==7.4.1
 pre-commit==3.5.0
 twine==6.2.0
 coverage==7.14.3
