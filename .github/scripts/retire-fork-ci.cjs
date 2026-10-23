@@ -13,9 +13,10 @@
  * limitations under the License.
  */
 'use strict';
-const { publishStatus } = require('./publish-ci-status.cjs');
+const { latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted } = require('./publish-ci-status.cjs');
 const { FORK_EVENTS } = require('./fork-ci-status.cjs');
 
+// A push cancels the fork run of the previous head, whose status would otherwise stay pending.
 async function retireCancelled({ github, repo, pr }) {
   if (!pr.head.repo || !pr.head.ref) return;
   const fork = { owner: pr.head.repo.owner.login, repo: pr.head.repo.name };
@@ -33,36 +34,21 @@ async function retireCancelled({ github, repo, pr }) {
     if (run.head_sha === pr.head.sha || run.head_branch !== pr.head.ref ||
         run.path !== '.github/workflows/fork-ci.yml' || !FORK_EVENTS.includes(run.event) ||
         run.status !== 'completed' || run.conclusion !== 'cancelled') continue;
-    const checks = await github.paginate(github.rest.checks.listForRef, {
-      ...repo, ref: run.head_sha, check_name: 'Fork CI', filter: 'all', per_page: 100 });
-    const latest = checks.filter(check => check.app?.slug === 'github-actions').sort((a, b) => b.id - a.id)[0];
-    let record;
-    try { record = JSON.parse(latest?.output?.text || '{}'); } catch { continue; }
-    // Never replace a trusted result, a newer attempt, or another run's metadata.
-    if (!latest || record.owner !== fork.owner || record.repo !== fork.repo || record.trusted ||
-        record.run_id !== run.id || record.run_attempt !== run.run_attempt ||
-        (latest.status === 'completed' && !record.superseded_by)) continue;
-    // A retired attempt is immutable. Remember a successful status write on the trusted
-    // check so later sweeps do not keep fetching its attempt, PR and status forever.
-    if (latest.status === 'completed' && latest.conclusion === 'cancelled' && record.retired_status_published) continue;
+    const latest = await latestStatus({ github, repo, sha: run.head_sha, context: 'Fork CI' });
+    const shown = parseRunUrl(latest?.target_url);
+    // Only finish a status still waiting on exactly this fork attempt. A retired status is no
+    // longer pending, so later sweeps skip it with this one read. Never replace a trusted
+    // result, a verdict, or a newer attempt; links without an attempt predate attempt records.
+    if (!latest || statusCompleted(latest) || !shown || shown.owner !== fork.owner || shown.repo !== fork.repo ||
+        shown.run_id !== run.id || (shown.run_attempt && shown.run_attempt !== run.run_attempt)) continue;
     const { data: actual } = await github.rest.actions.getWorkflowRunAttempt({ ...fork,
       run_id: run.id, attempt_number: run.run_attempt });
     if (actual.head_sha !== run.head_sha || actual.status !== 'completed' || actual.conclusion !== 'cancelled') continue;
     const { data: current } = await github.rest.pulls.get({ ...repo, pull_number: pr.number });
     if (current.state !== 'open' || current.head.sha !== pr.head.sha ||
         current.head.repo?.full_name !== pr.head.repo.full_name) return;
-    const title = 'Fork CI cancelled for a previous commit';
-    const details = `https://github.com/${fork.owner}/${fork.repo}/actions/runs/${run.id}`;
-    const output = { title, summary: `[See fork CI results](${details})\n\n` +
-      `This cancelled run tested a previous PR commit. Current head: ${pr.head.sha}.`,
-      text: JSON.stringify({ ...record, run_status: 'completed', run_conclusion: 'cancelled', superseded_by: pr.head.sha }) };
-    if (latest.status !== 'completed') await github.rest.checks.update({ ...repo,
-      check_run_id: latest.id, status: 'completed', conclusion: 'cancelled', output });
-    // Retry this independently if a previous write completed the check but lost its status.
-    await publishStatus({ github, repo, sha: run.head_sha, context: 'Fork CI',
-      state: 'error', description: title, targetUrl: details });
-    await github.rest.checks.update({ ...repo, check_run_id: latest.id,
-      output: { ...output, text: JSON.stringify({ ...JSON.parse(output.text), retired_status_published: true }) } });
+    await publishStatus({ github, repo, sha: run.head_sha, context: 'Fork CI', state: 'error',
+      description: 'Fork CI cancelled for a previous commit', targetUrl: runUrl(fork.owner, fork.repo, run), previous: latest });
   }
 }
 module.exports = { retireCancelled };
