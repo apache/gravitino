@@ -97,3 +97,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     uses: ./.github/workflows/ray-iceberg-it-action.yml
+    with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}
