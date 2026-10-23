@@ -26,7 +26,6 @@ import com.github.dockerjava.api.model.Info;
 import com.github.dockerjava.api.model.Network.Ipam.Config;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,18 +45,24 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.gravitino.integration.test.container.DatabaseContainer.Durability;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Network;
 
-public class ContainerSuite implements Closeable {
+public class ContainerSuite {
   public static final Logger LOG = LoggerFactory.getLogger(ContainerSuite.class);
   private static volatile ContainerSuite instance = null;
   private static volatile boolean initialized = false;
@@ -73,17 +78,19 @@ public class ContainerSuite implements Closeable {
   private static final String CLICKHOUSE_TEST_IMAGE_ENV = "GRAVITINO_CLICKHOUSE_TEST_IMAGE";
 
   private static Network network = null;
-  private static volatile HiveContainer hiveContainer;
+  // Keyed by Hive version: Hive2 and Hive3 tests share a JVM, and each gets its own version.
+  private static final ContainerSlot<String, HiveContainer> hiveContainer = new ContainerSlot<>();
 
   // Enable the Ranger plugin in the Hive container
   private static volatile HiveContainer hiveRangerContainer;
   private static volatile TrinoContainer trinoContainer;
-  private static volatile TrinoITContainers trinoITContainers;
+  // One cluster per Gravitino server: a test class with another server replaces it.
+  private static final ContainerSlot<TrinoSpec, TrinoCluster> trinoCluster = new ContainerSlot<>();
   private static volatile RangerContainer rangerContainer;
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
-  private static volatile HiveContainer kerberosHiveContainer;
-  private static volatile HiveContainer sqlBaseHiveContainer;
+  private static final ContainerSlot<String, HiveContainer> kerberosHiveContainer =
+      new ContainerSlot<>();
   private static volatile StarRocksContainer starRocksContainer;
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
@@ -101,13 +108,17 @@ public class ContainerSuite implements Closeable {
 
   private static volatile RustFSContainer rustFSContainer;
 
+  private static volatile GravitinoMotoContainer motoContainer;
+
   /**
    * We can share the same Hive container as Hive container with S3 contains the following
    * differences: 1. Configuration of S3 and corresponding environment variables 2. The Hive
    * container with S3 is Hive3 container and the Hive container is Hive2 container. There is
    * something wrong with the hive2 container to access the S3.
    */
-  private static volatile HiveContainer hiveContainerWithS3;
+  // A Hive whose tables live in cloud storage, keyed by storage and version; one at a time.
+  private static final ContainerSlot<String, HiveContainer> storageHiveContainer =
+      new ContainerSlot<>();
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -149,49 +160,41 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startHiveContainer(Map<String, String> env) {
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    builder.putAll(env);
-    builder.put("HADOOP_USER_NAME", "anonymous");
-
-    ITUtils.cleanDisk();
-    if (hiveContainer == null) {
-      synchronized (ContainerSuite.class) {
-        if (hiveContainer == null) {
-          initIfNecessary();
-          // Start Hive container
-          HiveContainer.Builder hiveBuilder =
-              HiveContainer.builder()
-                  .withHostName("gravitino-ci-hive")
-                  .withEnvVars(builder.build())
-                  .withNetwork(network);
-          HiveContainer container = closer.register(hiveBuilder.build());
-          container.start();
-          hiveContainer = container;
-        }
-      }
+    synchronized (ContainerSuite.class) {
+      hiveContainer.getOrStart(
+          hiveVersion(env),
+          () -> {
+            initIfNecessary();
+            HiveContainer container =
+                closer.register(hiveBuilder(env).withNetwork(network).build());
+            start(container);
+            return container;
+          });
     }
   }
 
-  public void startHiveContainerWithS3(Map<String, String> env) {
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    builder.putAll(env);
-    builder.put("HADOOP_USER_NAME", "anonymous");
-    ITUtils.cleanDisk();
-    if (hiveContainerWithS3 == null) {
-      synchronized (ContainerSuite.class) {
-        if (hiveContainerWithS3 == null) {
-          initIfNecessary();
-          // Start Hive container
-          HiveContainer.Builder hiveBuilder =
-              HiveContainer.builder()
-                  .withHostName("gravitino-ci-hive")
-                  .withEnvVars(builder.build())
-                  .withNetwork(network);
-          HiveContainer container = closer.register(hiveBuilder.build());
-          container.start();
-          hiveContainerWithS3 = container;
-        }
-      }
+  /**
+   * Starts, or returns the running, Hive whose tables live in the given cloud storage. Only one
+   * runs at a time: asking for another storage or version replaces it.
+   *
+   * @param storage the storage, other than {@link HiveStorage#HDFS}
+   * @param env the container environment, including {@link HiveContainer#HIVE_RUNTIME_VERSION}
+   * @param filesToMount host files to mount, keyed by container path
+   * @return the running Hive
+   */
+  public HiveContainer startStorageHiveContainer(
+      HiveStorage storage, Map<String, String> env, Map<String, String> filesToMount) {
+    synchronized (ContainerSuite.class) {
+      return storageHiveContainer.getOrStart(
+          storage + "/" + hiveVersion(env),
+          () -> {
+            initIfNecessary();
+            HiveContainer container =
+                closer.register(
+                    hiveBuilder(env).withFilesToMount(filesToMount).withNetwork(network).build());
+            start(container);
+            return container;
+          });
     }
   }
 
@@ -221,7 +224,6 @@ public class ContainerSuite implements Closeable {
       throw new IllegalArgumentException("Error environment variables for Hive Ranger container");
     }
 
-    ITUtils.cleanDisk();
     if (hiveRangerContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveRangerContainer == null) {
@@ -232,7 +234,7 @@ public class ContainerSuite implements Closeable {
                   .withEnvVars(envVars)
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
-          container.start();
+          start(container);
           hiveRangerContainer = container;
         }
       }
@@ -240,56 +242,65 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startKerberosHiveContainer(Map<String, String> envVars) {
-    ITUtils.cleanDisk();
-    if (kerberosHiveContainer == null) {
-      synchronized (ContainerSuite.class) {
-        if (kerberosHiveContainer == null) {
-          initIfNecessary();
-          // Start Hive container
-          HiveContainer.Builder hiveBuilder =
-              HiveContainer.builder()
-                  .withHostName("gravitino-ci-kerberos-hive")
-                  .withKerberosEnabled(true)
-                  .withEnvVars(envVars)
-                  .withNetwork(network);
-          HiveContainer container = closer.register(hiveBuilder.build());
-          container.start();
-          kerberosHiveContainer = container;
-        }
-      }
+    synchronized (ContainerSuite.class) {
+      kerberosHiveContainer.getOrStart(
+          hiveVersion(envVars),
+          () -> {
+            initIfNecessary();
+            HiveContainer container =
+                closer.register(kerberosHiveBuilder(envVars).withNetwork(network).build());
+            start(container);
+            return container;
+          });
     }
+  }
+
+  // The shared Hive and a private one (HiveSpec.startPrivate) are built the same way.
+  static HiveContainer.Builder hiveBuilder(Map<String, String> env) {
+    return HiveContainer.builder()
+        .withHostName("gravitino-ci-hive")
+        .withEnvVars(
+            ImmutableMap.<String, String>builder()
+                .putAll(env)
+                .put("HADOOP_USER_NAME", "anonymous")
+                .build());
+  }
+
+  static HiveContainer.Builder kerberosHiveBuilder(Map<String, String> env) {
+    return HiveContainer.builder()
+        .withHostName("gravitino-ci-kerberos-hive")
+        .withKerberosEnabled(true)
+        .withEnvVars(env);
+  }
+
+  /**
+   * Starts a container that only the caller uses, for fixtures with {@link Scope#CLASS} or {@link
+   * Scope#METHOD}. It starts like a shared container, on the shared network, but no field keeps it,
+   * so it never replaces a shared container. The caller closes it; the suite also closes it at the
+   * end of the run in case the caller does not.
+   *
+   * @param build builds the container on the given network, which is null when there is none
+   * @param <C> the container type
+   * @return the running container
+   */
+  public <C extends BaseContainer> C startPrivate(Function<Network, C> build) {
+    initIfNecessary();
+    return startPrivate(network, build, ContainerSuite::start);
+  }
+
+  // Tests pass their own start so that no Docker and no disk cleanup run.
+  static <C extends BaseContainer> C startPrivate(
+      @Nullable Network network, Function<Network, C> build, Consumer<BaseContainer> start) {
+    C container = build.apply(network);
+    synchronized (ContainerSuite.class) {
+      closer.register(container);
+    }
+    start.accept(container);
+    return container;
   }
 
   public void startKerberosHiveContainer() {
     startKerberosHiveContainer(ImmutableMap.of());
-  }
-
-  public void startSQLBaseAuthHiveContainer(Map<String, String> envVars) {
-    // If you want to enable SQL based authorization, you need both set the
-    // `ENABLE_SQL_BASE_AUTHORIZATION` environment.
-    if (envVars == null
-        || (!Objects.equals(envVars.get(HiveContainer.HIVE_RUNTIME_VERSION), HiveContainer.HIVE3))
-        || (!envVars.containsKey(HiveContainer.ENABLE_SQL_BASE_AUTHORIZATION))) {
-      throw new IllegalArgumentException(
-          "Error environment variables for Hive SQL base authorization container");
-    }
-
-    if (sqlBaseHiveContainer == null) {
-      synchronized (ContainerSuite.class) {
-        if (sqlBaseHiveContainer == null) {
-          initIfNecessary();
-          // Start Hive container
-          HiveContainer.Builder hiveBuilder =
-              HiveContainer.builder()
-                  .withHostName("gravitino-ci-hive")
-                  .withNetwork(network)
-                  .withEnvVars(envVars);
-          HiveContainer container = closer.register(hiveBuilder.build());
-          container.start();
-          sqlBaseHiveContainer = container;
-        }
-      }
-    }
   }
 
   /**
@@ -318,13 +329,12 @@ public class ContainerSuite implements Closeable {
       String trinoConnectorLibDir,
       int gravitinoServerPort,
       String metalakeName) {
-    ITUtils.cleanDisk();
     if (trinoContainer == null) {
       synchronized (ContainerSuite.class) {
         if (trinoContainer == null) {
           initIfNecessary();
           // Start Trino container
-          String hiveContainerIp = hiveContainer.getContainerIpAddress();
+          String hiveContainerIp = hiveContainer.get().getContainerIpAddress();
           TrinoContainer.Builder trinoBuilder =
               TrinoContainer.builder()
                   .withEnvVars(
@@ -347,7 +357,7 @@ public class ContainerSuite implements Closeable {
                   .withHiveContainerIP(hiveContainerIp);
 
           TrinoContainer container = closer.register(trinoBuilder.build());
-          container.start();
+          start(container);
           trinoContainer = container;
         }
       }
@@ -359,7 +369,6 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startDorisContainer(DorisImageName imageName) {
-    ITUtils.cleanDisk();
     if (!dorisContainerMap.containsKey(imageName)) {
       synchronized (ContainerSuite.class) {
         if (!dorisContainerMap.containsKey(imageName)) {
@@ -371,7 +380,7 @@ public class ContainerSuite implements Closeable {
                   .withImage(imageName.toString())
                   .withNetwork(network);
           DorisContainer container = closer.register(dorisBuilder.build());
-          container.start();
+          start(container);
           dorisContainerMap.put(imageName, container);
           // Keep backward-compatible reference for getDorisContainer()
           if (imageName == DorisImageName.VERSION_1_2) {
@@ -386,18 +395,16 @@ public class ContainerSuite implements Closeable {
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
-          ITUtils.cleanDisk();
           initIfNecessary();
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
                   .withHostName("gravitino-ci-mysql")
-                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
                   .withNetwork(network);
 
           MySQLContainer container = closer.register(mysqlBuilder.build());
-          container.start();
+          start(container);
           mySQLContainer = container;
         }
       }
@@ -408,7 +415,6 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startMySQLVersion5Container(TestDatabaseName testDatabaseName) {
-    ITUtils.cleanDisk();
     if (mySQLVersion5Container == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLVersion5Container == null) {
@@ -416,14 +422,13 @@ public class ContainerSuite implements Closeable {
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
-                  .withImage("mysql:5.7")
+                  .withImage(TestImages.MYSQL_5_7)
                   .withHostName("gravitino-ci-mysql-v5")
-                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
                   .withNetwork(network);
 
           MySQLContainer container = closer.register(mysqlBuilder.build());
-          container.start();
+          start(container);
           mySQLVersion5Container = container;
         }
       }
@@ -437,19 +442,17 @@ public class ContainerSuite implements Closeable {
     if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
-          ITUtils.cleanDisk();
           initIfNecessary();
           // Start PostgreSQL container
           PostgreSQLContainer.Builder pgBuilder =
               PostgreSQLContainer.builder()
                   .withImage(pgImageName.toString())
                   .withHostName(PostgreSQLContainer.HOST_NAME)
-                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
                   .withNetwork(network);
 
           PostgreSQLContainer container = closer.register(pgBuilder.build());
-          container.start();
+          start(container);
           pgContainerMap.put(pgImageName, container);
         }
       }
@@ -465,7 +468,6 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startOceanBaseContainer() {
-    ITUtils.cleanDisk();
     // create dir /tmp/obdata by CommandExecutor
     Object o =
         CommandExecutor.executeCommandLocalHost(
@@ -498,7 +500,7 @@ public class ContainerSuite implements Closeable {
                       ImmutableMap.<String, String>builder().put("/tmp/obdata", "/root/ob").build())
                   .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
           OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
-          container.start();
+          start(container);
           oceanBaseContainer = container;
         }
       }
@@ -506,7 +508,6 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startKafkaContainer() {
-    ITUtils.cleanDisk();
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kafkaContainer == null) {
@@ -514,7 +515,7 @@ public class ContainerSuite implements Closeable {
           KafkaContainer.Builder builder = KafkaContainer.builder().withNetwork(network);
           KafkaContainer container = closer.register(builder.build());
           try {
-            container.start();
+            start(container);
           } catch (Exception e) {
             LOG.error("Failed to start Kafka container", e);
             throw new RuntimeException("Failed to start Kafka container", e);
@@ -526,7 +527,6 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startLocalStackContainer() {
-    ITUtils.cleanDisk();
     if (gravitinoLocalStackContainer == null) {
       synchronized (ContainerSuite.class) {
         if (gravitinoLocalStackContainer == null) {
@@ -534,7 +534,7 @@ public class ContainerSuite implements Closeable {
               GravitinoLocalStackContainer.builder().withNetwork(network);
           GravitinoLocalStackContainer container = closer.register(builder.build());
           try {
-            container.start();
+            start(container);
           } catch (Exception e) {
             LOG.error("Failed to start LocalStack container", e);
             throw new RuntimeException("Failed to start LocalStack container", e);
@@ -545,8 +545,28 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  /** Starts the shared Moto server, the AWS mock behind the Glue catalog tests. */
+  public void startMotoContainer() {
+    if (motoContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (motoContainer == null) {
+          initIfNecessary();
+          GravitinoMotoContainer.Builder builder =
+              GravitinoMotoContainer.builder().withNetwork(network);
+          GravitinoMotoContainer container = closer.register(builder.build());
+          try {
+            start(container);
+          } catch (Exception e) {
+            LOG.error("Failed to start Moto container", e);
+            throw new RuntimeException("Failed to start Moto container", e);
+          }
+          motoContainer = container;
+        }
+      }
+    }
+  }
+
   public void startStarRocksContainer() {
-    ITUtils.cleanDisk();
     if (starRocksContainer == null) {
       synchronized (ContainerSuite.class) {
         if (starRocksContainer == null) {
@@ -556,7 +576,7 @@ public class ContainerSuite implements Closeable {
               StarRocksContainer.builder().withNetwork(network);
           StarRocksContainer container = closer.register(starRocksBuilder.build());
           try {
-            container.start();
+            start(container);
           } catch (Exception e) {
             LOG.error("Failed to start StarRocks container", e);
             throw new RuntimeException("Failed to start StarRocks container", e);
@@ -568,7 +588,6 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startClickHouseContainer(TestDatabaseName testDatabaseName) {
-    ITUtils.cleanDisk();
     if (clickHouseContainer == null) {
       synchronized (ContainerSuite.class) {
         if (clickHouseContainer == null) {
@@ -576,7 +595,7 @@ public class ContainerSuite implements Closeable {
           // Start ClickHouse container
           ClickHouseContainer.Builder clickHouseBuilder =
               ClickHouseContainer.builder()
-                  .withImage(resolveClickHouseImage())
+                  .withImage(TestImages.CLICKHOUSE)
                   .withFilesToMount(resolveClickHouseTestFiles())
                   .withHostName("gravitino-ci-clickhouse")
                   .withEnvVars(
@@ -587,7 +606,7 @@ public class ContainerSuite implements Closeable {
                   .withNetwork(network);
 
           ClickHouseContainer container = closer.register(clickHouseBuilder.build());
-          container.start();
+          start(container);
           clickHouseContainer = container;
         }
       }
@@ -610,7 +629,7 @@ public class ContainerSuite implements Closeable {
           for (int node = 1; node <= CLICKHOUSE_CLUSTER_SIZE; node++) {
             ClickHouseContainer.Builder clickHouseBuilder =
                 ClickHouseContainer.builder()
-                    .withImage(resolveClickHouseImage())
+                    .withImage(TestImages.CLICKHOUSE)
                     .withFilesToMount(resolveClickHouseTestFiles())
                     .withHostName(CLICKHOUSE_CLUSTER_HOST_PREFIX + node)
                     .withEnvVars(
@@ -625,7 +644,7 @@ public class ContainerSuite implements Closeable {
                     .withNetwork(network);
 
             ClickHouseContainer container = closer.register(clickHouseBuilder.build());
-            container.start();
+            start(container);
             containers.add(container);
           }
           clickHouseClusterContainers = List.copyOf(containers);
@@ -677,7 +696,7 @@ public class ContainerSuite implements Closeable {
                   .withExposePorts(ImmutableSet.of(ZooKeeperContainer.ZK_PORT))
                   .withNetwork(network);
           ZooKeeperContainer container = closer.register(zkBuilder.build());
-          container.start();
+          start(container);
           zooKeeperContainer = container;
         }
       }
@@ -710,16 +729,20 @@ public class ContainerSuite implements Closeable {
     return gravitinoLocalStackContainer;
   }
 
+  /** Returns the shared Moto server, or null before {@link #startMotoContainer()} runs. */
+  public GravitinoMotoContainer getMotoContainer() {
+    return motoContainer;
+  }
+
   /** Starts the shared RustFS object store for S3 credential-vending tests. */
   public void startRustFSContainer() {
-    ITUtils.cleanDisk();
     if (rustFSContainer == null) {
       synchronized (ContainerSuite.class) {
         if (rustFSContainer == null) {
           RustFSContainer.Builder builder = RustFSContainer.builder().withNetwork(network);
           RustFSContainer container = closer.register(builder.build());
           try {
-            container.start();
+            start(container);
           } catch (Exception e) {
             LOG.error("Failed to start RustFS container", e);
             throw new RuntimeException("Failed to start RustFS container", e);
@@ -739,10 +762,6 @@ public class ContainerSuite implements Closeable {
     return rustFSContainer;
   }
 
-  public HiveContainer getHiveContainerWithS3() {
-    return hiveContainerWithS3;
-  }
-
   public KafkaContainer getKafkaContainer() {
     return kafkaContainer;
   }
@@ -751,16 +770,35 @@ public class ContainerSuite implements Closeable {
     return trinoContainer;
   }
 
-  public static TrinoITContainers getTrinoITContainers() {
-    if (trinoITContainers == null) {
-      trinoITContainers = new TrinoITContainers();
-      closer.register(trinoITContainers);
+  /**
+   * Starts, or returns the running, Trino cluster for the spec. A spec for another Gravitino server
+   * or shape replaces the running cluster.
+   *
+   * @param spec the cluster to run, with the Gravitino server port set
+   * @return the running cluster
+   */
+  public TrinoCluster startTrinoCluster(TrinoSpec spec) {
+    synchronized (ContainerSuite.class) {
+      return trinoCluster.getOrStart(
+          spec,
+          () -> {
+            initIfNecessary();
+            TrinoCluster cluster =
+                closer.register(
+                    TrinoCluster.builder()
+                        .withTrinoVersion(spec.version())
+                        .withWorkers(spec.workers())
+                        .withHiveRuntimeVersion(spec.hive().runtimeVersion())
+                        .withGravitinoServerPort(spec.gravitinoServerPort())
+                        .build());
+            start(cluster);
+            return cluster;
+          });
     }
-    return trinoITContainers;
   }
 
   public HiveContainer getHiveContainer() {
-    return hiveContainer;
+    return hiveContainer.get();
   }
 
   public HiveContainer getHiveRangerContainer() {
@@ -772,11 +810,15 @@ public class ContainerSuite implements Closeable {
       synchronized (ContainerSuite.class) {
         if (rangerContainer == null) {
           initIfNecessary();
-          // Start Ranger container
-          RangerContainer.Builder rangerBuilder = RangerContainer.builder().withNetwork(network);
+          // Ranger keeps its policies in the run's MySQL, which also gets disposable data.
+          MySQLContainer mysql = RangerSpec.DATABASE.getOrStart(this);
+          RangerContainer.Builder rangerBuilder =
+              RangerContainer.builder()
+                  .withNetwork(network)
+                  .withDatabase(mysql, RangerSpec.DATABASE.database());
           RangerContainer container = closer.register(rangerBuilder.build());
           try {
-            container.start();
+            start(container);
           } catch (Exception e) {
             LOG.error("Failed to start Ranger container", e);
             throw new RuntimeException("Failed to start Ranger container", e);
@@ -792,11 +834,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public HiveContainer getKerberosHiveContainer() {
-    return kerberosHiveContainer;
-  }
-
-  public HiveContainer getSQLBaseAuthHiveContainer() {
-    return sqlBaseHiveContainer;
+    return kerberosHiveContainer.get();
   }
 
   public DorisContainer getDorisContainer() {
@@ -841,6 +879,86 @@ public class ContainerSuite implements Closeable {
   // Let containers assign addresses in a fixed subnet to avoid
   // `mac-docker-connector` needing to
   // refresh the configuration
+  // Disk cleanup runs here, so it happens only when a container actually starts.
+  private static void start(BaseContainer container) {
+    ITUtils.cleanDisk();
+    startTimed(container);
+  }
+
+  // Logs one greppable line per start, including the container's own readiness check, so CI logs
+  // show where container time goes. Failed starts are logged too, with ok=false.
+  //
+  // A failed start is closed here because Testcontainers leaves the container running when its
+  // readiness check times out, and the caller never stores it, so the next start* call would start
+  // another one beside it. The closer still holds it; closing it again at run end is a no-op.
+  static void startTimed(BaseContainer container) {
+    long startNanos = System.nanoTime();
+    long pullMs = 0;
+    boolean ok = false;
+    try {
+      pullMs = pullImage(container);
+      container.start();
+      ok = true;
+    } catch (Throwable e) {
+      closeFailedStart(container, e);
+      throw e;
+    } finally {
+      long totalMs = (System.nanoTime() - startNanos) / 1_000_000;
+      long containerMs = container.lastContainerStartMs();
+      LOG.info(
+          "[CONTAINER-TIMING] container={} image={} hostName={} ok={} startMs={} pullMs={}"
+              + " containerMs={} readyMs={}",
+          container.getClass().getSimpleName(),
+          container.getContainer().getDockerImageName(),
+          container.hostName,
+          ok,
+          totalMs,
+          pullMs,
+          containerMs,
+          Math.max(0, totalMs - pullMs - containerMs));
+    }
+  }
+
+  // Resolves (and if needed pulls) the image before start(), so the timing line can report the pull
+  // apart from the start: CI runners pull every image fresh, a warm Mac does not.
+  private static long pullImage(BaseContainer container) {
+    long pullNanos = System.nanoTime();
+    Future<String> image = container.getContainer().getImage();
+    if (image != null) {
+      try {
+        image.get();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Interrupted while pulling " + container.hostName, e);
+      } catch (ExecutionException e) {
+        throw new IllegalStateException("Failed to pull the image for " + container.hostName, e);
+      }
+    }
+    return (System.nanoTime() - pullNanos) / 1_000_000;
+  }
+
+  private static void closeFailedStart(BaseContainer container, Throwable startFailure) {
+    LOG.warn(
+        "Closing {} (image={}, hostName={}) after its start failed",
+        container.getClass().getSimpleName(),
+        container.getContainer().getDockerImageName(),
+        container.hostName);
+    try {
+      container.close();
+    } catch (Throwable closeFailure) {
+      // The start failure is the one the test must report; the close failure only rides along.
+      LOG.warn("Failed to close {}", container.getClass().getSimpleName(), closeFailure);
+      if (closeFailure != startFailure) {
+        startFailure.addSuppressed(closeFailure);
+      }
+    }
+  }
+
+  // Hive2 and Hive3 run from one image; HIVE_RUNTIME_VERSION picks the version, Hive2 by default.
+  static String hiveVersion(Map<String, String> env) {
+    return env.getOrDefault(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2);
+  }
+
   private static Network createDockerNetwork() {
     DockerClient dockerClient = DockerClientFactory.instance().client();
 
@@ -956,33 +1074,67 @@ public class ContainerSuite implements Closeable {
     return new long[] {startIp, endIp};
   }
 
-  @Override
-  public void close() throws IOException {
-    try {
-      closer.close();
-      mySQLContainer = null;
-      mySQLVersion5Container = null;
-      hiveContainer = null;
-      hiveRangerContainer = null;
-      trinoContainer = null;
-      trinoITContainers = null;
-      rangerContainer = null;
-      kafkaContainer = null;
-      dorisContainer = null;
-      dorisContainerMap.clear();
-      kerberosHiveContainer = null;
-      sqlBaseHiveContainer = null;
-      pgContainerMap.clear();
-    } catch (Exception e) {
-      LOG.error("Failed to close ContainerEnvironment", e);
+  /**
+   * Closes the suite when the JUnit run ends, through a resource in the root store. Calling it
+   * again is harmless; the store keeps one resource. {@code CloseContainerExtension} calls it
+   * before every class, so the run's containers stop once, after the last class.
+   *
+   * @param context any extension context of the run
+   */
+  public static void closeWhenRunEnds(ExtensionContext context) {
+    // Store.computeIfAbsent is atomic, so concurrent classes register the closer once.
+    context.getRoot().getStore(Namespace.GLOBAL).computeIfAbsent(RunCloser.class);
+  }
+
+  private static final class RunCloser implements AutoCloseable {
+    @Override
+    public void close() {
+      getInstance().close();
+      LOG.info("Containers were closed at the end of the run");
     }
   }
 
-  private static String resolveClickHouseImage() {
-    String configuredImage = System.getenv(CLICKHOUSE_TEST_IMAGE_ENV);
-    return configuredImage == null || configuredImage.isBlank()
-        ? ClickHouseContainer.DEFAULT_IMAGE
-        : configuredImage.trim();
+  // Stops every container and resets the suite; logs instead of failing, so a teardown error does
+  // not fail a green run. Package-private so tests cannot close the shared suite: later classes in
+  // the same JVM would have to restart every container. Only the run's closer above and this
+  // package's unit tests call it.
+  void close() {
+    try {
+      closer.close();
+    } catch (Exception e) {
+      LOG.error("Failed to close ContainerEnvironment", e);
+    } finally {
+      resetState();
+    }
+  }
+
+  // The closer has stopped every container and removed the network. Drop every reference so a
+  // later start* call starts a new container instead of returning a stopped one.
+  private static void resetState() {
+    network = null;
+    initialized = false;
+    hiveContainer.clear();
+    hiveRangerContainer = null;
+    trinoContainer = null;
+    trinoCluster.clear();
+    rangerContainer = null;
+    kafkaContainer = null;
+    dorisContainer = null;
+    kerberosHiveContainer.clear();
+    starRocksContainer = null;
+    mySQLContainer = null;
+    mySQLVersion5Container = null;
+    pgContainerMap.clear();
+    dorisContainerMap.clear();
+    oceanBaseContainer = null;
+    clickHouseContainer = null;
+    clickHouseClusterContainer = null;
+    clickHouseClusterContainers = List.of();
+    zooKeeperContainer = null;
+    gravitinoLocalStackContainer = null;
+    rustFSContainer = null;
+    motoContainer = null;
+    storageHiveContainer.clear();
   }
 
   private static Map<String, String> resolveClickHouseTestFiles() {

@@ -36,7 +36,10 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveSpec;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
@@ -62,8 +65,6 @@ public class SparkQueryRunner {
   private boolean isGravitinoEnvSetup;
   private String dataDir;
   private BaseIT baseIT;
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   public SparkQueryRunner(SparkTestConfig sparkTestConfig) {
     this.regenerateGoldenFiles = sparkTestConfig.generateGoldenFiles();
@@ -122,18 +123,17 @@ public class SparkQueryRunner {
   }
 
   private void setupGravitinoEnv() throws Exception {
-    // Start Hive and Hdfs
-    containerSuite.startHiveContainer();
+    // Start Hive and HDFS. Not a JUnit class, so it asks for the spec @HiveFixture would use and
+    // shares the run's Hive with fixture classes.
+    HiveContainer hive =
+        new HiveSpec(HiveVersion.HIVE2, HiveAuth.NONE).getOrStart(ContainerSuite.getInstance());
     String hiveMetastoreUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     this.warehouse =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     // Start Gravitino server
     baseIT.stopIntegrationTest();

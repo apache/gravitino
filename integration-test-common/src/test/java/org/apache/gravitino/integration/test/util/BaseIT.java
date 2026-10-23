@@ -62,6 +62,7 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.integration.test.MiniGravitino;
 import org.apache.gravitino.integration.test.MiniGravitinoContext;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.GravitinoServerAware;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
 import org.apache.gravitino.server.GravitinoServer;
@@ -85,7 +86,7 @@ import org.slf4j.LoggerFactory;
  */
 @ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class BaseIT {
+public class BaseIT implements GravitinoServerAware {
 
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -139,6 +140,7 @@ public class BaseIT {
 
   protected String originConfig;
 
+  @Override
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -248,7 +250,7 @@ public class BaseIT {
     POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
 
     String pgUrlWithoutSchema = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
-    String randomSchemaName = RandomStringUtils.random(10, true, false);
+    String randomSchemaName = RandomStringUtils.insecure().next(10, true, false);
     // Connect to the PostgreSQL docker and create a schema
     String currentExecuteSql = "";
     try (Connection connection =

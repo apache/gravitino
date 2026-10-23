@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.net.Socket;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,8 +39,7 @@ import org.testcontainers.containers.Network;
 public class KafkaContainer extends BaseContainer {
 
   public static final int DEFAULT_BROKER_PORT = 9092;
-  private static final String DEFAULT_KAFKA_IMAGE =
-      System.getenv("GRAVITINO_CI_KAFKA_DOCKER_IMAGE");
+  private static final String DEFAULT_KAFKA_IMAGE = TestImages.KAFKA;
   private static final String DEFAULT_HOST_NAME = "gravitino-ci-kafka";
   private static final String KAFKA_LOGS_DIR = "/opt/kafka/logs";
 
@@ -94,6 +94,7 @@ public class KafkaContainer extends BaseContainer {
 
     await()
         .atMost(1, TimeUnit.MINUTES)
+        .pollDelay(Duration.ZERO)
         .pollInterval(60 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
