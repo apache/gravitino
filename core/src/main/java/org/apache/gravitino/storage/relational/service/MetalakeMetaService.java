@@ -55,6 +55,7 @@ import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
@@ -346,7 +347,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SemanticModelVersionInfoMapper.class,
-                    mapper -> mapper.softDeleteSemanticModelVersionsByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteSemanticModelVersionsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SemanticModelMetricMapper.class,
+                    mapper -> mapper.softDeleteSemanticModelMetricsByMetalakeId(metalakeId)));
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {
