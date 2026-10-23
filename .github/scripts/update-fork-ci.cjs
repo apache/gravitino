@@ -41,7 +41,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   }
   // Never restore decisions or scheduling state from Actions caches: PR code dispatched
   // on the default branch can write those caches using its runner runtime token.
-  const service = createService(github);
+  let service = createService(github);
   const availableBases = new Map();
   const rate = (await github.rest.rateLimit.get()).data.resources.core;
   // Bound work even while settled successes are watched. Rotate the starting PR to avoid starving
@@ -76,6 +76,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   }
   async function refresh(pr) {
     if (!(await migrated(pr))) return;
+    refreshed.add(pr.number);
     const mirror = await service.mirror(pr);
     const { result, run } = mirror;
     const note = result.note || (result.status !== 'completed' ? result.title
@@ -136,7 +137,9 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
       if (!(await migrated(pr))) return;
       await work();
       // Publish the current head first; history cleanup failures must not block its result.
-      await retireCancelled({ github, repo: context.repo, pr });
+      // A probe that found the check settled skips it: pushes, which cancel previous runs,
+      // always signal a refresh, so probes stay cheap enough to reach every recent PR each pass.
+      if (refreshed.has(pr.number)) await retireCancelled({ github, repo: context.repo, pr });
       failures.delete(pr.number);
     } catch (error) {
       failures.add(pr.number);
@@ -145,13 +148,16 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   }
   let processed = 0;
   let visited = new Set();
+  let refreshed = new Set();
   let prs = [];
   let recentCursor = null;
-  async function pass(budget) {
+  async function pass(budget, verifyStatuses) {
     const now = clock();
     prs = await listPrs();
     processed = 0;
     visited = new Set();
+    refreshed = new Set();
+    service = createService(github);
     // Fork runs, including reruns, finish without an upstream event. Such PRs were updated recently,
     // so probe those first. A completed result changes only with a push or a trusted run, which both
     // signal a refresh, or with a fork rerun, so refresh it only when the fork run id or attempt changed.
@@ -188,6 +194,8 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
               fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt)))) {
             // A completed metadata check does not prove the visible status was written:
             // the status API can fail after the check write, or this may be a pre-migration PR.
+            // Verify that once per sweep, so later passes probe as cheaply as on main.
+            if (!verifyStatuses) return;
             const { data } = await github.rest.repos.getCombinedStatusForRef({
               ...context.repo, ref: pr.head.sha, per_page: 100 });
             const details = record.run_id
@@ -220,7 +228,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
       await sleep(PASS_MS);
       calls = 0;
     }
-    await pass(Math.floor(budget / passes));
+    await pass(Math.floor(budget / passes), i === 0);
   }
   if (manual && processed < prs.length) core.setFailed('API budget exhausted; dispatch again for a specific PR after the quota resets.');
   if (failures.size) core.setFailed(`Unable to refresh: ${[...failures].map(n => `#${n}`).join(', ')}`);

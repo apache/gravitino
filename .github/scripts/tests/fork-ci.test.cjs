@@ -572,6 +572,34 @@ test('only the fail-fast job can cancel the run', async () => {
   assert.match(workflow, /fail_fast:\n(?:.*\n)*?\s+runs-on: ubuntu-latest\n/);
 });
 
+test('every two-minute pass probes all recently updated PRs at the apache quota', async () => withPublisher(async ({ ctx, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const { github } = publisherMock();
+  // apache/gravitino has had 13-17 PRs updated within six hours; leave headroom.
+  const recent = Array.from({ length: 17 }, (_, i) => ({ ...pr(), number: 300 + i, updated_at: new Date().toISOString(),
+    head: { ...pr().head, sha: (300 + i).toString(16).padStart(40, 'e') } }));
+  const listPulls = github.rest.pulls.list, listForRef = github.rest.checks.listForRef, paginate = github.paginate;
+  let count = () => {};
+  github.hook = { before(_, hook) { count = hook; } };
+  github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: 15000, limit: 15000 } } } });
+  const record = { owner: 'fork', repo: 'repo', run_id: 1, run_attempt: 1, run_status: 'completed', fork_run_id: 1, fork_run_attempt: 1 };
+  const settled = { id: 1, app: { slug: 'github-actions' }, status: 'completed', conclusion: 'success',
+    output: { title: 'All required suites passed', text: JSON.stringify(record) } };
+  github.rest.repos.getCombinedStatusForRef = async () => { count(); return { data: { statuses: [{ context: 'Fork CI', state: 'success',
+    description: 'All required suites passed', target_url: 'https://github.com/fork/repo/actions/runs/1' }] } }; };
+  const perPass = [new Set()];
+  github.paginate = async (endpoint, args) => {
+    count();
+    if (endpoint === listPulls) return recent;
+    if (endpoint === listForRef) { perPass.at(-1).add(args.ref); return [settled]; }
+    return paginate(endpoint, args);
+  };
+  let t = Date.now();
+  await update({ github, context: ctx, core, clock: () => t, sleep: async ms => { t += ms; perPass.push(new Set()); } });
+  assert.equal(perPass.length, 6);
+  for (const seen of perPass) assert.equal(seen.size, recent.length);
+}));
+
 test('transient API errors never fail the watcher or the run', async () => {
   const mock = watcherMock([[job('build / build', 'in_progress')],
     [job('build / build', 'completed', 'success')], [job('build / build', 'completed', 'success')]]);

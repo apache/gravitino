@@ -123,11 +123,16 @@ function createService(github) {
     const sha = job?.name.slice(prefix.length, -suffix.length);
     return acceptedBase(pr, sha);
   }
+  // Trusted runs of every PR share one listing per base branch. A service lives for one
+  // publisher pass, so the next pass re-reads it.
+  const trustedListings = new Map();
   async function findRun(pr, trusted) {
     const target = trusted ? UPSTREAM : { owner: pr.head.repo.owner.login, repo: pr.head.repo.name };
-    const all = await github.paginate(github.rest.actions.listWorkflowRuns, { ...target, workflow_id: 'fork-ci.yml',
+    const list = () => github.paginate(github.rest.actions.listWorkflowRuns, { ...target, workflow_id: 'fork-ci.yml',
       event: trusted ? 'workflow_dispatch' : 'push',
       ...(trusted ? { branch: pr.base.ref } : { head_sha: pr.head.sha }), per_page: 100 });
+    if (trusted && !trustedListings.has(pr.base.ref)) trustedListings.set(pr.base.ref, list());
+    const all = trusted ? await trustedListings.get(pr.base.ref) : await list();
     const runs = all.filter(run => run.path === '.github/workflows/fork-ci.yml' &&
       (trusted ? run.head_branch === pr.base.ref : run.head_sha === pr.head.sha) &&
       (!trusted || run.display_title === `Trusted Fork CI #${pr.number}`)).sort((a, b) => b.id - a.id);
