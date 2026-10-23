@@ -20,6 +20,7 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.client.GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_BASIC_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_CONFIG_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_KERBEROS_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PREFIX;
@@ -138,6 +139,29 @@ public class GravitinoVirtualFileSystemUtils {
           .withHeaders(requestHeaders)
           .withClientConfig(clientConfig)
           .build();
+    } else if (authType.equalsIgnoreCase(GravitinoVirtualFileSystemConfiguration.BASIC_AUTH_TYPE)) {
+      String username =
+          configuration.get(
+              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_BASIC_USERNAME_KEY);
+      checkAuthConfig(
+          GravitinoVirtualFileSystemConfiguration.BASIC_AUTH_TYPE,
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_BASIC_USERNAME_KEY,
+          username);
+
+      String password =
+          configuration.get(
+              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_BASIC_PASSWORD_KEY);
+      checkAuthConfig(
+          GravitinoVirtualFileSystemConfiguration.BASIC_AUTH_TYPE,
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_BASIC_PASSWORD_KEY,
+          password);
+
+      return GravitinoClient.builder(serverUri)
+          .withMetalake(metalakeValue)
+          .withBasicAuth(username, password)
+          .withHeaders(requestHeaders)
+          .withClientConfig(clientConfig)
+          .build();
     } else if (authType.equalsIgnoreCase(
         GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE)) {
       String authServerUri =
@@ -241,6 +265,7 @@ public class GravitinoVirtualFileSystemUtils {
 
   private static boolean isClientConfigKey(String key) {
     return key.startsWith(FS_GRAVITINO_CLIENT_CONFIG_PREFIX)
+        && !key.startsWith(FS_GRAVITINO_CLIENT_BASIC_PREFIX)
         && !key.startsWith(FS_GRAVITINO_CLIENT_OAUTH2_PREFIX)
         && !key.startsWith(FS_GRAVITINO_CLIENT_KERBEROS_PREFIX)
         && !key.startsWith(FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX)

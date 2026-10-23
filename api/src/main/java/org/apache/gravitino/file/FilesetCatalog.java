@@ -215,10 +215,11 @@ public interface FilesetCatalog {
    * @param changes The changes to apply to the fileset.
    * @return The altered fileset metadata.
    * @throws NoSuchFilesetException If the fileset does not exist.
+   * @throws FilesetAlreadyExistsException If the new name is already used by another fileset.
    * @throws IllegalArgumentException If the change is rejected by the implementation.
    */
   Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
-      throws NoSuchFilesetException, IllegalArgumentException;
+      throws NoSuchFilesetException, FilesetAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Drop a fileset from the catalog.
@@ -235,9 +236,15 @@ public interface FilesetCatalog {
    * Get the actual location of a file or directory based on the default storage location of Fileset
    * and the sub path.
    *
+   * <p>Leading and trailing whitespace in the sub path is trimmed. An empty path or {@code /}
+   * refers to the default storage location. A leading slash is relative to that location.
+   *
    * @param ident A fileset identifier.
    * @param subPath The sub path to the file or directory.
    * @return The actual location of the file or directory.
+   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment or
+   *     a NUL character ({@code U+0000}), or its normalized path is outside the default storage
+   *     location.
    * @throws NoSuchFilesetException If the fileset does not exist.
    */
   default String getFileLocation(NameIdentifier ident, String subPath)
@@ -249,10 +256,16 @@ public interface FilesetCatalog {
    * Get the actual location of a file or directory based on the storage location of Fileset and the
    * sub path by the location name.
    *
+   * <p>Leading and trailing whitespace in the sub path is trimmed. An empty path or {@code /}
+   * refers to the selected storage location. A leading slash is relative to that location.
+   *
    * @param ident A fileset identifier.
    * @param subPath The sub path to the file or directory.
    * @param locationName The location name. If null, the default location will be used.
    * @return The actual location of the file or directory.
+   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment or
+   *     a NUL character ({@code U+0000}), or its normalized path is outside the selected storage
+   *     location.
    * @throws NoSuchFilesetException If the fileset does not exist.
    * @throws NoSuchLocationNameException If the location name does not exist.
    */

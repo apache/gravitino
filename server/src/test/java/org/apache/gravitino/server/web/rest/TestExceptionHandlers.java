@@ -47,6 +47,23 @@ public class TestExceptionHandlers {
   }
 
   @Test
+  void testSubmittedJobRegistrationFailureDoesNotReturnRetryableConflict() {
+    RuntimeException failure =
+        new RuntimeException(
+            "Execution submitted_conflict may already have run; check it before retrying",
+            new OptimisticLockException("lock wait timeout"));
+    try (Response response =
+        ExceptionHandlers.handleJobException(OperationType.RUN, "job", "metalake", failure)) {
+      Assertions.assertEquals(
+          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(RuntimeException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains("submitted_conflict"));
+      Assertions.assertTrue(error.getMessage().contains("check it before retrying"));
+    }
+  }
+
+  @Test
   public void testMissingJobParentsReturnNotFound() {
     Response runResponse =
         ExceptionHandlers.handleJobException(

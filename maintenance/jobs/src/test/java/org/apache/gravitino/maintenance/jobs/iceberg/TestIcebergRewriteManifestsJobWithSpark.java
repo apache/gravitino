@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.gravitino.maintenance.jobs.TemplateArguments;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterEach;
@@ -193,18 +194,7 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     if (caching != null) {
       jobConf.put("use_caching", caching);
     }
-    // Model JobManager's template substitution, including unresolved optional values.
-    return new IcebergRewriteManifestsJob()
-        .jobTemplate().arguments().stream()
-            .map(
-                value -> {
-                  String resolved = value;
-                  for (Map.Entry<String, String> entry : jobConf.entrySet()) {
-                    resolved = resolved.replace("{{" + entry.getKey() + "}}", entry.getValue());
-                  }
-                  return resolved;
-                })
-            .toArray(String[]::new);
+    return TemplateArguments.resolve(new IcebergRewriteManifestsJob().jobTemplate(), jobConf);
   }
 
   private void startSpark() {

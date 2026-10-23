@@ -197,8 +197,8 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
                 Privileges.UseSchema.allow(),
                 Privileges.CreateTable.allow(),
                 Privileges.SelectTable.allow(),
-                // Spark JDBC needs USE_SECRET to receive vended jdbc credentials.
-                Privileges.UseSecret.allow()));
+                // Spark JDBC needs USE_SECRETS to receive vended jdbc credentials.
+                Privileges.UseSecrets.allow()));
     metalake.createRole(ALICE_ROLE, new HashMap<>(), ImmutableList.of(catalogAccess));
     metalake.grantRolesToUser(ImmutableList.of(ALICE_ROLE), ALICE);
   }
@@ -246,7 +246,7 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
-                Privileges.UseSecret.allow()));
+                Privileges.UseSecrets.allow()));
     adminMetalake.createRole(BOB_ROLE, new HashMap<>(), ImmutableList.of(bobCatalogAccess));
     adminMetalake.grantRolesToUser(ImmutableList.of(BOB_ROLE), BOB);
 

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import static org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils.normalizeLocation;
 import static org.apache.spark.sql.functions.lit;
 
 import com.google.common.base.Preconditions;
@@ -31,13 +32,13 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.AnalysisException;
@@ -51,7 +52,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRemoveOrphanFilesJob.class);
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v2";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -100,7 +101,11 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     Table table =
         Spark3Util.loadIcebergTable(
             spark, IcebergJobUtils.escapeSqlIdentifier(catalog) + "." + identifier);
-    String location = options.getOrDefault("location", table.location());
+    String location = options.get("location");
+    // Direct callers may pass an empty template value without CLI argument parsing.
+    if (location == null || location.codePoints().allMatch(Character::isWhitespace)) {
+      location = table.location();
+    }
     validateLocation(table.location(), location);
     validateLocalLocation(table.location(), location);
     validateRemoteLocation(spark, table.location(), location);
@@ -158,19 +163,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   }
 
   static void validateLocation(String tableLocation, String location) {
-    URI root = normalizeLocation(tableLocation);
-    URI requested = normalizeLocation(location);
-    String rootPath = root.getPath().replaceAll("/+$", "");
-    String childPath = requested.getPath().replaceAll("/+$", "");
-    boolean sameStorage =
-        Objects.equals(root.getScheme(), requested.getScheme())
-            && Objects.equals(root.getAuthority(), requested.getAuthority());
-    Preconditions.checkArgument(
-        sameStorage
-            && (childPath.equals(rootPath)
-                || childPath.startsWith(rootPath.endsWith("/") ? rootPath : rootPath + "/")),
-        "location must be within the table's storage location: %s",
-        tableLocation);
+    OrphanFileLocationUtils.validateLocation(tableLocation, location);
   }
 
   private static List<String> buildArguments() {
@@ -180,13 +173,13 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
         "--table",
         "{{table_identifier}}",
         "--older-than",
-        "{{older_than}}",
+        "{{older_than:-}}",
         "--location",
-        "{{location}}",
+        "{{location:-}}",
         "--dry-run",
-        "{{dry_run}}",
+        "{{dry_run:-false}}",
         "--spark-conf",
-        "{{spark_conf}}");
+        "{{spark_conf:-}}");
   }
 
   private static Map<String, String> buildSparkConfigs() {
@@ -198,27 +191,6 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
         "Usage: IcebergRemoveOrphanFilesJob --catalog <name> --table <db.table> "
             + "[--older-than 'yyyy-MM-dd HH:mm:ss'] [--location <path>] "
             + "[--dry-run true|false] [--spark-conf <json>]");
-  }
-
-  private static URI normalizeLocation(String value) {
-    // Reject ambiguous encoded paths rather than allowing different filesystem decoders to
-    // interpret the containment check and the subsequent listing differently.
-    Preconditions.checkArgument(
-        !value.isEmpty() && !value.contains("%") && !value.contains("\\"),
-        "Invalid scan location: %s",
-        value);
-    URI uri = URI.create(value);
-    Preconditions.checkArgument(
-        uri.getQuery() == null
-            && uri.getFragment() == null
-            && uri.getPath() != null
-            && uri.getPath().startsWith("/"),
-        "Scan location must be an absolute path without query or fragment: %s",
-        value);
-    if (uri.getScheme() == null || "file".equals(uri.getScheme())) {
-      return (uri.getScheme() == null ? Paths.get(value) : Paths.get(uri)).normalize().toUri();
-    }
-    return uri.normalize();
   }
 
   private static void validateLocalLocation(String tableLocation, String location)

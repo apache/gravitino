@@ -49,19 +49,20 @@ attached to directly.
 ### What Can Carry a Tag
 
 A metadata object is identified by a type and a name, with each level below the catalog separated by
-a dot. Nine object types can carry a tag.
+a dot. Ten object types can carry a tag.
 
-| Object type | Name form                                                 |
-|-------------|-----------------------------------------------------------|
-| `CATALOG`   | `{catalog_name}`                                          |
-| `SCHEMA`    | `{catalog_name}.{schema_name}`                            |
-| `TABLE`     | `{catalog_name}.{schema_name}.{table_name}`               |
-| `VIEW`      | `{catalog_name}.{schema_name}.{view_name}`                |
-| `COLUMN`    | `{catalog_name}.{schema_name}.{table_name}.{column_name}` |
-| `FILESET`   | `{catalog_name}.{schema_name}.{fileset_name}`             |
-| `TOPIC`     | `{catalog_name}.{schema_name}.{topic_name}`               |
-| `MODEL`     | `{catalog_name}.{schema_name}.{model_name}`               |
-| `FUNCTION`  | `{catalog_name}.{schema_name}.{function_name}`            |
+| Object type      | Name form                                                 |
+|------------------|-----------------------------------------------------------|
+| `CATALOG`        | `{catalog_name}`                                          |
+| `SCHEMA`         | `{catalog_name}.{schema_name}`                            |
+| `TABLE`          | `{catalog_name}.{schema_name}.{table_name}`               |
+| `VIEW`           | `{catalog_name}.{schema_name}.{view_name}`                |
+| `SEMANTIC_MODEL` | `{catalog_name}.{schema_name}.{semantic_model_name}`      |
+| `COLUMN`         | `{catalog_name}.{schema_name}.{table_name}.{column_name}` |
+| `FILESET`        | `{catalog_name}.{schema_name}.{fileset_name}`             |
+| `TOPIC`          | `{catalog_name}.{schema_name}.{topic_name}`               |
+| `MODEL`          | `{catalog_name}.{schema_name}.{model_name}`               |
+| `FUNCTION`       | `{catalog_name}.{schema_name}.{function_name}`            |
 
 A metalake cannot carry a tag, so there is no single attachment point that covers everything at
 once. To reach every object in a catalog, attach the tag to the catalog.

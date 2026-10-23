@@ -18,15 +18,23 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum, unique
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 
 class Index(ABC):
-    """The Index interface describes the type, fields, and properties of a table index."""
+    """The Index interface defines methods for implementing table index columns.
+
+    Catalogs may provide key and connector-specific index types.
+    """
 
     @unique
     class IndexType(str, Enum):
-        """The types of indexes represented in table metadata."""
+        """The enum IndexType defines the type of the index.
+
+        Catalogs may support generic key types and connector-specific index types.
+        `DATA_SKIPPING_ANNOY` and `DATA_SKIPPING_USEARCH` are exposed for reading legacy
+        ClickHouse index metadata only.
+        """
 
         PRIMARY_KEY = "PRIMARY_KEY"
         """`PRIMARY` KEY index in a relational database is a field or a combination of fields that
@@ -43,6 +51,15 @@ class Index(ABC):
         integrity by preventing duplicate entries in specific columns, and they can be applied to
         columns that are not designated as the primary key. The uniqueness constraint imposed by
         UNIQUE KEY helps in avoiding redundancy and ensuring data accuracy in the database."""
+
+        DATA_SKIPPING_ANNOY = "DATA_SKIPPING_ANNOY"
+        """Legacy ClickHouse Annoy index metadata. This type is metadata-only."""
+
+        DATA_SKIPPING_USEARCH = "DATA_SKIPPING_USEARCH"
+        """Legacy ClickHouse USearch index metadata. This type is metadata-only."""
+
+        DATA_SKIPPING_VECTOR_SIMILARITY = "DATA_SKIPPING_VECTOR_SIMILARITY"
+        """ClickHouse vector similarity data skipping index."""
 
         DATA_SKIPPING_TEXT = "DATA_SKIPPING_TEXT"
         """A native ClickHouse text data-skipping index."""
@@ -77,6 +94,6 @@ class Index(ABC):
         """
         pass  # pragma: no cover
 
-    def properties(self) -> Dict[str, str]:
-        """Returns extra properties for index configuration."""
+    def properties(self) -> dict[str, str]:
+        """Returns the index properties, or an empty map when none are defined."""
         return {}

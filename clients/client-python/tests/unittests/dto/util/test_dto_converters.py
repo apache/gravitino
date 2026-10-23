@@ -770,17 +770,47 @@ class TestDTOConverters(unittest.TestCase):
 
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
 
-    def test_text_index_properties_survive_dto_conversion(self):
-        properties = {"tokenizer": "ngrams", "ngram_size": "3"}
-        index = Indexes.of(
-            Index.IndexType.DATA_SKIPPING_TEXT, "idx_body", [["body"]], properties
+    def test_index_properties_survive_dto_conversion(self):
+        cases = (
+            (
+                Index.IndexType.DATA_SKIPPING_TEXT,
+                {"tokenizer": "ngrams", "ngram_size": "3"},
+            ),
+            (
+                Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+                {"type": "hnsw", "distance_function": "L2Distance", "dimensions": "3"},
+            ),
+            (
+                Index.IndexType.DATA_SKIPPING_ANNOY,
+                {
+                    "annoy_trees": "100",
+                    "clickhouse_type_full": "annoy(100)",
+                    "granularity": "1",
+                },
+            ),
+            (
+                Index.IndexType.DATA_SKIPPING_USEARCH,
+                {
+                    "usearch_distance_function": "cosineDistance",
+                    "clickhouse_type_full": "usearch('cosineDistance')",
+                    "granularity": "1",
+                },
+            ),
         )
+        for index_type, properties in cases:
+            with self.subTest(index_type=index_type):
+                index = Indexes.of(index_type, "idx_body", [["body"]], properties)
 
-        dto = DTOConverters.to_dto(index)
-        self.assertEqual(dto.properties(), properties)
-        restored = DTOConverters.from_dto(dto)
-        self.assertIs(restored.type(), Index.IndexType.DATA_SKIPPING_TEXT)
-        self.assertEqual(restored.properties(), properties)
+                dto = DTOConverters.to_dto(index)
+                self.assertIs(dto.type(), index_type)
+                self.assertEqual(dto.name(), "idx_body")
+                self.assertEqual(dto.field_names(), [["body"]])
+                self.assertEqual(dto.properties(), properties)
+                restored = DTOConverters.from_dto(dto)
+                self.assertIs(restored.type(), index_type)
+                self.assertEqual(restored.name(), "idx_body")
+                self.assertEqual(restored.field_names(), [["body"]])
+                self.assertEqual(restored.properties(), properties)
 
     def test_to_dtos_representations(self):
         representations = [

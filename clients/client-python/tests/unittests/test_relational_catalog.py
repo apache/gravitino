@@ -179,6 +179,37 @@ class TestRelationalCatalog(unittest.TestCase):
             text_index.properties(), {"tokenizer": "ngrams", "ngram_size": "3"}
         )
 
+    def test_load_table_with_vector_similarity_index(self):
+        response_json = json.loads(TableResponse(0, self.table_dto).to_json())
+        response_json["table"]["indexes"] = [
+            {
+                "indexType": "DATA_SKIPPING_VECTOR_SIMILARITY",
+                "name": "idx_vector",
+                "fieldNames": [["id"]],
+                "properties": {
+                    "type": "hnsw",
+                    "distance_function": "L2Distance",
+                    "dimensions": "3",
+                },
+            }
+        ]
+        mock_resp = self._get_mock_http_resp(json.dumps(response_json))
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp
+        ):
+            table = self.catalog.load_table(self.table_identifier)
+
+        self.assertEqual(table.name(), self.table_dto.name())
+        self.assertEqual(len(table.index()), 1)
+        self.assertEqual(
+            table.index()[0].type(), Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY
+        )
+        self.assertEqual(
+            table.index()[0].properties(),
+            {"type": "hnsw", "distance_function": "L2Distance", "dimensions": "3"},
+        )
+
     def test_load_table_with_required_privilege_names(self):
         resp_body = TableResponse(0, self.table_dto)
         mock_resp = self._get_mock_http_resp(resp_body.to_json())
