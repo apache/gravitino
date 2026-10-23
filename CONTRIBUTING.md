@@ -97,9 +97,9 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 1. Enable GitHub Actions in your fork (the **Actions** tab of your fork).
 2. Push your branch to your fork. **Fork CI** resolves one upstream base commit and every suite tests the same merge of that base and your pushed commit.
 3. Open the pull request. Its **Fork CI** check verifies the suite jobs and the exact tested head, base branch and base SHA. A pre-PR run is accepted only if its inferred base matches the PR. After retargeting a PR, push again or ask a committer for a trusted run. The separate **ASF Allowlist Check** scans the PR's workflow YAML using reviewed upstream code.
-4. Keep your branch up to date before merging. Required checks use strict branch protection. If the base changes, update your branch and run CI again. The **Fork CI** check can stay green after the base branch moves on; strict branch protection, not the check, blocks the merge until the branch is updated.
+4. Keep your branch up to date before merging. Strict branch protection requires an up-to-date branch. If the base changes, update your branch and run CI again. The **Fork CI** check can stay green after the base branch moves on; strict branch protection, not the check, blocks the merge until the branch is updated.
 
-If the check asks you to enable Fork CI, enable Actions in your fork, merge or rebase your branch onto the latest base branch, and push again. To re-run flaky tests, re-run the failed jobs in your fork; reviewers cannot re-run them for you. Please fix failures before requesting a review.
+If the check asks you to enable Fork CI, enable Actions in your fork, merge or rebase your branch onto the latest base branch, and push again. Fork CI cancels the rest of the run as soon as one job fails, so you can re-run failed jobs in your fork right away; this also re-runs the jobs it cancelled. Reviewers cannot re-run them for you. Closing and reopening a pull request only refreshes the check from the latest fork run; to run CI again, re-run the workflow in your fork or push again. Please fix failures before requesting a review.
 
 Known limitations of Fork CI:
 
@@ -108,9 +108,9 @@ Known limitations of Fork CI:
 * Coverage comments remain available for release branches. For PRs to `main`, inspect the fork run's `build / coverage` log and `coverage-report` artifact.
 * Release branches (`branch-*`) keep their own upstream CI until this change is backported.
 * CI workflow, action, helper-script or `.asf.yaml` changes cannot approve themselves. After reviewing those changes, a committer runs **Fork CI** in `apache/gravitino`, from the current default branch, and supplies the PR number. This explicit exception uses upstream runner resources, reviewed default-branch workflow definitions, a read-only token and no repository secrets; it tests the exact contributor head against the current base. Any later push or base change requires another matching run.
-* The independent allowlist scanner downloads bounded YAML data outside its trusted checkout and never executes PR code. It reports the required **ASF Allowlist Check** on every PR, including PRs that do not change `.github/`. A committer can re-run **Trusted ASF Allowlist** with the PR number.
+* The independent allowlist scanner downloads bounded YAML data outside its trusted checkout and never executes PR code. It reports the **ASF Allowlist Check** on every PR, including PRs that do not change `.github/`. A committer can re-run **Trusted ASF Allowlist** with the PR number.
 
-The migration requires a coordinated branch-protection cutover: replace the old individual suite contexts with **Fork CI** and **ASF Allowlist Check**, and retain strict/up-to-date protection. The initial rollout must be reviewed and validated under the existing upstream checks before that protection changes. Announce the cutover so authors know to update existing branches. Release-branch protection is unchanged.
+**Fork CI** and **ASF Allowlist Check** are not required status checks, so a trusted run stuck in the shared runner queue does not block an urgent merge. Branch protection still requires an up-to-date branch and an approving review. Release-branch protection is unchanged.
 
 The trusted publishers use `workflow_run` and `schedule`, rather than `pull_request_target`. `actions/*`, `github/*` and `apache/*` actions are exempt from ASF's external-action SHA requirement; external third-party actions still require an approved SHA.
 
@@ -170,6 +170,7 @@ Reviewing and triaging helps maintain the project. You can:
 * Suggest improvements on PRs
 * Review code and give feedback
 * Review changes under `.github/` and `.asf.yaml` carefully, then dispatch a trusted upstream **Fork CI** run for those changes. Check the displayed tested base SHA and all caller suite results before merging.
+* Merge only after **Fork CI** and **ASF Allowlist Check** pass. They are not enforced by branch protection; if you must merge without them, for example while a trusted run is queued, comment on the PR with what you verified instead.
 * Please add Copilot before you review. That is recommended, not required. Do not wait on Copilot if you are ready to review.
 
 ## 🔃 Creating Pull Requests

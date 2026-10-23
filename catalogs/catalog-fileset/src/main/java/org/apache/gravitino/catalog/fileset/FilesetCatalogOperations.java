@@ -1292,6 +1292,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             : Maps.newHashMap(filesetEntity.properties());
     String newName = ident.name();
     String newComment = filesetEntity.comment();
+    Fileset.Type newType = filesetEntity.filesetType();
 
     for (FilesetChange change : changes) {
       if (change instanceof FilesetChange.SetProperty) {
@@ -1304,6 +1305,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         newName = ((FilesetChange.RenameFileset) change).getNewName();
       } else if (change instanceof FilesetChange.UpdateFilesetComment) {
         newComment = ((FilesetChange.UpdateFilesetComment) change).getNewComment();
+      } else if (change instanceof FilesetChange.UpdateFilesetType) {
+        newType = ((FilesetChange.UpdateFilesetType) change).getNewType();
       } else if (change instanceof FilesetChange.RemoveComment) {
         newComment = null;
       } else {
@@ -1317,7 +1320,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         .withNamespace(ident.namespace())
         .withId(filesetEntity.id())
         .withComment(newComment)
-        .withFilesetType(filesetEntity.filesetType())
+        .withFilesetType(newType)
         .withStorageLocations(filesetEntity.storageLocations())
         .withProperties(props)
         .withAuditInfo(
