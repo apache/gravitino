@@ -25,26 +25,21 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.Tag;
 
 /** Iceberg catalog with a JDBC (MySQL) metadata backend. */
 @Tag("gravitino-docker-test")
+@MySQLFixture(database = TestDatabaseName.FLINK_ICEBERG_JDBC_CATALOG_IT)
 public abstract class FlinkIcebergJdbcCatalogIT extends FlinkIcebergCatalogIT {
 
   private static final TestDatabaseName TEST_DB_NAME =
       TestDatabaseName.FLINK_ICEBERG_JDBC_CATALOG_IT;
 
-  private static MySQLContainer mySQLContainer;
-
-  @Override
-  protected void initCatalogEnv() throws Exception {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startMySQLContainer(TEST_DB_NAME);
-    mySQLContainer = containerSuite.getMySQLContainer();
-  }
+  @FixtureContainer private static MySQLContainer mySQLContainer;
 
   @Override
   protected Map<String, String> getCatalogConfigs() {

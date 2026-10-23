@@ -23,8 +23,9 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
@@ -32,10 +33,13 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@HiveFixture
 public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private boolean hiveStarted = false;
+  @FixtureContainer private HiveContainer hive;
+
+  // Cloud storage subclasses override initEnv() and keep their own warehouse instead of HDFS.
+  private boolean useHdfsWarehouse = false;
 
   public IcebergRESTJdbcCatalogIT() {
     catalogType = IcebergCatalogBackend.JDBC;
@@ -43,8 +47,7 @@ public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
 
   @Override
   void initEnv() {
-    containerSuite.startHiveContainer();
-    hiveStarted = true;
+    useHdfsWarehouse = true;
   }
 
   @Override
@@ -78,14 +81,13 @@ public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
 
     configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + "jdbc.schema-version", "V1");
 
-    if (hiveStarted) {
+    if (useHdfsWarehouse) {
       configMap.put(
           IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
           GravitinoITUtils.genRandomName(
               String.format(
                   "hdfs://%s:%d/user/hive/warehouse-jdbc-sqlite",
-                  containerSuite.getHiveContainer().getContainerIpAddress(),
-                  HiveContainer.HDFS_DEFAULTFS_PORT)));
+                  hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT)));
     }
     return configMap;
   }

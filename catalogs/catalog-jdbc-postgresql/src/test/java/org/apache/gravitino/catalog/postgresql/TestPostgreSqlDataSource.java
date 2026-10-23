@@ -28,32 +28,30 @@ import java.util.Map;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 /** Exercises default validation against a real PostgreSQL server. */
 @Tag("gravitino-docker-test")
+@PostgreSQLFixture(database = TestDatabaseName.PG_TEST_PG_DATA_SOURCE)
 public class TestPostgreSqlDataSource {
-  private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:13");
+  private static final TestDatabaseName DATABASE = TestDatabaseName.PG_TEST_PG_DATA_SOURCE;
 
-  /** Starts PostgreSQL and creates a schema for connection state changes. */
+  @FixtureContainer private static PostgreSQLContainer postgres;
+
+  /** Creates a schema for connection state changes. */
   @BeforeAll
-  public static void startPostgres() throws SQLException {
-    POSTGRES.start();
+  public static void createSchema() throws SQLException {
     try (Connection connection = observerConnection();
         Statement statement = connection.createStatement()) {
-      statement.execute("CREATE SCHEMA pool_target");
+      statement.execute("CREATE SCHEMA IF NOT EXISTS pool_target");
     }
-  }
-
-  /** Stops the test server. */
-  @AfterAll
-  public static void stopPostgres() {
-    POSTGRES.stop();
   }
 
   /** Verifies schema changes do not prevent reuse with default driver validation. */
@@ -102,10 +100,10 @@ public class TestPostgreSqlDataSource {
 
   private static BasicDataSource createDataSource() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(JdbcConfig.JDBC_URL.getKey(), POSTGRES.getJdbcUrl());
-    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), POSTGRES.getDriverClassName());
-    properties.put(JdbcConfig.USERNAME.getKey(), POSTGRES.getUsername());
-    properties.put(JdbcConfig.PASSWORD.getKey(), POSTGRES.getPassword());
+    properties.put(JdbcConfig.JDBC_URL.getKey(), postgres.getJdbcUrl(DATABASE));
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(JdbcConfig.USERNAME.getKey(), postgres.getUsername());
+    properties.put(JdbcConfig.PASSWORD.getKey(), postgres.getPassword());
     properties.put(JdbcConfig.POOL_MAX_SIZE.getKey(), "1");
     properties.put(JdbcConfig.POOL_MIN_SIZE.getKey(), "1");
     return (BasicDataSource) DataSourceUtils.createDataSource(properties);
@@ -113,7 +111,7 @@ public class TestPostgreSqlDataSource {
 
   private static Connection observerConnection() throws SQLException {
     return DriverManager.getConnection(
-        POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        postgres.getJdbcUrl(DATABASE), postgres.getUsername(), postgres.getPassword());
   }
 
   private static long connectionId(Connection connection) throws SQLException {

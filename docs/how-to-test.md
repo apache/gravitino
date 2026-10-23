@@ -57,7 +57,9 @@ To run one class or method, add `--tests` to its lane:
 
 If the class is not in that lane, Gradle fails with "No tests found for given includes".
 
-`coreMySQLTest` and `corePostgreSQLTest` run their test JVM with the system property `gravitino.test.db.disposableData=true`, so the MySQL and PostgreSQL containers keep their data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk. No other task sets it. Other tasks run MySQL with the image's default settings and PostgreSQL with the Testcontainers module's default, `fsync=off`.
+Tests get their containers from fixture annotations, such as `@MySQLFixture(database = ...)` with a `@FixtureContainer MySQLContainer` field. Code that cannot carry an annotation, such as a base class that picks its backend at run time, calls `Fixtures.get(spec)` with the same Spec and shares the same container. Containers start once per test JVM and stop when the run ends.
+
+Test containers skip durability work by default: MySQL and PostgreSQL keep their data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk, Hive keeps HDFS in memory and its metastore database skips syncing, Doris and StarRocks keep their backend storage in memory, and so on. No test reads data back after a container stops, so nothing is lost that a test needs. A test class that needs durable data asks for it on its fixture, for example `@HiveFixture(durability = Durability.DURABLE, scope = Scope.CLASS)`, and gets its own container. Any fixture takes `scope = Scope.CLASS` or `Scope.METHOD`, for durable data or for tests that change their service in ways later tests would see, except `@TrinoFixture` and `@ClickHouseFixture(nodes = 3)`, whose nodes find each other by fixed host names. To make every container durable, for example to inspect a container's data after a failure, pass `-PdurableTestContainers`.
 
 #### Database reuse and reset
 
@@ -108,7 +110,7 @@ To deploy the Gravitino server locally to run the integration tests, follow thes
    in the `distribution` directory.
 3. Use the `./gradlew test [--rerun-tasks] -PskipTests -PtestMode=deploy` command to run the
    integration tests in the `distribution` directory.
-4. Use the `bash trino-connector/integration-test/trino-test-tools/trino_test.sh` command to run all the
+4. Use the `bash trino-connector/integration-test/trino-test-tools/trino_integration_test.sh` command to run all the
    Trino test sets in the `trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets` directory.
    Specify the `--trino_worker_num` parameter to make the Trino test sets run in a distributed environment.
    Specify the `--trino_version` parameter to make the Trino test sets run with specific trino version.
@@ -149,6 +151,8 @@ public class CatalogHiveIT extends AbstractIT {
 ...
 }
 ```
+
+Two Gradle runs, for example in two worktrees, can share one Docker host. Each test JVM picks a run id and names its containers, networks and Doris Compose projects `gravitino-<service>-<runId>-<n>`, uses mapped host ports, and keeps its OceanBase data directory in a per-run temporary directory, so the runs do not collide. Host names and network aliases inside a network stay fixed, because images such as the Kerberos Hive derive their principals from their host name. One thing stays shared: on macOS with `NEED_CREATE_DOCKER_NETWORK=true`, the network must use the subnet that `mac-docker-connector` routes, so a second run on that host fails fast with a subnet conflict instead of removing the first run's network. On CI, `docker container prune -f` before each container start also removes stopped containers of any run on the host.
 
 ## Run All Integration Tests
 

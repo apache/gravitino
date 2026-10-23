@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
-import com.google.common.collect.Maps;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -30,6 +29,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -488,14 +488,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     try (Connection connection = DATA_SOURCE.getConnection()) {
       JdbcConnectorUtils.executeUpdate(connection, "CREATE DATABASE " + testDbName);
     }
-    HashMap<String, String> properties = Maps.newHashMap();
-    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
-    String jdbcUrl =
-        StringUtils.substring(CONTAINER.getJdbcUrl(), 0, CONTAINER.getJdbcUrl().lastIndexOf("/"));
-    properties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl + "/" + testDbName);
-    properties.put(JdbcConfig.USERNAME.getKey(), CONTAINER.getUsername());
-    properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());
-    DataSource dataSource = DataSourceUtils.createDataSource(properties);
+    DataSource dataSource = DataSourceUtils.createDataSource(dataSourceProperties(testDbName));
     PostgreSqlSchemaOperations postgreSqlSchemaOperations = new PostgreSqlSchemaOperations();
     Map<String, String> config =
         new HashMap<String, String>() {
@@ -660,7 +653,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
             });
 
     Assertions.assertTrue(
-        StringUtils.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
+        Strings.CS.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
   }
 
   @Test
@@ -745,7 +738,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                   primaryIndex);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             gravitinoRuntimeException.getMessage(),
             "column \"no_exist_1\" named in key does not exist"));
   }
@@ -797,7 +790,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                 PostgreSqlTableOperations.appendIndexesSql(
                     new Index[] {primary, unique1, unique2}, stringBuilder));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in PostgreSQL"));
   }

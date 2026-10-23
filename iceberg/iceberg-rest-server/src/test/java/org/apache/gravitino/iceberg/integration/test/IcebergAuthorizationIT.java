@@ -42,7 +42,9 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchUserException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
@@ -69,7 +71,10 @@ import org.slf4j.LoggerFactory;
  * are two users: SUPER_USER is the owner of metalake, has all privileges while NORMAL_USER is the
  * user for Spark SQL, doesn't have privileges by default. You could use Spark SQL to try to do the
  * operation and use Gravitino client to grant privilege or check the test result.
+ *
+ * <p>A subclass that needs its own PostgreSQL database re-declares the fixture with it.
  */
+@PostgreSQLFixture(database = TestDatabaseName.PG_ICEBERG_AUTHZ_IT)
 public class IcebergAuthorizationIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergAuthorizationIT.class);
@@ -85,7 +90,7 @@ public class IcebergAuthorizationIT extends BaseIT {
   protected Catalog catalogClientWithAllPrivilege;
   protected GravitinoMetalake metalakeClientWithAllPrivilege;
 
-  private static ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private PostgreSQLContainer postgreSQL;
   private SparkSession sparkSession;
   // IRC REST catalog authenticated as SUPER_USER, used for setup operations that the Gravitino
   // REST API cannot perform — e.g. creating hierarchical schemas whose names contain the
@@ -95,7 +100,6 @@ public class IcebergAuthorizationIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    containerSuite.startPostgreSQLContainer(getTestDatabaseName());
     startGravitinoServerWithIcebergREST();
     initMetalakeAndCatalog();
     initSparkEnv();
@@ -219,9 +223,14 @@ public class IcebergAuthorizationIT extends BaseIT {
     return null;
   }
 
-  /** Returns the PostgreSQL database used by this authorization test suite. */
+  /**
+   * Returns the PostgreSQL database used by this authorization test suite: the one its {@link
+   * PostgreSQLFixture} creates.
+   *
+   * @return the test's database
+   */
   protected TestDatabaseName getTestDatabaseName() {
-    return TestDatabaseName.PG_ICEBERG_AUTHZ_IT;
+    return getClass().getAnnotation(PostgreSQLFixture.class).database();
   }
 
   void revokeUserRoles() {
@@ -346,15 +355,15 @@ public class IcebergAuthorizationIT extends BaseIT {
   }
 
   private String getPGUri() {
-    return containerSuite.getPostgreSQLContainer().getJdbcUrl(getTestDatabaseName());
+    return postgreSQL.getJdbcUrl(getTestDatabaseName());
   }
 
   private String getPGUser() {
-    return containerSuite.getPostgreSQLContainer().getUsername();
+    return postgreSQL.getUsername();
   }
 
   private String getPGPassword() {
-    return containerSuite.getPostgreSQLContainer().getPassword();
+    return postgreSQL.getPassword();
   }
 
   protected Map<String, String> getTableInfo(String tableName) {

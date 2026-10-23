@@ -19,24 +19,18 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
-import static org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -48,10 +42,8 @@ import software.amazon.awssdk.services.s3.S3Client;
  * downgrade, without a cloud account.
  */
 public class RustFSContainer extends BaseContainer {
-  private static final Logger LOG = LoggerFactory.getLogger(RustFSContainer.class);
-
   /** The image pin consumed from the Docker Compose manifest tracked by image updates. */
-  public static final String DEFAULT_IMAGE = loadImage();
+  public static final String DEFAULT_IMAGE = TestImages.RUSTFS;
 
   /** The container hostname on the shared integration-test network. */
   public static final String HOST_NAME = "gravitino-ci-rustfs";
@@ -100,31 +92,28 @@ public class RustFSContainer extends BaseContainer {
     withLogConsumer(new PrintingContainerLog(format("%-14s| ", "RustFSContainer")));
   }
 
+  // A listening socket alone does not establish that IAM and the S3 API are initialized.
   @Override
-  public void start() {
-    super.start();
-    checkContainerStatus(60);
+  protected WaitStrategy waitStrategy() {
+    return new WaitAllStrategy()
+        .withStrategy(Wait.forListeningPort())
+        .withStrategy(
+            new ProbeWaitStrategy(
+                "RustFS to list buckets",
+                target -> {
+                  try (S3Client client =
+                      createS3Client(
+                          format("http://%s:%d", target.getHost(), target.getMappedPort(PORT)))) {
+                    client.listBuckets();
+                    return true;
+                  }
+                }));
   }
 
+  // The port check's five minutes plus the minute the S3 check had before.
   @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    // A listening socket alone does not establish that IAM and the S3 API are initialized.
-    try (S3Client client = createS3Client()) {
-      await()
-          .atMost(60, TimeUnit.SECONDS)
-          .pollInterval(Math.max(1, 60 / retryLimit), TimeUnit.SECONDS)
-          .until(
-              () -> {
-                try {
-                  client.listBuckets();
-                  return true;
-                } catch (Exception e) {
-                  LOG.info("RustFS is not ready yet: {}", e.getMessage());
-                  return false;
-                }
-              });
-    }
-    return true;
+  protected Duration startupTimeout() {
+    return Duration.ofMinutes(6);
   }
 
   /**
@@ -133,7 +122,7 @@ public class RustFSContainer extends BaseContainer {
    * @param bucketName the bucket to create
    */
   public void createBucket(String bucketName) {
-    try (S3Client client = createS3Client()) {
+    try (S3Client client = createS3Client(getS3Endpoint())) {
       client.createBucket(request -> request.bucket(bucketName));
       client.headBucket(request -> request.bucket(bucketName));
     }
@@ -148,36 +137,9 @@ public class RustFSContainer extends BaseContainer {
     return format("http://%s:%d", container.getHost(), getMappedPort(PORT));
   }
 
-  static String imageFromCompose(String compose) {
-    // This single-service manifest is deliberately limited to one unquoted image reference.
-    // Fail closed if its structure changes, rather than silently using a different image pin.
-    Matcher matcher = Pattern.compile("(?m)^\\s+image: (\\S+)\\s*$").matcher(compose);
-    if (!matcher.find()) {
-      throw new IllegalArgumentException("RustFS Compose manifest must contain an image");
-    }
-    String image = matcher.group(1);
-    if (matcher.find() || !image.matches("rustfs/rustfs:[^@\\s]+@sha256:[0-9a-f]{64}")) {
-      throw new IllegalArgumentException(
-          "RustFS Compose manifest must contain one version and digest pin");
-    }
-    return image;
-  }
-
-  private static String loadImage() {
-    try (InputStream stream =
-        RustFSContainer.class.getResourceAsStream("/docker-compose-rustfs.yml")) {
-      if (stream == null) {
-        throw new IllegalStateException("Missing docker-compose-rustfs.yml test resource");
-      }
-      return imageFromCompose(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
-    } catch (IOException e) {
-      throw new IllegalStateException("Unable to read RustFS image pin", e);
-    }
-  }
-
-  private S3Client createS3Client() {
+  private static S3Client createS3Client(String endpoint) {
     return S3Client.builder()
-        .endpointOverride(URI.create(getS3Endpoint()))
+        .endpointOverride(URI.create(endpoint))
         .region(Region.of(REGION))
         .forcePathStyle(true)
         .credentialsProvider(

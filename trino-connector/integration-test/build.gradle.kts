@@ -81,6 +81,10 @@ dependencies {
   }
   testImplementation(libs.trino.jdbc)
 
+  // The LocalStack fixture creates buckets with the S3 SDK v2; the synchronous client needs no Netty.
+  testRuntimeOnly(libs.aws.s3) {
+    exclude("software.amazon.awssdk", "netty-nio-client")
+  }
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -121,13 +125,14 @@ tasks.test {
       // Check whether this module has already built
       val trinoConnectorBuildDir = project(":trino-connector:trino-connector").buildDir
       if (trinoConnectorBuildDir.exists()) {
-        // Check the version Gravitino related jars in build equal to the current project version
+        // Check the version Gravitino related jars in build equal to the current project version.
+        // The build directory can exist without libs: this task needs only the module's classes.
         val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
           val name = it.name
           !name.endsWith(version + ".jar")
-        }
+        }.orEmpty()
 
-        if (invalidGravitinoJars!!.isNotEmpty()) {
+        if (invalidGravitinoJars.isNotEmpty()) {
           val message = "Mismatched Gravitino JAR versions found in trino-connector/build/libs:\n" +
             "${invalidGravitinoJars.joinToString(", ") { it.name }}\n" +
             "The expected project version is $version. Please clean and rebuild the project."
