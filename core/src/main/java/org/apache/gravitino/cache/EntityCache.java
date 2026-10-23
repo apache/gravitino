@@ -42,6 +42,16 @@ public interface EntityCache extends SupportsEntityStoreCache {
   void clear();
 
   /**
+   * Releases the resources this cache instance holds. The entity store calls this when it shuts
+   * down. A cache whose entries live in this process clears them, which is the default; a cache
+   * whose entries are shared with other nodes releases only its own client and leaves the shared
+   * entries in place, since another node may still be serving from them.
+   */
+  default void close() {
+    clear();
+  }
+
+  /**
    * Returns the number of entries in the cache.
    *
    * @return The number of entries in the cache
