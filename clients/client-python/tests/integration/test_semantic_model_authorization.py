@@ -22,13 +22,18 @@ import uuid
 from unittest.mock import patch
 
 from gravitino import Catalog, GravitinoClient, NameIdentifier
+from gravitino.api.authorization.owner import Owner
 from gravitino.api.authorization.privileges import Privileges
 from gravitino.api.authorization.securable_objects import SecurableObjects
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.types.types import Types
 from gravitino.api.semantic.dataset import Dataset
+from gravitino.api.semantic.dialect_expression import DialectExpression
+from gravitino.api.semantic.expression import Expression
+from gravitino.api.semantic.metric import Metric
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_model_metric import SemanticModelMetric
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
@@ -154,6 +159,76 @@ class TestSemanticModelAuthorization(AuthorizationIntegrationTestEnv):
         self.assertEqual(
             [], self._reader_models.list_semantic_models(Namespace.of("semantic"))
         )
+
+    def test_metric_discovery_follows_model_visibility_and_parent_access(self):
+        metrics = [
+            Metric(name, Expression([DialectExpression("ANSI_SQL", "COUNT(*)")]))
+            for name in ("Revenue", "revenue")
+        ]
+        definition = SemanticModelDefinition(
+            self._definition.datasets(), metrics=metrics
+        )
+        models = self._gravitino_client.load_catalog(
+            "iceberg"
+        ).as_semantic_model_catalog()
+        for model_name in ("sales", "hidden"):
+            models.alter_semantic_model(
+                NameIdentifier.of("semantic", model_name),
+                SemanticModelChange.replace_definition(definition),
+            )
+        namespace = Namespace.of("semantic")
+        expected = [
+            SemanticModelMetric(Namespace.of("semantic", "sales"), metric)
+            for metric in metrics
+        ]
+
+        def assert_discovery(infos):
+            self.assertEqual(infos, self._reader_models.list_metric_infos(namespace))
+            self.assertEqual(
+                [
+                    NameIdentifier.builder(info.namespace(), info.metric().name())
+                    for info in infos
+                ],
+                self._reader_models.list_metrics(namespace),
+            )
+
+        assert_discovery([])
+        model = SecurableObjects.of_semantic_model(self._schema, "sales", [])
+        for name in ("USE_SEMANTIC_MODEL", "MODIFY_SEMANTIC_MODEL"):
+            with self.subTest(privilege=name):
+                privilege = Privileges.allow(name)
+                self._gravitino_client.grant_privileges_to_role(
+                    "reader", model, [privilege]
+                )
+                assert_discovery(expected)
+                self._gravitino_client.revoke_privileges_from_role(
+                    "reader", model, [privilege]
+                )
+                assert_discovery([])
+
+        self._gravitino_client.set_owner(model, "semantic_reader", Owner.Type.USER)
+        assert_discovery(expected)
+        for obj, privilege in (
+            (self._schema, Privileges.allow("USE_SCHEMA")),
+            (
+                SecurableObjects.of_catalog("iceberg", []),
+                Privileges.allow("USE_CATALOG"),
+            ),
+        ):
+            with self.subTest(privilege=privilege.name()):
+                self._gravitino_client.revoke_privileges_from_role(
+                    "reader", obj, [privilege]
+                )
+                for method in (
+                    self._reader_models.list_metrics,
+                    self._reader_models.list_metric_infos,
+                ):
+                    with self.assertRaises(ForbiddenException):
+                        method(namespace)
+                self._gravitino_client.grant_privileges_to_role(
+                    "reader", obj, [privilege]
+                )
+                assert_discovery(expected)
 
     def test_create_requires_privilege_and_parent_access(self):
         ident = NameIdentifier.of("semantic", "created")

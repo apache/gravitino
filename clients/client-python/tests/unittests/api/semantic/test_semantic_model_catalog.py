@@ -92,6 +92,14 @@ class _InMemorySemanticModelCatalog(SemanticModelCatalog):
 
 
 class TestSemanticModelCatalog(unittest.TestCase):
+    def test_metric_discovery_defaults_preserve_existing_implementations(self):
+        catalog = _InMemorySemanticModelCatalog()
+        for method in (catalog.list_metrics, catalog.list_metric_infos):
+            with self.subTest(method=method), self.assertRaisesRegex(
+                UnsupportedOperationException, "Metric discovery is not supported"
+            ):
+                method(Namespace.of("semantic"))
+
     def test_semantic_model_exists_uses_load(self):
         catalog = _InMemorySemanticModelCatalog()
         identifier = NameIdentifier.of("semantic", "sales_model")

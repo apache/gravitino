@@ -28,6 +28,7 @@ from gravitino.api.semantic.semantic_model_change import (
     UpdateComment,
 )
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_model_metric import SemanticModelMetric
 from gravitino.client.generic_semantic_model import GenericSemanticModel
 from gravitino.dto.requests.semantic_model_create_request import (
     SemanticModelCreateRequest,
@@ -41,6 +42,7 @@ from gravitino.dto.requests.semantic_model_updates_request import (
 )
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.dto.responses.metric_info_list_response import MetricInfoListResponse
 from gravitino.dto.responses.semantic_model_response import SemanticModelResponse
 from gravitino.dto.semantic.semantic_model_definition_dto import (
     SemanticModelDefinitionDTO,
@@ -84,6 +86,42 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
         return [
             NameIdentifier.of(ident.namespace().level(2), ident.name())
             for ident in entity_list_resp.identifiers()
+        ]
+
+    def list_metrics(self, namespace: Namespace) -> list[NameIdentifier]:
+        self._check_semantic_model_namespace(namespace)
+        resp = self._rest_client.get(
+            self._format_metric_request_path(
+                self._get_semantic_model_full_namespace(namespace)
+            ),
+            params={"details": "false"},
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        response = EntityListResponse.from_json(resp.body, infer_missing=True)
+        response.validate()
+        return [
+            NameIdentifier.builder(
+                self._relative_metric_namespace(ident.namespace()), ident.name()
+            )
+            for ident in response.identifiers()
+        ]
+
+    def list_metric_infos(self, namespace: Namespace) -> list[SemanticModelMetric]:
+        self._check_semantic_model_namespace(namespace)
+        resp = self._rest_client.get(
+            self._format_metric_request_path(
+                self._get_semantic_model_full_namespace(namespace)
+            ),
+            params={"details": "true"},
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        response = MetricInfoListResponse.from_json(resp.body, infer_missing=True)
+        response.validate()
+        return [
+            SemanticModelMetric(
+                self._relative_metric_namespace(info.namespace()), info.metric()
+            )
+            for info in response.metrics()
         ]
 
     def load_semantic_model(self, identifier: NameIdentifier) -> SemanticModel:
@@ -290,6 +328,21 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             f"/schemas/{encode_string(namespace.level(2))}"
             "/semantic-models"
         )
+
+    @staticmethod
+    def _format_metric_request_path(namespace: Namespace) -> str:
+        return (
+            f"api/metalakes/{encode_string(namespace.level(0))}"
+            f"/catalogs/{encode_string(namespace.level(1))}"
+            f"/schemas/{encode_string(namespace.level(2))}"
+            "/semantic-model-metrics"
+        )
+
+    @staticmethod
+    def _relative_metric_namespace(namespace: Namespace) -> Namespace:
+        if namespace is None or namespace.length() != 4:
+            raise IllegalArgumentException("Metric namespace must have 4 levels")
+        return Namespace.of(namespace.level(2), namespace.level(3))
 
     def _get_semantic_model_full_namespace(
         self, semantic_model_namespace: Namespace
