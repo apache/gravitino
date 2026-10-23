@@ -32,6 +32,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -108,6 +109,7 @@ public class TrinoContainer extends BaseContainer {
   protected boolean checkContainerStatus(int retryLimit) {
     await()
         .atMost(30, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
         .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
@@ -155,6 +157,7 @@ public class TrinoContainer extends BaseContainer {
   public boolean checkSyncCatalogFromGravitino(int retryLimit, String catalogName) {
     await()
         .atMost(30, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
         .pollInterval(60 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {

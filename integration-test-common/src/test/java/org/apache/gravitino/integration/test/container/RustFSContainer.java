@@ -112,6 +112,7 @@ public class RustFSContainer extends BaseContainer {
     try (S3Client client = createS3Client()) {
       await()
           .atMost(60, TimeUnit.SECONDS)
+          .pollDelay(Duration.ZERO)
           .pollInterval(Math.max(1, 60 / retryLimit), TimeUnit.SECONDS)
           .until(
               () -> {
