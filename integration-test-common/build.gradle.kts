@@ -47,8 +47,10 @@ dependencies {
   testImplementation(libs.commons.io)
   testImplementation(libs.guava)
   testImplementation(libs.httpclient5)
+  testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.jdbc)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.ranger.intg) {
@@ -65,7 +67,6 @@ dependencies {
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
 
-  testImplementation(platform("org.junit:junit-bom:5.9.1"))
   testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
