@@ -99,33 +99,25 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 3. Open the pull request. Its **Fork CI** check verifies the suite jobs and the exact tested head, base branch and base SHA. A pre-PR run is accepted only if its inferred base matches the PR. After retargeting a PR, push again or ask a committer for a trusted run. The separate **ASF Allowlist Check** scans the PR's workflow YAML using reviewed upstream code.
 4. Keep your branch up to date before merging. Strict branch protection requires an up-to-date branch. If the base changes, update your branch and run CI again. The **Fork CI** check can stay green after the base branch moves on; strict branch protection, not the check, blocks the merge until the branch is updated.
 
-### Closing and reopening a PR
+### Running Fork CI again
 
-For PRs using Fork CI, closing and reopening the PR does **not** restart CI:
+`apache/gravitino` cannot start or cancel runs in your fork, so you control Fork CI from your fork. To run CI again without changing code, use any of these:
 
-| Action | Fork CI behavior | PR status |
+* **Run workflow:** In your fork, open **Actions → Fork CI → Run workflow**, select your PR branch and leave the PR number empty. This starts a new run for the branch's current commit against the latest base branch, and cancels a run of that branch that is still in progress. It also works when an old run can no longer be re-run. If **Run workflow** is missing, use **Sync fork** on your fork's default branch first.
+* **Re-run the run:** Open the run for your PR's current commit and choose **Re-run all jobs**, which also tests the latest base branch, or **Re-run jobs → Re-run failed jobs** to retry only failed and cancelled jobs against the same base. A run can be re-run only after it has finished; Fork CI cancels the rest of a run as soon as a job fails. See [GitHub's rerun instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+* **Push a commit:** Any push to the PR branch starts a new run and cancels the previous one. An empty commit (`git commit --allow-empty -m "Trigger Fork CI"`) is enough.
+
+The **Fork CI** check on the PR links to the run and to **Run workflow**. Its **Re-run** button and the **Update Fork CI Status** workflow only refresh the reported result; neither runs tests.
+
+| Action | Fork CI | PR status |
 | --- | --- | --- |
-| Push another commit to the same fork branch | Cancels the previous run and starts a run for the new commit | Tracks the new commit and run |
-| Close the PR | Existing fork CI continues; it is not automatically canceled | Status synchronization stops while the PR is closed |
-| Reopen the PR without another push | Does not start a new run or rerun an old one; a running fork CI continues | Refreshes the latest fork run's result |
+| Push to the PR branch, or **Run workflow** in the fork | Cancels the branch's running run and starts a new one | Tracks the new run |
+| Close the PR | The running fork run cancels itself within about a minute | Synchronization stops while the PR is closed |
+| Reopen the PR | Starts nothing | Shows the latest fork run's result; run CI again as above |
 
-To stop CI after closing a PR, cancel the run in your fork's **Actions** tab. Reopening a PR does not clear a failed or canceled result: it remains unsuccessful until CI is run again and passes.
+If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. A branch created before Fork CI was introduced does not contain `.github/workflows/fork-ci.yml`, so pushing it runs no CI; the check then asks you to merge or rebase onto the latest base branch. Please fix failures before requesting a review.
 
-### Starting or rerunning Fork CI
-
-After reopening a PR, use either of these methods to run CI again:
-
-* **Rerun the current commit:** In your fork, open **Actions → Fork CI** and select the run for your PR branch's current commit. Once the run has finished, choose **Re-run all jobs**. For failed runs, **Re-run jobs → Re-run failed jobs** can retry failed and canceled jobs without repeating successful jobs. See [GitHub's rerun instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
-* **Push a new commit:** Push another commit to the PR's source branch in your fork. This starts a new Fork CI run. If you only need to trigger CI, you can use an empty commit instead of changing a file. From your PR branch, replace `FORK_REMOTE` and `PR_BRANCH` with your fork remote and PR source branch:
-
-  ```shell
-  git commit --allow-empty -m "Trigger Fork CI"
-  git push FORK_REMOTE HEAD:PR_BRANCH
-  ```
-
-If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. A branch created before Fork CI was introduced does not contain `.github/workflows/fork-ci.yml`, so pushing it runs no CI; the check then asks you to merge or rebase onto the latest base branch. If an old run is no longer available for rerun, push a new commit instead. Fork CI cancels the rest of a run when a job fails, so wait for cancellation to finish before rerunning jobs. Please fix failures before requesting a review.
-
-Reopening the PR or dispatching **Update Fork CI Status** only refreshes results; neither starts fork CI. If the check requests trusted verification for CI-definition changes, a committer must dispatch the trusted upstream **Fork CI** run described below; rerunning the fork does not satisfy that requirement.
+If the check requests trusted verification for CI-definition changes, a committer must dispatch the trusted upstream **Fork CI** run described below; running CI in the fork does not satisfy that requirement.
 
 ### CI status synchronization
 

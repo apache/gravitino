@@ -49,7 +49,7 @@ test('confirmed cancelled previous runs close their metadata check and visible s
 });
 test('history retirement preserves other heads, runs, attempts, trusted results and terminal verdicts', async () => {
   const changes = [
-    f => f.run.head_sha = A, f => f.run.head_branch = 'another', f => f.run.event = 'workflow_dispatch',
+    f => f.run.head_sha = A, f => f.run.head_branch = 'another', f => f.run.event = 'schedule',
     f => f.run.path = '.github/workflows/other.yml', f => f.run.conclusion = 'success',
     f => f.record.owner = 'other', f => f.record.repo = 'other', f => f.record.trusted = true,
     f => f.record.run_id = 11, f => f.record.run_attempt = 2,
@@ -90,4 +90,10 @@ test('a fork without the Fork CI workflow has no history to retire', async () =>
   assert.equal(writes.length, 0); assert.equal(statuses.length, 0);
   github.rest.actions.listWorkflowRuns = async () => { throw Object.assign(new Error('Server Error'), { status: 500 }); };
   await assert.rejects(retireCancelled({ github, repo, pr }), /Server Error/);
+});
+
+test('a cancelled run started with Run workflow in the fork is retired like a push run', async () => {
+  const f = fixture();f.run.event = 'workflow_dispatch';f.actual.event = 'workflow_dispatch';
+  await retireCancelled(f);
+  assert.equal(f.writes[0].conclusion, 'cancelled');assert.equal(f.statuses[0].state, 'error');
 });

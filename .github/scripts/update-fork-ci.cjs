@@ -82,6 +82,17 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     }
     return availableBases.get(pr.base.sha);
   }
+  // apache/gravitino cannot start runs in a contributor's fork, so tell the author how to.
+  function rerunHelp(pr, runUrl) {
+    if (!pr.head.repo || !pr.head.ref) return '';
+    const fork = `https://github.com/${pr.head.repo.owner.login}/${pr.head.repo.name}`;
+    return '\n\n**Run CI again without a new commit:** ' +
+      (runUrl ? `open [the run](${runUrl}) and choose **Re-run jobs** once it has finished ` +
+        '(re-running all jobs also tests the latest base branch), or ' : '') +
+      `start a new run with [Run workflow](${fork}/actions/workflows/fork-ci.yml) on branch \`${pr.head.ref}\` in your fork. ` +
+      'Closing the PR cancels a running fork run; reopening it does not start one. ' +
+      'The Re-run button on this check only refreshes this status.';
+  }
   async function refresh(pr) {
     if (!(await migrated(pr))) return;
     refreshed.add(pr.number);
@@ -98,7 +109,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     const output = { title: result.title,
       // GitHub ignores details_url for checks created with GITHUB_TOKEN, so link the run here.
       summary: (run ? `[See fork CI results](${details})\n\n` : '') + note +
-        `\n\nBase: ${pr.base.ref} @ ${pr.base.sha}${testedBase}`,
+        `\n\nBase: ${pr.base.ref} @ ${pr.base.sha}${testedBase}` + rerunHelp(pr, mirror.trusted ? undefined : run && details),
       text: JSON.stringify(record) };
     // Re-read before publishing so a push or retarget during the API calls cannot get a stale success.
     const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });

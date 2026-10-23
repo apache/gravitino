@@ -14,11 +14,38 @@
  */
 'use strict';
 const STOPPED = ['failure', 'timed_out'];
+const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
+
+// apache/gravitino cannot cancel runs in a contributor's fork, so a fork run stops itself once
+// its pull request is closed. Returns the PR number when that happened.
+function closedPullRequest({ github, context, core }) {
+  const branch = context.ref.replace(/^refs\/heads\//, '');
+  const inFork = context.repo.owner !== UPSTREAM.owner || context.repo.repo !== UPSTREAM.repo;
+  let number;
+  return async () => {
+    if (!inFork || !context.ref.startsWith('refs/heads/')) return undefined;
+    try {
+      if (!number) {
+        // The run can start before the PR is opened, so keep looking until it exists.
+        const { data } = await github.rest.pulls.list({ ...UPSTREAM, state: 'open',
+          head: `${context.repo.owner}:${branch}`, per_page: 10 });
+        number = data.find(pr => pr.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}`)?.number;
+        return undefined;
+      }
+      const { data } = await github.rest.pulls.get({ ...UPSTREAM, pull_number: number });
+      return data.state === 'open' ? undefined : number;
+    } catch (error) {
+      core.warning(`Could not read the upstream pull request: ${error.message}.`);
+      return undefined;
+    }
+  };
+}
 
 // Jobs of one run can only be re-run after the whole run completes, and the slowest suite takes
 // hours. Cancel the run as soon as any job fails, so the author can re-run it right away.
 async function watch({ github, context, core, self, interval = 60000, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   const attempt = Number(process.env.GITHUB_RUN_ATTEMPT || 1);
+  const closed = closedPullRequest({ github, context, core });
   let idle = 0;
   // Dependent jobs appear only once their needs finish, so require two quiet polls before exiting.
   while (idle < 2) {
@@ -39,8 +66,14 @@ async function watch({ github, context, core, self, interval = 60000, sleep = ms
     core.info(`${jobs.length - running.length}/${jobs.length} jobs completed, ` +
       `${failed.length} failed` + (running.length ? `; waiting for ${running.slice(0, 5).join(', ')}` +
       (running.length > 5 ? ` and ${running.length - 5} more` : '') : ''));
-    if (failed.length) {
-      core.error(`Cancelling the run because these jobs failed: ${failed.join(', ')}. Re-run failed jobs once it is cancelled.`);
+    const closedPr = !failed.length && running.length ? await closed() : undefined;
+    if (failed.length || closedPr) {
+      if (failed.length) {
+        core.error(`Cancelling the run because these jobs failed: ${failed.join(', ')}. Re-run failed jobs once it is cancelled.`);
+      } else {
+        core.notice(`Cancelling the run because apache/gravitino#${closedPr} was closed. ` +
+          'After reopening it, re-run all jobs or start a new run with Run workflow.');
+      }
       try {
         await github.rest.actions.cancelWorkflowRun({ ...context.repo, run_id: context.runId });
         return failed;

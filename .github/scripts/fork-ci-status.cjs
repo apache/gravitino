@@ -21,6 +21,7 @@ const SUITES = ['build', 'backend', 'spark', 'flink', 'trino', 'iceberg_rest_tri
 // The fail-fast watcher in fork-ci.yml never fails the run (continue-on-error), but runs that
 // started before that change can still fail on the watcher's own API errors.
 const FAIL_FAST = 'Stop on first failure';
+const FORK_EVENTS = ['push', 'workflow_dispatch'];
 const requiredName = (pr, baseSha = pr.base.sha) => `Required CI / ${pr.base.ref} / ${baseSha} / ${pr.head.sha}`;
 const MISSING_WORKFLOW = 'Your fork has no Fork CI workflow, so pushes to this branch do not run CI. ' +
   'Merge or rebase the branch onto the latest base branch, which adds .github/workflows/fork-ci.yml, ' +
@@ -128,12 +129,13 @@ function createService(github) {
   const trustedListings = new Map();
   async function findRun(pr, trusted) {
     const target = trusted ? UPSTREAM : { owner: pr.head.repo.owner.login, repo: pr.head.repo.name };
+    // Fork runs start from a push or from "Run workflow" in the fork; both test the fork's own code.
     const list = () => github.paginate(github.rest.actions.listWorkflowRuns, { ...target, workflow_id: 'fork-ci.yml',
-      event: trusted ? 'workflow_dispatch' : 'push',
-      ...(trusted ? { branch: pr.base.ref } : { head_sha: pr.head.sha }), per_page: 100 });
+      ...(trusted ? { event: 'workflow_dispatch', branch: pr.base.ref } : { head_sha: pr.head.sha }), per_page: 100 });
     if (trusted && !trustedListings.has(pr.base.ref)) trustedListings.set(pr.base.ref, list());
     const all = trusted ? await trustedListings.get(pr.base.ref) : await list();
     const runs = all.filter(run => run.path === '.github/workflows/fork-ci.yml' &&
+      (trusted || FORK_EVENTS.includes(run.event)) &&
       (trusted ? run.head_branch === pr.base.ref : run.head_sha === pr.head.sha) &&
       (!trusted || run.display_title === `Trusted Fork CI #${pr.number}`)).sort((a, b) => b.id - a.id);
     return runs[0] && { ...target, run: runs[0], trusted };
@@ -192,4 +194,4 @@ function createService(github) {
   }
   return { mirror, unchanged, findRun };
 }
-module.exports = { FAIL_FAST, SUITES, requiredName, evaluate, createService };
+module.exports = { FAIL_FAST, FORK_EVENTS, SUITES, requiredName, evaluate, createService };

@@ -14,6 +14,7 @@
  */
 'use strict';
 const { publishStatus } = require('./publish-ci-status.cjs');
+const { FORK_EVENTS } = require('./fork-ci-status.cjs');
 
 async function retireCancelled({ github, repo, pr }) {
   if (!pr.head.repo || !pr.head.ref) return;
@@ -22,7 +23,7 @@ async function retireCancelled({ github, repo, pr }) {
   let data;
   try {
     ({ data } = await github.rest.actions.listWorkflowRuns({ ...fork, workflow_id: 'fork-ci.yml',
-      event: 'push', branch: pr.head.ref, per_page: 10 }));
+      branch: pr.head.ref, per_page: 10 }));
   } catch (error) {
     // The fork never ran fork-ci.yml, so there is no history to retire.
     if (error.status === 404) return;
@@ -30,7 +31,7 @@ async function retireCancelled({ github, repo, pr }) {
   }
   for (const run of data.workflow_runs) {
     if (run.head_sha === pr.head.sha || run.head_branch !== pr.head.ref ||
-        run.path !== '.github/workflows/fork-ci.yml' || run.event !== 'push' ||
+        run.path !== '.github/workflows/fork-ci.yml' || !FORK_EVENTS.includes(run.event) ||
         run.status !== 'completed' || run.conclusion !== 'cancelled') continue;
     const checks = await github.paginate(github.rest.checks.listForRef, {
       ...repo, ref: run.head_sha, check_name: 'Fork CI', filter: 'all', per_page: 100 });

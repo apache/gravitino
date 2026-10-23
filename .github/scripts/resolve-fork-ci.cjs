@@ -22,7 +22,10 @@ async function resolve({ github, context, core }) {
   let baseRef = context.ref.replace(/^refs\/heads\//, '');
   let baseSha = headSha;
   let sync = false;
-  if (context.eventName === 'workflow_dispatch') {
+  // In a fork, "Run workflow" without a PR number starts a run for the selected branch, like a push.
+  const trustedDispatch = context.eventName === 'workflow_dispatch' &&
+    (repository === UPSTREAM || !!context.payload.inputs?.['pull-request']);
+  if (trustedDispatch) {
     if (repository !== UPSTREAM) throw new Error('Trusted runs must be dispatched in apache/gravitino.');
     const number = context.payload.inputs?.['pull-request'];
     if (!/^[1-9][0-9]*$/.test(String(number))) throw new Error('A pull request number is required.');
