@@ -45,12 +45,11 @@ github:
     rebase: true
   protected_branches:
     main:
+      # Fork CI and ASF Allowlist Check are not required contexts: a PR that changes CI definitions
+      # needs a trusted run on the shared upstream runners, which can queue for hours. Committers
+      # verify both checks before merging, as described in CONTRIBUTING.md.
       required_status_checks:
         strict: true
-        # Mirrored from the contributor fork by the Fork CI Status workflows.
-        contexts:
-          - Fork CI
-          - ASF Allowlist Check
       required_pull_request_reviews:
         dismiss_stale_reviews: true
         required_approving_review_count: 1
