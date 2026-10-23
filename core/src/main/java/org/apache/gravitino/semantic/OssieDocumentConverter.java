@@ -108,10 +108,10 @@ public final class OssieDocumentConverter {
    * @throws IllegalSemanticModelException If the document cannot be parsed or represented by
    *     Gravitino.
    */
-  public static ImportedSemanticModel importDocument(OssieDocument document) {
+  public static ParsedSemanticModel importDocument(OssieDocument document) {
     Objects.requireNonNull(document, "document must not be null");
     ObjectNode root = parseDocument(document);
-    return toImportedModel(root);
+    return toParsedModel(root);
   }
 
   /**
@@ -139,7 +139,7 @@ public final class OssieDocumentConverter {
     stashProperties(root, semanticModel.properties());
 
     // Validate the generated document through the same conversion path used for imports.
-    toImportedModel(root.deepCopy());
+    toParsedModel(root.deepCopy());
 
     try {
       if (format == OssieFormat.JSON) {
@@ -153,15 +153,18 @@ public final class OssieDocumentConverter {
     }
   }
 
-  /** Native model values parsed from an Ossie document, before the model is created. */
-  public static final class ImportedSemanticModel {
+  /**
+   * Immutable native model values parsed from an Ossie document. Parsing does not validate source
+   * existence or permissions, or create the model.
+   */
+  public static final class ParsedSemanticModel {
 
     private final String name;
     @Nullable private final String comment;
     private final SemanticModelDefinition definition;
     private final Map<String, String> properties;
 
-    private ImportedSemanticModel(
+    private ParsedSemanticModel(
         String name,
         @Nullable String comment,
         SemanticModelDefinition definition,
@@ -248,7 +251,7 @@ public final class OssieDocumentConverter {
     }
   }
 
-  private static ImportedSemanticModel toImportedModel(ObjectNode root) {
+  private static ParsedSemanticModel toParsedModel(ObjectNode root) {
     validateObject(root, "$", ROOT_PROPERTIES);
     String name = readText(root, "name", "$");
     String comment = readText(root, "description", "$");
@@ -267,7 +270,7 @@ public final class OssieDocumentConverter {
       if (StringUtils.isBlank(name)) {
         throw new IllegalArgumentException("\"name\" field is required and cannot be empty");
       }
-      return new ImportedSemanticModel(name, comment, readDefinition(root), properties);
+      return new ParsedSemanticModel(name, comment, readDefinition(root), properties);
     } catch (IllegalSemanticModelException e) {
       throw e;
     } catch (IllegalArgumentException e) {

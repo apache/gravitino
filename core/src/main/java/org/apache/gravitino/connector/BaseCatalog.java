@@ -227,6 +227,21 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return false;
   }
 
+  /**
+   * Validates this catalog at create time when {@link #shouldValidateOnCreate()} returns true. The
+   * default eagerly initializes {@link #ops()}, which preserves the current behavior for every
+   * existing opt-in (for example Iceberg REST, which only needs eager initialization). Subclasses
+   * that can cheaply probe their backend — such as JDBC — override this to run a real connection
+   * check and throw a connection-failed error when the backend is unreachable.
+   *
+   * <p>This is {@code public} rather than {@code protected} because {@code CatalogManager}, in a
+   * different package, invokes it on the create-time validation path (mirroring {@link #ops()} and
+   * {@link #shouldValidateOnCreate()}).
+   */
+  public void validateOnCreate() {
+    ops();
+  }
+
   public void checkMetalakeAndCatalogInUse() {
     Map<String, String> catalogProperties = entity.getProperties();
     if (catalogProperties == null) {
@@ -503,6 +518,16 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+          // Expose the inferred provider names (never the credential values) so that clients
+          // make routing decisions from the same provider list the server vends credentials
+          // with. An explicitly configured list is returned as-is.
+          if (StringUtils.isBlank(tempProperties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+            String inferredProviders =
+                propertiesWithCredentialProviders().get(CredentialConstants.CREDENTIAL_PROVIDERS);
+            if (StringUtils.isNotBlank(inferredProviders)) {
+              tempProperties.put(CredentialConstants.CREDENTIAL_PROVIDERS, inferredProviders);
+            }
+          }
 
           properties = tempProperties;
         }

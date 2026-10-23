@@ -166,7 +166,18 @@ public class DataSourceUtils {
             : jdbcConfig.getPoolMinSize());
     // Validate connections on borrow when enabled.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
-    basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
+    // Same precedence as maxIdle: keep a maxWaitMillis supplied through the DBCP bypass unless the
+    // canonical setting is explicitly configured.
+    if (jdbcConfig.getAllConfig().containsKey(JdbcConfig.POOL_MAX_WAIT_MS.getKey())
+        || !jdbcConfig.getAllConfig().containsKey("maxWaitMillis")) {
+      basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
+    }
+    // Apply the driver-aware connect/socket timeout as DBCP connection properties (not pool keys,
+    // so no collision with UNSAFE_POOL_PROPERTIES and the pool stays lazy). These bound a single
+    // connection and take effect on the first real connection — i.e. create-time verification — so
+    // an unreachable backend fails fast instead of hanging. Operator-set values are preserved.
+    JdbcConnectionTimeouts.connectionProperties(jdbcConfig, jdbcUrl)
+        .forEach(basicDataSource::addConnectionProperty);
     return basicDataSource;
   }
 

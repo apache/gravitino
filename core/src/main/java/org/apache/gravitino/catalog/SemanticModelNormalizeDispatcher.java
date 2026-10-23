@@ -34,6 +34,8 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
@@ -81,6 +83,21 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
           IllegalSemanticModelException {
     return dispatcher.createSemanticModel(
         normalizeForCreate(ident), comment, definition, properties);
+  }
+
+  @Override
+  public SemanticModel importSemanticModel(
+      NameIdentifier ident,
+      @Nullable String comment,
+      SemanticModelDefinition definition,
+      Map<String, String> properties) {
+    return dispatcher.importSemanticModel(
+        normalizeForCreate(ident), comment, definition, properties);
+  }
+
+  @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+    return dispatcher.exportOssieDocument(normalizeForLookup(ident), format);
   }
 
   @Override

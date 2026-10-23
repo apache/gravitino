@@ -101,7 +101,8 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
    * @param properties the properties of the catalog
    * @param ignoreExist whether to ignore if the catalog already exists
    * @param metalakeArgument the metalake to create the catalog in, null to use the configured one
-   * @throws TrinoException if the catalog already exists and ignoreExist is false
+   * @throws TrinoException if the catalog already exists and ignoreExist is false, or the operation
+   *     fails
    */
   public void createCatalog(
       String catalogName,
@@ -147,13 +148,14 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
           "Catalog " + NameIdentifier.of(metalake, catalogName) + " already exists in the server.");
     } catch (Exception e) {
       // The failure can come from a CREATE CATALOG the load loop ran, whose message may carry the
-      // credentials the statement embedded, so it is masked before reaching the caller.
+      // credentials the statement embedded, so the message is masked while the classified error
+      // code is kept.
+      TrinoException error =
+          GravitinoErrorCode.toTrinoException(
+              e, "Create catalog " + NameIdentifier.of(metalake, catalogName) + " failed");
       throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-          "Create catalog failed. "
-              + (StringUtils.isEmpty(e.getMessage())
-                  ? ""
-                  : CatalogRegister.redactSecrets(e.getMessage())),
+          error::getErrorCode,
+          CatalogRegister.redactSecrets(StringUtils.defaultString(error.getMessage())),
           e);
     }
   }

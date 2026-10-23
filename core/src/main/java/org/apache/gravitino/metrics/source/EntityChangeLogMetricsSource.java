@@ -38,6 +38,9 @@ public class EntityChangeLogMetricsSource extends MetricsSource {
   private final Counter recordsApplied = getCounter("records-applied-total");
   private final Counter invalidationFailures = getCounter("invalidation-failures-total");
   private final Counter fallbackClears = getCounter("fallback-clears-total");
+  private final Counter replayFailures = getCounter("replay-failures-total");
+  private final Counter replayRecords = getCounter("replay-records-total");
+  private final Counter dedupEvictions = getCounter("dedup-evictions-total");
   private final Histogram batchSize = getHistogram("batch-size-records");
   private final Timer pollDuration = getTimer("poll-duration");
 
@@ -110,6 +113,21 @@ public class EntityChangeLogMetricsSource extends MetricsSource {
   /** Records a successful full-cache clear used as a recovery fallback. */
   public void fallbackCleared() {
     fallbackClears.inc();
+  }
+
+  /** Records a failed recent-history replay query; incremental delivery is not affected. */
+  public void replayFailed() {
+    replayFailures.inc();
+  }
+
+  /** Records previously unseen rows found behind the cursor by recent-history replay. */
+  public void replayRecordsFound(int count) {
+    replayRecords.inc(count);
+  }
+
+  /** Records remembered IDs evicted at capacity, which may allow duplicate invalidations. */
+  public void dedupEvicted(int count) {
+    dedupEvictions.inc(count);
   }
 
   /** Starts a poll duration measurement. */

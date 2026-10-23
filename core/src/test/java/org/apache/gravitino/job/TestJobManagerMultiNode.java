@@ -42,6 +42,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.local.LocalJobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
@@ -51,7 +52,9 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.DatabaseFixture;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.storage.relational.ResetStrategy;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -66,6 +69,7 @@ import org.junit.jupiter.api.TestTemplate;
  * JobManager} and {@link LocalJobExecutor}, share the same relational metadata store. The status
  * pull and the cleanup are triggered manually, so that the test controls which node runs them when.
  */
+@DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
 public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private static final String METALAKE = "metalake_job_multi_node";
@@ -77,6 +81,9 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   // Active jobs not updated for this long are expired, and finished jobs are cleaned up after it.
   // The tests move the job timestamps back instead of waiting for it to elapse.
   private static final long JOB_KEEP_TIME_IN_MS = TimeUnit.HOURS.toMillis(1);
+
+  // A cancellation of a local job is answered by its owner within a few pull intervals.
+  private static final long JOB_STATUS_PULL_INTERVAL_IN_MS = TimeUnit.MINUTES.toMillis(1);
 
   private File testDir;
 
@@ -178,6 +185,12 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Assertions.assertEquals(JobHandle.Status.CANCELLING, cancelling.status());
     Assertions.assertEquals(JobHandle.Status.STARTED, executorA.getJobStatus(job.jobExecutionId()));
 
+    // Node B leaves the cancellation to node A when it pulls job statuses, as node A still has
+    // time to answer it.
+    nodeB.pullAndUpdateJobStatus();
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, getJob(job.name()).status());
+    Assertions.assertEquals(JobHandle.Status.STARTED, executorA.getJobStatus(job.jobExecutionId()));
+
     // Node A cancels the job when it pulls the job status next time.
     nodeA.pullAndUpdateJobStatus();
     Awaitility.await()
@@ -230,6 +243,34 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     nodeB.cleanUpStagingDirs();
     Assertions.assertFalse(jobExists(startedJob.name()));
     Assertions.assertFalse(jobExists(cancellingJob.name()));
+  }
+
+  @TestTemplate
+  public void testCancelJobLeftByExitedNodeFromAnotherNode() throws Exception {
+    JobEntity job = runLongJobOnNodeA();
+
+    // Node A exits, e.g. its server restarts, and the job process is gone with it.
+    nodeA.close();
+    nodeA = null;
+
+    // Node B can't cancel the job itself, so it marks the job as CANCELLING and gives the owner
+    // time to answer. Until then, the job still blocks deleting its template.
+    Assertions.assertEquals(
+        JobHandle.Status.CANCELLING, nodeB.cancelJob(METALAKE, job.name()).status());
+    nodeB.pullAndUpdateJobStatus();
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, getJob(job.name()).status());
+    Assertions.assertThrows(
+        InUseException.class, () -> nodeB.deleteJobTemplate(METALAKE, TEMPLATE));
+
+    // Nobody answers the cancellation in time, so node B marks the job as CANCELLED, and the
+    // template can be deleted.
+    moveJobTimestampsBack(
+        job.name(), 3 * JOB_STATUS_PULL_INTERVAL_IN_MS + TimeUnit.MINUTES.toMillis(1));
+    nodeB.pullAndUpdateJobStatus();
+    JobEntity cancelled = getJob(job.name());
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelled.status());
+    Assertions.assertTrue(cancelled.finishedAt() > 0);
+    Assertions.assertTrue(nodeB.deleteJobTemplate(METALAKE, TEMPLATE));
   }
 
   @TestTemplate
@@ -426,7 +467,10 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   // Simulates that the keep time has elapsed since the job was last updated, or finished.
   private void moveJobTimestampsBack(String jobName) throws IOException {
-    long offsetInMs = JOB_KEEP_TIME_IN_MS + TimeUnit.MINUTES.toMillis(1);
+    moveJobTimestampsBack(jobName, JOB_KEEP_TIME_IN_MS + TimeUnit.MINUTES.toMillis(1));
+  }
+
+  private void moveJobTimestampsBack(String jobName, long offsetInMs) throws IOException {
     entityStore.update(
         NameIdentifierUtil.ofJob(METALAKE, jobName),
         JobEntity.class,
@@ -502,6 +546,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Config config = new Config(false) {};
     config.set(Configs.JOB_STAGING_DIR, stagingDir.getAbsolutePath());
     config.set(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS, JOB_KEEP_TIME_IN_MS);
+    config.set(Configs.JOB_STATUS_PULL_INTERVAL_IN_MS, JOB_STATUS_PULL_INTERVAL_IN_MS);
     return config;
   }
 

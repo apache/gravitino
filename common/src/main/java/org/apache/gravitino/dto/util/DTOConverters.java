@@ -104,9 +104,12 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.AccessControlContent;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.RowFilterContent;
@@ -686,6 +689,12 @@ public class DTOConverters {
           .withDryRun(content.dryRun())
           .build();
     }
+    if (policyContent instanceof IcebergRewriteManifestsContent) {
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.instance();
+    }
+    if (policyContent instanceof IcebergSnapshotExpirationContent) {
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.instance();
+    }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
           (IcebergDataCompactionContent) policyContent;
@@ -695,6 +704,8 @@ public class DTOConverters {
           .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+          .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
+          .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
     }
@@ -710,6 +721,14 @@ public class DTOConverters {
       ColumnMaskContent content = (ColumnMaskContent) policyContent;
       return PolicyContentDTO.ColumnMaskContentDTO.builder()
           .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof AccessControlContent) {
+      AccessControlContent accessControlContent = (AccessControlContent) policyContent;
+      return PolicyContentDTO.AccessControlContentDTO.builder()
+          .withPrivileges(accessControlContent.privileges())
+          .withApplicableRoles(accessControlContent.applicableRoles())
           .build();
     }
 
@@ -1563,6 +1582,12 @@ public class DTOConverters {
       return PolicyContents.icebergOrphanFileRemoval(
           content.olderThanDays(), content.location(), content.dryRun());
     }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
+      return PolicyContents.icebergRewriteManifests();
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
+      return PolicyContents.icebergSnapshotExpiration();
+    }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
       PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
           (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
@@ -1572,6 +1597,8 @@ public class DTOConverters {
           icebergCompactionContentDTO.dataFileMseWeight(),
           icebergCompactionContentDTO.deleteFileNumberWeight(),
           icebergCompactionContentDTO.maxPartitionNum(),
+          icebergCompactionContentDTO.rewriteStrategy(),
+          icebergCompactionContentDTO.sortOrder(),
           icebergCompactionContentDTO.rewriteOptions());
     }
 
@@ -1585,6 +1612,13 @@ public class DTOConverters {
       PolicyContentDTO.ColumnMaskContentDTO contentDTO =
           (PolicyContentDTO.ColumnMaskContentDTO) policyContentDTO;
       return PolicyContents.columnMask(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.AccessControlContentDTO) {
+      PolicyContentDTO.AccessControlContentDTO accessControlContentDTO =
+          (PolicyContentDTO.AccessControlContentDTO) policyContentDTO;
+      return PolicyContents.accessControl(
+          accessControlContentDTO.privileges(), accessControlContentDTO.applicableRoles());
     }
 
     throw new IllegalArgumentException(

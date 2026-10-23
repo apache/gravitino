@@ -83,14 +83,17 @@ public class TestJcasbinModelCacheInvalidation {
         MockedStatic<GravitinoEnv> environment = mockStatic(GravitinoEnv.class);
         MockedStatic<CapabilityHelpers> capabilities =
             mockStatic(CapabilityHelpers.class, CALLS_REAL_METHODS);
-        MockedStatic<MetadataIdConverter> converter = mockStatic(MetadataIdConverter.class)) {
+        MockedStatic<MetadataIdConverter> converter =
+            mockStatic(MetadataIdConverter.class, CALLS_REAL_METHODS)) {
       environment.when(GravitinoEnv::getInstance).thenReturn(env);
       capabilities
           .when(() -> CapabilityHelpers.getCapability(any(), eq(catalogManager)))
           .thenReturn(Capability.DEFAULT);
       converter
-          .when(() -> MetadataIdConverter.getID(MODEL, METALAKE))
+          .when(() -> MetadataIdConverter.getIdForNormalizedObject(MODEL, METALAKE))
           .thenReturn(Optional.of(10L), Optional.of(30L));
+      // With real methods enabled, the stubbing call above is recorded as an invocation.
+      converter.clearInvocations();
       // Use the real JCasbin hook and shared caches without starting its background poller.
       JcasbinAuthorizer authorizer = mock(JcasbinAuthorizer.class, CALLS_REAL_METHODS);
       FieldUtils.writeField(authorizer, "metadataIdCache", metadataIdCache, true);
@@ -121,7 +124,8 @@ public class TestJcasbinModelCacheInvalidation {
       Assertions.assertEquals(
           Optional.of(30L),
           lookups.resolveMetadataId(MODEL, METALAKE, new AuthorizationRequestContext()));
-      converter.verify(() -> MetadataIdConverter.getID(MODEL, METALAKE), times(2));
+      converter.verify(
+          () -> MetadataIdConverter.getIdForNormalizedObject(MODEL, METALAKE), times(2));
     }
   }
 
