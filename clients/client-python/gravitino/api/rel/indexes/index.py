@@ -61,12 +61,15 @@ class Index(ABC):
         DATA_SKIPPING_VECTOR_SIMILARITY = "DATA_SKIPPING_VECTOR_SIMILARITY"
         """ClickHouse vector similarity data skipping index."""
 
+        DATA_SKIPPING_TEXT = "DATA_SKIPPING_TEXT"
+        """A native ClickHouse text data-skipping index."""
+
     @abstractmethod
     def type(self) -> IndexType:
-        """Returns the type of the index. eg: `PRIMARY_KEY` and `UNIQUE_KEY`.
+        """Returns the type of the index.
 
         Returns:
-            IndexType: The type of the index. eg: `PRIMARY_KEY` and `UNIQUE_KEY`.
+            IndexType: The index type.
         """
         pass  # pragma: no cover
 

@@ -66,6 +66,27 @@ class TestTableDTO(unittest.TestCase):
 
         self.assertDictEqual(dto.properties(), {"format": "ORC"})
 
+    def test_table_dto_text_index_metadata_round_trip(self):
+        table_json = json.loads(self.complete_json)
+        table_json["indexes"].append(
+            {
+                "indexType": "DATA_SKIPPING_TEXT",
+                "name": "idx_name",
+                "fieldNames": [["name"]],
+                "properties": {"tokenizer": "ngrams", "ngram_size": "3"},
+            }
+        )
+
+        table_dto = TableDTO.from_json(json.dumps(table_json))
+        restored = TableDTO.from_json(table_dto.to_json())
+        text_index = restored.index()[1]
+        self.assertIs(text_index.type(), Index.IndexType.DATA_SKIPPING_TEXT)
+        self.assertEqual(text_index.name(), "idx_name")
+        self.assertEqual(text_index.field_names(), [["name"]])
+        self.assertEqual(
+            text_index.properties(), {"tokenizer": "ngrams", "ngram_size": "3"}
+        )
+
     def test_table_dto_deserialize_required_fields_success(self):
         json_string = """
         {
