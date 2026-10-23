@@ -30,6 +30,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /** Retrieve the version and build information from the building process */
 public class Version {
+  // Fork CI verification after #14192. Do not merge.
 
   /** The HTTP header to send the client version */
   public static final String CLIENT_VERSION_HEADER = "X-Client-Version";
