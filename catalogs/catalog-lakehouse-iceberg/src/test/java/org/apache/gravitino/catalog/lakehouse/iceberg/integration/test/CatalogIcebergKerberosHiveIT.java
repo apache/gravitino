@@ -45,6 +45,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.KerberosHdfs;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -87,6 +88,8 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
 
   private static GravitinoAdminClient adminClient;
 
+  private static KerberosHdfs hdfs;
+
   private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
   private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
@@ -123,6 +126,7 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
 
       // Prepare kerberos related-config;
       prepareKerberosConfig();
+      hdfs = KerberosHdfs.of(kerberosHiveContainer, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
 
       // Config kerberos configuration for Gravitino server
       addKerberosConfig();
@@ -255,15 +259,12 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to permit the user to create the schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-iceberg");
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-iceberg");
+    hdfs.mkdirs("/user/hive/warehouse-catalog-iceberg");
+    hdfs.setPermission("/user/hive/warehouse-catalog-iceberg", "777", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "000", "/user/hive/warehouse-catalog-iceberg");
+    hdfs.setPermission("/user/hive/warehouse-catalog-iceberg", "000", true);
 
     // Create a table, and the user has no EXECUTE permission to create table
     NameIdentifier tableNameIdentifier1 = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
@@ -287,8 +288,7 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=EXECUTE"));
 
     // Now try to permit the user to create the table again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-iceberg");
+    hdfs.setPermission("/user/hive/warehouse-catalog-iceberg", "777", true);
     // Create table
     NameIdentifier tableNameIdentifier = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
     catalog

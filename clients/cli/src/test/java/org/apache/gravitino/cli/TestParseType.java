@@ -19,9 +19,8 @@
 
 package org.apache.gravitino.cli;
 
-import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -34,14 +33,14 @@ public class TestParseType {
   @Test
   public void testParseTypeVarcharWithLength() {
     Type type = ParseType.toType("varchar(10)");
-    assertThat(type, instanceOf(Types.VarCharType.class));
+    assertInstanceOf(Types.VarCharType.class, type);
     assertEquals(10, ((Types.VarCharType) type).length());
   }
 
   @Test
   public void testParseTypeDecimalWithPrecisionAndScale() {
     Type type = ParseType.toType("decimal(10,5)");
-    assertThat(type, instanceOf(Types.DecimalType.class));
+    assertInstanceOf(Types.DecimalType.class, type);
     assertEquals(10, ((Types.DecimalType) type).precision());
     assertEquals(5, ((Types.DecimalType) type).scale());
   }
@@ -49,15 +48,15 @@ public class TestParseType {
   @Test
   public void testParseTypeVariant() {
     Type type = ParseType.toType("variant");
-    assertThat(type, instanceOf(Types.VariantType.class));
+    assertInstanceOf(Types.VariantType.class, type);
   }
 
   @Test
   public void testParseTypeListValidInput() {
     Type type = ParseType.toType("list(integer)");
-    assertThat(type, instanceOf(Types.ListType.class));
+    assertInstanceOf(Types.ListType.class, type);
     Type elementType = ((Types.ListType) type).elementType();
-    assertThat(elementType, instanceOf(Types.IntegerType.class));
+    assertInstanceOf(Types.IntegerType.class, elementType);
   }
 
   @Test
@@ -72,11 +71,11 @@ public class TestParseType {
   @Test
   public void testParseTypeMapValidInput() {
     Type type = ParseType.toType("map(string,integer)");
-    assertThat(type, instanceOf(Types.MapType.class));
+    assertInstanceOf(Types.MapType.class, type);
     Type keyType = ((Types.MapType) type).keyType();
     Type valueType = ((Types.MapType) type).valueType();
-    assertThat(keyType, instanceOf(Types.StringType.class));
-    assertThat(valueType, instanceOf(Types.IntegerType.class));
+    assertInstanceOf(Types.StringType.class, keyType);
+    assertInstanceOf(Types.IntegerType.class, valueType);
   }
 
   @Test
@@ -110,47 +109,47 @@ public class TestParseType {
   @Test
   public void testParseTypeListWithSpaces() {
     Type type = ParseType.toType("list( integer )");
-    assertThat(type, instanceOf(Types.ListType.class));
+    assertInstanceOf(Types.ListType.class, type);
     Type elementType = ((Types.ListType) type).elementType();
-    assertThat(elementType, instanceOf(Types.IntegerType.class));
+    assertInstanceOf(Types.IntegerType.class, elementType);
   }
 
   @Test
   public void testParseTypeMapWithSpaces() {
     Type type = ParseType.toType("map( string , integer )");
-    assertThat(type, instanceOf(Types.MapType.class));
+    assertInstanceOf(Types.MapType.class, type);
     Type keyType = ((Types.MapType) type).keyType();
     Type valueType = ((Types.MapType) type).valueType();
-    assertThat(keyType, instanceOf(Types.StringType.class));
-    assertThat(valueType, instanceOf(Types.IntegerType.class));
+    assertInstanceOf(Types.StringType.class, keyType);
+    assertInstanceOf(Types.IntegerType.class, valueType);
   }
 
   @Test
   public void testParseTypeNestedList() {
     Type type = ParseType.toType("list(list(integer))");
-    assertThat(type, instanceOf(Types.ListType.class));
+    assertInstanceOf(Types.ListType.class, type);
     Type innerList = ((Types.ListType) type).elementType();
-    assertThat(innerList, instanceOf(Types.ListType.class));
+    assertInstanceOf(Types.ListType.class, innerList);
     Type elementType = ((Types.ListType) innerList).elementType();
-    assertThat(elementType, instanceOf(Types.IntegerType.class));
+    assertInstanceOf(Types.IntegerType.class, elementType);
   }
 
   @Test
   public void testParseTypeMapWithNestedValue() {
     Type type = ParseType.toType("map(string,list(integer))");
-    assertThat(type, instanceOf(Types.MapType.class));
+    assertInstanceOf(Types.MapType.class, type);
     Type keyType = ((Types.MapType) type).keyType();
     Type valueType = ((Types.MapType) type).valueType();
-    assertThat(keyType, instanceOf(Types.StringType.class));
-    assertThat(valueType, instanceOf(Types.ListType.class));
+    assertInstanceOf(Types.StringType.class, keyType);
+    assertInstanceOf(Types.ListType.class, valueType);
     Type elementType = ((Types.ListType) valueType).elementType();
-    assertThat(elementType, instanceOf(Types.IntegerType.class));
+    assertInstanceOf(Types.IntegerType.class, elementType);
   }
 
   @Test
   public void testParseTypeDecimalWithSpaces() {
     Type type = ParseType.toType("decimal(10, 5)");
-    assertThat(type, instanceOf(Types.DecimalType.class));
+    assertInstanceOf(Types.DecimalType.class, type);
     assertEquals(10, ((Types.DecimalType) type).precision());
     assertEquals(5, ((Types.DecimalType) type).scale());
   }
@@ -158,7 +157,7 @@ public class TestParseType {
   @Test
   public void testParseTypeVarcharWithSpaces() {
     Type type = ParseType.toType("varchar( 10 )");
-    assertThat(type, instanceOf(Types.VarCharType.class));
+    assertInstanceOf(Types.VarCharType.class, type);
     assertEquals(10, ((Types.VarCharType) type).length());
   }
 
@@ -166,7 +165,7 @@ public class TestParseType {
   @Test
   public void testParseTypeDecimalWithPrecisionOnly() {
     Type type = ParseType.toType("decimal(10)");
-    assertThat(type, instanceOf(Types.DecimalType.class));
+    assertInstanceOf(Types.DecimalType.class, type);
     assertEquals(10, ((Types.DecimalType) type).precision());
     assertEquals(0, ((Types.DecimalType) type).scale());
   }
@@ -175,7 +174,7 @@ public class TestParseType {
   @Test
   public void testParseTypeDecimalWithPrecisionOnlySpacesAndCase() {
     Type type = ParseType.toType("DECIMAL ( 10 ) ");
-    assertThat(type, instanceOf(Types.DecimalType.class));
+    assertInstanceOf(Types.DecimalType.class, type);
     assertEquals(10, ((Types.DecimalType) type).precision());
     assertEquals(0, ((Types.DecimalType) type).scale());
   }

@@ -59,7 +59,7 @@ public class PostgreSQLContainer extends DatabaseContainer {
       Optional<Network> network) {
     super(
         // The image may be a mirror or a custom tag; the module only needs a PostgreSQL server.
-        new org.testcontainers.containers.PostgreSQLContainer<>(
+        new org.testcontainers.postgresql.PostgreSQLContainer(
                 DockerImageName.parse(image).asCompatibleSubstituteFor("postgres"))
             .withUsername(USER_NAME)
             .withPassword(PASSWORD)
@@ -96,15 +96,6 @@ public class PostgreSQLContainer extends DatabaseContainer {
     super.start();
     logDurability(
         List.of("data_directory", "fsync", "synchronous_commit", "full_page_writes"),
-        "psql",
-        "-U",
-        getUsername(),
-        "-d",
-        "postgres",
-        "--no-align",
-        "--tuples-only",
-        "--field-separator=\t",
-        "-c",
         "SELECT current_setting('data_directory'), current_setting('fsync'),"
             + " current_setting('synchronous_commit'), current_setting('full_page_writes')");
   }

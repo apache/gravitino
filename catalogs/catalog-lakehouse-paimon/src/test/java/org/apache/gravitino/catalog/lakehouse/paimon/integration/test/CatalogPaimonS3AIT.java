@@ -24,7 +24,6 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
@@ -32,13 +31,11 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.Container;
 
 /** Integration test for accessing a Paimon filesystem catalog through Hadoop S3A. */
 @Tag("gravitino-docker-test")
@@ -62,20 +59,8 @@ public class CatalogPaimonS3AIT extends BaseIT {
     containerSuite.startLocalStackContainer();
     localStackContainer = containerSuite.getLocalStackContainer();
 
-    Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    localStackContainer.executeInContainer(
-                        "awslocal", "s3", "mb", "s3://" + bucketName);
-                return result.getExitCode() == 0;
-              } catch (Exception e) {
-                return false;
-              }
-            });
+    // The container is ready once its health check passes.
+    localStackContainer.createBucket(bucketName);
 
     metalake = client.createMetalake(metalakeName, "Paimon S3A metalake", Collections.emptyMap());
   }

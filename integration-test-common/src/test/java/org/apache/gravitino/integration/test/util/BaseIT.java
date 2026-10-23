@@ -248,7 +248,7 @@ public class BaseIT {
     POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
 
     String pgUrlWithoutSchema = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
-    String randomSchemaName = RandomStringUtils.random(10, true, false);
+    String randomSchemaName = RandomStringUtils.insecure().next(10, true, false);
     // Connect to the PostgreSQL docker and create a schema
     String currentExecuteSql = "";
     try (Connection connection =

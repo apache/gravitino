@@ -42,6 +42,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.KerberosHdfs;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -85,6 +86,8 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
 
   private static GravitinoAdminClient adminClient;
 
+  private static KerberosHdfs hdfs;
+
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
   private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
   private static final String TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
@@ -115,6 +118,7 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
 
       // Prepare kerberos related-config;
       prepareKerberosConfig();
+      hdfs = KerberosHdfs.of(kerberosHiveContainer, TMP_DIR + HDFS_CLIENT_KEYTAB);
 
       // Config kerberos configuration for Gravitino server
       addKerberosConfig();
@@ -238,10 +242,8 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
     Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
 
     // Now try to permit the user to create the schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/paimon_catalog_warehouse");
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/paimon_catalog_warehouse");
+    hdfs.mkdirs("/user/hive/paimon_catalog_warehouse");
+    hdfs.setPermission("/user/hive/paimon_catalog_warehouse", "777", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -274,8 +276,7 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME, true));
 
     // Drop warehouse path
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-rm", "-r", "/user/hive/paimon_catalog_warehouse");
+    hdfs.delete("/user/hive/paimon_catalog_warehouse", true);
   }
 
   private static Column[] createColumns() {
