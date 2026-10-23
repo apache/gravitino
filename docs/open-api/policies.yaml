@@ -160,6 +160,15 @@ paths:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
                 NoSuchPolicyException:
                   $ref: "#/components/examples/NoSuchPolicyException"
+        "409":
+          description: Conflict - The target policy already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                PolicyAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/PolicyAlreadyExistsException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
