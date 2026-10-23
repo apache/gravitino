@@ -22,6 +22,9 @@ non-ascii-unicode-escape	filter := col("\u٠٠٤١") == "x"
 group-name-nul	filter := is_group_member("\u0000")
 conditional-filter	filter := true if is_group_member("auditors") else := false
 conditional-mask	mask := action("show-last-4") if is_group_member("support") else := action("replace-with-null")
+conditional-mask-null-fallback	mask := action("show-last-4") if is_group_member("support") else := null
+conditional-mask-null-branch	mask := null if is_group_member("support") else := action("show-last-4")
+unconditional-mask-null	mask := null
 uppercase-in-title	filter := col("region") In ["US"]
 uppercase-in	filter := col("region") IN ["US"]
 mixed-case-in	filter := col("region") iN ["US"]

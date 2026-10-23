@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.policy.rego;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.ColumnMask;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.MaskAction;
+import org.apache.gravitino.policy.rego.RestrictedRegoProgram.MaskBranch;
 import org.apache.gravitino.policy.rego.RestrictedRegoProgram.RowFilter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -109,5 +114,43 @@ public class TestRestrictedRegoProgram {
                         + " else := true if is_group_member(\"fallback\") else := false"));
 
     Assertions.assertEquals(512, RestrictedRegoTestUtils.countArrayElements(filter.lower()));
+  }
+
+  @Test
+  void testColumnMaskWithNullBranchesAndFallback() {
+    CanonicalExpression condition = new GroupMembership("support");
+    MaskBranch nullBranch1 = new MaskBranch(null, condition);
+    MaskBranch nullBranch2 = new MaskBranch(null, condition);
+    MaskBranch actionBranch = new MaskBranch(MaskAction.SHOW_LAST_4, condition);
+
+    Assertions.assertNull(nullBranch1.action());
+    Assertions.assertEquals(condition, nullBranch1.condition());
+    Assertions.assertDoesNotThrow(nullBranch1::validate);
+    Assertions.assertEquals(nullBranch1, nullBranch2);
+    Assertions.assertEquals(nullBranch1.hashCode(), nullBranch2.hashCode());
+    Assertions.assertNotEquals(nullBranch1, actionBranch);
+    Assertions.assertTrue(nullBranch1.toString().contains("action=null"));
+
+    ColumnMask nullMask1 = new ColumnMask(List.of(nullBranch1), null);
+    ColumnMask nullMask2 = new ColumnMask(List.of(nullBranch2), null);
+    ColumnMask replaceWithNullMask =
+        new ColumnMask(List.of(nullBranch1), MaskAction.REPLACE_WITH_NULL);
+
+    Assertions.assertNull(nullMask1.fallback());
+    Assertions.assertDoesNotThrow(nullMask1::validate);
+    Assertions.assertEquals(nullMask1, nullMask2);
+    Assertions.assertEquals(nullMask1.hashCode(), nullMask2.hashCode());
+    Assertions.assertNotEquals(nullMask1, replaceWithNullMask);
+    Assertions.assertTrue(nullMask1.toString().contains("fallback=null"));
+
+    ColumnMask emptyBranchesNullFallback = new ColumnMask(Collections.emptyList(), null);
+    Assertions.assertDoesNotThrow(emptyBranchesNullFallback::validate);
+    Assertions.assertFalse(emptyBranchesNullFallback.isConditional());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new ColumnMask(null, null).validate());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new ColumnMask(Collections.singletonList(null), null).validate());
   }
 }

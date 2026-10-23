@@ -46,6 +46,18 @@ lowered: LogicalExpression{operator=OR, operands=[LogicalExpression{operator=AND
 source: mask := action("show-last-4") if is_group_member("support") else := action("replace-with-null")
 result: ColumnMask{branches=[MaskBranch{action=SHOW_LAST_4, condition=GroupMembership{group='support'}}], fallback=REPLACE_WITH_NULL}
 
+=== conditional-mask-null-fallback ===
+source: mask := action("show-last-4") if is_group_member("support") else := null
+result: ColumnMask{branches=[MaskBranch{action=SHOW_LAST_4, condition=GroupMembership{group='support'}}], fallback=null}
+
+=== conditional-mask-null-branch ===
+source: mask := null if is_group_member("support") else := action("show-last-4")
+result: ColumnMask{branches=[MaskBranch{action=null, condition=GroupMembership{group='support'}}], fallback=SHOW_LAST_4}
+
+=== unconditional-mask-null ===
+source: mask := null
+result: ColumnMask{branches=[], fallback=null}
+
 === uppercase-in-title ===
 source: filter := col("region") In ["US"]
 error: Invalid restricted-rego-v1 program at line 1, column 25: unsupported identifier In

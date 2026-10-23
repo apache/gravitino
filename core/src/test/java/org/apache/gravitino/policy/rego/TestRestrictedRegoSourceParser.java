@@ -109,6 +109,79 @@ public class TestRestrictedRegoSourceParser {
   }
 
   @Test
+  void testParsesColumnMaskWithNullFallback() {
+    ColumnMask mask =
+        RestrictedRegoExpressionParserFacade.parseColumnMask(
+            "mask := action(\"show-last-4\") if session_user() == \"A\" else := null");
+
+    Assertions.assertTrue(mask.isConditional());
+    Assertions.assertEquals(1, mask.branches().size());
+    Assertions.assertEquals(MaskAction.SHOW_LAST_4, mask.branches().get(0).action());
+    Assertions.assertNull(mask.fallback());
+  }
+
+  @Test
+  void testParsesColumnMaskWithNullBranch() {
+    ColumnMask mask =
+        RestrictedRegoExpressionParserFacade.parseColumnMask(
+            "mask := null if session_user() == \"A\" else := action(\"show-last-4\")");
+
+    Assertions.assertTrue(mask.isConditional());
+    Assertions.assertEquals(1, mask.branches().size());
+    Assertions.assertNull(mask.branches().get(0).action());
+    Assertions.assertEquals(MaskAction.SHOW_LAST_4, mask.fallback());
+  }
+
+  @Test
+  void testParsesUnconditionalColumnMaskNull() {
+    ColumnMask mask = RestrictedRegoExpressionParserFacade.parseColumnMask("mask := null");
+
+    Assertions.assertFalse(mask.isConditional());
+    Assertions.assertTrue(mask.branches().isEmpty());
+    Assertions.assertNull(mask.fallback());
+  }
+
+  @Test
+  void testParsesColumnMaskMultipleBranchesWithNullAndActions() {
+    ColumnMask mask =
+        RestrictedRegoExpressionParserFacade.parseColumnMask(
+            "mask := action(\"show-last-4\") if session_user() == \"A\" "
+                + "else := null if session_user() == \"B\" "
+                + "else := action(\"replace-with-null\") if session_user() == \"C\" "
+                + "else := null");
+
+    Assertions.assertTrue(mask.isConditional());
+    Assertions.assertEquals(3, mask.branches().size());
+    Assertions.assertEquals(MaskAction.SHOW_LAST_4, mask.branches().get(0).action());
+    Assertions.assertNull(mask.branches().get(1).action());
+    Assertions.assertEquals(MaskAction.REPLACE_WITH_NULL, mask.branches().get(2).action());
+    Assertions.assertNull(mask.fallback());
+  }
+
+  @Test
+  void testRejectsInvalidColumnMaskRule() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RestrictedRegoExpressionParserFacade.parseColumnMask("mask := 123"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RestrictedRegoExpressionParserFacade.parseColumnMask("mask := action()"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RestrictedRegoExpressionParserFacade.parseColumnMask("mask := \"show-last-4\""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            RestrictedRegoExpressionParserFacade.parseColumnMask(
+                "mask := action(\"show-last-4\") if session_user() == \"A\""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            RestrictedRegoExpressionParserFacade.parseColumnMask(
+                "mask := action(\"show-last-4\") if col(\"region\") == \"US\" else := null"));
+  }
+
+  @Test
   void testRetainsExactNumbersAndNegativeZero() {
     Comparison comparison =
         (Comparison) RestrictedRegoTestUtils.parseFilterExpression("col(\"ratio\") == -0.00");
