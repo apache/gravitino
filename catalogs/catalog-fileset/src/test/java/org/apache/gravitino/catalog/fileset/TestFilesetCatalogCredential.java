@@ -74,4 +74,70 @@ public class TestFilesetCatalogCredential {
             .propertiesWithCredentialProviders()
             .get(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX));
   }
+<<<<<<< HEAD
+=======
+
+  @Test
+  void testCatalogPropertiesMaskCloudCredentials() {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "s3-ak")
+            .put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "s3-sk")
+            .put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, "oss-ak")
+            .put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, "oss-sk")
+            .put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, "abs-account")
+            .put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, "abs-key")
+            .put(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID, "cos-ak")
+            .put(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET, "cos-sk")
+            .build();
+    FilesetCatalogImpl catalog = newCatalog(properties);
+
+    Map<String, String> masked = catalog.properties();
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
+    Assertions.assertEquals(
+        "abs-account", masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
+  }
+
+  @Test
+  void testCosCredentialProviderAutoDetected() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID, "cos-ak");
+    properties.put(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET, "cos-sk");
+    FilesetCatalogImpl catalog = newCatalog(properties);
+    Assertions.assertTrue(
+        catalog
+            .propertiesWithCredentialProviders()
+            .get(CredentialConstants.CREDENTIAL_PROVIDERS)
+            .contains(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testPathBasedCredentialProvidersAllowed() {
+    FilesetCatalogImpl catalog = newCatalog(Maps.newHashMap());
+    Assertions.assertTrue(catalog.supportsPathBasedCredentials());
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,gcs-token")));
+  }
+>>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
 }

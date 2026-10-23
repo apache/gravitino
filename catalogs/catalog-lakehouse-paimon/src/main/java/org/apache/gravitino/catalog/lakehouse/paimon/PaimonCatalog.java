@@ -51,6 +51,11 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
     return "lakehouse-paimon";
   }
 
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
   /**
    * Creates a new instance of {@link PaimonCatalogOperations} with the provided configuration.
    *

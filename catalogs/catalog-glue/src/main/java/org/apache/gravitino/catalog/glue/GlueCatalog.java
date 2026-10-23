@@ -54,6 +54,11 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
     return "glue";
   }
 
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
   /**
    * Creates a new instance of {@link GlueCatalogOperations} with the provided configuration.
    *
