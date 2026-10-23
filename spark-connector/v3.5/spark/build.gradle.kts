@@ -130,6 +130,12 @@ dependencies {
   testImplementation(project(":api")) {
     exclude("org.apache.logging.log4j")
   }
+  if (scalaVersion == "2.12") {
+    // Reuse backend metadata conversion without adding another Hive dependency tree.
+    testImplementation(project(":catalogs:catalog-lakehouse-paimon")) {
+      isTransitive = false
+    }
+  }
   testImplementation(project(":catalogs:catalog-glue")) {
     exclude("org.apache.logging.log4j")
   }
