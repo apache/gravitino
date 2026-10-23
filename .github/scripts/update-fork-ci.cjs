@@ -15,6 +15,7 @@
 'use strict';
 const { createService } = require('./fork-ci-status.cjs');
 const { publishStatus, statusState } = require('./publish-ci-status.cjs');
+const { retireCancelled } = require('./retire-fork-ci.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
 // Publishers share one workflow concurrency group. Keep sweeps short so signals do not
@@ -55,7 +56,7 @@ async function update({ github, context, core, clock = Date.now }) {
     });
     return checks.filter(check => check.app?.slug === 'github-actions').sort((a, b) => b.id - a.id)[0];
   }
-  async function refresh(pr) {
+  async function migrated(pr) {
     // Release branches without this CI migration keep their own pull_request workflows.
     if (!availableBases.has(pr.base.sha)) {
       availableBases.set(pr.base.sha, github.rest.repos.getContent({ ...context.repo,
@@ -64,7 +65,10 @@ async function update({ github, context, core, clock = Date.now }) {
         throw error;
       }));
     }
-    if (!(await availableBases.get(pr.base.sha))) return;
+    return availableBases.get(pr.base.sha);
+  }
+  async function refresh(pr) {
+    if (!(await migrated(pr))) return;
     const mirror = await service.mirror(pr);
     const { result, run } = mirror;
     const note = result.note || (result.status !== 'completed' ? result.title
@@ -116,7 +120,10 @@ async function update({ github, context, core, clock = Date.now }) {
     visited.add(pr.number);
     if (pr.state !== 'open') return;
     try {
+      if (!(await migrated(pr))) return;
       await work();
+      // Publish the current head first; history cleanup failures must not block its result.
+      await retireCancelled({ github, repo: context.repo, pr });
       failures.delete(pr.number);
     } catch (error) {
       failures.add(pr.number);

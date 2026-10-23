@@ -927,3 +927,37 @@ test('all canonical status writers share serialized queues and scheduled sweeps 
     assert.equal(sleeps, 0, 'a sweep must not hold the global writer queue while sleeping');
   });
 });
+
+test('the publisher settles cancelled previous-head checks after publishing the current head', async () => withPublisher(async ({ ctx, core, failures }) => {
+  const p = pr();p.head.ref = 'topic';
+  const { github, writes, statuses } = publisherMock();
+  github.rest.pulls.get = async () => ({ data: p });
+  const oldRun = { ...run(), id: 10, head_sha: C, head_branch: 'topic', event: 'push', conclusion: 'cancelled' };
+  const oldCheck = { id: 88, app: { slug: 'github-actions' }, status: 'in_progress', output: {
+    text: JSON.stringify({ owner: 'fork', repo: 'repo', run_id: 10, run_attempt: 1 }) } };
+  const list = github.rest.actions.listWorkflowRuns, paginate = github.paginate;
+  github.rest.actions.listWorkflowRuns = async args => args.branch === 'topic'
+    ? { data: { workflow_runs: [oldRun] } } : list(args);
+  github.rest.actions.getWorkflowRunAttempt = async () => ({ data: oldRun });
+  github.paginate = async (endpoint, args) => endpoint === github.rest.checks.listForRef && args.ref === C
+    ? [oldCheck] : paginate(endpoint, args);
+  await update({ github, context: ctx, core });
+  assert.equal(failures.length, 0);
+  assert.equal(writes[0].create.head_sha, A);
+  assert.equal(writes[1].update.check_run_id, 88);
+  assert.equal(writes[1].update.conclusion, 'cancelled');
+  assert.deepEqual(statuses.map(s => [s.sha, s.state]), [[A, 'success'], [C, 'error']]);
+}));
+
+test('history cleanup failure leaves the current result published and remains observable', async () => withPublisher(async ({ ctx, core, failures }) => {
+  const p = pr();p.head.ref = 'topic';
+  const { github, statuses } = publisherMock();github.rest.pulls.get = async () => ({ data: p });
+  const list = github.rest.actions.listWorkflowRuns;
+  github.rest.actions.listWorkflowRuns = async args => {
+    if (args.branch === 'topic') throw new Error('History unavailable');
+    return list(args);
+  };
+  await update({ github, context: ctx, core });
+  assert.equal(statuses[0].sha, A);assert.equal(statuses[0].state, 'success');
+  assert.match(failures[0], /#7/);
+}));
