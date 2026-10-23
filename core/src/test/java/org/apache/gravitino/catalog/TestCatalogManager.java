@@ -54,6 +54,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -129,6 +130,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
@@ -1721,9 +1723,11 @@ public class TestCatalogManager {
     Mockito.verify(catalogWrapper, Mockito.never()).doWithSchemaOps(any());
   }
 
-  @Test
-  public void testForceDropManagedCatalogPropagatesSchemaConflict() throws Exception {
-    NameIdentifier ident = NameIdentifier.of("metalake", "test_force_drop_occ");
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testForceDropManagedCatalogPreservesMetadataOnSchemaFailure(boolean conflict)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test_force_drop_failure_" + conflict);
     Map<String, String> props =
         ImmutableMap.of(
             "provider",
@@ -1740,7 +1744,7 @@ public class TestCatalogManager {
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("schema_occ")
-            .withNamespace(Namespace.of("metalake", "test_force_drop_occ"))
+            .withNamespace(Namespace.of("metalake", ident.name()))
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -1755,14 +1759,28 @@ public class TestCatalogManager {
     // A managed-storage catalog drops each schema through its schema operations.
     Mockito.doReturn(CapabilityResult.SUPPORTED).when(capability).managedStorage(any());
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
-    OptimisticLockException conflict = new OptimisticLockException("lock wait timeout");
-    Mockito.doThrow(conflict).when(catalogWrapper).doWithSchemaOps(any());
+    RuntimeException failure =
+        conflict
+            ? new OptimisticLockException("lock wait timeout")
+            : new RuntimeException("Failed to delete fileset storage", new IOException("denied"));
+    Mockito.doThrow(failure).when(catalogWrapper).doWithSchemaOps(any());
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
 
-    Assertions.assertSame(
-        conflict,
+    RuntimeException thrown =
         Assertions.assertThrows(
-            OptimisticLockException.class, () -> catalogManager.dropCatalog(ident, true)));
+            RuntimeException.class, () -> catalogManager.dropCatalog(ident, true));
+    if (conflict) {
+      Assertions.assertSame(failure, thrown);
+    } else {
+      String schemaError =
+          "Failed to drop schema " + NameIdentifier.of("metalake", ident.name(), "schema_occ");
+      Assertions.assertTrue(thrown.getMessage().contains(schemaError));
+      Assertions.assertTrue(ExceptionUtils.getThrowableList(thrown).contains(failure));
+    }
+    Assertions.assertTrue(entityStore.exists(ident, EntityType.CATALOG));
+    Assertions.assertTrue(
+        entityStore.exists(
+            NameIdentifier.of("metalake", ident.name(), "schema_occ"), EntityType.SCHEMA));
   }
 
   @Test
