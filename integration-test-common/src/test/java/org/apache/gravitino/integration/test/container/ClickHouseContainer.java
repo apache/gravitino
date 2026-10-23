@@ -32,16 +32,17 @@ import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
-import org.awaitility.Awaitility;
-import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
 
 public class ClickHouseContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(ClickHouseContainer.class);
 
-  public static final String DEFAULT_IMAGE = "clickhouse:24.8.14";
+  public static final String DEFAULT_IMAGE = TestImages.CLICKHOUSE;
   public static final String HOST_NAME = "gravitino-ci-clickhouse";
   public static final int CLICKHOUSE_PORT = 8123;
   public static final int CLICKHOUSE_NATIVE_PORT = 9000;
@@ -72,36 +73,23 @@ public class ClickHouseContainer extends BaseContainer {
     withLogConsumer(new PrintingContainerLog(format("%-14s| ", "clickHouseContainer")));
   }
 
+  // The HTTP port opens before ClickHouse runs queries, so a query must succeed too. The probe
+  // calls getJdbcUrl() at wait time, so a subclass that maps the URL to the host is honoured.
   @Override
-  public void start() {
-    super.start();
-    Preconditions.check("clickHouse container startup failed!", checkContainerStatus(5));
+  protected WaitStrategy waitStrategy() {
+    return new WaitAllStrategy()
+        .withStrategy(Wait.forListeningPort())
+        .withStrategy(
+            new ProbeWaitStrategy(
+                "ClickHouse to answer SELECT 1",
+                ProbeWaitStrategy.jdbcQuery(
+                    target -> getJdbcUrl(), USER_NAME, PASSWORD, "SELECT 1", resultSet -> true)));
   }
 
+  // The port check's five minutes plus the two minutes the query check had before.
   @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    Awaitility.await()
-        .atMost(java.time.Duration.ofMinutes(2))
-        .pollInterval(Duration.ofSeconds(5))
-        .until(
-            () -> {
-              try (Connection connection =
-                      DriverManager.getConnection(getJdbcUrl(), USER_NAME, getPassword());
-                  Statement statement = connection.createStatement()) {
-                // Simple health check query; ClickHouse should respond if it is ready.
-                statement.execute("SELECT 1");
-                LOG.info("clickHouse container is healthy");
-                return true;
-              } catch (SQLException e) {
-                LOG.warn(
-                    "Failed to connect to clickHouse container during Awaitility health check: {}",
-                    e.getMessage(),
-                    e);
-                return false;
-              }
-            });
-
-    return true;
+  protected Duration startupTimeout() {
+    return Duration.ofMinutes(7);
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
