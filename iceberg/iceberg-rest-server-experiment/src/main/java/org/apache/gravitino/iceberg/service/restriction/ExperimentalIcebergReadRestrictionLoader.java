@@ -188,7 +188,7 @@ public final class ExperimentalIcebergReadRestrictionLoader
     }
     if (distinct.size() > 1) {
       throw new IllegalArgumentException(
-          "Conflicting row-filter policies apply to the requested table");
+          "Conflicting row-filter policies apply to the requested table; only one distinct effective row-filter is supported");
     }
     return distinct.values().stream().findFirst();
   }

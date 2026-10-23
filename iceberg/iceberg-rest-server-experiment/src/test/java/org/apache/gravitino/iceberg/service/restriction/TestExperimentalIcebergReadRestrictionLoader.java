@@ -376,7 +376,9 @@ public class TestExperimentalIcebergReadRestrictionLoader {
             () ->
                 ExperimentalIcebergReadRestrictionLoader.resolve(
                     policies, Collections.emptyMap(), SCHEMA, context("alice")));
-    assertTrue(exception.getMessage().contains("Conflicting row-filter"));
+    assertEquals(
+        "Conflicting row-filter policies apply to the requested table; only one distinct effective row-filter is supported",
+        exception.getMessage());
   }
 
   @Test
