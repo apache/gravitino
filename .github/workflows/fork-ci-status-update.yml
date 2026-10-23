@@ -45,7 +45,8 @@ jobs:
        github.event.workflow_run.event == 'workflow_dispatch' ||
        github.event.workflow_run.event == 'push')
     runs-on: ubuntu-slim
-    timeout-minutes: 10
+    # Scheduled sweeps poll for 11 minutes; ubuntu-slim stops jobs after 15.
+    timeout-minutes: 14
     permissions:
       actions: read
       checks: write
