@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -92,7 +93,9 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
@@ -116,6 +119,7 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -128,6 +132,8 @@ import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -3814,6 +3820,108 @@ public class TestJcasbinAuthorizer {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testMetalakeDropEvictsEveryMetadataTypeAndKeepsOtherMetalake(boolean peerReplay)
+      throws Exception {
+    // Use a dedicated metalake so the shared MetadataIdConverter stubs do not leak into other
+    // tests. The other metalake name extends the dropped one to check the name boundary.
+    String metalakeName = peerReplay ? "peer_drop_ml" : "local_drop_ml";
+    String otherMetalake = metalakeName + "_other";
+    GravitinoCache<String, Long> metadataIdCache = getMetadataIdCache(jcasbinAuthorizer);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(metadataIdCache, getOwnerRelCache(jcasbinAuthorizer));
+    MetadataObject.Type[] types = MetadataObject.Type.values();
+    for (int i = 0; i < types.length; i++) {
+      MetadataObject object = metadataObjectOfType(metalakeName, types[i]);
+      MetadataObject otherObject = metadataObjectOfType(otherMetalake, types[i]);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(object, metalakeName))
+          .thenReturn(Optional.of(1000L + i), Optional.of(2000L + i));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(otherObject, otherMetalake))
+          .thenReturn(Optional.of(3000L + i));
+
+      assertEquals(Optional.of(1000L + i), resolve(lookups, object, metalakeName));
+      assertEquals(Optional.of(3000L + i), resolve(lookups, otherObject, otherMetalake));
+      assertEquals(
+          Optional.of(1000L + i),
+          metadataIdCache.getIfPresent(
+              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalakeName, object)),
+          types[i].name());
+    }
+
+    metalakeDropInvalidation(metalakeName, peerReplay).run();
+
+    for (int i = 0; i < types.length; i++) {
+      MetadataObject object = metadataObjectOfType(metalakeName, types[i]);
+      MetadataObject otherObject = metadataObjectOfType(otherMetalake, types[i]);
+      assertEquals(
+          Optional.empty(),
+          metadataIdCache.getIfPresent(
+              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalakeName, object)),
+          types[i].name());
+      assertEquals(
+          Optional.of(3000L + i),
+          metadataIdCache.getIfPresent(
+              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(otherMetalake, otherObject)),
+          types[i].name());
+      // The recreated metalake resolves same-named objects to their new IDs.
+      assertEquals(Optional.of(2000L + i), resolve(lookups, object, metalakeName));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testRecreatedMetalakeDoesNotInheritOldOwnershipOrPermissions(boolean peerReplay)
+      throws Exception {
+    // Use a dedicated metalake so the shared mapper and MetadataIdConverter stubs do not leak into
+    // other tests.
+    String metalakeName = peerReplay ? "peer_recreate_ml" : "local_recreate_ml";
+    String roleName = "recreated_role";
+    long oldCatalogId = 7001L;
+    long oldUserId = 7002L;
+    long oldRoleId = 7003L;
+    long newCatalogId = 8001L;
+    long newUserId = 8002L;
+    long newRoleId = 8003L;
+    long otherCatalogId = 8004L;
+    long otherOwnerId = 9999L;
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject catalog = MetadataObjects.parse("cat", MetadataObject.Type.CATALOG);
+    MetadataObject otherCatalog = MetadataObjects.parse("other_cat", MetadataObject.Type.CATALOG);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(catalog, metalakeName))
+        .thenReturn(Optional.of(oldCatalogId), Optional.of(newCatalogId));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(otherCatalog, metalakeName))
+        .thenReturn(Optional.of(otherCatalogId));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(oldCatalogId), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(oldUserId, "USER"));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(newCatalogId), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(otherOwnerId, "USER"));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(otherCatalogId), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(newUserId, "USER"));
+
+    // Old metalake: the user owns "cat" and holds a role that grants USE_CATALOG on it.
+    mockMetalakeUserWithRole(metalakeName, oldUserId, oldRoleId, roleName, "cat");
+    assertTrue(authorizeUseCatalog(principal, metalakeName, catalog));
+    assertTrue(isOwner(principal, metalakeName, catalog));
+
+    // Drop the metalake, then recreate the same user, role and catalog names with new IDs. The
+    // new role grants USE_CATALOG on "other_cat" instead, and someone else owns "cat".
+    metalakeDropInvalidation(metalakeName, peerReplay).run();
+    mockedRoleVersions.remove(oldRoleId);
+    mockMetalakeUserWithRole(metalakeName, newUserId, newRoleId, roleName, "other_cat");
+
+    // The old ownership entry is retained, but the ID checks keep it from granting access.
+    assertTrue(getOwnerRelCache(jcasbinAuthorizer).getIfPresent(oldCatalogId).isPresent());
+    assertFalse(authorizeUseCatalog(principal, metalakeName, catalog));
+    assertFalse(isOwner(principal, metalakeName, catalog));
+    assertTrue(authorizeUseCatalog(principal, metalakeName, otherCatalog));
+    assertTrue(isOwner(principal, metalakeName, otherCatalog));
+  }
+
   @Test
   public void testSemanticModelCacheKeepsCaseSensitiveSchemasDistinct() throws Exception {
     CatalogManager catalogs = mock(CatalogManager.class);
@@ -4533,5 +4641,93 @@ public class TestJcasbinAuthorizer {
     Field field = JcasbinAuthorizer.class.getDeclaredField("denyEnforcer");
     field.setAccessible(true);
     return (Enforcer) field.get(authorizer);
+  }
+
+  private Runnable metalakeDropInvalidation(String metalakeName, boolean peerReplay)
+      throws Exception {
+    if (!peerReplay) {
+      return () ->
+          jcasbinAuthorizer.handleEntityNameIdMappingChange(
+              metalakeName, NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
+    }
+    JcasbinChangeListener listener =
+        new JcasbinChangeListener(
+            getMetadataIdCache(jcasbinAuthorizer), getOwnerRelCache(jcasbinAuthorizer), 1);
+    EntityChangeRecord metalakeDrop =
+        new EntityChangeRecord(
+            1L,
+            metalakeName,
+            MetadataObject.Type.METALAKE.name(),
+            EntityChangeLogNameIdentifierCodec.encode(NameIdentifier.of(metalakeName)),
+            OperateType.DROP,
+            0L);
+    return () -> listener.onEntityChange(ImmutableList.of(metalakeDrop));
+  }
+
+  private static MetadataObject metadataObjectOfType(String metalake, MetadataObject.Type type) {
+    String leaf = type.name().toLowerCase(Locale.ROOT);
+    switch (type) {
+      case METALAKE:
+        return MetadataObjects.parse(metalake, type);
+      case CATALOG:
+        return MetadataObjects.parse("catalog", type);
+      case SCHEMA:
+        return MetadataObjects.parse("catalog.schema", type);
+      case COLUMN:
+        return MetadataObjects.parse("catalog.schema.table.column", type);
+      case FILESET:
+      case TABLE:
+      case VIEW:
+      case SEMANTIC_MODEL:
+      case TOPIC:
+      case MODEL:
+      case FUNCTION:
+        return MetadataObjects.parse("catalog.schema." + leaf, type);
+      default:
+        return MetadataObjects.parse(leaf, type);
+    }
+  }
+
+  /** Mocks a metalake user, with the given ID, that holds one role granting USE_CATALOG. */
+  private static void mockMetalakeUserWithRole(
+      String metalake, long userId, long roleId, String roleName, String catalogName)
+      throws IOException {
+    RoleEntity role =
+        RoleEntity.builder()
+            .withNamespace(NamespaceUtil.ofRole(metalake))
+            .withId(roleId)
+            .withName(roleName)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withSecurableObjects(
+                ImmutableList.of(
+                    SecurableObjects.ofCatalog(
+                        catalogName, ImmutableList.of(Privileges.UseCatalog.allow()))))
+            .build();
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(metalake, roleName)),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(role);
+    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, nextRoleVersion()));
+    when(roleMetaMapper.listRolesByUserId(eq(userId)))
+        .thenReturn(ImmutableList.of(buildRolePO(roleId, roleName)));
+    when(userMetaMapper.getUserUpdatedAt(eq(metalake), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(userId, nextUserVersion()));
+  }
+
+  private boolean authorizeUseCatalog(
+      Principal principal, String metalake, MetadataObject catalog) {
+    return jcasbinAuthorizer.authorize(
+        principal, metalake, catalog, USE_CATALOG, new AuthorizationRequestContext());
+  }
+
+  private boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+    return jcasbinAuthorizer.isOwner(
+        principal, metalake, metadataObject, new AuthorizationRequestContext());
+  }
+
+  private static Optional<Long> resolve(
+      JcasbinAuthorizationLookups lookups, MetadataObject metadataObject, String metalake) {
+    return lookups.resolveMetadataId(metadataObject, metalake, new AuthorizationRequestContext());
   }
 }
