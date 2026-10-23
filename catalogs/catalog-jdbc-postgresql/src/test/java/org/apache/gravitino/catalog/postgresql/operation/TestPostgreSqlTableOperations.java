@@ -22,10 +22,12 @@ import com.google.common.collect.Maps;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -37,6 +39,7 @@ import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefault
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -238,6 +241,26 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     assertionsTableInfo(
         newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
+    // a nullable column with a NULL default can be changed back to not null, and the NULL
+    // default is dropped
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME,
+        newName,
+        TableChange.updateColumnDefaultValue(new String[] {"col_2"}, Literals.NULL));
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME, newName, TableChange.updateColumnNullability(new String[] {"col_2"}, false));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
+    alterColumns.set(
+        1,
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.DoubleType.get())
+            .withNullable(false)
+            .withComment("set test key")
+            .build());
+    assertionsTableInfo(
+        newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
+
     // delete column
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -270,6 +293,84 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testUpdateColumnDefaultValueAndNullabilityTogether() {
+    String tableName = RandomNameUtils.genRandomName("default_not_null_table_");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("col_1")
+          .withType(Types.IntegerType.get())
+          .withNullable(true)
+          .withComment("set default first")
+          .build(),
+      JdbcColumn.builder()
+          .withName("col_2")
+          .withType(Types.IntegerType.get())
+          .withNullable(true)
+          .withComment("set not null first")
+          .build()
+    };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        columns,
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME,
+        tableName,
+        TableChange.updateColumnDefaultValue(new String[] {"col_1"}, Literals.integerLiteral(5)),
+        TableChange.updateColumnNullability(new String[] {"col_1"}, false),
+        TableChange.updateColumnNullability(new String[] {"col_2"}, false),
+        TableChange.updateColumnDefaultValue(new String[] {"col_2"}, Literals.integerLiteral(7)));
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    Map<String, Column> loadedColumns =
+        Arrays.stream(load.columns()).collect(Collectors.toMap(Column::name, c -> c));
+    Assertions.assertFalse(loadedColumns.get("col_1").nullable());
+    Assertions.assertEquals(Literals.integerLiteral(5), loadedColumns.get("col_1").defaultValue());
+    Assertions.assertFalse(loadedColumns.get("col_2").nullable());
+    Assertions.assertEquals(Literals.integerLiteral(7), loadedColumns.get("col_2").defaultValue());
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    String tableName = RandomNameUtils.genRandomName("clear_comment_");
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("col comment").build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          new HashMap<>(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnComment(new String[] {"col_1"}, null),
+          TableChange.updateComment(null));
+
+      JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertTrue(StringUtils.isEmpty(load.comment()), load.comment());
+      Assertions.assertTrue(
+          StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
+  }
+
+  @Test
+>>>>>>> 993ed4038 ([#14056] fix(catalog-jdbc): Allow changing nullable column without default to NOT NULL (#14057))
   public void testCreateAllTypeTable() {
     String tableName = RandomNameUtils.genRandomName("type_table_");
     String tableComment = "test_comment";
