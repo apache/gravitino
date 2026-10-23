@@ -24,12 +24,18 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.semantic.AIContextDTO;
+import org.apache.gravitino.dto.semantic.CustomExtensionDTO;
+import org.apache.gravitino.dto.semantic.DatasetDTO;
+import org.apache.gravitino.dto.semantic.MetricDTO;
+import org.apache.gravitino.dto.semantic.RelationshipDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -111,8 +117,17 @@ public class SemanticModelPO {
     try {
       SemanticModelVersionInfoPO versionPO = semanticModelPO.getSemanticModelVersionInfoPO();
       SemanticModelDefinitionDTO definitionDTO =
-          JsonUtils.anyFieldMapper()
-              .readValue(versionPO.semanticModelDefinition(), SemanticModelDefinitionDTO.class);
+          SemanticModelDefinitionDTO.builder()
+              .withDatasets(
+                  JsonUtils.anyFieldMapper().readValue(versionPO.datasets(), DatasetDTO[].class))
+              .withRelationships(
+                  deserializeOptionalField(versionPO.relationships(), RelationshipDTO[].class))
+              .withMetrics(deserializeOptionalField(versionPO.metrics(), MetricDTO[].class))
+              .withAiContext(deserializeOptionalField(versionPO.aiContext(), AIContextDTO.class))
+              .withCustomExtensions(
+                  deserializeOptionalField(
+                      versionPO.customExtensions(), CustomExtensionDTO[].class))
+              .build();
       Map<String, String> properties =
           versionPO.properties() == null
               ? Collections.emptyMap()
@@ -163,10 +178,8 @@ public class SemanticModelPO {
       NamespacedEntityId namespacedEntityId,
       Integer version) {
     try {
-      String definitionJson =
-          JsonUtils.anyFieldMapper()
-              .writeValueAsString(
-                  SemanticModelDefinitionDTO.fromDefinition(semanticModelEntity.definition()));
+      SemanticModelDefinitionDTO definitionDTO =
+          SemanticModelDefinitionDTO.fromDefinition(semanticModelEntity.definition());
       String propertiesJson =
           semanticModelEntity.properties().isEmpty()
               ? null
@@ -180,7 +193,11 @@ public class SemanticModelPO {
           .withVersion(version)
           .withSemanticModelName(semanticModelEntity.name())
           .withSemanticModelComment(semanticModelEntity.comment())
-          .withSemanticModelDefinition(definitionJson)
+          .withDatasets(JsonUtils.anyFieldMapper().writeValueAsString(definitionDTO.getDatasets()))
+          .withRelationships(serializeOptionalField(definitionDTO.getRelationships()))
+          .withMetrics(serializeOptionalField(definitionDTO.getMetrics()))
+          .withAiContext(serializeOptionalField(definitionDTO.getAiContext()))
+          .withCustomExtensions(serializeOptionalField(definitionDTO.getCustomExtensions()))
           .withProperties(propertiesJson)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().writeValueAsString(semanticModelEntity.auditInfo()))
@@ -224,5 +241,17 @@ public class SemanticModelPO {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize Semantic Model audit info", e);
     }
+  }
+
+  @Nullable
+  private static String serializeOptionalField(@Nullable Object value)
+      throws JsonProcessingException {
+    return value == null ? null : JsonUtils.anyFieldMapper().writeValueAsString(value);
+  }
+
+  @Nullable
+  private static <T> T deserializeOptionalField(@Nullable String json, Class<T> type)
+      throws JsonProcessingException {
+    return json == null ? null : JsonUtils.anyFieldMapper().readValue(json, type);
   }
 }
