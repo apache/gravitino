@@ -32,10 +32,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -253,12 +255,24 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
+      // SHOW INDEX lists only secondary indexes, one row per single-column index; table keys are
+      // not included.
       List<Index> indexes = new ArrayList<>();
       while (resultSet.next()) {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
-        indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+        String starRocksIndexType = resultSet.getString("Index_type");
+        Index.IndexType indexType = mapStarRocksIndexType(starRocksIndexType);
+        if (indexType == null) {
+          LOG.warn(
+              "Skip StarRocks index '{}' on table {}.{} with unsupported type '{}'",
+              indexName,
+              databaseName,
+              tableName,
+              starRocksIndexType);
+          continue;
+        }
+        indexes.add(Indexes.of(indexType, indexName, new String[][] {{columnName}}));
       }
       return indexes;
     } catch (SQLException e) {
@@ -613,5 +627,32 @@ public class StarRocksTableOperations extends JdbcTableOperations {
             .withAutoIncrement(column.autoIncrement())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
+  }
+
+  /**
+   * Maps the {@code Index_type} value of StarRocks {@code SHOW INDEX} to a Gravitino index type.
+   * The value may carry index properties, e.g. {@code GIN("parser" = "english")}; only the type
+   * name is used and the properties are not kept, since StarRocks indexes cannot be created or
+   * altered through Gravitino.
+   *
+   * @param indexType the {@code Index_type} value returned by StarRocks
+   * @return the Gravitino index type, or null if the type has no Gravitino equivalent
+   */
+  @Nullable
+  private static Index.IndexType mapStarRocksIndexType(@Nullable String indexType) {
+    if (indexType == null) {
+      return null;
+    }
+    String typeName = StringUtils.substringBefore(indexType, "(").trim();
+    switch (typeName.toUpperCase(Locale.ROOT)) {
+      case "BITMAP":
+        return Index.IndexType.BITMAP;
+      case "GIN":
+        return Index.IndexType.INVERTED;
+      case "VECTOR":
+        return Index.IndexType.VECTOR;
+      default:
+        return null;
+    }
   }
 }

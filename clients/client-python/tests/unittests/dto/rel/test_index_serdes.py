@@ -116,3 +116,98 @@ class TestIndexSerdes(unittest.TestCase):
         json_dict = json.loads(json_string)
         serialized_dict = json.loads(mock_data_class.to_json())
         self.assertDictEqual(json_dict, serialized_dict)
+<<<<<<< HEAD
+=======
+
+    def test_index_serdes_legacy_clickhouse_metadata(self):
+        annoy_properties = {
+            "annoy_trees": "100",
+            "clickhouse_type_full": "annoy(100)",
+            "granularity": "1",
+        }
+        usearch_properties = {
+            "clickhouse_type_full": "usearch('cosineDistance')",
+            "granularity": "1",
+            "usearch_distance_function": "cosineDistance",
+        }
+
+        annoy = IndexSerdes.deserialize(
+            {
+                "indexType": "data_skipping_annoy",
+                "name": "idx_annoy",
+                "fieldNames": [["embedding"]],
+                "properties": annoy_properties,
+            }
+        )
+        usearch = IndexSerdes.deserialize(
+            {
+                "indexType": "data_skipping_usearch",
+                "name": "idx_usearch",
+                "fieldNames": [["embedding"]],
+                "properties": usearch_properties,
+            }
+        )
+
+        self.assertEqual(Index.IndexType.DATA_SKIPPING_ANNOY, annoy.type())
+        self.assertEqual(annoy_properties, annoy.properties())
+        self.assertEqual(Index.IndexType.DATA_SKIPPING_USEARCH, usearch.type())
+        self.assertEqual(usearch_properties, usearch.properties())
+
+        serialized_json = MockDataClass([annoy, usearch]).to_json()
+        serialized = json.loads(serialized_json)
+        self.assertEqual(annoy_properties, serialized["indexes"][0]["properties"])
+        self.assertEqual(usearch_properties, serialized["indexes"][1]["properties"])
+
+        round_tripped = MockDataClass.from_json(serialized_json).indexes
+        self.assertEqual(Index.IndexType.DATA_SKIPPING_ANNOY, round_tripped[0].type())
+        self.assertEqual(annoy_properties, round_tripped[0].properties())
+        self.assertEqual(Index.IndexType.DATA_SKIPPING_USEARCH, round_tripped[1].type())
+        self.assertEqual(usearch_properties, round_tripped[1].properties())
+
+    def test_index_serdes_bitmap_inverted_vector(self):
+        for index_type in (
+            Index.IndexType.BITMAP,
+            Index.IndexType.INVERTED,
+            Index.IndexType.VECTOR,
+        ):
+            index = IndexSerdes.deserialize(
+                {
+                    "indexType": index_type.value,
+                    "name": "idx",
+                    "fieldNames": [["col"]],
+                }
+            )
+            self.assertEqual(index_type, index.type())
+            self.assertEqual(
+                index_type.value, IndexSerdes.serialize(index)["indexType"]
+            )
+
+    def test_vector_similarity_index_properties_round_trip(self):
+        json_string = """
+        {
+            "indexes": [
+                {
+                    "indexType": "DATA_SKIPPING_VECTOR_SIMILARITY",
+                    "name": "idx_vector",
+                    "fieldNames": [["embedding"]],
+                    "properties": {
+                        "type": "hnsw",
+                        "distance_function": "L2Distance",
+                        "dimensions": "3"
+                    }
+                }
+            ]
+        }
+        """
+
+        index = MockDataClass.from_json(json_string).indexes[0]
+        self.assertEqual(index.type(), Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY)
+        self.assertEqual(
+            index.properties(),
+            {"type": "hnsw", "distance_function": "L2Distance", "dimensions": "3"},
+        )
+        self.assertDictEqual(
+            json.loads(json_string),
+            json.loads(MockDataClass(indexes=[index]).to_json()),
+        )
+>>>>>>> d4d95ebfe ([#14066] fix(starrocks): Map index types when loading StarRocks tables (#14067))
