@@ -65,6 +65,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -347,6 +348,32 @@ public class TestPolicyManager {
     Assertions.assertEquals(
         "Policy with name non_existent_policy under metalake metalake_for_policy_test does not exist",
         e.getMessage());
+  }
+
+  @Test
+  void testRenamePolicyToExistingName() {
+    PolicyContent content =
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
+    PolicyEntity source = createCustomPolicy(METALAKE, "source", content);
+    PolicyEntity target = createCustomPolicy(METALAKE, "target", content);
+    for (PolicyChange[] changes :
+        new PolicyChange[][] {
+          {PolicyChange.rename("target")},
+          {PolicyChange.rename("intermediate"), PolicyChange.rename("target")}
+        }) {
+      PolicyAlreadyExistsException exception =
+          Assertions.assertThrows(
+              PolicyAlreadyExistsException.class,
+              () -> policyManager.alterPolicy(METALAKE, "source", changes));
+      Assertions.assertEquals(
+          "Policy with name target under metalake " + METALAKE + " already exists",
+          exception.getMessage());
+      Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
+      Assertions.assertEquals(source.id(), policyManager.getPolicy(METALAKE, "source").id());
+      Assertions.assertEquals(target.id(), policyManager.getPolicy(METALAKE, "target").id());
+      Assertions.assertThrows(
+          NoSuchPolicyException.class, () -> policyManager.getPolicy(METALAKE, "intermediate"));
+    }
   }
 
   @Test
