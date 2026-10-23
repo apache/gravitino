@@ -293,8 +293,6 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
-<<<<<<< HEAD
-=======
   public void testUpdateColumnDefaultValueAndNullabilityTogether() {
     String tableName = RandomNameUtils.genRandomName("default_not_null_table_");
     JdbcColumn[] columns = {
@@ -339,38 +337,6 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
-  public void testClearCommentsWithNull() {
-    String tableName = RandomNameUtils.genRandomName("clear_comment_");
-    JdbcColumn column =
-        JdbcColumn.builder().withName("col_1").withType(INT).withComment("col comment").build();
-    try {
-      TABLE_OPERATIONS.create(
-          TEST_DB_NAME,
-          tableName,
-          new JdbcColumn[] {column},
-          "table comment",
-          new HashMap<>(),
-          null,
-          Distributions.NONE,
-          Indexes.EMPTY_INDEXES);
-
-      TABLE_OPERATIONS.alterTable(
-          TEST_DB_NAME,
-          tableName,
-          TableChange.updateColumnComment(new String[] {"col_1"}, null),
-          TableChange.updateComment(null));
-
-      JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-      Assertions.assertTrue(StringUtils.isEmpty(load.comment()), load.comment());
-      Assertions.assertTrue(
-          StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
-    } finally {
-      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
-    }
-  }
-
-  @Test
->>>>>>> 993ed4038 ([#14056] fix(catalog-jdbc): Allow changing nullable column without default to NOT NULL (#14057))
   public void testCreateAllTypeTable() {
     String tableName = RandomNameUtils.genRandomName("type_table_");
     String tableComment = "test_comment";
