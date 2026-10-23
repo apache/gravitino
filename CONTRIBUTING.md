@@ -99,9 +99,37 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 3. Open the pull request. Its **Fork CI** check verifies the suite jobs and the exact tested head, base branch and base SHA. A pre-PR run is accepted only if its inferred base matches the PR. After retargeting a PR, push again or ask a committer for a trusted run. The separate **ASF Allowlist Check** scans the PR's workflow YAML using reviewed upstream code.
 4. Keep your branch up to date before merging. Strict branch protection requires an up-to-date branch. If the base changes, update your branch and run CI again. The **Fork CI** check can stay green after the base branch moves on; strict branch protection, not the check, blocks the merge until the branch is updated.
 
-If the check asks you to enable Fork CI, enable Actions in your fork, merge or rebase your branch onto the latest base branch, and push again. Fork CI cancels the rest of the run as soon as one job fails, so you can re-run failed jobs in your fork right away; this also re-runs the jobs it cancelled. Reviewers cannot re-run them for you. Closing and reopening a pull request only refreshes the check from the latest fork run; to run CI again, re-run the workflow in your fork or push again. Please fix failures before requesting a review.
+### Closing and reopening a PR
 
-A new push on the same fork branch cancels its previous Fork CI run and starts a run for the new commit. Status synchronization also closes unfinished checks for confirmed canceled runs among the branch's ten most recent runs. Closing a PR does not cancel fork CI, and reopening it does not start a new fork run: an existing successful run remains successful, while a canceled run remains canceled until you re-run it or push again.
+For PRs using Fork CI, closing and reopening the PR does **not** restart CI:
+
+| Action | Fork CI behavior | PR status |
+| --- | --- | --- |
+| Push another commit to the same fork branch | Cancels the previous run and starts a run for the new commit | Tracks the new commit and run |
+| Close the PR | Existing fork CI continues; it is not automatically canceled | Status synchronization stops while the PR is closed |
+| Reopen the PR without another push | Does not start a new run or rerun an old one; a running fork CI continues | Refreshes the latest fork run's result |
+
+To stop CI after closing a PR, cancel the run in your fork's **Actions** tab. Reopening a PR does not clear a failed or canceled result: it remains unsuccessful until CI is run again and passes.
+
+### Starting or rerunning Fork CI
+
+After reopening a PR, use either of these methods to run CI again:
+
+* **Rerun the current commit:** In your fork, open **Actions → Fork CI** and select the run for your PR branch's current commit. Once the run has finished, choose **Re-run all jobs**. For failed runs, **Re-run jobs → Re-run failed jobs** can retry failed and canceled jobs without repeating successful jobs. See [GitHub's rerun instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+* **Push a new commit:** Push another commit to the PR's source branch in your fork. This starts a new Fork CI run. If you only need to trigger CI, you can use an empty commit instead of changing a file. From your PR branch, replace `FORK_REMOTE` and `PR_BRANCH` with your fork remote and PR source branch:
+
+  ```shell
+  git commit --allow-empty -m "Trigger Fork CI"
+  git push FORK_REMOTE HEAD:PR_BRANCH
+  ```
+
+If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. If an old run is no longer available for rerun, push a new commit instead. Fork CI cancels the rest of a run when a job fails, so wait for cancellation to finish before rerunning jobs. Please fix failures before requesting a review.
+
+Reopening the PR or dispatching **Update Fork CI Status** only refreshes results; neither starts fork CI. If the check requests trusted verification for CI-definition changes, a committer must dispatch the trusted upstream **Fork CI** run described below; rerunning the fork does not satisfy that requirement.
+
+### CI status synchronization
+
+Status synchronization closes unfinished checks for confirmed canceled runs among the fork branch's ten most recent runs.
 
 Publishers serialize status writes so an older synchronization cannot overwrite a newer result. Each scheduled run makes one bounded pass and releases its runner; signals wait in a queue of up to 100 runs. GitHub cancels excess runs when that queue is full; later sweeps recover Fork CI updates, and committers can manually dispatch either publisher for a specific PR.
 
