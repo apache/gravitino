@@ -26,6 +26,12 @@ import org.junit.jupiter.api.Test;
 public class TestVersion {
 
   @Test
+  void testForkCiFailFastVerification() {
+    // Deliberate failure to verify Fork CI fail-fast reporting. Do not merge.
+    Assertions.fail("Deliberate failure to verify Fork CI fail-fast");
+  }
+
+  @Test
   public void testParseReleaseCandidateVersions() {
     Assertions.assertArrayEquals(new int[] {1, 1, 0}, Version.parseVersionNumber("1.1.0rc0"));
     Assertions.assertArrayEquals(new int[] {1, 1, 0}, Version.parseVersionNumber("1.1.0rc1"));
