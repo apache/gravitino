@@ -36,6 +36,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 
 /** Database operations for Apache Doris. */
@@ -81,9 +82,8 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
         Statement statement = connection.createStatement();
         ResultSet resultSet = statement.executeQuery(query)) {
       if (resultSet.next()) {
-        throw new IllegalStateException(
-            String.format(
-                "Database %s is not empty, the value of cascade should be true.", databaseName));
+        throw new NonEmptySchemaException(
+            "Database %s is not empty, the value of cascade should be true.", databaseName);
       }
     } catch (SQLException sqlException) {
       throw this.exceptionMapper.toGravitinoException(sqlException);
