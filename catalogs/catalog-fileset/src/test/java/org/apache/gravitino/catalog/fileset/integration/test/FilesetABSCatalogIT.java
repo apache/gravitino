@@ -25,6 +25,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -39,7 +40,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.junit.platform.commons.util.StringUtils;
 
 @EnabledIf("absIsConfigured")
 public class FilesetABSCatalogIT extends FilesetCatalogIT {

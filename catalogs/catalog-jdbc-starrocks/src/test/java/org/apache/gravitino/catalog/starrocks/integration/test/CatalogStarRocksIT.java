@@ -50,8 +50,9 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.StarRocksContainer;
+import org.apache.gravitino.integration.test.container.StarRocksFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -85,7 +86,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@StarRocksFixture
 public class CatalogStarRocksIT extends BaseIT {
+  @FixtureContainer private StarRocksContainer starRocks;
 
   private static final String provider = "jdbc-starrocks";
 
@@ -111,8 +114,6 @@ public class CatalogStarRocksIT extends BaseIT {
   private static final long MAX_WAIT_IN_SECONDS = 30;
 
   private static final long WAIT_INTERVAL_IN_SECONDS = 1;
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private GravitinoMetalake metalake;
   private String jdbcUrl;
 
@@ -120,7 +121,6 @@ public class CatalogStarRocksIT extends BaseIT {
 
   @BeforeAll
   public void startup() throws IOException {
-    containerSuite.startStarRocksContainer();
 
     createMetalake();
     createCatalog();
@@ -158,7 +158,7 @@ public class CatalogStarRocksIT extends BaseIT {
   private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    StarRocksContainer starRocksContainer = containerSuite.getStarRocksContainer();
+    StarRocksContainer starRocksContainer = starRocks;
 
     jdbcUrl =
         String.format(

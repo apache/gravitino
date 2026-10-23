@@ -38,8 +38,10 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.KafkaContainer;
+import org.apache.gravitino.integration.test.container.KafkaFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
@@ -53,7 +55,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@KafkaFixture
 public class OwnerIT extends BaseIT {
+  @FixtureContainer private KafkaContainer kafka;
 
   private static final Logger LOG = LoggerFactory.getLogger(OwnerIT.class);
 
@@ -78,13 +82,8 @@ public class OwnerIT extends BaseIT {
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
-
-    containerSuite.startKafkaContainer();
     kafkaBootstrapServers =
-        String.format(
-            "%s:%d",
-            containerSuite.getKafkaContainer().getContainerIpAddress(),
-            KafkaContainer.DEFAULT_BROKER_PORT);
+        String.format("%s:%d", kafka.getContainerIpAddress(), KafkaContainer.DEFAULT_BROKER_PORT);
   }
 
   @AfterAll

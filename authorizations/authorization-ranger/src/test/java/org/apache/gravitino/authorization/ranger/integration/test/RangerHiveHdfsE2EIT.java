@@ -94,7 +94,7 @@ public class RangerHiveHdfsE2EIT extends RangerBaseE2EIT {
     registerCustomConfigs(configs);
 
     super.startIntegrationTest();
-    RangerITEnv.init(RangerBaseE2EIT.metalakeName, false);
+    RangerITEnv.init(ranger, RangerBaseE2EIT.metalakeName, false);
     RangerITEnv.startHiveRangerContainer();
 
     DEFAULT_FS =

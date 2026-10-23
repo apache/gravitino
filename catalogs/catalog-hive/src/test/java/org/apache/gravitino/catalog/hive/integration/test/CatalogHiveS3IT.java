@@ -23,25 +23,21 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.LocalStackFixture;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.TestInstance;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@LocalStackFixture
 public class CatalogHiveS3IT extends CatalogHive3IT {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
-
   private static final String S3_BUCKET_NAME = "my-test-bucket";
-  private GravitinoLocalStackContainer gravitinoLocalStackContainer;
+  @FixtureContainer private GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
   private static final String S3_ACCESS_KEY = "S3_ACCESS_KEY";
   private static final String S3_SECRET_KEY = "S3_SECRET_KEY";
@@ -54,51 +50,16 @@ public class CatalogHiveS3IT extends CatalogHive3IT {
   @Override
   protected void startNecessaryContainer() {
     hmsCatalog = "hive";
-    containerSuite.startLocalStackContainer();
-    gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
-    Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    gravitinoLocalStackContainer.executeInContainer(
-                        "awslocal", "iam", "create-user", "--user-name", "anonymous");
-                return result.getExitCode() == 0;
-              } catch (Exception e) {
-                LOGGER.info("LocalStack is not ready yet for: ", e);
-                return false;
-              }
-            });
-
-    gravitinoLocalStackContainer.executeInContainer(
-        "awslocal", "s3", "mb", "s3://" + S3_BUCKET_NAME);
-
-    Container.ExecResult result =
-        gravitinoLocalStackContainer.executeInContainer(
-            "awslocal", "iam", "create-access-key", "--user-name", "anonymous");
-
-    // Get access key and secret key from result
-    String[] lines = result.getStdout().split("\n");
-    accessKey = lines[3].split(":")[1].trim().substring(1, 21);
-    secretKey = lines[5].split(":")[1].trim().substring(1, 41);
-
-    LOGGER.info("Access key: " + accessKey);
-    LOGGER.info("Secret key: " + secretKey);
+    // The container is ready once its health check passes. LocalStack does not enforce IAM, so
+    // the shared test keys work without creating a user.
+    gravitinoLocalStackContainer.createBucket(S3_BUCKET_NAME);
+    gravitinoLocalStackContainer.makeBucketPublic(S3_BUCKET_NAME);
+    accessKey = GravitinoLocalStackContainer.ACCESS_KEY;
+    secretKey = GravitinoLocalStackContainer.SECRET_KEY;
 
     getS3Endpoint =
         String.format("http://%s:%d", gravitinoLocalStackContainer.getContainerIpAddress(), 4566);
-
-    gravitinoLocalStackContainer.executeInContainer(
-        "awslocal",
-        "s3api",
-        "put-bucket-acl",
-        "--bucket",
-        "my-test-bucket",
-        "--acl",
-        "public-read-write");
 
     Map<String, String> hiveContainerEnv =
         ImmutableMap.of(

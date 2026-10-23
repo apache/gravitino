@@ -80,6 +80,8 @@ dependencies {
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.junit.platform.commons)
+  testImplementation(libs.junit.platform.engine)
   testImplementation(libs.junit.platform.testkit)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
