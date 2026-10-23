@@ -19,19 +19,24 @@ const { retireCancelled } = require('./retire-fork-ci.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
 // Fork runs finish without an upstream event, and GitHub fires five-minute schedules only every
-// 10-36 minutes on apache/gravitino. A scheduled sweep therefore keeps polling for LOOP_MS, one
-// pass every PASS_MS, staying below the 15-minute job limit of ubuntu-slim. Sweeps run in their
-// own concurrency group, so PR signals never wait behind a sleeping sweep.
+// 10-36 minutes on apache/gravitino. A sweep therefore keeps polling for LOOP_MS, one pass every
+// PASS_MS, staying below the 15-minute job limit of ubuntu-slim, and then dispatches the next
+// sweep (the rearm job), so polling is continuous; the schedule restarts a broken chain. Sweeps
+// run in their own concurrency group, so PR signals never wait behind a sleeping sweep.
 const LOOP_MS = 11 * 60 * 1000;
-const PASS_MS = 2 * 60 * 1000;
+const PASS_MS = 60 * 1000;
+// Back-to-back sweeps spend at most this share of the hourly API quota.
+const SWEEP_SHARE = 0.4;
 
 async function update({ github, context, core, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), clock = Date.now }) {
   const signal = context.eventName === 'workflow_run' && context.payload.workflow_run.name === 'Fork CI PR Signal';
   const trustedSignal = context.eventName === 'workflow_run' &&
     context.payload.workflow_run.event === 'workflow_dispatch' &&
     /^Trusted Fork CI #([1-9][0-9]*)$/.exec(context.payload.workflow_run.display_title || '');
-  const manual = context.eventName === 'workflow_dispatch' || !!trustedSignal || signal;
-  const requested = context.payload.inputs?.['pull-request'] || (trustedSignal && trustedSignal[1]);
+  // A sweep dispatched by the previous sweep runs like a scheduled one.
+  const chained = context.eventName === 'workflow_dispatch' && String(context.payload.inputs?.sweep) === 'true';
+  const manual = (context.eventName === 'workflow_dispatch' && !chained) || !!trustedSignal || signal;
+  const requested = (!chained && context.payload.inputs?.['pull-request']) || (trustedSignal && trustedSignal[1]);
   if (requested && !/^[1-9][0-9]*$/.test(requested)) throw new Error('Invalid PR number.');
   async function listPrs() {
     const prs = requested
@@ -46,13 +51,16 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   const rate = (await github.rest.rateLimit.get()).data.resources.core;
   // Bound work even while settled successes are watched. Rotate the starting PR to avoid starving
   // older PRs, and leave quota for signal workflows and other repository automation. Organizations on
-  // GitHub Enterprise Cloud, such as apache, get 15,000 requests per hour: spend at most about half of
-  // the hourly quota across five-minute sweeps, and never less than 60 calls per sweep.
-  const perSweep = Math.max(60, Math.floor(rate.limit / 24));
+  // GitHub Enterprise Cloud, such as apache, get 15,000 requests per hour. Sweeps run back to back,
+  // so budget them by time (SWEEP_SHARE of the hourly quota), and never less than 60 calls per sweep.
+  const perSweep = Math.max(60, Math.floor(rate.limit * SWEEP_SHARE * LOOP_MS / (60 * 60 * 1000)));
   const budget = manual ? Math.max(0, rate.remaining - 100) : Math.min(perSweep, Math.max(0, rate.remaining - 100));
   // Small quotas keep one pass per sweep; larger ones split the sweep budget across passes.
   const passes = manual ? 1 : Math.max(1, Math.min(Math.ceil(LOOP_MS / PASS_MS), Math.floor(budget / 60)));
   const slotMs = passes > 1 ? PASS_MS : 300000;
+  // Only polling sweeps continue the chain. With a small quota a sweep is a single pass, and
+  // dispatching it back to back would exceed the budget; the schedule paces those instead.
+  if (!manual) core.setOutput('chain', String(passes > 1));
   let calls = 0;
   github.hook.before('request', () => { calls++; });
   const failures = new Set();

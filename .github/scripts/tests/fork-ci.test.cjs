@@ -303,8 +303,10 @@ async function withPublisher(fn) {
   const stateFile = path.join(directory, 'state.json');
   const ctx = context('apache/gravitino');ctx.eventName = 'workflow_dispatch';ctx.payload.inputs = { 'pull-request': '7' };
   const failures = [];
-  const core = { info() {}, warning() {}, setFailed: message => failures.push(message) };
-  try { await fn({ ctx, stateFile, core, failures }); }
+  const outputs = {};
+  const core = { info() {}, warning() {}, setFailed: message => failures.push(message),
+    setOutput: (name, value) => { outputs[name] = value; } };
+  try { await fn({ ctx, stateFile, core, failures, outputs }); }
   finally { await rm(directory, { recursive: true, force: true }); }
 }
 test('publisher binds the check to the exact base and current run attempt', async () => withPublisher(async ({ ctx, stateFile, core }) => {
@@ -467,9 +469,9 @@ test('signals queue in order while scheduled sweeps poll in their own group', as
   // No workflow-level group: a polling sweep must never block queued PR signals.
   assert.doesNotMatch(workflow, /^concurrency:/m);
   assert.match(workflow, /^  update:\n(?:.*\n)*?.*github\.event_name != 'schedule'(?:.*\n)*?\s+group: fork-ci-status-update\n\s+queue: max\n\s+cancel-in-progress: false\n/m);
-  assert.match(workflow, /^  sweep:\n\s+if: .*github\.event_name == 'schedule'\n(?:.*\n)*?\s+group: fork-ci-status-sweep\n\s+cancel-in-progress: false\n/m);
+  assert.match(workflow, /^  sweep:\n\s+if: >-\n(?:.*\n)*?.*github\.event_name == 'schedule' \|\| \(github\.event_name == 'workflow_dispatch' && inputs\.sweep\)\)\n(?:.*\n)*?\s+group: fork-ci-status-sweep\n\s+cancel-in-progress: false\n/m);
   // A newer schedule replaces a pending sweep rather than piling up behind 11-minute sweeps.
-  assert.doesNotMatch(workflow.slice(workflow.indexOf('  sweep:')), /queue:/);
+  assert.doesNotMatch(workflow.slice(workflow.indexOf('\n  sweep:')), /queue:/);
 });
 
 test('scheduled sweeps refresh a settled check when its fork run is rerun', async () => withPublisher(async ({ ctx, stateFile, core }) => {
@@ -572,7 +574,7 @@ test('only the fail-fast job can cancel the run', async () => {
   assert.match(workflow, /fail_fast:\n(?:.*\n)*?\s+runs-on: ubuntu-latest\n/);
 });
 
-test('every two-minute pass probes all recently updated PRs at the apache quota', async () => withPublisher(async ({ ctx, core }) => {
+test('every one-minute pass probes all recently updated PRs at the apache quota', async () => withPublisher(async ({ ctx, core }) => {
   ctx.eventName = 'schedule'; delete ctx.payload.inputs;
   const { github } = publisherMock();
   // apache/gravitino has had 13-17 PRs updated within six hours; leave headroom.
@@ -596,9 +598,46 @@ test('every two-minute pass probes all recently updated PRs at the apache quota'
   };
   let t = Date.now();
   await update({ github, context: ctx, core, clock: () => t, sleep: async ms => { t += ms; perPass.push(new Set()); } });
-  assert.equal(perPass.length, 6);
+  assert.equal(perPass.length, 11);
   for (const seen of perPass) assert.equal(seen.size, recent.length);
 }));
+
+test('each polling sweep dispatches the next; only that job can write Actions state', async () => {
+  const workflow = await readFile(path.join(__dirname, '../../workflows/fork-ci-status-update.yml'), 'utf8');
+  assert.match(workflow, /^      sweep:\n\s+description: .*\n\s+required: false\n\s+type: boolean\n/m);
+  assert.match(workflow, /!\(github\.event_name == 'workflow_dispatch' && inputs\.sweep\)/);
+  assert.match(workflow, /outputs:\n\s+chain: \$\{\{ steps\.sweep\.outputs\.chain \}\}\n/);
+  const rearm = workflow.slice(workflow.indexOf('\n  rearm:'));
+  assert.match(rearm, /needs: sweep\n\s+if: \$\{\{ !cancelled\(\) && needs\.sweep\.outputs\.chain == 'true' \}\}/);
+  assert.match(rearm, /permissions:\n\s+actions: write\n\s+steps:/);
+  assert.doesNotMatch(rearm, /checkout|require\(/);
+  assert.match(rearm, /context\.ref !== `refs\/heads\/\$\{repository\.default_branch\}`/);
+  assert.match(rearm, /createWorkflowDispatch\(\{[^}]*workflow_id: 'fork-ci-status-update\.yml', ref: repository\.default_branch, inputs: \{ sweep: 'true' \}/);
+  // The publishers themselves never get write access to Actions.
+  assert.equal(workflow.match(/^\s+actions: write$/gm).length, 1);
+});
+
+test('a dispatched sweep polls like a scheduled one and continues the chain only when polling', async () => {
+  const run = async (eventName, inputs, limit) => {
+    let observed;
+    await withPublisher(async ({ ctx, core, outputs }) => {
+      ctx.eventName = eventName; ctx.payload.inputs = inputs;
+      const { github } = publisherMock();
+      github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: limit, limit } } } });
+      let sleeps = 0;
+      await update({ github, context: ctx, core, sleep: async () => { sleeps++; } });
+      observed = { chain: outputs.chain, passes: sleeps + 1 };
+    });
+    return observed;
+  };
+  assert.deepEqual(await run('workflow_dispatch', { sweep: 'true', 'pull-request': '' }, 15000), { chain: 'true', passes: 11 });
+  assert.deepEqual(await run('workflow_dispatch', { sweep: true }, 15000), { chain: 'true', passes: 11 });
+  assert.deepEqual(await run('schedule', undefined, 15000), { chain: 'true', passes: 11 });
+  // A single-pass sweep at a small quota must not run back to back.
+  assert.deepEqual(await run('schedule', undefined, 1000), { chain: 'false', passes: 1 });
+  // A manual refresh is one pass and never starts a chain.
+  assert.deepEqual(await run('workflow_dispatch', { 'pull-request': '7' }, 15000), { chain: undefined, passes: 1 });
+});
 
 test('transient API errors never fail the watcher or the run', async () => {
   const mock = watcherMock([[job('build / build', 'in_progress')],
@@ -708,10 +747,10 @@ test('scheduled sweeps scale their budget with the hourly quota', async () => wi
     await update({ github, context: ctx, core, stateFile, clock: () => t, sleep: async ms => { t += ms; passes++; } });
     return { seen: seen.size, passes: passes + 1 };
   };
-  // Small quotas keep one pass; large ones poll every two minutes within the 11-minute sweep.
+  // Small quotas keep one pass; large ones poll every minute within the 11-minute sweep.
   const small = await probed(1000), large = await probed(15000);
   assert.equal(small.passes, 1); assert.ok(small.seen < 60);
-  assert.equal(large.passes, 6); assert.equal(large.seen, 60);
+  assert.equal(large.passes, 11); assert.equal(large.seen, 60);
 }));
 
 test('a missing fork run waits instead of asking the author to act', async () => {
