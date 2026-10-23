@@ -344,6 +344,19 @@ test('PR signals prioritize their head and bypass settled state', async () => wi
   assert.equal(statuses.length, 1);
 }));
 
+test('a finished Fork CI push run refreshes only its head once, without polling the signal queue', async () => withPublisher(async ({ ctx, core, outputs }) => {
+  ctx.eventName = 'workflow_run';delete ctx.payload.inputs;
+  for (const [head, expected] of [[A, 1], [C, 0]]) {
+    ctx.payload.workflow_run = { name: 'Fork CI', head_sha: head, event: 'push', display_title: 'Fork CI main' };
+    const { github, statuses } = publisherMock();
+    github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: 15000, limit: 15000 } } } });
+    let sleeps = 0;
+    await update({ github, context: ctx, core, sleep: async () => { sleeps++; } });
+    assert.equal(sleeps, 0); assert.equal(statuses.length, expected);
+    assert.equal(outputs.chain, undefined);
+  }
+}));
+
 test('scheduled publication ignores poisoned cache state and recomputes definitions', async () => withPublisher(async ({ ctx, stateFile, core }) => {
   ctx.eventName = 'schedule'; delete ctx.payload.inputs;
   await require('node:fs/promises').writeFile(stateFile, JSON.stringify({ cursor: 0, prs: { 7: {

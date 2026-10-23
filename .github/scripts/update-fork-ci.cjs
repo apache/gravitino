@@ -29,10 +29,13 @@ const PASS_MS = 60 * 1000;
 const SWEEP_SHARE = 0.4;
 
 async function update({ github, context, core, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), clock = Date.now }) {
-  const signal = context.eventName === 'workflow_run' && context.payload.workflow_run.name === 'Fork CI PR Signal';
   const trustedSignal = context.eventName === 'workflow_run' &&
     context.payload.workflow_run.event === 'workflow_dispatch' &&
     /^Trusted Fork CI #([1-9][0-9]*)$/.exec(context.payload.workflow_run.display_title || '');
+  // Every other workflow_run, a PR signal or a finished Fork CI push run in this repository (for
+  // example a same-repository PR branch, or main after a merge), refreshes the PRs with its head
+  // once. It must never become a polling sweep: it runs in the signal queue and would block it.
+  const signal = context.eventName === 'workflow_run' && !trustedSignal;
   // A sweep dispatched by the previous sweep runs like a scheduled one.
   const chained = context.eventName === 'workflow_dispatch' && String(context.payload.inputs?.sweep) === 'true';
   const manual = (context.eventName === 'workflow_dispatch' && !chained) || !!trustedSignal || signal;
