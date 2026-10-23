@@ -39,7 +39,7 @@ class TestTableMaintenanceSchedulerPools extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testThreePoolsStartAndStop() {
+  void testCronAndCommitPoolsStartAndStop() {
     DataSource dataSource =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()
