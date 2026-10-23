@@ -454,9 +454,10 @@ allprojects {
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
       param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:4.14.0")
 
-      // Disable Ryuk for integration tests
-      // Ryuk need privileged mode, if we want to rootless or run non-privileged mode, we need to disable it.
-      param.environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+      // Ryuk is on: it removes this JVM's test containers even when the JVM is killed, and needs only
+      // the Docker socket, not privileged mode. On rootless Podman, turn it off with Testcontainers'
+      // own switch: export TESTCONTAINERS_RYUK_DISABLED=true (#6475).
+      param.environment("TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED", "false")
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
@@ -583,6 +584,9 @@ fun excludePackagesForSparkConnector(project: Project) {
 }
 
 val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
+val checkstyleVersion: String = libs.versions.checkstyle.get()
+val junitBom = libs.junit.bom
+val junitPlatformLauncher = libs.junit.platform.launcher
 
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
@@ -612,6 +616,17 @@ subprojects {
     // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.
     exclude(group = "log4j", module = "log4j")
   }
+
+  // Checkstyle carries only the import bans Spotless cannot express, such as JUnit 4.
+  apply(plugin = "checkstyle")
+  configure<CheckstyleExtension> {
+    toolVersion = checkstyleVersion
+    configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+    maxWarnings = 0
+  }
+  // The import bans need no type information; an empty classpath keeps checkstyle from building
+  // other modules' test jars.
+  tasks.withType<Checkstyle>().configureEach { classpath = files() }
 
   repositories {
     mavenCentral()
@@ -699,13 +714,25 @@ subprojects {
       options.release.set(8)
     }
 
-    // Tests still need Java 17 to compile against dependencies that only publish Java 17 variants.
-    tasks.named<JavaCompile>("compileTestJava") {
-      options.release.set(17)
-    }
+    // Tests and test fixtures still need Java 17 to compile against dependencies that only
+    // publish Java 17 variants, such as JUnit 6.
+    tasks.matching { it.name in setOf("compileTestJava", "compileTestFixturesJava") }
+      .withType<JavaCompile>()
+      .configureEach {
+        options.release.set(17)
+      }
 
     val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
-    configurations.matching { it.name in setOf("testCompileClasspath", "testRuntimeClasspath") }
+    configurations.matching {
+      it.name in setOf(
+        "testCompileClasspath",
+        "testRuntimeClasspath",
+        "testFixturesCompileClasspath",
+        "testFixturesRuntimeClasspath",
+        "testFixturesApiElements",
+        "testFixturesRuntimeElements"
+      )
+    }
       .configureEach {
         attributes.attribute(targetJvmVersionAttribute, 17)
       }
@@ -732,6 +759,11 @@ subprojects {
   apply(plugin = "net.ltgt.errorprone")
   dependencies {
     errorprone("com.google.errorprone:error_prone_core:2.10.0")
+    // Align every JUnit artifact (including transitive ones) on one version. JUnit 6 also needs
+    // the matching launcher on the test runtime classpath, otherwise Gradle falls back to its
+    // bundled 1.x launcher, which cannot drive a 6.x engine.
+    testImplementation(platform(junitBom))
+    testRuntimeOnly(junitPlatformLauncher)
   }
 
   tasks.withType<JavaCompile>().configureEach {

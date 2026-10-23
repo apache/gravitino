@@ -18,10 +18,10 @@
  */
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -45,8 +45,9 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -62,23 +63,22 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@HiveFixture
 public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
+
+  @FixtureContainer private HiveContainer hive;
 
   private static final String CATALOG = "catalog";
   private static final String SCHEMA = "schema";
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String hmsUri;
   private static String role = "role";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startHiveContainer();
     super.startIntegrationTest();
     hmsUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
     client
@@ -88,7 +88,6 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createSchema(SCHEMA, "test", new HashMap<>());
     // try to load the schema as normal user, expect failure
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         RuntimeException.class,
         () -> {
           normalUserClient
@@ -96,7 +95,8 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadCatalog(CATALOG)
               .asSchemas()
               .loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -109,11 +109,11 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
   }
 
   @AfterAll
@@ -152,18 +152,18 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     TableCatalog tableCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.createTable(
               NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.listTables(Namespace.of(SCHEMA));
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     // grant privileges
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
@@ -189,12 +189,12 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     TableCatalog catalogLoadByTmpUser =
         tempUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           catalogLoadByTmpUser.createTable(
               NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(role), tempUser);
     catalogLoadByTmpUser.createTable(
         NameIdentifier.of(SCHEMA, "table4"), createColumns(), "test2", new HashMap<>());
@@ -233,11 +233,11 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     // normal user can load table2 and table3, but not table1
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
     Table table2 = tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table2"));
     assertEquals("table2", table2.name());
     Table table3 = tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table3"));
@@ -252,23 +252,23 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
 
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.loadTable(
               NameIdentifier.of(SCHEMA, "table1"), Sets.newHashSet(Privilege.Name.MODIFY_TABLE));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
 
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
         ImmutableList.of(Privileges.SelectTable.deny()));
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
 
     gravitinoMetalake.grantPrivilegesToRole(
         role,
@@ -291,12 +291,12 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     // normal user cannot alter table1 (no privilege)
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.alterTable(
               NameIdentifier.of(SCHEMA, "table1"), TableChange.setProperty("key", "value"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
     // grant normal user owner privilege on table1
     gravitinoMetalake.setOwner(
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
@@ -319,11 +319,11 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         Owner.Type.USER);
     // normal user cannot drop table1
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.dropTable(NameIdentifier.of(SCHEMA, "table1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"));
     // normal user can drop table2 and table3 (they created them)
     tableCatalogNormalUser.dropTable(NameIdentifier.of(SCHEMA, "table2"));
     tableCatalogNormalUser.dropTable(NameIdentifier.of(SCHEMA, "table3"));

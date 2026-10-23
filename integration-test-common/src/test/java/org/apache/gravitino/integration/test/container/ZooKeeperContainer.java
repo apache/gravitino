@@ -29,7 +29,7 @@ import org.testcontainers.containers.Network;
 public class ZooKeeperContainer extends BaseContainer {
   private static final Logger LOG = LoggerFactory.getLogger(ZooKeeperContainer.class);
 
-  public static final String DEFAULT_IMAGE = "zookeeper:3.8.0";
+  public static final String DEFAULT_IMAGE = TestImages.ZOOKEEPER;
   public static final String HOST_NAME = "gravitino-ci-zookeeper";
   public static final int ZK_PORT = 2181;
 

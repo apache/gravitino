@@ -35,7 +35,7 @@ import org.testcontainers.containers.Network;
 public class RangerContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(RangerContainer.class);
 
-  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_RANGER_DOCKER_IMAGE");
+  public static final String DEFAULT_IMAGE = TestImages.RANGER;
   public static final String HOST_NAME = "gravitino-ci-ranger";
   public static final int RANGER_SERVER_PORT = 6080;
   public RangerClient rangerClient;
@@ -56,6 +56,15 @@ public class RangerContainer extends BaseContainer {
   public static final String DOCKER_ENV_RANGER_SERVER_URL = "RANGER_SERVER_URL";
   public static final String DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME = "RANGER_HDFS_REPOSITORY_NAME";
   public static final String DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME = "RANGER_HIVE_REPOSITORY_NAME";
+
+  /** The Ranger repository a Ranger-enabled Hive reports Hive access to. */
+  public static final String HIVE_REPOSITORY = "hiveDev";
+
+  /** The Ranger repository a Ranger-enabled Hive reports HDFS access to. */
+  public static final String HDFS_REPOSITORY = "hdfsDev";
+
+  /** The Hadoop user a Ranger-enabled Hive runs as. */
+  public static final String HADOOP_USER = "gravitino";
 
   public static Builder builder() {
     return new Builder();

@@ -26,9 +26,9 @@ import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.integration.test.util.KerberosHdfs;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.spark.SparkConf;
@@ -124,25 +124,23 @@ public final class IcebergRestKerberosTestEnv {
   }
 
   /**
-   * Starts the Kerberos Hive container and configures the JVM krb5 settings for tests.
+   * Configures the JVM krb5 settings for tests against a running Kerberos Hive container.
    *
-   * @param containerSuite shared docker container suite
+   * @param kerberosHiveContainer the running Kerberos Hive container
    * @return temp directory containing krb5.conf and client keytab
    */
-  public static String init(ContainerSuite containerSuite) {
+  public static String init(HiveContainer kerberosHiveContainer) {
     if (initRefCount == 0) {
       savedSystemProperties = saveSystemProperties(MANAGED_SYSTEM_PROPERTIES);
     }
     initRefCount++;
 
-    containerSuite.startKerberosHiveContainer();
     try {
       File baseDir = new File(System.getProperty("java.io.tmpdir"));
       File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
       file.deleteOnExit();
       String tempDir = file.getAbsolutePath();
 
-      HiveContainer kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
       kerberosHiveContainer
           .getContainer()
           .copyFileFromContainer(KEYTAB_CONTAINER_PATH, tempDir + CLIENT_KEYTAB);
@@ -170,10 +168,8 @@ public final class IcebergRestKerberosTestEnv {
       refreshKerberosConfig();
       resetDefaultRealm();
 
-      kerberosHiveContainer.executeInContainer(
-          "hadoop", "fs", "-chown", "-R", "cli", "/user/hive/");
-
       IcebergRestKerberosTestEnv.tempDir = tempDir;
+      hdfs(kerberosHiveContainer).setOwner("/user/hive/", "cli", true);
       return tempDir;
     } catch (Exception e) {
       reset();
@@ -181,7 +177,21 @@ public final class IcebergRestKerberosTestEnv {
     }
   }
 
-  /** Restores JVM Kerberos system properties changed by {@link #init(ContainerSuite)}. */
+  /**
+   * Returns an HDFS client that logs in with the keytab {@link #init(HiveContainer)} copied.
+   *
+   * @param kerberosHiveContainer the running Kerberos Hive container
+   * @return the client
+   */
+  public static KerberosHdfs hdfs(HiveContainer kerberosHiveContainer) {
+    if (tempDir == null) {
+      throw new IllegalStateException(
+          "Kerberos test environment is not initialized, call init() first");
+    }
+    return KerberosHdfs.of(kerberosHiveContainer, tempDir + CLIENT_KEYTAB);
+  }
+
+  /** Restores JVM Kerberos system properties changed by {@link #init(HiveContainer)}. */
   public static void reset() {
     if (initRefCount == 0) {
       return;

@@ -50,7 +50,7 @@ public class CatalogHive3ITWithCatalog extends CatalogHive3IT {
     String location =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse/%s/%s/%s",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
+            hive.getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             hmsCatalog,
             catalogName.toLowerCase(),
