@@ -81,6 +81,14 @@ public class TableMaintenanceActionSQLProviderFactory {
 
   /**
    * @param tableId table entity id
+   * @return SELECT statement for unbound in-flight rows on the table
+   */
+  public static String selectUnboundByTableId(@Param("tableId") long tableId) {
+    return getProvider().selectUnboundByTableId(tableId);
+  }
+
+  /**
+   * @param tableId table entity id
    * @param policyId policy entity id
    * @param claimTimeoutMs unbound claim TTL in milliseconds
    * @return SELECT statement
@@ -123,35 +131,72 @@ public class TableMaintenanceActionSQLProviderFactory {
 
   /**
    * @param jobId job run id
-   * @param beforeSnapshotId snapshot id
-   * @return UPDATE statement
+   * @param tableId table entity id
+   * @return SELECT statement
    */
-  public static String updateBeforeSnapshot(
-      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId) {
-    return getProvider().updateBeforeSnapshot(jobId, beforeSnapshotId);
+  public static String selectByJobIdAndTableId(
+      @Param("jobId") long jobId, @Param("tableId") long tableId) {
+    return getProvider().selectByJobIdAndTableId(jobId, tableId);
   }
 
   /**
    * @param jobId job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public static String selectByJobIdAndTableIdAndPolicyId(
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId) {
+    return getProvider().selectByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+  }
+
+  /**
+   * @param jobId job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param beforeSnapshotId snapshot id
+   * @return UPDATE statement
+   */
+  public static String updateBeforeSnapshot(
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("beforeSnapshotId") long beforeSnapshotId) {
+    return getProvider().updateBeforeSnapshot(jobId, tableId, policyId, beforeSnapshotId);
+  }
+
+  /**
+   * @param jobId job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param afterSnapshotId after snapshot
    * @param finishedAt finish millis
    * @return UPDATE statement
    */
   public static String markFinished(
       @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt) {
-    return getProvider().markFinished(jobId, afterSnapshotId, finishedAt);
+    return getProvider().markFinished(jobId, tableId, policyId, afterSnapshotId, finishedAt);
   }
 
   /**
    * @param jobId job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param afterSnapshotId after snapshot
    * @return UPDATE statement
    */
   public static String backfillAfterSnapshot(
-      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId) {
-    return getProvider().backfillAfterSnapshot(jobId, afterSnapshotId);
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterSnapshotId") long afterSnapshotId) {
+    return getProvider().backfillAfterSnapshot(jobId, tableId, policyId, afterSnapshotId);
   }
 
   /**
