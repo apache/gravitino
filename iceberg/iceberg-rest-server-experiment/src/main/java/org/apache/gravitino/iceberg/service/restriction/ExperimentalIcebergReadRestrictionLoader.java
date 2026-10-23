@@ -104,10 +104,10 @@ public final class ExperimentalIcebergReadRestrictionLoader
             metalake, context.catalogName(), tableName.namespace().level(2)),
         Entity.EntityType.SCHEMA);
     Schema schema = response.tableMetadata().schema();
-    PolicyEntity[] rowPolicies =
-        policyDispatcher.listPolicyInfosForMetadataObject(
-            metalake, NameIdentifierUtil.toMetadataObject(tableName, Entity.EntityType.TABLE));
-    Map<Integer, PolicyEntity[]> maskPolicies = new LinkedHashMap<>();
+    MetadataObject table = NameIdentifierUtil.toMetadataObject(tableName, Entity.EntityType.TABLE);
+    List<MetadataObject> objects = new ArrayList<>();
+    objects.add(table);
+    Map<Integer, MetadataObject> columns = new LinkedHashMap<>();
     for (Types.NestedField field : schema.columns()) {
       NameIdentifier columnName =
           NameIdentifierUtil.ofColumn(
@@ -118,9 +118,14 @@ public final class ExperimentalIcebergReadRestrictionLoader
               field.name());
       MetadataObject column =
           NameIdentifierUtil.toMetadataObject(columnName, Entity.EntityType.COLUMN);
-      maskPolicies.put(
-          field.fieldId(), policyDispatcher.listPolicyInfosForMetadataObject(metalake, column));
+      objects.add(column);
+      columns.put(field.fieldId(), column);
     }
+    Map<MetadataObject, PolicyEntity[]> policies =
+        policyDispatcher.listPolicyInfosForMetadataObjects(metalake, objects);
+    PolicyEntity[] rowPolicies = policies.get(table);
+    Map<Integer, PolicyEntity[]> maskPolicies = new LinkedHashMap<>();
+    columns.forEach((fieldId, column) -> maskPolicies.put(fieldId, policies.get(column)));
 
     IdentityBindingContext bindingContext =
         new IdentityBindingContext(context.userName(), metalake, accessControlDispatcher);

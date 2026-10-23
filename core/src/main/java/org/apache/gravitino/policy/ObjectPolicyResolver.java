@@ -80,12 +80,7 @@ public class ObjectPolicyResolver {
    * @return Enabled policies selected by the object's effective tags.
    */
   public PolicyEntity[] resolve(String metalake, MetadataObject metadataObject) {
-    Match[] matches = resolveMatches(metalake, metadataObject);
-    PolicyEntity[] policies = new PolicyEntity[matches.length];
-    for (int i = 0; i < matches.length; i++) {
-      policies[i] = matches[i].policy();
-    }
-    return policies;
+    return policies(resolveMatches(metalake, metadataObject));
   }
 
   /**
@@ -104,18 +99,52 @@ public class ObjectPolicyResolver {
       return new Match[0];
     }
 
-    Map<String, ResolvedTag> tagsByName =
-        Arrays.stream(effectiveTags)
-            .collect(
-                Collectors.toMap(
-                    resolvedTag -> resolvedTag.tag().name(),
-                    resolvedTag -> resolvedTag,
-                    (left, right) -> left,
-                    LinkedHashMap::new));
     List<NameIdentifier> tagIdentifiers =
-        tagsByName.keySet().stream()
+        Arrays.stream(effectiveTags)
+            .map(resolvedTag -> resolvedTag.tag().name())
+            .distinct()
             .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
             .collect(Collectors.toList());
+    return selectMatches(effectiveTags, loadRelations(tagIdentifiers, metadataObject));
+  }
+
+  /**
+   * Resolves effective policies for multiple objects using shared tag and policy reads.
+   *
+   * @param metalake the metalake name
+   * @param metadataObjects the objects to resolve
+   * @return policies keyed by requested object
+   */
+  public Map<MetadataObject, PolicyEntity[]> resolve(
+      String metalake, List<MetadataObject> metadataObjects) {
+    if (metadataObjects.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+    Map<MetadataObject, ResolvedTag[]> tagsByObject =
+        effectiveTagResolver.resolveWithSources(metalake, metadataObjects);
+    Map<String, NameIdentifier> tagIdentifiers = new LinkedHashMap<>();
+    tagsByObject
+        .values()
+        .forEach(
+            tags -> {
+              for (ResolvedTag resolvedTag : tags) {
+                TagEntity tag = resolvedTag.tag();
+                tagIdentifiers.putIfAbsent(
+                    tag.name(), NameIdentifierUtil.ofTag(metalake, tag.name()));
+              }
+            });
+    List<RelationalEntity<?>> relations =
+        tagIdentifiers.isEmpty()
+            ? Collections.emptyList()
+            : loadRelations(new ArrayList<>(tagIdentifiers.values()), metadataObjects);
+    Map<MetadataObject, PolicyEntity[]> result = new LinkedHashMap<>();
+    tagsByObject.forEach(
+        (object, tags) -> result.put(object, policies(selectMatches(tags, relations))));
+    return result;
+  }
+
+  private List<RelationalEntity<?>> loadRelations(
+      List<NameIdentifier> tagIdentifiers, Object request) {
 
     List<RelationalEntity<?>> relations;
     try {
@@ -127,9 +156,26 @@ public class ObjectPolicyResolver {
                   tagIdentifiers,
                   Entity.EntityType.TAG);
     } catch (IOException e) {
-      LOG.error("Failed to resolve policies for metadata object {}", metadataObject, e);
+      LOG.error("Failed to resolve policies for metadata objects {}", request, e);
       throw new RuntimeException(e);
     }
+    return relations;
+  }
+
+  private static PolicyEntity[] policies(Match[] matches) {
+    return Arrays.stream(matches).map(Match::policy).toArray(PolicyEntity[]::new);
+  }
+
+  private static Match[] selectMatches(
+      ResolvedTag[] effectiveTags, List<RelationalEntity<?>> relations) {
+    Map<String, ResolvedTag> tagsByName =
+        Arrays.stream(effectiveTags)
+            .collect(
+                Collectors.toMap(
+                    resolvedTag -> resolvedTag.tag().name(),
+                    resolvedTag -> resolvedTag,
+                    (left, right) -> left,
+                    LinkedHashMap::new));
 
     Map<Long, MatchState> matchStates = new LinkedHashMap<>();
     for (RelationalEntity<?> relation : relations) {
