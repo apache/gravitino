@@ -109,11 +109,11 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 
 The **Fork CI** check on the PR links to the run and to **Run workflow**. Its **Re-run** button and the **Update Fork CI Status** workflow only refresh the reported result; neither runs tests.
 
-| Action | Fork CI | PR status |
-| --- | --- | --- |
-| Push to the PR branch, or **Run workflow** in the fork | Cancels the branch's running run and starts a new one | Tracks the new run |
-| Close the PR | The running fork run cancels itself within about a minute | Synchronization stops while the PR is closed |
-| Reopen the PR | Starts nothing | Shows the latest fork run's result; run CI again as above |
+| Action                                                 | Fork CI                                                   | PR status                                                 |
+| ------------------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------------- |
+| Push to the PR branch, or **Run workflow** in the fork | Cancels the branch's running run and starts a new one     | Tracks the new run                                        |
+| Close the PR                                           | The running fork run cancels itself within about a minute | Synchronization stops while the PR is closed              |
+| Reopen the PR                                          | Starts nothing                                            | Shows the latest fork run's result; run CI again as above |
 
 If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. A branch created before Fork CI was introduced does not contain `.github/workflows/fork-ci.yml`, so pushing it runs no CI; the check then asks you to merge or rebase onto the latest base branch. Please fix failures before requesting a review.
 
