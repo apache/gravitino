@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,10 +38,15 @@ import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
@@ -1215,6 +1221,57 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         IcebergTableOperations.generateETag("s3://bucket/metadata.json", "all"), unrestricted);
     Assertions.assertNotEquals(unrestricted, firstRestriction);
     Assertions.assertNotEquals(firstRestriction, secondRestriction);
+  }
+
+  @Test
+  void testLoadTableConditionalRequestResolvesRestrictionsBeforeETag() throws Exception {
+    IcebergTableOperationDispatcher dispatcher =
+        Mockito.mock(IcebergTableOperationDispatcher.class);
+    IcebergReadRestrictionLoader loader = Mockito.mock(IcebergReadRestrictionLoader.class);
+    Mockito.when(loader.enabled()).thenReturn(true);
+    Namespace namespace = IcebergRestTestUtil.TEST_NAMESPACE_NAME;
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "conditional_restrictions");
+    TableMetadata metadata = getTableMeta(namespace, "conditional_restrictions");
+    LoadTableResponse tableResponse =
+        LoadTableResponse.builder().withTableMetadata(metadata).build();
+    Mockito.when(dispatcher.loadTable(Mockito.any(), Mockito.any())).thenReturn(tableResponse);
+    Mockito.when(loader.load(Mockito.any(), Mockito.any(), Mockito.eq(tableResponse)))
+        .thenReturn(
+            IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("first")),
+            IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("second")),
+            IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("second")))
+        .thenThrow(new IllegalStateException("policy resolution failed"))
+        .thenThrow(new IllegalNameIdentifierException("Dotted names are unsupported"));
+
+    IcebergTableOperations operations =
+        new IcebergTableOperations(Mockito.mock(IcebergMetricsManager.class), dispatcher, loader);
+    HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+    Mockito.when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+    Mockito.when(request.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
+    FieldUtils.writeField(operations, "httpRequest", request, true);
+
+    Response first = operations.loadTable("", "schema", "table", "all", null, null);
+    Assertions.assertEquals(Status.OK.getStatusCode(), first.getStatus());
+    String firstETag = first.getHeaderString("ETag");
+    Assertions.assertNotNull(firstETag);
+
+    Response changed = operations.loadTable("", "schema", "table", "all", null, firstETag);
+    Assertions.assertEquals(Status.OK.getStatusCode(), changed.getStatus());
+    String changedETag = changed.getHeaderString("ETag");
+    Assertions.assertNotEquals(firstETag, changedETag);
+
+    Response unchanged = operations.loadTable("", "schema", "table", "all", null, changedETag);
+    Assertions.assertEquals(Status.NOT_MODIFIED.getStatusCode(), unchanged.getStatus());
+
+    Response failed = operations.loadTable("", "schema", "table", "all", null, changedETag);
+    Assertions.assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), failed.getStatus());
+
+    Response unsupported = operations.loadTable("", "schema", "table", "all", null, changedETag);
+    Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), unsupported.getStatus());
+    Mockito.verify(dispatcher, Mockito.never())
+        .getTableMetadataLocation(Mockito.any(), Mockito.any());
+    Mockito.verify(dispatcher, Mockito.times(5)).loadTable(Mockito.any(), Mockito.any());
   }
 
   @ParameterizedTest

@@ -26,7 +26,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -35,9 +39,14 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
@@ -50,12 +59,14 @@ import org.apache.iceberg.Labels;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.BoundLiteralPredicate;
 import org.apache.iceberg.rest.RemoteSigningConfig;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.restrictions.ReadRestrictions;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /** Tests effective policy resolution into one load-table read restriction. */
 public class TestExperimentalIcebergReadRestrictionLoader {
@@ -113,6 +124,137 @@ public class TestExperimentalIcebergReadRestrictionLoader {
     assertSame(metadata, result.tableMetadata());
     assertSame(remoteSigningConfig, result.remoteSigningConfig());
     assertSame(labels, result.labels());
+  }
+
+  @Test
+  void testLoadWithoutPolicyDispatcherReturnsOriginalResponse() throws Exception {
+    LoadTableResponse response = response(SCHEMA);
+
+    IcebergReadRestrictionLoader.Result result =
+        load(null, TableIdentifier.of("schema", "table"), response);
+
+    assertSame(response, result.response());
+    assertFalse(result.etagSeed().isPresent());
+  }
+
+  @Test
+  void testLoadWithoutApplicablePoliciesQueriesTableAndColumns() throws Exception {
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    when(dispatcher.listPolicyInfosForMetadataObject(eq(METALAKE), any(MetadataObject.class)))
+        .thenReturn(new PolicyEntity[0]);
+    LoadTableResponse response = response(SCHEMA);
+
+    IcebergReadRestrictionLoader.Result result =
+        load(dispatcher, TableIdentifier.of("schema", "table"), response);
+
+    assertSame(response, result.response());
+    assertFalse(result.etagSeed().isPresent());
+    ArgumentCaptor<MetadataObject> objects = ArgumentCaptor.forClass(MetadataObject.class);
+    verify(dispatcher, times(4)).listPolicyInfosForMetadataObject(eq(METALAKE), objects.capture());
+    assertEquals(MetadataObject.Type.TABLE, objects.getAllValues().get(0).type());
+    for (int index = 1; index < 4; index++) {
+      assertEquals(MetadataObject.Type.COLUMN, objects.getAllValues().get(index).type());
+    }
+  }
+
+  @Test
+  void testLoadBuildsRestrictedResponseAndSeed() throws Exception {
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    when(dispatcher.listPolicyInfosForMetadataObject(eq(METALAKE), any(MetadataObject.class)))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(1);
+              if (object.type() == MetadataObject.Type.TABLE) {
+                return new PolicyEntity[] {
+                  rowPolicy(1, "regional", "filter := col(\"region\") == \"US\"")
+                };
+              }
+              if (object.type() == MetadataObject.Type.COLUMN && "region".equals(object.name())) {
+                return new PolicyEntity[] {
+                  maskPolicy(2, "regional_mask", "mask := action(\"show-last-4\")")
+                };
+              }
+              return new PolicyEntity[0];
+            });
+    RemoteSigningConfig remoteSigningConfig = mock(RemoteSigningConfig.class);
+    Labels labels = mock(Labels.class);
+    LoadTableResponse response =
+        LoadTableResponse.builder()
+            .withTableMetadata(response(SCHEMA).tableMetadata())
+            .addAllConfig(Collections.singletonMap("test", "value"))
+            .withRemoteSigningConfig(remoteSigningConfig)
+            .withLabels(labels)
+            .build();
+
+    IcebergReadRestrictionLoader.Result result =
+        load(dispatcher, TableIdentifier.of("schema", "table"), response);
+
+    assertNotNull(result.response().readRestrictions().rowFilter());
+    assertEquals(1, result.response().readRestrictions().columnProjections().size());
+    assertEquals(2, result.response().readRestrictions().columnProjections().get(0).fieldId());
+    assertTrue(result.etagSeed().isPresent());
+    assertSame(response.tableMetadata(), result.response().tableMetadata());
+    assertEquals(response.config(), result.response().config());
+    assertSame(remoteSigningConfig, result.response().remoteSigningConfig());
+    assertSame(labels, result.response().labels());
+  }
+
+  @Test
+  void testLoadRejectsDottedTableNameWithPolicyDispatcher() throws Exception {
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+
+    IllegalNameIdentifierException exception =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () ->
+                load(
+                    dispatcher, TableIdentifier.of("schema", "table.with.dots"), response(SCHEMA)));
+
+    assertTrue(exception.getMessage().contains("table.with.dots"));
+  }
+
+  @Test
+  void testLoadRejectsDottedColumnNameWithPolicyDispatcher() throws Exception {
+    Schema schema = new Schema(Types.NestedField.optional(1, "a.b", Types.StringType.get()));
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    when(dispatcher.listPolicyInfosForMetadataObject(eq(METALAKE), any(MetadataObject.class)))
+        .thenReturn(new PolicyEntity[0]);
+
+    IllegalNameIdentifierException exception =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () -> load(dispatcher, TableIdentifier.of("schema", "table"), response(schema)));
+
+    assertTrue(exception.getMessage().contains("a.b"));
+  }
+
+  @Test
+  void testLoadRejectsDottedAncestorNamesWithPolicyDispatcher() throws Exception {
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    TableIdentifier table = TableIdentifier.of("schema", "table");
+
+    IllegalNameIdentifierException metalakeError =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () -> load(dispatcher, "metalake.with.dots", "catalog", table, response(SCHEMA)));
+    IllegalNameIdentifierException catalogError =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () -> load(dispatcher, METALAKE, "catalog.with.dots", table, response(SCHEMA)));
+    IllegalNameIdentifierException schemaError =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () ->
+                load(
+                    dispatcher,
+                    METALAKE,
+                    "catalog",
+                    TableIdentifier.of("schema.with.dots", "table"),
+                    response(SCHEMA)));
+
+    assertTrue(metalakeError.getMessage().contains("metalake.with.dots"));
+    assertTrue(catalogError.getMessage().contains("catalog.with.dots"));
+    assertTrue(schemaError.getMessage().contains("schema.with.dots"));
   }
 
   @Test
@@ -339,6 +481,46 @@ public class TestExperimentalIcebergReadRestrictionLoader {
 
   private static PolicyEntity rowPolicy(long id, String name, String expression) {
     return policy(id, name, Policy.BuiltInType.ROW_FILTER, PolicyContents.rowFilter(expression));
+  }
+
+  private static LoadTableResponse response(Schema schema) {
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema, PartitionSpec.unpartitioned(), "s3://bucket/table", Collections.emptyMap());
+    return LoadTableResponse.builder().withTableMetadata(metadata).build();
+  }
+
+  private static IcebergReadRestrictionLoader.Result load(
+      PolicyDispatcher dispatcher, TableIdentifier table, LoadTableResponse response)
+      throws Exception {
+    return load(dispatcher, METALAKE, "catalog", table, response);
+  }
+
+  private static IcebergReadRestrictionLoader.Result load(
+      PolicyDispatcher dispatcher,
+      String metalake,
+      String catalog,
+      TableIdentifier table,
+      LoadTableResponse response)
+      throws Exception {
+    GravitinoEnv environment = GravitinoEnv.getInstance();
+    PolicyDispatcher originalDispatcher = environment.internalPolicyDispatcher();
+    Class<?> contextHolder =
+        Class.forName(IcebergRESTServerContext.class.getName() + "$InstanceHolder");
+    Object originalContext = FieldUtils.readStaticField(contextHolder, "INSTANCE", true);
+    try {
+      FieldUtils.writeField(environment, "internalPolicyDispatcher", dispatcher, true);
+      IcebergConfigProvider configProvider = mock(IcebergConfigProvider.class);
+      when(configProvider.getMetalakeName()).thenReturn(metalake);
+      IcebergRESTServerContext.create(configProvider, false, true, false, null);
+      IcebergRequestContext request = mock(IcebergRequestContext.class);
+      when(request.catalogName()).thenReturn(catalog);
+      when(request.userName()).thenReturn("alice");
+      return new ExperimentalIcebergReadRestrictionLoader().load(request, table, response);
+    } finally {
+      FieldUtils.writeField(environment, "internalPolicyDispatcher", originalDispatcher, true);
+      FieldUtils.writeStaticField(contextHolder, "INSTANCE", originalContext, true);
+    }
   }
 
   private static PolicyEntity maskPolicy(long id, String name, String expression) {

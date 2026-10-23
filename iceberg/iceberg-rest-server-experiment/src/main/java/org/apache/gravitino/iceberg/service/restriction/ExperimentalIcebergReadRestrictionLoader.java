@@ -90,6 +90,14 @@ public final class ExperimentalIcebergReadRestrictionLoader
             context.catalogName(),
             tableIdentifier,
             HierarchicalSchemaUtil.schemaSeparator());
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofMetalake(metalake), Entity.EntityType.METALAKE);
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofCatalog(metalake, context.catalogName()), Entity.EntityType.CATALOG);
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofSchema(
+            metalake, context.catalogName(), tableName.namespace().level(2)),
+        Entity.EntityType.SCHEMA);
     Schema schema = response.tableMetadata().schema();
     PolicyEntity[] rowPolicies =
         policyDispatcher.listPolicyInfosForMetadataObject(
@@ -274,6 +282,11 @@ public final class ExperimentalIcebergReadRestrictionLoader
       } catch (NoSuchGroupException exception) {
         return Optional.empty();
       } catch (RuntimeException exception) {
+        LOG.warn(
+            "Failed to resolve group {} in metalake {} for Iceberg read restrictions",
+            group,
+            metalake,
+            exception);
         return Optional.empty();
       }
     }

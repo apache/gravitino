@@ -113,6 +113,12 @@ fails the load-table request rather than omitting the mask and exposing the orig
 Unselected actions do not need to be applicable to that column. For example, `replace-with-null`
 cannot apply to a required column when that action is selected.
 
+When the experimental Iceberg REST service has a policy dispatcher, load-table does not support
+names containing `.` in the metalake, catalog, schema, table, or top-level column path. The
+metadata-object API reserves `.` as a qualified-name separator, so a tag cannot be assigned
+directly to such an object. The loader returns HTTP 400 for these names even when no policy is
+assigned. A standalone service without a policy dispatcher does not perform policy resolution.
+
 Conditional branches are evaluated from left to right. The first true condition selects its result,
 and every conditional rule must end with an unconditional `else`. Row-filter conditions and results
 must be Boolean. Column-mask conditions may use only request context; they cannot reference columns.
