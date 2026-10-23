@@ -66,7 +66,7 @@ function serviceMock({ changed = false, trusted = false, forkJobs = jobs(pr()), 
       ? [{ path: '.github', sha: 'github-tree' }, { path: '.asf.yaml', sha: 'policy' }]
       : ['workflows', 'actions', 'scripts'].map(name => ({ path: name, sha: changed && owner === 'fork' ? 'changed-' + name : name })) } }) },
     actions: { listWorkflowRuns: async ({ event }) => ({ data: { workflow_runs: event === 'push' ? [run()] : trusted
-      ? [{ ...run(), id: 2, head_sha: trustedSha, display_title: 'Trusted Fork CI #7', created_at: '2026-01-02T00:00:00Z' }] : [] } }) }
+      ? [{ ...run(), id: 2, head_sha: trustedSha, head_branch: 'main', display_title: 'Trusted Fork CI #7', created_at: '2026-01-02T00:00:00Z' }] : [] } }) }
   } };
   github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? (args.run_id === 2 ? trustedJobs : forkJobs);
   return github;
@@ -130,6 +130,55 @@ test('trusted dispatch rejects an arbitrary ref or a non-upstream repository', a
   await assert.rejects(resolve({ context: ctx, core: coreFor({}), github: {} }), /apache/);
   const upstream = context('apache/gravitino');upstream.eventName = 'workflow_dispatch';upstream.payload.inputs = { 'pull-request': '7' };
   await assert.rejects(resolve({ context: upstream, core: coreFor({}), github: { rest: { pulls: { get: async () => ({ data: pr() }) } } } }), /current default branch/);
+});
+
+test('trusted dispatch resolves the current default branch after the PR base snapshot ages', async () => {
+  const ctx = context('apache/gravitino');ctx.eventName = 'workflow_dispatch';
+  ctx.ref = 'refs/heads/main';ctx.sha = C;ctx.payload.inputs = { 'pull-request': '7' };
+  const output = {};
+  const github = { rest: { pulls: { get: async () => ({ data: pr() }) },
+    repos: { getBranch: async () => ({ data: { commit: { sha: C } } }) } } };
+  await resolve({ context: ctx, core: coreFor(output), github });
+  assert.equal(output['base-sha'], C);
+  assert.equal(output['head-sha'], A);
+  ctx.sha = B;
+  await assert.rejects(resolve({ context: ctx, core: coreFor({}), github }), /current default branch/);
+});
+
+test('trusted runs on an advanced base are found by branch and verified against their actual tested SHA', async () => {
+  for (const comparison of ['ahead', 'identical', 'diverged']) {
+    const tested = pr();tested.base.sha = C;
+    const github = serviceMock({ changed: true, trusted: true, trustedSha: C, trustedJobs: jobs(tested) });
+    github.rest.repos = { compareCommitsWithBasehead: async args => {
+      assert.equal(args.basehead, `${C}...main`);return { data: { status: comparison } };
+    } };
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = async args => {
+      if (args.event === 'workflow_dispatch') { assert.equal(args.branch, 'main');assert.equal(args.head_sha, undefined); }
+      return list(args);
+    };
+    const mirrored = await createService(github).mirror(pr());
+    assert.equal(mirrored.base, C);
+    assert.equal(mirrored.result.conclusion, comparison === 'diverged' ? 'action_required' : 'success');
+  }
+});
+
+test('a trusted result for a previous contributor head cannot hide current fork progress', async () => {
+  const previous = pr();previous.head.sha = C;
+  for (const trustedStatus of ['completed', 'in_progress']) {
+    const github = serviceMock({ changed: true, trusted: true, trustedJobs: jobs(previous) });
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = async args => {
+      const response = await list(args);
+      Object.assign(response.data.workflow_runs[0], args.event === 'push'
+        ? { status: 'in_progress', conclusion: null } : { status: trustedStatus });
+      return response;
+    };
+    const mirrored = await createService(github).mirror(pr());
+    assert.equal(mirrored.trusted, false);
+    assert.equal(mirrored.result.status, 'in_progress');
+    assert.equal(mirrored.result.conclusion, undefined);
+  }
 });
 
 test('allowlist scan rejects paths, symlinks, oversized files and truncated listings', () => {
@@ -371,7 +420,8 @@ test('scheduled sweeps probe recently updated PRs first and refresh only running
     head: { ...pr().head, sha: (100 + i).toString(16).padStart(40, 'd') } }));
   const settled = { ...pr(), number: 8, updated_at: recent, head: { ...pr().head, sha: 'e'.repeat(40) } };
   github.rest.repos.getCombinedStatusForRef = async ({ ref }) => ({ data: { statuses:
-    ref === settled.head.sha ? [{ context: 'Fork CI', state: 'error' }] : [] } });
+    ref === settled.head.sha ? [{ context: 'Fork CI', state: 'error', description: 'Fork CI cancelled',
+      target_url: 'https://github.com/fork/repo/actions/runs/1' }] : [] } });
   const failed = { ...pr(), updated_at: recent };
   const all = [...old, settled, failed];
   const listPulls = github.rest.pulls.list;
@@ -379,7 +429,8 @@ test('scheduled sweeps probe recently updated PRs first and refresh only running
   const paginate = github.paginate;
   // Any completed result, not only success, is final until the fork run id or attempt changes.
   const check = completed => ({ id: 1, app: { slug: 'github-actions' }, status: completed ? 'completed' : 'in_progress',
-    conclusion: completed ? 'cancelled' : null, output: { text: JSON.stringify({ run_id: 1, run_attempt: 1 }) } });
+    conclusion: completed ? 'cancelled' : null, output: { title: 'Fork CI cancelled', text: JSON.stringify({ owner: 'fork', repo: 'repo', run_id: 1, run_attempt: 1,
+      run_status: completed ? 'completed' : 'in_progress' }) } });
   github.paginate = async (endpoint, args) => endpoint === listPulls ? all
     : endpoint === listForRef ? [check(args.ref === settled.head.sha)] : paginate(endpoint, args);
   github.rest.pulls.get = async ({ pull_number }) => ({ data: all.find(p => p.number === pull_number) });
@@ -392,7 +443,7 @@ test('scheduled sweeps probe recently updated PRs first and refresh only running
     return response;
   };
   await update({ github, context: ctx, core, stateFile, sleep: async () => {} });
-  // The settled check is probed for its fork run once, which is unchanged, so it is not refreshed.
+  // Probe both the fork and trusted runs; neither changed, so no full refresh is needed.
   const written = writes.map(write => write.create || write.update);
   assert.equal(runsFor.filter(sha => sha === settled.head.sha).length, 1);
   assert.equal(written[0].conclusion, 'success');
@@ -625,8 +676,127 @@ test('changed CI definitions publish an error until trusted CI verifies them', a
   github.rest.git = serviceMock({ changed: true }).rest.git;
   await update({ github, context: ctx, core });
   assert.equal(statuses[0].state, 'error');
-  assert.equal(statuses[0].description, 'Fork CI needs attention');
+  assert.equal(statuses[0].description, 'Fork CI passed; trusted verification required');
 }));
+
+test('CI edits mirror execution progress and failures without self-approving success', async () => withPublisher(async ({ ctx, core }) => {
+  for (const [status, conclusion, expectedStatus, expectedConclusion, state] of [
+    ['queued', null, 'queued', undefined, 'pending'],
+    ['in_progress', null, 'in_progress', undefined, 'pending'],
+    ['completed', 'failure', 'completed', 'failure', 'failure'],
+    ['completed', 'cancelled', 'completed', 'cancelled', 'error'],
+    ['completed', 'success', 'completed', 'action_required', 'error']]) {
+    const { github, writes, statuses } = publisherMock({ rerun: { ...run(), status, conclusion } });
+    github.rest.git = serviceMock({ changed: true }).rest.git;
+    await update({ github, context: ctx, core });
+    const check = writes[0].create;
+    assert.equal(check.status, expectedStatus);
+    assert.equal(check.conclusion, expectedConclusion);
+    assert.equal(statuses[0].state, state);
+    assert.match(check.output.summary, /committer must dispatch Fork CI/);
+    assert.equal(JSON.parse(check.output.text).run_status, status);
+    assert.equal(JSON.parse(check.output.text).run_conclusion, conclusion);
+  }
+}));
+
+test('scheduled publishers repair legacy premature terminal checks while the same attempt runs', async () => withPublisher(async ({ ctx, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  const latest = { id: 55, app: { slug: 'github-actions' }, status: 'completed', conclusion: 'action_required',
+    output: { text: JSON.stringify({ owner: 'fork', repo: 'repo', run_id: 1, run_attempt: 1,
+      base_ref: 'main', base_sha: B }) } };
+  const { github, writes, statuses } = publisherMock({ latest, rerun: { ...run(), status: 'in_progress', conclusion: null } });
+  github.rest.git = serviceMock({ changed: true }).rest.git;
+  github.rest.repos.getCombinedStatusForRef = async () => ({ data: { statuses: [{ context: 'Fork CI', state: 'error' }] } });
+  const listPulls = github.rest.pulls.list, paginate = github.paginate;
+  github.paginate = async (endpoint, args) => endpoint === listPulls ? [recent] : paginate(endpoint, args);
+  github.rest.pulls.get = async () => ({ data: recent });
+  await update({ github, context: ctx, core });
+  assert.equal(writes.length, 1);
+  assert.equal((writes[0].create || writes[0].update).status, 'in_progress');
+  assert.equal(statuses[0].state, 'pending');
+}));
+
+test('known completed action-required executions cannot regress to running on a stale API response', async () => withPublisher(async ({ ctx, core }) => {
+  const latest = { id: 55, app: { slug: 'github-actions' }, status: 'completed', conclusion: 'action_required',
+    output: { text: JSON.stringify({ owner: 'fork', repo: 'repo', run_id: 1, run_attempt: 1, run_status: 'completed' }) } };
+  const { github, writes, statuses } = publisherMock({ latest, rerun: { ...run(), status: 'in_progress', conclusion: null } });
+  github.rest.git = serviceMock({ changed: true }).rest.git;
+  await update({ github, context: ctx, core });
+  assert.equal(writes.length, 0);
+  assert.equal(statuses.length, 0);
+}));
+
+test('scheduled probes repair same-state statuses with stale run links or descriptions', async () => withPublisher(async ({ ctx, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  const manual = { ...ctx, eventName: 'workflow_dispatch', payload: { inputs: { 'pull-request': '7' } } };
+  const initial = publisherMock();
+  await update({ github: initial.github, context: manual, core });
+  const check = { id: 55, app: { slug: 'github-actions' }, ...initial.writes[0].create };
+  for (const wrong of [{ target_url: 'https://github.com/fork/repo/actions/runs/0' }, { description: 'Old success' }]) {
+    const { github, statuses } = publisherMock({ latest: check });
+    github.rest.repos.getCombinedStatusForRef = async () => ({ data: { statuses: [{ ...initial.statuses[0], ...wrong }] } });
+    const listPulls = github.rest.pulls.list, paginate = github.paginate;
+    github.paginate = async (endpoint, args) => endpoint === listPulls ? [recent] : paginate(endpoint, args);
+    github.rest.pulls.get = async () => ({ data: recent });
+    await update({ github, context: ctx, core });
+    assert.equal(statuses.length, 1);
+    assert.equal(statuses[0].target_url, 'https://github.com/fork/repo/actions/runs/1');
+    assert.equal(statuses[0].description, 'All required suites passed');
+  }
+}));
+
+test('scheduled probes clear settled success when trusted CI is dispatched or rerun', async () => withPublisher(async ({ ctx, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  for (const wasTrusted of [false, true]) {
+    const owner = wasTrusted ? 'apache' : 'fork', repo = wasTrusted ? 'gravitino' : 'repo';
+    const latest = { id: 55, app: { slug: 'github-actions' }, status: 'completed', conclusion: 'success',
+      output: { title: 'All required suites passed', text: JSON.stringify({ owner, repo,
+        run_id: wasTrusted ? 2 : 1, run_attempt: 1, run_status: 'completed', trusted: wasTrusted,
+        base_ref: 'main', base_sha: B, fork_run_id: 1, fork_run_attempt: 1 }) } };
+    const { github, writes, statuses } = publisherMock({ latest });
+    github.rest.repos.getCombinedStatusForRef = async () => ({ data: { statuses: [{ context: 'Fork CI',
+      state: 'success', description: latest.output.title, target_url: `https://github.com/${owner}/${repo}/actions/runs/${wasTrusted ? 2 : 1}` }] } });
+    github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs: event === 'push' ? [run()]
+      : [{ ...run(), id: 2, head_sha: B, head_branch: 'main', run_attempt: wasTrusted ? 2 : 1,
+        status: 'in_progress', conclusion: null, display_title: 'Trusted Fork CI #7', created_at: '2026-01-02T00:00:00Z' }] } });
+    const listPulls = github.rest.pulls.list, paginate = github.paginate;
+    github.paginate = async (endpoint, args) => endpoint === listPulls ? [recent] : paginate(endpoint, args);
+    github.rest.pulls.get = async () => ({ data: recent });
+    await update({ github, context: ctx, core });
+    assert.equal(writes[0].create.status, 'in_progress');
+    assert.equal(statuses[0].state, 'pending');
+    assert.equal(statuses[0].target_url, 'https://github.com/apache/gravitino/actions/runs/2');
+  }
+}));
+
+test('CI edits keep the failed job visible after fail-fast cancellation', async () => {
+  const github = serviceMock({ changed: true, forkJobs: [{ name: 'build / build', conclusion: 'failure' }] });
+  github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs:
+    event === 'push' ? [{ ...run(), conclusion: 'cancelled' }] : [] } });
+  const { result } = await createService(github).mirror(pr());
+  assert.equal(result.conclusion, 'failure');
+  assert.equal(result.title, 'Failed: build / build');
+  assert.match(result.note, /committer must dispatch/);
+});
+
+test('trusted verification of CI edits mirrors running, failure and success', async () => {
+  for (const [status, conclusion] of [['in_progress', null], ['completed', 'failure'], ['completed', 'success']]) {
+    const github = serviceMock({ changed: true, trusted: true });
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = async args => {
+      const response = await list(args);
+      if (args.event === 'workflow_dispatch') Object.assign(response.data.workflow_runs[0], { status, conclusion });
+      return response;
+    };
+    const mirrored = await createService(github).mirror(pr());
+    assert.equal(mirrored.trusted, true);
+    assert.equal(mirrored.result.status, status);
+    assert.equal(mirrored.result.conclusion || null, conclusion);
+  }
+});
 
 test('an unchanged hidden metadata check still gets its missing visible status', async () => withPublisher(async ({ ctx, core }) => {
   const initial = publisherMock();
