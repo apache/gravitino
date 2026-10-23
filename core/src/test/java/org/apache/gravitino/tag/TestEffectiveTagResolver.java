@@ -18,18 +18,24 @@
  */
 package org.apache.gravitino.tag;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -120,6 +126,60 @@ public class TestEffectiveTagResolver {
         Assertions.assertThrows(
             NoSuchMetadataObjectException.class, () -> resolver.resolve(METALAKE, TABLE));
     Assertions.assertSame(exception, actual.getCause());
+  }
+
+  @Test
+  void testBatchSharesAncestorsAndPreservesNearestAssignment() throws Exception {
+    MetadataObject first =
+        MetadataObjects.of(
+            Arrays.asList("catalog", "schema", "table", "first"), MetadataObject.Type.COLUMN);
+    MetadataObject second =
+        MetadataObjects.of(
+            Arrays.asList("catalog", "schema", "table", "second"), MetadataObject.Type.COLUMN);
+    metadataObjectUtil
+        .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, first))
+        .thenAnswer(invocation -> null);
+    metadataObjectUtil
+        .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, second))
+        .thenAnswer(invocation -> null);
+    TagEntity inherited = tag(1L, "domain", TagAssignment.ofValues("finance"));
+    TagEntity direct = tag(1L, "domain", TagAssignment.ofValues("engineering"));
+    when(relationOperations.batchListEntitiesByRelation(any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              Entity.EntityType type = invocation.getArgument(2);
+              if (type == Entity.EntityType.TABLE) {
+                return Collections.singletonList(
+                    new RelationalEntity<>(
+                        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                        MetadataObjectUtil.toEntityIdent(METALAKE, TABLE),
+                        type,
+                        inherited));
+              }
+              if (type == Entity.EntityType.COLUMN) {
+                return Collections.singletonList(
+                    new RelationalEntity<>(
+                        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                        MetadataObjectUtil.toEntityIdent(METALAKE, first),
+                        type,
+                        direct));
+              }
+              return Collections.emptyList();
+            });
+
+    Map<MetadataObject, TagEntity[]> result = resolver.resolve(METALAKE, List.of(first, second));
+
+    Assertions.assertArrayEquals(
+        new String[] {"engineering"}, result.get(first)[0].assignment().orElseThrow().values());
+    Assertions.assertFalse(result.get(first)[0].inherited().orElseThrow());
+    Assertions.assertArrayEquals(
+        new String[] {"finance"}, result.get(second)[0].assignment().orElseThrow().values());
+    Assertions.assertTrue(result.get(second)[0].inherited().orElseThrow());
+    verify(relationOperations, times(1))
+        .batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            List.of(MetadataObjectUtil.toEntityIdent(METALAKE, TABLE)),
+            Entity.EntityType.TABLE);
   }
 
   private static TagEntity tag(long id, String name, TagAssignment assignment) {
