@@ -49,9 +49,10 @@ import org.slf4j.LoggerFactory;
  * <p>Registers {@link TableMaintenanceActionOperations} for sample/finish callbacks. Cron and
  * commit pools poll. The expand pool stays stopped, and a policy lifecycle hook writes the matching
  * {@code policy-expand} row on the same transaction as create, alter, enable, disable, and delete.
- * On start, existing maintenance policies are reconciled into expand rows so upgrade and first-enable
- * paths do not wait for an edit. Pools stop on Jersey {@code DESTROY_FINISHED}, which runs during
- * Jetty shutdown before {@code GravitinoEnv} closes the entity-store {@code DataSource}.
+ * On start, existing maintenance policies are reconciled into expand rows so upgrade and
+ * first-enable paths do not wait for an edit. Pools stop on Jersey {@code DESTROY_FINISHED}, which
+ * runs during Jetty shutdown before {@code GravitinoEnv} closes the entity-store {@code
+ * DataSource}.
  *
  * <p>After {@link #stopSchedulers()}, a later {@link #configure} may start pools again, re-register
  * the destroy listener, and reconcile again (needed for tests / embedded restarts in the same JVM).
