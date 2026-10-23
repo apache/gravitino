@@ -19,19 +19,18 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
@@ -53,7 +52,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 public class DorisContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(DorisContainer.class);
 
-  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_DORIS_DOCKER_IMAGE");
+  public static final String DEFAULT_IMAGE = TestImages.DORIS;
   public static final String HOST_NAME = "gravitino-ci-doris";
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
@@ -71,7 +70,12 @@ public class DorisContainer extends BaseContainer {
   private static final String DORIS_FE_PATH = "/opt/apache-doris/fe/log";
   private static final String DORIS_BE_PATH = "/opt/apache-doris/be/log";
 
-  private final ComposeContainer composeContainer;
+  private static final String BASE_COMPOSE_FILE = "docker-compose.yaml";
+  private static final String DISPOSABLE_COMPOSE_FILE = "docker-compose-disposable.yaml";
+
+  private final String image;
+  private final String composeDir;
+  @Nullable private ComposeContainer composeContainer;
   private String feIpAddress;
   private int feMysqlPort;
 
@@ -93,15 +97,31 @@ public class DorisContainer extends BaseContainer {
     if (dir == null || dir.isEmpty()) {
       throw new RuntimeException("GRAVITINO_ROOT_DIR is not set");
     }
-    String composeFile =
-        ITUtils.joinPath(
-            dir, "integration-test-common", "doris-docker-script", "docker-compose.yaml");
+    this.composeDir = ITUtils.joinPath(dir, "integration-test-common", "doris-docker-script");
 
     Preconditions.check(
         "Doris Docker image must be configured via GRAVITINO_CI_DORIS_DOCKER_IMAGE "
             + "environment variable or DorisContainer builder withImage()",
         image != null && !image.isEmpty());
+    this.image = image;
+  }
 
+  /**
+   * Returns the Compose files the cluster starts from: the base file, plus {@value
+   * #DISPOSABLE_COMPOSE_FILE} when the cluster is {@link Durability#DISPOSABLE}.
+   *
+   * @return the Compose files, base file first
+   */
+  List<File> composeFiles() {
+    File base = new File(composeDir, BASE_COMPOSE_FILE);
+    return durability() == Durability.DISPOSABLE
+        ? List.of(base, new File(composeDir, DISPOSABLE_COMPOSE_FILE))
+        : List.of(base);
+  }
+
+  // Built at start rather than in the constructor, because the Compose files depend on the
+  // durability, which is set after the container is built.
+  private ComposeContainer newComposeContainer() {
     // Support both all-in-one images (e.g. apache/gravitino-ci:doris-0.1.5) and
     // split FE/BE images (e.g. apache/doris:fe-3.0.6.2 / apache/doris:be-3.0.6.2).
     // The compose file uses FE_IMAGE/BE_IMAGE with fallback to DOCKER_IMAGE.
@@ -115,8 +135,8 @@ public class DorisContainer extends BaseContainer {
       beImage = base + ":be-" + version;
     }
 
-    composeContainer =
-        new ComposeContainer(new File(composeFile))
+    ComposeContainer compose =
+        new ComposeContainer(RunNames.composeIdentifier("doris"), composeFiles())
             .withEnv("GRAVITINO_CI_DORIS_DOCKER_IMAGE", image)
             .withEnv("GRAVITINO_CI_DORIS_FE_IMAGE", feImage)
             .withEnv("GRAVITINO_CI_DORIS_BE_IMAGE", beImage)
@@ -126,14 +146,28 @@ public class DorisContainer extends BaseContainer {
                 Wait.forListeningPort()
                     .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
             .withExposedService(FE_SERVICE, FE_HTTP_PORT)
+            // Runs after the FE port checks; the FE answers before the BEs have registered.
+            .waitingFor(
+                FE_SERVICE,
+                new ProbeWaitStrategy(
+                        format("Doris to report %d live backends with capacity", BE_SCALE),
+                        ProbeWaitStrategy.jdbcQuery(
+                            target ->
+                                format(
+                                    "jdbc:mysql://%s:%d/",
+                                    target.getHost(), target.getMappedPort(FE_MYSQL_PORT)),
+                            USER_NAME,
+                            "",
+                            "SHOW PROC '/backends';",
+                            backends -> StarRocksContainer.readyBackends(backends) >= BE_SCALE))
+                    .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
             .withScaledService(BE_SERVICE, BE_SCALE)
             .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS))
-            .withTailChildContainers(true)
-            .withLocalCompose(true);
+            .withTailChildContainers(true);
 
     // Expose ports for each BE instance (1-indexed)
     for (int i = 1; i <= BE_SCALE; i++) {
-      composeContainer
+      compose
           .withExposedService(
               BE_SERVICE,
               i,
@@ -142,20 +176,22 @@ public class DorisContainer extends BaseContainer {
                   .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
           .withExposedService(BE_SERVICE, i, BE_WEBSERVER_PORT);
     }
+    return compose;
   }
 
   @Override
   public void start() {
-    composeContainer.start();
+    LOG.info("Starting Doris from {}", composeFiles());
+    composeContainer = newComposeContainer();
+    timedStart(composeContainer);
     resolveFeIpAddress();
-    Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
     Preconditions.check("Doris container password change failed!", changePassword());
   }
 
   @Override
   public void close() {
-    copyDorisLog();
     if (composeContainer != null) {
+      copyDorisLog();
       composeContainer.stop();
     }
   }
@@ -199,54 +235,6 @@ public class DorisContainer extends BaseContainer {
     return feMysqlPort;
   }
 
-  @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, feMysqlPort);
-    LOG.info("Doris JDBC url is {}", dorisJdbcUrl);
-
-    await()
-        .atMost(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .pollInterval(STARTUP_TIMEOUT_SECONDS / retryLimit, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try (Connection connection =
-                      DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
-                  Statement statement = connection.createStatement()) {
-
-                // execute `SHOW PROC '/backends';` to check if all backends are ready
-                String query = "SHOW PROC '/backends';";
-                int aliveCount = 0;
-                try (ResultSet resultSet = statement.executeQuery(query)) {
-                  while (resultSet.next()) {
-                    String alive = resultSet.getString("Alive");
-                    String totalCapacity = resultSet.getString("TotalCapacity");
-                    float totalCapacityFloat = Float.parseFloat(totalCapacity.split(" ")[0]);
-
-                    if (alive.equalsIgnoreCase("true") && totalCapacityFloat > 0.0f) {
-                      aliveCount++;
-                    }
-                  }
-                }
-
-                if (aliveCount >= BE_SCALE) {
-                  LOG.info(
-                      "Doris docker-compose cluster startup success! All {} backends are alive.",
-                      aliveCount);
-                  return true;
-                }
-                LOG.info(
-                    "Doris docker-compose cluster is not ready yet! {}/{} backends alive.",
-                    aliveCount,
-                    BE_SCALE);
-              } catch (Exception e) {
-                LOG.error(e.getMessage(), e);
-              }
-              return false;
-            });
-
-    return true;
-  }
-
   private void resolveFeIpAddress() {
     // Use the host-accessible address from Testcontainers (works on macOS/Linux).
     // The internal Docker network IP is not reachable from the host on macOS.
@@ -275,7 +263,7 @@ public class DorisContainer extends BaseContainer {
   public static class Builder
       extends BaseContainer.Builder<DorisContainer.Builder, DorisContainer> {
     private Builder() {
-      this.image = (DEFAULT_IMAGE != null && !DEFAULT_IMAGE.isEmpty()) ? DEFAULT_IMAGE : null;
+      this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
       this.exposePorts = ImmutableSet.of(FE_HTTP_PORT, FE_MYSQL_PORT);
     }

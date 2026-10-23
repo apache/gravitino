@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.rel.Column;
@@ -148,7 +149,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
   @Test
   public void testOperationTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_op_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16).toLowerCase() + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -269,7 +270,8 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
   @Test
   public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
-    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_type_default_table";
+    String tableName =
+        RandomStringUtils.insecure().nextAlphabetic(16).toLowerCase() + "_type_default_table";
     JdbcColumn col_1 =
         JdbcColumn.builder().withName("col_1").withType(INT).withNullable(false).build();
     JdbcColumn col_2 =
@@ -302,7 +304,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
   @Test
   public void testAlterTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_al_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16).toLowerCase() + "_al_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     JdbcColumn col_1 =
@@ -692,7 +694,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
   @Test
   public void testCreateAndLoadTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_cl_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16).toLowerCase() + "_cl_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -1056,7 +1058,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
                     Distributions.NONE,
                     Indexes.EMPTY_INDEXES));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             exception.getMessage(),
             "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
 
@@ -1092,7 +1094,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
                     Distributions.NONE,
                     primaryIndex));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             exception.getMessage(),
             "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: [col_1,col_4]"));
   }
@@ -1161,7 +1163,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     sql = OceanBaseTableOperations.addIndexDefinition(successIndex);
     Assertions.assertEquals("ADD PRIMARY KEY  (`col_1`, `col_2`)", sql);
 
-    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_oi_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16).toLowerCase() + "_oi_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -1307,7 +1309,8 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
   @Test
   public void testAlterTableSkipsEmptySql() {
-    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_skip_empty_sql";
+    String tableName =
+        RandomStringUtils.insecure().nextAlphabetic(16).toLowerCase() + "_skip_empty_sql";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
         JdbcColumn.builder()

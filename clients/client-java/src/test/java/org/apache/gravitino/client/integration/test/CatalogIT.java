@@ -44,8 +44,9 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -58,11 +59,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@HiveFixture
 public class CatalogIT extends BaseIT {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogIT.class);
+  @FixtureContainer private HiveContainer hive;
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogIT.class);
 
   private static final String metalakeName = GravitinoITUtils.genRandomName("catalog_it_metalake");
 
@@ -72,12 +74,9 @@ public class CatalogIT extends BaseIT {
 
   @BeforeAll
   public void startUp() {
-    containerSuite.startHiveContainer();
     hmsUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     Assertions.assertFalse(client.metalakeExists(metalakeName));
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
