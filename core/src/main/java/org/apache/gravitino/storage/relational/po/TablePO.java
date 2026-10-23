@@ -20,6 +20,8 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 
 @Getter
@@ -42,6 +44,19 @@ public class TablePO {
   private String distribution;
   private String indexes;
   private String comment;
+
+  // Populated only by the single-statement aggregate read; not a column of table_meta.
+  private List<ColumnPO> columnPOs = new ArrayList<>();
+
+  /**
+   * Returns the columns read in the same statement as this table, or an empty list for row-only
+   * reads.
+   *
+   * @return the column snapshot
+   */
+  public List<ColumnPO> getColumnPOs() {
+    return columnPOs;
+  }
 
   public Long getTableId() {
     return tableId;

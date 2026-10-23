@@ -20,6 +20,8 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserPO {
   private Long userId;
@@ -29,6 +31,17 @@ public class UserPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+
+  private List<RolePO> rolePOs = new ArrayList<>();
+
+  /**
+   * Returns roles loaded in the same statement as this principal.
+   *
+   * @return the membership snapshot, or an empty list for metadata-only reads
+   */
+  public List<RolePO> getRolePOs() {
+    return rolePOs;
+  }
 
   public Long getUserId() {
     return userId;
