@@ -873,7 +873,66 @@ public class GravitinoEnv {
       secretManager.close();
     }
 
+    clearComponents();
     LOG.info("Gravitino Environment is shut down.");
+  }
+
+  // The environment is a JVM-wide singleton. Without this, a later initialization or test in the
+  // same JVM would see components that are already closed, or test doubles an earlier test set.
+  private void clearComponents() {
+    config = null;
+    manageFullComponents = true;
+    entityStore = null;
+    catalogDispatcher = null;
+    internalCatalogDispatcher = null;
+    catalogManager = null;
+    metalakeManager = null;
+    schemaDispatcher = null;
+    internalSchemaDispatcher = null;
+    tableDispatcher = null;
+    internalTableDispatcher = null;
+    partitionDispatcher = null;
+    internalPartitionDispatcher = null;
+    filesetDispatcher = null;
+    internalFilesetDispatcher = null;
+    topicDispatcher = null;
+    internalTopicDispatcher = null;
+    modelDispatcher = null;
+    internalModelDispatcher = null;
+    functionDispatcher = null;
+    internalFunctionDispatcher = null;
+    semanticModelDispatcher = null;
+    internalSemanticModelDispatcher = null;
+    viewDispatcher = null;
+    internalViewDispatcher = null;
+    metalakeDispatcher = null;
+    internalMetalakeDispatcher = null;
+    credentialOperationDispatcher = null;
+    secretPropertyOperationDispatcher = null;
+    kmsClientRegistry = null;
+    secretManager = null;
+    tagDispatcher = null;
+    internalTagDispatcher = null;
+    policyDispatcher = null;
+    internalPolicyDispatcher = null;
+    accessControlDispatcher = null;
+    internalAccessControlDispatcher = null;
+    idGenerator = null;
+    auxServiceManager = null;
+    metricsSystem = null;
+    lockManager = null;
+    eventListenerManager = null;
+    auditLogManager = null;
+    jobOperationDispatcher = null;
+    internalJobOperationDispatcher = null;
+    eventBus = null;
+    ownerDispatcher = null;
+    internalOwnerDispatcher = null;
+    bulkManager = null;
+    futureGrantManager = null;
+    gravitinoAuthorizer = null;
+    statisticDispatcher = null;
+    internalStatisticDispatcher = null;
   }
 
   private void initBaseComponents() {
