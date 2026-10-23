@@ -44,8 +44,9 @@ than federating an external one, so no provider is needed when creating it.
 [Catalogs and Schemas](./catalogs-and-schemas.md). A fileset catalog usually carries a base
 `location`, and schemas can narrow it further.
 
-**2. Create the fileset.** Give it a name, a type, and a storage location. Creating a managed
-fileset creates the directory; pointing at an existing path makes it external.
+**2. Create the fileset.** Give it a name, a type, and a storage location. Choose `MANAGED` to let
+Gravitino manage the data lifecycle, or `EXTERNAL` to retain the data when the fileset is dropped.
+Pointing at an existing path does not automatically make a fileset external.
 
 **3. Read it by name.** Engines reach the files through GVFS or the client rather than the raw path.
 See [How to use GVFS](./how-to-use-gvfs.md).
@@ -54,14 +55,19 @@ See [How to use GVFS](./how-to-use-gvfs.md).
 
 ### Managed and External
 
-A managed fileset belongs to Gravitino. Creating it creates the directory, and deleting it deletes
-the data.
+A managed fileset belongs to Gravitino. Creating it creates the directory if needed, and deleting
+it deletes the data.
 
-An external fileset points at a location that already exists and stays under someone else's control.
-Deleting it removes the Gravitino record and leaves the files alone.
+An external fileset leaves data lifecycle management to the user. Deleting it removes only the
+Gravitino record and preserves the files. With filesystem operations enabled, creating either
+type creates the storage directory if it does not exist.
 
-The distinction only matters at deletion time, and it is the single most important thing to get
-right when creating one.
+An existing fileset can be converted between the two types using
+[`FilesetChange.updateType`](./manage-fileset-metadata-using-gravitino.md#change-the-fileset-type).
+Conversion changes metadata only and preserves its identity, locations, and files. Converting to
+external relinquishes management of the data; converting to managed accepts deletion of the data
+when the fileset is dropped. With `disable-filesystem-ops=true`, dropping a fileset removes only
+its metadata, even after conversion to `MANAGED`.
 
 ### Storage Locations
 
