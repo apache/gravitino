@@ -22,9 +22,18 @@ async function watch({ github, context, core, self, interval = 60000, sleep = ms
   let idle = 0;
   // Dependent jobs appear only once their needs finish, so require two quiet polls before exiting.
   while (idle < 2) {
-    const jobs = (await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
-      ...context.repo, run_id: context.runId, attempt_number: attempt, per_page: 100
-    })).filter(job => job.name !== self);
+    let jobs;
+    try {
+      jobs = (await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+        ...context.repo, run_id: context.runId, attempt_number: attempt, per_page: 100
+      })).filter(job => job.name !== self);
+    } catch (error) {
+      // The watcher only observes the suites. A transient API error must not fail a run whose
+      // suites pass, so keep polling until the job times out.
+      core.warning(`Could not list the run's jobs: ${error.message}. Retrying in a minute.`);
+      await sleep(interval);
+      continue;
+    }
     const failed = jobs.filter(job => STOPPED.includes(job.conclusion)).map(job => job.name);
     const running = jobs.filter(job => job.status !== 'completed').map(job => job.name);
     core.info(`${jobs.length - running.length}/${jobs.length} jobs completed, ` +
@@ -32,8 +41,12 @@ async function watch({ github, context, core, self, interval = 60000, sleep = ms
       (running.length > 5 ? ` and ${running.length - 5} more` : '') : ''));
     if (failed.length) {
       core.error(`Cancelling the run because these jobs failed: ${failed.join(', ')}. Re-run failed jobs once it is cancelled.`);
-      await github.rest.actions.cancelWorkflowRun({ ...context.repo, run_id: context.runId });
-      return failed;
+      try {
+        await github.rest.actions.cancelWorkflowRun({ ...context.repo, run_id: context.runId });
+        return failed;
+      } catch (error) {
+        core.warning(`Could not cancel the run: ${error.message}. Retrying in a minute.`);
+      }
     }
     idle = running.length ? 0 : idle + 1;
     if (idle < 2) await sleep(interval);

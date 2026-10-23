@@ -13,11 +13,18 @@
  * limitations under the License.
  */
 'use strict';
+const { TRUSTED_REQUIRED } = require('./publish-ci-status.cjs');
 const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
 const SUITES = ['build', 'backend', 'spark', 'flink', 'trino', 'iceberg_rest_trino', 'python',
   'frontend', 'access_control', 'idp_basic', 'mcp', 'maintenance', 'web_ui', 'charts',
   'contrib_catalog', 'asf_allowlist'];
+// The fail-fast watcher in fork-ci.yml never fails the run (continue-on-error), but runs that
+// started before that change can still fail on the watcher's own API errors.
+const FAIL_FAST = 'Stop on first failure';
 const requiredName = (pr, baseSha = pr.base.sha) => `Required CI / ${pr.base.ref} / ${baseSha} / ${pr.head.sha}`;
+const MISSING_WORKFLOW = 'Your fork has no Fork CI workflow, so pushes to this branch do not run CI. ' +
+  'Merge or rebase the branch onto the latest base branch, which adds .github/workflows/fork-ci.yml, ' +
+  'make sure Actions are enabled in your fork, and push again.';
 const requiredAction = note => ({ status: 'completed', conclusion: 'action_required',
   title: 'Fork CI needs attention', note });
 
@@ -29,9 +36,13 @@ function evaluate(pr, run, jobs, baseSha = pr.base.sha) {
     return { status: running ? 'in_progress' : 'queued',
       title: running ? 'Fork CI is running' : 'Fork CI is queued, waiting for a runner' };
   }
-  if (run.conclusion !== 'success') {
+  const failed = jobs.filter(job => job.name !== FAIL_FAST && ['failure', 'timed_out'].includes(job.conclusion))
+    .map(job => job.name);
+  // A run that failed only because of the watcher is judged by its suites below.
+  const watcherOnly = run.conclusion === 'failure' && !failed.length &&
+    jobs.some(job => job.name === FAIL_FAST && ['failure', 'timed_out'].includes(job.conclusion));
+  if (run.conclusion !== 'success' && !watcherOnly) {
     // Fork CI cancels its own run on the first failed job, so report that job, not the cancellation.
-    const failed = jobs.filter(job => ['failure', 'timed_out'].includes(job.conclusion)).map(job => job.name);
     if (failed.length) return { status: 'completed', conclusion: 'failure',
       title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
     return { status: 'completed',
@@ -125,7 +136,15 @@ function createService(github) {
   async function mirror(pr) {
     if (!pr.head.repo) return { result: requiredAction('The PR head repository no longer exists.') };
     // Read trusted metadata only. Nothing in the contributor repository is checked out or executed.
-    let ordinary = await findRun(pr, false);
+    let ordinary;
+    let missingWorkflow = false;
+    try {
+      ordinary = await findRun(pr, false);
+    } catch (error) {
+      // The fork never ran fork-ci.yml, e.g. the branch predates the Fork CI migration.
+      if (error.status !== 404) throw error;
+      missingWorkflow = true;
+    }
     const sameDefinitions = await unchanged(pr);
     let trusted = await findRun(pr, true);
     let trustedJobs;
@@ -142,7 +161,9 @@ function createService(github) {
       ? trusted : ordinary;
     // Run listings can lag behind, e.g. right after a push or during GitHub incidents, so keep
     // waiting instead of asking the author to act.
-    if (!selected) return { result: { status: 'queued', title: 'Waiting for Fork CI',
+    if (!selected && missingWorkflow) return { result: { ...requiredAction(MISSING_WORKFLOW),
+      title: 'Fork CI has never run in your fork; merge the latest base branch and push' } };
+    if (!selected) return { result: { status: 'queued', title: 'Waiting for Fork CI; enable Actions in your fork if no run starts',
       note: 'No Fork CI run was found for this commit yet. If none starts, enable Actions in your fork and push again, ' +
         'or ask a committer to dispatch trusted Fork CI.' } };
     const { owner, repo, run } = selected;
@@ -159,11 +180,11 @@ function createService(github) {
       // Approval of CI edits is separate from execution progress. Never turn a running fork
       // into a completed error, or hide an actual failure behind the trust requirement.
       result = run.status === 'completed' && run.conclusion === 'success'
-        ? { ...requiredAction(note), title: 'Fork CI passed; trusted verification required' }
+        ? { ...requiredAction(note), title: TRUSTED_REQUIRED }
         : { ...result, note: `${result.title}. ${note}` };
     }
     return { ...selected, fork: ordinary?.run, base, result };
   }
   return { mirror, unchanged, findRun };
 }
-module.exports = { SUITES, requiredName, evaluate, createService };
+module.exports = { FAIL_FAST, SUITES, requiredName, evaluate, createService };

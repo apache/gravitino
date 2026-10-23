@@ -19,8 +19,15 @@ async function retireCancelled({ github, repo, pr }) {
   if (!pr.head.repo || !pr.head.ref) return;
   const fork = { owner: pr.head.repo.owner.login, repo: pr.head.repo.name };
   // Bound history work independently of branch age. Most pushes supersede just one run.
-  const { data } = await github.rest.actions.listWorkflowRuns({ ...fork, workflow_id: 'fork-ci.yml',
-    event: 'push', branch: pr.head.ref, per_page: 10 });
+  let data;
+  try {
+    ({ data } = await github.rest.actions.listWorkflowRuns({ ...fork, workflow_id: 'fork-ci.yml',
+      event: 'push', branch: pr.head.ref, per_page: 10 }));
+  } catch (error) {
+    // The fork never ran fork-ci.yml, so there is no history to retire.
+    if (error.status === 404) return;
+    throw error;
+  }
   for (const run of data.workflow_runs) {
     if (run.head_sha === pr.head.sha || run.head_branch !== pr.head.ref ||
         run.path !== '.github/workflows/fork-ci.yml' || run.event !== 'push' ||

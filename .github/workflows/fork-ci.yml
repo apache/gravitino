@@ -260,6 +260,8 @@ jobs:
     # Not ubuntu-slim: it limits jobs to 15 minutes, and this job lasts as long as the slowest suite.
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    # The watcher only observes the suites; its own failure or timeout must not fail the run.
+    continue-on-error: true
     permissions:
       contents: read
       actions: write

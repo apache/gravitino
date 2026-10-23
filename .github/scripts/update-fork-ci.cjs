@@ -18,9 +18,14 @@ const { publishStatus, statusState } = require('./publish-ci-status.cjs');
 const { retireCancelled } = require('./retire-fork-ci.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
-// Publishers share one workflow concurrency group. Keep sweeps short so signals do not
-// wait behind a runner sleeping between polls; later schedules read current fork metadata.
-async function update({ github, context, core, clock = Date.now }) {
+// Fork runs finish without an upstream event, and GitHub fires five-minute schedules only every
+// 10-36 minutes on apache/gravitino. A scheduled sweep therefore keeps polling for LOOP_MS, one
+// pass every PASS_MS, staying below the 15-minute job limit of ubuntu-slim. Sweeps run in their
+// own concurrency group, so PR signals never wait behind a sleeping sweep.
+const LOOP_MS = 11 * 60 * 1000;
+const PASS_MS = 2 * 60 * 1000;
+
+async function update({ github, context, core, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), clock = Date.now }) {
   const signal = context.eventName === 'workflow_run' && context.payload.workflow_run.name === 'Fork CI PR Signal';
   const trustedSignal = context.eventName === 'workflow_run' &&
     context.payload.workflow_run.event === 'workflow_dispatch' &&
@@ -45,7 +50,9 @@ async function update({ github, context, core, clock = Date.now }) {
   // the hourly quota across five-minute sweeps, and never less than 60 calls per sweep.
   const perSweep = Math.max(60, Math.floor(rate.limit / 24));
   const budget = manual ? Math.max(0, rate.remaining - 100) : Math.min(perSweep, Math.max(0, rate.remaining - 100));
-  const slotMs = 300000;
+  // Small quotas keep one pass per sweep; larger ones split the sweep budget across passes.
+  const passes = manual ? 1 : Math.max(1, Math.min(Math.ceil(LOOP_MS / PASS_MS), Math.floor(budget / 60)));
+  const slotMs = passes > 1 ? PASS_MS : 300000;
   let calls = 0;
   github.hook.before('request', () => { calls++; });
   const failures = new Set();
@@ -90,7 +97,7 @@ async function update({ github, context, core, clock = Date.now }) {
     const params = { ...context.repo, ...result, output, details_url: details };
     delete params.title;
     delete params.note;
-    // Workflow concurrency serializes signal and sweep writers. Also never replace a newer
+    // Signals and sweeps can publish concurrently. Read the check last and never replace a newer
     // attempt of a run from the same repository, or a completed result with a running one.
     const latest = await latestCheck(pr);
     const oldRecord = recordOf(latest);
@@ -110,10 +117,16 @@ async function update({ github, context, core, clock = Date.now }) {
     } else if (!sameRun || latest.status !== result.status || latest.conclusion !== (result.conclusion || null) || latest.output?.summary !== output.summary || latest.output?.text !== output.text) {
       await github.rest.checks.update({ ...params, check_run_id: latest.id });
     }
-    // Even an unchanged metadata check may be absent from the PR's latest-check view.
-    // Backfill the commit status independently, after the same stale-result guards.
+    // Even an unchanged metadata check may be absent from the PR's latest-check view, so
+    // backfill the commit status. Derive it from the check as it is now, not from this
+    // publisher's snapshot: a concurrent writer may have recorded a newer result meanwhile.
+    // Any remaining interleaving is repaired by the next pass, which compares both.
+    const settled = (await latestCheck(pr)) || { ...result, output };
+    const settledRecord = recordOf(settled);
     await publishStatus({ github, repo: context.repo, sha: pr.head.sha, context: 'Fork CI',
-      state: statusState(result), description: result.title, targetUrl: details });
+      state: statusState(settled), description: settled.output?.title || result.title,
+      targetUrl: settledRecord.run_id
+        ? `https://github.com/${settledRecord.owner}/${settledRecord.repo}/actions/runs/${settledRecord.run_id}` : pr.html_url });
   }
   async function visit(pr, work) {
     processed++;
@@ -133,6 +146,7 @@ async function update({ github, context, core, clock = Date.now }) {
   let processed = 0;
   let visited = new Set();
   let prs = [];
+  let recentCursor = null;
   async function pass(budget) {
     const now = clock();
     prs = await listPrs();
@@ -143,9 +157,11 @@ async function update({ github, context, core, clock = Date.now }) {
     // signal a refresh, or with a fork rerun, so refresh it only when the fork run id or attempt changed.
     const recent = manual ? [] : prs.filter(pr => now - Date.parse(pr.updated_at) < RECENT_MS)
       .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
-    // Probes need up to four calls, so rotate them too and keep a third of the budget for older PRs.
+    // Probes need up to five calls, so rotate them too and keep a third of the budget for older PRs.
+    // Later passes of the same sweep resume where the previous pass stopped.
     const recentBudget = Math.floor(budget * 2 / 3);
-    const recentStart = !recent.length ? 0 : (Math.floor(now / slotMs) * Math.max(1, Math.floor(recentBudget / 4))) % recent.length;
+    const recentStart = !recent.length ? 0 : (recentCursor ??
+      Math.floor(now / slotMs) * Math.max(1, Math.floor(recentBudget / 5))) % recent.length;
     let probed = 0;
     for (let offset = 0; offset < recent.length; offset++) {
       if (calls + 15 > recentBudget) break; // One PR may need trees, runs, paginated jobs and a check write.
@@ -156,14 +172,18 @@ async function update({ github, context, core, clock = Date.now }) {
         if (latest?.status === 'completed') {
           if (!pr.head.repo) return;
           const record = recordOf(latest);
-          const fork = (await service.findRun(pr, false))?.run;
+          // A fork without fork-ci.yml (404) has no run to watch; its check already says so.
+          const fork = (await service.findRun(pr, false).catch(error => {
+            if (error.status !== 404) throw error;
+          }))?.run;
           // Trusted reruns and new dispatches also start without a PR-head signal. A
           // settled fork alone cannot prove the selected trusted execution is settled.
           const trusted = (await service.findRun(pr, true))?.run;
           const trustedSettled = record.trusted
             ? trusted?.id === record.run_id && trusted.run_attempt === record.run_attempt && trusted.status === 'completed'
             : !trusted;
-          if (trustedSettled && record.run_status === 'completed' && (!fork || (fork.status === 'completed' &&
+          // A completed check without a run (no fork workflow) changes only with a push or a run.
+          if (trustedSettled && (record.run_status === 'completed' || !record.run_id) && (!fork || (fork.status === 'completed' &&
               fork.id === (record.fork_run_id ?? record.run_id) &&
               fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt)))) {
             // A completed metadata check does not prove the visible status was written:
@@ -179,6 +199,7 @@ async function update({ github, context, core, clock = Date.now }) {
         await refresh(pr);
       });
     }
+    recentCursor = recentStart + probed;
     // Rotate the rest using trusted wall-clock time, so old PRs are eventually visited without
     // accepting a contributor-writable cursor. Advance by about one sweep's capacity.
     const step = Math.max(1, Math.floor(budget / 20));
@@ -192,7 +213,15 @@ async function update({ github, context, core, clock = Date.now }) {
     core.info(`Visited ${processed}/${prs.length} PRs (probed ${probed}/${recent.length} recently updated); ` +
       `${calls}/${budget} API calls; starting index ${start}.`);
   }
-  await pass(budget);
+  const deadline = clock() + LOOP_MS;
+  for (let i = 0; i < passes; i++) {
+    if (i) {
+      if (clock() + PASS_MS > deadline) break;
+      await sleep(PASS_MS);
+      calls = 0;
+    }
+    await pass(Math.floor(budget / passes));
+  }
   if (manual && processed < prs.length) core.setFailed('API budget exhausted; dispatch again for a specific PR after the quota resets.');
   if (failures.size) core.setFailed(`Unable to refresh: ${[...failures].map(n => `#${n}`).join(', ')}`);
 }

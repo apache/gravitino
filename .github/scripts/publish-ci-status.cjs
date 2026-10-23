@@ -25,10 +25,15 @@ async function publishStatus({ github, repo, sha, context, state, description, t
   await github.rest.repos.createCommitStatus(params);
 }
 
+// Waiting for a committer is not a failure of the contributor's change.
+const TRUSTED_REQUIRED = 'Fork CI passed; trusted verification required';
+
+// Accepts a computed result ({ status, conclusion, title }) or a check run (title in output).
 function statusState(result) {
   if (result.status !== 'completed') return 'pending';
+  if ((result.title ?? result.output?.title) === TRUSTED_REQUIRED) return 'pending';
   if (result.conclusion === 'success') return 'success';
   return result.conclusion === 'failure' || result.conclusion === 'timed_out' ? 'failure' : 'error';
 }
 
-module.exports = { publishStatus, statusState };
+module.exports = { TRUSTED_REQUIRED, publishStatus, statusState };

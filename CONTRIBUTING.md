@@ -123,7 +123,7 @@ After reopening a PR, use either of these methods to run CI again:
   git push FORK_REMOTE HEAD:PR_BRANCH
   ```
 
-If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. If an old run is no longer available for rerun, push a new commit instead. Fork CI cancels the rest of a run when a job fails, so wait for cancellation to finish before rerunning jobs. Please fix failures before requesting a review.
+If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. A branch created before Fork CI was introduced does not contain `.github/workflows/fork-ci.yml`, so pushing it runs no CI; the check then asks you to merge or rebase onto the latest base branch. If an old run is no longer available for rerun, push a new commit instead. Fork CI cancels the rest of a run when a job fails, so wait for cancellation to finish before rerunning jobs. Please fix failures before requesting a review.
 
 Reopening the PR or dispatching **Update Fork CI Status** only refreshes results; neither starts fork CI. If the check requests trusted verification for CI-definition changes, a committer must dispatch the trusted upstream **Fork CI** run described below; rerunning the fork does not satisfy that requirement.
 
@@ -131,9 +131,9 @@ Reopening the PR or dispatching **Update Fork CI Status** only refreshes results
 
 Status synchronization closes unfinished checks for confirmed canceled runs among the fork branch's ten most recent runs.
 
-Publishers serialize status writes so an older synchronization cannot overwrite a newer result. Each scheduled run makes one bounded pass and releases its runner; signals wait in a queue of up to 100 runs. GitHub cancels excess runs when that queue is full; later sweeps recover Fork CI updates, and committers can manually dispatch either publisher for a specific PR.
+Fork runs cannot notify `apache/gravitino` when they finish, so a scheduled sweep polls recently updated PRs every two minutes for 11 minutes; GitHub starts these sweeps every 10-40 minutes. PR events are processed in order in a separate queue of up to 100 runs, so they never wait behind a sweep. Before writing the commit status, each publisher re-reads the check and publishes what it records, and the next pass repairs any interleaving. GitHub cancels excess runs when the queue is full; later sweeps recover Fork CI updates, and committers can manually dispatch either publisher for a specific PR.
 
-The publishers report **Fork CI** and **ASF Allowlist Check** as commit statuses with direct links to the corresponding runs. Additional check runs retain diagnostic metadata; GitHub can omit those checks from the PR's latest-check view after another signal run. Queued and running CI both have a pending status, with the description distinguishing whether jobs have started. This also applies to PRs that edit CI definitions: their check explains that trusted verification will be needed, while continuing to show execution progress. Failed tests report failure; cancellation reports error. A successful fork run with changed CI definitions reports **Fork CI passed; trusted verification required** until a trusted run verifies the PR.
+The publishers report **Fork CI** and **ASF Allowlist Check** as commit statuses with direct links to the corresponding runs. Additional check runs retain diagnostic metadata; GitHub can omit those checks from the PR's latest-check view after another signal run. Queued and running CI both have a pending status, with the description distinguishing whether jobs have started. This also applies to PRs that edit CI definitions: their check explains that trusted verification will be needed, while continuing to show execution progress. Failed tests report failure; cancellation reports error. A successful fork run with changed CI definitions stays pending as **Fork CI passed; trusted verification required** until a trusted run verifies the PR. The job that stops a run on the first failure only observes the other jobs: its own errors never fail the run.
 
 Known limitations of Fork CI:
 

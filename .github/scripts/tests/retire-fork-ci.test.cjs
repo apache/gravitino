@@ -82,3 +82,12 @@ test('settled retired attempts do not repeatedly query the attempt, PR or status
   await retireCancelled(f);
   assert.equal(f.writes.length, 2);assert.equal(f.statuses.length, 1);
 });
+
+test('a fork without the Fork CI workflow has no history to retire', async () => {
+  const { github, repo, pr, writes, statuses } = fixture();
+  github.rest.actions.listWorkflowRuns = async () => { throw Object.assign(new Error('Not Found'), { status: 404 }); };
+  await retireCancelled({ github, repo, pr });
+  assert.equal(writes.length, 0); assert.equal(statuses.length, 0);
+  github.rest.actions.listWorkflowRuns = async () => { throw Object.assign(new Error('Server Error'), { status: 500 }); };
+  await assert.rejects(retireCancelled({ github, repo, pr }), /Server Error/);
+});
