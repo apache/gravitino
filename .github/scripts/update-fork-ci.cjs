@@ -14,6 +14,7 @@
  */
 'use strict';
 const { createService } = require('./fork-ci-status.cjs');
+const { publishStatus, statusState } = require('./publish-ci-status.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
 // Fork runs finish without an upstream event, and GitHub fires five-minute schedules only every
@@ -72,7 +73,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     if (!(await availableBases.get(pr.base.sha))) return;
     const mirror = await service.mirror(pr);
     const { result, run } = mirror;
-    const note = result.note || (result.status !== 'completed' ? 'Waiting for the fork run.'
+    const note = result.note || (result.status !== 'completed' ? result.title
       : result.conclusion === 'success' ? 'Verified all caller suites.' : 'Open the run to see which jobs did not succeed.');
     const testedBase = mirror.base && mirror.base !== pr.base.sha ? `\nTested base: ${mirror.base}` : '';
     const record = { owner: mirror.owner, repo: mirror.repo, run_id: run?.id,
@@ -106,6 +107,10 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     } else if (!sameRun || latest.status !== result.status || latest.conclusion !== (result.conclusion || null) || latest.output?.summary !== output.summary || latest.output?.text !== output.text) {
       await github.rest.checks.update({ ...params, check_run_id: latest.id });
     }
+    // Even an unchanged metadata check may be absent from the PR's latest-check view.
+    // Backfill the commit status independently, after the same stale-result guards.
+    await publishStatus({ github, repo: context.repo, sha: pr.head.sha, context: 'Fork CI',
+      state: statusState(result), description: result.title, targetUrl: details });
   }
   async function visit(pr, work) {
     processed++;
@@ -147,7 +152,13 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
           const record = recordOf(latest);
           const fork = (await service.findRun(pr, false))?.run;
           if (!fork || (fork.id === (record.fork_run_id ?? record.run_id) &&
-              fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt))) return;
+              fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt))) {
+            // A completed metadata check does not prove the visible status was written:
+            // the status API can fail after the check write, or this may be a pre-migration PR.
+            const { data } = await github.rest.repos.getCombinedStatusForRef({
+              ...context.repo, ref: pr.head.sha, per_page: 100 });
+            if (data.statuses.some(status => status.context === 'Fork CI' && status.state === statusState(latest))) return;
+          }
         }
         await refresh(pr);
       });

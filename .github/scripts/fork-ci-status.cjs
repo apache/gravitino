@@ -23,7 +23,12 @@ const requiredAction = note => ({ status: 'completed', conclusion: 'action_requi
 
 function evaluate(pr, run, jobs, baseSha = pr.base.sha) {
   const required = jobs.find(job => job.name === requiredName(pr, baseSha));
-  if (run.status !== 'completed') return { status: 'in_progress', title: 'Fork CI is running' };
+  if (run.status !== 'completed') {
+    // A workflow can remain queued while some of its matrix jobs already have runners.
+    const running = run.status === 'in_progress' || jobs.some(job => job.status === 'in_progress');
+    return { status: running ? 'in_progress' : 'queued',
+      title: running ? 'Fork CI is running' : 'Fork CI is queued, waiting for a runner' };
+  }
   if (run.conclusion !== 'success') {
     // Fork CI cancels its own run on the first failed job, so report that job, not the cancellation.
     const failed = jobs.filter(job => ['failure', 'timed_out'].includes(job.conclusion)).map(job => job.name);

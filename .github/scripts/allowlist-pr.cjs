@@ -15,6 +15,7 @@
 'use strict';
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { publishStatus } = require('./publish-ci-status.cjs');
 const MAX_FILE = 1024 * 1024;
 const MAX_TOTAL = 8 * MAX_FILE;
 
@@ -82,11 +83,15 @@ async function publish({ github, context, core }) {
     const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
     if (current.state !== 'open' || current.head.sha !== pr.sha) continue;
     const success = process.env.SCAN_OUTCOME === 'success';
+    const details = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
     await github.rest.checks.create({ ...context.repo, name: 'ASF Allowlist Check', head_sha: pr.sha,
       status: 'completed', conclusion: success ? 'success' : 'failure',
-      details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+      details_url: details,
       output: { title: success ? 'Workflow actions are allowlisted' : 'Workflow allowlist scan failed',
         summary: 'Scanned PR YAML as data with the reviewed default-branch workflow. No PR code was executed.' } });
+    await publishStatus({ github, repo: context.repo, sha: pr.sha, context: 'ASF Allowlist Check',
+      state: success ? 'success' : 'failure',
+      description: success ? 'Workflow actions are allowlisted' : 'Workflow allowlist scan failed', targetUrl: details });
   }
   if (process.env.SCAN_OUTCOME !== 'success' && prs.length) core.setFailed('ASF allowlist scan failed.');
 }

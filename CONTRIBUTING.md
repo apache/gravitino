@@ -101,6 +101,8 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 
 If the check asks you to enable Fork CI, enable Actions in your fork, merge or rebase your branch onto the latest base branch, and push again. Fork CI cancels the rest of the run as soon as one job fails, so you can re-run failed jobs in your fork right away; this also re-runs the jobs it cancelled. Reviewers cannot re-run them for you. Closing and reopening a pull request only refreshes the check from the latest fork run; to run CI again, re-run the workflow in your fork or push again. Please fix failures before requesting a review.
 
+The publishers report **Fork CI** and **ASF Allowlist Check** as commit statuses with direct links to the corresponding runs. Additional check runs retain diagnostic metadata; GitHub can omit those checks from the PR's latest-check view after another signal run. Queued and running CI both have a pending status, with the description distinguishing whether jobs have started. Failed tests report failure; cancellation or a required trusted run reports error.
+
 Known limitations of Fork CI:
 
 * New/edited PR notifications wake a default-branch publisher. Fork run completions and reruns, including reruns of successful runs, are polled on a five-minute schedule, subject to GitHub scheduling delays and a bounded API budget. All open PRs, including settled successes, remain watched. The starting PR rotates on each scheduled interval; large queues can take longer. Committers can force-refresh a particular PR using **Update Fork CI Status** with its PR number.

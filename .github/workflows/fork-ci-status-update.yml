@@ -50,6 +50,7 @@ jobs:
     permissions:
       actions: read
       checks: write
+      statuses: write
       contents: read
       pull-requests: read
     steps:
