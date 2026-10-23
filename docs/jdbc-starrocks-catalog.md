@@ -149,7 +149,15 @@ Unsupported for now.
 
 ### Table Indexes
 
-Unsupported. Creating a table with non-empty index definitions is rejected before the table is created.
+Creating a table with non-empty index definitions is rejected before the table is created.
+
+When loading a table, Gravitino reports StarRocks secondary indexes with the following type mapping. Indexes of other types (e.g. `NGRAMBF`) are not reported, and table keys are not reported as indexes.
+
+| StarRocks Index Type | Gravitino Index Type |
+|----------------------|----------------------|
+| `BITMAP`             | `BITMAP`             |
+| `GIN`                | `INVERTED`           |
+| `VECTOR`             | `VECTOR`             |
 
 ### Table Partitioning
 
