@@ -47,6 +47,7 @@ import { useAppSelector } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 import PropertiesContent from '@/components/PropertiesContent'
+import { formatColumnType } from '@/lib/utils/columnType'
 
 const { Title, Paragraph } = Typography
 const { Search } = Input
@@ -197,7 +198,11 @@ export default function ViewDetailsPage() {
         filters: columnTypeFilters,
         onFilter: (value, record) =>
           typeof record.type === 'string' ? record.type.indexOf(value) === 0 : record.type.type.indexOf(value) === 0,
-        render: type => <Tag color={columnTypeColor(type)}>{typeof type === 'string' ? type : type.type}</Tag>
+        render: type => (
+          <Tag color={columnTypeColor(type)} title={formatColumnType(type)}>
+            {formatColumnType(type)}
+          </Tag>
+        )
       },
       {
         title: 'Nullable',
