@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -416,6 +417,45 @@ public class TestDorisTableOperations extends TestDoris {
                     indexes,
                     Transforms.EMPTY_TRANSFORM,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    String tableName = GravitinoITUtils.genRandomName("doris_clear_comment_table");
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
+
+    try {
+      TABLE_OPERATIONS.create(
+          databaseName,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          createProperties(),
+          null,
+          Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+          Indexes.EMPTY_INDEXES);
+
+      // Doris rejects table and column comment changes in the same ALTER statement.
+      TABLE_OPERATIONS.alterTable(
+          databaseName, tableName, TableChange.updateColumnComment(new String[] {"col_1"}, null));
+      TABLE_OPERATIONS.alterTable(databaseName, tableName, TableChange.updateComment(null));
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(
+              () -> {
+                JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
+                // Doris reports the engine name (OLAP) as the comment of a table without a comment.
+                Assertions.assertTrue(
+                    StringUtils.isEmpty(load.comment()) || "OLAP".equals(load.comment()),
+                    load.comment());
+                Assertions.assertTrue(
+                    StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
+              });
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
   }
 
   @Test

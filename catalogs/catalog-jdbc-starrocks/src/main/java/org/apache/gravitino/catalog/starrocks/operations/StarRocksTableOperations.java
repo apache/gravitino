@@ -178,7 +178,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateComment) {
         TableChange.UpdateComment updateComment = (TableChange.UpdateComment) change;
-        String newComment = updateComment.getNewComment();
+        String newComment = StringUtils.defaultString(updateComment.getNewComment());
         if (StringIdentifier.fromComment(newComment) == null) {
           lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
           StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
