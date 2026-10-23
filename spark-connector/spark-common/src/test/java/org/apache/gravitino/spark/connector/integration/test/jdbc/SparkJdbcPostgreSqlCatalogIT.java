@@ -22,14 +22,19 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CAT
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
+@PostgreSQLFixture(database = PG_CATALOG_PG_IT)
 public abstract class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
+
+  @FixtureContainer private PostgreSQLContainer postgreSQL;
 
   protected String pgUrl;
   protected String pgUsername;
@@ -98,12 +103,10 @@ public abstract class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
 
   @Override
   protected void initCatalogEnv() throws Exception {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startPostgreSQLContainer(PG_CATALOG_PG_IT);
-    this.pgUrl = containerSuite.getPostgreSQLContainer().getJdbcUrl();
-    this.pgUsername = containerSuite.getPostgreSQLContainer().getUsername();
-    this.pgPassword = containerSuite.getPostgreSQLContainer().getPassword();
-    this.pgDriver = containerSuite.getPostgreSQLContainer().getDriverClassName(PG_CATALOG_PG_IT);
+    this.pgUrl = postgreSQL.getJdbcUrl();
+    this.pgUsername = postgreSQL.getUsername();
+    this.pgPassword = postgreSQL.getPassword();
+    this.pgDriver = postgreSQL.getDriverClassName(PG_CATALOG_PG_IT);
   }
 
   @Override

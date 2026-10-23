@@ -38,8 +38,9 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.rel.ColumnDTO;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -60,8 +61,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@HiveFixture
 public class HudiCatalogHMSIT extends BaseIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  // Static because the static createHudiTables() reads it.
+  @FixtureContainer private static HiveContainer hive;
 
   private static String hmsURI;
   private static SparkSession sparkSession;
@@ -77,12 +80,9 @@ public class HudiCatalogHMSIT extends BaseIT {
 
   @BeforeAll
   public void prepare() {
-    containerSuite.startHiveContainer();
     hmsURI =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     createHudiTables();
 
@@ -464,8 +464,7 @@ public class HudiCatalogHMSIT extends BaseIT {
                 "spark.sql.warehouse.dir",
                 String.format(
                     "hdfs://%s:%d/user/hive/warehouse-catalog-hudi",
-                    containerSuite.getHiveContainer().getContainerIpAddress(),
-                    HiveContainer.HDFS_DEFAULTFS_PORT))
+                    hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT))
             .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
             .config("spark.sql.extensions", "org.apache.spark.sql.hudi.HoodieSparkSessionExtension")
             .config(

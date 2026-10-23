@@ -17,8 +17,8 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -58,11 +58,11 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(1)
   public void testCreateUser() {
     assertThrows(
-        "Current user can not access metadata {testMetalake}",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).addUser("user1");
-        });
+        },
+        "Current user can not access metadata {testMetalake}");
     client.loadMetalake(METALAKE).addUser("user1");
     client.loadMetalake(METALAKE).addUser("user2");
   }
@@ -94,11 +94,11 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoAdminClient user1Client = getClientByUser("user1");
     user1Client.loadMetalake(METALAKE).getUser("user1");
     assertThrows(
-        "Current user can not get user.",
         ForbiddenException.class,
         () -> {
           user1Client.loadMetalake(METALAKE).getUser("user2");
-        });
+        },
+        "Current user can not get user.");
     client.loadMetalake(METALAKE).getUser("user1");
     client.loadMetalake(METALAKE).getUser("user2");
   }
@@ -156,17 +156,17 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testRemoveUser() {
     GravitinoAdminClient user1Client = getClientByUser("user1");
     assertThrows(
-        "Current user can not get user",
         ForbiddenException.class,
         () -> {
           user1Client.loadMetalake(METALAKE).removeUser("user2");
-        });
+        },
+        "Current user can not get user");
     assertThrows(
-        "Current user can not get user.",
         ForbiddenException.class,
         () -> {
           user1Client.loadMetalake(METALAKE).removeUser("user1");
-        });
+        },
+        "Current user can not get user.");
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     // owner can remove user
     gravitinoMetalake.removeUser("user2");

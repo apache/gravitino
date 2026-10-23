@@ -18,11 +18,9 @@
  */
 package org.apache.gravitino.integration.test.util;
 
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This is an extension for JUnit 5, which aims to perform certain operations (such as resource
@@ -32,26 +30,6 @@ import org.slf4j.LoggerFactory;
 public class CloseContainerExtension implements BeforeAllCallback {
   @Override
   public void beforeAll(ExtensionContext extensionContext) {
-    // Store.getOrComputeIfAbsent is atomic, so concurrent classes register the closer once.
-    extensionContext
-        .getRoot()
-        .getStore(ExtensionContext.Namespace.GLOBAL)
-        .getOrComputeIfAbsent(CloseableContainer.class);
-  }
-
-  private static class CloseableContainer implements ExtensionContext.Store.CloseableResource {
-    private static final Logger LOGGER = LoggerFactory.getLogger(CloseableContainer.class);
-    private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
-
-    // Log instead of failing: a container teardown error must not fail an otherwise green run.
-    @Override
-    public void close() {
-      try {
-        CONTAINER_SUITE.close();
-        LOGGER.info("Containers were closed successfully");
-      } catch (Exception e) {
-        LOGGER.warn("Containers were not closed as expected", e);
-      }
-    }
+    Fixtures.closeWhenRunEnds(extensionContext);
   }
 }

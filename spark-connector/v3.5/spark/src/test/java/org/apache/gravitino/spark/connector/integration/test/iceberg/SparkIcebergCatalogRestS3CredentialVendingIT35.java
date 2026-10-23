@@ -39,8 +39,9 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.JwksMockServerHelper;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -63,6 +64,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 /** Spark 3.5 integration test for OAuth2 IRC routing with AWS credential vending. */
 @Tag("gravitino-docker-test")
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
+@PostgreSQLFixture(database = TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD)
 public class SparkIcebergCatalogRestS3CredentialVendingIT35 extends BaseIT {
 
   private static final String ADMIN = "gravitino";
@@ -76,7 +78,7 @@ public class SparkIcebergCatalogRestS3CredentialVendingIT35 extends BaseIT {
   private static final String ROLE = "spark35-irc-role";
   private static final String AWS_ROLE_ARN = System.getenv("AWS_ROLE_ARN");
 
-  private final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private PostgreSQLContainer postgres;
 
   private JwksMockServerHelper mockServer;
   private SparkSession spark;
@@ -86,7 +88,6 @@ public class SparkIcebergCatalogRestS3CredentialVendingIT35 extends BaseIT {
   public void startIntegrationTest() throws Exception {
     initializeOAuthServer();
     initializeGravitinoConfig();
-    initializePostgreSQL();
     super.startIntegrationTest();
     initializeMetadata();
     spark = createSparkSession();
@@ -172,13 +173,7 @@ public class SparkIcebergCatalogRestS3CredentialVendingIT35 extends BaseIT {
     registerCustomConfigs(configs);
   }
 
-  private void initializePostgreSQL() {
-    containerSuite.startPostgreSQLContainer(
-        TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD);
-  }
-
   private void initializeMetadata() throws SQLException {
-    PostgreSQLContainer postgres = containerSuite.getPostgreSQLContainer();
     TestDatabaseName database = TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD;
     client.createMetalake(METALAKE, "", new HashMap<>());
     GravitinoMetalake metalake = client.loadMetalake(METALAKE);
