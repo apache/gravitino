@@ -34,18 +34,18 @@ public class TestRustFSContainer {
   void testImagePinParsing() {
     String manifest = "services:\n  rustfs:\n    image: " + RustFSContainer.DEFAULT_IMAGE + "\n";
     Assertions.assertEquals(
-        RustFSContainer.DEFAULT_IMAGE, RustFSContainer.imageFromCompose(manifest));
+        RustFSContainer.DEFAULT_IMAGE, TestImages.rustFSImageFromCompose(manifest));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> RustFSContainer.imageFromCompose(manifest + "    image: another/image:latest\n"));
+        () -> TestImages.rustFSImageFromCompose(manifest + "    image: another/image:latest\n"));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> RustFSContainer.imageFromCompose("services:\n  rustfs:\n"));
+        () -> TestImages.rustFSImageFromCompose("services:\n  rustfs:\n"));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> RustFSContainer.imageFromCompose("    image: rustfs/rustfs:latest\n"));
+        () -> TestImages.rustFSImageFromCompose("    image: rustfs/rustfs:latest\n"));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> RustFSContainer.imageFromCompose("    image: rustfs/rustfs:1.0.0@sha256:bad\n"));
+        () -> TestImages.rustFSImageFromCompose("    image: rustfs/rustfs:1.0.0@sha256:bad\n"));
   }
 }

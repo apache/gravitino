@@ -18,17 +18,23 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
 
 /**
  * A database test container backed by a Testcontainers JDBC module, which owns the credentials and
@@ -98,6 +104,14 @@ public abstract class DatabaseContainer extends BaseContainer {
   }
 
   /** The user tests connect as. */
+  // A Testcontainers JDBC module has its own readiness check: PostgreSQL's waits for a log line,
+  // which a port wait would replace; MySQL's queries the database.
+  @Override
+  @Nullable
+  protected WaitStrategy waitStrategy() {
+    return null;
+  }
+
   public String getUsername() {
     return db.getUsername();
   }
@@ -116,15 +130,24 @@ public abstract class DatabaseContainer extends BaseContainer {
   /**
    * Logs whether lower durability is enabled and the settings the server reports, so each run's
    * output shows which mode it ran in. Warns when lower durability is enabled but the data
-   * directory is not on {@code tmpfs}. The query must print tab-separated values, the data
-   * directory first, in the order of {@code names}.
+   * directory is not on {@code tmpfs}. The query must return one row with the data directory first,
+   * in the order of {@code names}.
    */
-  protected void logDurability(List<String> names, String... query) {
+  protected void logDurability(List<String> names, String query) {
     String name = getClass().getSimpleName();
-    Container.ExecResult settings = executeInContainer(query);
-    String[] values = settings.getStdout().trim().split("\t");
-    if (settings.getExitCode() != 0 || values.length != names.size()) {
-      LOG.warn("{}: could not read the durability settings: {}", name, settings.getStderr());
+    String[] values = new String[names.size()];
+    try (Connection connection = db.createConnection("");
+        Statement statement = connection.createStatement();
+        ResultSet row = statement.executeQuery(query)) {
+      if (!row.next() || row.getMetaData().getColumnCount() != names.size()) {
+        LOG.warn("{}: could not read the durability settings from: {}", name, query);
+        return;
+      }
+      for (int i = 0; i < values.length; i++) {
+        values[i] = row.getString(i + 1);
+      }
+    } catch (SQLException e) {
+      LOG.warn("{}: could not read the durability settings: {}", name, e.getMessage());
       return;
     }
     String report =

@@ -38,8 +38,9 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.model.Model;
@@ -61,9 +62,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@HiveFixture
 public class PolicyIT extends BaseIT {
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private HiveContainer hive;
 
   private static final String metalakeName = GravitinoITUtils.genRandomName("policy_it_metalake");
 
@@ -80,12 +82,9 @@ public class PolicyIT extends BaseIT {
 
   @BeforeAll
   public void setUp() {
-    containerSuite.startHiveContainer();
     String hmsUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     // Create metalake
     Assertions.assertFalse(client.metalakeExists(metalakeName));

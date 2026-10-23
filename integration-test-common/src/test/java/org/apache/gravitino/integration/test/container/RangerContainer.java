@@ -35,7 +35,7 @@ import org.testcontainers.containers.Network;
 public class RangerContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(RangerContainer.class);
 
-  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_RANGER_DOCKER_IMAGE");
+  public static final String DEFAULT_IMAGE = TestImages.RANGER;
   public static final String HOST_NAME = "gravitino-ci-ranger";
   public static final int RANGER_SERVER_PORT = 6080;
   public RangerClient rangerClient;

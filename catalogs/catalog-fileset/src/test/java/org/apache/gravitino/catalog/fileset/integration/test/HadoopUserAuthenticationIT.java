@@ -45,10 +45,14 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.Scope;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.KerberosHdfs;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -59,11 +63,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.utility.MountableFile;
 
+// A private Kerberos Hive: the test adds principals with kadmin and changes HDFS permissions,
+// which would break the shared Kerberos Hive for later classes.
 @Tag("gravitino-docker-test")
+@HiveFixture(auth = HiveAuth.KERBEROS, scope = Scope.CLASS)
 public class HadoopUserAuthenticationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopUserAuthenticationIT.class);
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final String SDK_KERBEROS_PRINCIPAL_KEY = "client.kerberos.principal";
   private static final String SDK_KERBEROS_KEYTAB_KEY = "client.kerberos.keytab";
@@ -92,7 +97,9 @@ public class HadoopUserAuthenticationIT extends BaseIT {
 
   private static GravitinoAdminClient adminClient;
 
-  private static HiveContainer kerberosHiveContainer;
+  private static KerberosHdfs hdfs;
+
+  @FixtureContainer private static HiveContainer kerberosHive;
 
   private static final String METALAKE_NAME =
       GravitinoITUtils.genRandomName("CatalogHadoop_metalake");
@@ -105,18 +112,16 @@ public class HadoopUserAuthenticationIT extends BaseIT {
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startKerberosHiveContainer();
-    kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
-
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
     File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
     TMP_DIR = file.getAbsolutePath();
 
-    HDFS_URL = String.format("hdfs://%s:9000", kerberosHiveContainer.getContainerIpAddress());
+    HDFS_URL = String.format("hdfs://%s:9000", kerberosHive.getContainerIpAddress());
 
     // Prepare kerberos related-config;
     prepareKerberosConfig();
+    hdfs = KerberosHdfs.of(kerberosHive, TMP_DIR + HADOOP_CLIENT_KEYTAB);
 
     // Config kerberos configuration for Gravitino server
     addKerberosConfig();
@@ -137,28 +142,28 @@ public class HadoopUserAuthenticationIT extends BaseIT {
 
   private static void prepareKerberosConfig() throws IOException {
     // Keytab of the Gravitino SDK client
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
 
     createKeyTableForSchemaAndFileset();
 
     // Keytab of the Gravitino server
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
 
     // Keytab of Gravitino server to connector to HDFS
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HADOOP_CLIENT_KEYTAB);
 
     String tmpKrb5Path = TMP_DIR + "krb5.conf_tmp";
     String krb5Path = TMP_DIR + "krb5.conf";
-    kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+    kerberosHive.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
-    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+    String ip = kerberosHive.getContainerIpAddress();
     String content = FileUtils.readFileToString(new File(tmpKrb5Path), StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
@@ -190,11 +195,11 @@ public class HadoopUserAuthenticationIT extends BaseIT {
             HADOOP_SCHEMA_PRINCIPAL,
             REALM),
         StandardCharsets.UTF_8);
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileToContainer(
             MountableFile.forHostPath(TMP_DIR + createSchemaShellFile), createSchemaShellFile);
-    kerberosHiveContainer.executeInContainer("bash", createSchemaShellFile);
+    kerberosHive.executeInContainer("bash", createSchemaShellFile);
 
     FileUtils.writeStringToFile(
         Paths.get(TMP_DIR + createFileSetShellFile).toFile(),
@@ -208,16 +213,16 @@ public class HadoopUserAuthenticationIT extends BaseIT {
             HADOOP_FILESET_PRINCIPAL,
             REALM),
         StandardCharsets.UTF_8);
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileToContainer(
             MountableFile.forHostPath(TMP_DIR + createFileSetShellFile), createFileSetShellFile);
-    kerberosHiveContainer.executeInContainer("bash", createFileSetShellFile);
+    kerberosHive.executeInContainer("bash", createFileSetShellFile);
 
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer(HADOOP_SCHEMA_KEYTAB, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer(HADOOP_FILESET_KEYTAB, TMP_DIR + HADOOP_FILESET_KEYTAB);
   }
@@ -255,7 +260,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put("location", HDFS_URL + "/user/hadoop/");
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hadoop");
+    hdfs.mkdirs("/user/hadoop");
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -286,7 +291,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         CATALOG_NAME, CatalogChange.setProperty(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL));
 
     // Now try to give the user the permission to create schema again
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");
+    hdfs.setPermission("/user/hadoop", "777", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -342,8 +347,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put("location", location);
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+    hdfs.mkdirs("/user/hadoop/" + catalogName);
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -387,8 +391,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to give the user the permission to create schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "gravitino_client", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "gravitino_client", false);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
 
@@ -406,8 +409,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     // END of test schema creation
     Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "cli_schema", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_schema", false);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
 
@@ -446,8 +448,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put("location", location);
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+    hdfs.mkdirs("/user/hadoop/" + catalogName);
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -460,8 +461,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     schemaProperty.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
     schemaProperty.put(PRINCIPAL_KEY, HADOOP_SCHEMA_PRINCIPAL + "@" + REALM);
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli_schema", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_schema", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
 
@@ -499,8 +499,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=cli_fileset, access=WRITE"));
 
     // Now change the owner of schema directory to 'cli_fileset'
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli_fileset", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_fileset", true);
     Assertions.assertDoesNotThrow(
         () ->
             catalog
@@ -532,8 +531,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now change the owner of schema directory to 'gravitino_client'
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "gravitino_client", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "gravitino_client", true);
     Assertions.assertDoesNotThrow(
         () ->
             catalog
@@ -550,8 +548,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     Assertions.assertThrows(
         Exception.class,
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset1)));
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli_fileset", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_fileset", true);
     // Now try to drop fileset
     Assertions.assertDoesNotThrow(
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset1)));
@@ -559,15 +556,13 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     Assertions.assertThrows(
         Exception.class,
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "gravitino_client", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "gravitino_client", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
 
     Assertions.assertThrows(
         Exception.class, () -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli_schema", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli_schema", true);
     Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
   }
 
@@ -596,8 +591,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put("location", localtion);
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+    hdfs.mkdirs("/user/hadoop/" + catalogName);
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -628,8 +622,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     exceptionMessage = Throwables.getStackTraceAsString(exception);
     Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chown", "-R", "cli", "/user/hadoop/" + catalogName);
+    hdfs.setOwner("/user/hadoop/" + catalogName, "cli", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
 

@@ -35,21 +35,24 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.startupcheck.IsRunningStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
 import org.testcontainers.lifecycle.Startable;
 
 /**
- * The BaseContainer is the base for all containers. It's contains the common methods and settings
- * for all containers. You can extend this class to create your own container to integration test.
+ * The base for all integration test containers: it applies the common settings and manages the
+ * lifecycle. Gravitino's own images have no official Testcontainers module, so they start from an
+ * image name; services that have an official module supply that module instead, so they keep its
+ * defaults and readiness check.
  */
 public abstract class BaseContainer implements Startable {
   public static final Logger LOG = LoggerFactory.getLogger(BaseContainer.class);
@@ -68,6 +71,18 @@ public abstract class BaseContainer implements Startable {
 
   protected final GenericContainer<?> container;
 
+  /**
+   * Builds the container from an image name. Used by Gravitino's own images, which have no official
+   * Testcontainers module.
+   *
+   * @param image the Docker image name
+   * @param hostName the host name and network alias of the container
+   * @param ports the ports to expose
+   * @param extraHosts additional host name to IP address mappings
+   * @param filesToMount host files to copy into the container, keyed by container path
+   * @param envVars the environment variables of the container
+   * @param network the network to join, if any
+   */
   protected BaseContainer(
       String image,
       String hostName,
@@ -86,7 +101,19 @@ public abstract class BaseContainer implements Startable {
         network);
   }
 
-  /** Wraps a container a subclass has already created, such as a Testcontainers module. */
+  /**
+   * Wraps a container the subclass has already built, such as an official Testcontainers module or
+   * a {@link GenericContainer} with its own wait strategy. A subclass that relies on the readiness
+   * check of the supplied container should also override {@link #waitStrategy()}.
+   *
+   * @param container the container to configure and manage
+   * @param hostName the host name and network alias of the container
+   * @param ports the ports to expose
+   * @param extraHosts additional host name to IP address mappings
+   * @param filesToMount host files to copy into the container, keyed by container path
+   * @param envVars the environment variables of the container
+   * @param network the network to join, if any
+   */
   protected BaseContainer(
       GenericContainer<?> container,
       String hostName,
@@ -113,6 +140,10 @@ public abstract class BaseContainer implements Startable {
     setupContainer();
   }
 
+  /**
+   * Applies the common settings and then the readiness check. Runs from the constructor, so an
+   * override must call {@code super.setupContainer()} and must not read subclass fields.
+   */
   protected void setupContainer() {
     // Add exposed ports in the container
     for (int port : this.ports) {
@@ -128,16 +159,29 @@ public abstract class BaseContainer implements Startable {
     // can look up the corresponding IP address by host name.
     // This method fixes an error that occurs when HDFS looks up hostnames from DNS.
     extraHosts.forEach((hostName, ipAddress) -> container.withExtraHost(hostName, ipAddress));
-    container
-        .withCreateContainerCmdModifier(c -> c.withHostName(hostName))
-        .withStartupCheckStrategy(new IsRunningStartupCheckStrategy());
-    // A Testcontainers JDBC module has its own readiness check: PostgreSQL's waits for a log line
-    // through the wait strategy, which a port wait would replace; MySQL's queries the database.
-    if (!(container instanceof JdbcDatabaseContainer)) {
-      container.waitingFor(Wait.forListeningPort());
-    }
-    container.withStartupTimeout(Duration.ofMinutes(5));
+    container.withCreateContainerCmdModifier(c -> c.withHostName(hostName));
     network.ifPresent(net -> container.withNetwork(net).withNetworkAliases(hostName));
+
+    WaitStrategy waitStrategy = waitStrategy();
+    if (waitStrategy != null) {
+      container
+          .withStartupCheckStrategy(new IsRunningStartupCheckStrategy())
+          .waitingFor(waitStrategy)
+          .withStartupTimeout(Duration.ofMinutes(5));
+    }
+  }
+
+  /**
+   * Returns how to tell that the container is ready. The default waits for the exposed ports to
+   * listen. Override it to return a service-specific strategy, or return {@code null} to keep the
+   * startup check, wait strategy and timeout the supplied container already has, as an official
+   * module does. Called from the constructor, so an override must not read subclass fields.
+   *
+   * @return the wait strategy, or {@code null} to keep the container's own
+   */
+  @Nullable
+  protected WaitStrategy waitStrategy() {
+    return Wait.forListeningPort();
   }
 
   // This method is used to set the log output of the container.

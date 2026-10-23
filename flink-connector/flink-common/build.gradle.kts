@@ -98,7 +98,6 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.metrics.core)
   testImplementation(libs.flinkjdbc119)
