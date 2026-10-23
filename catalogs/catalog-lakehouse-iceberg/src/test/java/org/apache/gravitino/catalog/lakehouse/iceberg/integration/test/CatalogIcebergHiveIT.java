@@ -36,15 +36,12 @@ public class CatalogIcebergHiveIT extends CatalogIcebergBaseIT {
   protected void initIcebergCatalogProperties() {
     URIS =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     TYPE = "hive";
     WAREHOUSE =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 
   @Test

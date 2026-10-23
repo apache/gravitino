@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import com.google.common.collect.ImmutableMap;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -31,31 +33,36 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
-import org.testcontainers.containers.Container.ExecResult;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture(version = HiveVersion.HIVE3)
 public class CatalogHive3IT extends CatalogHive2IT {
+
+  private HiveServer2Sql hiveSql;
+
+  @AfterAll
+  public void closeHiveSql() throws SQLException {
+    if (hiveSql != null) {
+      hiveSql.close();
+    }
+  }
 
   @Override
   protected void startNecessaryContainer() {
     hmsCatalog = "hive";
-    containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
-
     hiveMetastoreUris =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
   }
 
   /** Returns the Hive container used by this test suite. */
   protected HiveContainer hiveContainer() {
-    return containerSuite.getHiveContainer();
+    return hive;
   }
 
   /** Hive 3.x metastores support NOT NULL and DEFAULT constraints, which must round-trip to HMS. */
@@ -102,12 +109,12 @@ public class CatalogHive3IT extends CatalogHive2IT {
             "INSERT INTO TABLE %s.%s (not_null_column, plain_column) "
                 + "VALUES ('required', 'plain')",
             schemaName, constraintsIdent.name()));
-    ExecResult queryResult =
+    String queryResult =
         executeHiveSql(
             String.format(
                 "SELECT default_column, default_string_column FROM %s.%s",
                 schemaName, constraintsIdent.name()));
-    Assertions.assertEquals("42\tit's", queryResult.getStdout().trim());
+    Assertions.assertEquals("42\tit's", queryResult.trim());
 
     // Property-only alters must leave the constraints untouched
     catalog.asTableCatalog().alterTable(constraintsIdent, TableChange.setProperty("k1", "v1"));
@@ -161,15 +168,11 @@ public class CatalogHive3IT extends CatalogHive2IT {
     }
   }
 
-  private ExecResult executeHiveSql(String sql) {
-    ExecResult result = hiveContainer().executeInContainer("hive", "-S", "-e", sql);
-    Assertions.assertEquals(
-        0,
-        result.getExitCode(),
-        String.format(
-            "Failed to execute SQL with hive cli. SQL: %s, stdout: %s, stderr: %s",
-            sql, result.getStdout(), result.getStderr()));
-    return result;
+  private String executeHiveSql(String sql) {
+    if (hiveSql == null) {
+      hiveSql = new HiveServer2Sql(hiveContainer());
+    }
+    return hiveSql.run(sql);
   }
 
   private Column[] loadHiveTableColumns(String schema, String table) {

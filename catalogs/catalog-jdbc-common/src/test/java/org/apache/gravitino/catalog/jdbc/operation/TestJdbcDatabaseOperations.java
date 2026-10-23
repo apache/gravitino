@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -142,7 +142,7 @@ public class TestJdbcDatabaseOperations {
             SchemaAlreadyExistsException.class,
             () -> JDBC_DATABASE_OPERATIONS.create(database1, null, null));
     Assertions.assertTrue(
-        StringUtils.contains(illegalArgumentException.getMessage(), "already exists"));
+        Strings.CS.contains(illegalArgumentException.getMessage(), "already exists"));
     Assertions.assertDoesNotThrow(() -> JDBC_DATABASE_OPERATIONS.create(database2, null, null));
 
     // list database

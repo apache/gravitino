@@ -24,8 +24,7 @@ azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
 reactor-netty-core = "1.2.1"
 # JUnit Jupiter 5.x ships with JUnit Platform 1.x of the same minor; bump them together.
-junit = "5.8.1"
-junit-platform = "1.8.1"
+junit = "6.1.3"
 jackson = "2.15.2"
 snakeyaml = "2.0"
 gson = "2.11.0"
@@ -95,10 +94,10 @@ trino-iceberg-it = "478"
 scala-collection-compat = "2.7.0"
 scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
-testcontainers = "1.21.4"
-# docker-java version aligned with testcontainers 1.21.4; forced in iceberg-rest-trino-it to
+testcontainers = "2.0.5"
+# docker-java version aligned with testcontainers 2.0.5; forced in iceberg-rest-trino-it to
 # override the newer versions Trino's test stack would otherwise pull in.
-docker-java = "3.4.2"
+docker-java = "3.7.1"
 jwt = "0.11.1"
 nimbus-jose-jwt = "10.9"
 jline = "3.21.0"
@@ -119,6 +118,9 @@ h2db = "2.2.224"
 kafka = "3.4.0"
 curator = "2.12.0"
 awaitility = "4.2.1"
+# Lowest AssertJ among the Trino test stacks; newer Trino versions resolve it upward.
+assertj = "3.25.3"
+checkstyle = "10.12.5"
 servlet = "3.1.0"
 jodd = "3.5.2"
 flink119 = "1.19.0"
@@ -222,7 +224,11 @@ lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" 
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit" }
-junit-platform-testkit = { group = "org.junit.platform", name = "junit-platform-testkit", version.ref = "junit-platform" }
+junit-platform-commons = { group = "org.junit.platform", name = "junit-platform-commons", version.ref = "junit" }
+junit-platform-engine = { group = "org.junit.platform", name = "junit-platform-engine", version.ref = "junit" }
+junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit" }
+junit-platform-testkit = { group = "org.junit.platform", name = "junit-platform-testkit", version.ref = "junit" }
+junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
 slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version.ref = "slf4j" }
@@ -324,11 +330,11 @@ trino-client= { group = "io.trino", name = "trino-client", version.ref = "trino"
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
-testcontainers-clickhouse = { group = "org.testcontainers", name = "clickhouse", version.ref = "testcontainers" }
-testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
-testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
-testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
-testcontainers-localstack = { group = "org.testcontainers", name = "localstack", version.ref = "testcontainers" }
+testcontainers-jdbc = { group = "org.testcontainers", name = "testcontainers-jdbc", version.ref = "testcontainers" }
+testcontainers-clickhouse = { group = "org.testcontainers", name = "testcontainers-clickhouse", version.ref = "testcontainers" }
+testcontainers-mysql = { group = "org.testcontainers", name = "testcontainers-mysql", version.ref = "testcontainers" }
+testcontainers-postgresql = { group = "org.testcontainers", name = "testcontainers-postgresql", version.ref = "testcontainers" }
+testcontainers-localstack = { group = "org.testcontainers", name = "testcontainers-localstack", version.ref = "testcontainers" }
 trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino" }
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
 jwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jwt"}
@@ -376,6 +382,7 @@ selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.
 rauschig = { group = "org.rauschig", name = "jarchivelib", version.ref = "rauschig" }
 mybatis = { group = "org.mybatis", name = "mybatis", version.ref = "mybatis"}
 h2db = { group = "com.h2database", name = "h2", version.ref = "h2db"}
+assertj-core = { group = "org.assertj", name = "assertj-core", version.ref = "assertj" }
 awaitility = { group = "org.awaitility", name = "awaitility", version.ref = "awaitility" }
 servlet = { group = "javax.servlet", name = "javax.servlet-api", version.ref = "servlet" }
 mail = { group = "javax.mail", name = "mail", version.ref = "mail" }

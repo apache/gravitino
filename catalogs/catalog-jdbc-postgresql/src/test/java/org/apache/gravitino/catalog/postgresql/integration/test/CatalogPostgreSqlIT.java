@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -828,7 +829,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
                   primaryIndex);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in PostgreSQL"));
 
@@ -849,7 +850,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
                   primaryIndex2);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in PostgreSQL"));
 
