@@ -45,19 +45,49 @@ public interface JobExecutor extends Closeable {
   void initialize(Map<String, String> configs);
 
   /**
-   * Submit a job with the given name and job template to the external job runner.
+   * Submit a job to the external job runner.
    *
    * <p>The returned job identifier is unique in the external job runner, and can be used to track
    * the job status or cancel it later.
    *
-   * <p>The placeholders in the job template has already been replaced with the actual values before
-   * calling this method. So the implementors can directly use this job template to submit the job
-   * to the external job runner.
+   * <p>The placeholders in the job template have already been replaced with the actual values, but
+   * its resources, that is its executable, scripts, jars, files and archives, are still the URIs
+   * given in the template. The job executor decides how to handle them: fetch them to the Gravitino
+   * server, for example with {@link JobResourceUtils#localizeJobTemplate} into {@link
+   * JobContext#stagingDir()}, or pass the URIs on to the external job runner.
    *
-   * @param jobTemplate The job template containing the job configuration and parameters.
+   * <p>The default implementation localizes the job template into {@link JobContext#stagingDir()}
+   * and delegates to {@link #submitJob(JobTemplate)}, so a job executor that implements only that
+   * method keeps receiving local paths.
+   *
+   * @param context The context of the job run.
+   * @param jobTemplate The runtime job template, whose resources are URIs.
    * @return A unique identifier for the submitted job.
    */
-  String submitJob(JobTemplate jobTemplate);
+  default String submitJob(JobContext context, JobTemplate jobTemplate) {
+    return submitJob(JobResourceUtils.localizeJobTemplate(jobTemplate, context.stagingDir()));
+  }
+
+  /**
+   * Submit a job whose resources have already been fetched to the Gravitino server.
+   *
+   * <p>Gravitino calls {@link #submitJob(JobContext, JobTemplate)}, whose default implementation
+   * localizes the job template and calls this method. A job executor must implement one of the two
+   * methods.
+   *
+   * @param jobTemplate The runtime job template, whose resources are paths of local files.
+   * @return A unique identifier for the submitted job.
+   * @throws UnsupportedOperationException if the job executor implements {@link
+   *     #submitJob(JobContext, JobTemplate)} instead.
+   * @deprecated Implement {@link #submitJob(JobContext, JobTemplate)} instead, which lets the job
+   *     executor decide how to handle the job resources. This method will be removed in a future
+   *     release.
+   */
+  @Deprecated
+  default String submitJob(JobTemplate jobTemplate) {
+    throw new UnsupportedOperationException(
+        getClass().getName() + " doesn't support submitJob(JobTemplate)");
+  }
 
   /**
    * Get a snapshot of the job's execution state by its unique identifier, including its status and

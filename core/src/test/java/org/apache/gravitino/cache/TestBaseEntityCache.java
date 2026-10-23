@@ -112,10 +112,19 @@ public class TestBaseEntityCache {
     Assertions.assertThrows(IllegalArgumentException.class, () -> cache.put(null));
   }
 
+  @Test
+  void testIndexRemovalDelegatesToLegacySubclassHook() {
+    EntityCacheKey key =
+        EntityCacheKey.of(NameIdentifier.of("metalake"), Entity.EntityType.METALAKE);
+    cache.removeIndexEntryIfAbsent(key);
+    Assertions.assertEquals(List.of(key), cache.removedKeys);
+  }
+
   /** A minimal {@link BaseEntityCache} that records everything handed down to it. */
   private static class RecordingCache extends BaseEntityCache {
     private final List<Entity> cached = new ArrayList<>();
     private final List<Entity> keyChanges = new ArrayList<>();
+    private final List<EntityCacheKey> removedKeys = new ArrayList<>();
 
     RecordingCache(Config config) {
       super(config);
@@ -131,8 +140,11 @@ public class TestBaseEntityCache {
       keyChanges.add(entity);
     }
 
+    @Deprecated
     @Override
-    protected void invalidateExpiredItem(EntityCacheKey key) {}
+    protected void invalidateExpiredItem(EntityCacheKey key) {
+      removedKeys.add(key);
+    }
 
     @Override
     public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(

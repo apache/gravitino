@@ -81,7 +81,6 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.apache.gravitino.flink.connector.utils.TableUtils;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
@@ -842,7 +841,18 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return table;
   }
 
-  protected CatalogTable newCatalogTable(
+  /**
+   * Create a {@link CatalogTable} using this catalog's Flink version's constructor and behavior.
+   * Public so version-independent test/integration-test code can build fixtures without knowing
+   * which Flink minor is active.
+   *
+   * @param schema table schema
+   * @param comment table comment
+   * @param partitionKeys partition column names
+   * @param options table options
+   * @return a version-compatible catalog table
+   */
+  public CatalogTable newCatalogTable(
       org.apache.flink.table.api.Schema schema,
       String comment,
       List<String> partitionKeys,
@@ -850,11 +860,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return catalogCompat().createCatalogTable(schema, comment, partitionKeys, options);
   }
 
-  protected CatalogCompat catalogCompat() {
-    // Versioned catalog entry classes override this hook when the Flink minor has a different
-    // catalog/table API path.
-    return DefaultCatalogCompat.INSTANCE;
-  }
+  // Every concrete, version-specific catalog entry class overrides this hook because the
+  // catalog/table API differs per Flink minor; there is no version-agnostic default.
+  protected abstract CatalogCompat catalogCompat();
 
   private static Optional<List<String>> getFlinkPrimaryKey(Table table) {
     List<Index> primaryKeyList =

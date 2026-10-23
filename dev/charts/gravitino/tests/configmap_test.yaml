@@ -275,6 +275,25 @@ tests:
           path: data["gravitino.conf"]
           pattern: "gravitino\\.entity\\.store\\.relational\\.maxConnections"
 
+  - it: renders entity.maxIdleConnections only when set
+    release:
+      name: gravitino
+    set:
+      entity:
+        maxIdleConnections: 64
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.maxIdleConnections = 64"
+
+  - it: does not render entity.maxIdleConnections when empty (default)
+    release:
+      name: gravitino
+    asserts:
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.maxIdleConnections"
+
   - it: renders lock.maxNodes and lock.minNodes only when set
     release:
       name: gravitino

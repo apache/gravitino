@@ -20,6 +20,8 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,16 +33,79 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
+import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchViewException;
+import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
+import org.apache.iceberg.types.Types;
+import org.apache.iceberg.view.ViewOperations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
+
+  @Test
+  void testLoadViewReportsMissingAfterNativeRename(@TempDir Path warehouseDir) throws Exception {
+    Namespace namespace = Namespace.of("views");
+    TableIdentifier oldName = TableIdentifier.of(namespace, "old_name");
+    TableIdentifier newName = TableIdentifier.of(namespace, "new_name");
+    AtomicBoolean renameDuringLoad = new AtomicBoolean();
+    AtomicInteger operationLoads = new AtomicInteger();
+    try (JdbcCatalog catalog =
+        new JdbcCatalog() {
+          @Override
+          protected ViewOperations newViewOps(TableIdentifier identifier) {
+            // BaseMetastoreViewCatalog checks one operations instance, then returns a BaseView
+            // backed by another. Rename between those two instances, without timing or threads.
+            if (renameDuringLoad.get()
+                && identifier.equals(oldName)
+                && operationLoads.incrementAndGet() == 2) {
+              renameView(oldName, newName);
+            }
+            return super.newViewOps(identifier);
+          }
+        }) {
+      catalog.initialize(
+          "rename-test",
+          Map.of(
+              CatalogProperties.URI,
+              "jdbc:sqlite:" + warehouseDir.resolve("catalog.db"),
+              CatalogProperties.WAREHOUSE_LOCATION,
+              warehouseDir.toUri().toString(),
+              "jdbc.schema-version",
+              "V1"));
+      catalog.createNamespace(namespace);
+      catalog
+          .buildView(oldName)
+          .withSchema(new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())))
+          .withDefaultNamespace(namespace)
+          .withQuery("spark", "SELECT 1 AS id")
+          .create();
+      IcebergCatalogWrapper wrapper =
+          Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+      Mockito.doReturn(catalog).when(wrapper).getCatalog();
+      renameDuringLoad.set(true);
+
+      NoSuchViewException failure =
+          Assertions.assertThrows(NoSuchViewException.class, () -> wrapper.loadView(oldName));
+      Assertions.assertTrue(failure.getMessage().contains(oldName.toString()));
+      Assertions.assertFalse(catalog.viewExists(oldName));
+      LoadViewResponse response = wrapper.loadView(newName);
+      Assertions.assertNotNull(response.metadata());
+      Assertions.assertEquals(
+          response.metadata().metadataFileLocation(), response.metadataLocation());
+    }
+  }
 
   @Test
   public void testCatalogShouldBeLazyLoaded() {
@@ -102,6 +167,26 @@ public class TestIcebergCatalogWrapper {
 
     Assertions.assertEquals(1, TrackingTableMetadataCache.INITIALIZE_COUNT.get());
     Assertions.assertTrue(TrackingTableMetadataCache.CLOSED.get());
+  }
+
+  @Test
+  public void testLoadTableMetadataFromLocation(@TempDir Path tempDir) throws Exception {
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
+    TableMetadata expected =
+        TableMetadata.newTableMetadata(
+            schema,
+            PartitionSpec.unpartitioned(),
+            tempDir.resolve("table").toUri().toString(),
+            Map.of());
+    Path metadataFile = tempDir.resolve("v1.metadata.json");
+    Files.writeString(metadataFile, TableMetadataParser.toJson(expected), StandardCharsets.UTF_8);
+    IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(
+            new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory")));
+
+    TableMetadata actual = wrapper.loadTableMetadataFromLocation(metadataFile.toUri().toString());
+
+    Assertions.assertEquals(schema.asStruct(), actual.schema().asStruct());
   }
 
   private static TableMetadataCache invokeGetMetadataCache(IcebergCatalogWrapper wrapper)

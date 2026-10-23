@@ -77,6 +77,10 @@ import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.metrics.CommitReport;
+import org.apache.iceberg.metrics.MetricsReport;
+import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
@@ -405,10 +409,14 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "report-table-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "report-table-metrics", absolute = true)
+  @AuthorizationExpression(
+      expression = LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response reportTableMetrics(
-      @PathParam("prefix") String prefix,
-      @Encoded() @PathParam("namespace") String namespace,
-      @Encoded() @PathParam("table") String table,
+      @AuthorizationMetadata(type = EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
+          String namespace,
+      @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table,
       ReportMetricsRequest request) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -423,8 +431,30 @@ public class IcebergTableOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean accepted =
-                icebergMetricsManager.recordMetric(catalogName, icebergNS, request.report());
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
+            if (!tableOperationDispatcher.tableExists(context, tableIdentifier)) {
+              throw new NoSuchTableException("Table %s not found", tableIdentifier);
+            }
+            MetricsReport report = request.report();
+            String reportedTableName;
+            if (report instanceof CommitReport) {
+              reportedTableName = ((CommitReport) report).tableName();
+            } else if (report instanceof ScanReport) {
+              reportedTableName = ((ScanReport) report).tableName();
+            } else {
+              throw new IllegalArgumentException("Unsupported metrics report type");
+            }
+            String qualifiedTableName = tableIdentifier.toString();
+            if (reportedTableName == null
+                || (!tableName.equals(reportedTableName)
+                    && !qualifiedTableName.equals(reportedTableName)
+                    && !reportedTableName.endsWith("." + qualifiedTableName))) {
+              throw new IllegalArgumentException(
+                  "Metrics report table name does not match the requested table");
+            }
+            boolean accepted = icebergMetricsManager.recordMetric(catalogName, icebergNS, report);
             if (accepted) {
               return IcebergRESTUtils.noContent();
             } else {

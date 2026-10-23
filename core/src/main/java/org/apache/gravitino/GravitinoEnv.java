@@ -70,6 +70,7 @@ import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.PolicyHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
+import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
@@ -90,6 +91,7 @@ import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.SemanticModelEventDispatcher;
 import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
@@ -161,6 +163,7 @@ public class GravitinoEnv {
   private FunctionDispatcher internalFunctionDispatcher;
 
   private SemanticModelDispatcher semanticModelDispatcher;
+  private SemanticModelDispatcher internalSemanticModelDispatcher;
 
   private ViewDispatcher viewDispatcher;
   private ViewDispatcher internalViewDispatcher;
@@ -415,6 +418,15 @@ public class GravitinoEnv {
    */
   public SemanticModelDispatcher semanticModelDispatcher() {
     return semanticModelDispatcher;
+  }
+
+  /**
+   * Returns the Semantic Model dispatcher for infrastructure operations without hooks or events.
+   *
+   * @return the internal Semantic Model dispatcher
+   */
+  public SemanticModelDispatcher internalSemanticModelDispatcher() {
+    return internalSemanticModelDispatcher;
   }
 
   /**
@@ -1004,15 +1016,12 @@ public class GravitinoEnv {
   }
 
   private void initSemanticModelDispatcher(SchemaOperationDispatcher schemaOperationDispatcher) {
-    // Semantic Model operation chain: SemanticModelNormalizeDispatcher ->
-    // SemanticModelOperationDispatcher -> ManagedSemanticModelOperations.
-    // TODO(#12595): Add Semantic Model event dispatching before server integration.
-    // TODO(#12594): Add Semantic Model ownership and privilege hooks.
     SemanticModelOperationDispatcher semanticModelOperationDispatcher =
         new SemanticModelOperationDispatcher(
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
-    this.semanticModelDispatcher =
+    this.internalSemanticModelDispatcher =
         new SemanticModelNormalizeDispatcher(semanticModelOperationDispatcher, catalogManager);
+    this.semanticModelDispatcher = internalSemanticModelDispatcher;
   }
 
   private void initInternalAuthorizationComponents() {
@@ -1136,6 +1145,22 @@ public class GravitinoEnv {
     ViewNormalizeDispatcher viewNormalizeDispatcher =
         new ViewNormalizeDispatcher(viewHookDispatcher, catalogManager);
     this.viewDispatcher = new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
+
+    // Semantic Model operation chain: Event -> Normalize -> Hook -> Operation.
+    SemanticModelOperationDispatcher semanticModelOperationDispatcher =
+        new SemanticModelOperationDispatcher(
+            catalogManager,
+            metadataOperations.schemaOperationDispatcher,
+            entityStore,
+            idGenerator,
+            secretManager);
+    SemanticModelHookDispatcher semanticModelHookDispatcher =
+        new SemanticModelHookDispatcher(
+            semanticModelOperationDispatcher, this::internalOwnerDispatcher);
+    SemanticModelNormalizeDispatcher semanticModelNormalizeDispatcher =
+        new SemanticModelNormalizeDispatcher(semanticModelHookDispatcher, catalogManager);
+    this.semanticModelDispatcher =
+        new SemanticModelEventDispatcher(eventBus, semanticModelNormalizeDispatcher);
 
     this.statisticDispatcher = new StatisticEventDispatcher(eventBus, internalStatisticDispatcher);
 

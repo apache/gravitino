@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.clickhouse.integration.test;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.CLICKHOUSE_TYPE_FULL;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_DISTANCE_FUNCTION;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.REPLACINGMERGETREE;
@@ -34,7 +36,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
@@ -91,6 +97,7 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -639,7 +646,7 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
-  void testLoadAndCreateWithStartOfWeekAndMonthPartitionTransforms() {
+  void testLoadAndCreateWithStartOfDatePartitionTransforms() {
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Column[] columns =
         new Column[] {
@@ -652,7 +659,8 @@ public class CatalogClickHouseIT extends BaseIT {
               DEFAULT_VALUE_NOT_SET)
         };
 
-    for (String functionName : new String[] {"toStartOfWeek", "toStartOfMonth"}) {
+    for (String functionName :
+        new String[] {"toStartOfWeek", "toStartOfMonth", "toStartOfQuarter", "toStartOfYear"}) {
       String nativeTableName = GravitinoITUtils.genRandomName("native_start_partition");
       String createdTableName = GravitinoITUtils.genRandomName("created_start_partition");
       String createNativeSql =
@@ -918,6 +926,226 @@ public class CatalogClickHouseIT extends BaseIT {
             schemaName, nativeTableName));
     Table nativeLoaded = tableCatalog.loadTable(NameIdentifier.of(schemaName, nativeTableName));
     assertSetIndexMetadata(nativeLoaded, "idx_native_set", setProperties);
+  }
+
+  @Test
+  void testLoadLegacyUsearchIndexMetadata() throws Exception {
+    String legacyCatalogName = GravitinoITUtils.genRandomName("clickhouse_legacy_catalog");
+    String legacySchemaName = GravitinoITUtils.genRandomName("clickhouse_legacy_schema");
+    String legacyTableName = GravitinoITUtils.genRandomName("clickhouse_legacy_usearch");
+    ClickHouseContainer legacyContainer =
+        ClickHouseContainer.builder()
+            .withImage("clickhouse/clickhouse-server:23.8.16.16")
+            .withHostName("gravitino-ci-clickhouse-legacy")
+            .withEnvVars(Map.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
+            .withExposePorts(Set.of(ClickHouseContainer.CLICKHOUSE_PORT))
+            .withNetwork(containerSuite.getNetwork())
+            .build();
+    Catalog legacyCatalog = null;
+    try {
+      legacyContainer.start();
+      legacyContainer.createDatabase(TEST_DB_NAME);
+
+      Map<String, String> catalogProperties = Maps.newHashMap();
+      String jdbcUrl = legacyContainer.getJdbcUrl(TEST_DB_NAME);
+      String baseJdbcUrl = jdbcUrl.substring(0, jdbcUrl.lastIndexOf("/"));
+      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), baseJdbcUrl);
+      catalogProperties.put(
+          JdbcConfig.JDBC_DRIVER.getKey(), legacyContainer.getDriverClassName(TEST_DB_NAME));
+      catalogProperties.put(JdbcConfig.USERNAME.getKey(), legacyContainer.getUsername());
+      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), legacyContainer.getPassword());
+      legacyCatalog =
+          metalake.createCatalog(
+              legacyCatalogName,
+              Catalog.Type.RELATIONAL,
+              provider,
+              "legacy ClickHouse index metadata fixture",
+              catalogProperties);
+      legacyCatalog = metalake.loadCatalog(legacyCatalogName);
+      legacyCatalog.asSchemas().createSchema(legacySchemaName, "legacy index metadata", Map.of());
+
+      // This official 23.8 image exposes USearch but not Annoy; Annoy metadata parsing is covered
+      // by the catalog unit tests.
+      String usearchTypeFull;
+      String legacyJdbcUrl = baseJdbcUrl + "?custom_settings=allow_experimental_usearch_index%3D1";
+      try (Connection legacyConnection =
+              DriverManager.getConnection(
+                  legacyJdbcUrl, legacyContainer.getUsername(), legacyContainer.getPassword());
+          Statement legacyStatement = legacyConnection.createStatement()) {
+        legacyStatement.execute(
+            String.format(
+                "CREATE TABLE `%s`.`%s` ("
+                    + "`id` UInt64, `usearch_embedding` Array(Float32), "
+                    + "INDEX `idx_legacy_usearch` `usearch_embedding` TYPE usearch('cosineDistance') GRANULARITY 1"
+                    + ") ENGINE = MergeTree ORDER BY `id`",
+                legacySchemaName, legacyTableName));
+
+        try (ResultSet resultSet =
+            legacyStatement.executeQuery(
+                String.format(
+                    "SELECT type_full FROM system.data_skipping_indices WHERE database = '%s' "
+                        + "AND table = '%s' AND name = 'idx_legacy_usearch'",
+                    legacySchemaName, legacyTableName))) {
+          Assertions.assertTrue(resultSet.next(), "Expected to find the legacy USearch index");
+          usearchTypeFull = resultSet.getString("type_full");
+        }
+      }
+      Assertions.assertEquals("usearch('cosineDistance')", usearchTypeFull);
+
+      Table loaded =
+          legacyCatalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(legacySchemaName, legacyTableName));
+      assertLegacyIndexMetadata(
+          loaded,
+          "idx_legacy_usearch",
+          Index.IndexType.DATA_SKIPPING_USEARCH,
+          "usearch_embedding",
+          Map.of(
+              USEARCH_DISTANCE_FUNCTION,
+              "cosineDistance",
+              CLICKHOUSE_TYPE_FULL,
+              usearchTypeFull,
+              GRANULARITY,
+              "1"));
+    } finally {
+      try {
+        if (legacyCatalog != null) {
+          try {
+            legacyCatalog.asSchemas().dropSchema(legacySchemaName, true);
+          } catch (Exception ignored) {
+            // The historical container is discarded below; cleanup failures must not hide test
+            // errors.
+          }
+          metalake.disableCatalog(legacyCatalogName);
+          metalake.dropCatalog(legacyCatalogName, true);
+        }
+      } finally {
+        legacyContainer.close();
+      }
+    }
+  }
+
+  @Test
+  void testLoadLegacyAnnoyIndexMetadata() throws Exception {
+    String legacyCatalogName = GravitinoITUtils.genRandomName("clickhouse_legacy_annoy_catalog");
+    String legacySchemaName = GravitinoITUtils.genRandomName("clickhouse_legacy_annoy_schema");
+    String legacyTableName = GravitinoITUtils.genRandomName("clickhouse_legacy_annoy_table");
+    ClickHouseContainer legacyContainer =
+        ClickHouseContainer.builder()
+            .withImage("clickhouse/clickhouse-server:24.8.14.39")
+            .withHostName("gravitino-ci-clickhouse-legacy-annoy")
+            .withEnvVars(Map.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
+            .withExposePorts(Set.of(ClickHouseContainer.CLICKHOUSE_PORT))
+            .withNetwork(containerSuite.getNetwork())
+            .build();
+    Catalog legacyCatalog = null;
+    try {
+      legacyContainer.start();
+      legacyContainer.createDatabase(TEST_DB_NAME);
+
+      Map<String, String> catalogProperties = Maps.newHashMap();
+      String jdbcUrl = legacyContainer.getJdbcUrl(TEST_DB_NAME);
+      String baseJdbcUrl = jdbcUrl.substring(0, jdbcUrl.lastIndexOf("/"));
+      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), baseJdbcUrl);
+      catalogProperties.put(
+          JdbcConfig.JDBC_DRIVER.getKey(), legacyContainer.getDriverClassName(TEST_DB_NAME));
+      catalogProperties.put(JdbcConfig.USERNAME.getKey(), legacyContainer.getUsername());
+      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), legacyContainer.getPassword());
+      legacyCatalog =
+          metalake.createCatalog(
+              legacyCatalogName,
+              Catalog.Type.RELATIONAL,
+              provider,
+              "legacy Annoy index metadata fixture",
+              catalogProperties);
+      legacyCatalog = metalake.loadCatalog(legacyCatalogName);
+      legacyCatalog.asSchemas().createSchema(legacySchemaName, "legacy Annoy metadata", Map.of());
+
+      String nativeType;
+      String nativeTypeFull;
+      long nativeGranularity;
+      String legacyJdbcUrl =
+          baseJdbcUrl + "?custom_settings=allow_experimental_vector_similarity_index%3D1";
+      try (Connection legacyConnection =
+              DriverManager.getConnection(
+                  legacyJdbcUrl, legacyContainer.getUsername(), legacyContainer.getPassword());
+          Statement legacyStatement = legacyConnection.createStatement()) {
+        // ClickHouse 24.8 retains the legacy Annoy metadata-load compatibility path. Do not insert
+        // or search: legacy index operations are intentionally unsupported by this contribution.
+        legacyStatement.execute(
+            String.format(
+                "CREATE TABLE `%s`.`%s` ("
+                    + "`id` Int32, `embedding` Array(Float32), "
+                    + "INDEX `idx_legacy_annoy` `embedding` TYPE annoy()"
+                    + ") ENGINE = MergeTree ORDER BY `id`",
+                legacySchemaName, legacyTableName));
+
+        try (ResultSet resultSet =
+            legacyStatement.executeQuery(
+                String.format(
+                    "SELECT type, type_full, granularity FROM system.data_skipping_indices "
+                        + "WHERE database = '%s' AND table = '%s' AND name = 'idx_legacy_annoy'",
+                    legacySchemaName, legacyTableName))) {
+          Assertions.assertTrue(resultSet.next(), "Expected to find the legacy Annoy index");
+          nativeType = resultSet.getString("type");
+          nativeTypeFull = resultSet.getString("type_full");
+          nativeGranularity = resultSet.getLong("granularity");
+        }
+      }
+
+      Assertions.assertEquals("annoy", nativeType);
+      Assertions.assertTrue(
+          StringUtils.startsWithIgnoreCase(nativeTypeFull, "annoy"),
+          "Expected ClickHouse to preserve the Annoy type expression, but got: " + nativeTypeFull);
+      Assertions.assertTrue(nativeGranularity > 0);
+
+      Table loaded =
+          legacyCatalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(legacySchemaName, legacyTableName));
+      Index loadedAnnoy =
+          Arrays.stream(loaded.index())
+              .filter(index -> Objects.equals(index.name(), "idx_legacy_annoy"))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("Missing legacy Annoy index"));
+      Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_ANNOY, loadedAnnoy.type());
+      Assertions.assertArrayEquals(new String[][] {{"embedding"}}, loadedAnnoy.fieldNames());
+      Assertions.assertEquals(nativeTypeFull, loadedAnnoy.properties().get(CLICKHOUSE_TYPE_FULL));
+      Assertions.assertEquals(
+          String.valueOf(nativeGranularity), loadedAnnoy.properties().get(GRANULARITY));
+    } finally {
+      try {
+        if (legacyCatalog != null) {
+          try {
+            legacyCatalog.asSchemas().dropSchema(legacySchemaName, true);
+          } catch (Exception ignored) {
+            // The historical container is discarded below; cleanup failures must not hide test
+            // errors.
+          }
+          metalake.disableCatalog(legacyCatalogName);
+          metalake.dropCatalog(legacyCatalogName, true);
+        }
+      } finally {
+        legacyContainer.close();
+      }
+    }
+  }
+
+  private void assertLegacyIndexMetadata(
+      Table table,
+      String indexName,
+      Index.IndexType indexType,
+      String fieldName,
+      Map<String, String> properties) {
+    Index index =
+        Arrays.stream(table.index())
+            .filter(candidate -> Objects.equals(indexName, candidate.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing index " + indexName));
+    Assertions.assertEquals(indexType, index.type());
+    Assertions.assertArrayEquals(new String[][] {{fieldName}}, index.fieldNames());
+    Assertions.assertEquals(properties, index.properties());
   }
 
   private void assertSetIndexMetadata(
@@ -1688,7 +1916,11 @@ public class CatalogClickHouseIT extends BaseIT {
           Assertions.assertEquals(Types.DateType.get(), column.dataType());
           break;
         case "time_col":
-          Assertions.assertEquals(Types.LongType.get(), column.dataType());
+          Assertions.assertEquals(
+              StringUtils.isBlank(System.getenv("GRAVITINO_CLICKHOUSE_TEST_IMAGE"))
+                  ? Types.LongType.get()
+                  : Types.ExternalType.of("Time"),
+              column.dataType());
           break;
         case "timestamp_col":
           Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
@@ -3042,6 +3274,10 @@ public class CatalogClickHouseIT extends BaseIT {
     String password = CLICKHOUSE_CONTAINER.getPassword();
     String wrongPassword = password + "wrong";
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), wrongPassword);
+    // This test deliberately creates the catalog with a wrong password and then fixes it via
+    // alterCatalog, so it must opt out of create-time backend verification; otherwise the create
+    // itself would be rejected for the unreachable backend (the behavior added in #13767).
+    catalogProperties.put(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false");
 
     metalake.createCatalog(
         testCatalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
@@ -3890,5 +4126,162 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertTrue(
         normalizedCreateSql.contains("tokenbf_v1(256,2,0)"),
         "SHOW CREATE TABLE should retain tokenbf_v1 parameters: " + createSql);
+  }
+
+  @Test
+  @Tag("gravitino-docker-test")
+  void testVectorSimilarityIndex() {
+    String tableName = GravitinoITUtils.genRandomName("ch_vector_similarity_idx_");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    String vectorColumn = "embedding";
+    String customVectorColumn = "embedding_custom";
+    String zeroVectorColumn = "embedding_zero";
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              CLICKHOUSE_COL_NAME1,
+              Types.IntegerType.get(),
+              "id",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              vectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              customVectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "custom embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              zeroVectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "zero parameter embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+        };
+    Map<String, String> defaultProperties =
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3");
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders(CLICKHOUSE_COL_NAME1),
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+              "idx_vector_default",
+              new String[][] {{vectorColumn}},
+              defaultProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Index defaultIndex =
+        Arrays.stream(loaded.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_default"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, defaultIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{vectorColumn}}, defaultIndex.fieldNames());
+    Assertions.assertEquals(defaultProperties, defaultIndex.properties());
+
+    Map<String, String> customProperties =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "i8",
+            "hnsw_max_connections_per_layer", "16",
+            "hnsw_candidate_list_size_for_construction", "64",
+            "granularity", "7");
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+            "idx_vector_custom",
+            new String[][] {{customVectorColumn}},
+            customProperties));
+
+    clickhouseService.executeQuery(
+        "ALTER TABLE `%s`.`%s` ADD INDEX `idx_vector_zero` `%s` TYPE "
+                .formatted(schemaName, tableName, zeroVectorColumn)
+            + "vector_similarity('hnsw', 'L2Distance', 3, 'bf16', 0, 0) "
+            + "GRANULARITY 100000000");
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    Index customIndex =
+        Arrays.stream(altered.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_custom"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, customIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{customVectorColumn}}, customIndex.fieldNames());
+    Assertions.assertEquals(customProperties, customIndex.properties());
+
+    Index zeroValueIndex =
+        Arrays.stream(altered.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_zero"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertArrayEquals(new String[][] {{zeroVectorColumn}}, zeroValueIndex.fieldNames());
+    Assertions.assertEquals(
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3"),
+        zeroValueIndex.properties());
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName));
+    String normalizedCreateSql = createSql.replaceAll("\\s+", "");
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("vector_similarity('hnsw','L2Distance',3)"), createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("vector_similarity('hnsw','cosineDistance',3,'i8',16,64)"),
+        createSql);
+    Assertions.assertTrue(normalizedCreateSql.contains("GRANULARITY100000000"), createSql);
+    Assertions.assertTrue(normalizedCreateSql.contains("GRANULARITY7"), createSql);
+  }
+
+  @Test
+  @Tag("gravitino-docker-test")
+  void testLoadTableWithUnsupportedNativeDotProductVectorIndex() {
+    String[] version = clickhouseService.executeQueryForResult("SELECT version()").split("\\.");
+    int majorVersion = Integer.parseInt(version[0]);
+    int minorVersion = Integer.parseInt(version[1]);
+    Assumptions.assumeTrue(
+        majorVersion > 26 || (majorVersion == 26 && minorVersion >= 4),
+        "Native dotProduct vector indexes require ClickHouse 26.4 or later");
+
+    String nativeTableName = GravitinoITUtils.genRandomName("ch_native_dot_vector_idx_");
+    clickhouseService.executeQuery(
+        ("CREATE TABLE `%s`.`%s` ("
+                + "id Int32, embedding_l2 Array(Float32), embedding_dot Array(Float32), "
+                + "INDEX idx_minmax id TYPE minmax GRANULARITY 1, "
+                + "INDEX idx_l2 embedding_l2 TYPE "
+                + "vector_similarity('hnsw', 'L2Distance', 3) GRANULARITY 100000000, "
+                + "INDEX idx_dot embedding_dot TYPE "
+                + "vector_similarity('hnsw', 'dotProduct', 3) GRANULARITY 100000000) "
+                + "ENGINE = MergeTree ORDER BY id")
+            .formatted(schemaName, nativeTableName));
+
+    Table loaded =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, nativeTableName));
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index()).anyMatch(index -> "idx_minmax".equals(index.name())));
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index()).anyMatch(index -> "idx_l2".equals(index.name())));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index()).anyMatch(index -> "idx_dot".equals(index.name())));
   }
 }

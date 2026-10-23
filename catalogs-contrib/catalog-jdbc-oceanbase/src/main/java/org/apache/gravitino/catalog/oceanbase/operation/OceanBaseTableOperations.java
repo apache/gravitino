@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.oceanbase.operation;
 
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -108,7 +108,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT='").append(comment).append("'");
+      sqlBuilder.append(" COMMENT='").append(escapeSqlLiteral(comment, '\'')).append("'");
     }
 
     // Add table properties
@@ -196,7 +196,8 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    return String.format("TRUNCATE TABLE `%s`", tableName);
+    throw new UnsupportedOperationException(
+        "OceanBase does not support purge table in Gravitino, please use drop table");
   }
 
   /**
@@ -211,19 +212,22 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
-    try (Connection connection = getConnection(databaseName)) {
-      for (TableChange change : changes) {
-        String sql = generateAlterTableSql(databaseName, tableName, change);
-        if (StringUtils.isEmpty(sql)) {
-          LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-          continue;
-        }
-        JdbcConnectorUtils.executeUpdate(connection, sql);
+    for (TableChange change : changes) {
+      // Generate each statement before borrowing the connection that executes it, as the
+      // generator may load the table through another connection. Each change is generated after
+      // the previous one is applied, so it sees the updated table.
+      String sql = generateAlterTableSql(databaseName, tableName, change);
+      if (StringUtils.isEmpty(sql)) {
+        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+        continue;
       }
-      LOG.info("Alter table {} from database {}", tableName, databaseName);
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
+      try (Connection connection = getConnection(databaseName)) {
+        JdbcConnectorUtils.executeUpdate(connection, sql);
+      } catch (final SQLException se) {
+        throw this.exceptionMapper.toGravitinoException(se);
+      }
     }
+    LOG.info("Alter table {} from database {}", tableName, databaseName);
   }
 
   @Override
@@ -301,7 +305,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -310,7 +314,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add("COMMENT '" + newComment + "'");
+      alterSql.add("COMMENT '" + escapeSqlLiteral(newComment, '\'') + "'");
     }
 
     if (!setProperties.isEmpty()) {
@@ -475,7 +479,10 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     }
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
+      columnDefinition
+          .append("COMMENT '")
+          .append(escapeSqlLiteral(addColumn.getComment(), '\''))
+          .append("' ");
     }
 
     // Append default value if available
@@ -600,6 +607,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
             .withType(column.dataType())
             .withNullable(column.nullable())
             .withComment(column.comment())
+            .withAutoIncrement(column.autoIncrement())
             .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
@@ -618,7 +626,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
@@ -646,7 +654,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
-      sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
+      sqlBuilder.append("COMMENT '").append(escapeSqlLiteral(column.comment(), '\'')).append("' ");
     }
     return sqlBuilder;
   }

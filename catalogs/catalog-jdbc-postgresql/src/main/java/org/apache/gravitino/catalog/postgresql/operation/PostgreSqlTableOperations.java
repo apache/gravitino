@@ -414,33 +414,17 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   @VisibleForTesting
   static String deleteIndexDefinition(String tableName, TableChange.DeleteIndex deleteIndex) {
-    StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("ALTER TABLE ")
-        .append(PG_QUOTE)
-        .append(tableName)
-        .append(PG_QUOTE)
-        .append(" DROP CONSTRAINT ")
-        .append(PG_QUOTE)
-        .append(deleteIndex.getName())
-        .append(PG_QUOTE)
-        .append(";\n");
-    if (deleteIndex.isIfExists()) {
-      sqlBuilder
-          .append("DROP INDEX IF EXISTS ")
-          .append(PG_QUOTE)
-          .append(deleteIndex.getName())
-          .append(PG_QUOTE)
-          .append(";");
-    } else {
-      sqlBuilder
-          .append("DROP INDEX ")
-          .append(PG_QUOTE)
-          .append(deleteIndex.getName())
-          .append(PG_QUOTE)
-          .append(";");
-    }
-    return sqlBuilder.toString();
+    // Gravitino creates primary and unique indexes as constraints. Dropping the constraint
+    // also removes its backing index, so a second DROP INDEX would fail after a successful drop.
+    return String.format(
+        "ALTER TABLE %s%s%s DROP CONSTRAINT %s%s%s%s;",
+        PG_QUOTE,
+        tableName,
+        PG_QUOTE,
+        deleteIndex.isIfExists() ? "IF EXISTS " : "",
+        PG_QUOTE,
+        deleteIndex.getName(),
+        PG_QUOTE);
   }
 
   @VisibleForTesting
@@ -502,7 +486,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   private String updateCommentDefinition(
       TableChange.UpdateComment updateComment, JdbcTable jdbcTable) {
-    String newComment = updateComment.getNewComment();
+    String newComment = StringUtils.defaultString(updateComment.getNewComment());
     if (null == StringIdentifier.fromComment(newComment)) {
       // Detect and add Gravitino id.
       if (StringUtils.isNotEmpty(jdbcTable.comment())) {
@@ -711,7 +695,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   private String updateColumnCommentFieldDefinition(
       TableChange.UpdateColumnComment updateColumnComment, String tableName) {
-    String newComment = updateColumnComment.getNewComment();
+    String newComment = StringUtils.defaultString(updateColumnComment.getNewComment());
     if (updateColumnComment.fieldName().length > 1) {
       throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }

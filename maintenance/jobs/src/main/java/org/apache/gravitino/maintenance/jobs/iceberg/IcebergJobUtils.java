@@ -20,6 +20,9 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.SparkSession;
 
@@ -32,8 +35,32 @@ import org.apache.spark.sql.SparkSession;
 public final class IcebergJobUtils {
 
   private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
+  /**
+   * Matches a job template placeholder that no job configuration value replaced, e.g. {@code
+   * {{use_caching}}}.
+   */
+  private static final Pattern UNRESOLVED_PLACEHOLDER_PATTERN = Pattern.compile("^\\{\\{[^{}]*}}$");
 
   private IcebergJobUtils() {}
+
+  /**
+   * Return the given argument value unless it is an unresolved job template placeholder.
+   *
+   * <p>Job templates declare optional parameters as {@code {{name}}} placeholders. When the caller
+   * omits a parameter, the server leaves the placeholder untouched and it reaches the job as a
+   * literal {@code "{{name}}"} argument. Treating that as a real value would forward nonsense to
+   * Iceberg, so callers use this method to map it back to "not supplied".
+   *
+   * @param value the argument value to inspect
+   * @return the value, or null if it is null or an unresolved placeholder
+   */
+  @Nullable
+  public static String nullIfUnresolvedPlaceholder(@Nullable String value) {
+    if (value == null || UNRESOLVED_PLACEHOLDER_PATTERN.matcher(value.trim()).matches()) {
+      return null;
+    }
+    return value;
+  }
 
   /**
    * Escape single quotes in SQL string literals by replacing ' with ''.
@@ -97,6 +124,45 @@ public final class IcebergJobUtils {
     }
 
     return argMap;
+  }
+
+  /**
+   * Parse named arguments with explicit values and validate supported and required names.
+   *
+   * <p>Blank values and unresolved template placeholders are normalized to null. Duplicate names,
+   * unknown names, missing values, and absent required arguments are rejected. Unlike the
+   * single-argument overload, this parser does not accept bare boolean flags.
+   *
+   * @param args command line arguments
+   * @param supported allowed argument names without the leading dashes
+   * @param requiredArguments required argument names without the leading dashes
+   * @return map of argument names to normalized values
+   * @throws IllegalArgumentException if arguments are invalid
+   */
+  public static Map<String, String> parseArguments(
+      String[] args, Set<String> supported, Set<String> requiredArguments) {
+    Map<String, String> parsed = new HashMap<>();
+    for (int i = 0; i < args.length; i += 2) {
+      String flag = args[i];
+      if (flag == null || !flag.startsWith("--") || !supported.contains(flag.substring(2))) {
+        throw new IllegalArgumentException("Unknown argument: " + flag);
+      }
+      if (i + 1 == args.length || args[i + 1] == null || args[i + 1].startsWith("--")) {
+        throw new IllegalArgumentException("Missing value for " + flag);
+      }
+      String key = flag.substring(2);
+      if (parsed.containsKey(key)) {
+        throw new IllegalArgumentException("Duplicate argument: " + flag);
+      }
+      String value = nullIfUnresolvedPlaceholder(args[i + 1].trim());
+      parsed.put(key, value == null || value.isEmpty() ? null : value);
+    }
+    for (String required : requiredArguments) {
+      if (parsed.get(required) == null) {
+        throw new IllegalArgumentException("--" + required + " is required");
+      }
+    }
+    return parsed;
   }
 
   /**

@@ -288,6 +288,13 @@ public class TestTypeUtils {
 
   @Test
   public void testExternalTypeFromOtherCatalogConversion() {
+    for (String declaration : new String[] {"numeric(39,0)", "numeric(2,-3)", "numeric(3,5)"}) {
+      Assertions.assertEquals(
+          DataTypes.STRING(),
+          TypeUtils.toFlinkType(Types.ExternalType.of(declaration)),
+          declaration);
+    }
+
     // A type name of another data source that parses as a Flink type by accident: a PostgreSQL
     // numeric parses as DECIMAL(10, 0)
     Assertions.assertEquals(
