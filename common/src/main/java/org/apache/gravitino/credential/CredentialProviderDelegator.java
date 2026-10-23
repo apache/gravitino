@@ -63,6 +63,8 @@ public abstract class CredentialProviderDelegator<T extends Credential>
   public Credential getCredential(CredentialContext context) {
     try {
       return generator.generate(context);
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to generate credential using " + getGeneratorClassName(), e);

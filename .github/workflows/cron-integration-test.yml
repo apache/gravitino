@@ -52,7 +52,8 @@ concurrency:
 jobs:
   select-suites:
     name: Select suites
-    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino'
+    # Other copies of the repository set ENABLE_SCHEDULED_TESTS to run it on schedule.
+    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino' || vars.ENABLE_SCHEDULED_TESTS == 'true'
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.parse.outputs.backend }}
@@ -241,7 +242,8 @@ jobs:
       - trino-multi-version
       - lance
       - multi-instance
-    if: always()
+    # Scheduled runs are skipped outside the upstream repository; do not report them as failures.
+    if: always() && (github.event_name != 'schedule' || github.repository == 'apache/gravitino' || vars.ENABLE_SCHEDULED_TESTS == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Write summary

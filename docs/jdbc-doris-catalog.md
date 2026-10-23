@@ -53,7 +53,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
 | `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned; takes precedence over `gravitino.bypass.maxWaitMillis`.                                                    | `30000`       | No       |
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
@@ -182,6 +182,8 @@ Doris enforces the following constraints (violations are rejected by the Doris s
 - The table must use `UNIQUE KEY` or `DUPLICATE KEY` model.
 - The auto-increment column must be `BIGINT NOT NULL` with no `DEFAULT` value.
 - Each table can have at most one auto-increment column.
+
+An auto-increment column can only be defined when the table is created. Gravitino rejects adding one with `alterTable`.
 
 :::note
 Gravitino currently supports creating `UNIQUE KEY` tables via the `UNIQUE_KEY` index type. To create a `DUPLICATE KEY` table, omit key indexes from the table definition — Doris defaults to the DUPLICATE model when no key is specified.

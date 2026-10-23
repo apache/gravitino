@@ -458,6 +458,27 @@ public class TestSchemaOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testDropNonEmptySchemaWithoutCascadeReturnsConflict() {
+    NameIdentifier identifier = NameIdentifier.of(metalake, catalog, "schema1");
+    doThrow(new NonEmptySchemaException("Schema schema1 is not empty"))
+        .when(dispatcher)
+        .dropSchema(identifier, false);
+
+    try (Response response =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .queryParam("cascade", false)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete()) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.NON_EMPTY_CODE, error.getCode());
+      Assertions.assertEquals(NonEmptySchemaException.class.getSimpleName(), error.getType());
+      verify(dispatcher).dropSchema(identifier, false);
+    }
+  }
+
+  @Test
   public void testDropSchema() {
     when(dispatcher.dropSchema(any(), eq(false))).thenReturn(true);
 

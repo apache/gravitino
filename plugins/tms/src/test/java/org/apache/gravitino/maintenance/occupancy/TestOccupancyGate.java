@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.occupancy;
 
+import static org.apache.gravitino.maintenance.storage.TableMaintenanceActionTestUtils.expireClaim;
+
 import java.io.IOException;
 import java.util.function.Function;
 import org.apache.gravitino.Namespace;
@@ -200,7 +202,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    long claimTimeoutMs = 200L;
+    long claimTimeoutMs = TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS;
     OccupancyGate gate = new OccupancyGate(actions, claimTimeoutMs);
     long policyId = 66L;
 
@@ -208,7 +210,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertTrue(actions.hasLiveUnboundClaim(table.id(), policyId, claimTimeoutMs));
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
 
-    Thread.sleep(claimTimeoutMs + 50L);
+    expireClaim(claim, claimTimeoutMs);
 
     // Unbound TTL is evaluated in the DAO against the database clock, so OccupancyGate agrees with
     // acquire/reclaim even when the JVM clock would disagree (multi-node skew).

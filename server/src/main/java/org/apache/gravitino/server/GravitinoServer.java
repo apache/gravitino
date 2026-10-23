@@ -54,8 +54,10 @@ import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.server.web.ConfigServlet;
 import org.apache.gravitino.server.web.HealthAliasServlet;
+import org.apache.gravitino.server.web.HealthCheckPathMatcher;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
@@ -96,8 +98,8 @@ public class GravitinoServer extends ResourceConfig {
   // audit-on-failure coverage. VersioningFilter is intentionally not applied to these: it
   // negotiates Gravitino's "application/vnd.gravitino.vN+json" media type for the Jersey-managed
   // REST surface, and none of these servlets are part of it or read that header. /metrics and
-  // /prometheus/metrics are registered by JettyServer#initialize() itself (see server-common's
-  // JettyServer), outside GravitinoServer's own control entirely. See GH-12760.
+  // /prometheus/metrics are registered directly on JettyServer's servlet context, outside the
+  // Jersey-managed REST surface. See GH-12760.
   private static final ImmutableList<String> ROOT_MOUNTED_PATHS =
       ImmutableList.<String>builder()
           .add("/configs")
@@ -133,6 +135,7 @@ public class GravitinoServer extends ResourceConfig {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
     server.initialize(jettyServerConfig, SERVER_NAME);
+    server.addMetricsServlets(gravitinoEnv.metricsSystem());
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
@@ -231,9 +234,10 @@ public class GravitinoServer extends ResourceConfig {
 
     // API_ANY_PATH keeps its original, unabridged filter set: this is the only pathspec that is
     // part of the Jersey-managed REST surface, so it's the only one VersioningFilter applies to.
-    server.addFilter(new RequestContextFilter(gravitinoEnv.eventBus()), API_ANY_PATH);
+    ClientAddressResolver clientAddressResolver = jettyServerConfig.getClientAddressResolver();
     server.addFilter(
-        new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), API_ANY_PATH);
+        new RequestContextFilter(gravitinoEnv.eventBus(), clientAddressResolver), API_ANY_PATH);
+    server.addFilter(createHttpAuditFilter(clientAddressResolver), API_ANY_PATH);
     server.addFilter(
         new VersioningFilter(jettyServerConfig.isIncludeErrorStackTrace()), API_ANY_PATH);
 
@@ -246,9 +250,9 @@ public class GravitinoServer extends ResourceConfig {
     // given gravitinoEnv.eventBus() here too (not just API_ANY_PATH) so query-parameter capture
     // (see RequestContextFilter's class doc) applies uniformly, not only to the REST API.
     for (String pathSpec : ROOT_MOUNTED_PATHS) {
-      server.addFilter(new RequestContextFilter(gravitinoEnv.eventBus()), pathSpec);
       server.addFilter(
-          new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), pathSpec);
+          new RequestContextFilter(gravitinoEnv.eventBus(), clientAddressResolver), pathSpec);
+      server.addFilter(createHttpAuditFilter(clientAddressResolver), pathSpec);
     }
 
     // Custom filters are registered once, across every filtered path in a single call, so a
@@ -266,6 +270,14 @@ public class GravitinoServer extends ResourceConfig {
       server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
       server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
     }
+  }
+
+  private HttpAuditFilter createHttpAuditFilter(ClientAddressResolver clientAddressResolver) {
+    return new HttpAuditFilter(
+        gravitinoEnv.eventBus(),
+        EventSource.GRAVITINO_SERVER,
+        new HealthCheckPathMatcher(),
+        clientAddressResolver);
   }
 
   public void start() throws Exception {

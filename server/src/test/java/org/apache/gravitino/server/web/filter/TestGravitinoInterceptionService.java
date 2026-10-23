@@ -35,6 +35,8 @@ import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.Principal;
+import java.security.PrivilegedExceptionAction;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -68,10 +70,22 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.metalake.MetalakeManager;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -962,7 +976,7 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
-  public void testLoadTableAuthorizationProceedsWhenProbeAllowedTableDoesNotExist()
+  public void testLoadTableAuthorizationTerminatesWhenProbeAllowedTableDoesNotExist()
       throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
@@ -992,7 +1006,8 @@ public class TestGravitinoInterceptionService {
       envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
       when(mockEnv.internalTableDispatcher()).thenReturn(tableDispatcher);
       when(mockEnv.eventBus()).thenReturn(mockEventBus);
-      when(tableDispatcher.tableExists(ArgumentMatchers.any())).thenReturn(false);
+      when(tableDispatcher.loadTable(ArgumentMatchers.any()))
+          .thenThrow(new NoSuchTableException("Table is absent"));
 
       MethodInterceptor interceptor = tableLoadInterceptor();
       MethodInvocation invocation = tableLoadInvocation();
@@ -1002,8 +1017,11 @@ public class TestGravitinoInterceptionService {
       Response response = (Response) interceptor.invoke(invocation);
 
       assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-      verify(invocation).proceed();
-      verify(tableDispatcher).tableExists(ArgumentMatchers.any());
+      verify(invocation, never()).proceed();
+      assertEquals(
+          NoSuchTableException.class.getSimpleName(),
+          ((ErrorResponse) response.getEntity()).getType());
+      verify(tableDispatcher).loadTable(ArgumentMatchers.any());
       verify(mockEventBus, never()).dispatchEvent(ArgumentMatchers.any());
     }
   }
@@ -1039,7 +1057,7 @@ public class TestGravitinoInterceptionService {
       envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
       when(mockEnv.internalTableDispatcher()).thenReturn(tableDispatcher);
       when(mockEnv.eventBus()).thenReturn(mockEventBus);
-      when(tableDispatcher.tableExists(ArgumentMatchers.any())).thenReturn(true);
+      when(tableDispatcher.loadTable(ArgumentMatchers.any())).thenReturn(mock(Table.class));
 
       MethodInterceptor interceptor = tableLoadInterceptor();
       MethodInvocation invocation = tableLoadInvocation();
@@ -1048,9 +1066,261 @@ public class TestGravitinoInterceptionService {
 
       assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
       verify(invocation, never()).proceed();
-      verify(tableDispatcher).tableExists(ArgumentMatchers.any());
+      verify(tableDispatcher).loadTable(ArgumentMatchers.any());
       verify(mockEventBus)
           .dispatchEvent(ArgumentMatchers.any(AuthorizationDenialFailureEvent.class));
+    }
+  }
+
+  /**
+   * Unsupported view probes preserve the primary denial and its authorization event.
+   *
+   * @throws Throwable If authorization interception fails.
+   */
+  @Test
+  public void testLoadViewAuthorizationReturnsForbiddenWhenViewsAreUnsupported() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class);
+        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      authUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = tableProbeAuthorizer();
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+      ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
+      EventBus mockEventBus = spy(new EventBus(Collections.emptyList()));
+      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+      when(mockEnv.internalViewDispatcher()).thenReturn(viewDispatcher);
+      when(mockEnv.eventBus()).thenReturn(mockEventBus);
+      when(viewDispatcher.loadView(ArgumentMatchers.any()))
+          .thenThrow(new UnsupportedOperationException("Catalog does not support view operations"));
+
+      Method method =
+          ViewOperations.class.getMethod(
+              "loadView", String.class, String.class, String.class, String.class);
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(new Object[] {"testMetalake", "testCatalog", "testSchema", "missingView"});
+
+      Response response = (Response) interceptor.invoke(invocation);
+
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+      verify(invocation, never()).proceed();
+      verify(viewDispatcher).loadView(ArgumentMatchers.any());
+      verify(mockEventBus)
+          .dispatchEvent(ArgumentMatchers.any(AuthorizationDenialFailureEvent.class));
+    }
+  }
+
+  /**
+   * An absent view probe is terminal even when a concurrent create makes the view loadable.
+   *
+   * @throws Throwable If authorization interception fails.
+   */
+  @Test
+  public void testMissingViewProbeDoesNotLoadConcurrentlyCreatedView() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class);
+        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      authUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = tableProbeAuthorizer();
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+      ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
+      EventBus mockEventBus = spy(new EventBus(Collections.emptyList()));
+      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+      when(mockEnv.internalViewDispatcher()).thenReturn(viewDispatcher);
+      when(mockEnv.eventBus()).thenReturn(mockEventBus);
+      AtomicReference<View> created = new AtomicReference<>();
+      View view = mock(View.class);
+      when(view.name()).thenReturn("missingView");
+      when(view.columns()).thenReturn(new Column[0]);
+      when(view.representations())
+          .thenReturn(
+              new Representation[] {
+                SQLRepresentation.builder()
+                    .withDialect("spark")
+                    .withSql("SELECT secret FROM private_table")
+                    .build()
+              });
+      when(view.properties()).thenReturn(Collections.emptyMap());
+      when(view.auditInfo())
+          .thenReturn(
+              AuditInfo.builder().withCreator("owner").withCreateTime(Instant.now()).build());
+      when(viewDispatcher.loadView(ArgumentMatchers.any()))
+          .thenAnswer(
+              ignored -> {
+                if (created.get() == null) {
+                  // The load observed absence; another request creates the view before the handler
+                  // can run.
+                  created.set(view);
+                  throw new NoSuchViewException("View is absent");
+                }
+                return created.get();
+              });
+      ViewOperations operations = new ViewOperations(viewDispatcher);
+      FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+      principalUtilsMocked
+          .when(() -> PrincipalUtils.doAs(any(), any()))
+          .thenAnswer(
+              invocation -> ((PrivilegedExceptionAction<?>) invocation.getArgument(1)).run());
+
+      Method method =
+          ViewOperations.class.getMethod(
+              "loadView", String.class, String.class, String.class, String.class);
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(new Object[] {"testMetalake", "testCatalog", "testSchema", "missingView"});
+
+      when(invocation.proceed())
+          .thenAnswer(
+              ignored ->
+                  operations.loadView("testMetalake", "testCatalog", "testSchema", "missingView"));
+      Response response = (Response) interceptor.invoke(invocation);
+
+      assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+      verify(invocation, never()).proceed();
+      verify(viewDispatcher).loadView(ArgumentMatchers.any());
+      Assertions.assertSame(view, created.get());
+      Assertions.assertTrue(response.getEntity() instanceof ErrorResponse);
+      assertEquals(
+          NoSuchViewException.class.getSimpleName(),
+          ((ErrorResponse) response.getEntity()).getType());
+
+      verify(mockEventBus, never()).dispatchEvent(ArgumentMatchers.any());
+    }
+  }
+
+  /**
+   * An absent table probe is terminal even when a concurrent create makes the table loadable.
+   *
+   * @throws Throwable If authorization interception fails.
+   */
+  @Test
+  public void testMissingTableProbeDoesNotLoadConcurrentlyCreatedTable() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class);
+        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      authUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = tableProbeAuthorizer();
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+      TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+      EventBus mockEventBus = spy(new EventBus(Collections.emptyList()));
+      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+      when(mockEnv.internalTableDispatcher()).thenReturn(tableDispatcher);
+      when(mockEnv.eventBus()).thenReturn(mockEventBus);
+      AtomicReference<Table> created = new AtomicReference<>();
+      Table table = mock(Table.class);
+      when(table.name()).thenReturn("missingTable");
+      when(table.columns()).thenReturn(new Column[0]);
+      when(table.sortOrder()).thenReturn(new SortOrder[0]);
+      when(table.partitioning()).thenReturn(new Transform[0]);
+      when(table.index()).thenReturn(new Index[0]);
+      when(table.distribution()).thenReturn(Distributions.NONE);
+      when(table.properties()).thenReturn(Collections.emptyMap());
+      when(table.auditInfo())
+          .thenReturn(
+              AuditInfo.builder().withCreator("owner").withCreateTime(Instant.now()).build());
+      when(tableDispatcher.loadTable(ArgumentMatchers.any()))
+          .thenAnswer(
+              ignored -> {
+                if (created.get() == null) {
+                  // The load observed absence; another request creates the table before the handler
+                  // can run.
+                  created.set(table);
+                  throw new NoSuchTableException("Table is absent");
+                }
+                return created.get();
+              });
+      TableOperations operations = new TableOperations(tableDispatcher);
+      FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+      principalUtilsMocked
+          .when(() -> PrincipalUtils.doAs(any(), any()))
+          .thenAnswer(
+              invocation -> ((PrivilegedExceptionAction<?>) invocation.getArgument(1)).run());
+
+      Method method =
+          TableOperations.class.getMethod(
+              "loadTable", String.class, String.class, String.class, String.class, String.class);
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(
+              new Object[] {"testMetalake", "testCatalog", "testSchema", "missingTable", null});
+
+      when(invocation.proceed())
+          .thenAnswer(
+              ignored ->
+                  operations.loadTable(
+                      "testMetalake", "testCatalog", "testSchema", "missingTable", null));
+      Response response = (Response) interceptor.invoke(invocation);
+
+      assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+      verify(invocation, never()).proceed();
+      verify(tableDispatcher).loadTable(ArgumentMatchers.any());
+      Assertions.assertSame(table, created.get());
+      Assertions.assertTrue(response.getEntity() instanceof ErrorResponse);
+      assertEquals(
+          NoSuchTableException.class.getSimpleName(),
+          ((ErrorResponse) response.getEntity()).getType());
+
+      verify(mockEventBus, never()).dispatchEvent(ArgumentMatchers.any());
     }
   }
 
