@@ -44,8 +44,10 @@ than federating an external one, so no provider is needed when creating it.
 [Catalogs and Schemas](./catalogs-and-schemas.md). A fileset catalog usually carries a base
 `location`, and schemas can narrow it further.
 
-**2. Create the fileset.** Give it a name, a type, and a storage location. Creating a managed
-fileset creates the directory; pointing at an existing path makes it external.
+**2. Create the fileset.** Give it a name, a type, and a storage location. Choose `EXTERNAL` to
+retain existing data when the fileset is dropped. Choose `MANAGED` to let Gravitino create or adopt
+an empty directory and delete its data on drop. Adopting an existing non-empty directory as
+`MANAGED` requires `allow-existing-location-as-managed=true`.
 
 **3. Read it by name.** Engines reach the files through GVFS or the client rather than the raw path.
 See [How to use GVFS](./how-to-use-gvfs.md).

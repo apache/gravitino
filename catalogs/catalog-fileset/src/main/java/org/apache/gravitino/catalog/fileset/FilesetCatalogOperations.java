@@ -574,7 +574,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             // that already holds files would put data Gravitino never created at risk.
             if (type == Fileset.Type.MANAGED
                 && !allowExistingLocationAsManaged
-                && fs.listStatus(formalizePath).length > 0) {
+                && fs.listStatusIterator(formalizePath).hasNext()) {
               throw new IllegalArgumentException(
                   "Location "
                       + formalizePath
