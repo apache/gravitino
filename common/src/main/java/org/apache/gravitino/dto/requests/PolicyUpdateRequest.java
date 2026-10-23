@@ -157,7 +157,10 @@ public interface PolicyUpdateRequest extends RESTRequest {
           name = "system_row_filter"),
       @JsonSubTypes.Type(
           value = PolicyContentDTO.ColumnMaskContentDTO.class,
-          name = "system_column_mask")
+          name = "system_column_mask"),
+      @JsonSubTypes.Type(
+          value = PolicyContentDTO.AccessControlContentDTO.class,
+          name = "system_access_control")
     })
     private final PolicyContentDTO newContent;
 

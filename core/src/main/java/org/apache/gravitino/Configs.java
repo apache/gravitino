@@ -620,8 +620,9 @@ public class Configs {
   public static final ConfigEntry<String> JOB_EXECUTOR =
       new ConfigBuilder("gravitino.job.executor")
           .doc(
-              "The executor to run jobs, by default it is 'local', user can implement their own "
-                  + "executor and set it here.")
+              "The executor to run jobs: one of the built-in executors 'local' (the default) and "
+                  + "'k8s', or the name of a custom executor whose class is set by "
+                  + "gravitino.jobExecutor.<name>.class.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
