@@ -956,9 +956,13 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   private String updateColumnNullabilityDefinition(
       TableChange.UpdateColumnNullability change, JdbcTable table, Optional<String> dorisVersion) {
-    validateUpdateColumnNullable(change, table);
+    JdbcColumn column = validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
+    // Doris schema change does not allow converting a nullable column to non-nullable.
+    Preconditions.checkArgument(
+        change.nullable() || !column.nullable(),
+        "Doris does not support changing nullable column %s to not null",
+        col);
     JdbcColumn updateColumn =
         JdbcColumn.builder()
             .withName(col)

@@ -1746,7 +1746,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
-  public void testAlterTableNullabilityValidationFails() {
+  public void testAlterTableNullabilityDropsNullDefault() {
     StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
     ops.initialize(
         null,
@@ -1756,15 +1756,38 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         new HashMap<>());
     ops.setTable(buildStubTableWithNullDefault());
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            ops.buildAlterSql(
-                "db",
-                "tbl",
-                new TableChange[] {
-                  TableChange.updateColumnNullability(new String[] {"c3"}, false)
-                }));
+    String sql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {TableChange.updateColumnNullability(new String[] {"c3"}, false)});
+    Assertions.assertTrue(sql.replaceAll("\\s+", " ").contains("MODIFY COLUMN `c3` String"), sql);
+    Assertions.assertFalse(sql.contains("Nullable"), sql);
+    Assertions.assertFalse(sql.contains("DEFAULT"), sql);
+  }
+
+  @Test
+  public void testAlterTableNullabilityWithDefaultValueInSameRequest() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTableWithNullDefault());
+
+    TableChange setDefault =
+        TableChange.updateColumnDefaultValue(new String[] {"c3"}, Literals.stringLiteral("abc"));
+    TableChange setNotNull = TableChange.updateColumnNullability(new String[] {"c3"}, false);
+    // Every regenerated column definition carries both the new default and NOT NULL, whichever
+    // order the changes come in.
+    for (TableChange[] changes :
+        new TableChange[][] {{setDefault, setNotNull}, {setNotNull, setDefault}}) {
+      String sql = ops.buildAlterSql("db", "tbl", changes);
+      Assertions.assertFalse(sql.contains("Nullable"), sql);
+      Assertions.assertEquals(2, StringUtils.countMatches(sql, "DEFAULT 'abc'"), sql);
+    }
   }
 
   @Test
