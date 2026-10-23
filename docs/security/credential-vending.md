@@ -11,6 +11,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 ### Capabilities
 
+<<<<<<< HEAD
 - Supports Gravitino Iceberg REST server.
 - Supports Gravitino server with the following catalog types:
 
@@ -28,6 +29,91 @@ Gravitino credential vending is used to generate temporary or static credentials
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
 - Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs.
+=======
+| Catalog type | Vends                           |
+|--------------|---------------------------------|
+| Fileset      | S3, OSS, GCS, ADLS, COS         |
+| Hive         | S3, OSS, ADLS                   |
+| Iceberg      | S3, OSS, GCS, ADLS              |
+| Glue         | S3                              |
+| JDBC         | JDBC user and password          |
+| Paimon       | S3, OSS, JDBC user and password |
+
+S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs, except that the Trino Hive connector does not consume OSS credentials. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
+
+Token providers (`s3-token`, `oss-token`, `gcs-token`, `adls-token`, and `cos-token`) and `aws-irsa` scope credentials to a path, so only Fileset and Iceberg catalogs support them. Other catalogs vend static keys only, such as `s3-secret-key`, `oss-secret-key`, and `azure-account-key`. Creating or altering such a catalog with one of these providers fails.
+
+## Quick Start
+
+Vend scoped S3 credentials to Spark through the IRC. Create the catalog through the Gravitino REST catalog API:
+
+```shell
+curl -X POST http://localhost:8090/api/metalakes/{metalake}/catalogs \
+-H "Content-Type: application/json" \
+-d '{
+  "name": "iceberg_catalog",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-iceberg",
+  "properties": {
+    "catalog-backend": "jdbc",
+    "uri": "jdbc:postgresql://{postgres_host}:5432/{database}",
+    "jdbc-driver": "org.postgresql.Driver",
+    "jdbc-user": "{jdbc_user}",
+    "jdbc-password": "{jdbc_password}",
+    "jdbc-initialize": "true",
+    "warehouse": "s3://{bucket_name}/{warehouse_path}",
+    "io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
+    "credential-providers": "s3-token",
+    "s3-access-key-id": "{access_key_id}",
+    "s3-secret-access-key": "{secret_access_key}",
+    "s3-region": "{region_name}",
+    "s3-role-arn": "{role_arn}"
+  }
+}'
+```
+
+Point Spark at the IRC and request vended credentials with the delegation header:
+
+```shell
+./bin/spark-sql -v \
+--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0,org.apache.iceberg:iceberg-aws-bundle:1.10.0 \
+--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+--conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog \
+--conf spark.sql.catalog.rest.type=rest \
+--conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.rest.prefix=iceberg_catalog \
+--conf spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation=vended-credentials
+```
+
+The role in `s3-role-arn` needs a trust policy and S3 permissions before this works. See [`s3-token`](#s3-token).
+
+For Trino instead of Spark:
+
+```properties
+connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=http://127.0.0.1:9001/iceberg/
+iceberg.rest-catalog.prefix=iceberg_catalog
+iceberg.rest-catalog.vended-credentials-enabled=true
+fs.native-s3.enabled=true
+s3.region={region_name}
+```
+
+For the full Trino setup, see [Connect Trino to the IRC](../iceberg-rest-engine/trino.md).
+
+## Setting Properties
+
+Credential vending properties go in the catalog's `properties` map when you create it through the Gravitino REST catalog API, alongside the warehouse location and the other catalog settings.
+
+The Gravitino Iceberg REST Catalog (IRC) is the exception. It can also read a catalog straight from `gravitino.conf`, using the same property names prefixed with `gravitino.iceberg-rest.`:
+
+```properties
+s3-role-arn                             # as a catalog property
+gravitino.iceberg-rest.s3-role-arn      # in gravitino.conf
+```
+
+Catalogs defined in `gravitino.conf` are not registered in a metalake, so Gravitino access control does not apply to them. Privileges are granted on catalogs in a metalake, and there is nothing to grant them on.
+>>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
 
 ## General Configurations
 
@@ -38,13 +124,74 @@ Gravitino credential vending is used to generate temporary or static credentials
 | `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       |
 | `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       |
 
+<<<<<<< HEAD
 If a catalog does not set `credential-providers`, Gravitino infers providers from the credential properties present. The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
+=======
+### Values for `credential-providers`
+
+| Value                | Storage | Vends                                                      |
+|----------------------|---------|------------------------------------------------------------|
+| `s3-token`           | S3      | Temporary STS credentials, scoped to the table path        |
+| `aws-irsa`           | S3      | Credentials from an IAM role for service accounts, for EKS |
+| `s3-secret-key`      | S3      | The configured static access key and secret                |
+| `oss-token`          | OSS     | Temporary STS credentials, scoped to the table path        |
+| `oss-secret-key`     | OSS     | The configured static access key and secret                |
+| `adls-token`         | ADLS    | A user delegation SAS token                                |
+| `azure-account-key`  | ADLS    | The configured static storage account key                  |
+| `gcs-token`          | GCS     | A downscoped access token                                  |
+| `cos-token`          | COS     | A temporary STS token                                      |
+| `cos-secret-key`     | COS     | The configured static access key and secret                |
+| `jdbc-user-password` | JDBC    | The configured JDBC username and password                  |
+| `aws-secret-key`     | Glue    | The configured AWS access key and secret for Glue API auth |
+| `dlf-secret-key`     | Paimon  | The configured DLF access key and secret (optional token)  |
+
+Each value has its own properties, listed in the sections below. To vend for more than one storage type on a catalog, separate values with a comma. Custom providers can be added by implementing `CredentialProvider`, described under [Custom Credentials](#custom-credentials).
+
+### When `credential-providers` Is Omitted
+
+If a catalog does not set `credential-providers`, Gravitino infers providers from the credential properties present:
+
+| Properties present                                           | Provider enabled    |
+|--------------------------------------------------------------|---------------------|
+| `s3-access-key-id` and `s3-secret-access-key`                | `s3-secret-key`     |
+| `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
+| `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
+| `cos-access-key-id` and `cos-secret-access-key`              | `cos-secret-key`    |
+| `gcs-service-account-file` (Fileset and Iceberg only)        | `gcs-token`         |
+| `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
+| `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
+
+JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc-password`.
+
+The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
+
+Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
+
+### Static providers and `getCredentials` privilege risk
+
+Static providers such as `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`,
+`jdbc-user-password`, `aws-secret-key`, and `dlf-secret-key` return the configured long-lived
+plaintext keys from `getCredentials` / `GET .../credentials`. That endpoint does **not** require a
+dedicated privilege beyond being able to load the metadata object (unlike `getSecrets`, which
+requires `USE_SECRETS`, with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
+>>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
 
 ## Build-in Credentials Configurations
 
 ### S3 Credentials
 
+<<<<<<< HEAD
 #### S3 IRSA Credential
+=======
+- Prefer short-lived token providers (`s3-token`, `oss-token`, `adls-token`, `gcs-token`,
+  `cos-token`, `aws-irsa`) over static `*-secret-key` / `azure-account-key` / `jdbc-user-password`
+  whenever possible. These providers are only accepted on
+  Fileset and Iceberg catalogs.
+- When static providers are unavoidable, grant load / use privileges only to trusted principals
+  (connectors and operators that must recover credentials).
+- Do not treat `getCredentials` as a secrets-protected API for static keys; use `USE_SECRETS` /
+  `INCLUDE_CREDENTIAL_SECRETS` and `getSecrets` when you need privilege-gated plaintext access.
+>>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
 
 A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with temporary credentials, typically used in EKS environments. This provider supports both basic IRSA credentials and fine-grained path-based access control with dynamically generated IAM policies.
 
@@ -225,7 +372,11 @@ Clients retrieve vended credentials from:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
+<<<<<<< HEAD
 The server returns short-lived or static credentials that the client can use to access the underlying storage directly.
+=======
+The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed. These credentials are catalog-level and are not refreshed. Path-based providers such as `s3-token` and `aws-irsa` vend nothing at catalog level.
+>>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
 
 ### Spark and Flink Connector Integration
 
