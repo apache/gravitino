@@ -134,18 +134,19 @@ public class MySQLContainer extends DatabaseContainer {
     return DriverManager.getDriver(getJdbcUrl(testDatabaseName)).getClass().getName();
   }
 
-  private static org.testcontainers.containers.MySQLContainer<?> module(
+  private static org.testcontainers.mysql.MySQLContainer module(
       String image, Durability durability) {
     // The image may be a mirror or a custom tag; the module only needs a MySQL server.
-    return new org.testcontainers.containers.MySQLContainer<>(
+    return new org.testcontainers.mysql.MySQLContainer(
             DockerImageName.parse(image).asCompatibleSubstituteFor("mysql"))
         .withUsername(USER_NAME)
         .withPassword(PASSWORD)
         // The module always creates a database. Its default, "test", is also a schema name catalog
         // tests create, so name MySQL's own system database instead.
         .withDatabaseName("mysql")
-        // Our own config replaces the one Testcontainers 1.x bundles, so the server settings do not
-        // depend on the Testcontainers version; it carries the disposable settings too.
+        // The 2.x module mounts no default config, so the server runs on the image defaults plus
+        // ours, exactly as with 1.x, where this override replaced the bundled one. It carries the
+        // disposable settings too.
         .withConfigurationOverride(
             durability == Durability.DISPOSABLE ? DISPOSABLE_CONFIG : DEFAULT_CONFIG)
         // The module's readiness check queries the database and ignores BaseContainer's startup

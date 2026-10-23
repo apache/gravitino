@@ -59,7 +59,7 @@ public class PostgreSQLContainer extends DatabaseContainer {
       Optional<Network> network) {
     super(
         // The image may be a mirror or a custom tag; the module only needs a PostgreSQL server.
-        new org.testcontainers.containers.PostgreSQLContainer<>(
+        new org.testcontainers.postgresql.PostgreSQLContainer(
                 DockerImageName.parse(image).asCompatibleSubstituteFor("postgres"))
             .withUsername(USER_NAME)
             .withPassword(PASSWORD)
