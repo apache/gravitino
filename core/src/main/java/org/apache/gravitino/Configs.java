@@ -745,4 +745,67 @@ public class Configs {
                       && valueList.stream().allMatch(SensitivePropertyKeyKeywords::isValidKeyword),
               SensitivePropertyKeyKeywords.invalidKeywordMessage())
           .createWithDefault(SensitivePropertyKeyKeywords.defaultKeywords());
+
+  // The followings are configurations for stale registration reconcile
+
+  public static final String RECONCILE_ENABLED_KEY = "gravitino.reconcile.enabled";
+
+  public static final String RECONCILE_INTERVAL_SECS_KEY = "gravitino.reconcile.intervalSecs";
+
+  public static final String RECONCILE_CATALOG_JITTER_SECS_KEY =
+      "gravitino.reconcile.catalogJitterSecs";
+
+  public static final String RECONCILE_POLICY_KEY = "gravitino.reconcile.policy";
+
+  public static final long DEFAULT_RECONCILE_INTERVAL_SECS = 3600L;
+
+  public static final long DEFAULT_RECONCILE_CATALOG_JITTER_SECS = 60L;
+
+  public static final String DEFAULT_RECONCILE_POLICY = "report-only";
+
+  public static final ConfigEntry<Boolean> RECONCILE_ENABLED =
+      new ConfigBuilder(RECONCILE_ENABLED_KEY)
+          .doc(
+              "Whether to enable the periodic stale-registration reconcile task. The task scans "
+                  + "non-managed catalogs for registrations whose source object no longer exists "
+                  + "and reports them per the reconcile policy. Disabled by default.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  public static final ConfigEntry<Long> RECONCILE_INTERVAL_SECS =
+      new ConfigBuilder(RECONCILE_INTERVAL_SECS_KEY)
+          .doc(
+              "The interval in seconds between two stale-registration reconcile rounds. A round "
+                  + "enumerates every non-managed catalog of every metalake and probes each "
+                  + "registered object for existence in its source.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_RECONCILE_INTERVAL_SECS);
+
+  public static final ConfigEntry<Long> RECONCILE_CATALOG_JITTER_SECS =
+      new ConfigBuilder(RECONCILE_CATALOG_JITTER_SECS_KEY)
+          .doc(
+              "The maximum random delay in seconds applied before probing each catalog in a "
+                  + "reconcile round, spreading probe load across the round instead of probing "
+                  + "every catalog at once at the start. Zero disables the delay.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .longConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_RECONCILE_CATALOG_JITTER_SECS);
+
+  public static final ConfigEntry<String> RECONCILE_POLICY =
+      new ConfigBuilder(RECONCILE_POLICY_KEY)
+          .doc(
+              "The policy the reconcile applies to detected stale registrations. Only "
+                  + "'report-only' is currently supported: stale registrations are reported "
+                  + "without removing anything. The 'auto-remove' policy is not implemented yet "
+                  + "and will be enabled by a follow-up change.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value -> "report-only".equalsIgnoreCase(value),
+              "The value must be 'report-only'; 'auto-remove' is not implemented yet")
+          .createWithDefault(DEFAULT_RECONCILE_POLICY);
 }
