@@ -17,9 +17,9 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertLinesMatch;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -70,7 +70,6 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createSchema(SCHEMA, "test", new HashMap<>());
     // try to load the schema as normal user, expect failure
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           normalUserClient
@@ -78,7 +77,8 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadCatalog(CATALOG)
               .asSchemas()
               .loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -91,11 +91,11 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
   }
 
   @Test
@@ -107,18 +107,18 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     ModelCatalog normalUserCatalog =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           normalUserCatalog.registerModel(NameIdentifier.of(SCHEMA, "model2"), "", new HashMap<>());
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.");
 
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           normalUserCatalog.listModels(Namespace.of(SCHEMA));
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.");
 
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     // Test Case 1: Grant using NEW privilege name (REGISTER_MODEL)
@@ -185,11 +185,11 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalog = catalogEntityLoadByNormalUser.asModelCatalog();
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           modelCatalog.getModel(NameIdentifier.of(SCHEMA, "model1"));
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.");
     // test grant use model
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
@@ -212,12 +212,12 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           modelCatalogLoadByNormalUser.alterModel(
               NameIdentifier.of(SCHEMA, "model1"), new ModelChange.RenameModel("model5"));
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.");
     ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
     modelCatalog.alterModel(
         NameIdentifier.of(SCHEMA, "model1"), new ModelChange.RenameModel("model4"));
@@ -234,11 +234,11 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           modelCatalogLoadByNormalUser.deleteModel(NameIdentifier.of(SCHEMA, "model5"));
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "}.");
     modelCatalog.deleteModel(NameIdentifier.of(SCHEMA, "model5"));
   }
 
@@ -251,7 +251,6 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
         ForbiddenException.class,
         () -> {
           modelCatalogLoadByNormalUser.linkModelVersion(
@@ -260,7 +259,8 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
               new String[] {"alias2"},
               "comment2",
               null);
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.");
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
 
     // Test Case 1: Grant using NEW privilege name (LINK_MODEL_VERSION)
@@ -331,9 +331,9 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     int[] versions = modelCatalog.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
     assertEquals(2, versions.length);
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
         ForbiddenException.class,
-        () -> modelCatalogLoadByNormalUser.listModelVersions(NameIdentifier.of(SCHEMA, "model1")));
+        () -> modelCatalogLoadByNormalUser.listModelVersions(NameIdentifier.of(SCHEMA, "model1")),
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.");
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
@@ -357,11 +357,11 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     ModelVersion version = modelCatalog.getModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
     assertEquals(1, version.version());
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
         ForbiddenException.class,
         () -> {
           modelCatalogLoadByNormalUser.getModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.");
 
     gravitinoMetalake.grantPrivilegesToRole(
         role,
@@ -387,14 +387,14 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
             NameIdentifier.of(SCHEMA, "model1"), 1, ModelVersionChange.setProperty("key", "value"));
     assertEquals("value", version.properties().get("key"));
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
         ForbiddenException.class,
         () -> {
           modelCatalogLoadByNormalUser.alterModelVersion(
               NameIdentifier.of(SCHEMA, "model1"),
               1,
               ModelVersionChange.setProperty("key", "value"));
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.");
   }
 
   @Test
@@ -405,11 +405,11 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
     assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
         ForbiddenException.class,
         () -> {
           modelCatalogLoadByNormalUser.deleteModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
-        });
+        },
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.");
     modelCatalog.deleteModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
     int[] versions = modelCatalog.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
     assertEquals(1, versions.length);

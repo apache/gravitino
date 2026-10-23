@@ -93,7 +93,6 @@ public class TestHive2HMS {
 
   @AfterAll
   public void stopHiveContainer() throws Exception {
-    containerSuite.close();
     if (hiveClient != null) {
       hiveClient.close();
       hiveClient = null;

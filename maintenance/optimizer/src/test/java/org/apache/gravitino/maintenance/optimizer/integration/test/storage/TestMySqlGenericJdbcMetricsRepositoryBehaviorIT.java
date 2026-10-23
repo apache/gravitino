@@ -25,17 +25,17 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.mysql.MySQLContainer;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestMySqlGenericJdbcMetricsRepositoryBehaviorIT extends BaseGenericJdbcMetricsRepositoryTest {
 
-  private MySQLContainer<?> mysql;
+  private MySQLContainer mysql;
 
   @BeforeAll
   void setUp() {
-    mysql = new MySQLContainer<>("mysql:8.0.33");
+    mysql = new MySQLContainer("mysql:8.0.33");
     mysql.start();
     JdbcMetricsRepositoryITUtils.initializeSchema(
         mysql.getJdbcUrl(), mysql.getUsername(), mysql.getPassword(), "mysql");

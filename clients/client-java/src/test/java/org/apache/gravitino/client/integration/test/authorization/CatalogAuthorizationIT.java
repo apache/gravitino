@@ -17,9 +17,9 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -72,21 +72,21 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
     assertThrows(
-        "Can not access metadata {" + catalog1 + "}.",
         ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
               .testConnection(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
-        });
+        },
+        "Can not access metadata {" + catalog1 + "}.");
     assertThrows(
-        "Can not access metadata {" + catalog1 + "}.",
         ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
               .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
-        });
+        },
+        "Can not access metadata {" + catalog1 + "}.");
     client
         .loadMetalake(METALAKE)
         .testConnection(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
@@ -100,13 +100,13 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
         .loadMetalake(METALAKE)
         .createCatalog(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);
     assertThrows(
-        "Can not access metadata {" + catalog1 + "}.",
         ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
               .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
-        });
+        },
+        "Can not access metadata {" + catalog1 + "}.");
   }
 
   @Test
@@ -141,9 +141,9 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake adminMetalake = client.loadMetalake(METALAKE);
     CatalogChange proposedChange = CatalogChange.updateComment("proposed comment");
     assertThrows(
-        "Can not access metadata {" + catalog1 + "}.",
         ForbiddenException.class,
-        () -> normalUserClient.loadMetalake(METALAKE).testConnection(catalog1));
+        () -> normalUserClient.loadMetalake(METALAKE).testConnection(catalog1),
+        "Can not access metadata {" + catalog1 + "}.");
 
     // USE_CATALOG allows testing the stored configuration, but not proposed changes.
     String role = "testConnectionRole";
@@ -158,9 +158,9 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
       GravitinoMetalake normalUserMetalake = normalUserClient.loadMetalake(METALAKE);
       normalUserMetalake.testConnection(catalog1);
       assertThrows(
-          "Can not access metadata {" + catalog1 + "}.",
           ForbiddenException.class,
-          () -> normalUserMetalake.testConnection(catalog1, proposedChange));
+          () -> normalUserMetalake.testConnection(catalog1, proposedChange),
+          "Can not access metadata {" + catalog1 + "}.");
     } finally {
       adminMetalake.revokeRolesFromUser(ImmutableList.of(role), NORMAL_USER);
       adminMetalake.deleteRole(role);
@@ -178,11 +178,11 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(2, catalogs.length);
     assertArrayEquals(new String[] {catalog1, catalog2}, catalogs);
     assertThrows(
-        "Can not access metadata {" + catalog1 + "}.",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).dropCatalog(catalog1, true);
-        });
+        },
+        "Can not access metadata {" + catalog1 + "}.");
     client.loadMetalake(METALAKE).dropCatalog(catalog1, true);
     catalogs = client.loadMetalake(METALAKE).listCatalogs();
     assertEquals(1, catalogs.length);
