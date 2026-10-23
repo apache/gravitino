@@ -165,14 +165,12 @@ public class TestNameIdentifierUtil {
             NameIdentifierUtil.ofTag("metalake1", "tag1"), Entity.EntityType.TAG);
     assertEquals(expectedTagObject, tagObject);
 
-    // test model version
+    // test model version is not convertible to MetadataObject
     NameIdentifier modelVersion =
         NameIdentifier.of("metalake1", "catalog1", "schema1", "model1", "0");
-    MetadataObject modelVersionObject =
-        MetadataObjects.parse("catalog1.schema1.model1.0", MetadataObject.Type.MODEL_VERSION);
-    assertEquals(
-        modelVersionObject,
-        NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
   }
 
   @Test

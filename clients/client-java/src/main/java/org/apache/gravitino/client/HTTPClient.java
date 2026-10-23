@@ -48,6 +48,7 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
@@ -68,6 +69,7 @@ import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.hc.core5.reactor.ssl.SSLBufferMode;
+import org.apache.hc.core5.util.TimeValue;
 
 /**
  * An HttpClient for usage with the REST catalog.
@@ -148,6 +150,9 @@ public class HTTPClient implements RESTClient {
         GravitinoClientConfiguration.buildFromProperties(properties);
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
+    clientBuilder.setRetryStrategy(
+        new DefaultHttpRequestRetryStrategy(
+            clientConfiguration.getClientRetryTimes(), TimeValue.ofSeconds(1)));
     clientBuilder.setConnectionManager(
         configureConnectionManager(clientConfiguration, tlsConfigurer));
 
@@ -332,7 +337,7 @@ public class HTTPClient implements RESTClient {
       Map<String, String> headers,
       Consumer<ErrorResponse> errorHandler) {
     return execute(
-        method, path, queryParams, requestBody, responseType, headers, errorHandler, h -> {});
+        method, path, queryParams, requestBody, null, responseType, headers, errorHandler, h -> {});
   }
 
   /**
@@ -351,6 +356,8 @@ public class HTTPClient implements RESTClient {
    * @param queryParams A map of query parameters (key-value pairs) to include in the request URL
    *     (can be null).
    * @param requestBody The content to place in the request body (can be null).
+   * @param requestContentType The media type for an already serialized request body, or {@code
+   *     null} to use the standard JSON or form encoding.
    * @param responseType The class type of the response for deserialization (Must be registered with
    *     the ObjectMapper).
    * @param headers A map of request headers (key-value pairs) to include in the request (can be
@@ -371,6 +378,7 @@ public class HTTPClient implements RESTClient {
       String path,
       Map<String, String> queryParams,
       Object requestBody,
+      String requestContentType,
       Class<T> responseType,
       Map<String, String> headers,
       Consumer<ErrorResponse> errorHandler,
@@ -388,7 +396,13 @@ public class HTTPClient implements RESTClient {
     URI requestUri = buildUri(path, queryParams);
     HttpUriRequestBase request = new HttpUriRequestBase(method.name(), requestUri);
 
-    if (requestBody instanceof Map) {
+    if (requestContentType != null) {
+      addRequestHeaders(request, headers, requestContentType);
+      request.setEntity(
+          new StringEntity(
+              (String) requestBody,
+              ContentType.create(requestContentType, StandardCharsets.UTF_8)));
+    } else if (requestBody instanceof Map) {
       // encode maps as form data, application/x-www-form-urlencoded
       addRequestHeaders(request, headers, ContentType.APPLICATION_FORM_URLENCODED.getMimeType());
       request.setEntity(toFormEncoding((Map<?, ?>) requestBody));
@@ -434,6 +448,10 @@ public class HTTPClient implements RESTClient {
             method.name(),
             path,
             response.getCode());
+      }
+
+      if (responseType == String.class) {
+        return responseType.cast(responseBody);
       }
 
       try {
@@ -521,6 +539,24 @@ public class HTTPClient implements RESTClient {
   }
 
   /**
+   * Sends an HTTP GET request and returns the response body without JSON deserialization.
+   *
+   * @param path The URL path to send the GET request to.
+   * @param queryParams A map of query parameters to include in the request URL.
+   * @param headers A map of request headers to include in the request.
+   * @param errorHandler The error handler delegated for HTTP error responses.
+   * @return The raw response body.
+   */
+  @Override
+  public String getRaw(
+      String path,
+      Map<String, String> queryParams,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    return execute(Method.GET, path, queryParams, null, String.class, headers, errorHandler);
+  }
+
+  /**
    * Sends an HTTP POST request to the specified path with the provided request body and processes
    * the response.
    *
@@ -543,6 +579,33 @@ public class HTTPClient implements RESTClient {
       Map<String, String> headers,
       Consumer<ErrorResponse> errorHandler) {
     return execute(Method.POST, path, null, body, responseType, headers, errorHandler);
+  }
+
+  /**
+   * Sends an HTTP POST request with an already serialized request body.
+   *
+   * @param path The URL path to send the POST request to.
+   * @param body The raw request body.
+   * @param contentType The media type of the raw request body.
+   * @param responseType The class type of the JSON response.
+   * @param headers A map of request headers to include in the request.
+   * @param errorHandler The error handler delegated for HTTP error responses.
+   * @param <T> The class type of the response.
+   * @return The response entity parsed and converted to its type T.
+   */
+  @Override
+  public <T extends RESTResponse> T postRaw(
+      String path,
+      String body,
+      String contentType,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    Preconditions.checkArgument(body != null, "Raw request body must not be null");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(contentType), "Raw request content type must not be blank");
+    return execute(
+        Method.POST, path, null, body, contentType, responseType, headers, errorHandler, h -> {});
   }
 
   /**
@@ -570,7 +633,7 @@ public class HTTPClient implements RESTClient {
       Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     return execute(
-        Method.POST, path, null, body, responseType, headers, errorHandler, responseHeaders);
+        Method.POST, path, null, body, null, responseType, headers, errorHandler, responseHeaders);
   }
 
   /**
@@ -623,7 +686,7 @@ public class HTTPClient implements RESTClient {
       Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     return execute(
-        Method.PUT, path, null, body, responseType, headers, errorHandler, responseHeaders);
+        Method.PUT, path, null, body, null, responseType, headers, errorHandler, responseHeaders);
   }
 
   /**

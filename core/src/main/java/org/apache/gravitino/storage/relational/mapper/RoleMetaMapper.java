@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -46,6 +47,17 @@ public interface RoleMetaMapper {
       method = "selectRoleMetaByMetalakeIdAndName")
   RolePO selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName);
+
+  /**
+   * Returns an active role by ID and holds its lock for the current transaction.
+   *
+   * <p>The lock is shared on MySQL/PostgreSQL and exclusive on H2.
+   *
+   * @return the active role, or null if it does not exist
+   */
+  @Nullable
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "selectRoleMetaByIdForShare")
+  RolePO selectRoleMetaByIdForShare(@Param("roleId") Long roleId);
 
   /** Returns and locks an active role by ID for the current transaction. */
   @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "selectRoleMetaByIdForUpdate")

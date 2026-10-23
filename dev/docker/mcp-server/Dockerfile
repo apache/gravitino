@@ -22,7 +22,8 @@ LABEL maintainer="dev@gravitino.apache.org"
 
 WORKDIR /opt/mcp-server
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+# Pinned to an exact version so every build ships the same uv.
+COPY --from=ghcr.io/astral-sh/uv:0.12.14 /uv /bin/uv
 
 COPY --chmod=775 packages/mcp-server /opt/mcp-server
 
@@ -33,7 +34,9 @@ ENV UV_CACHE_DIR=/opt/mcp-server/.cache/uv
 
 RUN uv venv
 
-RUN uv sync
+# --no-dev excludes the [dependency-groups] dev tools (pylint/astroid, pytest,
+# parameterized) so GPL/LGPL and unused test tooling stay out of the shipped image.
+RUN uv sync --no-dev
 
 RUN uv pip install -e .
 

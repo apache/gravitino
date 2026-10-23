@@ -51,6 +51,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -379,6 +380,45 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> dispatcher.dropSchema(schemaIdent, false));
+  }
+
+  @Test
+  public void testImportSchemaPropagatesOptimisticLockConflict() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_import_occ");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    entityStore.delete(schemaIdent, SCHEMA);
+
+    // The schema is only in the catalog, so loading it imports it into the store.
+    doThrow(new NoSuchEntityException("mock error"))
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.SCHEMA), any());
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .put(any(SchemaEntity.class), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> dispatcher.loadSchema(schemaIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
+  public void testDropSchemaPropagatesOptimisticLockConflict() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_occ");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    // A conflict of the store, such as a lock wait timeout, reaches the caller as a conflict
+    // rather than an internal error.
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> dispatcher.dropSchema(schemaIdent, false));
+    } finally {
+      reset(entityStore);
+    }
   }
 
   @Test

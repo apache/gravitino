@@ -29,7 +29,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,10 +79,20 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+/**
+ * Base class for tests that run against a real relational backend. Write each test as a
+ * {@code @TestTemplate}: {@link BackendTestExtension} runs it once per backend and sets {@link
+ * #backend} and {@link #backendType} before it. A plain {@code @Test} gets neither, nor a reset.
+ *
+ * <p>The class shares one database; before each test, and before the test's own
+ * {@code @BeforeEach}, the tables written to are emptied ({@link ResetStrategy#DELETE_ROWS}). Use
+ * {@link DatabaseFixture} on the class or a method to choose another {@link ResetStrategy}. The
+ * backend is not built yet in {@code @BeforeAll}.
+ */
+@CoreBackend.All
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith({
   BackendTestExtension.class,
@@ -105,59 +114,12 @@ public abstract class TestJDBCBackend {
     this.backendType = backendType;
   }
 
-  @BeforeEach
-  public void init() throws SQLException {
-    truncateAllTables();
-  }
-
-  private void truncateAllTables() throws SQLException {
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection()) {
-        try (Statement statement = connection.createStatement()) {
-          if ("postgresql".equalsIgnoreCase(backendType)) {
-            truncateAllTablesForPostgreSQL(connection);
-          } else {
-            String query = "SHOW TABLES";
-            List<String> tableList = new ArrayList<>();
-            try (ResultSet rs = statement.executeQuery(query)) {
-              while (rs.next()) {
-                tableList.add(rs.getString(1));
-              }
-            }
-            for (String table : tableList) {
-              statement.execute("TRUNCATE TABLE " + table);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  private void truncateAllTablesForPostgreSQL(Connection connection) throws SQLException {
-    List<String> tableList = new ArrayList<>();
-    try (Statement statement = connection.createStatement()) {
-      String query =
-          "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()";
-      try (ResultSet rs = statement.executeQuery(query)) {
-        while (rs.next()) {
-          tableList.add(rs.getString(1));
-        }
-      }
-
-      if (tableList.isEmpty()) {
-        return;
-      }
-
-      // Merge all TRUNCATE operations into a single DO block to improve efficiency
-      StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
-      for (String table : tableList) {
-        pgTruncateCommand.append(
-            String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", table));
-      }
-      pgTruncateCommand.append("END $$;");
-      statement.execute(pgTruncateCommand.toString());
-    }
+  /**
+   * Empties the shared database mid-test ({@link ResetStrategy#DELETE_ROWS}), for a test that runs
+   * several scenarios in a loop.
+   */
+  protected void resetDatabase() throws SQLException {
+    DatabaseResetter.reset(backendType, ResetStrategy.DELETE_ROWS);
   }
 
   protected BaseMetalake createAndInsertMakeLake(String metalakeName) throws IOException {
@@ -252,6 +214,10 @@ public abstract class TestJDBCBackend {
         tableName = "function_meta";
         idColumnName = "function_id";
         break;
+      case SEMANTIC_MODEL:
+        tableName = "semantic_model_meta";
+        idColumnName = "semantic_model_id";
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
@@ -289,6 +255,32 @@ public abstract class TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return versionDeletedTime;
+  }
+
+  /**
+   * Counts the rows a fileset holds in {@code fileset_version_info}.
+   *
+   * <p>A snapshot is one row per storage location, so the row count, unlike the number of distinct
+   * versions, shows what an alter that allocates a version actually costs.
+   *
+   * @param filesetId the fileset ID
+   * @return the number of active and deleted version rows
+   */
+  protected int countFilesetVersionRows(Long filesetId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT COUNT(*) AS row_count FROM fileset_version_info WHERE fileset_id = %d",
+                    filesetId))) {
+      rs.next();
+      return rs.getInt("row_count");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
   }
 
   protected Map<Integer, Long> listPolicyVersions(Long policyId) {
