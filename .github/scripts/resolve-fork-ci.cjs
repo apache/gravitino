@@ -22,19 +22,27 @@ async function resolve({ github, context, core }) {
   let baseRef = context.ref.replace(/^refs\/heads\//, '');
   let baseSha = headSha;
   let sync = false;
-  if (context.eventName === 'workflow_dispatch') {
+  // In a fork, "Run workflow" without a PR number starts a run for the selected branch, like a push.
+  const trustedDispatch = context.eventName === 'workflow_dispatch' &&
+    (repository === UPSTREAM || !!context.payload.inputs?.['pull-request']);
+  if (trustedDispatch) {
     if (repository !== UPSTREAM) throw new Error('Trusted runs must be dispatched in apache/gravitino.');
     const number = context.payload.inputs?.['pull-request'];
     if (!/^[1-9][0-9]*$/.test(String(number))) throw new Error('A pull request number is required.');
     const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) });
     if (pr.state !== 'open' || !pr.head.repo) throw new Error('The pull request must be open with an existing head repository.');
     baseRef = pr.base.ref;
-    if (baseRef !== context.payload.repository.default_branch || context.sha !== pr.base.sha) {
+    if (baseRef !== context.payload.repository.default_branch || context.ref !== `refs/heads/${baseRef}`) {
+      throw new Error('Dispatch the trusted workflow from the current default branch; release branches use their own CI.');
+    }
+    // Pull requests retain an older base.sha after the base branch advances.
+    const { data: base } = await github.rest.repos.getBranch({ ...context.repo, branch: baseRef });
+    if (context.sha !== base.commit.sha) {
       throw new Error('Dispatch the trusted workflow from the current default branch; release branches use their own CI.');
     }
     headSha = pr.head.sha;
     headRepository = pr.head.repo.full_name;
-    baseSha = pr.base.sha;
+    baseSha = base.commit.sha;
     sync = true;
   } else if (repository === UPSTREAM && (baseRef === 'main' || baseRef.startsWith('branch-'))) {
     // Post-merge CI tests the pushed upstream commit itself.
