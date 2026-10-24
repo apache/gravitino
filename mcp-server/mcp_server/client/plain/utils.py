@@ -19,6 +19,8 @@ import json
 import logging
 from urllib.parse import quote
 
+import simplejson
+
 from mcp_server.client.plain.exception import GravitinoException
 
 
@@ -35,6 +37,29 @@ def extract_content_from_response(response, field: str, default="") -> str:
     response_json = response.json()
     _handle_gravitino_exception(response_json)
     return json.dumps(response_json.get(field, default))
+
+
+def extract_list_from_response(response, field: str) -> str:
+    """Extract a required JSON array without rounding fractional numbers.
+
+    Propagate server errors and reject malformed envelopes instead of returning
+    an empty result for a failed discovery request.
+    """
+    try:
+        payload = simplejson.loads(response.content, use_decimal=True)
+    except simplejson.JSONDecodeError:
+        response.raise_for_status()
+        raise
+    if isinstance(payload, dict):
+        _handle_gravitino_exception(payload)
+    response.raise_for_status()
+    if not isinstance(payload, dict) or "code" not in payload:
+        raise GravitinoException("Invalid Gravitino response: missing code")
+    if not isinstance(payload.get(field), list):
+        raise GravitinoException(
+            f"Invalid Gravitino response: {field} must be a JSON array"
+        )
+    return simplejson.dumps(payload[field], use_decimal=True)
 
 
 def extract_response(response) -> str:
