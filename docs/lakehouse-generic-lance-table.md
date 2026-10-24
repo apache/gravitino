@@ -123,22 +123,16 @@ them: 2.2 for `lance.blob` and 2.1 for `lance.blob.legacy`. A table cannot have 
 column to an existing dataset fails with a clear error if the dataset's file format version does not
 support it.
 
-A table created without blob columns uses Lance's own default file format version, which is 2.2 as
-of `lance-core` 12.0.0. Such a table therefore accepts a later `lance.blob` column, but rejects
-`lance.blob.legacy`. Tables created by earlier Gravitino releases, whose Lance default was below
-2.2, behave the other way round; their stored version is unchanged by an upgrade.
+A table created without blob columns uses Lance's own default file format version, 2.2 as of
+`lance-core` 12.0.0, and there is no property to override it. Such a table accepts a later
+`lance.blob` column but rejects `lance.blob.legacy`; tables created by earlier releases, whose
+Lance default was below 2.2, behave the other way round and keep their stored version.
 
-This default applies to every table created through Gravitino's own table API, not only to tables
-with blob columns, and there is no property to override it. Any Lance client can still **read** such
-a table: `LanceSparkRESTServiceIT` seeds rows with `lance-core` 12.0.0 and reads them back through
-every `lance-spark` bundle in the matrix, down to the one built on `lance-core` 2.0.0. **Writing** to it requires
-a Lance that understands version 2.2: a client built on `lance-core` 2.0.0 has its commit rejected
-with `added files with version 2.0. However, the data storage version is 2.2.`, where before this
-upgrade the same write succeeded because Gravitino's default was below 2.2. `lance-core` 4.0.0 and
-later are unaffected. `LanceSparkRESTServiceIT` covers this combination per bundle.
-
-Tables created *through* a connector are unaffected, because that path uses `DeclareTable`, where
-Gravitino registers metadata only and the connector writes the dataset at its own version.
+Any Lance client can **read** such a table. **Writing** to it needs a Lance that understands 2.2:
+a `lance-core` 2.0.0 client has its commit rejected with `added files with version 2.0. However,
+the data storage version is 2.2.`, where before this upgrade the same write succeeded. `lance-core`
+4.0.0 and later are unaffected, as are tables created *through* a connector — that path uses
+`DeclareTable`, and the connector writes the dataset at its own version.
 
 Only the blob marker is recognized. Other blob metadata, such as
 `lance-encoding:blob-dedicated-size-threshold`, is not shown in the Gravitino type, and columns created
