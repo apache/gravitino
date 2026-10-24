@@ -19,8 +19,12 @@
 package org.apache.gravitino.catalog.mysql.operation;
 
 import java.sql.SQLException;
+import java.util.Collections;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import org.apache.gravitino.catalog.mysql.MysqlCatalog;
+import org.apache.gravitino.connector.CatalogInfo;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +36,18 @@ public class TestMysqlCatalogOperations extends TestMysql {
     MySQLProtocolCompatibleCatalogOperations catalogOperations =
         new MySQLProtocolCompatibleCatalogOperations(
             null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, null);
-    catalogOperations.initialize(getMySQLCatalogProperties(), null, new MysqlCatalog());
+    // A CatalogInfo is required once an earlier class in this JVM has left GravitinoEnv with a
+    // metrics system, because initialize() then registers catalog metrics under its name.
+    CatalogInfo info =
+        new CatalogInfo(
+            1L,
+            "mysql_catalog",
+            Catalog.Type.RELATIONAL,
+            "jdbc-mysql",
+            null,
+            Collections.emptyMap(),
+            null,
+            Namespace.of("metalake"));
+    catalogOperations.initialize(getMySQLCatalogProperties(), info, new MysqlCatalog());
   }
 }
