@@ -53,6 +53,17 @@ Other non-empty dialect identifiers are also accepted and preserved. Choose iden
 by the application consuming the model. Gravitino validates the definition's structure but does
 not parse or execute the expression text.
 
+### Metric Discovery
+
+Applications can discover metrics across Semantic Models in a schema by listing metric
+identifiers or retrieving complete definitions. A metric is identified by its containing model's
+identifier and the metric name, so different models can use the same metric name. Results reflect the
+models' current committed definitions and follow their visibility rules.
+
+Use discovery to find definitions for an analytical application or AI tool. Gravitino does not
+execute the metric expressions, and source data access remains separate. See the
+[REST, Java, and Python examples](./manage-semantic-model-metadata-using-gravitino.md#discover-metrics-in-a-schema).
+
 ### Sources and Validation
 
 Dataset sources use `catalog.schema.object` within the model's metalake. They may reference another
