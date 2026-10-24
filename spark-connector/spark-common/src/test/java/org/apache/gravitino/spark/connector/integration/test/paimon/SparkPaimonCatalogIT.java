@@ -28,6 +28,9 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -46,6 +49,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
 
   @Override
   protected boolean supportsSparkSQLClusteredBy() {
+    // The common bucket suite also requires SORTED BY; use the Paimon-specific test below.
     return false;
   }
 
@@ -118,6 +122,77 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     Assertions.assertEquals("2,a,beijing", queryResult.get(0));
     Path partitionPath = new Path(getTableLocation(tableInfo), partitionPathString);
     checkDirExists(partitionPath);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testPrimaryKeyTableWithDynamicBuckets() throws Exception {
+    String tableName = "test_paimon_primary_key_dynamic_bucket";
+    dropTableIfExists(tableName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (source STRING, event_id BIGINT, payload STRING, dt STRING) USING paimon "
+                + "PARTITIONED BY (dt) TBLPROPERTIES ("
+                + "'primary-key'='source,event_id', 'bucket'='-1', 'merge-engine'='deduplicate')",
+            tableName));
+
+    TableCatalog catalog =
+        (TableCatalog) getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+    Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
+    Assertions.assertEquals("source,event_id", table.properties().get("primary-key"));
+    Assertions.assertEquals("-1", table.properties().get("bucket"));
+    Assertions.assertFalse(table.properties().containsKey("bucket-key"));
+    Assertions.assertFalse(table.schema().apply("event_id").nullable());
+    Assertions.assertEquals(1, table.partitioning().length);
+
+    sql(String.format("INSERT INTO %s VALUES ('input', 1, 'first', '2026-10-23')", tableName));
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES ('input', 1, 'replayed', '2026-10-23'), "
+                + "('input', 2, 'different offset', '2026-10-23')",
+            tableName));
+    List<Row> rows =
+        getSparkSession()
+            .sql(String.format("SELECT event_id, payload FROM %s ORDER BY event_id", tableName))
+            .collectAsList();
+    Assertions.assertEquals(2, rows.size());
+    Assertions.assertEquals(1L, rows.get(0).getLong(0));
+    Assertions.assertEquals("replayed", rows.get(0).getString(1));
+    Assertions.assertEquals(2L, rows.get(1).getLong(0));
+    Assertions.assertEquals("different offset", rows.get(1).getString(1));
+  }
+
+  @Test
+  void testClusteredByDistributionRoundTrip() throws Exception {
+    String tableName = "test_paimon_clustered_by";
+    dropTableIfExists(tableName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id INT, payload STRING, dt STRING) USING paimon "
+                + "PARTITIONED BY (dt) CLUSTERED BY (id) INTO 4 BUCKETS",
+            tableName));
+
+    TableCatalog catalog =
+        (TableCatalog) getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+    Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
+    Assertions.assertEquals("4", table.properties().get("bucket"));
+    Assertions.assertEquals("id", table.properties().get("bucket-key"));
+    Assertions.assertEquals(1, table.partitioning().length);
+    Assertions.assertEquals("identity", table.partitioning()[0].name());
+
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, 'first', '2026-10-23'), (2, 'second', '2026-10-23')",
+            tableName));
+    List<Row> rows =
+        getSparkSession()
+            .sql(String.format("SELECT id, payload FROM %s ORDER BY id", tableName))
+            .collectAsList();
+    Assertions.assertEquals(2, rows.size());
+    Assertions.assertEquals(1, rows.get(0).getInt(0));
+    Assertions.assertEquals("first", rows.get(0).getString(1));
+    Assertions.assertEquals(2, rows.get(1).getInt(0));
+    Assertions.assertEquals("second", rows.get(1).getString(1));
   }
 
   @Test
