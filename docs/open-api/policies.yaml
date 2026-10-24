@@ -160,6 +160,15 @@ paths:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
                 NoSuchPolicyException:
                   $ref: "#/components/examples/NoSuchPolicyException"
+        "409":
+          description: Conflict - The target policy already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                PolicyAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/PolicyAlreadyExistsException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -569,6 +578,41 @@ components:
             `else`. The UTF-8 source must not exceed 16 KiB; see the Policies documentation for
             allowlisted actions, grammar, limits, and examples.
 
+    AccessControlContent:
+      type: object
+      description: Rule content for a built-in access-control policy.
+      required:
+        - privileges
+        - applicableRoles
+      properties:
+        privileges:
+          type: array
+          minItems: 1
+          description: >-
+            The privileges granted when the rule matches. Limited to privileges that apply to a
+            whole securable object; column-scoped privileges are not permitted. This enum mirrors
+            AccessControlContent.PERMITTED_PRIVILEGES; change both together.
+          items:
+            type: string
+            enum:
+              - SELECT_TABLE
+              - MODIFY_TABLE
+              - PROBE_TABLE_LIKE
+              - SELECT_VIEW
+              - READ_FILESET
+              - WRITE_FILESET
+              - CONSUME_TOPIC
+              - PRODUCE_TOPIC
+              - USE_MODEL
+              - EXECUTE_FUNCTION
+              - USE_SEMANTIC_MODEL
+        applicableRoles:
+          type: array
+          minItems: 1
+          description: The names of the roles the rule applies to.
+          items:
+            type: string
+
     RowFilterPolicy:
       allOf:
         - $ref: '#/components/schemas/PolicyBase'
@@ -616,6 +660,30 @@ components:
               enum: [system_column_mask]
             content:
               $ref: '#/components/schemas/ColumnMaskContent'
+
+    AccessControlPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_access_control]
+            content:
+              $ref: '#/components/schemas/AccessControlContent'
+
+    AccessControlPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_access_control]
+            content:
+              $ref: '#/components/schemas/AccessControlContent'
 
     PolicyContentBase:
       type: object
@@ -699,7 +767,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask]
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask, system_access_control]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -714,6 +782,7 @@ components:
         - $ref: '#/components/schemas/IcebergSnapshotExpirationPolicy'
         - $ref: '#/components/schemas/RowFilterPolicy'
         - $ref: '#/components/schemas/ColumnMaskPolicy'
+        - $ref: '#/components/schemas/AccessControlPolicy'
       discriminator:
         propertyName: policyType
         mapping:
@@ -724,6 +793,7 @@ components:
           system_iceberg_snapshot_expiration: '#/components/schemas/IcebergSnapshotExpirationPolicy'
           system_row_filter: '#/components/schemas/RowFilterPolicy'
           system_column_mask: '#/components/schemas/ColumnMaskPolicy'
+          system_access_control: '#/components/schemas/AccessControlPolicy'
 
     PolicyListResponse:
       type: object
@@ -818,7 +888,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask]
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask, system_access_control]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -833,6 +903,7 @@ components:
         - $ref: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
         - $ref: '#/components/schemas/RowFilterPolicyCreateRequest'
         - $ref: '#/components/schemas/ColumnMaskPolicyCreateRequest'
+        - $ref: '#/components/schemas/AccessControlPolicyCreateRequest'
       discriminator:
         propertyName: policyType
         mapping:
@@ -843,6 +914,7 @@ components:
           system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
           system_row_filter: '#/components/schemas/RowFilterPolicyCreateRequest'
           system_column_mask: '#/components/schemas/ColumnMaskPolicyCreateRequest'
+          system_access_control: '#/components/schemas/AccessControlPolicyCreateRequest'
 
 
     PolicyUpdatesRequest:
@@ -932,7 +1004,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask]
+                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask, system_access_control]
             newContent:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -1002,6 +1074,17 @@ components:
             newContent:
               $ref: '#/components/schemas/ColumnMaskContent'
 
+    UpdateAccessControlPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              type: string
+              enum: [system_access_control]
+            newContent:
+              $ref: '#/components/schemas/AccessControlContent'
+
     UpdatePolicyContentRequest:
       description: Selects typed content using the sibling policyType field, matching REST deserialization.
       oneOf:
@@ -1012,6 +1095,7 @@ components:
         - $ref: '#/components/schemas/UpdateIcebergSnapshotExpirationPolicyContentRequest'
         - $ref: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
         - $ref: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateAccessControlPolicyContentRequest'
       discriminator:
         propertyName: policyType
         mapping:
@@ -1022,6 +1106,7 @@ components:
           system_iceberg_snapshot_expiration: '#/components/schemas/UpdateIcebergSnapshotExpirationPolicyContentRequest'
           system_row_filter: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
           system_column_mask: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
+          system_access_control: '#/components/schemas/UpdateAccessControlPolicyContentRequest'
       example: {
         "@type": "updateContent",
         "policyType": "custom",

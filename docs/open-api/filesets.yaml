@@ -393,6 +393,7 @@ components:
         - $ref: "#/components/schemas/RenameFilesetRequest"
         - $ref: "#/components/schemas/SetFilesetPropertyRequest"
         - $ref: "#/components/schemas/UpdateFilesetCommentRequest"
+        - $ref: "#/components/schemas/UpdateFilesetTypeRequest"
         - $ref: "#/components/schemas/RemoveFilesetPropertyRequest"
         - $ref: "#/components/schemas/SetFilesetSecretBindingRequest"
         - $ref: "#/components/schemas/SetFilesetSecretReferenceRequest"
@@ -402,6 +403,7 @@ components:
           rename: "#/components/schemas/RenameFilesetRequest"
           setProperty: "#/components/schemas/SetFilesetPropertyRequest"
           updateComment: "#/components/schemas/UpdateFilesetCommentRequest"
+          updateType: "#/components/schemas/UpdateFilesetTypeRequest"
           removeProperty: "#/components/schemas/RemoveFilesetPropertyRequest"
           setSecretBinding: "#/components/schemas/SetFilesetSecretBindingRequest"
           setSecretReference: "#/components/schemas/SetFilesetSecretReferenceRequest"
@@ -466,6 +468,32 @@ components:
       example: {
         "@type": "updateComment",
         "newComment": "new comment"
+      }
+
+    UpdateFilesetTypeRequest:
+      type: object
+      description: >-
+        Changes the fileset type without changing its identity, storage locations, or files.
+        Changing to external retains data on drop. Changing to managed accepts management
+        of the data, including deleting it on drop. Setting the current type is allowed.
+      required:
+        - "@type"
+        - newType
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - updateType
+        newType:
+          type: string
+          description: The new type of the fileset
+          enum:
+            - managed
+            - external
+      example: {
+        "@type": "updateType",
+        "newType": "external"
       }
 
     RemoveFilesetPropertyRequest:

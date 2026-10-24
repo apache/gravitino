@@ -180,6 +180,7 @@ empty string or list; `(none)` means it has no default at all.
 | `gravitino.server.webserver.requestHeaderSize`       | Maximum size in bytes of an HTTP request header.                                                                                                                                             | `131072`                                |
 | `gravitino.server.webserver.responseHeaderSize`      | Maximum size in bytes of an HTTP response header.                                                                                                                                            | `131072`                                |
 | `gravitino.server.webserver.customFilters`           | Comma-separated list of servlet filter class names to apply to the API.                                                                                                                      | (empty)                                 |
+| `gravitino.server.webserver.trustedProxies`          | Comma-separated list of IP addresses or CIDR blocks (IPv4 or IPv6) of reverse proxies whose `X-Forwarded-For` header is trusted when recording the client address. Host names are not allowed.             | (empty)                                 |
 | `gravitino.server.rest.extensionPackages`            | Comma-separated list of packages to scan for additional REST resources.                                                                                                                      | (empty)                                 |
 | `gravitino.server.visibleConfigs`                    | Comma-separated list of extra properties to expose on the unauthenticated `GET /configs` endpoint, on top of the fixed set it always returns. Additive, so each entry widens what is public. | (empty)                                 |
 | `gravitino.server.bulk.maxItems`                     | Maximum number of items allowed in a single bulk request.                                                                                                                                    | `100`                                   |
@@ -188,6 +189,28 @@ empty string or list; `(none)` means it has no default at all.
 Filters named in `customFilters` must be standard `javax.servlet` filters. Pass parameters to a
 filter with properties of the form
 `gravitino.server.webserver.{filter_class_name}.param.{param_name} = {value}`.
+
+`trustedProxies` controls the client address recorded in audit events. A caller can set
+`X-Forwarded-For` to any value, so the server honors it only when the TCP peer is a trusted proxy.
+In that case the server reads every `X-Forwarded-For` header from right to left, skips trusted
+proxies, and records the first address that is not one. Entries to the left of that address were
+supplied by the client and are ignored. Empty list elements are skipped. If an entry is not an IP address, the server
+stops and records the last trusted hop. When `trustedProxies` is empty, the default, `X-Forwarded-For` is
+ignored and the TCP peer address is recorded. Recorded addresses are in canonical form, with IPv6
+compressed and without brackets, for example `::1`. An entry that is not an IP address or CIDR
+block fails server startup. IPv6 link-local addresses (`fe80::/10`) cannot be trusted proxies: the
+same link-local address can name different hosts on different network links, so an entry inside
+`fe80::/10` also fails startup, and a link-local peer is never trusted even when a wider entry such
+as `::/0` covers it. Use a global or unique local address (for example `fd00::/8`) for the proxy.
+
+If Gravitino runs behind a load balancer, ingress controller, or other reverse proxy, list their
+addresses here. Otherwise the audit log records the proxy address for every request. List only
+the proxies themselves: trusting a range that untrusted clients can connect from, such as a whole
+Kubernetes pod CIDR, lets those clients choose the recorded address again.
+
+```properties
+gravitino.server.webserver.trustedProxies = 10.0.0.10, 10.0.1.0/24, fd00:10::/64
+```
 
 `GET /configs` backs the Web UI, so it answers without authentication and always returns
 `gravitino.authenticators`, `gravitino.authorization.enable`, and `gravitino.schema.separator`.
@@ -629,7 +652,7 @@ server, are documented with those services. See
 
 | Configuration Item                     | Description                                                                                                                                                    | Default Value                 |
 |----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                                                                      | `local`                       |
+| `gravitino.job.executor`               | Executor that runs jobs: the built-in `local` or `k8s`, or the name of a custom executor whose class is set by `gravitino.jobExecutor.<name>.class`.            | `local`                       |
 | `gravitino.job.stagingDir`             | Directory holding staging files for running jobs. With multiple servers, put it on storage shared by all servers so that any server can return a job's output. | `/tmp/gravitino/jobs/staging` |
 | `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing.                                                     | `604800000` (7 days)          |
 | `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                                                                      | `300000` (5 minutes)          |

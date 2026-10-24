@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -621,6 +622,27 @@ public class TestPolicyOperations extends BaseOperationsTest {
             .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
 
     assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  void testRenamePolicyToExistingName() {
+    PolicyAlreadyExistsException exception =
+        new PolicyAlreadyExistsException("Policy existing already exists");
+    doThrow(exception).when(policyManager).alterPolicy(any(), any(), any(PolicyChange.class));
+    PolicyUpdatesRequest request =
+        new PolicyUpdatesRequest(
+            Collections.singletonList(new PolicyUpdateRequest.RenamePolicyRequest("existing")));
+    try (Response response =
+        target(policyPath(metalake) + "/policy1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(PolicyAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
   }
 
   @Test

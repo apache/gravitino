@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
@@ -54,6 +55,11 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
 
   @Override
   protected boolean supportTablePropertiesOperation() {
+    return false;
+  }
+
+  @Override
+  protected boolean supportsCustomTableProperties() {
     return false;
   }
 
@@ -207,5 +213,31 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
                         + ")",
                     catalogName, mysqlUrl, mysqlUsername, mysqlDefaultDatabase)),
         "Missing required options are:\n" + "\n" + "password");
+  }
+
+  @Test
+  public void testCreateTableLikeDoesNotForwardConnectorOptions() {
+    String databaseName = "test_create_table_like_db";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          sql("CREATE TABLE source_table (id INT COMMENT 'id', name STRING COMMENT 'name')");
+          // LIKE copies the options that getTable() exposes for the source table, which include the
+          // JDBC connection options the connector injects for scans.
+          sql("CREATE TABLE like_table LIKE source_table");
+
+          Map<String, String> properties =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, "like_table"))
+                  .properties();
+          Assertions.assertFalse(
+              properties.containsKey(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
+          Assertions.assertFalse(
+              properties.containsKey(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
+        },
+        true,
+        supportDropCascade());
   }
 }

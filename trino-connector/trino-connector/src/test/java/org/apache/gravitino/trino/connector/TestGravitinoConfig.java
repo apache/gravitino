@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector;
 
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT;
+import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -474,8 +475,10 @@ public class TestGravitinoConfig {
                 "gravitino.client.basic.password", "admin-pass"));
 
     TrinoException e = assertThrows(TrinoException.class, config::getIcebergRestCatalogConfig);
+    assertEquals(GRAVITINO_MISSING_CONFIG.toErrorCode(), e.getErrorCode());
     assertTrue(e.getMessage().contains("gravitino.client.authType=basic"));
-    assertTrue(e.getMessage().contains("gravitino.iceberg.rest-catalog.security"));
+    assertTrue(e.getMessage().contains("gravitino.iceberg.rest-catalog.security=OAUTH2"));
+    assertFalse(e.getMessage().contains("NONE"));
   }
 
   @Test
