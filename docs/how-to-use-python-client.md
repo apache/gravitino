@@ -51,6 +51,50 @@ To preserve the previous installation profile that included all GVFS backends, i
 the base Gravitino client alongside their Ray Data dependencies without installing these storage
 extras.
 
+### Core client compatibility
+
+The core client keeps `dataclasses-json==0.6.7` and allows
+`simplejson>=3.20.1,<=4.2.0`. The upper bound limits the initial reviewed release
+scope; it does not indicate a known incompatibility in later releases.
+Development and standard test dependencies remain pinned independently.
+
+The installed-artifact compatibility matrix uses the source-built candidate
+`apache-gravitino 2.0.0.dev0` with Gravitino Server `2.0.0-SNAPSHOT` and covers the
+following environments. These candidate versions are not a published release pair.
+
+| Python | Ray | PyArrow | pandas | simplejson |
+| --- | --- | --- | --- | --- |
+| 3.10 | Not installed | Not installed | Not installed | 3.20.1 |
+| 3.12 | 2.59.0 | 17.0.0 | 2.2.3 | 4.2.0 |
+| 3.12 | 2.59.0 | 23.0.1 | 2.3.3 | 4.2.0 |
+| 3.12 | 2.59.0 | 26.0.0 | 3.0.6 | 4.2.0 |
+
+Each case installs the built client normally without the `dev` or storage extras,
+checks resolved versions and dependency consistency, and exercises the official
+metadata APIs against a matching Gravitino server. Client/server version checking
+remains enabled. The checks also cover Semantic DTO decimal precision and existing
+metadata exceptions. They do not establish Ray Catalog provider integration,
+Iceberg or Delta data access, or HDFS/cloud/Lance compatibility.
+
+To run the matrix from a source checkout, first build the server distribution,
+then run the dedicated task. Python 3.10 and 3.12 are required; explicit interpreter
+paths can be supplied through the two properties shown below.
+
+```shell
+./gradlew compileDistribution -PskipWeb=true -x test
+./gradlew :clients:client-python:coreCompatibilityTest \
+  -PcoreCompatibilityPython=/path/to/python3.12 \
+  -PcoreCompatibilityMinimumPython=/path/to/python3.10
+```
+
+The task retains case logs, resolved requirements and `results.json` under
+`clients/client-python/build/core-compatibility`. The listed versions are selected
+test points; intermediate releases are not individually exercised by this matrix.
+The task starts a foreground server and cleans up only that process, including
+startup and test failures. Port 8090 must be free. To use an already running server,
+invoke `scripts/run_core_compatibility_matrix.py` with `--artifact` and
+`--gravitino-uri`, omitting `--gravitino-home`; this leaves the service running.
+
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 3. [Manage Semantic Model metadata using Gravitino Python API](./manage-semantic-model-metadata-using-gravitino.md?language=python)

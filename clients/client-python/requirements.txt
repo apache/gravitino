@@ -18,4 +18,5 @@
 
 # Runtime dependencies for the core metadata client.
 dataclasses-json==0.6.7
-simplejson==3.20.1
+# Initial compatibility range is limited to reviewed releases.
+simplejson>=3.20.1,<=4.2.0

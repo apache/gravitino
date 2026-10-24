@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+"""Verify core runtime ranges and independently declared storage extras."""
+
 import re
 import subprocess
 import sys
@@ -28,6 +30,7 @@ class TestPackageMetadata(unittest.TestCase):
     """Verify the built package separates core and optional dependencies."""
 
     def test_core_requirements_and_storage_extras(self):
+        """Generated metadata preserves the core and optional dependency contracts."""
         metadata, source_files = self._read_package_metadata()
 
         self._assert_core_requirements(metadata)
@@ -81,6 +84,15 @@ class TestPackageMetadata(unittest.TestCase):
         }
         self.assertIn("dataclasses-json", base_names)
         self.assertIn("simplejson", base_names)
+        self.assertEqual(base_names, {"dataclasses-json", "simplejson"})
+        simplejson_requirement = next(
+            requirement
+            for requirement in base_requirements
+            if requirement.startswith("simplejson")
+        )
+        self.assertIn(">=3.20.1", simplejson_requirement)
+        self.assertIn("<=4.2.0", simplejson_requirement)
+        self.assertIn("dataclasses-json==0.6.7", base_requirements)
         for optional_name in (
             "black",
             "cachetools",

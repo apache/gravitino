@@ -362,6 +362,51 @@ tasks {
     }
   }
 
+  register("coreCompatibilityTest") {
+    group = "verification"
+    description = "Verify installed core SDK artifacts in isolated Ray dependency environments."
+    dependsOn(distribution)
+
+    fun interpreter(version: String, property: String): String {
+      val explicit = (project.findProperty(property) as? String)?.takeIf { it.isNotBlank() }
+      if (explicit != null) {
+        return explicit
+      }
+      val osDir = if (org.gradle.internal.os.OperatingSystem.current().isMacOsX) {
+        "MacOSX"
+      } else {
+        "Linux"
+      }
+      val conda = file("${project.rootDir}/.gradle/python/$osDir/Miniforge3/envs/python-$version/bin/python")
+      return if (conda.exists()) conda.absolutePath else "python$version"
+    }
+
+    doLast {
+      val artifacts = projectDir.resolve("dist").listFiles { file ->
+        file.name.startsWith("apache-gravitino-") || file.name.startsWith("apache_gravitino-")
+      }?.filter { it.name.endsWith(".tar.gz") } ?: emptyList()
+      if (artifacts.size != 1) {
+        throw GradleException("Expected one Python client source distribution")
+      }
+      val args = mutableListOf(
+        interpreter("3.12", "coreCompatibilityPython"),
+        projectDir.resolve("scripts/run_core_compatibility_matrix.py").absolutePath,
+        "--artifact", artifacts.single().absolutePath,
+        "--python", interpreter("3.12", "coreCompatibilityPython"),
+        "--minimum-python", interpreter("3.10", "coreCompatibilityMinimumPython"),
+        "--gravitino-uri", "http://localhost:8090",
+        "--gravitino-home", rootDir.resolve("distribution/package").absolutePath,
+      )
+      (project.findProperty("coreCompatibilityCases") as? String)?.let {
+        args += listOf("--cases", it)
+      }
+      val process = ProcessBuilder(args).inheritIO().start()
+      if (process.waitFor() != 0) {
+        throw GradleException("Core SDK compatibility matrix failed")
+      }
+    }
+  }
+
   // Deploy to https://pypi.org/project/gravitino/
   register("deploy", VenvTask::class) {
     dependsOn(distribution)
