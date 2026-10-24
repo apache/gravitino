@@ -19,8 +19,9 @@
 
 package org.apache.gravitino.hive.client;
 
-import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.TestInstance;
  */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture(version = HiveVersion.HIVE3)
 public class TestHive3HMS extends TestHive2HMS {
 
   @BeforeAll
@@ -38,18 +40,13 @@ public class TestHive3HMS extends TestHive2HMS {
     testPrefix = "hive3";
     catalogName = "hive"; // Hive3 default catalog
 
-    containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
-    hiveContainer = containerSuite.getHiveContainer();
-
     metastoreUri =
         String.format(
-            "thrift://%s:%d",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     hdfsBasePath =
         String.format(
             "hdfs://%s:%d/tmp/gravitino_test",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     hiveClient = new HiveClientFactory(createHiveProperties(), testPrefix).createHiveClient();
   }

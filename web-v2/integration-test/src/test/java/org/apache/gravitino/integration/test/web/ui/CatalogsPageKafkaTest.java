@@ -22,7 +22,9 @@ package org.apache.gravitino.integration.test.web.ui;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.KafkaContainer;
+import org.apache.gravitino.integration.test.container.KafkaFixture;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
@@ -36,11 +38,13 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@KafkaFixture
 public class CatalogsPageKafkaTest extends BaseWebIT {
+  @FixtureContainer private KafkaContainer kafka;
+
   private MetalakePage metalakePage;
   private CatalogsPage catalogsPage;
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
 
   protected static String gravitinoUri = "http://127.0.0.1:8090";
@@ -62,9 +66,7 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
 
     gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
 
-    containerSuite.startKafkaContainer();
-
-    String address = containerSuite.getKafkaContainer().getContainerIpAddress();
+    String address = kafka.getContainerIpAddress();
     kafkaUri = String.format("%s:%d", address, DEFAULT_BROKER_PORT);
 
     metalakePage = new MetalakePage(driver);

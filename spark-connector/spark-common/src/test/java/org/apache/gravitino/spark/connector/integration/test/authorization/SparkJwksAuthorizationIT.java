@@ -43,7 +43,9 @@ import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.JwksMockServerHelper;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -72,6 +74,7 @@ import org.slf4j.LoggerFactory;
  */
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@MySQLFixture(database = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT)
 public abstract class SparkJwksAuthorizationIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(SparkJwksAuthorizationIT.class);
@@ -92,7 +95,7 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
   private static final String ALICE_ROLE = "alice-role";
   private static final String BOB_ROLE = "bob-role";
 
-  protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private MySQLContainer mysql;
 
   private static JwksMockServerHelper mockServerHelper;
 
@@ -164,14 +167,10 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
   }
 
   private void initMysqlContainer() throws SQLException {
-    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
-    mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
-    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
-    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
-    mysqlDriver =
-        containerSuite
-            .getMySQLContainer()
-            .getDriverClassName(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
+    mysqlUrl = mysql.getJdbcUrl();
+    mysqlUsername = mysql.getUsername();
+    mysqlPassword = mysql.getPassword();
+    mysqlDriver = mysql.getDriverClassName(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
   }
 
   private void initMetadata() {

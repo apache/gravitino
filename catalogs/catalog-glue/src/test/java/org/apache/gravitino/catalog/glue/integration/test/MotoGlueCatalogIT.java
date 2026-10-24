@@ -20,9 +20,9 @@ package org.apache.gravitino.catalog.glue.integration.test;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.GravitinoMotoContainer;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.apache.gravitino.integration.test.container.MotoFixture;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
@@ -31,34 +31,15 @@ import org.junit.jupiter.api.TestInstance;
  *
  * <p>Requires Docker. Skipped by default when the {@code gravitino-docker-test} tag is excluded.
  * Override the container image with the {@code GRAVITINO_CI_MOTO_DOCKER_IMAGE} environment
- * variable.
+ * variable. The shared Moto server starts through {@link MotoFixture} and closes at run end.
  */
+@MotoFixture
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MotoGlueCatalogIT extends AbstractGlueCatalogIT {
 
-  private static final String FALLBACK_IMAGE = "motoserver/moto:5.1.4";
-
-  private GravitinoMotoContainer moto;
-
-  @Override
-  @BeforeAll
-  void initOps() {
-    String image = GravitinoMotoContainer.DEFAULT_IMAGE;
-    if (image == null || image.isBlank()) {
-      image = FALLBACK_IMAGE;
-    }
-    moto = GravitinoMotoContainer.builder().withImage(image).build();
-    moto.start();
-    super.initOps();
-  }
-
-  @AfterAll
-  void stopContainer() {
-    if (moto != null) {
-      moto.close();
-    }
-  }
+  // Filled when the instance is created, before the inherited @BeforeAll initOps() reads it.
+  @FixtureContainer private GravitinoMotoContainer moto;
 
   @Override
   protected Map<String, String> catalogConfig() {

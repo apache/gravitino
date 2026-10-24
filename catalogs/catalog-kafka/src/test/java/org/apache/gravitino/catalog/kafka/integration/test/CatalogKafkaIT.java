@@ -41,7 +41,8 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.KafkaContainer;
+import org.apache.gravitino.integration.test.container.KafkaFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.messaging.Topic;
@@ -75,9 +76,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@KafkaFixture
 public class CatalogKafkaIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogKafkaIT.class);
-  private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
   private static final String METALAKE_NAME =
       GravitinoITUtils.genRandomName("catalogKafkaIT_metalake");
   private static final String CATALOG_NAME =
@@ -90,12 +91,9 @@ public class CatalogKafkaIT extends BaseIT {
   private static AdminClient adminClient;
 
   @BeforeAll
-  public void startUp() throws ExecutionException, InterruptedException {
-    CONTAINER_SUITE.startKafkaContainer();
+  public void startUp(KafkaContainer kafka) throws ExecutionException, InterruptedException {
     kafkaBootstrapServers =
-        String.format(
-            "%s:%d",
-            CONTAINER_SUITE.getKafkaContainer().getContainerIpAddress(), DEFAULT_BROKER_PORT);
+        String.format("%s:%d", kafka.getContainerIpAddress(), DEFAULT_BROKER_PORT);
     adminClient = AdminClient.create(ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers));
 
     // create topics for testing
