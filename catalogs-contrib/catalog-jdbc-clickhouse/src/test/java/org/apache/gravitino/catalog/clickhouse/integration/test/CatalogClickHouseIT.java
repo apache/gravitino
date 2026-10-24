@@ -1916,11 +1916,7 @@ public class CatalogClickHouseIT extends BaseIT {
           Assertions.assertEquals(Types.DateType.get(), column.dataType());
           break;
         case "time_col":
-          Assertions.assertEquals(
-              StringUtils.isBlank(System.getenv("GRAVITINO_CLICKHOUSE_TEST_IMAGE"))
-                  ? Types.LongType.get()
-                  : Types.ExternalType.of("Time"),
-              column.dataType());
+          Assertions.assertEquals(Types.ExternalType.of("Time"), column.dataType());
           break;
         case "timestamp_col":
           Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());

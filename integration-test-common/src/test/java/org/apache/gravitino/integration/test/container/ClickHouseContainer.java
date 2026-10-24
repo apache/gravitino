@@ -41,7 +41,7 @@ import org.testcontainers.containers.Network;
 public class ClickHouseContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(ClickHouseContainer.class);
 
-  public static final String DEFAULT_IMAGE = "clickhouse:24.8.14";
+  public static final String DEFAULT_IMAGE = "clickhouse:25.8.14.17";
   public static final String HOST_NAME = "gravitino-ci-clickhouse";
   public static final int CLICKHOUSE_PORT = 8123;
   public static final int CLICKHOUSE_NATIVE_PORT = 9000;
