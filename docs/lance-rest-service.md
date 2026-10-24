@@ -289,6 +289,8 @@ URL encoded:        lance_catalog%24schema%24table01
 - Tables **cannot** be nested deeper than schema level  
 - Parent catalog must be created in Gravitino before using Lance REST API
 - Namespace deletion defaults to `restrict`; use `cascade` to remove child metadata
+- Lance **branches and tags** are not implemented; a request setting `branch` or `tag` is
+  rejected with HTTP `400`
 :::
 
 ## Authentication and authorization
@@ -480,7 +482,7 @@ curl -X POST \
 <TabItem value="java" label="Java">
 
 ```java
-// Add dependency: implementation("org.lance:lance-namespace-core:0.4.5")
+// Add dependency: implementation("org.lance:lance-namespace-core:0.11.1")
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -546,7 +548,7 @@ tableApi.createTable(
 <TabItem value="python" label="Python">
 
 ```python
-# Install: pip install lance-namespace==0.4.5
+# Install: pip install lance-namespace==0.11.1
 
 import lance_namespace as ln
 import requests
