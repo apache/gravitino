@@ -86,7 +86,7 @@ class TestManifestRewriteStrategyHandler {
   }
 
   @Test
-  void testDefaultCycleRetainsResolvedSpecAndOptions() {
+  void testExplicitSpecRequiredAndOptionsRetained() {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     StrategyHandlerContext context =
         context(
@@ -94,7 +94,10 @@ class TestManifestRewriteStrategyHandler {
             statistics(100, 1));
     handler.initialize(context);
     Assertions.assertFalse(handler.shouldTrigger());
-    handler.initialize(context, 1);
+    handler.initialize(
+        context(
+            PolicyContents.icebergRewriteManifests(null, null, null, 1, false),
+            statistics(100, 1)));
     Map<String, String> config =
         new GravitinoManifestRewriteJobAdapter()
             .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow());
@@ -109,14 +112,7 @@ class TestManifestRewriteStrategyHandler {
             "use_caching",
             "false"),
         config);
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            handler.initialize(
-                context(
-                    PolicyContents.icebergRewriteManifests(null, null, null, 0, null),
-                    statistics(100, 1)),
-                1));
+    handler.initialize(context);
     Assertions.assertFalse(handler.shouldTrigger());
   }
 

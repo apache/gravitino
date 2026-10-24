@@ -338,6 +338,7 @@ public interface PolicyContentDTO extends PolicyContent {
     private Integer specId;
 
     @JsonProperty("use_caching")
+    @JsonDeserialize(using = ManifestUseCachingDeserializer.class)
     private Boolean useCaching;
 
     private IcebergRewriteManifestsContentDTO() {}
@@ -447,6 +448,18 @@ public interface PolicyContentDTO extends PolicyContent {
           return context.reportInputMismatch(Integer.class, "spec_id must be a 32-bit integer");
         }
         return parser.getIntValue();
+      }
+    }
+
+    /** Reads the caching option without silently coercing numbers or strings to booleans. */
+    public static class ManifestUseCachingDeserializer extends JsonDeserializer<Boolean> {
+      @Override
+      public Boolean deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
+          return context.reportInputMismatch(Boolean.class, "use_caching must be a boolean");
+        }
+        return parser.getBooleanValue();
       }
     }
 

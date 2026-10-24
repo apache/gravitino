@@ -56,7 +56,7 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
       "avg_manifest_size_threshold_bytes";
   /** Default exclusive average size threshold in bytes. */
   public static final long DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES = 8388608L;
-  /** Rule key for requested partition spec ID, or null to use the cycle target. */
+  /** Rule key for the explicit partition spec ID required by the recommender. */
   public static final String SPEC_ID = "spec_id";
   /** Rule key for caching option, or null for the Iceberg default. */
   public static final String USE_CACHING = "use_caching";
@@ -67,7 +67,7 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
   private final Integer specId;
   private final Boolean useCaching;
 
-  /** Creates manifest rewrite policy content with default thresholds. */
+  /** Creates default thresholds without a spec ID; the recommender skips this content until set. */
   public IcebergRewriteManifestsContent() {
     this(null, null, null, null, null);
   }
@@ -118,9 +118,9 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
   }
 
   /**
-   * Returns the requested partition spec ID, or null to use the cycle target.
+   * Returns the requested partition spec ID. The recommender skips content without an explicit ID.
    *
-   * @return requested partition spec ID, or null to use the cycle target
+   * @return requested partition spec ID, or null when storing defaults without a target
    */
   @Nullable
   public Integer specId() {

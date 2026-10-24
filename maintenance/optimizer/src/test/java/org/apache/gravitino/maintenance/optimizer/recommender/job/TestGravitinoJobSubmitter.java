@@ -30,10 +30,15 @@ import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestGravitinoJobSubmitter {
-  @Test
-  void testManifestAdapterPreservesResolvedSpecOverGlobalConfig() {
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(booleans = {true, false})
+  void testManifestAdapterPreservesPolicyOptionsOverGlobalConfig(Boolean useCaching) {
     GravitinoJobAdapter adapter =
         new GravitinoJobSubmitter()
             .loadJobAdapter(IcebergRewriteManifestsContent.JOB_TEMPLATE_NAME_VALUE);
@@ -42,17 +47,20 @@ public class TestGravitinoJobSubmitter {
         new OptimizerConfig(
             Map.of(
                 OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "spec_id", "99",
+                OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "use_caching", "false",
                 OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "catalog_name", "other",
                 OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "spark_master", "local[2]"));
     Map<String, String> result =
         GravitinoJobSubmitter.buildJobConfig(
             config,
-            new ManifestRewriteJobContext(NameIdentifier.of("catalog", "db", "table"), 1, null),
+            new ManifestRewriteJobContext(
+                NameIdentifier.of("catalog", "db", "table"), 1, useCaching),
             adapter);
     Assertions.assertEquals("1", result.get("spec_id"));
     Assertions.assertEquals("catalog", result.get("catalog_name"));
     Assertions.assertEquals("local[2]", result.get("spark_master"));
-    Assertions.assertFalse(result.containsKey("use_caching"));
+    Assertions.assertEquals(
+        useCaching == null ? "" : useCaching.toString(), result.get("use_caching"));
     Assertions.assertThrows(IllegalArgumentException.class, () -> adapter.jobConfig(null));
   }
 

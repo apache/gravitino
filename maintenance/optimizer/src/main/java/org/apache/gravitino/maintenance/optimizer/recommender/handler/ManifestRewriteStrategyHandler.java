@@ -59,31 +59,7 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
   @Override
   public void initialize(StrategyHandlerContext context) {
     evaluation = StrategyEvaluation.NO_EXECUTION;
-    Integer requestedSpec = requestedSpec(context.strategy().rules());
-    if (requestedSpec == null) {
-      LOG.warn(
-          "Skipping manifest rewrite policy {} for {}: set spec_id in the policy before running the recommender",
-          context.strategy().name(),
-          context.nameIdentifier());
-      return;
-    }
-    initialize(context, requestedSpec);
-  }
-
-  /**
-   * Evaluates statistics using the spec resolved at collection start. The default is never resolved
-   * again, even if partition evolution has occurred since collection.
-   *
-   * <p>This overload is for direct programmatic callers. The recommender and CLI call {@link
-   * #initialize(StrategyHandlerContext)} and require an explicit policy spec ID.
-   *
-   * @param context strategy, fresh table metadata, and one consistent table-statistics response
-   * @param resolvedSpecId spec selected before collection
-   */
-  public void initialize(StrategyHandlerContext context, int resolvedSpecId) {
-    evaluation = StrategyEvaluation.NO_EXECUTION;
     Objects.requireNonNull(context, "context");
-    Preconditions.checkArgument(resolvedSpecId >= 0, "spec_id must be >= 0");
     Preconditions.checkArgument(
         strategyType().equals(context.strategy().strategyType()),
         "Unexpected strategy type: %s",
@@ -94,9 +70,13 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
         "Unexpected manifest rewrite job template");
     Map<String, Object> rules = context.strategy().rules();
     Integer requestedSpec = requestedSpec(rules);
-    Preconditions.checkArgument(
-        requestedSpec == null || requestedSpec == resolvedSpecId,
-        "Resolved spec ID does not match the policy spec_id");
+    if (requestedSpec == null) {
+      LOG.warn(
+          "Skipping manifest rewrite policy {} for {}: set spec_id in the policy before running the recommender",
+          context.strategy().name(),
+          context.nameIdentifier());
+      return;
+    }
     IcebergRewriteManifestsContent content =
         PolicyContents.icebergRewriteManifests(
             longRule(rules, IcebergRewriteManifestsContent.MANIFEST_COUNT_CRITICAL),
@@ -119,11 +99,11 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
       return;
     }
     Optional<IcebergManifestStatistics> measurement =
-        IcebergManifestStatistics.fromStatistics(statistics, resolvedSpecId);
+        IcebergManifestStatistics.fromStatistics(statistics, requestedSpec);
     if (measurement.isEmpty()) {
       LOG.info(
           "Collect manifest statistics for spec {} of {} before evaluating",
-          resolvedSpecId,
+          requestedSpec,
           context.nameIdentifier());
       return;
     }
@@ -135,7 +115,7 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
           new StrategyEvaluationImpl(
               values.count(),
               new ManifestRewriteJobContext(
-                  context.nameIdentifier(), resolvedSpecId, content.useCaching()));
+                  context.nameIdentifier(), requestedSpec, content.useCaching()));
     }
   }
 

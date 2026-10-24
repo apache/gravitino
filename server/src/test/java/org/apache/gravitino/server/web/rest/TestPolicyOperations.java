@@ -416,9 +416,11 @@ public class TestPolicyOperations extends BaseOperationsTest {
     "spec_id,1.5",
     "manifest_count_critical,500.5",
     "manifest_count_warning,100.5",
-    "avg_manifest_size_threshold_bytes,4096.5"
+    "avg_manifest_size_threshold_bytes,4096.5",
+    "use_caching,0",
+    "use_caching,1"
   })
-  public void testCreateManifestPolicyRejectsFractionalNumbers(String field, String value) {
+  public void testCreateManifestPolicyRejectsInvalidFieldTypes(String field, String value) {
     PolicyEntity policy =
         PolicyEntity.builder()
             .withId(1L)

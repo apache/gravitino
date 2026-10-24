@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestManifestRewritePolicyDTO {
   @Test
@@ -56,6 +57,13 @@ class TestManifestRewritePolicyDTO {
 
   @ParameterizedTest
   @CsvSource({
+    "use_caching,0",
+    "use_caching,1",
+    "use_caching,1.0",
+    "use_caching,\"true\"",
+    "use_caching,\"false\"",
+    "use_caching,[]",
+    "use_caching,{}",
     "spec_id,1.5",
     "spec_id,2147483648",
     "spec_id,true",
@@ -67,7 +75,7 @@ class TestManifestRewritePolicyDTO {
     "avg_manifest_size_threshold_bytes,4096.5",
     "avg_manifest_size_threshold_bytes,\"4096\""
   })
-  void testRejectInvalidNumericValuesInCreateAndUpdate(String field, String value) {
+  void testRejectInvalidValuesInCreateAndUpdate(String field, String value) {
     String content = "{\"" + field + "\":" + value + "}";
     String create =
         "{\"name\":\"rewrite\",\"policyType\":\"system_iceberg_rewrite_manifests\","
@@ -89,6 +97,20 @@ class TestManifestRewritePolicyDTO {
                 .readValue(update, PolicyUpdateRequest.UpdatePolicyContentRequest.class));
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testBooleanCachingValues(boolean useCaching) throws Exception {
+    PolicyContentDTO.IcebergRewriteManifestsContentDTO dto =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"use_caching\":" + useCaching + "}",
+                PolicyContentDTO.IcebergRewriteManifestsContentDTO.class);
+    dto.validate();
+    Assertions.assertEquals(
+        PolicyContents.icebergRewriteManifests(null, null, null, null, useCaching),
+        DTOConverters.fromDTO(dto));
+  }
+
   @Test
   void testNumericBoundsAndNullDefaults() throws Exception {
     PolicyContentDTO.IcebergRewriteManifestsContentDTO bounds =
@@ -103,7 +125,7 @@ class TestManifestRewritePolicyDTO {
         JsonUtils.objectMapper()
             .readValue(
                 "{\"spec_id\":null,\"manifest_count_critical\":null,\"manifest_count_warning\":null,"
-                    + "\"avg_manifest_size_threshold_bytes\":null}",
+                    + "\"avg_manifest_size_threshold_bytes\":null,\"use_caching\":null}",
                 PolicyContentDTO.IcebergRewriteManifestsContentDTO.class);
     defaults.validate();
     Assertions.assertEquals(

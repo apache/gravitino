@@ -23,7 +23,8 @@ The strategy type is `iceberg-rewrite-manifests`; its handler and job adapter ar
 
 The critical count must be at least the warning count. Spec IDs must be non-negative
 32-bit integers. Thresholds use integer counts and bytes. Recommendations are ranked by
-the selected spec's manifest count.
+the selected spec's manifest count. The policy API accepts only JSON booleans for
+`use_caching`; numbers and strings are rejected.
 
 At the defaults, 99 manifests never trigger; 100 manifests averaging 8 MiB do not trigger;
 100 averaging less than 8 MiB trigger; and 500 trigger regardless of size.
@@ -40,10 +41,14 @@ metadata supplied by the optimizer's table metadata provider. Missing, malformed
 mismatched snapshot IDs produce no recommendation; recollect before evaluating again.
 For a table without a snapshot, the collector publishes `-1` and Iceberg table metadata
 reports `none`. The provider must expose this metadata property to verify freshness.
+The recommender reads metadata after statistics to detect snapshot changes during collection
+of its inputs. This freshness check is not transactional with job submission; the table may
+still change after evaluation.
 
 The handler reads the chosen spec's count and average from the same statistics response.
 A missing map or key produces no recommendation. An empty spec has count and average zero.
-Malformed measurements fail evaluation. Counts from other specs are ignored.
+Invalid policy rules or malformed measurements are logged and skipped for that table without
+aborting recommendations for other tables. Counts from other specs are ignored.
 
 For recommender or CLI evaluation, set `spec_id` in the policy to the existing spec to evaluate.
 The following example assumes that spec `1` exists and its statistics have been collected:
@@ -70,7 +75,9 @@ to the table. Configure the optimizer's Gravitino providers and Spark submission
 
 Remove `--dry-run` to submit the recommendations. The adapter supplies `catalog_name`,
 `table_identifier`, the exact evaluated `spec_id`, and optional `use_caching`.
-Its catalog, table, and spec values override shared job-submitter configuration.
+Its catalog, table, spec, and caching values override shared job-submitter configuration.
+When the policy omits `use_caching`, the adapter supplies an empty option to clear any shared
+caching setting and leave the Iceberg runtime default in effect.
 Recollect statistics after a successful rewrite before evaluating again.
 
 ## Selecting a partition spec

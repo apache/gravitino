@@ -67,8 +67,11 @@ public final class ManifestRewriteJobContext implements JobExecutionContext {
 
   @Override
   public Map<String, String> jobOptions() {
-    return useCaching == null
-        ? Map.of("spec_id", Integer.toString(specId))
-        : Map.of("spec_id", Integer.toString(specId), "use_caching", useCaching.toString());
+    // An empty option clears shared submitter settings and preserves Iceberg's runtime default.
+    return Map.of(
+        "spec_id",
+        Integer.toString(specId),
+        "use_caching",
+        useCaching == null ? "" : useCaching.toString());
   }
 }

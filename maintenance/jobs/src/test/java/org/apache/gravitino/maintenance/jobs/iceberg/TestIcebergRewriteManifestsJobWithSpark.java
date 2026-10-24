@@ -162,6 +162,14 @@ public class TestIcebergRewriteManifestsJobWithSpark {
   @Test
   public void testCollectEvaluateAndRewriteAfterDefaultSpecChanges() throws Exception {
     int resolvedSpecId = Spark3Util.loadIcebergTable(spark, TABLE).spec().specId();
+    PolicyDTO policy =
+        PolicyDTO.builder()
+            .withName("rewrite")
+            .withPolicyType("system_iceberg_rewrite_manifests")
+            .withContent(
+                DTOConverters.toDTO(
+                    PolicyContents.icebergRewriteManifests(3L, 3L, null, resolvedSpecId, false)))
+            .build();
     List<StatisticEntry<?>> measurements =
         IcebergUpdateManifestStatsJob.collectManifestStatistics(
             spark, "manifest_catalog", "db.events");
@@ -173,14 +181,6 @@ public class TestIcebergRewriteManifestsJobWithSpark {
             .orElseThrow();
     assertEquals(1, resolvedSpecId);
     assertEquals(3, measurement.count());
-    PolicyDTO policy =
-        PolicyDTO.builder()
-            .withName("rewrite")
-            .withPolicyType("system_iceberg_rewrite_manifests")
-            .withContent(
-                DTOConverters.toDTO(
-                    PolicyContents.icebergRewriteManifests(3L, 3L, null, null, false)))
-            .build();
     // Change the default after collection, before evaluation and submission.
     spark.sql(
         "ALTER TABLE "
@@ -191,12 +191,12 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     Set<String> oldManifests = manifests(0);
     Set<String> newDefaultManifests = manifests(2);
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
-    handler.initialize(manifestContext(policy, measurements), resolvedSpecId);
+    handler.initialize(manifestContext(policy, measurements));
     assertFalse(handler.shouldTrigger(), "Measurements from an older snapshot must be recollected");
     measurements =
         IcebergUpdateManifestStatsJob.collectManifestStatistics(
             spark, "manifest_catalog", "db.events");
-    handler.initialize(manifestContext(policy, measurements), resolvedSpecId);
+    handler.initialize(manifestContext(policy, measurements));
     assertTrue(handler.shouldTrigger());
     Map<String, String> config =
         new GravitinoManifestRewriteJobAdapter()
@@ -213,8 +213,7 @@ public class TestIcebergRewriteManifestsJobWithSpark {
         manifestContext(
             policy,
             IcebergUpdateManifestStatsJob.collectManifestStatistics(
-                spark, "manifest_catalog", "db.events")),
-        resolvedSpecId);
+                spark, "manifest_catalog", "db.events")));
     assertFalse(handler.shouldTrigger());
   }
 

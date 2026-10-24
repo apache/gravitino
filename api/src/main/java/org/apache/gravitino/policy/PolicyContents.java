@@ -171,7 +171,8 @@ public class PolicyContents {
   }
 
   /**
-   * Creates a manifest rewrite policy with default thresholds and cycle target selection.
+   * Creates a manifest rewrite policy with default thresholds and no target spec. The recommender
+   * skips this policy until an explicit spec ID is set.
    *
    * @return manifest rewrite policy
    */
@@ -185,7 +186,8 @@ public class PolicyContents {
    * @param manifestCountCritical count that triggers regardless of size
    * @param manifestCountWarning minimum count for the size trigger
    * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
-   * @param specId requested existing spec, or null for the resolved collection-cycle target
+   * @param specId requested existing spec, or null to store defaults; the recommender skips
+   *     policies without an explicit spec ID
    * @param useCaching caching option, or null for the Iceberg default
    * @return manifest rewrite policy
    */
