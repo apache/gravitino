@@ -34,6 +34,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoManif
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.stats.StatisticValues;
@@ -83,6 +84,19 @@ class TestManifestRewriteRecommendation {
       Assertions.assertEquals(
           1, recommender.recommendForStrategyName(List.of(identifier), "rewrite", 1).size());
       Mockito.verifyNoInteractions(submitter);
+      PolicyContent validContent = policy.content();
+      for (Object invalid : new Object[] {"+500", new StringBuilder("500")}) {
+        Mockito.when(policy.content())
+            .thenReturn(
+                PolicyContents.custom(
+                    Map.of("spec_id", 7, "manifest_count_critical", invalid),
+                    validContent.supportedObjectTypes(),
+                    validContent.properties()));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> recommender.recommendForStrategyName(List.of(identifier), "rewrite", 1));
+      }
+      Mockito.when(policy.content()).thenReturn(validContent);
       List<Recommender.RecommendationResult> results =
           recommender.submitForStrategyName(List.of(identifier), "rewrite");
       Assertions.assertEquals("job-1", results.get(0).jobId());

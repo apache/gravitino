@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.optimizer.recommender.handler;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -119,16 +121,85 @@ class TestManifestRewriteStrategyHandler {
   }
 
   @Test
-  void testConfigurableThresholdsAndSpecIsolation() {
+  void testConfigurableThresholds() {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     handler.initialize(
         context(PolicyContents.icebergRewriteManifests(10L, 5L, 2L, 1, true), statistics(5, 1)));
     Assertions.assertTrue(handler.shouldTrigger());
+  }
+
+  @Test
+  void testOnlySelectedSpecCanTrigger() {
+    List<StatisticEntry<?>> measurements = statistics(0, 0);
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     handler.initialize(
-        context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 1, null), statistics(99, 1)));
-    // Spec 0 has 1000 manifests, but cannot trigger a rewrite of spec 1.
+        context(PolicyContents.icebergRewriteManifests(null, null, null, 1, null), measurements));
+    Assertions.assertFalse(handler.shouldTrigger(), "Spec 1 has zero manifests");
+    handler.initialize(
+        context(PolicyContents.icebergRewriteManifests(null, null, null, 0, null), measurements));
+    Assertions.assertTrue(handler.shouldTrigger(), "Spec 0 has 1000 manifests");
+    Assertions.assertEquals(1000, handler.evaluate().score());
+    Assertions.assertEquals(
+        "0",
+        new GravitinoManifestRewriteJobAdapter()
+            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow())
+            .get("spec_id"));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true,true", "TRUE,true", "TrUe,true", "false,false", "FALSE,false", "FaLsE,false"})
+  void testMixedCaseCachingReachesJobConfiguration(String input, String expected) {
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    handler.initialize(
+        context(customContent(Map.of("spec_id", 1, "use_caching", input)), statistics(500, 1)));
+    Assertions.assertEquals(
+        expected,
+        new GravitinoManifestRewriteJobAdapter()
+            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow())
+            .get("use_caching"));
+  }
+
+  @Test
+  void testIntegralRuleValues() {
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    for (Object warning :
+        new Object[] {(byte) 100, (short) 100, 100, 100L, BigInteger.valueOf(100), "100"}) {
+      handler.initialize(
+          context(
+              customContent(Map.of("spec_id", 1, "manifest_count_warning", warning)),
+              statistics(100, 1)));
+      Assertions.assertTrue(handler.shouldTrigger());
+    }
+    handler.initialize(
+        context(customContent(Map.of("spec_id", (long) Integer.MAX_VALUE)), statistics(500, 1)));
     Assertions.assertFalse(handler.shouldTrigger());
+  }
+
+  @Test
+  void testNonIntegerRuleValuesAreRejected() {
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    for (Object warning :
+        new Object[] {
+          "+100",
+          "100.0",
+          "1e2",
+          " 100",
+          100.0d,
+          100.0f,
+          new BigDecimal("100"),
+          new StringBuilder("100"),
+          new BigInteger("9223372036854775808"),
+          "9223372036854775808"
+        }) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              handler.initialize(
+                  context(
+                      customContent(Map.of("spec_id", 1, "manifest_count_warning", warning)),
+                      statistics(100, 1))),
+          warning.toString());
+    }
   }
 
   @Test
@@ -137,15 +208,12 @@ class TestManifestRewriteStrategyHandler {
     for (Map<String, Object> rules :
         List.<Map<String, Object>>of(
             Map.of("spec_id", "2147483648"),
+            Map.of("spec_id", 2147483648L),
             Map.of("spec_id", -1),
             Map.of("spec_id", 1.5),
             Map.of("spec_id", 1, "use_caching", "yes"),
             Map.of("spec_id", 1, "manifest_count_critical", 99))) {
-      PolicyContent content =
-          PolicyContents.custom(
-              rules,
-              PolicyContents.icebergRewriteManifests().supportedObjectTypes(),
-              PolicyContents.icebergRewriteManifests().properties());
+      PolicyContent content = customContent(rules);
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () -> handler.initialize(context(content, statistics(500, 1))));
@@ -222,6 +290,13 @@ class TestManifestRewriteStrategyHandler {
                         IcebergManifestStatistics.SNAPSHOT_ID, StatisticValues.longValue(-1))))
             .build());
     Assertions.assertFalse(handler.shouldTrigger());
+  }
+
+  private static PolicyContent customContent(Map<String, Object> rules) {
+    return PolicyContents.custom(
+        rules,
+        PolicyContents.icebergRewriteManifests().supportedObjectTypes(),
+        PolicyContents.icebergRewriteManifests().properties());
   }
 
   private static StrategyHandlerContext context(

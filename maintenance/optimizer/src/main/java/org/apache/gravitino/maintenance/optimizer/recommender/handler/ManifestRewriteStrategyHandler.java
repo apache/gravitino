@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.recommender.handler;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.CURRENT_SNAPSHOT_ID;
 
 import com.google.common.base.Preconditions;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -61,8 +62,7 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     Integer requestedSpec = requestedSpec(context.strategy().rules());
     if (requestedSpec == null) {
       LOG.warn(
-          "Skipping manifest rewrite policy {} for {}: set spec_id for persisted statistics "
-              + "or pass the spec ID resolved before collection when initializing a collection cycle",
+          "Skipping manifest rewrite policy {} for {}: set spec_id in the policy before running the recommender",
           context.strategy().name(),
           context.nameIdentifier());
       return;
@@ -73,6 +73,9 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
   /**
    * Evaluates statistics using the spec resolved at collection start. The default is never resolved
    * again, even if partition evolution has occurred since collection.
+   *
+   * <p>This overload is for direct programmatic callers. The recommender and CLI call {@link
+   * #initialize(StrategyHandlerContext)} and require an explicit policy spec ID.
    *
    * @param context strategy, fresh table metadata, and one consistent table-statistics response
    * @param resolvedSpecId spec selected before collection
@@ -177,9 +180,22 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     if (value == null) {
       return null;
     }
+    if (value instanceof Byte
+        || value instanceof Short
+        || value instanceof Integer
+        || value instanceof Long) {
+      return ((Number) value).longValue();
+    }
     try {
-      return Long.valueOf(value.toString());
-    } catch (NumberFormatException e) {
+      if (value instanceof BigInteger) {
+        return ((BigInteger) value).longValueExact();
+      }
+      Preconditions.checkArgument(
+          value instanceof String && ((String) value).matches("-?[0-9]+"),
+          "%s must be an integer",
+          key);
+      return Long.valueOf((String) value);
+    } catch (NumberFormatException | ArithmeticException e) {
       throw new IllegalArgumentException(key + " must be an integer", e);
     }
   }

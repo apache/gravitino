@@ -485,7 +485,7 @@ components:
           format: int32
           minimum: 0
           nullable: true
-          description: Existing partition spec. Required for standalone evaluation of persisted statistics; a collection cycle may supply its resolved ID instead.
+          description: Existing partition spec. Required by the recommender and CLI; omission skips the policy. There is no automatic spec handoff from collection to recommendation.
         use_caching:
           type: boolean
           nullable: true

@@ -18,7 +18,7 @@ The strategy type is `iceberg-rewrite-manifests`; its handler and job adapter ar
 | `manifest_count_critical` | `500` | Trigger when count is at least this value, regardless of size. |
 | `manifest_count_warning` | `100` | Minimum count for the small-average-size trigger. Must be positive. |
 | `avg_manifest_size_threshold_bytes` | `8388608` | Trigger when average size is strictly below this value and the warning count is reached. Must be positive. |
-| `spec_id` | Omitted | Existing partition spec to evaluate. Required when evaluating previously persisted statistics through the CLI. |
+| `spec_id` | Omitted | Existing partition spec to evaluate. Required by the recommender and CLI; omission skips the policy. |
 | `use_caching` | Omitted | Optional boolean forwarded to Iceberg; omission preserves the runtime default. |
 
 The critical count must be at least the warning count. Spec IDs must be non-negative
@@ -45,7 +45,7 @@ The handler reads the chosen spec's count and average from the same statistics r
 A missing map or key produces no recommendation. An empty spec has count and average zero.
 Malformed measurements fail evaluation. Counts from other specs are ignored.
 
-For CLI evaluation of persisted statistics, set `spec_id` to the existing spec to evaluate.
+For recommender or CLI evaluation, set `spec_id` in the policy to the existing spec to evaluate.
 The following example assumes that spec `1` exists and its statistics have been collected:
 
 ```shell
@@ -73,22 +73,18 @@ Remove `--dry-run` to submit the recommendations. The adapter supplies `catalog_
 Its catalog, table, and spec values override shared job-submitter configuration.
 Recollect statistics after a successful rewrite before evaluating again.
 
-## Keeping the collection target
+## Selecting a partition spec
 
-An application that collects and evaluates in one cycle may omit the policy's requested
-spec. Resolve the table's default spec once before collection and retain that ID.
-`IcebergUpdateManifestStatsJob.collectManifestStatistics(spark, catalog, table)` returns
-both complete maps and their snapshot ID. Pass that list and fresh Gravitino table metadata
-into `StrategyHandlerContext`, then call
-`ManifestRewriteStrategyHandler.initialize(context, resolvedSpecId)`. An explicitly configured
-policy spec must match the retained target. If the snapshot changed, recollect the complete
-maps and retry with the same target ID.
+The recommender and CLI require an explicit policy `spec_id`. They do not resolve the table's
+current default spec or receive a target spec from the collector. There is no automatic
+collection-to-recommendation handoff in this release. Empty policy content is accepted for
+storing default thresholds, but the recommender skips it with a warning until `spec_id` is set.
 
-The adapter always submits the resolved ID, even if the table's default changes after collection.
-It never infers the default from map keys or resolves it again during evaluation. The standalone
-CLI skips a policy without `spec_id` and logs a warning, because persisted per-spec maps do not
-identify which default an application selected before collection. Empty policy content is valid for the
-collection-cycle API but produces no standalone CLI recommendation until `spec_id` is set.
+Choose an existing spec before configuring the policy. To target the current default, read it
+from the table's Iceberg metadata and store that ID as `spec_id`. The adapter submits the exact
+evaluated ID even if the table's default changes afterward. It never infers a spec from the
+statistics map keys. After a snapshot change, recollect the statistics and evaluate the same
+configured spec again.
 
 Rewriting reorganizes manifests within the selected spec and does not migrate data files
 between specs. This policy introduces no scheduling, cooldown, or last-success statistic.

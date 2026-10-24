@@ -58,5 +58,9 @@ class TestIcebergRewriteManifestsContent {
     Assertions.assertEquals(0, content.rules().get("spec_id"));
     Assertions.assertEquals(false, content.rules().get("use_caching"));
     Assertions.assertNotEquals(content, PolicyContents.icebergRewriteManifests());
+    IcebergRewriteManifestsContent largestSpec =
+        PolicyContents.icebergRewriteManifests(null, null, null, Integer.MAX_VALUE, null);
+    largestSpec.validate();
+    Assertions.assertEquals(Integer.MAX_VALUE, largestSpec.specId());
   }
 }
