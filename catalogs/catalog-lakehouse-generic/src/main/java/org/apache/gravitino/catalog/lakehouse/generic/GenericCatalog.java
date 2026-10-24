@@ -46,6 +46,11 @@ public class GenericCatalog extends BaseCatalog<GenericCatalog> {
     return "lakehouse-generic";
   }
 
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
   /**
    * Creates a new instance of {@link GenericCatalogOperations} with the provided configuration.
    *

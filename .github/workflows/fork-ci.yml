@@ -17,7 +17,7 @@
 
 # Run the complete CI entry point from branch pushes in the contributor's repository.
 name: Fork CI
-run-name: "${{ github.event_name == 'workflow_dispatch' && format('Trusted Fork CI #{0}', inputs.pull-request) || format('Fork CI {0}', github.ref_name) }}"
+run-name: "${{ github.event_name == 'workflow_dispatch' && inputs.pull-request != '' && format('Trusted Fork CI #{0}', inputs.pull-request) || format('Fork CI {0}', github.ref_name) }}"
 
 on:
   push:
@@ -25,8 +25,8 @@ on:
   workflow_dispatch:
     inputs:
       pull-request:
-        description: 'PR to test using the reviewed workflows on the default branch (committers only)'
-        required: true
+        description: 'In apache/gravitino: PR to test using the reviewed default-branch workflows (committers only). In a fork: leave empty to test the selected branch.'
+        required: false
         type: string
 
 permissions:
@@ -34,8 +34,10 @@ permissions:
   actions: read
   pull-requests: read
 
+# A push and a "Run workflow" in the fork share the branch's group, so either one replaces a
+# running test of that branch.
 concurrency:
-  group: fork-ci-${{ github.event_name }}-${{ inputs.pull-request || github.ref }}
+  group: fork-ci-${{ inputs.pull-request && format('trusted-{0}', inputs.pull-request) || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -260,6 +262,8 @@ jobs:
     # Not ubuntu-slim: it limits jobs to 15 minutes, and this job lasts as long as the slowest suite.
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    # The watcher only observes the suites; its own failure or timeout must not fail the run.
+    continue-on-error: true
     permissions:
       contents: read
       actions: write
