@@ -70,6 +70,15 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
 
   private static final String PRIMARY_KEY_INDEX_NAME = "PAIMON_PRIMARY_KEY_INDEX";
 
+  /**
+   * Creates Paimon table metadata with structured primary keys and bucket distribution.
+   *
+   * @param ident the Spark table identifier
+   * @param schema the Spark table schema
+   * @param transforms the requested partition and bucket transforms
+   * @param properties the requested Paimon table properties
+   * @return the created Gravitino table
+   */
   @Override
   protected org.apache.gravitino.rel.Table createGravitinoTable(
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties) {

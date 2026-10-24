@@ -135,6 +135,9 @@ dependencies {
     testImplementation(project(":catalogs:catalog-lakehouse-paimon")) {
       isTransitive = false
     }
+    tasks.named("compileTestJava") {
+      dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
+    }
   }
   testImplementation(project(":catalogs:catalog-glue")) {
     exclude("org.apache.logging.log4j")
