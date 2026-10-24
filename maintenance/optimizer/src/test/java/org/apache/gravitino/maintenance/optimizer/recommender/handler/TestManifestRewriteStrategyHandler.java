@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 class TestManifestRewriteStrategyHandler {
@@ -86,7 +87,7 @@ class TestManifestRewriteStrategyHandler {
   }
 
   @Test
-  void testExplicitSpecRequiredAndOptionsRetained() {
+  void testMissingDefaultSkipsButExplicitSpecRetainsOptions() {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     StrategyHandlerContext context =
         context(
@@ -114,6 +115,59 @@ class TestManifestRewriteStrategyHandler {
         config);
     handler.initialize(context);
     Assertions.assertFalse(handler.shouldTrigger());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "1", "2147483647"})
+  void testDefaultSpecIsResolvedAndPinned(String specId) {
+    Table metadata = Mockito.mock(Table.class);
+    Mockito.when(metadata.properties())
+        .thenReturn(Map.of("current-snapshot-id", "1", "default-spec-id", specId));
+    StrategyHandlerContext context = context(PolicyContents.icebergRewriteManifests(), List.of());
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    handler.initialize(
+        StrategyHandlerContext.builder(context.nameIdentifier(), context.strategy())
+            .withTableMetadata(metadata)
+            .withTableStatistics(
+                List.of(
+                    new StatisticEntryImpl<>(
+                        IcebergManifestStatistics.MANIFEST_NUMBER,
+                        StatisticValues.objectValue(
+                            Map.of(specId, StatisticValues.longValue(500)))),
+                    new StatisticEntryImpl<>(
+                        IcebergManifestStatistics.AVG_MANIFEST_SIZE,
+                        StatisticValues.objectValue(
+                            Map.of(specId, StatisticValues.doubleValue(1)))),
+                    new StatisticEntryImpl<>(
+                        IcebergManifestStatistics.SNAPSHOT_ID, StatisticValues.longValue(1))))
+            .build());
+    Assertions.assertTrue(handler.shouldTrigger());
+    Mockito.when(metadata.properties())
+        .thenReturn(Map.of("current-snapshot-id", "1", "default-spec-id", "2"));
+    Assertions.assertEquals(
+        specId,
+        new GravitinoManifestRewriteJobAdapter()
+            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow())
+            .get("spec_id"));
+  }
+
+  @Test
+  void testExplicitSpecOverridesCurrentDefault() {
+    StrategyHandlerContext context =
+        context(
+            PolicyContents.icebergRewriteManifests(null, null, null, 0, null), statistics(0, 0));
+    Table metadata = Mockito.mock(Table.class);
+    Mockito.when(metadata.properties())
+        .thenReturn(Map.of("current-snapshot-id", "1", "default-spec-id", "1"));
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    handler.initialize(
+        StrategyHandlerContext.builder(context.nameIdentifier(), context.strategy())
+            .withTableMetadata(metadata)
+            .withTableStatistics(context.tableStatistics())
+            .build());
+    Assertions.assertTrue(handler.shouldTrigger());
+    Assertions.assertEquals(
+        "0", handler.evaluate().jobExecutionContext().orElseThrow().jobOptions().get("spec_id"));
   }
 
   @Test

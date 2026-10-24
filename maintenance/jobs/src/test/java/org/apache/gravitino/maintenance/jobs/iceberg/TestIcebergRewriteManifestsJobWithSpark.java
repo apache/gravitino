@@ -45,6 +45,8 @@ import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRe
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoManifestRewriteJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -217,8 +219,62 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     assertFalse(handler.shouldTrigger());
   }
 
+  /**
+   * Resolves an omitted spec from Iceberg metadata and retains it through later partition
+   * evolution.
+   *
+   * @throws Exception if the Iceberg table cannot be loaded
+   */
+  @Test
+  public void testDefaultSpecIsPinnedAcrossPartitionEvolution() throws Exception {
+    PolicyDTO policy =
+        PolicyDTO.builder()
+            .withName("rewrite")
+            .withPolicyType("system_iceberg_rewrite_manifests")
+            .withContent(
+                DTOConverters.toDTO(
+                    PolicyContents.icebergRewriteManifests(3L, 3L, null, null, false)))
+            .build();
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    handler.initialize(
+        manifestContext(
+            policy,
+            IcebergUpdateManifestStatsJob.collectManifestStatistics(
+                spark, "manifest_catalog", "db.events")));
+    assertTrue(handler.shouldTrigger(), "An omitted spec must use the current Iceberg default");
+    Map<String, String> config =
+        new GravitinoManifestRewriteJobAdapter()
+            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow());
+    assertEquals("1", config.get("spec_id"));
+
+    spark.sql(
+        "ALTER TABLE "
+            + TABLE
+            + " REPLACE PARTITION FIELD hours(event_time) WITH months(event_time)");
+    insertRows(6);
+    Set<String> oldManifests = manifests(0);
+    Set<String> newDefaultManifests = manifests(2);
+    List<Row> records = records();
+    runJob(config.get("spec_id"), config.get("use_caching"));
+    assertEquals(1, manifests(1).size());
+    assertEquals(oldManifests, manifests(0));
+    assertEquals(newDefaultManifests, manifests(2));
+    assertEquals(records, records());
+
+    handler.initialize(
+        manifestContext(
+            policy,
+            IcebergUpdateManifestStatsJob.collectManifestStatistics(
+                spark, "manifest_catalog", "db.events")));
+    assertTrue(handler.shouldTrigger());
+    assertEquals(
+        "2", handler.evaluate().jobExecutionContext().orElseThrow().jobOptions().get("spec_id"));
+  }
+
   private StrategyHandlerContext manifestContext(
-      PolicyDTO policy, List<StatisticEntry<?>> measurements) {
+      PolicyDTO policy, List<StatisticEntry<?>> measurements) throws Exception {
+    TableMetadata metadata =
+        ((BaseTable) Spark3Util.loadIcebergTable(spark, TABLE)).operations().current();
     return StrategyHandlerContext.builder(
             NameIdentifier.of("manifest_catalog", "db", "events"), new GravitinoStrategy(policy))
         .withTableStatistics(measurements)
@@ -227,7 +283,11 @@ public class TestIcebergRewriteManifestsJobWithSpark {
                 .withName("events")
                 .withAudit(
                     AuditDTO.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
-                .withProperties(Map.of("current-snapshot-id", Long.toString(currentSnapshot())))
+                .withProperties(
+                    Map.of(
+                        "current-snapshot-id",
+                            Long.toString(metadata.currentSnapshot().snapshotId()),
+                        "default-spec-id", Integer.toString(metadata.defaultSpecId())))
                 .build())
         .build();
   }

@@ -485,7 +485,7 @@ components:
           format: int32
           minimum: 0
           nullable: true
-          description: Existing partition spec. Required by the recommender and CLI; omission skips the policy. There is no automatic spec handoff from collection to recommendation.
+          description: Existing partition spec. Omission resolves Iceberg's current default spec from table metadata. If it cannot be resolved, the table is skipped. The evaluated ID is retained through job submission.
         use_caching:
           type: boolean
           nullable: true

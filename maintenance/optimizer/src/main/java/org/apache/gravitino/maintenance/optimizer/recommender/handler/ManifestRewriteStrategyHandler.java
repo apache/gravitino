@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.optimizer.recommender.handler;
 
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.CURRENT_SNAPSHOT_ID;
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.DEFAULT_SPEC_ID;
 
 import com.google.common.base.Preconditions;
 import java.math.BigInteger;
@@ -70,11 +71,13 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
         "Unexpected manifest rewrite job template");
     Map<String, Object> rules = context.strategy().rules();
     Integer requestedSpec = requestedSpec(rules);
-    if (requestedSpec == null) {
+    Integer resolvedSpec = requestedSpec == null ? defaultSpec(context) : requestedSpec;
+    if (resolvedSpec == null) {
       LOG.warn(
-          "Skipping manifest rewrite policy {} for {}: set spec_id in the policy before running the recommender",
+          "Skipping manifest rewrite policy {} for {}: cannot resolve Iceberg {} from table metadata",
           context.strategy().name(),
-          context.nameIdentifier());
+          context.nameIdentifier(),
+          DEFAULT_SPEC_ID);
       return;
     }
     IcebergRewriteManifestsContent content =
@@ -99,11 +102,11 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
       return;
     }
     Optional<IcebergManifestStatistics> measurement =
-        IcebergManifestStatistics.fromStatistics(statistics, requestedSpec);
+        IcebergManifestStatistics.fromStatistics(statistics, resolvedSpec);
     if (measurement.isEmpty()) {
       LOG.info(
           "Collect manifest statistics for spec {} of {} before evaluating",
-          requestedSpec,
+          resolvedSpec,
           context.nameIdentifier());
       return;
     }
@@ -115,7 +118,7 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
           new StrategyEvaluationImpl(
               values.count(),
               new ManifestRewriteJobContext(
-                  context.nameIdentifier(), requestedSpec, content.useCaching()));
+                  context.nameIdentifier(), resolvedSpec, content.useCaching()));
     }
   }
 
@@ -143,6 +146,20 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     return collectedSnapshot == -1L
         ? "none".equals(currentSnapshot)
         : collectedSnapshot >= 0 && Long.toString(collectedSnapshot).equals(currentSnapshot);
+  }
+
+  @Nullable
+  private static Integer defaultSpec(StrategyHandlerContext context) {
+    String value =
+        context.tableMetadata().map(table -> table.properties().get(DEFAULT_SPEC_ID)).orElse(null);
+    if (value == null || !value.matches("[0-9]+")) {
+      return null;
+    }
+    try {
+      return Integer.valueOf(value);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   @Nullable

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.optimizer.recommender;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -46,6 +47,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -236,6 +238,49 @@ class TestManifestRewriteRecommendation {
     }
   }
 
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = {"", "-1", "1.5", "+1", " 1", "2147483648", "invalid"})
+  void testUnresolvableDefaultSkipsOnlyAffectedTable(String defaultSpec) throws Exception {
+    NameIdentifier bad = NameIdentifier.of("catalog", "db", "bad");
+    NameIdentifier healthy = NameIdentifier.of("catalog", "db", "healthy");
+    SupportTableStatistics statistics = Mockito.mock(SupportTableStatistics.class);
+    Mockito.when(statistics.tableStatistics(Mockito.any()))
+        .thenReturn(measurements(StatisticValues.longValue(500), 1));
+    TableMetadataProvider metadata = Mockito.mock(TableMetadataProvider.class);
+    Table badTable = Mockito.mock(Table.class);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("current-snapshot-id", "1");
+    if (defaultSpec != null) {
+      properties.put("default-spec-id", defaultSpec);
+    }
+    Mockito.when(badTable.properties()).thenReturn(properties);
+    Table healthyTable = tableAtSnapshot("1");
+    Mockito.when(metadata.tableMetadata(bad)).thenReturn(badTable);
+    Mockito.when(metadata.tableMetadata(healthy)).thenReturn(healthyTable);
+    JobSubmitter submitter = Mockito.mock(JobSubmitter.class);
+    try (Recommender recommender =
+        new Recommender(
+            manifestStrategies(PolicyContents.icebergRewriteManifests(), bad, healthy),
+            statistics,
+            metadata,
+            submitter,
+            new OptimizerEnv(new OptimizerConfig(Map.of())))) {
+      List<Recommender.RecommendationResult> results =
+          recommender.submitForStrategyName(List.of(bad, healthy), "rewrite");
+      Assertions.assertEquals(1, results.size());
+      Assertions.assertEquals(healthy, results.get(0).identifier());
+      Assertions.assertEquals("7", results.get(0).jobOptions().get("spec_id"));
+      ArgumentCaptor<JobExecutionContext> captured =
+          ArgumentCaptor.forClass(JobExecutionContext.class);
+      Mockito.verify(submitter)
+          .submitJob(
+              Mockito.eq(IcebergRewriteManifestsContent.JOB_TEMPLATE_NAME_VALUE),
+              captured.capture());
+      Assertions.assertEquals("7", captured.getValue().jobOptions().get("spec_id"));
+    }
+  }
+
   private static Stream<List<StatisticEntry<?>>> invalidMeasurements() {
     return Stream.of(
         measurements(StatisticValues.stringValue("500"), 1),
@@ -262,10 +307,15 @@ class TestManifestRewriteRecommendation {
   }
 
   private static StrategyProvider manifestStrategies(NameIdentifier... identifiers) {
+    return manifestStrategies(
+        PolicyContents.icebergRewriteManifests(null, null, null, 7, null), identifiers);
+  }
+
+  private static StrategyProvider manifestStrategies(
+      PolicyContent content, NameIdentifier... identifiers) {
     Policy policy = Mockito.mock(Policy.class);
     Mockito.when(policy.name()).thenReturn("rewrite");
-    Mockito.when(policy.content())
-        .thenReturn(PolicyContents.icebergRewriteManifests(null, null, null, 7, null));
+    Mockito.when(policy.content()).thenReturn(content);
     GravitinoStrategy strategy = new GravitinoStrategy(policy);
     StrategyProvider strategies = Mockito.mock(StrategyProvider.class);
     Mockito.when(strategies.strategy("rewrite")).thenReturn(strategy);
@@ -277,7 +327,8 @@ class TestManifestRewriteRecommendation {
 
   private static Table tableAtSnapshot(String snapshot) {
     Table table = Mockito.mock(Table.class);
-    Mockito.when(table.properties()).thenReturn(Map.of("current-snapshot-id", snapshot));
+    Mockito.when(table.properties())
+        .thenReturn(Map.of("current-snapshot-id", snapshot, "default-spec-id", "7"));
     return table;
   }
 }
