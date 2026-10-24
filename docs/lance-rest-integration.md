@@ -24,7 +24,7 @@ The following table outlines the tested compatibility between Gravitino versions
 | ------------------------------ | ------------------------------ | --------------------------------------------- |
 | 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
 | 1.3.0                          | 0.2.0, 0.4.0, 0.5.1            | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
-| 2.0.0                          | 0.2.0, 0.4.0, 0.5.1, 0.6.1, 0.7.1, 0.8.0 | 0.2.0 - 0.5.0 (each with the paired `lance-namespace`, see below) |
+| 2.0.0                          | 0.2.0, 0.4.0, 0.5.1, 0.6.1, 0.7.1, 0.8.0 | 0.2.0 + `lance-namespace` 0.4.5; 0.3.0 and 0.4.2 + 0.7.5; 0.5.0 + 0.11.1 |
 
 :::note
 - These version entries show which versions are expected to work together.
@@ -55,36 +55,14 @@ The following table outlines the tested compatibility between Gravitino versions
   raising `ImportError: cannot import name
   'LanceNamespaceStorageOptionsProvider' from 'lance'`. You can use
   `lance-ray` 0.2.0 with Gravitino 1.3.0 by pinning `pylance` to 3.x or 4.x.
-- **Gravitino 2.0.0 embeds `lance-core` 12.0.0 and `lance-namespace-core` 0.11.1**, the same
-  pair that `lance-spark` 0.8.0 is built on. Relative to 0.7.5 the spec changed in several ways —
-  it removed `/v1/table/{id}/refresh`, removed `AddVirtualColumnEntry.data_type`, added a `branch`
-  query parameter to five operations and tightened 21 properties with `minLength: 1` — but **none
-  of that reaches the 15 endpoints Gravitino serves**. What those endpoints do see is purely
-  additive: the optional request fields `branch` and `tag`, which Gravitino accepts and ignores,
-  and a `context` map on responses, which Gravitino leaves empty. Every `lance-spark` bundle in the
-  matrix and the `lance-namespace` 0.7.5 Python client keep working, because all of them ignore
-  response fields they do not know. The branch, materialized-view, `update_field_metadata` and
-  `rename` endpoints are not implemented.
-- **The `lance-ray` matrix pins a `lance-namespace` per version, and the pairing is not the one
-  `lance-ray` itself locks.** `lance-ray` never bounds `lance-namespace`, so without a pin every
-  version resolves the same newest client; `pylance` is what actually bounds it (`pylance` 9-11
-  require `>=0.8.5,<0.9`, `pylance` 12-13 require `>=0.11.1,<0.12`). The verified rows against
-  Gravitino 2.0.0 are `lance-ray` 0.5.0 with `lance-namespace` 0.11.1, 0.4.2 and 0.3.0 with 0.7.5,
-  and 0.2.0 with 0.4.5. 0.5.0 is pinned to 0.11.1 so the matrix covers the generation the server
-  itself embeds and not only older ones; it cannot use 0.7.5 at all, because `pylance>=9.0.0`
-  makes that unsatisfiable and pip reports `ResolutionImpossible`. Two pairings are deliberately
-  *not* the upstream ones: `lance-ray` 0.3.0 is paired with 0.7.5 rather than the 0.6.1 its own
-  lockfile pins, because the 0.6.1 client creates tables through the legacy
-  `POST /v1/table/{id}/create-empty` endpoint that Gravitino does not serve; and 0.2.0 is pinned to
-  0.4.5 because that uniquely forces `pylance` 2.0.1 (`pylance` 3.0.0+ require `lance-namespace`
-  `>=0.5.2`), which is what avoids the missing `LanceNamespaceStorageOptionsProvider` import that
-  makes 0.2.0 only conditionally supported on 1.3.0.
-- **An unimplemented Lance REST endpoint currently answers `500`, not `404`.**
-  `LanceExceptionMapper` matches Gravitino's own `NotFoundException`, so Jersey's
-  `javax.ws.rs.NotFoundException` for an unmatched route falls through to
-  `InternalException("Internal server error")`. A client calling a removed or never-implemented
-  endpoint therefore sees an internal error rather than a not-found, which makes the
-  `create-empty` case above harder to diagnose than it should be.
+- **Gravitino 2.0.0 embeds `lance-core` 12.0.0 and `lance-namespace-core` 0.11.1**, the pair
+  `lance-spark` 0.8.0 is built on. Older clients keep working: none of the 0.11.1 spec changes
+  reaches the endpoints Gravitino serves, and responses only gained an empty `context` map, which
+  older clients ignore. Lance branches and tags are not implemented, so a request setting `branch`
+  or `tag` is rejected with `400`.
+- **An unimplemented endpoint answers `500`, not `404`**, because `LanceExceptionMapper` matches
+  only Gravitino's own `NotFoundException`. A call to a removed endpoint therefore looks like an
+  internal error.
 - Before using in production, test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
@@ -142,8 +120,8 @@ the normal `test` task.
 # clients/client-python/build/lance-ray-matrix/.venv-<version>/ and runs
 # tests/integration/test_lance_ray.py against each. The Gradle wrapper
 # below starts / stops Gravitino automatically. Each entry is
-# <lance-ray-version>=<lance-namespace-version>; a bare version instead
-# falls back to the runner's --lance-namespace-spec.
+# <lance-ray-version>=<lance-namespace-version>; `lance-ray` does not bound
+# `lance-namespace` itself, so the pairing has to be given per version.
 ./gradlew :clients:client-python:lanceRayMatrixTest \
     -PlanceRayVersions=0.5.0=0.11.1,0.4.2=0.7.5,0.3.0=0.7.5,0.2.0=0.4.5
 ```
