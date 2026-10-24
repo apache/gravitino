@@ -585,7 +585,11 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
     `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
     `semantic_model_comment` TEXT DEFAULT NULL COMMENT 'semantic model comment snapshot',
-    `semantic_model_definition` MEDIUMTEXT NOT NULL COMMENT 'structured definition snapshot (JSON)',
+    `datasets` MEDIUMTEXT NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
+    `relationships` MEDIUMTEXT DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
+    `metrics` MEDIUMTEXT DEFAULT NULL COMMENT 'metric definitions snapshot (JSON)',
+    `ai_context` MEDIUMTEXT DEFAULT NULL COMMENT 'model AI context snapshot (JSON)',
+    `custom_extensions` MEDIUMTEXT DEFAULT NULL COMMENT 'model custom extensions snapshot (JSON)',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'semantic model properties snapshot (JSON)',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
@@ -596,17 +600,45 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
   COMMENT 'semantic model version information';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_metric_meta` (
+    `metric_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'stable internal metric id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
+    `metric_name` MEDIUMTEXT NOT NULL COMMENT 'metric name',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'metric retired at',
+    PRIMARY KEY (`metric_id`),
+    KEY `idx_smmm_model_live` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smmm_mid` (`metalake_id`),
+    KEY `idx_smmm_cid` (`catalog_id`),
+    KEY `idx_smmm_sid` (`schema_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model metric identities';
 ```
 
-`semantic_model_definition` contains AI context, datasets, relationships, metrics, and custom
-extensions as structured JSON managed by typed converters. Keeping the definition as one snapshot
-preserves collection order and allows create and alter to validate and persist the complete model
-atomically. Child members are not stored in separate tables because they do not have independent
-identity, lifecycle, or authorization.
+Each version row stores the complete definition in five JSON columns: `datasets`, `relationships`,
+`metrics`, `ai_context`, and `custom_extensions`. Typed converters preserve the existing field
+representations and collection order, including string-or-object AI context. Absent optional fields
+use SQL `NULL`, while explicit empty collections use JSON `[]`. Create and alter still validate and
+persist all definition fields atomically in one snapshot. Metric definitions remain in the snapshot;
+`semantic_model_metric_meta` stores only their internal IDs, exact names, parent IDs, and retirement
+state. Other child members remain embedded. Editing and authorization remain model-scoped.
+
+These Semantic Model tables are introduced in 2.0.0. Before that release, storage changes update the
+2.0.0 schema and 1.3.0-to-2.0.0 upgrade scripts in place for all supported databases. Released versions
+have no Semantic Model data to migrate.
 
 #### Version and Lifecycle Behavior
 
-- Create writes the identity row and version 1 snapshot in one transaction.
+- Create writes the model identity, version 1 snapshot, and metric identities in one transaction.
+- Definition replacement and overwrite reconcile metric identities in the model transaction after
+  the concurrency check. Exact-name matches retain their IDs, added names receive new IDs, and
+  removed names are retired. Reintroducing a removed name allocates a new ID. Model renames and
+  metric content or order changes preserve IDs; IDs are not exposed in public APIs.
+- Model drops and schema/catalog/metalake cascades retire live metric identities in the same
+  transaction as model deletion. Garbage collection purges retired identities after the configured
+  retention period; snapshot retention never retires live metric identities.
 - Alter follows Gravitino's existing version-based OCC mechanism. It atomically writes a new
   snapshot, increments `last_version`, and advances `current_version` with a server-internal CAS. A
   transaction-level CAS conflict rolls back and returns `409` with

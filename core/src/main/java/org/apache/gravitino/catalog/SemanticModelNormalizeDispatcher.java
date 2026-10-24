@@ -39,6 +39,7 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 
 /** Normalizes Semantic Model parents while retaining Gravitino-owned model naming rules. */
 public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher {
@@ -61,6 +62,16 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   @Override
   public NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException {
     return dispatcher.listSemanticModels(normalizeParentForLookup(namespace));
+  }
+
+  @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    return dispatcher.listMetrics(normalizeParentForLookup(namespace));
+  }
+
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    return dispatcher.listMetricInfos(normalizeParentForLookup(namespace));
   }
 
   @Override
