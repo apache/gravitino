@@ -23,8 +23,10 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.Tag;
@@ -35,13 +37,14 @@ import org.junit.jupiter.api.condition.DisabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@HiveFixture(auth = HiveAuth.KERBEROS)
 public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   protected static final String HDFS_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
 
   private static String tempDir;
+
+  @FixtureContainer protected HiveContainer kerberosHive;
 
   public IcebergRestKerberosJdbcCatalogIT() {
     catalogType = IcebergCatalogBackend.JDBC;
@@ -49,7 +52,7 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
 
   @Override
   void initEnv() {
-    tempDir = IcebergRestKerberosTestEnv.init(containerSuite);
+    tempDir = IcebergRestKerberosTestEnv.init(kerberosHive);
   }
 
   @Override
@@ -71,8 +74,7 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
     configMap.put("gravitino.iceberg-rest.authentication.impersonation-enable", "false");
     configMap.put(
         "gravitino.iceberg-rest.dfs.namenode.kerberos.principal",
-        "hdfs/_HOST@HADOOPKRB"
-            .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
+        "hdfs/_HOST@HADOOPKRB".replace("_HOST", kerberosHive.getHostName()));
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_BACKEND.getKey(),
@@ -95,15 +97,14 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
         GravitinoITUtils.genRandomName(
             String.format(
                 "hdfs://%s:%d/user/hive/warehouse-jdbc-kerberos",
-                containerSuite.getKerberosHiveContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT)));
+                kerberosHive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT)));
     return configMap;
   }
 
   @Override
   protected void customizeSparkConf(SparkConf sparkConf) {
     IcebergRestKerberosTestEnv.configureSparkKerberos(
-        sparkConf, HDFS_CLIENT_PRINCIPAL, containerSuite.getKerberosHiveContainer().getHostName());
+        sparkConf, HDFS_CLIENT_PRINCIPAL, kerberosHive.getHostName());
   }
 
   // Spark writes data files to HDFS directly in these tests; keep them in embedded mode only.

@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseUtils;
@@ -71,7 +72,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
   @Test
   public void testCreateAndAlterTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_op_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -172,7 +173,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             UnsupportedOperationException.class,
             () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), newName, setProperty));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             gravitinoRuntimeException.getMessage(),
             "Only ClickHouse table properties with the 'settings.' prefix can be altered"));
 
@@ -215,7 +216,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
   @Test
   public void testAlterTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_al_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_al_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     JdbcColumn col_1 =
@@ -440,7 +441,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
   @Test
   public void testCreateAndLoadTable() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_cl_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_cl_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -497,17 +498,15 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
   @Test
   public void testLoadTableWithMaterializedAndAliasColumns() throws Exception {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_default_kind";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_default_kind";
 
     // Create table with MATERIALIZED and ALIAS columns via raw SQL.
     // Using DriverManager.getConnection directly because Gravitino's create() API
     // does not support specifying MATERIALIZED/ALIAS default value kinds.
-    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    String jdbcUrl = clickHouseContainer.getJdbcUrl(TEST_DB_NAME);
     try (Connection conn =
             DriverManager.getConnection(
-                jdbcUrl,
-                containerSuite.getClickHouseContainer().getUsername(),
-                containerSuite.getClickHouseContainer().getPassword());
+                jdbcUrl, clickHouseContainer.getUsername(), clickHouseContainer.getPassword());
         Statement stmt = conn.createStatement()) {
       stmt.execute(
           String.format(
@@ -559,7 +558,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
   @Test
   public void testTypeConversionAgainstCluster() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_type_conv";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_type_conv";
 
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -723,7 +722,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
   @Test
   public void testClearCommentsWithNull() {
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_clear_comment";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_clear_comment";
     JdbcColumn column =
         JdbcColumn.builder()
             .withName("col_1")

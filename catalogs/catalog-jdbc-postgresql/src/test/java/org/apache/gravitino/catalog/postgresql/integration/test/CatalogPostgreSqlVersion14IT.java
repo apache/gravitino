@@ -20,11 +20,12 @@
 package org.apache.gravitino.catalog.postgresql.integration.test;
 
 import org.apache.gravitino.integration.test.container.PGImageName;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
-public class CatalogPostgreSqlVersion14IT extends CatalogPostgreSqlIT {
-  public CatalogPostgreSqlVersion14IT() {
-    postgreImageName = PGImageName.VERSION_14;
-  }
-}
+@PostgreSQLFixture(
+    version = PGImageName.VERSION_14,
+    database = TestDatabaseName.PG_CATALOG_POSTGRESQL_IT)
+public class CatalogPostgreSqlVersion14IT extends CatalogPostgreSqlIT {}

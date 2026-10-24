@@ -42,6 +42,10 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.RangerContainer;
+import org.apache.gravitino.integration.test.container.RangerFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.TableChange;
@@ -54,6 +58,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@RangerFixture
 public abstract class RangerBaseE2EIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerBaseE2EIT.class);
   public static final String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
@@ -104,6 +109,11 @@ public abstract class RangerBaseE2EIT extends BaseIT {
       String.format("ALTER TABLE new_table RENAME TO %s", tableName);
 
   protected static final String SQL_DROP_TABLE = String.format("DROP TABLE %s", tableName);
+
+  @FixtureContainer protected RangerContainer ranger;
+
+  // The Ranger-enabled Hive; subclasses start it after RangerITEnv.init().
+  protected static HiveContainer hiveRanger;
 
   protected static void generateRangerSparkSecurityXML(String modeName) throws IOException {
     String templatePath =
@@ -279,7 +289,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testCreateTable() {
+  protected void testCreateTable() {
     // Choose a catalog
     reset();
 
@@ -345,7 +355,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testSelectModifyTableWithMetalakeLevelRole() {
+  protected void testSelectModifyTableWithMetalakeLevelRole() {
     // Choose a catalog
     reset();
 
@@ -430,7 +440,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testSelectModifyTableWithTableLevelRole() {
+  protected void testSelectModifyTableWithTableLevelRole() {
     // Choose a catalog
     reset();
 
@@ -496,7 +506,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testSelectOnlyTable() {
+  protected void testSelectOnlyTable() {
     // Choose a catalog
     reset();
 
@@ -603,7 +613,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testModifyOnlyTable() {
+  protected void testModifyOnlyTable() {
     // Choose a catalog
     reset();
 
@@ -686,7 +696,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testCreateAllPrivilegesRole() {
+  protected void testCreateAllPrivilegesRole() {
     // Choose a catalog
     reset();
 
@@ -735,7 +745,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testDeleteAndRecreateRole() {
+  protected void testDeleteAndRecreateRole() {
     // Choose a catalog
     reset();
 
@@ -801,7 +811,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testDeleteAndRecreateMetadataObject() {
+  protected void testDeleteAndRecreateMetadataObject() {
     // Choose a catalog
     reset();
 
@@ -872,7 +882,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testRenameMetadataObject() {
+  protected void testRenameMetadataObject() {
     // Choose a catalog
     reset();
 
@@ -910,7 +920,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testRenameMetadataObjectPrivilege() {
+  protected void testRenameMetadataObjectPrivilege() {
     // Choose a catalog
     reset();
 
@@ -959,7 +969,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testChangeOwner() {
+  protected void testChangeOwner() {
     // Choose a catalog
     reset();
 
@@ -1183,7 +1193,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     }
   }
 
-  void testDenyPrivileges() {
+  protected void testDenyPrivileges() {
     // Choose a catalog
     reset();
 
@@ -1248,7 +1258,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   // ISSUE-5892 Fix to grant privilege for the metalake
   @Test
-  void testGrantPrivilegesForMetalake() {
+  protected void testGrantPrivilegesForMetalake() {
     // Choose a catalog
     reset();
 

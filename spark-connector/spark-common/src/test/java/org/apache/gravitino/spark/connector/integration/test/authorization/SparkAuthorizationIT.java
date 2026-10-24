@@ -18,7 +18,7 @@
 package org.apache.gravitino.spark.connector.integration.test.authorization;
 
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -41,6 +41,9 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
@@ -64,6 +67,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@MySQLFixture(database = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT)
 public abstract class SparkAuthorizationIT extends BaseIT {
 
   private static final String METALAKE = "metalake";
@@ -87,6 +91,8 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   protected String mysqlPassword;
 
   protected String mysqlDriver;
+
+  @FixtureContainer private MySQLContainer mysql;
 
   private SparkSession normalUserSparkSession;
 
@@ -117,7 +123,6 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   @AfterAll
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
-    containerSuite.close();
     setEnv("SPARK_USER", AuthConstants.ANONYMOUS_USER);
     // HADOOP_USER_NAME will be set by spark auto.
     setEnv("HADOOP_USER_NAME", AuthConstants.ANONYMOUS_USER);
@@ -126,11 +131,10 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   }
 
   private void initMysqlContainer() throws SQLException {
-    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
-    mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
-    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
-    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
-    mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
+    mysqlUrl = mysql.getJdbcUrl();
+    mysqlUsername = mysql.getUsername();
+    mysqlPassword = mysql.getPassword();
+    mysqlDriver = mysql.getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
   }
 
   private void initTables() {
@@ -222,11 +226,11 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE), MetadataObject.Type.SCHEMA),
         ImmutableList.of(Privileges.CreateTable.deny()));
     assertThrows(
-        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
         ForbiddenException.class,
         () -> {
           normalUserSparkSession.sql("CREATE TABLE table_d(a STRING)");
-        });
+        },
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.");
     List<Row> tables = normalUserSparkSession.sql("show tables").collectAsList();
     assertEqualsRows(
         ImmutableList.of(
@@ -252,22 +256,22 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             RowFactory.create("jdbcDatabase", "table_c", false)),
         tables);
     assertThrows(
-        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
         ForbiddenException.class,
         () -> {
           normalUserSparkSession.sql("ALTER TABLE table_c ADD COLUMNS (b STRING);");
-        });
+        },
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.");
   }
 
   @Test
   @Order(4)
   public void testDropTable() {
     assertThrows(
-        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
         ForbiddenException.class,
         () -> {
           normalUserSparkSession.sql("DROP TABLE table_c");
-        });
+        },
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.");
     normalUserSparkSession.sql("DROP TABLE table_a");
   }
 
