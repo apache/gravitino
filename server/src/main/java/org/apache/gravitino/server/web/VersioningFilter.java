@@ -115,6 +115,13 @@ public class VersioningFilter implements Filter {
     return String.format("application/vnd.gravitino.v%d+json", version);
   }
 
+  private static String prependAcceptVersion(int version, List<String> acceptHeaders) {
+    String versionedAccept = getAcceptVersion(version);
+    return acceptHeaders.isEmpty()
+        ? versionedAccept
+        : versionedAccept + ", " + String.join(", ", acceptHeaders);
+  }
+
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {}
 
@@ -122,7 +129,8 @@ public class VersioningFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     HttpServletRequest req = (HttpServletRequest) request;
-    Integer acceptVersion = versionFromHeaders(req.getHeaders(ACCEPT_VERSION_HEADER));
+    List<String> acceptHeaders = Collections.list(req.getHeaders(ACCEPT_VERSION_HEADER));
+    Integer acceptVersion = versionFromHeaders(Collections.enumeration(acceptHeaders));
     if (acceptVersion != null) {
       if (isUnsupportedVersion(acceptVersion, response)) {
         return;
@@ -139,10 +147,12 @@ public class VersioningFilter implements Filter {
         return;
       }
 
-      mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(contentTypeVersion));
+      mutableRequest.putHeader(
+          ACCEPT_VERSION_HEADER, prependAcceptVersion(contentTypeVersion, acceptHeaders));
     } else {
       ApiVersion defaultVersion = ApiVersion.defaultVersion();
-      mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(defaultVersion.version()));
+      mutableRequest.putHeader(
+          ACCEPT_VERSION_HEADER, prependAcceptVersion(defaultVersion.version(), acceptHeaders));
     }
 
     chain.doFilter(mutableRequest, response);
