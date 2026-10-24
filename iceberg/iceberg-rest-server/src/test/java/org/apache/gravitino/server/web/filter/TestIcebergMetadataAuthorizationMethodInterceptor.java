@@ -534,6 +534,13 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
             authorizer.findUnheldRoles(
                 Mockito.any(), Mockito.eq(TEST_METALAKE), Mockito.any(), Mockito.any()))
         .thenReturn(Collections.singleton("ghostRole"));
+    // The membership check reads GravitinoEnv directly; pin it so state left by earlier tests in
+    // this JVM (for example a PassThroughAuthorizer over a closed store) cannot turn 403 into 500.
+    Mockito.when(authorizer.isMetalakeUser(Mockito.eq(TEST_METALAKE), Mockito.any()))
+        .thenReturn(true);
+    Object previousAuthorizer =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", authorizer, true);
 
     try (MockedStatic<PrincipalUtils> principalUtils = Mockito.mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> providerStatic =
@@ -554,6 +561,9 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
       ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
       assertTrue(errorResponse.message().contains("ghostRole"));
       Mockito.verify(invocation, Mockito.never()).proceed();
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "gravitinoAuthorizer", previousAuthorizer, true);
     }
   }
 
