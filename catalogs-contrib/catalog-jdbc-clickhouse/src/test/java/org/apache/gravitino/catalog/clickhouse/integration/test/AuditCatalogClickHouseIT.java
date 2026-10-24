@@ -38,7 +38,8 @@ import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHou
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.ClickHouseFixture;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -53,8 +54,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT)
 public class AuditCatalogClickHouseIT extends BaseIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("audit_clickhouse_metalake");
   private static final String expectUser = System.getProperty("user.name");
@@ -62,7 +63,7 @@ public class AuditCatalogClickHouseIT extends BaseIT {
   private static final String provider = "jdbc-clickhouse";
 
   private static ClickHouseService clickhouseService;
-  private static ClickHouseContainer CLICKHOUSE_CONTAINER;
+  @FixtureContainer private static ClickHouseContainer CLICKHOUSE_CONTAINER;
   private static GravitinoMetalake metalake;
 
   @BeforeAll
@@ -72,12 +73,8 @@ public class AuditCatalogClickHouseIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    containerSuite.startClickHouseContainer(
-        TestDatabaseName.CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT);
-    CLICKHOUSE_CONTAINER = containerSuite.getClickHouseContainer();
     TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT;
-    clickhouseService =
-        new ClickHouseService(containerSuite.getClickHouseContainer(), TEST_DB_NAME);
+    clickhouseService = new ClickHouseService(CLICKHOUSE_CONTAINER, TEST_DB_NAME);
     createMetalake();
   }
 

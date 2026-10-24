@@ -49,9 +49,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchTableException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
+import org.apache.gravitino.integration.test.container.DorisFixture;
 import org.apache.gravitino.integration.test.container.DorisImageName;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -89,13 +90,14 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 @Tag("gravitino-docker-test")
 @Tag("doris-multi-version")
+@DorisFixture(version = DorisImageName.VERSION_4_0)
 public class CatalogDoris4xIT extends BaseIT {
+  @FixtureContainer private DorisContainer doris;
 
   private static final String PROVIDER = "jdbc-doris";
   private static final String DRIVER_CLASS_NAME = "com.mysql.cj.jdbc.Driver";
   private static final long MAX_WAIT_IN_SECONDS = 30;
   private static final long WAIT_INTERVAL_IN_SECONDS = 1;
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private String metalakeName = GravitinoITUtils.genRandomName("doris4x_metalake");
   private String catalogName = GravitinoITUtils.genRandomName("doris4x_catalog");
@@ -110,7 +112,6 @@ public class CatalogDoris4xIT extends BaseIT {
 
   @BeforeAll
   public void startup() throws IOException {
-    containerSuite.startDorisContainer(DorisImageName.VERSION_4_0);
     createMetalake();
     createCatalog();
     createSchema();
@@ -179,7 +180,7 @@ public class CatalogDoris4xIT extends BaseIT {
   }
 
   private void createCatalog() {
-    DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_4_0);
+    DorisContainer dorisContainer = doris;
     jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/",
@@ -1003,7 +1004,7 @@ public class CatalogDoris4xIT extends BaseIT {
         null,
         null);
 
-    DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_4_0);
+    DorisContainer dorisContainer = doris;
     String jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/%s",

@@ -18,30 +18,45 @@
  */
 package org.apache.gravitino.integration.test.container;
 
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
+import org.testcontainers.utility.DockerImageName;
 
+/**
+ * A single KRaft broker on the official {@code org.testcontainers.kafka.KafkaContainer} module,
+ * which runs the {@code apache/kafka} image that {@link TestImages#KAFKA} names. The module owns
+ * the listener layout; the mounted {@code run} script only advertises the container IP on {@link
+ * #DEFAULT_BROKER_PORT}, which callers use as the bootstrap address.
+ */
 public class KafkaContainer extends BaseContainer {
 
   public static final int DEFAULT_BROKER_PORT = 9092;
-  private static final String DEFAULT_KAFKA_IMAGE =
-      System.getenv("GRAVITINO_CI_KAFKA_DOCKER_IMAGE");
+  private static final String DEFAULT_KAFKA_IMAGE = TestImages.KAFKA;
   private static final String DEFAULT_HOST_NAME = "gravitino-ci-kafka";
   private static final String KAFKA_LOGS_DIR = "/opt/kafka/logs";
+  private static final short API_VERSIONS_KEY = 18;
+  private static final int PROBE_CORRELATION_ID = 0x6772;
+  // The module's own readiness line: the broker has left recovery and is unfenced.
+  private static final String RUNNING_LOG = ".*Transitioning from RECOVERY to RUNNING.*";
 
   protected KafkaContainer(
       String image,
@@ -51,17 +66,11 @@ public class KafkaContainer extends BaseContainer {
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
-    super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+    super(module(image), hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
   public static Builder builder() {
     return new Builder();
-  }
-
-  @Override
-  public void start() {
-    super.start();
-    Preconditions.checkArgument(checkContainerStatus(5), "Kafka container startup failed!");
   }
 
   @Override
@@ -85,54 +94,62 @@ public class KafkaContainer extends BaseContainer {
     }
   }
 
+  // The module waits for its log line, which the broker writes just before it serves requests; the
+  // ApiVersions request checks that it does.
   @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    String address = getContainerIpAddress();
-    Preconditions.checkArgument(
-        Strings.isNotBlank(address), "Kafka container IP address is not available.");
-    String broker = String.format("%s:%d", address, DEFAULT_BROKER_PORT);
+  protected WaitStrategy waitStrategy() {
+    return new WaitAllStrategy()
+        .withStrategy(Wait.forLogMessage(RUNNING_LOG, 1))
+        .withStrategy(
+            new ProbeWaitStrategy(
+                "Kafka to answer an ApiVersions request",
+                target -> {
+                  String address = ipAddress(target.getContainerInfo());
+                  Preconditions.checkArgument(
+                      Strings.isNotBlank(address), "Kafka container IP address is not available.");
+                  return answersApiVersions(address, DEFAULT_BROKER_PORT);
+                }));
+  }
 
-    await()
-        .atMost(1, TimeUnit.MINUTES)
-        .pollInterval(60 / retryLimit, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    executeInContainer(
-                        "sh",
-                        "/opt/kafka/bin/kafka-cluster.sh",
-                        "cluster-id",
-                        "--bootstrap-server",
-                        broker);
-                if (result.getStdout().startsWith("Cluster ID:")) {
-                  LOG.info("Kafka server has started." + result.getStdout());
-                  return true;
-                }
-              } catch (Exception ex) {
-                LOG.warn(
-                    "Could not connect to Kafka server[{}:{}]", address, DEFAULT_BROKER_PORT, ex);
-              }
-              return false;
-            });
+  // The log line's five minutes plus the minute the ApiVersions check had before.
+  @Override
+  protected Duration startupTimeout() {
+    return Duration.ofMinutes(6);
+  }
 
-    await()
-        .atMost(30, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try (Socket socket = new Socket()) {
-                socket.connect(
-                    new java.net.InetSocketAddress(getContainerIpAddress(), DEFAULT_BROKER_PORT),
-                    3000);
-              } catch (Exception ex) {
-                LOG.warn(
-                    "Could not connect to Kafka server[{}:{}]", address, DEFAULT_BROKER_PORT, ex);
-                return false;
-              }
-              return true;
-            });
+  /**
+   * Sends a Kafka {@code ApiVersions} v0 request and returns whether the broker answers it. The
+   * port accepts connections while the broker still starts; it answers requests only once it serves
+   * clients.
+   */
+  static boolean answersApiVersions(String host, int port) {
+    byte[] clientId = "gravitino-it".getBytes(StandardCharsets.UTF_8);
+    try (Socket socket = new Socket()) {
+      socket.connect(new InetSocketAddress(host, port), 3000);
+      socket.setSoTimeout(3000);
+      DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+      // Request header v1: api key, api version, correlation id, client id.
+      out.writeInt(2 + 2 + 4 + 2 + clientId.length);
+      out.writeShort(API_VERSIONS_KEY);
+      out.writeShort(0);
+      out.writeInt(PROBE_CORRELATION_ID);
+      out.writeShort(clientId.length);
+      out.write(clientId);
+      out.flush();
+      DataInputStream in = new DataInputStream(socket.getInputStream());
+      return in.readInt() >= 4 && in.readInt() == PROBE_CORRELATION_ID;
+    } catch (IOException e) {
+      LOG.info("Kafka server {}:{} is not ready yet: {}", host, port, e.getMessage());
+      return false;
+    }
+  }
 
-    return true;
+  private static org.testcontainers.kafka.KafkaContainer module(String image) {
+    // The image may be a mirror or a custom tag; the module only needs an apache/kafka image.
+    // Its environment holds the KRaft layout: PLAINTEXT on 9092, the inter-broker listener on
+    // 9093 and the controller on 9094.
+    return new org.testcontainers.kafka.KafkaContainer(
+        DockerImageName.parse(image).asCompatibleSubstituteFor("apache/kafka"));
   }
 
   public static class Builder extends BaseContainer.Builder<Builder, KafkaContainer> {
@@ -140,16 +157,8 @@ public class KafkaContainer extends BaseContainer {
       this.image = DEFAULT_KAFKA_IMAGE;
       this.hostName = DEFAULT_HOST_NAME;
       this.exposePorts = ImmutableSet.of(DEFAULT_BROKER_PORT);
-      this.envVars =
-          ImmutableMap.<String, String>builder()
-              .put("KAFKA_PROCESS_ROLES", "broker,controller")
-              .put("KAFKA_NODE_ID", "1")
-              .put("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@" + hostName + ":9093")
-              .put("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
-              .put("KAFKA_LISTENERS", "PLAINTEXT://:" + DEFAULT_BROKER_PORT + ",CONTROLLER://:9093")
-              .put("DEFAULT_BROKER_PORT", String.valueOf(DEFAULT_BROKER_PORT))
-              .put("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
-              .build();
+      // The run script advertises PLAINTEXT on this port.
+      this.envVars = ImmutableMap.of("DEFAULT_BROKER_PORT", String.valueOf(DEFAULT_BROKER_PORT));
 
       String rootDir = System.getenv("GRAVITINO_ROOT_DIR");
       Preconditions.checkArgument(rootDir != null, "GRAVITINO_ROOT_DIR is not set");

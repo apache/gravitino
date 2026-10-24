@@ -35,8 +35,10 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -62,9 +64,11 @@ static variables and caches that interfere with each other,
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class GvfsMultipleClusterIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(GvfsMultipleClusterIT.class);
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  protected HiveContainer hiveContainer;
-  protected HiveContainer kerberosHiveContainer;
+  @HiveFixture @FixtureContainer private HiveContainer hive;
+
+  @HiveFixture(auth = HiveAuth.KERBEROS)
+  @FixtureContainer
+  private HiveContainer kerberosHive;
 
   protected String metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
   protected String catalogName = GravitinoITUtils.genRandomName("catalog");
@@ -76,12 +80,6 @@ public class GvfsMultipleClusterIT extends BaseIT {
 
   @BeforeAll
   public void startUp() throws Exception {
-    containerSuite.startHiveContainer();
-    hiveContainer = containerSuite.getHiveContainer();
-
-    containerSuite.startKerberosHiveContainer();
-    kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
-
     setupKerberosEnv();
 
     Assertions.assertFalse(client.metalakeExists(metalakeName));
@@ -112,14 +110,14 @@ public class GvfsMultipleClusterIT extends BaseIT {
 
     // Keytab of the Gravitino SDK client
     String keytabPath = tmpDir + "/admin.keytab";
-    kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/admin.keytab", keytabPath);
+    kerberosHive.getContainer().copyFileFromContainer("/etc/admin.keytab", keytabPath);
 
     String tmpKrb5Path = tmpDir + "/krb5.conf_tmp";
     String krb5Path = tmpDir + "/krb5.conf";
-    kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+    kerberosHive.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
-    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+    String ip = kerberosHive.getContainerIpAddress();
     String content = FileUtils.readFileToString(new File(tmpKrb5Path), StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
@@ -209,7 +207,7 @@ public class GvfsMultipleClusterIT extends BaseIT {
     String normalFilesetName = GravitinoITUtils.genRandomName("fileset_normal");
     NameIdentifier normalFilesetIdent = NameIdentifier.of(schemaName, normalFilesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
-    String location = baseHdfsPath(hiveContainer.getContainerIpAddress(), normalFilesetName);
+    String location = baseHdfsPath(hive.getContainerIpAddress(), normalFilesetName);
     catalog
         .asFilesetCatalog()
         .createMultipleLocationFileset(
@@ -223,7 +221,7 @@ public class GvfsMultipleClusterIT extends BaseIT {
     // create a fileset with kerberos cluster
     String kerberosFilesetName = GravitinoITUtils.genRandomName("fileset_kerberos");
     NameIdentifier kerberosFilesetIdent = NameIdentifier.of(schemaName, kerberosFilesetName);
-    location = baseHdfsPath(kerberosHiveContainer.getContainerIpAddress(), kerberosFilesetName);
+    location = baseHdfsPath(kerberosHive.getContainerIpAddress(), kerberosFilesetName);
     String configResources =
         configResourcesPath + "/core-site.xml," + configResourcesPath + "/hdfs-site.xml";
     catalog

@@ -52,8 +52,9 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -76,9 +77,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@HiveFixture
 public class FilesetCatalogIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(FilesetCatalogIT.class);
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+
+  @FixtureContainer private HiveContainer hive;
 
   protected String metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
   protected String catalogName = GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
@@ -92,9 +95,8 @@ public class FilesetCatalogIT extends BaseIT {
 
   protected CloseableHttpClient httpClient;
 
-  protected void startNecessaryContainer() {
-    containerSuite.startHiveContainer();
-  }
+  // Hook for subclasses whose storage needs more setup than the Hive fixture gives.
+  protected void startNecessaryContainer() {}
 
   @BeforeAll
   public void setup() throws IOException {
@@ -1226,9 +1228,7 @@ public class FilesetCatalogIT extends BaseIT {
     String localCatalogName = GravitinoITUtils.genRandomName("local_catalog");
     String hdfsLocation =
         String.format(
-            "hdfs://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            "hdfs://%s:%d", hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
     Map<String, String> catalogProps = ImmutableMap.of("location", hdfsLocation);
 
     Catalog localCatalog =
@@ -1285,7 +1285,7 @@ public class FilesetCatalogIT extends BaseIT {
   protected String generateLocation(String filesetName) {
     return String.format(
         "hdfs://%s:%d/user/hadoop/%s/%s/%s",
-        containerSuite.getHiveContainer().getContainerIpAddress(),
+        hive.getContainerIpAddress(),
         HiveContainer.HDFS_DEFAULTFS_PORT,
         catalogName,
         schemaName,
@@ -1355,7 +1355,7 @@ public class FilesetCatalogIT extends BaseIT {
       defaultBaseLocation =
           String.format(
               "hdfs://%s:%d/user/hadoop/%s.db",
-              containerSuite.getHiveContainer().getContainerIpAddress(),
+              hive.getContainerIpAddress(),
               HiveContainer.HDFS_DEFAULTFS_PORT,
               schemaName.toLowerCase());
     }
