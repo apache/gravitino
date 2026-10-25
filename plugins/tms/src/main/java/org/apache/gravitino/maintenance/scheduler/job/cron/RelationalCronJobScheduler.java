@@ -311,9 +311,7 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     }
     MaintenanceJobSpec merged =
         new MaintenanceJobSpec(
-            new ArrayList<>(byId.values()),
-            open.spec.getOperations(),
-            open.spec.getJobConf());
+            new ArrayList<>(byId.values()), open.spec.getOperations(), open.spec.getJobConf());
     try {
       return client.reschedule(open.instanceId, open.executionTime, merged);
     } catch (RuntimeException e) {

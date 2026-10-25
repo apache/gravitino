@@ -256,4 +256,34 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     actions.bindJobId(reclaimed.get(), 1002L);
     Assertions.assertEquals(1002L, actions.getById(reclaimed.get().id()).jobId());
   }
+
+  @TestTemplate
+  void testDeleteUnboundClaimFencesAgainstReclaim() throws Exception {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    long tableId = 12L;
+    long policyId = 22L;
+    long timeoutMs = 200L;
+
+    Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
+    Assertions.assertTrue(first.isPresent());
+    Assertions.assertTrue(actions.deleteUnboundClaim(first.get()));
+    Assertions.assertNull(actions.getById(first.get().id()));
+
+    Optional<OccupancyClaim> second = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
+    Assertions.assertTrue(second.isPresent());
+    Thread.sleep(timeoutMs + 50L);
+    Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
+    Assertions.assertTrue(reclaimed.isPresent());
+    Assertions.assertEquals(second.get().id(), reclaimed.get().id());
+    Assertions.assertTrue(reclaimed.get().createdAt() >= second.get().createdAt());
+
+    // Stale submitter cleanup must not delete the reclaimed live claim.
+    Assertions.assertFalse(actions.deleteUnboundClaim(second.get()));
+    Assertions.assertNotNull(actions.getById(reclaimed.get().id()));
+    Assertions.assertNull(actions.getById(reclaimed.get().id()).jobId());
+    Assertions.assertEquals(0L, actions.getById(reclaimed.get().id()).finishedAt());
+
+    Assertions.assertTrue(actions.deleteUnboundClaim(reclaimed.get()));
+    Assertions.assertNull(actions.getById(reclaimed.get().id()));
+  }
 }

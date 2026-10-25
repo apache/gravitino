@@ -430,6 +430,28 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
+   * Releases an unbound occupancy claim when submit / bind fails.
+   *
+   * <p>Deletes only when {@code (id, created_at)} still match and the row is unbound. A concurrent
+   * reclaim that CAS-updated {@code created_at} leaves the new owner's live claim intact (returns
+   * {@code false}).
+   *
+   * @param claim claim returned by {@link #tryAcquireInFlight} / {@link #insertInFlight}
+   * @return {@code true} when this claim lease was deleted
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteUnboundTableMaintenanceActionClaim")
+  public boolean deleteUnboundClaim(OccupancyClaim claim) {
+    Preconditions.checkNotNull(claim, "claim must not be null");
+    int deleted =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.deleteUnboundClaim(claim.id(), claim.createdAt()));
+    return deleted == 1;
+  }
+
+  /**
    * Deletes the {@code table_maintenance_action} row keyed by job run id. Does not delete metrics.
    *
    * @param jobId Gravitino job run id
