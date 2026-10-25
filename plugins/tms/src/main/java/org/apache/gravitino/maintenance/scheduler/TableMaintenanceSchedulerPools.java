@@ -36,6 +36,8 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.job.commit.CommitOccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.job.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceSparkSubmitPipeline;
@@ -56,8 +58,8 @@ import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandOccupancyG
  * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
  * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows with an
- * enqueue-time {@link MaintenanceJobSpec}. The cron pool consumes that spec, claims a soft slot,
- * and submits Spark. The commit pool still only removes its one-shot row.
+ * enqueue-time {@link MaintenanceJobSpec}. The cron and commit pools consume that spec, claim a
+ * soft slot, and submit Spark.
  */
 public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
@@ -95,6 +97,9 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   static final AtomicReference<BiConsumer<String, MaintenanceJobSpec>> CRON_SUBMIT =
       new AtomicReference<>(unconfiguredSubmit("cron-job"));
 
+  /** Commit submit handler used by {@link #commitJobTask()}; bound in {@link #start}. */
+  static final AtomicReference<BiConsumer<String, MaintenanceJobSpec>> COMMIT_SUBMIT =
+      new AtomicReference<>(unconfiguredSubmit("commit-job"));
 
   private final List<Scheduler> schedulers = new ArrayList<>();
 
@@ -135,6 +140,15 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
             config.claimTimeoutMs());
     CRON_SUBMIT.set(cronSubmit::submit);
 
+    MaintenanceCommitSubmitPipeline commitSubmit =
+        new MaintenanceCommitSubmitPipeline(
+            CommitOccupancyGate.of(occupancyGate),
+            TableMaintenanceActionMetaService.getInstance(),
+            MaintenanceJobSubmitter.fromEnv(),
+            new MaintenanceJobConfBuilder(gravitinoConfig),
+            config.claimTimeoutMs());
+    COMMIT_SUBMIT.set(commitSubmit::submit);
+
     List<Scheduler> built =
         List.of(
             buildScheduler(
@@ -171,6 +185,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
           throw new IllegalStateException("policy-expand pipeline is not configured");
         });
     CRON_SUBMIT.set(unconfiguredSubmit("cron-job"));
+    COMMIT_SUBMIT.set(unconfiguredSubmit("commit-job"));
     LOG.info("Stopped table maintenance scheduler pools");
   }
 
@@ -244,15 +259,27 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
 
+
   /**
-   * Commit-pool task definition. Removes the one-shot row. Chained submit lands in a follow-up.
+   * Commit-pool task definition. Consumes the enqueue-time chain spec, claims a soft slot, submits
+   * Spark, then removes the one-shot row.
    *
    * @return the {@code commit-job} task
    */
   public static Task<MaintenanceJobSpec> commitJobTask() {
     return Tasks.custom(COMMIT_JOB, MaintenanceJobSpec.class)
         .execute(
-            (taskInstance, executionContext) ->
-                (executionComplete, executionOperations) -> executionOperations.remove());
+            (taskInstance, executionContext) -> {
+              try {
+                COMMIT_SUBMIT.get().accept(taskInstance.getId(), taskInstance.getData());
+              } catch (RuntimeException e) {
+                LOG.warn(
+                    "commit-job submit failed for instance {}; removing one-shot row",
+                    taskInstance.getId(),
+                    e);
+              }
+              return (executionComplete, executionOperations) -> executionOperations.remove();
+            });
   }
+
 }

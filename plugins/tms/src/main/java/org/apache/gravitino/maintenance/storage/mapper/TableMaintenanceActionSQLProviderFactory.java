@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.storage.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceActionBaseSQLProvider;
 import org.apache.gravitino.maintenance.storage.mapper.provider.h2.TableMaintenanceActionH2Provider;
@@ -54,6 +55,16 @@ public class TableMaintenanceActionSQLProviderFactory {
    */
   public static String insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta) {
     return getProvider().insertAction(actionMeta);
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyIds policy entity ids
+   * @return multi-row INSERT statement
+   */
+  public static String insertActions(
+      @Param("tableId") long tableId, @Param("policyIds") List<Long> policyIds) {
+    return getProvider().insertActions(tableId, policyIds);
   }
 
   /**

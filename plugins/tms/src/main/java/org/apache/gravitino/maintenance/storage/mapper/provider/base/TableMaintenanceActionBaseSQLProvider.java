@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.storage.mapper.provider.base;
 
 import static org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.ibatis.annotations.Param;
@@ -49,6 +50,29 @@ public class TableMaintenanceActionBaseSQLProvider {
         + " VALUES (#{actionMeta.tableId}, #{actionMeta.policyId}, "
         + currentTimeMillisExpr()
         + ", 0)";
+  }
+
+  /**
+   * Inserts unbound occupancy claims for a commit chain in one statement. Each {@code (table_id,
+   * policy_id, finished_at=0)} must be free or the unique index rejects the whole batch.
+   *
+   * @param tableId table entity id (shared by all chain members)
+   * @param policyIds policy entity ids in chain order
+   * @return multi-row INSERT statement
+   */
+  public String insertActions(
+      @Param("tableId") long tableId, @Param("policyIds") List<Long> policyIds) {
+    String now = currentTimeMillisExpr();
+    return "<script>"
+        + "INSERT INTO "
+        + TABLE_NAME
+        + " (table_id, policy_id, created_at, finished_at) VALUES "
+        + "<foreach item='policyId' collection='policyIds' separator=','>"
+        + "(#{tableId}, #{policyId}, "
+        + now
+        + ", 0)"
+        + "</foreach>"
+        + "</script>";
   }
 
   /**
