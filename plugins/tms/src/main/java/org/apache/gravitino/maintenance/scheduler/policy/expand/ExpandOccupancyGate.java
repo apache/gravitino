@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler;
+package org.apache.gravitino.maintenance.scheduler.policy.expand;
 
 /**
  * Gate used by expand before inserting a {@code cron-job} row.
