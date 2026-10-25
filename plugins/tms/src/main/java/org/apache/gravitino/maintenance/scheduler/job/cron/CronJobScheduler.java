@@ -30,6 +30,9 @@ import org.apache.gravitino.meta.PolicyEntity;
  * batch:{batch_id}:{policy_id}} rows; incomplete batches are filled via {@code
  * SchedulerClient#getScheduledExecution} / {@code reschedule} before a new {@code batch_id} is
  * allocated (§5.2.2).
+ *
+ * <p>Enqueue builds a {@link org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec} once
+ * (policy → jobConf) into {@code task_data}; pick consumes that spec.
  */
 @FunctionalInterface
 public interface CronJobScheduler {
@@ -37,7 +40,7 @@ public interface CronJobScheduler {
   /**
    * Enqueues due-now cron jobs for the given expand candidates.
    *
-   * @param policy effective maintenance policy
+   * @param policy effective maintenance policy (used to build the jobConf spec)
    * @param candidates enqueueable tables with winner levels
    * @param batchCapacity max tables per snapshot-expiry batch row (and max candidates considered)
    * @return number of newly inserted cron-job rows (merges into existing batches do not count)
