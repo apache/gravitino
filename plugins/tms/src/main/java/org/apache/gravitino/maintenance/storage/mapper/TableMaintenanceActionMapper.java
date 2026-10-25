@@ -122,6 +122,11 @@ public interface TableMaintenanceActionMapper {
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteById")
   int deleteById(@Param("id") long id);
 
+  @DeleteProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "deleteUnboundClaim")
+  int deleteUnboundClaim(@Param("id") long id, @Param("expectedCreatedAt") long expectedCreatedAt);
+
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteByJobId")
   int deleteByJobId(@Param("jobId") long jobId);
 
