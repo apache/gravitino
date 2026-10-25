@@ -72,7 +72,7 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
       throw new IllegalStateException("GravitinoEnv config is not available");
     }
     this.commitJobScheduler = new RelationalCommitJobScheduler(dataSource, gravitinoConfig);
-    LOG.info("PostCommitMaintenanceListener started (commit-job upsert with spec)");
+    LOG.info("TMS PostCommitMaintenanceListener started (commit-job upsert with spec)");
   }
 
   @Override
