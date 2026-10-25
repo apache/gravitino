@@ -41,6 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
+import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.slf4j.Logger;
@@ -90,13 +91,18 @@ public final class PolicyExpandRegistrar {
   }
 
   /**
-   * Opens a client that reads committed rows from the entity-store pool.
+   * Opens a client against the entity-store pool with JDBC autocommit forced on.
+   *
+   * <p>Used for post-commit reads and test-only writes such as {@link #scheduleAt}. The
+   * entity-store pool often disables autocommit; without this wrap, SchedulerClient mutations would
+   * not commit and the expand pool would never observe them.
    *
    * @param dataSource relational JDBC pool shared with the entity store
-   * @return registrar that can read expand rows after the policy transaction commits
+   * @return registrar that can read (and test-write) expand rows after the policy transaction
+   *     commits
    */
   public static PolicyExpandRegistrar forReads(DataSource dataSource) {
-    return new PolicyExpandRegistrar(dataSource);
+    return new PolicyExpandRegistrar(AutocommitDataSources.wrap(dataSource));
   }
 
   private SchedulerClient client() {
@@ -130,7 +136,7 @@ public final class PolicyExpandRegistrar {
    * @param due execution time to store
    */
   @VisibleForTesting
-  void scheduleAt(long policyId, Instant due) {
+  public void scheduleAt(long policyId, Instant due) {
     runDespiteExecution(() -> scheduleOnce(policyId, due));
   }
 
@@ -147,7 +153,8 @@ public final class PolicyExpandRegistrar {
    * @param policyId persisted policy id
    * @return next execution time of the expand row, or empty when the row is absent
    */
-  Optional<Instant> scheduledExecutionTime(long policyId) {
+  @VisibleForTesting
+  public Optional<Instant> scheduledExecutionTime(long policyId) {
     return client()
         .getScheduledExecution(instanceId(policyId))
         .map(execution -> execution.getExecutionTime());
