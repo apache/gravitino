@@ -156,8 +156,11 @@ TMS has two trigger paths that stay separate:
 - **onCommit** — after an IRC commit, enqueue one per-table commit-job; one pick runs a
   chained Spark Job for the allowed types.
 
-Both paths end with a short control-plane `runJob` on the Gravitino Job framework. Read
-policy first, then scheduling.
+Both paths **build an enqueue-time job snapshot** (tables, chain steps, merged `jobConf`) into
+db-scheduler `task_data` before insert. The cron / commit pool pick **consumes that snapshot** —
+soft-slot claim, light in-flight checks, then `runJob` — and does **not** re-collect policies or
+rebuild `jobConf`. Both paths end with a short control-plane `runJob` on the Gravitino Job
+framework. Read policy first, then scheduling.
 
 | Store                                                          | Role                                                         |
 | -------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -291,7 +294,7 @@ gates**, **`minIntervalMs`**, and Iceberg **before/after snapshot ids**. That is
 | `id`                 | `BIGINT UNSIGNED` PK       | Auto increment                                                                             |
 | `job_id`             | `BIGINT UNSIGNED NULL`     | Set at `runJob`; maps to `job_run_meta.job_run_id`; **non-unique** — one Spark job may bind multiple tables; null if released before submit |
 | `table_id`           | `BIGINT UNSIGNED NOT NULL` | `table_meta` PK                                                                            |
-| `policy_id`          | `BIGINT UNSIGNED NOT NULL` | Cron: that Job's policy. Commit chain: first type that ran; full chain in runtime template |
+| `policy_id`          | `BIGINT UNSIGNED NOT NULL` | Soft slot per policy. Cron: that Job's policy. Commit chain: one row per chain member (same `job_id`) |
 | `before_snapshot_id` | `BIGINT NULL`              | Set inside the Spark Job when S0 is sampled                                                |
 | `after_snapshot_id`  | `BIGINT NULL`              | Iceberg snapshot after job terminal; null while pending                                    |
 | `finished_at`        | `BIGINT UNSIGNED NULL`     | Epoch millis; **null = in-flight**                                                         |
@@ -361,17 +364,21 @@ many cron-jobs due now, then schedules itself for the next 02:00. Expand's due t
 
 #### 5.2.2 `cron-job`
 
-Expand writes these one-shot rows. Most types use one table per job
-(`table:{table_id}:{policy_id}`). Batched **snapshot-expiry** may use
-`batch:{batch_id}:{policy_id}`.
+Expand writes these one-shot rows **with an enqueue-time job snapshot** in `task_data`
+(metalake, table targets, one chain step, merged `jobConf` including auth overlays).
+`minIntervalMs` is gated at expand / enqueue so cooled-down tables are not scheduled.
+Most types use one table per job (`table:{table_id}:{policy_id}`). Batched **snapshot-expiry**
+may use `batch:{batch_id}:{policy_id}` (one snapshot covering several same-catalog tables).
 
-When a cron-job is due (cron pool), keep the callback short — insert then submit; do not sample here:
+When a cron-job is due (cron pool), keep the callback short — consume the snapshot, claim, submit;
+do not sample or rebuild `jobConf` here. For a batch row, **any** in-flight table aborts the whole
+pick (no partial submits) before the one-shot row is removed:
 
 ```mermaid
 flowchart TD
-  A{Already in-flight?} -->|yes| Z[Delete cron-job; stop]
-  A -->|no| B[Insert table_maintenance_job]
-  B --> C[runJob]
+  A[Read enqueue-time snapshot from task_data] --> B{Any snapshot table in-flight?}
+  B -->|yes| Z[Delete cron-job; stop]
+  B -->|no| C[For each table: insert table_maintenance_job + runJob]
   C --> D[Delete cron-job; return]
 ```
 
@@ -395,21 +402,35 @@ A later wake-up sees the fresher state.
 
 After a successful IRC table update in the same JVM, an `EventListenerPlugin` upserts one
 commit-job for that table (`{table_id}`). Register it with `gravitino.eventListener.names` /
-`{name}.class`. The listener only enqueues — it does not submit Spark or build the type chain.
-Bursts of commits on the same table coalesce to one row.
+`{name}.class`. The listener does **not** submit Spark; enqueue (on the listener thread path)
+builds the onCommit chain and snapshot, then inserts the row.
+
+**Enqueue** (before the commit-job row exists):
+
+1. Collect nearest policies with `commitTrigger=true` in order compaction →
+   manifest-rewrite → snapshot-expiry (orphan cleanup is timeTrigger-only).
+2. Drop members still inside `minIntervalMs`.
+3. Fail closed if effective Gravitino / IRC auth bags disagree across the remaining chain.
+4. Build an enqueue-time job snapshot (table target, ordered chain steps, merged `jobConf`)
+   into `task_data`.
+5. `scheduleIfNotExists` due now. Bursts coalesce: an existing row keeps its original
+   `task_data` (no overwrite).
+
+If the chain is empty after gates, or snapshot build fails, **skip** — do not insert a row.
 
 When a commit-job is due (commit pool) — keep the callback short; Spark runs elsewhere:
 
 ```mermaid
 flowchart TD
-  A{Any type in chain in-flight?} -->|yes| Z[Delete commit-job; stop]
-  A -->|no| B["Collect onCommit types: compaction → manifest-rewrite → snapshot-expiry"]
-  B --> C[Insert table_maintenance_job]
-  C --> D[Merge jobOptions + auth; one runJob]
+  A[Read enqueue-time snapshot from task_data] --> B{Any snapshot type in-flight?}
+  B -->|yes| Z[Delete commit-job; stop]
+  B -->|no| C[Claim soft slots for every chain policy]
+  C --> D[runJob from snapshot jobConf / chain]
   D --> E[Delete commit-job]
 ```
 
-Insert then `runJob` — sampling is **not** on the control plane.
+Consume the snapshot then `runJob` — sampling is **not** on the control plane; pick does
+**not** re-collect policies or re-merge auth.
 
 Inside that **one** Spark Job, types run in order in the same process. Each type's full flow
 includes its own sample / recommend / work. If the snapshot drifts during a type, **end that type**
@@ -579,8 +600,9 @@ Implementation checklist:
 - [ ] Insert `table_maintenance_job` then `runJob`; sample / recommend / drift handling run
       **inside** the Spark Job; then DELETE the scheduled row.
 - [ ] Validation reads metrics per type in the run; purge unreferenced history by TTL/N.
-- [ ] Commit path: one chained Job; `policy_id` = first type; full chain in runtime template;
-      orphan crontab-only; coalesce on `{table_id}`; Spark `jobOptions` merge uses max.
+- [ ] Commit path: one chained Job; soft slot per chain policy (same `job_id`); full chain in
+      `maintenance_types` / `policy_ids`; orphan crontab-only; coalesce on `{table_id}`; Spark
+      `jobOptions` merge uses max.
 - [ ] Client auth from `gravitino.conf` only; reject credential-shaped keys in policy
       `jobOptions`.
 - [ ] Authorization on ⇒ grants to the token identity; no auto user bootstrap.

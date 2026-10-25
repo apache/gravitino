@@ -33,10 +33,44 @@ For in-process Table Maintenance Service (TMS), client credentials are **cluster
 the prefixes below in `gravitino.conf`. Do not store passwords, OAuth secrets, or keytab paths in policy
 content. Values may be plaintext or secret-manager references when the deployment supports them.
 
-At `runJob`, `gravitino.maintenance.gravitinoAuth.*` overlays policy `updaterOptions`, and
-`gravitino.maintenance.ircAuth.*` overlays policy `jobOptions`. Auth wins on duplicate keys. The
-live scheduler submit call site is wired in a follow-up; `MaintenanceAuthConfigs` exposes the load
-and overlay helpers (`overlayUpdaterOptions` / `overlayJobOptions`) for that path.
+When building the enqueue-time job snapshot, `gravitino.maintenance.gravitinoAuth.*` overlays
+policy `updaterOptions` (serialized into `updater_options` for Spark → Gravitino callbacks), and
+`gravitino.maintenance.ircAuth.*` overlays policy `jobOptions`. Auth wins on duplicate keys.
+Non-template IRC keys are then packed into `spark_conf` as `spark.sql.catalog.<catalog>.*` so
+Spark Iceberg REST catalogs can authenticate.
+
+Cron also injects callback identity into `updater_options`:
+
+- `metalake` — always from the policy namespace (policy `updaterOptions.metalake` cannot redirect
+  sample/finish to another metalake)
+- `gravitino_uri` — from `gravitino.maintenance.gravitinoUri` when the policy does not set
+  `updaterOptions.gravitino_uri`. Submit fails closed if neither source provides a URI.
+
+```properties
+gravitino.maintenance.gravitinoUri = http://localhost:8090
+```
+
+### TMS commit-job (IRC update → chained Spark)
+
+When Iceberg REST runs as an auxiliary service in the same JVM, register the TMS listener so a
+successful IRC table update upserts a one-shot `commit-job` / `{table_id}` (bursts coalesce and
+keep the first snapshot). **At enqueue**, TMS collects nearest policies with
+`commitTrigger=true` in order compaction → manifest-rewrite → snapshot-expiry, drops members
+still inside `minIntervalMs`, **fails closed when effective `gravitinoAuth` / `ircAuth` bags
+disagree across the chain**, and writes an enqueue-time job snapshot (`task_data`: tables,
+operations, merged `jobConf`). The commit pool **consumes that snapshot**: if any snapshot
+type is still in-flight it deletes the row and stops; otherwise it claims a soft slot for
+**every** chain policy and submits one chained `builtin-iceberg-maintenance-task` Spark job.
+
+```properties
+gravitino.server.rest.extensionPackages = org.apache.gravitino.maintenance.web.rest.feature
+gravitino.auxService.names = iceberg-rest
+gravitino.eventListener.names = post-commit-maintenance-listener
+gravitino.eventListener.post-commit-maintenance-listener.class = org.apache.gravitino.maintenance.listener.PostCommitMaintenanceListener
+```
+
+Without the listener, the crontab (`timeTrigger` → expand → cron-job) path still works; commit-triggered
+maintenance does not.
 
 #### Gravitino client auth (`gravitino.maintenance.gravitinoAuth.`) — fixed schema
 
