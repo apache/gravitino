@@ -208,6 +208,16 @@ public class TableMaintenanceActionSQLProviderFactory {
   }
 
   /**
+   * @param id action id
+   * @param expectedCreatedAt claim lease start
+   * @return DELETE statement
+   */
+  public static String deleteUnboundClaim(
+      @Param("id") long id, @Param("expectedCreatedAt") long expectedCreatedAt) {
+    return getProvider().deleteUnboundClaim(id, expectedCreatedAt);
+  }
+
+  /**
    * @param jobId job run id
    * @return DELETE statement
    */
