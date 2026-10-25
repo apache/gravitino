@@ -511,6 +511,55 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
+
+    ReportMetricsRequest qualifiedRequest =
+        ReportMetricsRequest.of(
+            ImmutableCommitReport.builder()
+                .tableName("client_catalog." + namespace + ".metrics_foo1")
+                .snapshotId(-1)
+                .sequenceNumber(-1)
+                .operation("append")
+                .commitMetrics(commitMetrics)
+                .build());
+    Response qualifiedResponse =
+        getReportMetricsClientBuilder("metrics_foo1", namespace)
+            .post(Entity.entity(qualifiedRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), qualifiedResponse.getStatus());
+
+    Response missingTableResponse =
+        getReportMetricsClientBuilder("missing_metrics_table", namespace)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), missingTableResponse.getStatus());
+
+    ReportMetricsRequest mismatchedRequest =
+        ReportMetricsRequest.of(
+            ImmutableCommitReport.builder()
+                .tableName("another_table")
+                .snapshotId(-1)
+                .sequenceNumber(-1)
+                .operation("append")
+                .commitMetrics(commitMetrics)
+                .build());
+    Response mismatchedTableResponse =
+        getReportMetricsClientBuilder("metrics_foo1", namespace)
+            .post(Entity.entity(mismatchedRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Status.BAD_REQUEST.getStatusCode(), mismatchedTableResponse.getStatus());
+
+    ReportMetricsRequest mismatchedNamespaceRequest =
+        ReportMetricsRequest.of(
+            ImmutableCommitReport.builder()
+                .tableName("client_catalog.other_namespace.metrics_foo1")
+                .snapshotId(-1)
+                .sequenceNumber(-1)
+                .operation("append")
+                .commitMetrics(commitMetrics)
+                .build());
+    Response mismatchedNamespaceResponse =
+        getReportMetricsClientBuilder("metrics_foo1", namespace)
+            .post(Entity.entity(mismatchedNamespaceRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Status.BAD_REQUEST.getStatusCode(), mismatchedNamespaceResponse.getStatus());
   }
 
   @ParameterizedTest

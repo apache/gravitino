@@ -2685,6 +2685,43 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   @Test
+  void testClearCommentsWithNull() {
+    ExposedClickHouseTableOperations ops = newAlterOps(new HashMap<>());
+
+    String tableSql = ops.callGenerateAlterTableSql(TableChange.updateComment(null));
+    Assertions.assertTrue(tableSql.contains("MODIFY COMMENT ''"), tableSql);
+
+    String columnSql =
+        ops.callGenerateAlterTableSql(TableChange.updateColumnComment(new String[] {"id"}, null));
+    Assertions.assertTrue(columnSql.contains("COMMENT COLUMN `id` ''"), columnSql);
+  }
+
+  @Test
+  void testClearCommentsWithNullOnCluster() {
+    ExposedClickHouseTableOperations ops =
+        newAlterOps(
+            Map.of(
+                ClusterConstants.ON_CLUSTER,
+                "true",
+                ClusterConstants.CLUSTER_NAME,
+                "test_cluster"));
+
+    String tableSql = ops.callGenerateAlterTableSql(TableChange.updateComment(null));
+    Assertions.assertTrue(
+        tableSql.startsWith("ALTER TABLE `test_table` ON CLUSTER `test_cluster`"), tableSql);
+    String clusterComment =
+        ClickHouseClusterUtils.escapeSingleQuotes(
+            ClickHouseClusterUtils.embedClusterInComment("", "test_cluster"));
+    Assertions.assertTrue(tableSql.contains("MODIFY COMMENT '" + clusterComment + "'"), tableSql);
+
+    String columnSql =
+        ops.callGenerateAlterTableSql(TableChange.updateColumnComment(new String[] {"id"}, null));
+    Assertions.assertTrue(
+        columnSql.startsWith("ALTER TABLE `test_table` ON CLUSTER `test_cluster`"), columnSql);
+    Assertions.assertTrue(columnSql.contains("COMMENT COLUMN `id` ''"), columnSql);
+  }
+
+  @Test
   void testRejectDuplicateTableSettingChanges() {
     ExposedClickHouseTableOperations ops = newOps();
 

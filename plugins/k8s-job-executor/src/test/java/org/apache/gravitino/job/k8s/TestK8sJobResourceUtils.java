@@ -96,6 +96,26 @@ public class TestK8sJobResourceUtils {
     }
   }
 
+  @Test
+  public void testIsClusterReachable() {
+    for (String uri :
+        new String[] {
+          "local:///opt/app.jar",
+          "https://repo/app.jar",
+          "s3a://bucket/app.jar",
+          "hdfs://nn/app.jar",
+          " s3a://bucket/app jar "
+        }) {
+      Assertions.assertTrue(K8sJobResourceUtils.isClusterReachable(uri), uri);
+    }
+
+    // Paths on the Gravitino server.
+    for (String uri :
+        new String[] {"/opt/app.jar", "app.jar", "file:///opt/app.jar", "FILE:/a", "C:\\app.jar"}) {
+      Assertions.assertFalse(K8sJobResourceUtils.isClusterReachable(uri), uri);
+    }
+  }
+
   private static ConfigMap resource(String name, long jobId) {
     return new ConfigMapBuilder()
         .withNewMetadata()
