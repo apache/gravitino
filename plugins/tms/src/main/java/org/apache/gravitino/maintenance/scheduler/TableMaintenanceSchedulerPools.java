@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.scheduler;
 
 import com.github.kagkarlsson.scheduler.Scheduler;
+import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
 import com.github.kagkarlsson.scheduler.task.Task;
 import com.github.kagkarlsson.scheduler.task.helper.Tasks;
 import com.google.common.base.Preconditions;
@@ -26,8 +27,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.policy.PolicyExpandLifecycleHook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,10 +39,8 @@ import org.slf4j.LoggerFactory;
  * <p>db-scheduler requires a dedicated {@code tableName} per Scheduler instance for multi-pool
  * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
- * <p>Cron and commit pools poll. {@code policy-expand} rows are written with a {@link
- * com.github.kagkarlsson.scheduler.SchedulerClient}; expand polling starts with fan-out. {@link
- * #policyExpandTask()} reschedules to the next cron after a pick, so a run does not leave the row
- * picked.
+ * <p>Cron enqueue uses {@link #cronJobTask()} with Jackson {@code task_data}; pick submit lands in
+ * a follow-up.
  */
 public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
@@ -68,11 +67,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   private final List<Scheduler> schedulers = new ArrayList<>();
 
   /**
-   * Creates and starts the cron and commit scheduler pools.
-   *
-   * <p>The expand pool stays stopped. Due {@code policy-expand} rows would otherwise be picked by
-   * an empty handler and block policy alter and delete. Expand polling starts when fan-out can both
-   * run and reschedule the row.
+   * Creates and starts expand, cron, and commit scheduler pools.
    *
    * <p>If any pool fails to start, already-started pools are stopped and this instance returns to
    * the idle state so {@link #start} may be retried.
@@ -87,7 +82,13 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     List<Scheduler> built =
         List.of(
             buildScheduler(
-                dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, noopTask(CRON_JOB)),
+                dataSource,
+                config,
+                config.expandThreads(),
+                EXPAND_TASKS_TABLE,
+                noopTask(POLICY_EXPAND)),
+            buildScheduler(
+                dataSource, config, config.cronThreads(), CRON_TASKS_TABLE, cronJobTask()),
             buildScheduler(
                 dataSource,
                 config,
@@ -130,12 +131,13 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
       TableMaintenanceConfig config,
       int threads,
       String tableName,
-      Task<Void> task) {
+      Task<?> task) {
     return Scheduler.create(dataSource, task)
         .threads(threads)
         .pollingInterval(Duration.ofMillis(config.pollingIntervalMs()))
         .heartbeatInterval(Duration.ofMillis(config.heartbeatIntervalMs()))
         .missedHeartbeatsLimit(config.missedHeartbeatsLimit())
+        .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
         .tableName(tableName)
         .commitWhenAutocommitDisabled(true)
         .registerShutdownHook()
@@ -143,20 +145,15 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
   /**
-   * Expand task definition shared by the registration client and a future expand pool.
+   * Cron-pool task stub: removes the one-shot row after dequeue. Real submit lands in a follow-up.
    *
-   * <p>{@link #start} does not poll this task. When a run does happen, completion reschedules to
-   * the next cron or removes the row, so the execution does not stay picked.
-   *
-   * @return the {@code policy-expand} task
+   * @return the {@code cron-job} task
    */
-  public static Task<Void> policyExpandTask() {
-    return Tasks.custom(POLICY_EXPAND, Void.class)
+  public static Task<MaintenanceJobSpec> cronJobTask() {
+    return Tasks.custom(CRON_JOB, MaintenanceJobSpec.class)
         .execute(
             (taskInstance, executionContext) ->
-                (executionComplete, executionOperations) ->
-                    PolicyExpandLifecycleHook.completePick(
-                        taskInstance.getId(), executionComplete, executionOperations));
+                (executionComplete, executionOperations) -> executionOperations.remove());
   }
 
   private static Task<Void> noopTask(String taskName) {
