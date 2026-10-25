@@ -36,15 +36,19 @@ import org.apache.gravitino.config.ConfigEntry;
  * Cluster-static TMS client auth in {@code gravitino.conf}.
  *
  * <p>{@link #GRAVITINO_AUTH_PREFIX} is a <strong>fixed</strong> camelCase bag in {@code
- * gravitino.conf} ({@code authType}, {@code oauthServerUri}, …). {@link #loadGravitinoAuth} maps
- * those suffixes onto built-in updater short names ({@code auth_type}, {@code oauth_server_uri}, …)
- * before overlaying onto policy {@code updaterOptions}. Unknown or blank suffixes are rejected, and
- * {@code authType} plus mode-required fields are validated at load time.
+ * gravitino.conf} ({@code uri}, {@code authType}, {@code oauthServerUri}, …), symmetric with {@link
+ * #IRC_AUTH_PREFIX}. {@link #loadGravitinoAuth} maps those suffixes onto built-in updater short
+ * names ({@code gravitino_uri}, {@code auth_type}, {@code oauth_server_uri}, …) before overlaying
+ * onto policy {@code updaterOptions}. Unknown or blank suffixes are rejected, and {@code authType}
+ * plus mode-required fields are validated at load time ({@code uri} alone is allowed without {@code
+ * authType}).
  *
  * <p>{@link #IRC_AUTH_PREFIX} is an <strong>open</strong> passthrough for Spark / Iceberg REST
  * properties (for example {@code rest.auth.type}); any non-empty suffix under the prefix is loaded
- * and overlaid onto policy {@code jobOptions}. Auth wins on duplicate keys. Live {@code runJob}
- * wiring is a follow-up.
+ * and overlaid onto policy {@code jobOptions} with suffixes unchanged (for example {@code
+ * rest.auth.type}). Cron {@code runJob} later expands those short names into {@code spark_conf}
+ * under {@code spark.sql.catalog.<catalog>.*}; Spark resource keys such as {@code
+ * spark.executor.memory} stay as Spark settings, not catalog properties.
  */
 public final class MaintenanceAuthConfigs {
 
@@ -57,6 +61,12 @@ public final class MaintenanceAuthConfigs {
    * rest.auth.type}.
    */
   public static final String IRC_AUTH_PREFIX = "gravitino.maintenance.ircAuth.";
+
+  /**
+   * Base URI for Spark → Gravitino TMS callbacks ({@code updater_options.gravitino_uri}). Under
+   * {@link #GRAVITINO_AUTH_PREFIX} for symmetry with {@link #IRC_AUTH_PREFIX}.
+   */
+  public static final String URI_SUFFIX = "uri";
 
   /** Auth mode: {@code none}, {@code simple}, {@code basic}, or {@code oauth}. */
   public static final String AUTH_TYPE_SUFFIX = "authType";
@@ -93,6 +103,7 @@ public final class MaintenanceAuthConfigs {
    */
   private static final Map<String, String> GRAVITINO_AUTH_TO_UPDATER_OPTIONS =
       ImmutableMap.<String, String>builder()
+          .put(URI_SUFFIX, "gravitino_uri")
           .put(AUTH_TYPE_SUFFIX, "auth_type")
           .put(USERNAME_SUFFIX, "username")
           .put(PASSWORD_SUFFIX, "password")
@@ -101,6 +112,24 @@ public final class MaintenanceAuthConfigs {
           .put(OAUTH_CREDENTIAL_SUFFIX, "oauth_credential")
           .put(OAUTH_SCOPE_SUFFIX, "oauth_scope")
           .build();
+
+  /**
+   * Updater-option short names that belong to the Gravitino auth bag (after camelCase → short-name
+   * remap).
+   */
+  public static final Set<String> GRAVITINO_AUTH_UPDATER_OPTION_KEYS =
+      ImmutableSet.copyOf(GRAVITINO_AUTH_TO_UPDATER_OPTIONS.values());
+
+  /**
+   * Cluster-static base URI for TMS sample/finish callbacks. Policy {@code updaterOptions} may
+   * override via {@code gravitino_uri}.
+   */
+  public static final ConfigEntry<Optional<String>> GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_URI =
+      optionalAuth(
+          GRAVITINO_AUTH_PREFIX,
+          URI_SUFFIX,
+          "Base URI for Spark → Gravitino TMS callbacks (sample/finish). Injected into cron "
+              + "updater_options when the policy does not set gravitino_uri.");
 
   public static final ConfigEntry<Optional<String>> GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_TYPE =
       optionalAuth(
@@ -166,6 +195,30 @@ public final class MaintenanceAuthConfigs {
   }
 
   /**
+   * Like {@link #loadGravitinoAuth} but values are the full {@code gravitino.conf} keys (not secret
+   * values). For enqueue {@code task_data}; resolve with {@link Config#getRawString(String)} at
+   * submit.
+   *
+   * @param config gravitino server config
+   * @return updater short name → conf key; empty when unset
+   */
+  public static Map<String, String> loadGravitinoAuthAsConfigKeys(Config config) {
+    Map<String, String> loaded = loadAuthBag(config, GRAVITINO_AUTH_PREFIX, /*fixedSchema=*/ true);
+    if (loaded.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    validateGravitinoAuth(loaded);
+    Map<String, String> keys = new LinkedHashMap<>();
+    GRAVITINO_AUTH_TO_UPDATER_OPTIONS.forEach(
+        (suffix, updateKey) -> {
+          if (loaded.containsKey(suffix)) {
+            keys.put(updateKey, GRAVITINO_AUTH_PREFIX + suffix);
+          }
+        });
+    return ImmutableMap.copyOf(keys);
+  }
+
+  /**
    * Loads arbitrary IRC / Spark property suffixes under {@link #IRC_AUTH_PREFIX}.
    *
    * @param config gravitino server config
@@ -173,6 +226,42 @@ public final class MaintenanceAuthConfigs {
    */
   public static Map<String, String> loadIrcAuth(Config config) {
     return loadAuthBag(config, IRC_AUTH_PREFIX, /*fixedSchema=*/ false);
+  }
+
+  /**
+   * Like {@link #loadIrcAuth} but values are full conf keys under {@link #IRC_AUTH_PREFIX}.
+   *
+   * @param config gravitino server config
+   * @return IRC short suffix → conf key; empty when unset
+   */
+  public static Map<String, String> loadIrcAuthAsConfigKeys(Config config) {
+    Map<String, String> loaded = loadAuthBag(config, IRC_AUTH_PREFIX, /*fixedSchema=*/ false);
+    if (loaded.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<String, String> keys = new LinkedHashMap<>();
+    loaded.forEach((suffix, ignored) -> keys.put(suffix, IRC_AUTH_PREFIX + suffix));
+    return ImmutableMap.copyOf(keys);
+  }
+
+  /**
+   * Resolves a value that may be a {@code gravitino.maintenance.*} conf key into the live config
+   * value. Non-key literals are returned unchanged.
+   *
+   * @param config server config
+   * @param value literal or conf key
+   * @return resolved value
+   */
+  public static String resolveConfigReference(Config config, @Nullable String value) {
+    if (value == null || !value.startsWith("gravitino.maintenance.")) {
+      return value;
+    }
+    String raw = config.getRawString(value);
+    if (raw == null || raw.trim().isEmpty()) {
+      throw new IllegalArgumentException(
+          "Missing gravitino.conf value for referenced key: " + value);
+    }
+    return raw.trim();
   }
 
   /**
@@ -188,7 +277,8 @@ public final class MaintenanceAuthConfigs {
   }
 
   /**
-   * Merges policy {@code updaterOptions} with Gravitino auth; auth wins on duplicate keys.
+   * Merges policy {@code updaterOptions} with Gravitino auth. Auth wins on credential keys; policy
+   * {@code gravitino_uri} wins over cluster {@code gravitinoAuth.uri} when both are set.
    *
    * @param policyUpdaterOptions options from the effective policy (may be null)
    * @param gravitinoAuth updater-short-name Gravitino auth bag (may be null)
@@ -197,7 +287,24 @@ public final class MaintenanceAuthConfigs {
   public static Map<String, String> overlayUpdaterOptions(
       @Nullable Map<String, String> policyUpdaterOptions,
       @Nullable Map<String, String> gravitinoAuth) {
-    return overlay(policyUpdaterOptions, gravitinoAuth);
+    if ((policyUpdaterOptions == null || policyUpdaterOptions.isEmpty())
+        && (gravitinoAuth == null || gravitinoAuth.isEmpty())) {
+      return Collections.emptyMap();
+    }
+    Map<String, String> merged = new LinkedHashMap<>();
+    if (policyUpdaterOptions != null) {
+      merged.putAll(policyUpdaterOptions);
+    }
+    if (gravitinoAuth != null) {
+      for (Map.Entry<String, String> entry : gravitinoAuth.entrySet()) {
+        String key = entry.getKey();
+        if ("gravitino_uri".equals(key) && merged.containsKey("gravitino_uri")) {
+          continue;
+        }
+        merged.put(key, entry.getValue());
+      }
+    }
+    return ImmutableMap.copyOf(merged);
   }
 
   /**
@@ -256,6 +363,10 @@ public final class MaintenanceAuthConfigs {
   private static void validateGravitinoAuth(Map<String, String> loaded) {
     String authType = loaded.get(AUTH_TYPE_SUFFIX);
     if (authType == null) {
+      // uri alone is connection target, not a credential mode — allow without authType.
+      if (loaded.keySet().stream().allMatch(URI_SUFFIX::equals)) {
+        return;
+      }
       throw new IllegalArgumentException(
           String.format(
               "Configuration %s%s is required when any Gravitino auth setting is present",
