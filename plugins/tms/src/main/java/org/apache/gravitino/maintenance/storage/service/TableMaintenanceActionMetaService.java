@@ -22,7 +22,9 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import com.google.common.base.Preconditions;
 import java.sql.SQLIntegrityConstraintViolationException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -118,6 +120,78 @@ public class TableMaintenanceActionMetaService {
     Preconditions.checkState(
         inserted != null && inserted.createdAt() != null, "insert lost created_at");
     return Optional.of(new OccupancyClaim(inserted.id(), inserted.createdAt()));
+  }
+
+  /**
+   * Tries to acquire unbound soft slots for every entry in {@code policyIds} in one transaction
+   * (commit-chain submit).
+   *
+   * <p>Expired unbound rows are reclaimed first; remaining policies are inserted with a single
+   * multi-row {@code INSERT}. Any live slot or unique conflict aborts the transaction so the caller
+   * never holds a partial chain.
+   *
+   * @param tableId table entity id
+   * @param policyIds chain member policy ids (duplicates collapsed, order preserved)
+   * @param claimTimeoutMs unbound claim TTL
+   * @return one {@link OccupancyClaim} per distinct policy id, or empty when the chain cannot be
+   *     claimed atomically
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "tryAcquireTableMaintenanceActionBatch")
+  public Optional<List<OccupancyClaim>> tryAcquireInFlightBatch(
+      long tableId, List<Long> policyIds, long claimTimeoutMs) {
+    Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
+    Preconditions.checkArgument(
+        policyIds != null && !policyIds.isEmpty(), "policyIds must not be empty");
+    List<Long> distinct = new ArrayList<>(new LinkedHashSet<>(policyIds));
+    try {
+      return Optional.of(
+          SessionUtils.doWithCommitAndFetchResult(
+              TableMaintenanceActionMapper.class,
+              mapper -> acquireBatchInTransaction(mapper, tableId, distinct, claimTimeoutMs)));
+    } catch (SoftSlotBusyException e) {
+      return Optional.empty();
+    } catch (RuntimeException e) {
+      if (isUniqueViolation(e)) {
+        return Optional.empty();
+      }
+      throw e;
+    }
+  }
+
+  private static List<OccupancyClaim> acquireBatchInTransaction(
+      TableMaintenanceActionMapper mapper,
+      long tableId,
+      List<Long> policyIds,
+      long claimTimeoutMs) {
+    List<Long> toInsert = new ArrayList<>();
+    for (long policyId : policyIds) {
+      int reclaimed = mapper.reclaimExpiredUnbound(tableId, policyId, claimTimeoutMs);
+      if (reclaimed == 1) {
+        continue;
+      }
+      TableMaintenanceActionPO live =
+          mapper.selectLiveUnboundByTableAndPolicy(tableId, policyId, claimTimeoutMs);
+      if (live != null) {
+        throw new SoftSlotBusyException();
+      }
+      toInsert.add(policyId);
+    }
+    if (!toInsert.isEmpty()) {
+      mapper.insertActions(tableId, toInsert);
+    }
+    List<OccupancyClaim> claims = new ArrayList<>(policyIds.size());
+    for (long policyId : policyIds) {
+      TableMaintenanceActionPO unbound = mapper.selectUnboundByTableAndPolicy(tableId, policyId);
+      Preconditions.checkState(
+          unbound != null && unbound.id() != null && unbound.createdAt() != null,
+          "batch acquire lost unbound row for table %s policy %s",
+          tableId,
+          policyId);
+      claims.add(new OccupancyClaim(unbound.id(), unbound.createdAt()));
+    }
+    return claims;
   }
 
   /**
@@ -224,6 +298,61 @@ public class TableMaintenanceActionMetaService {
     } catch (IllegalStateException e) {
       TableMaintenanceActionPO bound = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
       return bound != null && bound.finishedAt() != null && bound.finishedAt() == 0L;
+    }
+  }
+
+  /**
+   * Binds the same Gravitino job run id to every claim from {@link #tryAcquireInFlightBatch} in one
+   * transaction (commit-chain submit).
+   *
+   * <p>Idempotent per claim when the row is already bound to {@code jobId} and still in-flight
+   * (Spark may lazy-bind before submit-side bind), matching {@link #bindJobId}.
+   *
+   * @param claims claims returned by batch acquire
+   * @param jobId Gravitino job run id
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "bindTableMaintenanceActionJobIds")
+  public void bindJobIds(List<OccupancyClaim> claims, long jobId) {
+    Preconditions.checkArgument(claims != null && !claims.isEmpty(), "claims must not be empty");
+    SessionUtils.doWithCommit(
+        TableMaintenanceActionMapper.class,
+        mapper -> {
+          for (OccupancyClaim claim : claims) {
+            Preconditions.checkNotNull(claim, "claim must not be null");
+            int updated = mapper.bindJobId(claim.id(), jobId, claim.createdAt());
+            if (updated == 1) {
+              continue;
+            }
+            TableMaintenanceActionPO current = mapper.selectById(claim.id());
+            Preconditions.checkState(
+                current != null
+                    && Objects.equals(current.jobId(), jobId)
+                    && current.finishedAt() != null
+                    && current.finishedAt() == 0L,
+                "expected to bind job_id on claim id=%s, updated=%s",
+                claim.id(),
+                updated);
+          }
+        });
+  }
+
+  /**
+   * Releases unbound claims after a failed submit. Each delete is fenced on {@code (id,
+   * created_at)} so a concurrent reclaim's live claim is not removed.
+   *
+   * @param claims claims to release
+   */
+  public void deleteClaims(List<OccupancyClaim> claims) {
+    if (claims == null || claims.isEmpty()) {
+      return;
+    }
+    for (OccupancyClaim claim : claims) {
+      if (claim == null) {
+        continue;
+      }
+      deleteUnboundClaim(claim);
     }
   }
 
@@ -533,5 +662,10 @@ public class TableMaintenanceActionMetaService {
       }
     }
     return false;
+  }
+
+  /** Thrown inside a batch-acquire transaction to roll back when any soft slot is busy. */
+  private static final class SoftSlotBusyException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
   }
 }
