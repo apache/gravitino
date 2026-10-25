@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.expand;
+package org.apache.gravitino.maintenance.scheduler.policy.expand;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -33,7 +33,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
-import org.apache.gravitino.maintenance.scheduler.ExpandOccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandOccupancyGate;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;

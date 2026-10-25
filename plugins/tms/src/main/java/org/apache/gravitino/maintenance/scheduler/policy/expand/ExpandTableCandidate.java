@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.expand;
+package org.apache.gravitino.maintenance.scheduler.policy.expand;
 
 import com.google.common.base.Preconditions;
 import java.util.Objects;
