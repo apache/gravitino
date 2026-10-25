@@ -259,6 +259,22 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
+   * Deletes an unbound claim only when the lease {@code created_at} still matches. A concurrent
+   * reclaim that CAS-updated {@code created_at} leaves the new owner's row intact.
+   *
+   * @param id action row id
+   * @param expectedCreatedAt claim lease start observed at acquire time
+   * @return DELETE statement
+   */
+  public String deleteUnboundClaim(
+      @Param("id") long id, @Param("expectedCreatedAt") long expectedCreatedAt) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE id = #{id} AND job_id IS NULL AND finished_at = 0"
+        + " AND created_at = #{expectedCreatedAt}";
+  }
+
+  /**
    * @param jobId Gravitino job run id
    * @return DELETE statement
    */

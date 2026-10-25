@@ -24,7 +24,8 @@ import java.util.Objects;
  * Immutable occupancy claim returned by acquire.
  *
  * <p>Callers must pass {@link #createdAt()} to {@link TableMaintenanceActionMetaService#bindJobId}
- * without re-reading {@code created_at} from the row.
+ * and {@link TableMaintenanceActionMetaService#deleteUnboundClaim} without re-reading {@code
+ * created_at} from the row.
  *
  * <p>{@link #id()} is the durable claim token for OccupancyGate follow-ups: make {@code runJob}
  * idempotent on this id (or outbox / reconcile-before-reclaim). Binding {@code job_id} alone cannot
