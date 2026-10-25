@@ -111,6 +111,42 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
   }
 
   @Test
+  void testClearCommentsWithNull() {
+    String tableName = RandomNameUtils.genRandomName("clear_comment");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withComment("col comment")
+            .build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnComment(new String[] {"col1"}, null),
+          TableChange.updateComment(null));
+
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertTrue(StringUtils.isEmpty(table.comment()), table.comment());
+      Assertions.assertTrue(
+          StringUtils.isEmpty(table.columns()[0].comment()), table.columns()[0].comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
+  }
+
+  @Test
   public void testOperationTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_op_table";
     String tableComment = "test_comment";
@@ -229,6 +265,39 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     Assertions.assertTrue(TABLE_OPERATIONS.drop(TEST_DB_NAME, newName), "table should be dropped");
     Assertions.assertFalse(
         TABLE_OPERATIONS.drop(TEST_DB_NAME, newName), "table should be non-existent");
+  }
+
+  @Test
+  public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
+    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_type_default_table";
+    JdbcColumn col_1 =
+        JdbcColumn.builder().withName("col_1").withType(INT).withNullable(false).build();
+    JdbcColumn col_2 =
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.VarCharType.of(16))
+            .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
+            .withNullable(false)
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        new JdbcColumn[] {col_1, col_2},
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnType(new String[] {col_2.name()}, Types.VarCharType.of(32)));
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Column updated = load.columns()[1];
+    Assertions.assertEquals(Types.VarCharType.of(32), updated.dataType());
+    Assertions.assertEquals(Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
   }
 
   @Test

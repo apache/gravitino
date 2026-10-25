@@ -94,10 +94,11 @@ public interface PolicyOperations {
    * @param changes The changes to apply to the policy.
    * @return The altered policy.
    * @throws NoSuchPolicyException If the policy does not exist.
+   * @throws PolicyAlreadyExistsException If the new name is already used by another policy.
    * @throws IllegalArgumentException If the changes cannot be associated with the policy.
    */
   Policy alterPolicy(String name, PolicyChange... changes)
-      throws NoSuchPolicyException, IllegalArgumentException;
+      throws NoSuchPolicyException, PolicyAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Delete a policy under a metalake.

@@ -27,7 +27,7 @@ Gravitino credential vending is used to generate temporary or static credentials
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs.
+- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
 
 ## General Configurations
 
@@ -224,7 +224,7 @@ Clients retrieve vended credentials from:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
-The server returns short-lived or static credentials that the client can use to access the underlying storage directly.
+The server returns short-lived or static credentials that the client can use to access the underlying storage directly. These credentials are catalog-level and are not refreshed: token providers such as `s3-token` vend nothing at catalog level, and `aws-irsa` credentials expire after `s3-token-expire-in-secs`.
 
 ### Spark and Flink Connector Integration
 
