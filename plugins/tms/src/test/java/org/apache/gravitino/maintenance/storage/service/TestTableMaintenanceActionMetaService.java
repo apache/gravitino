@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.storage.service;
 
 import static org.apache.gravitino.maintenance.storage.TableMaintenanceActionTestUtils.expireClaim;
 
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -42,6 +43,7 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long after = System.currentTimeMillis();
     Assertions.assertNull(actionService.getById(claim.id()).jobId());
     Assertions.assertEquals(0L, actionService.getById(claim.id()).finishedAt());
+    // DB clock may skew slightly from the JVM; allow a small window.
     Assertions.assertTrue(claim.createdAt() >= before - 5_000L);
     Assertions.assertTrue(claim.createdAt() <= after + 5_000L);
     Assertions.assertEquals(claim.createdAt(), actionService.getById(claim.id()).createdAt());
@@ -151,6 +153,24 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     // Spark lazy-bound first; submit-side bind must not fail.
     actions.bindJobId(claim, jobId);
     Assertions.assertEquals(jobId, actions.getByJobIdAndTableId(jobId, tableId).jobId());
+  }
+
+  @TestTemplate
+  void testBindJobIdsIdempotentWhenAlreadyBoundToSameJob() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long tableId = 37L;
+    long policyA = 48L;
+    long policyB = 49L;
+    long jobId = 5700L;
+    OccupancyClaim claimA = actions.insertInFlight(tableId, policyA, config);
+    OccupancyClaim claimB = actions.insertInFlight(tableId, policyB, config);
+    actions.bindJobId(claimA, jobId);
+    actions.bindJobId(claimB, jobId);
+    // Spark may lazy-bind before commit-chain submit-side bindJobIds.
+    actions.bindJobIds(List.of(claimA, claimB), jobId);
+    Assertions.assertEquals(jobId, actions.getById(claimA.id()).jobId());
+    Assertions.assertEquals(jobId, actions.getById(claimB.id()).jobId());
   }
 
   @TestTemplate
@@ -265,7 +285,7 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long tableId = 12L;
     long policyId = 22L;
-    long timeoutMs = 200L;
+    long timeoutMs = TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS;
 
     Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(first.isPresent());
@@ -274,11 +294,14 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
 
     Optional<OccupancyClaim> second = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(second.isPresent());
-    Thread.sleep(timeoutMs + 50L);
+    OccupancyClaim expired = expireClaim(second.get(), timeoutMs);
+    // Let the DB clock advance so reclaim cannot reuse the original fencing token.
+    Thread.sleep(2L);
     Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
     Assertions.assertEquals(second.get().id(), reclaimed.get().id());
-    Assertions.assertTrue(reclaimed.get().createdAt() >= second.get().createdAt());
+    Assertions.assertTrue(reclaimed.get().createdAt() > expired.createdAt());
+    Assertions.assertNotEquals(second.get().createdAt(), reclaimed.get().createdAt());
 
     // Stale submitter cleanup must not delete the reclaimed live claim.
     Assertions.assertFalse(actions.deleteUnboundClaim(second.get()));
@@ -288,5 +311,64 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
 
     Assertions.assertTrue(actions.deleteUnboundClaim(reclaimed.get()));
     Assertions.assertNull(actions.getById(reclaimed.get().id()));
+  }
+
+  @TestTemplate
+  void testDeleteClaimsFencesAgainstReclaim() throws Exception {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    long tableId = 38L;
+    long policyId = 50L;
+    long timeoutMs = TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS;
+
+    Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
+    Assertions.assertTrue(first.isPresent());
+    OccupancyClaim expired = expireClaim(first.get(), timeoutMs);
+    // Let the DB clock advance so reclaim cannot reuse the original fencing token.
+    Thread.sleep(2L);
+    Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
+    Assertions.assertTrue(reclaimed.isPresent());
+    Assertions.assertEquals(first.get().id(), reclaimed.get().id());
+    Assertions.assertTrue(reclaimed.get().createdAt() > expired.createdAt());
+
+    // Failed submit cleanup uses deleteClaims; stale created_at must not remove live claim.
+    actions.deleteClaims(List.of(first.get()));
+    Assertions.assertNotNull(actions.getById(reclaimed.get().id()));
+    Assertions.assertNull(actions.getById(reclaimed.get().id()).jobId());
+    Assertions.assertEquals(0L, actions.getById(reclaimed.get().id()).finishedAt());
+
+    actions.deleteClaims(List.of(reclaimed.get()));
+    Assertions.assertNull(actions.getById(reclaimed.get().id()));
+  }
+
+  @TestTemplate
+  void testTryAcquireBatchClaimsAllPoliciesOrNone() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    long tableId = 31L;
+    long policyA = 41L;
+    long policyB = 42L;
+    long timeoutMs = 60_000L;
+
+    Optional<List<OccupancyClaim>> batch =
+        actions.tryAcquireInFlightBatch(tableId, List.of(policyA, policyB), timeoutMs);
+    Assertions.assertTrue(batch.isPresent());
+    Assertions.assertEquals(2, batch.get().size());
+    Assertions.assertEquals(0L, actions.getById(batch.get().get(0).id()).finishedAt());
+    Assertions.assertEquals(0L, actions.getById(batch.get().get(1).id()).finishedAt());
+
+    // Partial hold blocks the whole chain.
+    Assertions.assertTrue(
+        actions.tryAcquireInFlightBatch(tableId, List.of(policyA, policyB), timeoutMs).isEmpty());
+    Assertions.assertTrue(actions.tryAcquireInFlight(tableId, policyA, timeoutMs).isEmpty());
+
+    long jobId = 3100L;
+    actions.bindJobIds(batch.get(), jobId);
+    Assertions.assertEquals(jobId, actions.getById(batch.get().get(0).id()).jobId());
+    Assertions.assertEquals(jobId, actions.getById(batch.get().get(1).id()).jobId());
+
+    long finishedAt = System.currentTimeMillis();
+    actions.markFinished(jobId, tableId, policyA, 500L, finishedAt);
+    actions.markFinished(jobId, tableId, policyB, 501L, finishedAt + 1);
+    Assertions.assertTrue(actions.getById(batch.get().get(0).id()).finishedAt() > 0);
+    Assertions.assertTrue(actions.getById(batch.get().get(1).id()).finishedAt() > 0);
   }
 }

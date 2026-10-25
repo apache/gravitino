@@ -37,6 +37,9 @@ public interface TableMaintenanceActionMapper {
   @Options(useGeneratedKeys = true, keyProperty = "actionMeta.id", keyColumn = "id")
   void insertAction(@Param("actionMeta") TableMaintenanceActionPO actionMeta);
 
+  @InsertProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "insertActions")
+  void insertActions(@Param("tableId") long tableId, @Param("policyIds") List<Long> policyIds);
+
   @UpdateProvider(
       type = TableMaintenanceActionSQLProviderFactory.class,
       method = "reclaimExpiredUnbound")
