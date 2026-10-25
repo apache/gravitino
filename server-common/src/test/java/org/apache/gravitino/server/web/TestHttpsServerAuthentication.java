@@ -35,6 +35,7 @@ import java.security.KeyStore;
 import java.time.Duration;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -42,8 +43,10 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.rest.RESTUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestHttpsServerAuthentication {
 
@@ -54,7 +57,14 @@ public class TestHttpsServerAuthentication {
   private static final String TEST_RESPONSE = "success";
   private static final String SERVLET_RESPONSE = "success";
 
+  @TempDir static Path tlsDirectory;
+
   private JettyServer jettyServer;
+
+  @BeforeAll
+  static void generateTlsMaterial() throws Exception {
+    TestTlsServerUtils.generateTlsMaterial(tlsDirectory);
+  }
 
   @BeforeEach
   public void setUp() {
@@ -77,7 +87,7 @@ public class TestHttpsServerAuthentication {
 
     config.set(
         JettyServerConfig.SSL_KEYSTORE_PATH,
-        TestTlsServerUtils.testResource("test-server-keystore.p12").toString());
+        tlsDirectory.resolve("test-server-keystore.p12").toString());
     config.set(JettyServerConfig.SSL_KEYSTORE_PASSWORD, TEST_STORE_PASSWORD);
     config.set(JettyServerConfig.SSL_MANAGER_PASSWORD, TEST_STORE_PASSWORD);
     config.set(JettyServerConfig.ENABLE_CLIENT_AUTH, true);
@@ -88,12 +98,13 @@ public class TestHttpsServerAuthentication {
   @Test
   public void testMutualTlsAcceptsTrustedClientCertificate() throws Exception {
     int port =
-        TestTlsServerUtils.startHttpsServer(jettyServer, true, createTestServlet(), TEST_PATH);
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, true, createTestServlet(), TEST_PATH, tlsDirectory);
 
     HttpClient client =
         createHttpsClient(
-            TestTlsServerUtils.testResource("test-client-truststore.p12"),
-            TestTlsServerUtils.testResource("test-trusted-client-keystore.p12"));
+            tlsDirectory.resolve("test-client-truststore.p12"),
+            tlsDirectory.resolve("test-trusted-client-keystore.p12"));
 
     HttpRequest request = createHttpsRequest(port);
 
@@ -106,10 +117,12 @@ public class TestHttpsServerAuthentication {
   @Test
   public void testMutualTlsRejectsMissingClientCertificate() throws Exception {
     int port =
-        TestTlsServerUtils.startHttpsServer(jettyServer, true, createTestServlet(), TEST_PATH);
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, true, createTestServlet(), TEST_PATH, tlsDirectory);
 
+    // TLS 1.2 reports the missing certificate during the handshake, before HTTP reads.
     HttpClient client =
-        createHttpsClient(TestTlsServerUtils.testResource("test-client-truststore.p12"), null);
+        createHttpsClient(tlsDirectory.resolve("test-client-truststore.p12"), null, "TLSv1.2");
 
     HttpRequest request = createHttpsRequest(port);
 
@@ -123,12 +136,15 @@ public class TestHttpsServerAuthentication {
   @Test
   public void testMutualTlsRejectsUntrustedClientCertificate() throws Exception {
     int port =
-        TestTlsServerUtils.startHttpsServer(jettyServer, true, createTestServlet(), TEST_PATH);
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, true, createTestServlet(), TEST_PATH, tlsDirectory);
 
+    // TLS 1.2 reports client-certificate rejection during the handshake, before HTTP reads.
     HttpClient client =
         createHttpsClient(
-            TestTlsServerUtils.testResource("test-client-truststore.p12"),
-            TestTlsServerUtils.testResource("test-untrusted-client-keystore.p12"));
+            tlsDirectory.resolve("test-client-truststore.p12"),
+            tlsDirectory.resolve("test-untrusted-client-keystore.p12"),
+            "TLSv1.2");
 
     HttpRequest request = createHttpsRequest(port);
 
@@ -142,11 +158,11 @@ public class TestHttpsServerAuthentication {
   @Test
   public void testClientRejectsUntrustedServerCertificate() throws Exception {
     int port =
-        TestTlsServerUtils.startHttpsServer(jettyServer, false, createTestServlet(), TEST_PATH);
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, false, createTestServlet(), TEST_PATH, tlsDirectory);
 
     HttpClient client =
-        createHttpsClient(
-            TestTlsServerUtils.testResource("test-untrusted-server-truststore.p12"), null);
+        createHttpsClient(tlsDirectory.resolve("test-untrusted-server-truststore.p12"), null);
 
     HttpRequest request = createHttpsRequest(port);
 
@@ -160,10 +176,10 @@ public class TestHttpsServerAuthentication {
   @Test
   public void testHttpsWithoutClientAuthentication() throws Exception {
     int port =
-        TestTlsServerUtils.startHttpsServer(jettyServer, false, createTestServlet(), TEST_PATH);
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, false, createTestServlet(), TEST_PATH, tlsDirectory);
 
-    HttpClient client =
-        createHttpsClient(TestTlsServerUtils.testResource("test-client-truststore.p12"), null);
+    HttpClient client = createHttpsClient(tlsDirectory.resolve("test-client-truststore.p12"), null);
 
     HttpRequest request = createHttpsRequest(port);
 
@@ -191,8 +207,8 @@ public class TestHttpsServerAuthentication {
     assertEquals(TEST_RESPONSE, response.body());
   }
 
-  private static HttpClient createHttpsClient(Path trustStorePath, Path clientKeyStorePath)
-      throws Exception {
+  private static HttpClient createHttpsClient(
+      Path trustStorePath, Path clientKeyStorePath, String... protocols) throws Exception {
     KeyStore trustStore = loadStore(trustStorePath);
 
     TrustManagerFactory trustManagerFactory =
@@ -214,10 +230,14 @@ public class TestHttpsServerAuthentication {
           keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
     }
 
-    return HttpClient.newBuilder()
-        .sslContext(sslContext)
-        .connectTimeout(Duration.ofSeconds(10))
-        .build();
+    HttpClient.Builder builder =
+        HttpClient.newBuilder().sslContext(sslContext).connectTimeout(Duration.ofSeconds(10));
+    if (protocols.length > 0) {
+      SSLParameters parameters = sslContext.getDefaultSSLParameters();
+      parameters.setProtocols(protocols);
+      builder.sslParameters(parameters);
+    }
+    return builder.build();
   }
 
   private static HttpRequest createHttpsRequest(int port) {
