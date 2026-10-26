@@ -135,6 +135,8 @@ public class TestIcebergJobUtils {
             "spark.kubernetes.executor.secretKeyRef.TOKEN", "secret:token",
             "spark.kubernetes.container.image", "other:1.0",
             "spark.sql.shuffle.partitions", "",
+            // Blank like StringUtils.isBlank, as the k8s job executor checks it: an em space.
+            "spark.driver.memory", "\u2003",
             "spark.executor.memory", "2g");
     assertEquals(
         ImmutableMap.of("spark.executor.memory", "2g"),

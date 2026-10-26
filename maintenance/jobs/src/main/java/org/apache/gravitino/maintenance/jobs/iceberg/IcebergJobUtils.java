@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
@@ -231,7 +232,7 @@ public final class IcebergJobUtils {
     configs.forEach(
         (key, value) -> {
           // A blank value leaves a configuration unset, as the k8s job executor does.
-          if (value == null || value.trim().isEmpty()) {
+          if (StringUtils.isBlank(value)) {
             return;
           }
           if (key.startsWith(SPARK_KUBERNETES_PREFIX)) {
