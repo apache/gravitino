@@ -75,15 +75,15 @@ import org.junit.jupiter.api.TestTemplate;
 /**
  * An external object (for example one created through the Iceberg REST server) can carry a {@code
  * gravitino.identifier} property that names the id of another, live entity. Importing that object
- * must never take over the other entity: the victim keeps its name, its parent and its id, so its
+ * must never reuse the other entity: the existing entity keeps its name, its parent and its id, so its
  * owner and role grants stay with it, and the new object is imported under a fresh id.
  */
-public class TestImportStringIdentifierSpoofing extends TestJDBCBackend {
+public class TestImportStringIdentifierReuse extends TestJDBCBackend {
 
-  private static final String METALAKE = "spoof_metalake";
-  private static final String CATALOG = "spoof_catalog";
-  private static final String OTHER_CATALOG = "spoof_other_catalog";
-  private static final String SCHEMA = "spoof_schema";
+  private static final String METALAKE = "reuse_metalake";
+  private static final String CATALOG = "reuse_catalog";
+  private static final String OTHER_CATALOG = "reuse_other_catalog";
+  private static final String SCHEMA = "reuse_schema";
 
   private Config previousConfig;
   private Object previousLockManager;
@@ -135,30 +135,30 @@ public class TestImportStringIdentifierSpoofing extends TestJDBCBackend {
   @TestTemplate
   public void testImportedViewCannotAdoptAnotherViewsId() throws IOException {
     Namespace ns = NamespaceUtil.ofView(METALAKE, CATALOG, SCHEMA);
-    long victimId = RandomIdGenerator.INSTANCE.nextId();
-    NameIdentifier victimIdent = NameIdentifier.of(ns, "victim_view");
-    store.put(createViewEntity(victimId, ns, victimIdent.name()), false);
+    long existingId = RandomIdGenerator.INSTANCE.nextId();
+    NameIdentifier existingIdent = NameIdentifier.of(ns, "existing_view");
+    store.put(createViewEntity(existingId, ns, existingIdent.name()), false);
 
-    // The attacker's new view carries the victim's id in its properties.
-    NameIdentifier attackerIdent = NameIdentifier.of(ns, "attacker_view");
-    View attackerView = mock(View.class);
-    when(attackerView.name()).thenReturn(attackerIdent.name());
-    when(attackerView.properties()).thenReturn(spoofedProperties(victimId));
-    when(attackerView.auditInfo()).thenReturn(AUDIT_INFO);
-    when(attackerView.columns()).thenReturn(new Column[0]);
-    when(attackerView.representations())
+    // The new view carries the existing entity's id in its properties.
+    NameIdentifier newIdent = NameIdentifier.of(ns, "new_view");
+    View newView = mock(View.class);
+    when(newView.name()).thenReturn(newIdent.name());
+    when(newView.properties()).thenReturn(carriedIdProperties(existingId));
+    when(newView.auditInfo()).thenReturn(AUDIT_INFO);
+    when(newView.columns()).thenReturn(new Column[0]);
+    when(newView.representations())
         .thenReturn(
             new Representation[] {
               SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
             });
-    when(viewCatalog.loadView(attackerIdent)).thenReturn(attackerView);
-    // The victim is still live in the catalog, so the attacker's view is not a rename of it.
-    when(viewCatalog.viewExists(victimIdent)).thenReturn(true);
+    when(viewCatalog.loadView(newIdent)).thenReturn(newView);
+    // The existing entity is still live in the catalog, so the new view is not a rename of it.
+    when(viewCatalog.viewExists(existingIdent)).thenReturn(true);
 
-    newViewDispatcher().loadView(attackerIdent);
+    newViewDispatcher().loadView(newIdent);
 
-    assertVictimUntouched(victimIdent, Entity.EntityType.VIEW, ViewEntity.class, victimId);
-    assertNotAdopted(attackerIdent, Entity.EntityType.VIEW, ViewEntity.class, victimId);
+    assertExistingUntouched(existingIdent, Entity.EntityType.VIEW, ViewEntity.class, existingId);
+    assertNotAdopted(newIdent, Entity.EntityType.VIEW, ViewEntity.class, existingId);
   }
 
   @TestTemplate
@@ -172,7 +172,7 @@ public class TestImportStringIdentifierSpoofing extends TestJDBCBackend {
     NameIdentifier newIdent = NameIdentifier.of(ns, "new_view");
     View renamedView = mock(View.class);
     when(renamedView.name()).thenReturn(newIdent.name());
-    when(renamedView.properties()).thenReturn(spoofedProperties(viewId));
+    when(renamedView.properties()).thenReturn(carriedIdProperties(viewId));
     when(renamedView.auditInfo()).thenReturn(AUDIT_INFO);
     when(renamedView.columns()).thenReturn(new Column[0]);
     when(renamedView.representations())
@@ -191,20 +191,20 @@ public class TestImportStringIdentifierSpoofing extends TestJDBCBackend {
 
   @TestTemplate
   public void testImportedTableCannotAdoptAnotherCatalogsTableId() throws IOException {
-    // The victim lives in another catalog; only its id leaks into the attacker's table.
-    Namespace victimNs = NamespaceUtil.ofTable(METALAKE, OTHER_CATALOG, SCHEMA);
-    long victimId = RandomIdGenerator.INSTANCE.nextId();
-    NameIdentifier victimIdent = NameIdentifier.of(victimNs, "victim_table");
-    store.put(createTableEntity(victimId, victimNs, victimIdent.name(), AUDIT_INFO), false);
+    // The existing entity lives in another catalog; only its id leaks into the new table.
+    Namespace existing entityNs = NamespaceUtil.ofTable(METALAKE, OTHER_CATALOG, SCHEMA);
+    long existingId = RandomIdGenerator.INSTANCE.nextId();
+    NameIdentifier existingIdent = NameIdentifier.of(existing entityNs, "existing_table");
+    store.put(createTableEntity(existingId, existing entityNs, existingIdent.name(), AUDIT_INFO), false);
 
-    NameIdentifier attackerIdent =
-        NameIdentifier.of(NamespaceUtil.ofTable(METALAKE, CATALOG, SCHEMA), "attacker_table");
-    Table attackerTable = mock(Table.class);
-    when(attackerTable.name()).thenReturn(attackerIdent.name());
-    when(attackerTable.properties()).thenReturn(spoofedProperties(victimId));
-    when(attackerTable.auditInfo()).thenReturn(AUDIT_INFO);
-    when(attackerTable.columns()).thenReturn(new Column[0]);
-    when(tableCatalog.loadTable(attackerIdent)).thenReturn(attackerTable);
+    NameIdentifier newIdent =
+        NameIdentifier.of(NamespaceUtil.ofTable(METALAKE, CATALOG, SCHEMA), "new_table");
+    Table newTable = mock(Table.class);
+    when(newTable.name()).thenReturn(newIdent.name());
+    when(newTable.properties()).thenReturn(carriedIdProperties(existingId));
+    when(newTable.auditInfo()).thenReturn(AUDIT_INFO);
+    when(newTable.columns()).thenReturn(new Column[0]);
+    when(tableCatalog.loadTable(newIdent)).thenReturn(newTable);
 
     TableOperationDispatcher dispatcher =
         new TableOperationDispatcher(
@@ -213,34 +213,34 @@ public class TestImportStringIdentifierSpoofing extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE,
             () -> mock(SchemaDispatcher.class),
             mock(SecretManager.class));
-    dispatcher.loadTable(attackerIdent);
+    dispatcher.loadTable(newIdent);
 
-    assertVictimUntouched(victimIdent, Entity.EntityType.TABLE, TableEntity.class, victimId);
-    assertNotAdopted(attackerIdent, Entity.EntityType.TABLE, TableEntity.class, victimId);
+    assertExistingUntouched(existingIdent, Entity.EntityType.TABLE, TableEntity.class, existingId);
+    assertNotAdopted(newIdent, Entity.EntityType.TABLE, TableEntity.class, existingId);
   }
 
   @TestTemplate
   public void testImportedSchemaCannotAdoptAnotherCatalogsSchemaId() throws IOException {
-    Namespace victimNs = NamespaceUtil.ofSchema(METALAKE, OTHER_CATALOG);
-    long victimId = RandomIdGenerator.INSTANCE.nextId();
-    NameIdentifier victimIdent = NameIdentifier.of(victimNs, "victim_schema");
-    store.put(createSchemaEntity(victimId, victimNs, victimIdent.name(), AUDIT_INFO), false);
+    Namespace existing entityNs = NamespaceUtil.ofSchema(METALAKE, OTHER_CATALOG);
+    long existingId = RandomIdGenerator.INSTANCE.nextId();
+    NameIdentifier existingIdent = NameIdentifier.of(existing entityNs, "existing_schema");
+    store.put(createSchemaEntity(existingId, existing entityNs, existingIdent.name(), AUDIT_INFO), false);
 
-    NameIdentifier attackerIdent =
-        NameIdentifier.of(NamespaceUtil.ofSchema(METALAKE, CATALOG), "attacker_schema");
-    Schema attackerSchema = mock(Schema.class);
-    when(attackerSchema.name()).thenReturn(attackerIdent.name());
-    when(attackerSchema.properties()).thenReturn(spoofedProperties(victimId));
-    when(attackerSchema.auditInfo()).thenReturn(AUDIT_INFO);
-    when(schemaCatalog.loadSchema(attackerIdent)).thenReturn(attackerSchema);
+    NameIdentifier newIdent =
+        NameIdentifier.of(NamespaceUtil.ofSchema(METALAKE, CATALOG), "new_schema");
+    Schema newSchema = mock(Schema.class);
+    when(newSchema.name()).thenReturn(newIdent.name());
+    when(newSchema.properties()).thenReturn(carriedIdProperties(existingId));
+    when(newSchema.auditInfo()).thenReturn(AUDIT_INFO);
+    when(schemaCatalog.loadSchema(newIdent)).thenReturn(newSchema);
 
     SchemaOperationDispatcher dispatcher =
         new SchemaOperationDispatcher(
             catalogManager, store, RandomIdGenerator.INSTANCE, mock(SecretManager.class));
-    dispatcher.loadSchema(attackerIdent);
+    dispatcher.loadSchema(newIdent);
 
-    assertVictimUntouched(victimIdent, Entity.EntityType.SCHEMA, SchemaEntity.class, victimId);
-    assertNotAdopted(attackerIdent, Entity.EntityType.SCHEMA, SchemaEntity.class, victimId);
+    assertExistingUntouched(existingIdent, Entity.EntityType.SCHEMA, SchemaEntity.class, existingId);
+    assertNotAdopted(newIdent, Entity.EntityType.SCHEMA, SchemaEntity.class, existingId);
   }
 
   private ViewOperationDispatcher newViewDispatcher() {
@@ -252,29 +252,29 @@ public class TestImportStringIdentifierSpoofing extends TestJDBCBackend {
         mock(SecretManager.class));
   }
 
-  private static Map<String, String> spoofedProperties(long victimId) {
+  private static Map<String, String> carriedIdProperties(long existingId) {
     return ImmutableMap.of(
-        StringIdentifier.ID_KEY, StringIdentifier.fromId(victimId).toString(), "k", "v");
+        StringIdentifier.ID_KEY, StringIdentifier.fromId(existingId).toString(), "k", "v");
   }
 
-  private <E extends Entity & HasIdentifier> void assertVictimUntouched(
-      NameIdentifier victimIdent, Entity.EntityType type, Class<E> clazz, long victimId)
+  private <E extends Entity & HasIdentifier> void assertExistingUntouched(
+      NameIdentifier existingIdent, Entity.EntityType type, Class<E> clazz, long existingId)
       throws IOException {
     assertTrue(
-        store.exists(victimIdent, type),
-        "Importing a foreign object must not rename or move the victim " + victimIdent);
-    assertEquals(victimId, store.get(victimIdent, type, clazz).id());
+        store.exists(existingIdent, type),
+        "Importing a foreign object must not rename or move the existing entity " + existingIdent);
+    assertEquals(existingId, store.get(existingIdent, type, clazz).id());
   }
 
   private <E extends Entity & HasIdentifier> void assertNotAdopted(
-      NameIdentifier attackerIdent, Entity.EntityType type, Class<E> clazz, long victimId)
+      NameIdentifier newIdent, Entity.EntityType type, Class<E> clazz, long existingId)
       throws IOException {
-    // The attacker's object is a new external object: it is imported under a fresh id.
-    assertTrue(store.exists(attackerIdent, type), "The attacker's object must still be imported");
+    // The new object is a new external object: it is imported under a fresh id.
+    assertTrue(store.exists(newIdent, type), "The new object must still be imported");
     assertNotEquals(
-        victimId,
-        store.get(attackerIdent, type, clazz).id(),
-        "The imported object must not adopt the victim's id");
+        existingId,
+        store.get(newIdent, type, clazz).id(),
+        "The imported object must not adopt the existing entity's id");
   }
 
   @SuppressWarnings("unchecked")

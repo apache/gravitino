@@ -50,13 +50,13 @@ import org.junit.jupiter.api.function.Executable;
 /**
  * The Iceberg REST server must reject a request that sets the reserved {@code gravitino.identifier}
  * property: Gravitino trusts that id on import, so a client that copies another object's id would
- * take over that object's entity, owner and grants.
+ * end up attached to that object's entity, owner and grants.
  */
 public class TestIcebergReservedPropertyRejection {
 
   private static final Namespace NAMESPACE = Namespace.of("test_ns");
   private static final TableIdentifier IDENT = TableIdentifier.of(NAMESPACE, "test_obj");
-  private static final Map<String, String> SPOOFED =
+  private static final Map<String, String> RESERVED_ID_PROPERTIES =
       ImmutableMap.of(StringIdentifier.ID_KEY, StringIdentifier.fromId(42L).toString(), "k", "v");
 
   private CatalogWrapperForREST catalogWrapper;
@@ -85,7 +85,7 @@ public class TestIcebergReservedPropertyRejection {
         CreateTableRequest.builder()
             .withName("test_obj")
             .withSchema(new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())))
-            .setProperties(SPOOFED)
+            .setProperties(RESERVED_ID_PROPERTIES)
             .build();
 
     assertRejected(() -> tableExecutor.createTable(context, NAMESPACE, request));
@@ -99,7 +99,7 @@ public class TestIcebergReservedPropertyRejection {
   @Test
   public void testCreateViewRejectsReservedProperty() {
     CreateViewRequest request = mock(CreateViewRequest.class);
-    when(request.properties()).thenReturn(SPOOFED);
+    when(request.properties()).thenReturn(RESERVED_ID_PROPERTIES);
 
     assertRejected(() -> viewExecutor.createView(context, NAMESPACE, request));
   }
@@ -112,7 +112,7 @@ public class TestIcebergReservedPropertyRejection {
   @Test
   public void testCreateNamespaceRejectsReservedProperty() {
     CreateNamespaceRequest request =
-        CreateNamespaceRequest.builder().withNamespace(NAMESPACE).setProperties(SPOOFED).build();
+        CreateNamespaceRequest.builder().withNamespace(NAMESPACE).setProperties(RESERVED_ID_PROPERTIES).build();
 
     assertRejected(() -> namespaceExecutor.createNamespace(context, request));
   }
@@ -120,7 +120,7 @@ public class TestIcebergReservedPropertyRejection {
   @Test
   public void testUpdateNamespaceRejectsReservedProperty() {
     UpdateNamespacePropertiesRequest request =
-        UpdateNamespacePropertiesRequest.builder().updateAll(SPOOFED).build();
+        UpdateNamespacePropertiesRequest.builder().updateAll(RESERVED_ID_PROPERTIES).build();
 
     assertRejected(() -> namespaceExecutor.updateNamespace(context, NAMESPACE, request));
   }
@@ -140,7 +140,7 @@ public class TestIcebergReservedPropertyRejection {
 
   private static UpdateTableRequest setPropertiesRequest() {
     return new UpdateTableRequest(
-        ImmutableList.of(), ImmutableList.of(new MetadataUpdate.SetProperties(SPOOFED)));
+        ImmutableList.of(), ImmutableList.of(new MetadataUpdate.SetProperties(RESERVED_ID_PROPERTIES)));
   }
 
   private void assertRejected(Executable call) {

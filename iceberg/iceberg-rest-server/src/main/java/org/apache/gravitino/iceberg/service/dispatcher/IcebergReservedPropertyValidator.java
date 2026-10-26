@@ -28,7 +28,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
  * Rejects Iceberg REST requests that set a property Gravitino reserves for itself.
  *
  * <p>Gravitino reads {@link StringIdentifier#ID_KEY} to match an external object to its stored
- * entity. A client that sets it could copy another object's id and take over that entity, with its
+ * entity. A client that sets it could copy another object's id and get attached to that entity, with its
  * owner and grants, so the Gravitino REST API never accepts it from users and neither does this
  * server.
  */
