@@ -84,11 +84,7 @@ async function publish({ github, context, core }) {
     if (current.state !== 'open' || current.head.sha !== pr.sha) continue;
     const success = process.env.SCAN_OUTCOME === 'success';
     const details = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-    await github.rest.checks.create({ ...context.repo, name: 'ASF Allowlist Check', head_sha: pr.sha,
-      status: 'completed', conclusion: success ? 'success' : 'failure',
-      details_url: details,
-      output: { title: success ? 'Workflow actions are allowlisted' : 'Workflow allowlist scan failed',
-        summary: 'Scanned PR YAML as data with the reviewed default-branch workflow. No PR code was executed.' } });
+    // Scanned PR YAML as data with the reviewed default-branch workflow; no PR code was executed.
     await publishStatus({ github, repo: context.repo, sha: pr.sha, context: 'ASF Allowlist Check',
       state: success ? 'success' : 'failure',
       description: success ? 'Workflow actions are allowlisted' : 'Workflow allowlist scan failed', targetUrl: details });
