@@ -666,8 +666,7 @@ public class Configs {
               "The maximum number of bytes returned from the tail of a job's captured "
                   + "stdout/stderr when retrieving its output. Bounds the response size regardless "
                   + "of how the content is shaped (e.g. a single very long line). Whether it also "
-                  + "bounds the bytes read depends on the job executor: the k8s job executor reads "
-                  + "the last outputMaxLines lines of the driver log. This is resolved by "
+                  + "bounds the bytes read depends on the job executor. This is resolved by "
                   + "JobManager and passed as an argument to JobExecutor#getJobStdout and "
                   + "JobExecutor#getJobStderr, so all executors honor the same cap.")
           .version(ConfigConstants.VERSION_2_0_0)

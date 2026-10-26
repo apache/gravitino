@@ -598,7 +598,8 @@ public class K8sJobExecutor implements JobExecutor {
    *
    * @param id the job execution id
    * @param shouldDelete tells whether to delete the SparkApplication
-   * @return the SparkApplication the deletion was decided on, or empty if it doesn't exist
+   * @return the SparkApplication the deletion was decided on, or empty if it doesn't exist, also if
+   *     it was gone by the time it was deleted
    */
   private Optional<GenericKubernetesResource> deleteSparkApplicationIf(
       K8sJobExecutionId id, Predicate<GenericKubernetesResource> shouldDelete) {
@@ -608,8 +609,11 @@ public class K8sJobExecutor implements JobExecutor {
         return app;
       }
       try {
-        deleteUnchangedSparkApplication(app.get());
-        return app;
+        // fabric8 reports that nothing was deleted, rather than failing, for a SparkApplication
+        // that is gone, for example deleted by a cancellation on another server meanwhile.
+        boolean deleted = !lockSparkApplication(app.get()).delete().isEmpty();
+        sparkApplicationCache.invalidate(id.namespace());
+        return deleted ? app : Optional.empty();
       } catch (KubernetesClientException e) {
         if (e.getCode() != HttpURLConnection.HTTP_CONFLICT || attempt >= UPDATE_CONFLICT_RETRIES) {
           throw e;
@@ -619,26 +623,26 @@ public class K8sJobExecutor implements JobExecutor {
   }
 
   /**
-   * Deletes a SparkApplication only if it hasn't changed since it was read, as its resource version
-   * tells. Its pods are deleted first, as by {@link #deleteSparkApplication(K8sJobExecutionId)}.
+   * Returns a SparkApplication as a resource locked to the version it was read at. Deleting it
+   * fails with the code 409 if it has changed since, and deletes its pods first, as {@link
+   * #deleteSparkApplication(K8sJobExecutionId)} does.
    *
    * @param app the SparkApplication as it was read
-   * @throws KubernetesClientException with the code 409 if it has changed since
+   * @return the locked resource
    */
   @SuppressWarnings("unchecked")
-  private void deleteUnchangedSparkApplication(GenericKubernetesResource app) {
-    String namespace = app.getMetadata().getNamespace();
+  private ExtensibleResource<GenericKubernetesResource> lockSparkApplication(
+      GenericKubernetesResource app) {
     // fabric8 types a resource locked to a version as one that can't set the propagation policy,
     // but its implementation can: it sends both the precondition and the policy in the options of
     // the deletion.
     ExtensibleResource<GenericKubernetesResource> resource =
         (ExtensibleResource<GenericKubernetesResource>)
-            getSparkApplicationClient(namespace).withName(app.getMetadata().getName());
-    resource
+            getSparkApplicationClient(app.getMetadata().getNamespace())
+                .withName(app.getMetadata().getName());
+    return resource
         .lockResourceVersion(app.getMetadata().getResourceVersion())
-        .withPropagationPolicy(DeletionPropagation.FOREGROUND)
-        .delete();
-    sparkApplicationCache.invalidate(namespace);
+        .withPropagationPolicy(DeletionPropagation.FOREGROUND);
   }
 
   /**

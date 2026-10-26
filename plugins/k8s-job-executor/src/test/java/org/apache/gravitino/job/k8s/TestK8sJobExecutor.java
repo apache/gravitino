@@ -331,6 +331,23 @@ public class TestK8sJobExecutor {
   }
 
   @Test
+  public void testJobWithoutStatusGoneBeforeDeletion() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    now.set(now.get().plusSeconds(601));
+    // Deleted by a cancellation on another server between the read and the deletion.
+    server
+        .expect()
+        .delete()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(404, new StatusBuilder().withCode(404).build())
+        .once();
+
+    // Missing rather than failed, which settles a cancelling job as cancelled.
+    Assertions.assertThrows(
+        NoSuchJobException.class, () -> executor.getJobExecutionInfo(jobExecutionId));
+  }
+
+  @Test
   public void testJobWithoutStatusConflictRetriesRunOut() {
     String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
     now.set(now.get().plusSeconds(601));
@@ -697,6 +714,32 @@ public class TestK8sJobExecutor {
     Assertions.assertTrue(
         delete.contains("\"resourceVersion\":\"" + resourceVersion + "\""), delete);
     Assertions.assertTrue(delete.contains("\"Foreground\""), delete);
+  }
+
+  @Test
+  public void testSubmitWithServerErrorAndFailedCleanup() {
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(500, new StatusBuilder().withCode(500).withMessage("etcd timeout").build())
+        .always();
+    server
+        .expect()
+        .get()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(403, new StatusBuilder().withCode(403).build())
+        .always();
+
+    try (KubernetesClient noRetries = clientWithoutRetries(client.getConfiguration())) {
+      executor.initialize(TestSparkApplicationUtils.newConfigs(ImmutableMap.of()), noRetries);
+      // The failure of the cleanup doesn't hide the failure of the submission.
+      KubernetesClientException e =
+          Assertions.assertThrows(
+              KubernetesClientException.class,
+              () -> executor.submitJob(context(1L), sparkTemplate()));
+      Assertions.assertEquals(500, e.getCode());
+    }
   }
 
   @Test
