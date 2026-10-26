@@ -20,9 +20,11 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -30,7 +32,9 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -40,6 +44,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -63,6 +68,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 
 public class TestIcebergNamespaceHookDispatcher {
 
@@ -276,7 +284,7 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testRegisterViewSkipsImportWhenEntityExists() throws Exception {
+  public void testRegisterViewRemovesStaleEntityBeforeImport() throws Exception {
     Namespace namespace = Namespace.of("test_schema");
     RegisterViewRequest request =
         ImmutableRegisterViewRequest.builder()
@@ -287,16 +295,29 @@ public class TestIcebergNamespaceHookDispatcher {
     LoadViewResponse mockResponse = mock(LoadViewResponse.class);
     when(mockDispatcher.registerView(mockContext, namespace, request)).thenReturn(mockResponse);
 
-    NameIdentifier expectedIdent =
+    // A ViewEntity is still stored under the name, left by a dropped view. Register view has no
+    // overwrite, so its success proves no view had this name and the entity is stale.
+    NameIdentifier ident =
         NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
-    when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(true);
+    List<String> calls = new ArrayList<>();
+    doAnswer(record(calls, "delete", true))
+        .when(mockEntityStore)
+        .delete(ident, Entity.EntityType.VIEW);
+    doAnswer(record(calls, "import", null)).when(mockInternalViewDispatcher).loadView(ident);
 
-    LoadViewResponse response = hookDispatcher.registerView(mockContext, namespace, request);
+    LoadViewResponse response;
+    try (MockedStatic<AuthorizationUtils> authz = recordPluginRemoval(calls)) {
+      response = hookDispatcher.registerView(mockContext, namespace, request);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  eq(ident), eq(Entity.EntityType.VIEW), eq(Collections.emptyList())));
+    }
 
-    verify(mockDispatcher).registerView(mockContext, namespace, request);
-    // Import and setOwner are both skipped since the entity already exists
-    verify(mockInternalViewDispatcher, never()).loadView(any());
-    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    // Without the removal the import adopts the stale view id and every grant, tag and policy,
+    // and the registering user never becomes the owner.
+    Assertions.assertEquals(List.of("delete", "removePrivileges", "import"), calls);
+    verify(mockInternalOwnerDispatcher).setOwner(any(), any(), eq(TEST_USER), any());
     Assertions.assertEquals(mockResponse, response);
   }
 
@@ -330,7 +351,7 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testRegisterViewThrowsWhenEntityStoreCheckFails() throws Exception {
+  public void testRegisterViewThrowsWhenStaleEntityRemovalFails() throws Exception {
     Namespace namespace = Namespace.of("test_schema");
     RegisterViewRequest request =
         ImmutableRegisterViewRequest.builder()
@@ -345,8 +366,9 @@ public class TestIcebergNamespaceHookDispatcher {
         NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
     doThrow(new IOException("Store unavailable"))
         .when(mockEntityStore)
-        .exists(eq(expectedIdent), eq(Entity.EntityType.VIEW));
+        .delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
 
+    // Importing now would adopt whatever entity is still under the name, so fail instead.
     RuntimeException thrown =
         Assertions.assertThrows(
             RuntimeException.class,
@@ -383,10 +405,11 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testRegisterTableSkipsWhenGravitinoExists() throws Exception {
+  public void testRegisterTableWithOverwriteKeepsExistingEntity() throws Exception {
     Namespace namespace = Namespace.of("test_schema");
     RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
     when(mockRequest.name()).thenReturn("test_table");
+    when(mockRequest.overwrite()).thenReturn(true);
     doReturn(true).when(mockEntityStore).exists(any(), eq(Entity.EntityType.TABLE));
 
     LoadTableResponse mockResponse = mock(LoadTableResponse.class);
@@ -396,9 +419,48 @@ public class TestIcebergNamespaceHookDispatcher {
     LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
 
     Assertions.assertSame(mockResponse, response);
+    verify(mockEntityStore, never()).delete(any(), any());
     verify(mockInternalTableDispatcher, never()).loadTable(any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterTableWithoutOverwriteRemovesStaleEntityBeforeImport() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
+    when(mockRequest.name()).thenReturn("test_table");
+    when(mockRequest.overwrite()).thenReturn(false);
+    doReturn(true).when(mockEntityStore).exists(any(), eq(Entity.EntityType.TABLE));
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
+        .thenReturn(mockResponse);
+
+    // A TableEntity is still stored under the name, left by a dropped table. A register without
+    // overwrite succeeded, so no table had this name and the entity is stale.
+    NameIdentifier ident =
+        NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_table");
+    List<String> calls = new ArrayList<>();
+    doAnswer(record(calls, "delete", true))
+        .when(mockEntityStore)
+        .delete(ident, Entity.EntityType.TABLE);
+    doAnswer(record(calls, "import", null)).when(mockInternalTableDispatcher).loadTable(ident);
+
+    LoadTableResponse response;
+    try (MockedStatic<AuthorizationUtils> authz = recordPluginRemoval(calls)) {
+      response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  eq(ident), eq(Entity.EntityType.TABLE), eq(Collections.emptyList())));
+    }
+
+    // Without the removal the register keeps the stale table id, its grants, tags, policies and
+    // the old owner.
+    Assertions.assertSame(mockResponse, response);
+    Assertions.assertEquals(List.of("delete", "removePrivileges", "import"), calls);
+    verify(mockInternalOwnerDispatcher).setOwner(any(), any(), eq(TEST_USER), any());
   }
 
   @Test
@@ -540,5 +602,62 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockEntityStore, times(1))
         .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
     Assertions.assertEquals("A:B:C", captor.getValue().name());
+  }
+
+  @Test
+  public void testDropNamespaceRemovesPrivilegesAfterBackendDrop() {
+    Namespace leaf = Namespace.of("parent", "child");
+    NameIdentifier schemaIdent = NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "parent:child");
+    List<String> locations = List.of("s3://bucket/parent/child");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      schemaIdent, Entity.EntityType.SCHEMA))
+          .thenReturn(locations);
+
+      hookDispatcher.dropNamespace(mockContext, leaf);
+
+      verify(mockDispatcher).dropNamespace(mockContext, leaf);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  schemaIdent, Entity.EntityType.SCHEMA, locations));
+    }
+  }
+
+  @Test
+  public void testFailedDropNamespaceKeepsPrivileges() {
+    Namespace namespace = Namespace.of("test_schema");
+    RuntimeException failure = new RuntimeException("namespace is not empty");
+    doThrow(failure).when(mockDispatcher).dropNamespace(mockContext, namespace);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              RuntimeException.class, () -> hookDispatcher.dropNamespace(mockContext, namespace)));
+
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
+  }
+
+  private static Answer<Object> record(List<String> calls, String call, Object result) {
+    return invocation -> {
+      calls.add(call);
+      return result;
+    };
+  }
+
+  private static MockedStatic<AuthorizationUtils> recordPluginRemoval(List<String> calls) {
+    MockedStatic<AuthorizationUtils> authz = mockStatic(AuthorizationUtils.class);
+    authz
+        .when(() -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()))
+        .thenAnswer(record(calls, "removePrivileges", null));
+    return authz;
   }
 }

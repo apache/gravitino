@@ -28,6 +28,22 @@ import org.junit.jupiter.api.Test;
 
 public class TestRESTService {
 
+  /**
+   * Entity bookkeeping for Iceberg REST drops and renames needs the entity store, which exists in
+   * the auxiliary mode whether or not authorization is on.
+   */
+  @Test
+  void testHookDispatchersAreInstalledWheneverAnEntityStoreExists() {
+    assertTrue(
+        RESTService.shouldInstallHookDispatchers(true, false),
+        "Auxiliary mode without authorization must still delete and move entities");
+    assertTrue(RESTService.shouldInstallHookDispatchers(true, true));
+    assertTrue(RESTService.shouldInstallHookDispatchers(false, true));
+    assertFalse(
+        RESTService.shouldInstallHookDispatchers(false, false),
+        "Standalone Iceberg REST has no entity store to keep in step");
+  }
+
   /** The documented Iceberg REST key reaches the value the service passes to its error builder. */
   @Test
   public void testIncludeErrorStackTraceReadFromServiceConfig() {

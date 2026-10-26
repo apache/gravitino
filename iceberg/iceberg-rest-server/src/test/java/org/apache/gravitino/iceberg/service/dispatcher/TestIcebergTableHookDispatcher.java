@@ -20,17 +20,22 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -38,17 +43,26 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -62,7 +76,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestIcebergTableHookDispatcher {
 
@@ -286,6 +305,64 @@ public class TestIcebergTableHookDispatcher {
 
     Assertions.assertDoesNotThrow(() -> hookDispatcher.dropTable(mockContext, tableId, false));
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
+  }
+
+  @Test
+  public void testDropTableWithAuthorizationOffDeletesEntity() throws Exception {
+    // With authorization off there is no owner dispatcher, but the entity store must still
+    // forget a table dropped through Iceberg REST.
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", null, true);
+    IcebergTableHookDispatcher bookkeepingOnly =
+        new IcebergTableHookDispatcher(mockDispatcher, mockNamespaceDispatcher, false);
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+
+    bookkeepingOnly.dropTable(mockContext, tableId, false);
+
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    verify(mockEntityStore)
+        .delete(
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                TEST_METALAKE, TEST_CATALOG, tableId, ":"),
+            Entity.EntityType.TABLE);
+  }
+
+  @Test
+  public void testRenameTableWithAuthorizationOffMovesEntity() throws Exception {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", null, true);
+    IcebergTableHookDispatcher bookkeepingOnly =
+        new IcebergTableHookDispatcher(mockDispatcher, mockNamespaceDispatcher, false);
+    TableIdentifier source = TableIdentifier.of("schema1", "old_table");
+    TableIdentifier dest = TableIdentifier.of("schema1", "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+
+    bookkeepingOnly.renameTable(mockContext, request);
+
+    verify(mockEntityStore)
+        .update(
+            eq(
+                IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                    TEST_METALAKE, TEST_CATALOG, source, ":")),
+            eq(TableEntity.class),
+            eq(Entity.EntityType.TABLE),
+            any());
+  }
+
+  @Test
+  public void testCreateTableWithAuthorizationOffSkipsImportAndOwnership() {
+    IcebergTableHookDispatcher bookkeepingOnly =
+        new IcebergTableHookDispatcher(mockDispatcher, mockNamespaceDispatcher, false);
+    Namespace namespace = Namespace.of("test_schema");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.createTable(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    Assertions.assertSame(
+        mockResponse, bookkeepingOnly.createTable(mockContext, namespace, request));
+
+    verify(mockInternalTableDispatcher, never()).loadTable(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test
@@ -547,5 +624,312 @@ public class TestIcebergTableHookDispatcher {
     verify(mockTableDispatcher, never()).loadTable(any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testDropTableRemovesPrivilegesAfterBackendDrop(boolean purgeRequested) {
+    TableIdentifier tableId = TableIdentifier.of(Namespace.of("parent", "child"), "test_table");
+    NameIdentifier tableIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    List<String> locations = List.of("s3://bucket/parent/child/test_table");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(tableIdent, Entity.EntityType.TABLE))
+          .thenReturn(locations);
+
+      hookDispatcher.dropTable(mockContext, tableId, purgeRequested);
+
+      verify(mockDispatcher).dropTable(mockContext, tableId, purgeRequested);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  tableIdent, Entity.EntityType.TABLE, locations));
+    }
+  }
+
+  @Test
+  public void testFailedDropTableKeepsPrivileges() {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    RuntimeException failure = new RuntimeException("backend drop failed");
+    doThrow(failure).when(mockDispatcher).dropTable(mockContext, tableId, true);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              RuntimeException.class, () -> hookDispatcher.dropTable(mockContext, tableId, true)));
+
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
+  }
+
+  @Test
+  public void testDropTablePropagatesPluginFailureAfterEntityCleanup() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier tableIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    RuntimeException failure = new RuntimeException("plugin failed");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()))
+          .thenThrow(failure);
+
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              RuntimeException.class, () -> hookDispatcher.dropTable(mockContext, tableId, false)));
+    }
+    // The backend drop and the entity cleanup happened before the plugin was called.
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    verify(mockEntityStore).delete(tableIdent, Entity.EntityType.TABLE);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"schema1, schema1", "schema1, schema2", "parent:child, other"})
+  public void testRenameTableRenamesPrivilegesAfterBackendRename(
+      String sourceNamespace, String destNamespace) {
+    TableIdentifier source =
+        TableIdentifier.of(Namespace.of(sourceNamespace.split(":")), "old_table");
+    TableIdentifier dest = TableIdentifier.of(Namespace.of(destNamespace.split(":")), "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+    NameIdentifier sourceIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, source, ":");
+    NameIdentifier destIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, dest, ":");
+    List<String> locations = List.of("s3://bucket/old_table");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      sourceIdent, Entity.EntityType.TABLE))
+          .thenReturn(locations);
+
+      hookDispatcher.renameTable(mockContext, request);
+
+      verify(mockDispatcher).renameTable(mockContext, request);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  sourceIdent, Entity.EntityType.TABLE, destIdent, locations));
+    }
+  }
+
+  @Test
+  public void testFailedRenameTableKeepsPrivileges() throws IOException {
+    TableIdentifier source = TableIdentifier.of("schema1", "old_table");
+    TableIdentifier dest = TableIdentifier.of("schema2", "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+    RuntimeException failure = new RuntimeException("backend rename failed");
+    doThrow(failure).when(mockDispatcher).renameTable(mockContext, request);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              RuntimeException.class, () -> hookDispatcher.renameTable(mockContext, request)));
+
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  any(), any(), any(NameIdentifier.class), any()),
+          never());
+    }
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRenameTableKeepsPrivilegesWhenEntityUpdateFails() throws IOException {
+    TableIdentifier source = TableIdentifier.of("schema1", "old_table");
+    TableIdentifier dest = TableIdentifier.of("schema2", "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+    doThrow(new IOException("IO error")).when(mockEntityStore).update(any(), any(), any(), any());
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertThrows(
+          RuntimeException.class, () -> hookDispatcher.renameTable(mockContext, request));
+
+      // The Gravitino entity keeps the source name, so its privileges keep it too.
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  any(), any(), any(NameIdentifier.class), any()),
+          never());
+    }
+  }
+
+  @Test
+  public void testCreateTableAfterFailedDropReconcileDoesNotAdoptStaleEntity() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+
+    // The backend drop succeeds, but the entity delete fails. The hook swallows the failure, so
+    // the old TableEntity (old id, role grants, tags, policies) stays under the name.
+    doThrow(new IOException("store unavailable"))
+        .when(mockEntityStore)
+        .delete(ident, Entity.EntityType.TABLE);
+    Assertions.assertDoesNotThrow(() -> hookDispatcher.dropTable(mockContext, tableId, false));
+
+    // Another user creates a new table under the same name. The backend create succeeded, so no
+    // table had this name: any entity stored under it belongs to the dropped table and is stale.
+    clearInvocations(mockEntityStore);
+    List<String> calls = recordStaleCleanupCalls(ident, Entity.EntityType.TABLE);
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, tableId.namespace(), request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    try (MockedStatic<AuthorizationUtils> authz = recordPluginRemoval(calls)) {
+      hookDispatcher.createTable(mockContext, tableId.namespace(), request);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  eq(ident), eq(Entity.EntityType.TABLE), eq(Collections.emptyList())));
+    }
+
+    // Core import treats any same-name entity as already imported for tables with no stored
+    // Gravitino id, which is every Iceberg REST table. The stale entity and its plugin policies
+    // must be removed before the import, or the new table inherits the old table's id and bindings.
+    Assertions.assertEquals(List.of("delete", "removePrivileges", "import"), calls);
+  }
+
+  @Test
+  public void testStagedCreateCommitRemovesStaleEntityBeforeImport() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    List<String> calls = recordStaleCleanupCalls(ident, Entity.EntityType.TABLE);
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
+    when(mockDispatcher.updateTable(mockContext, tableId, request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    try (MockedStatic<AuthorizationUtils> ignored = recordPluginRemoval(calls)) {
+      hookDispatcher.updateTable(mockContext, tableId, request);
+    }
+
+    // The staged create committed with AssertTableDoesNotExist, so the name was free.
+    Assertions.assertEquals(List.of("delete", "removePrivileges", "import"), calls);
+  }
+
+  @Test
+  public void testCreateTableFailsWhenStaleEntityCannotBeRemoved() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    doThrow(new IOException("store unavailable"))
+        .when(mockEntityStore)
+        .delete(ident, Entity.EntityType.TABLE);
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, tableId.namespace(), request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    // Importing now would adopt whatever entity is still under the name, so fail instead.
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createTable(mockContext, tableId.namespace(), request));
+    Assertions.assertInstanceOf(IOException.class, thrown.getCause());
+    verify(mockInternalTableDispatcher, never()).loadTable(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  private List<String> recordStaleCleanupCalls(NameIdentifier ident, Entity.EntityType type)
+      throws IOException {
+    List<String> calls = new ArrayList<>();
+    doAnswer(
+            invocation -> {
+              calls.add("delete");
+              return true;
+            })
+        .when(mockEntityStore)
+        .delete(ident, type);
+    doAnswer(
+            invocation -> {
+              calls.add("import");
+              return null;
+            })
+        .when(mockInternalTableDispatcher)
+        .loadTable(ident);
+    return calls;
+  }
+
+  private static MockedStatic<AuthorizationUtils> recordPluginRemoval(List<String> calls) {
+    MockedStatic<AuthorizationUtils> authz = mockStatic(AuthorizationUtils.class);
+    authz
+        .when(() -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              calls.add("removePrivileges");
+              return null;
+            });
+    return authz;
+  }
+
+  @Test
+  public void testAsyncPurgeEnqueueFailureStillCleansUpEntity() throws Exception {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+
+    // Real executor under the hook, so the async-purge path runs as in production.
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    TableMetadata metadata = mock(TableMetadata.class);
+    when(metadata.metadataFileLocation()).thenReturn("s3://b/test_schema/test_table/m/0.json");
+    when(wrapper.loadTableMetadata(tableId)).thenReturn(metadata);
+    when(wrapper.fileIOImpl()).thenReturn("io");
+    when(wrapper.fileIOProperties()).thenReturn(Collections.emptyMap());
+    // The backend drop commits; the table no longer exists.
+    when(wrapper.tableExists(tableId)).thenReturn(false);
+    IcebergCatalogWrapperManager wrapperManager = mock(IcebergCatalogWrapperManager.class);
+    when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    IcebergCleanupManager cleanupManager = mock(IcebergCleanupManager.class);
+    when(cleanupManager.addJob(any())).thenThrow(new RuntimeException("job store unavailable"));
+    IcebergTableHookDispatcher asyncHook =
+        new IcebergTableHookDispatcher(
+            new IcebergTableOperationExecutor(wrapperManager, Optional.of(cleanupManager)),
+            mockNamespaceDispatcher);
+    when(mockContext.asyncPurge()).thenReturn(true);
+
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    CatalogEntity catalogEntity = mock(CatalogEntity.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    when(catalog.entity()).thenReturn(catalogEntity);
+    when(catalogEntity.id()).thenReturn(42L);
+    Object previousCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    try {
+      // The catalog drop is committed before the enqueue fails. The request must not report a
+      // failed drop, and the hook must still remove the entity of the dropped table.
+      Assertions.assertDoesNotThrow(() -> asyncHook.dropTable(mockContext, tableId, true));
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
+    }
+
+    verify(wrapper).dropTable(tableId);
+    verify(mockEntityStore).delete(ident, Entity.EntityType.TABLE);
   }
 }

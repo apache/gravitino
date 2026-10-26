@@ -26,6 +26,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -58,15 +59,33 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
 
   private final IcebergNamespaceOperationDispatcher dispatcher;
   private final String metalake;
+  private final boolean trackCreates;
 
   public IcebergNamespaceHookDispatcher(IcebergNamespaceOperationDispatcher dispatcher) {
+    this(dispatcher, true);
+  }
+
+  /**
+   * Creates the namespace hook dispatcher.
+   *
+   * @param dispatcher the dispatcher this hook decorates
+   * @param trackCreates whether namespace creates and table or view registrations import the new
+   *     entity into Gravitino and assign its owner. Off when authorization is off; drop keeps the
+   *     entity store in step either way.
+   */
+  public IcebergNamespaceHookDispatcher(
+      IcebergNamespaceOperationDispatcher dispatcher, boolean trackCreates) {
     this.dispatcher = dispatcher;
     this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    this.trackCreates = trackCreates;
   }
 
   @Override
   public CreateNamespaceResponse createNamespace(
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
+    if (!trackCreates) {
+      return dispatcher.createNamespace(context, createRequest);
+    }
     String catalogName = context.catalogName();
     Namespace leaf = createRequest.namespace();
     List<Namespace> newlyOwned = new ArrayList<>();
@@ -141,6 +160,13 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
   @Override
   public void dropNamespace(IcebergRequestContext context, Namespace namespace) {
     String catalogName = context.catalogName();
+    NameIdentifier schemaIdent =
+        IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+            metalake, catalogName, namespace, HierarchicalSchemaUtil.schemaSeparator());
+    // Read the locations before the drop, while the namespace still exists, like
+    // SchemaHookDispatcher.
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(schemaIdent, Entity.EntityType.SCHEMA);
     // Same top-level branch lock as createNamespace, so the phantom-row cleanup stays atomic
     // against concurrent creates that could re-add children under our ancestors.
     TreeLockUtils.doWithTreeLock(
@@ -164,6 +190,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
           IcebergOrphanSchemaCleanup.bestEffortCleanUp(metalake, dispatcher, context, namespace);
           return null;
         });
+    // The backend drop succeeded, so remove the namespace's privileges from the authorization
+    // plugins and the cached name-id mapping, like SchemaHookDispatcher.dropSchema. A failed drop
+    // throws above and keeps the privileges.
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        schemaIdent, Entity.EntityType.SCHEMA, locations);
   }
 
   @Override
@@ -189,10 +220,24 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       RegisterTableRequest registerTableRequest) {
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
-    if (hasTableEntityInStore(context, namespace, registerTableRequest.name())) {
-      // Gravitino already tracks this table: preserve table_id and existing role/owner/tag/policy
-      // bindings after the backend registerTable completes.
+    if (!trackCreates) {
       return response;
+    }
+
+    if (registerTableRequest.overwrite()) {
+      if (hasTableEntityInStore(context, namespace, registerTableRequest.name())) {
+        // Gravitino already tracks this table: preserve table_id and existing
+        // role/owner/tag/policy bindings after the backend registerTable completes.
+        return response;
+      }
+    } else {
+      // A register without overwrite succeeded, so no table had this name. Any entity or plugin
+      // policy under it belongs to a dropped table; remove it, or the import adopts its id and
+      // bindings.
+      IcebergStaleEntityCleaner.removeStaleTable(
+          metalake,
+          context.catalogName(),
+          TableIdentifier.of(namespace, registerTableRequest.name()));
     }
 
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
@@ -216,11 +261,15 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
     LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
 
-    if (hasViewEntityInStore(context, namespace, registerViewRequest.name())) {
-      // Gravitino already tracks this view: preserve view_id and existing role/owner/tag/policy
-      // bindings after the backend registerView completes.
+    if (!trackCreates) {
       return response;
     }
+
+    // Register view has no overwrite, so its success means no view had this name. Any entity or
+    // plugin policy under it belongs to a dropped view; remove it, or the import adopts its id and
+    // bindings.
+    IcebergStaleEntityCleaner.removeStaleView(
+        metalake, context.catalogName(), TableIdentifier.of(namespace, registerViewRequest.name()));
 
     // Import is intentionally NOT wrapped in try-catch: if it fails the view exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
@@ -247,25 +296,6 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
               catalogName,
               TableIdentifier.of(namespace, viewName),
               HierarchicalSchemaUtil.schemaSeparator()));
-    }
-  }
-
-  private boolean hasViewEntityInStore(
-      IcebergRequestContext context, Namespace namespace, String viewName) {
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    if (entityStore == null) {
-      return false;
-    }
-    try {
-      return entityStore.exists(
-          IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake,
-              context.catalogName(),
-              TableIdentifier.of(namespace, viewName),
-              HierarchicalSchemaUtil.schemaSeparator()),
-          Entity.EntityType.VIEW);
-    } catch (IOException ioe) {
-      throw new RuntimeException("io exception when checking view entity existence", ioe);
     }
   }
 

@@ -19,17 +19,23 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -37,9 +43,11 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.ViewEntity;
@@ -58,6 +66,8 @@ import org.apache.iceberg.view.ImmutableViewVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestIcebergViewHookDispatcher {
 
@@ -192,7 +202,7 @@ public class TestIcebergViewHookDispatcher {
   }
 
   @Test
-  public void testCreateViewHandlesImportFailureGracefully() throws Exception {
+  public void testCreateViewPropagatesImportFailure() throws Exception {
     Namespace namespace = Namespace.of(SCHEMA_NAME);
     CreateViewRequest createRequest =
         ImmutableCreateViewRequest.builder()
@@ -220,11 +230,15 @@ public class TestIcebergViewHookDispatcher {
         .when(mockInternalViewDispatcher)
         .loadView(any(NameIdentifier.class));
 
-    // Should not throw - import is best-effort
-    LoadViewResponse response = hookDispatcher.createView(mockContext, namespace, createRequest);
+    // The view exists in the backend but not in Gravitino, so the create must not report success.
+    RuntimeException thrown =
+        assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createView(mockContext, namespace, createRequest));
 
-    assertEquals(mockResponse, response);
+    assertEquals("Import failed", thrown.getMessage());
     verify(mockExecutor, times(1)).createView(mockContext, namespace, createRequest);
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test
@@ -264,6 +278,63 @@ public class TestIcebergViewHookDispatcher {
     verify(mockInternalViewDispatcher, times(1)).loadView(any(NameIdentifier.class));
     verify(mockViewDispatcher, never()).loadView(any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateViewSurfacesImportFailureInsteadOfOwnerNotFound() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    CreateViewRequest createRequest =
+        ImmutableCreateViewRequest.builder()
+            .name(VIEW_NAME)
+            .schema(VIEW_SCHEMA)
+            .viewVersion(
+                ImmutableViewVersion.builder()
+                    .versionId(1)
+                    .timestampMillis(System.currentTimeMillis())
+                    .schemaId(1)
+                    .defaultNamespace(namespace)
+                    .addRepresentations(
+                        ImmutableSQLViewRepresentation.builder()
+                            .sql("SELECT * FROM test")
+                            .dialect("spark")
+                            .build())
+                    .build())
+            .build();
+    when(mockExecutor.createView(mockContext, namespace, createRequest))
+        .thenReturn(mock(LoadViewResponse.class));
+
+    // The view is committed in the backend, but the import into Gravitino fails.
+    doThrow(new IllegalArgumentException("Import failed"))
+        .when(mockInternalViewDispatcher)
+        .loadView(any(NameIdentifier.class));
+    // Like OwnerManager, the owner dispatcher cannot set an owner on a view with no entity.
+    doThrow(new NotFoundException("Metadata object %s or owner %s is not found", VIEW_NAME, USER))
+        .when(mockInternalOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+
+    // The table and namespace hooks surface the import failure. The view hook should do the
+    // same, and not report a misleading "not found" for a view it has just created.
+    IllegalArgumentException thrown =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> hookDispatcher.createView(mockContext, namespace, createRequest));
+    assertEquals("Import failed", thrown.getMessage());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testDropViewWithAuthorizationOffRemovesFromEntityStore() throws Exception {
+    FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", null, true);
+    IcebergViewHookDispatcher bookkeepingOnly =
+        new IcebergViewHookDispatcher(mockExecutor, mockNamespaceDispatcher, METALAKE, false);
+    TableIdentifier viewIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), VIEW_NAME);
+
+    bookkeepingOnly.dropView(mockContext, viewIdent);
+
+    verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
+    NameIdentifier expectedIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
+    verify(mockEntityStore, times(1)).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
   }
 
   @Test
@@ -520,5 +591,147 @@ public class TestIcebergViewHookDispatcher {
 
     verify(mockExecutor, times(1)).viewExists(mockContext, viewIdent);
     assertEquals(true, exists);
+  }
+
+  @Test
+  public void testDropViewEvictsNameIdMappingAfterBackendDrop() {
+    TableIdentifier viewId = TableIdentifier.of(Namespace.of("parent", "child"), VIEW_NAME);
+    NameIdentifier viewIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewId, ":");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      hookDispatcher.dropView(mockContext, viewId);
+
+      verify(mockExecutor).dropView(mockContext, viewId);
+      authz.verify(
+          () ->
+              AuthorizationUtils.notifyEntityNameIdMappingChange(
+                  viewIdent, Entity.EntityType.VIEW));
+      // Views have no catalog authorization plugin privileges, like ViewHookDispatcher.dropView.
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          never());
+    }
+  }
+
+  @Test
+  public void testFailedDropViewKeepsNameIdMapping() {
+    TableIdentifier viewId = TableIdentifier.of(SCHEMA_NAME, VIEW_NAME);
+    RuntimeException failure = new RuntimeException("backend drop failed");
+    doThrow(failure).when(mockExecutor).dropView(mockContext, viewId);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      assertSame(
+          failure,
+          assertThrows(RuntimeException.class, () -> hookDispatcher.dropView(mockContext, viewId)));
+
+      authz.verify(() -> AuthorizationUtils.notifyEntityNameIdMappingChange(any(), any()), never());
+    }
+  }
+
+  @Test
+  public void testRenameViewRenamesPrivilegesAfterBackendRename() {
+    TableIdentifier sourceIdent = TableIdentifier.of(Namespace.of("parent", "child"), "old_view");
+    TableIdentifier destIdent = TableIdentifier.of(Namespace.of("other"), "new_view");
+    RenameTableRequest renameRequest =
+        RenameTableRequest.builder().withSource(sourceIdent).withDestination(destIdent).build();
+    NameIdentifier sourceGravitinoIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent, ":");
+    NameIdentifier destGravitinoIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, destIdent, ":");
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      hookDispatcher.renameView(mockContext, renameRequest);
+
+      verify(mockExecutor).renameView(mockContext, renameRequest);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  sourceGravitinoIdent, Entity.EntityType.VIEW, destGravitinoIdent, null));
+    }
+  }
+
+  @Test
+  public void testFailedRenameViewKeepsPrivileges() {
+    TableIdentifier sourceIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), "old_view");
+    TableIdentifier destIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), "new_view");
+    RenameTableRequest renameRequest =
+        RenameTableRequest.builder().withSource(sourceIdent).withDestination(destIdent).build();
+    RuntimeException failure = new RuntimeException("backend rename failed");
+    doThrow(failure).when(mockExecutor).renameView(mockContext, renameRequest);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      assertSame(
+          failure,
+          assertThrows(
+              RuntimeException.class, () -> hookDispatcher.renameView(mockContext, renameRequest)));
+
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRenamePrivileges(
+                  any(), any(), any(NameIdentifier.class), any()),
+          never());
+    }
+  }
+
+  @Test
+  public void testCreateViewRemovesStaleEntityBeforeImport() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    CreateViewRequest createRequest =
+        ImmutableCreateViewRequest.builder()
+            .name(VIEW_NAME)
+            .schema(VIEW_SCHEMA)
+            .viewVersion(
+                ImmutableViewVersion.builder()
+                    .versionId(1)
+                    .timestampMillis(System.currentTimeMillis())
+                    .schemaId(1)
+                    .defaultNamespace(namespace)
+                    .addRepresentations(
+                        ImmutableSQLViewRepresentation.builder()
+                            .sql("SELECT * FROM test")
+                            .dialect("spark")
+                            .build())
+                    .build())
+            .build();
+    when(mockExecutor.createView(mockContext, namespace, createRequest))
+        .thenReturn(mock(LoadViewResponse.class));
+
+    // A ViewEntity is still stored under the name, left by a dropped view whose entity cleanup
+    // failed. The backend create succeeded, so no view had this name and the entity is stale.
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, SCHEMA_NAME, VIEW_NAME);
+    List<String> calls = new ArrayList<>();
+    doAnswer(
+            invocation -> {
+              calls.add("delete");
+              return true;
+            })
+        .when(mockEntityStore)
+        .delete(ident, Entity.EntityType.VIEW);
+    doAnswer(
+            invocation -> {
+              calls.add("import");
+              return null;
+            })
+        .when(mockInternalViewDispatcher)
+        .loadView(ident);
+
+    try (MockedStatic<AuthorizationUtils> authz = mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                calls.add("removePrivileges");
+                return null;
+              });
+      hookDispatcher.createView(mockContext, namespace, createRequest);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  eq(ident), eq(Entity.EntityType.VIEW), eq(Collections.emptyList())));
+    }
+
+    // Without the removal the import adopts the stale view id and every grant, tag and policy.
+    assertEquals(List.of("delete", "removePrivileges", "import"), calls);
   }
 }

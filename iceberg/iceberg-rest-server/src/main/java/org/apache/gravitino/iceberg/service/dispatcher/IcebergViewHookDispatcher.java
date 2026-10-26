@@ -23,6 +23,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -55,14 +56,33 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private final IcebergViewOperationDispatcher dispatcher;
   private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
   private final String metalake;
+  private final boolean trackCreates;
 
   public IcebergViewHookDispatcher(
       IcebergViewOperationDispatcher dispatcher,
       IcebergNamespaceOperationDispatcher namespaceDispatcher,
       String metalake) {
+    this(dispatcher, namespaceDispatcher, metalake, true);
+  }
+
+  /**
+   * Creates the view hook dispatcher.
+   *
+   * @param dispatcher the dispatcher this hook decorates
+   * @param namespaceDispatcher the raw namespace dispatcher used for orphan-schema cleanup
+   * @param metalake the metalake containing the Iceberg REST catalogs
+   * @param trackCreates whether creates import the new entity into Gravitino and assign its owner.
+   *     Off when authorization is off; drop and rename keep the entity store in step either way.
+   */
+  public IcebergViewHookDispatcher(
+      IcebergViewOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher,
+      String metalake,
+      boolean trackCreates) {
     this.dispatcher = dispatcher;
     this.namespaceDispatcher = namespaceDispatcher;
     this.metalake = metalake;
+    this.trackCreates = trackCreates;
   }
 
   @Override
@@ -70,8 +90,19 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       IcebergRequestContext context, Namespace namespace, CreateViewRequest createViewRequest) {
     // First, create the view in the underlying catalog
     LoadViewResponse response = dispatcher.createView(context, namespace, createViewRequest);
+    if (!trackCreates) {
+      return response;
+    }
 
-    // Then import it into Gravitino so Gravitino is aware of the view
+    // The backend create just succeeded, so no view had this name. Any entity or plugin policy
+    // under it belongs to a dropped view; remove it, or the import adopts its id and bindings.
+    IcebergStaleEntityCleaner.removeStaleView(
+        metalake, context.catalogName(), TableIdentifier.of(namespace, createViewRequest.name()));
+
+    // Then import it into Gravitino so Gravitino is aware of the view. The import is not
+    // best-effort here: if it fails, the view has no Gravitino entity, so setting the owner below
+    // would fail with a misleading "not found". Surface the import failure instead, as the table
+    // and namespace hooks do.
     importView(context.catalogName(), namespace, createViewRequest.name());
 
     // Set ownership for the newly created view.
@@ -108,6 +139,16 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     bestEffortReconcileViewEntity(context, viewIdentifier);
     IcebergOrphanSchemaCleanup.bestEffortCleanUp(
         metalake, namespaceDispatcher, context, viewIdentifier.namespace());
+    // The backend drop succeeded. A view created later under the same name gets a new id, so drop
+    // the cached name-id mapping, like ViewHookDispatcher.dropView. Views have no catalog
+    // authorization plugin privileges to remove.
+    AuthorizationUtils.notifyEntityNameIdMappingChange(
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            viewIdentifier,
+            HierarchicalSchemaUtil.schemaSeparator()),
+        Entity.EntityType.VIEW);
   }
 
   @Override
@@ -171,6 +212,12 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // stale entity on the source or miss importing a re-created destination.
     bestEffortReconcileViewEntity(context, renameViewRequest.source());
     bestEffortReconcileViewEntity(context, renameViewRequest.destination());
+
+    // The backend rename succeeded, so rename the view's privileges and evict the cached name-id
+    // mapping, like ViewHookDispatcher.alterView. The destination may be in another namespace. A
+    // failed rename throws above and leaves both untouched.
+    AuthorizationUtils.authorizationPluginRenamePrivileges(
+        sourceIdent, Entity.EntityType.VIEW, destIdent, null);
   }
 
   /**
@@ -180,8 +227,8 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
    * catalog's ViewCatalog implementation. This ensures Gravitino is aware of the view and can apply
    * authorization policies to it.
    *
-   * <p>This is a best-effort operation - if it fails, we log a warning but don't fail the Iceberg
-   * REST operation, as the view was successfully created in the underlying catalog.
+   * <p>Failures propagate to the caller. Callers that only reconcile state after a backend
+   * operation wrap this call in {@link #bestEffortReconcileViewEntity}.
    *
    * @param catalogName The name of the Gravitino catalog.
    * @param namespace The Iceberg namespace containing the view.
@@ -190,29 +237,18 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private void importView(String catalogName, Namespace namespace, String viewName) {
     ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
     if (viewDispatcher != null) {
-      try {
-        viewDispatcher.loadView(
-            IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake,
-                catalogName,
-                TableIdentifier.of(namespace, viewName),
-                HierarchicalSchemaUtil.schemaSeparator()));
-        LOG.info(
-            "Successfully imported view into Gravitino: {}.{}.{}.{}",
-            metalake,
-            catalogName,
-            namespace,
-            viewName);
-      } catch (Exception e) {
-        // Log but don't fail - view import is best-effort
-        LOG.warn(
-            "Failed to import view into Gravitino: {}.{}.{}.{} - {}",
-            metalake,
-            catalogName,
-            namespace,
-            viewName,
-            e.getMessage());
-      }
+      viewDispatcher.loadView(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, viewName),
+              HierarchicalSchemaUtil.schemaSeparator()));
+      LOG.info(
+          "Successfully imported view into Gravitino: {}.{}.{}.{}",
+          metalake,
+          catalogName,
+          namespace,
+          viewName);
     }
   }
 
@@ -238,7 +274,9 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     try {
       reconcileViewEntity(context, viewIdentifier);
     } catch (RuntimeException e) {
-      LOG.warn(
+      // Kept best-effort so the client sees the committed backend result, but logged at ERROR: a
+      // stale entity left here keeps its grants until the name is created again.
+      LOG.error(
           "Failed to reconcile Gravitino view entity after the Iceberg backend operation "
               + "succeeded. catalog={}, view={}",
           context.catalogName(),

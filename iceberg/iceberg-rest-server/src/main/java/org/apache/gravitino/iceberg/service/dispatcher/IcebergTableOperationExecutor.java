@@ -152,10 +152,11 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
         manager -> {
           // Read the metadata location before dropping the catalog entry, then enqueue the job. The
           // job deletes only files reachable from this old metadata, so a table recreated at the
-          // same name (with fresh metadata) is never touched.
+          // same name (with fresh metadata) is never touched. Resolve everything that can fail
+          // before the drop: once the drop commits, a failure here would skip the caller's entity
+          // and privilege cleanup and report a failed drop for a table that is gone.
           TableMetadata metadata = wrapper.loadTableMetadata(tableIdentifier);
-          wrapper.dropTable(tableIdentifier);
-          manager.addJob(
+          IcebergCleanupJob job =
               new IcebergCleanupJob(
                   0L,
                   IcebergCleanupHelper.catalogId(context.catalogName()),
@@ -164,7 +165,21 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
                   metadata.metadataFileLocation(),
                   wrapper.fileIOImpl(),
                   wrapper.fileIOProperties(),
-                  context.userName()));
+                  context.userName());
+          wrapper.dropTable(tableIdentifier);
+          try {
+            manager.addJob(job);
+          } catch (RuntimeException e) {
+            // The table is already dropped from the catalog, so the drop succeeded. Its files are
+            // orphaned; the metadata location lets an operator purge them.
+            LOG.error(
+                "Dropped table {} in catalog {} but failed to enqueue its async purge; its data"
+                    + " files are not deleted. Purge them from metadata {}",
+                tableIdentifier,
+                context.catalogName(),
+                metadata.metadataFileLocation(),
+                e);
+          }
         },
         () -> wrapper.purgeTable(tableIdentifier));
   }

@@ -20,11 +20,13 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -56,13 +58,30 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   private final IcebergTableOperationDispatcher dispatcher;
   private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
+  private final boolean trackCreates;
   private String metalake;
 
   public IcebergTableHookDispatcher(
       IcebergTableOperationDispatcher dispatcher,
       IcebergNamespaceOperationDispatcher namespaceDispatcher) {
+    this(dispatcher, namespaceDispatcher, true);
+  }
+
+  /**
+   * Creates the table hook dispatcher.
+   *
+   * @param dispatcher the dispatcher this hook decorates
+   * @param namespaceDispatcher the raw namespace dispatcher used for orphan-schema cleanup
+   * @param trackCreates whether creates import the new entity into Gravitino and assign its owner.
+   *     Off when authorization is off; drop and rename keep the entity store in step either way.
+   */
+  public IcebergTableHookDispatcher(
+      IcebergTableOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher,
+      boolean trackCreates) {
     this.dispatcher = dispatcher;
     this.namespaceDispatcher = namespaceDispatcher;
+    this.trackCreates = trackCreates;
     this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
   }
 
@@ -72,7 +91,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
     // Skip import and ownership for staged creates (credential vending).
     // The table will be imported when the staged table is committed via updateTable.
-    if (!createTableRequest.stageCreate()) {
+    if (trackCreates && !createTableRequest.stageCreate()) {
       importTableAndSetOwner(context, namespace, createTableRequest.name());
     }
 
@@ -92,7 +111,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     boolean isStagedCreateCommit =
         updateTableRequest.requirements().stream()
             .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
-    if (isStagedCreateCommit) {
+    if (trackCreates && isStagedCreateCommit) {
       importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
     }
     return response;
@@ -101,6 +120,15 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
+    NameIdentifier tableIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            tableIdentifier,
+            HierarchicalSchemaUtil.schemaSeparator());
+    // Read the locations before the drop, while the table still exists, like TableHookDispatcher.
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(tableIdent, Entity.EntityType.TABLE);
     dispatcher.dropTable(context, tableIdentifier, purgeRequested);
     // Reconcile against Iceberg backend state — without a distributed TreeLock,
     // another node may recreate the same table between the drop above and the
@@ -108,6 +136,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     bestEffortReconcileTableEntity(context, tableIdentifier);
     IcebergOrphanSchemaCleanup.bestEffortCleanUp(
         metalake, namespaceDispatcher, context, tableIdentifier.namespace());
+    // The backend drop (or purge) succeeded, so remove the table's privileges from the
+    // authorization plugins and the cached name-id mapping, like TableHookDispatcher.dropTable.
+    // A failed drop throws above and keeps the privileges.
+    AuthorizationUtils.authorizationPluginRemovePrivileges(
+        tableIdent, Entity.EntityType.TABLE, locations);
   }
 
   @Override
@@ -128,7 +161,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
-    dispatcher.renameTable(context, renameTableRequest);
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     NameIdentifier tableSource =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
@@ -136,6 +168,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     NameIdentifier tableDest =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             metalake, context.catalogName(), renameTableRequest.destination(), separator);
+    // Read the locations before the rename, while the source table still exists, like
+    // TableHookDispatcher.alterTable.
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(tableSource, Entity.EntityType.TABLE);
+    dispatcher.renameTable(context, renameTableRequest);
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     try {
       if (store != null) {
@@ -170,6 +207,12 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     // stale entity on the source or miss importing a re-created destination.
     bestEffortReconcileTableEntity(context, renameTableRequest.source());
     bestEffortReconcileTableEntity(context, renameTableRequest.destination());
+
+    // The backend rename succeeded, so rename the table's privileges in the authorization plugins
+    // and evict the cached name-id mapping, like TableHookDispatcher.alterTable. The destination
+    // may be in another namespace. A failed rename throws above and keeps the privileges.
+    AuthorizationUtils.authorizationPluginRenamePrivileges(
+        tableSource, Entity.EntityType.TABLE, tableDest, locations);
   }
 
   @Override
@@ -224,6 +267,10 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   private void importTableAndSetOwner(
       IcebergRequestContext context, Namespace namespace, String tableName) {
+    // The backend create just succeeded, so no table had this name. Any entity or plugin policy
+    // under it belongs to a dropped table; remove it, or the import adopts its id and bindings.
+    IcebergStaleEntityCleaner.removeStaleTable(
+        metalake, context.catalogName(), TableIdentifier.of(namespace, tableName));
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
@@ -272,7 +319,9 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     try {
       reconcileTableEntity(context, tableIdentifier);
     } catch (RuntimeException e) {
-      LOG.warn(
+      // Kept best-effort so the client sees the committed backend result, but logged at ERROR: a
+      // stale entity left here keeps its grants until the name is created again.
+      LOG.error(
           "Failed to reconcile Gravitino table entity after the Iceberg backend operation "
               + "succeeded. catalog={}, table={}",
           context.catalogName(),
