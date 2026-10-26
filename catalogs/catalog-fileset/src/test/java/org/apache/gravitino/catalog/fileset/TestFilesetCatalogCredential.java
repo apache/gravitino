@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Map;
@@ -73,5 +74,15 @@ public class TestFilesetCatalogCredential {
         catalog
             .propertiesWithCredentialProviders()
             .get(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX));
+  }
+
+  @Test
+  void testPathBasedCredentialProvidersAllowed() {
+    FilesetCatalogImpl catalog = newCatalog(Maps.newHashMap());
+    Assertions.assertTrue(catalog.supportsPathBasedCredentials());
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,gcs-token")));
   }
 }

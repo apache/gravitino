@@ -17,7 +17,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 | Catalog type     | Supported credential types                         |
 |------------------|----------------------------------------------------|
 | Hadoop (Fileset) | S3, OSS, GCS, ADLS                                 |
-| Hive             | S3, OSS, GCS, ADLS                                 |
+| Hive             | S3, OSS, ADLS                                      |
 | Iceberg          | S3, OSS, GCS, ADLS                                 |
 | Glue             | S3                                                 |
 | JDBC             | JDBC user/password (`jdbc-user-password`)          |
@@ -27,7 +27,8 @@ Gravitino credential vending is used to generate temporary or static credentials
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
+- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs, except that the Trino Hive connector does not consume OSS credentials. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
+- Token providers (`s3-token`, `oss-token`, `gcs-token`, and `adls-token`) and `aws-irsa` scope credentials to a path, so only Fileset and Iceberg catalogs support them. Other catalogs vend static keys only, such as `s3-secret-key`, `oss-secret-key`, and `azure-account-key`. Creating or altering such a catalog with one of these providers fails.
 
 ## General Configurations
 
@@ -224,7 +225,7 @@ Clients retrieve vended credentials from:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
-The server returns short-lived or static credentials that the client can use to access the underlying storage directly. These credentials are catalog-level and are not refreshed: token providers such as `s3-token` vend nothing at catalog level, and `aws-irsa` credentials expire after `s3-token-expire-in-secs`.
+The server returns short-lived or static credentials that the client can use to access the underlying storage directly. These credentials are catalog-level and are not refreshed. Path-based providers such as `s3-token` and `aws-irsa` vend nothing at catalog level.
 
 ### Spark and Flink Connector Integration
 

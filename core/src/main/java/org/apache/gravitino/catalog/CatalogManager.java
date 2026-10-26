@@ -1023,6 +1023,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       metadata.catalogPropertiesMetadata(),
                       alterProperty.getLeft(),
                       alterProperty.getRight());
+                  storedCatalog.validateCredentialProviders(alterProperty.getLeft());
                   return null;
                 });
 
@@ -1182,6 +1183,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             f.catalogPropertiesMetadata(),
                             alterProperty.getLeft(),
                             alterProperty.getRight());
+                        catalog.validateCredentialProviders(alterProperty.getLeft());
                         return null;
                       });
             } catch (IllegalArgumentException e1) {
@@ -1705,6 +1707,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     classLoader.withClassLoader(
         cl -> {
           validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
+          catalog.validateCredentialProviders(propsToValidate);
+          if (propsToValidate == null) {
+            // Loading stays lenient for catalogs persisted with unsupported providers, so only
+            // warn about them.
+            try {
+              catalog.validateCredentialProviders(conf);
+            } catch (IllegalArgumentException e) {
+              LOG.warn(
+                  "Catalog {} has credential providers that cannot vend credentials: {}",
+                  entity.nameIdentifier(),
+                  e.getMessage());
+            }
+          }
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why do we do this? Because wrapper.catalog.properties() needs to be called in
