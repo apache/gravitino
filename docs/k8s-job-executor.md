@@ -474,7 +474,9 @@ configurations: a variable `REGION` becomes `spark.kubernetes.driverEnv.REGION` 
 `spark.executorEnv.REGION`. A name must consist of letters, digits, `_`, `-`, and `.`, can't start
 with a digit or `..`, and can't be `.`. Otherwise, the run is rejected. The same rule applies to the
 names of `spark.executorEnv.*` in the `configs` of a job template and in the `spark_conf` of a
-built-in Iceberg job.
+built-in Iceberg job. Such a `spark.executorEnv.<name>` overrides the variable only in the
+executors, as in Spark: `spark_conf` can't set `spark.kubernetes.driverEnv.*`, so the driver keeps
+the value from the `environments` of the template.
 
 The variables are set in the driver and executor containers, while the local job executor sets them
 on the `spark-submit` process on the Gravitino server. A template written for the local job
