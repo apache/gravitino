@@ -517,8 +517,26 @@ components:
 
     IcebergSnapshotExpirationContent:
       type: object
-      description: Placeholder content for system_iceberg_snapshot_expiration. Configurable thresholds land in a follow-up.
+      description: Snapshot expiration options for system_iceberg_snapshot_expiration. Scheduling is configured separately.
       additionalProperties: false
+      properties:
+        olderThanDays:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 36500
+          default: 7
+          description: Minimum age of snapshots eligible for expiration, in days.
+        retainLast:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 1
+          description: Minimum number of recent snapshots to keep regardless of age.
+        streamResults:
+          type: boolean
+          default: false
+          description: Whether the expire job should stream intermediate delete results.
 
     IcebergSnapshotExpirationPolicy:
       allOf:

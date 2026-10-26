@@ -43,6 +43,7 @@ import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.RowFilterContent;
@@ -473,17 +474,46 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
-  /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
+  /** Typed snapshot-expiration policy content for REST requests and responses. */
   @EqualsAndHashCode
   @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+    @JsonProperty("olderThanDays")
+    private Long olderThanDays;
+
+    @JsonProperty("retainLast")
+    private Long retainLast;
+
+    @JsonProperty("streamResults")
+    private Boolean streamResults;
+
     private IcebergSnapshotExpirationContentDTO() {}
 
     /**
-     * @return empty snapshot-expiration content DTO
+     * @return minimum snapshot age in days, defaulting to seven
      */
-    public static IcebergSnapshotExpirationContentDTO instance() {
-      return new IcebergSnapshotExpirationContentDTO();
+    public long olderThanDays() {
+      return olderThanDays == null
+          ? IcebergSnapshotExpirationContent.DEFAULT_OLDER_THAN_DAYS
+          : olderThanDays;
+    }
+
+    /**
+     * @return minimum recent snapshots to keep, defaulting to one
+     */
+    public long retainLast() {
+      return retainLast == null ? IcebergSnapshotExpirationContent.DEFAULT_RETAIN_LAST : retainLast;
+    }
+
+    /**
+     * @return whether to stream intermediate delete results
+     */
+    public boolean streamResults() {
+      return streamResults == null
+          ? IcebergSnapshotExpirationContent.DEFAULT_STREAM_RESULTS
+          : streamResults;
     }
 
     @Override
@@ -508,7 +538,8 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     private PolicyContent toDomainContent() {
-      return PolicyContents.icebergSnapshotExpiration();
+      return PolicyContents.icebergSnapshotExpiration(
+          olderThanDays(), retainLast(), streamResults());
     }
   }
 

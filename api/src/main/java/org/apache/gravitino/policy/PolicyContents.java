@@ -206,12 +206,25 @@ public class PolicyContents {
   }
 
   /**
-   * Creates placeholder Iceberg snapshot-expiration policy content.
+   * Creates Iceberg snapshot-expiration policy content with built-in defaults.
    *
    * @return snapshot-expiration policy content
    */
   public static PolicyContent icebergSnapshotExpiration() {
-    return new IcebergSnapshotExpirationContent();
+    return icebergSnapshotExpiration(null, null, null);
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content. Null arguments use built-in defaults.
+   *
+   * @param olderThanDays minimum snapshot age in days, or null for the default
+   * @param retainLast minimum recent snapshots to keep, or null for the default
+   * @param streamResults whether to stream intermediate delete results, or null for the default
+   * @return snapshot-expiration policy content
+   */
+  public static IcebergSnapshotExpirationContent icebergSnapshotExpiration(
+      @Nullable Long olderThanDays, @Nullable Long retainLast, @Nullable Boolean streamResults) {
+    return new IcebergSnapshotExpirationContent(olderThanDays, retainLast, streamResults);
   }
 
   /**

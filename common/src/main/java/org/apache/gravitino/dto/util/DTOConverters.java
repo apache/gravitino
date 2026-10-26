@@ -700,7 +700,12 @@ public class DTOConverters {
           .build();
     }
     if (policyContent instanceof IcebergSnapshotExpirationContent) {
-      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.instance();
+      IcebergSnapshotExpirationContent content = (IcebergSnapshotExpirationContent) policyContent;
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withRetainLast(content.retainLast())
+          .withStreamResults(content.streamResults())
+          .build();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
@@ -1600,7 +1605,10 @@ public class DTOConverters {
           content.useCaching());
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
-      return PolicyContents.icebergSnapshotExpiration();
+      PolicyContentDTO.IcebergSnapshotExpirationContentDTO content =
+          (PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO;
+      return PolicyContents.icebergSnapshotExpiration(
+          content.olderThanDays(), content.retainLast(), content.streamResults());
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
       PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
