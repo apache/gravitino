@@ -49,6 +49,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -1341,6 +1342,60 @@ public class TestCatalogManager {
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
     Assertions.assertTrue(catalogManager.dropCatalog(ident, true));
     Mockito.verify(catalogWrapper, Mockito.never()).doWithSchemaOps(any());
+  }
+
+  @Test
+  void testForceDropManagedCatalogPreservesMetadataOnSchemaFailure() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test_force_drop_failure");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
+    entityStore.put(
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("schema_cleanup_failure")
+            .withNamespace(Namespace.of("metalake", ident.name()))
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build());
+    CatalogManager.CatalogWrapper catalogWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Capability capability = Mockito.mock(Capability.class);
+    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
+    Mockito.doReturn(capability).when(catalogWrapper).capabilities();
+    // A managed-storage catalog drops each schema through its schema operations.
+    Mockito.doReturn(CapabilityResult.SUPPORTED).when(capability).managedStorage(any());
+    Mockito.doReturn(catalog).when(catalogWrapper).catalog();
+    RuntimeException failure =
+        new RuntimeException("Failed to delete fileset storage", new IOException("denied"));
+    Mockito.doThrow(failure).when(catalogWrapper).doWithSchemaOps(any());
+    catalogManager.getCatalogCache().put(ident, catalogWrapper);
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> catalogManager.dropCatalog(ident, true));
+    String schemaError =
+        "Failed to drop schema "
+            + NameIdentifier.of("metalake", ident.name(), "schema_cleanup_failure");
+    Assertions.assertTrue(thrown.getMessage().contains(schemaError));
+    Assertions.assertTrue(ExceptionUtils.getThrowableList(thrown).contains(failure));
+    Assertions.assertTrue(entityStore.exists(ident, EntityType.CATALOG));
+    Assertions.assertTrue(
+        entityStore.exists(
+            NameIdentifier.of("metalake", ident.name(), "schema_cleanup_failure"),
+            EntityType.SCHEMA));
   }
 
   @Test

@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -51,6 +52,7 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
@@ -212,6 +214,17 @@ public class RelationalEntityStore
       return false;
     } finally {
       cache.invalidate(ident, entityType);
+    }
+  }
+
+  @Override
+  public Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    try {
+      return backend.deleteSchemaAndGet(ident, cascadeFunctions, postDeleteAction);
+    } finally {
+      cache.invalidate(ident, Entity.EntityType.SCHEMA);
     }
   }
 

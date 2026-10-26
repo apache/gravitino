@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -31,6 +33,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.SchemaEntity;
 
 /** Interface defining the operations for a Relation Backend. */
 public interface RelationalBackend extends Closeable, SupportsRelationOperations {
@@ -136,6 +139,26 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    */
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException;
+
+  /**
+   * Deletes a schema and optionally its functions, then runs an action before commit.
+   *
+   * <p>Remaining filesets must prevent deletion. Function cleanup, schema deletion, and the action
+   * share one metadata transaction.
+   *
+   * @param ident the schema identifier
+   * @param cascadeFunctions whether to delete functions in the same metadata transaction
+   * @param postDeleteAction the action to run against the deleted snapshot before commit
+   * @return the deleted schema, or empty when it did not exist
+   * @throws IOException if the store operation fails
+   * @throws UnsupportedOperationException if the backend cannot honor this transaction boundary
+   */
+  default Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "This backend cannot delete a schema with a pre-commit action");
+  }
 
   /**
    * Deletes the entities in the specified namespace and entity type.

@@ -60,7 +60,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -106,6 +105,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.FileInfo;
@@ -701,50 +701,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public boolean dropFileset(NameIdentifier ident) {
     try {
-      FilesetEntity filesetEntity =
-          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
-
-      // For managed fileset, we should delete the related files.
-      if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-        AtomicReference<IOException> exception = new AtomicReference<>();
-        Map<String, Path> storageLocations =
-            Maps.transformValues(filesetEntity.storageLocations(), Path::new);
-        storageLocations.forEach(
-            (locationName, location) -> {
-              try {
-                Map<String, String> fsConf =
-                    mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
-                FileSystem fs = getFileSystemWithCache(location, fsConf);
-                if (fs.exists(location)) {
-                  if (!fs.delete(location, true)) {
-                    LOG.warn(
-                        "Failed to delete fileset {} location {} with location name {}",
-                        ident,
-                        location,
-                        locationName);
-                  }
-                } else {
-                  LOG.warn(
-                      "Fileset {} location {} with location name {} does not exist",
-                      ident,
-                      location,
-                      locationName);
-                }
-              } catch (IOException ioe) {
-                LOG.warn(
-                    "Failed to delete fileset {} location {} with location name {}",
-                    ident,
-                    location,
-                    locationName,
-                    ioe);
-                exception.set(ioe);
-              }
-            });
-        if (exception.get() != null) {
-          throw exception.get();
-        }
+      FilesetEntity fileset = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+      if (!disableFSOps && fileset.filesetType() == Fileset.Type.MANAGED) {
+        deleteManagedFilesetStorage(ident, fileset);
       }
-
       return store.delete(ident, Entity.EntityType.FILESET);
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
@@ -866,118 +826,45 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         throw new NonEmptySchemaException("Schema %s is not empty", ident);
       }
 
-      SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
-      Map<String, String> properties =
-          Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
-      Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
-
-      boolean dropped = super.dropSchema(ident, cascade);
-      if (disableFSOps) {
-        return dropped;
-      }
-
-      // If the schema entity is failed to be deleted, we should not delete the storage location
-      // and return false immediately.
-      if (!dropped) {
-        return false;
-      }
-
-      // Delete all the managed filesets no matter whether the storage location is under the
-      // schema path or not.
-      // The reason why we delete the managed fileset's storage location one by one is because we
-      // may mis-delete the storage location of the external fileset if it happens to be under
-      // the schema path.
-      ClassLoader cl = Thread.currentThread().getContextClassLoader();
-      filesets.parallelStream()
-          .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
-          .forEach(
-              f -> {
-                ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
-                try {
-                  // parallelStream uses forkjoin thread pool, which has a different classloader
-                  // than the catalog thread. We need to set the context classloader to the
-                  // catalog's classloader to avoid classloading issues.
-                  Thread.currentThread().setContextClassLoader(cl);
-                  f.storageLocations()
-                      .forEach(
-                          (locationName, location) -> {
-                            try {
-                              Path filesetPath = new Path(location);
-                              Map<String, String> fsConf =
-                                  mergeUpLevelConfigurations(ident, f.properties(), filesetPath);
-                              FileSystem fs = getFileSystemWithCache(filesetPath, fsConf);
-                              if (fs.exists(filesetPath)) {
-                                if (!fs.delete(filesetPath, true)) {
-                                  LOG.warn(
-                                      "Failed to delete fileset {} location: {} with location name: {}",
-                                      f.name(),
-                                      filesetPath,
-                                      locationName);
-                                }
-                              }
-                            } catch (IOException ioe) {
-                              LOG.warn(
-                                  "Failed to delete fileset {} location: {} with location name: {}",
-                                  f.name(),
-                                  location,
-                                  locationName,
-                                  ioe);
-                            }
-                          });
-                } finally {
-                  Thread.currentThread().setContextClassLoader(oldCl);
-                }
-              });
-
-      // Delete the schema path if it exists and is empty.
-      if (!schemaPaths.isEmpty()) {
-        AtomicReference<RuntimeException> exception = new AtomicReference<>();
-        schemaPaths.forEach(
-            (locationName, schemaPath) -> {
-              try {
-                Map<String, String> fsConf =
-                    mergeUpLevelConfigurations(ident, schemaEntity.properties(), schemaPath);
-                FileSystem fs = getFileSystemWithCache(schemaPath, fsConf);
-                if (fs.exists(schemaPath)) {
-                  FileStatus[] statuses = fs.listStatus(schemaPath);
-                  if (statuses.length == 0) {
-                    if (fs.delete(schemaPath, true)) {
-                      LOG.info(
-                          "Deleted schema {} location {} with location name {}",
-                          ident,
-                          schemaPath,
-                          locationName);
-                    } else {
-                      LOG.warn(
-                          "Failed to delete schema {} because it has files/folders under location {} with location name {}",
-                          ident,
-                          schemaPath,
-                          locationName);
-                    }
-                  }
-                }
-              } catch (IOException ioe) {
-                LOG.warn(
-                    "Failed to delete schema {} location {} with location name {}",
-                    ident,
-                    schemaPath,
-                    locationName,
-                    ioe);
-                exception.set(
-                    new RuntimeException("Failed to delete schema " + ident + " location", ioe));
-              }
-            });
-        if (exception.get() != null) {
-          throw exception.get();
+      // Catalog force-drop reaches this method without SchemaOperationDispatcher's fileset
+      // cleanup. Drop each fileset before its schema so a storage failure preserves the failed
+      // fileset and its parent for retry. Stop at the first failure; earlier drops stay committed.
+      if (cascade) {
+        for (FilesetEntity fileset : filesets) {
+          dropFileset(fileset.nameIdentifier());
         }
       }
 
-      LOG.info("Deleted schema {}", ident);
-      return true;
+      // Only functions may be deleted with the schema; remaining filesets still reject the drop.
+      // Keep function and schema metadata in one transaction until directory cleanup succeeds.
+      boolean dropped =
+          store
+              .deleteSchemaAndGet(
+                  ident,
+                  cascade,
+                  schemaEntity -> {
+                    if (!disableFSOps) {
+                      try {
+                        deleteEmptySchemaLocations(ident, schemaEntity);
+                      } catch (IOException ioe) {
+                        throw new UncheckedIOException(ioe);
+                      }
+                    }
+                  })
+              .isPresent();
+      if (dropped) {
+        LOG.info("Deleted schema {}", ident);
+      }
+      return dropped;
 
+    } catch (NonEmptyEntityException neee) {
+      throw new NonEmptySchemaException(neee, "Schema %s is not empty", ident);
     } catch (NoSuchEntityException ne) {
       LOG.warn("Schema {} does not exist", ident);
       return false;
+    } catch (UncheckedIOException uioe) {
+      throw ExceptionMessages.wrap(
+          "Failed to delete schema " + ident + " location", uioe.getCause());
     } catch (IOException ioe) {
       throw ExceptionMessages.wrap("Failed to delete schema " + ident + " location", ioe);
     }
@@ -1050,6 +937,61 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
+  }
+
+  /** Stops at the first failed location, leaving fileset metadata available for retry. */
+  private void deleteManagedFilesetStorage(NameIdentifier ident, FilesetEntity filesetEntity)
+      throws IOException {
+    Map<String, Path> storageLocations =
+        Maps.transformValues(filesetEntity.storageLocations(), Path::new);
+    for (Map.Entry<String, Path> entry : storageLocations.entrySet()) {
+      String locationName = entry.getKey();
+      Path location = entry.getValue();
+      Map<String, String> fsConf =
+          mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
+      FileSystem fs = getFileSystemWithCache(location, fsConf);
+      if (!fs.exists(location)) {
+        LOG.warn(
+            "Fileset {} location {} with location name {} does not exist",
+            ident,
+            location,
+            locationName);
+        continue;
+      }
+      if (!fs.delete(location, true) && fs.exists(location)) {
+        // A false return also covers a location that somebody else removed between the check above
+        // and this call. Only a location that is still there is a reason to reject the drop.
+        throw new IOException(
+            String.format(
+                "Failed to delete fileset %s location %s with location name %s",
+                ident, location, locationName));
+      }
+    }
+  }
+
+  private void deleteEmptySchemaLocations(NameIdentifier ident, SchemaEntity schemaEntity)
+      throws IOException {
+    Map<String, String> properties =
+        Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
+    Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
+    for (Map.Entry<String, Path> entry : schemaPaths.entrySet()) {
+      String locationName = entry.getKey();
+      Path schemaPath = entry.getValue();
+      Map<String, String> fsConf = mergeUpLevelConfigurations(ident, properties, schemaPath);
+      FileSystem fs = getFileSystemWithCache(schemaPath, fsConf);
+      // Filesystem changes cannot be rolled back with metadata. A retry may find a location gone.
+      if (!fs.exists(schemaPath) || fs.listStatus(schemaPath).length != 0) {
+        continue;
+      }
+      if (!fs.delete(schemaPath, true) && fs.exists(schemaPath)) {
+        throw new IOException(
+            String.format(
+                "Failed to delete schema %s location %s with location name %s",
+                ident, schemaPath, locationName));
+      }
+      LOG.info(
+          "Deleted schema {} location {} with location name {}", ident, schemaPath, locationName);
+    }
   }
 
   private void validateLocationHierarchy(

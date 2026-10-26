@@ -41,6 +41,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -262,6 +263,42 @@ public class SchemaMetaService {
     } else {
       throw new IOException("Failed to update the entity: " + identifier);
     }
+  }
+
+  /**
+   * Deletes a schema and optionally its functions within the caller's metadata transaction.
+   *
+   * <p>The caller must keep the transaction open until any external cleanup succeeds. Remaining
+   * filesets reject the non-cascading schema deletion and roll back function cleanup with it.
+   *
+   * @param identifier the schema identifier
+   * @param cascadeFunctions whether to remove functions before the non-cascading schema delete
+   * @return the schema snapshot used for external cleanup
+   */
+  public SchemaEntity deleteSchemaAndGet(NameIdentifier identifier, boolean cascadeFunctions) {
+    SchemaEntity schema = getSchemaByIdentifier(identifier);
+    try {
+      List<FunctionEntity> functions =
+          FunctionMetaService.getInstance()
+              .listFunctionsByNamespace(
+                  NamespaceUtil.ofFunction(
+                      identifier.namespace().level(0),
+                      identifier.namespace().level(1),
+                      identifier.name()));
+      if (!functions.isEmpty() && !cascadeFunctions) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+      }
+      for (FunctionEntity function : functions) {
+        if (!FunctionMetaService.getInstance().deleteFunction(function.nameIdentifier())) {
+          throw new NoSuchEntityException("Function %s does not exist", function.nameIdentifier());
+        }
+      }
+    } catch (NoSuchEntityException e) {
+      throw new RuntimeException("Failed to delete functions under schema " + identifier, e);
+    }
+    deleteSchema(identifier, false);
+    return schema;
   }
 
   @Monitored(

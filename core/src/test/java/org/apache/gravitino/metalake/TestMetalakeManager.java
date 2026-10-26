@@ -339,6 +339,53 @@ public class TestMetalakeManager {
     }
   }
 
+  @Test
+  void testForceDropMetalakePreservesMetadataOnCatalogFailure() throws Exception {
+    InMemoryEntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Mockito.when(catalogManager.dropCatalog(Mockito.any(NameIdentifier.class), Mockito.eq(true)))
+        .thenThrow(new RuntimeException("catalog drop failed"));
+    // enableMetalake/disableMetalake propagate metalake-in-use to catalogs through
+    // GravitinoEnv.catalogManager(), so point it at the mock for the duration of this test.
+    Mockito.doNothing()
+        .when(catalogManager)
+        .setMetalakeInUseStatus(Mockito.any(NameIdentifier.class), Mockito.anyBoolean());
+    Object previousCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+
+    try {
+      MetalakeManager manager = new MetalakeManager(store, new RandomIdGenerator(), catalogManager);
+
+      NameIdentifier metalakeIdent = NameIdentifier.of("force_drop_failure_ml");
+      manager.createMetalake(metalakeIdent, "comment", ImmutableMap.of());
+      store.put(
+          CatalogEntity.builder()
+              .withId(99L)
+              .withName("leftover_catalog")
+              .withNamespace(Namespace.of(metalakeIdent.name()))
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider("test")
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build(),
+          true);
+
+      Assertions.assertThrows(
+          RuntimeException.class, () -> manager.dropMetalake(metalakeIdent, true));
+      Assertions.assertTrue(store.exists(metalakeIdent, Entity.EntityType.METALAKE));
+      Assertions.assertTrue(
+          store.exists(
+              NameIdentifier.of(metalakeIdent.name(), "leftover_catalog"),
+              Entity.EntityType.CATALOG));
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
+      store.close();
+    }
+  }
+
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
     expectedProps.forEach(
         (k, v) -> {

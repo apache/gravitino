@@ -28,6 +28,8 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -84,6 +86,7 @@ import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -432,6 +435,31 @@ public class JDBCBackend implements RelationalBackend {
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
+    }
+  }
+
+  @Override
+  public Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    SessionUtils.beginTransaction();
+    boolean committed = false;
+    try {
+      SchemaEntity deletedSchema;
+      try {
+        deletedSchema = SchemaMetaService.getInstance().deleteSchemaAndGet(ident, cascadeFunctions);
+      } catch (NoSuchEntityException e) {
+        return Optional.empty();
+      }
+      // Keep schema and function metadata recoverable until directory cleanup succeeds.
+      postDeleteAction.accept(deletedSchema);
+      SessionUtils.commitTransaction();
+      committed = true;
+      return Optional.of(deletedSchema);
+    } finally {
+      if (!committed) {
+        SessionUtils.rollbackTransaction();
+      }
     }
   }
 
