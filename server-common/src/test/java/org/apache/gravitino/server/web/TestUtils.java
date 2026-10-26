@@ -117,6 +117,19 @@ public class TestUtils {
   }
 
   @Test
+  public void testServiceUnavailable() {
+    Response response = Utils.serviceUnavailable("secret provider 'vault' is unavailable");
+    assertNotNull(response);
+    assertEquals(Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), response.getStatus());
+    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals("secret provider 'vault' is unavailable", errorResponse.getMessage());
+    assertEquals(
+        org.apache.gravitino.exceptions.ServiceUnavailableException.class.getSimpleName(),
+        errorResponse.getType());
+  }
+
+  @Test
   public void testInternalError() {
     Response response = Utils.internalError("Internal error");
     assertNotNull(response);

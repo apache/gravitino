@@ -130,6 +130,32 @@ public class Utils {
         .build();
   }
 
+  /**
+   * Returns HTTP 503 with a structured {@link ErrorResponse} for a temporarily unavailable
+   * dependency.
+   *
+   * @param message client-visible error message
+   * @return HTTP 503 response
+   */
+  public static Response serviceUnavailable(String message) {
+    return serviceUnavailable(message, null);
+  }
+
+  /**
+   * Returns HTTP 503 with a structured {@link ErrorResponse} for a temporarily unavailable
+   * dependency.
+   *
+   * @param message client-visible error message
+   * @param throwable cause retained for server logging / optional stack in the body
+   * @return HTTP 503 response
+   */
+  public static Response serviceUnavailable(String message, Throwable throwable) {
+    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+        .entity(ErrorResponse.serviceUnavailable(message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response internalError(String message) {
     return internalError(message, null);
   }

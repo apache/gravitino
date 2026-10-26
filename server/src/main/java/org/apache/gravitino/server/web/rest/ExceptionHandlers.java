@@ -50,6 +50,7 @@ import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -431,12 +432,18 @@ public class ExceptionHandlers {
     public Response handle(OperationType op, String catalog, String metalake, Exception e) {
       String formatted = StringUtil.isBlank(catalog) ? "" : " [" + catalog + "]";
       // Keep schema-check context even when the backend message contains "Exception: ".
-      String reason = e instanceof ConnectionFailedException ? e.getMessage() : getErrorMsg(e);
+      String reason =
+          e instanceof ConnectionFailedException || e instanceof ServiceUnavailableException
+              ? e.getMessage()
+              : getErrorMsg(e);
       String errorMsg = getCatalogErrorMsg(formatted, op.name(), metalake, reason);
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof ServiceUnavailableException) {
+        return Utils.serviceUnavailable(errorMsg, e);
 
       } else if (e instanceof ConnectionFailedException) {
         return Utils.connectionFailed(errorMsg, e);
@@ -806,6 +813,9 @@ public class ExceptionHandlers {
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof ServiceUnavailableException) {
+        return Utils.serviceUnavailable(errorMsg, e);
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
@@ -1224,6 +1234,14 @@ public class ExceptionHandlers {
 
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
+
+      // A configured dependency that is temporarily down is not an internal Gravitino bug: surface
+      // it as 503 Service Unavailable so callers can distinguish retryable outages from 502 gateway
+      // / connection failures and from 500 server bugs.
+      if (e instanceof ServiceUnavailableException) {
+        LOG.warn(errorMsg, e);
+        return Utils.serviceUnavailable(errorMsg, e);
+      }
 
       // A backend a catalog federates to being unreachable is a downstream-dependency failure, not
       // an internal Gravitino error: surface it as 502 Bad Gateway so callers can tell a dependency

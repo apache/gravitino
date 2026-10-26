@@ -26,11 +26,37 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Tests REST error handling for optimistic-lock conflicts. */
 public class TestErrorHandlers {
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testServiceUnavailableAcrossHandlers() throws ReflectiveOperationException {
+    ErrorResponse response =
+        ErrorResponse.serviceUnavailable("secret provider 'vault' is unavailable");
+    List<Method> factories =
+        Arrays.stream(ErrorHandlers.class.getDeclaredMethods())
+            .filter(method -> Modifier.isPublic(method.getModifiers()))
+            .filter(method -> Modifier.isStatic(method.getModifiers()))
+            .filter(method -> method.getName().endsWith("ErrorHandler"))
+            .filter(method -> method.getParameterCount() == 0)
+            .filter(method -> Consumer.class.isAssignableFrom(method.getReturnType()))
+            .collect(Collectors.toList());
+    Assertions.assertFalse(factories.isEmpty());
+
+    for (Method factory : factories) {
+      Consumer<ErrorResponse> handler = (Consumer<ErrorResponse>) factory.invoke(null);
+      ServiceUnavailableException exception =
+          Assertions.assertThrows(
+              ServiceUnavailableException.class, () -> handler.accept(response), factory.getName());
+      Assertions.assertEquals(
+          "secret provider 'vault' is unavailable", exception.getMessage(), factory.getName());
+    }
+  }
 
   @Test
   @SuppressWarnings("unchecked")

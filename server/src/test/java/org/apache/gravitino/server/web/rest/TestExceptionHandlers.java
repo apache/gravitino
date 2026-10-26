@@ -26,6 +26,7 @@ import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -130,6 +131,33 @@ public class TestExceptionHandlers {
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     Assertions.assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, errorResponse.getCode());
     Assertions.assertEquals(OptimisticLockException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testServiceUnavailableReturnsServiceUnavailable() {
+    ServiceUnavailableException exception =
+        new ServiceUnavailableException("secret provider 'vault' is unavailable");
+
+    Response secretResponse =
+        ExceptionHandlers.handleSecretException(OperationType.GET, "catalog.demo", exception);
+    Assertions.assertEquals(
+        Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), secretResponse.getStatus());
+    ErrorResponse secretError = (ErrorResponse) secretResponse.getEntity();
+    Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, secretError.getCode());
+    Assertions.assertEquals(
+        ServiceUnavailableException.class.getSimpleName(), secretError.getType());
+    Assertions.assertTrue(
+        secretError.getMessage().contains("secret provider 'vault' is unavailable"));
+
+    Response catalogResponse =
+        ExceptionHandlers.handleCatalogException(
+            OperationType.CREATE, "demo", "metalake", exception);
+    Assertions.assertEquals(
+        Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), catalogResponse.getStatus());
+    ErrorResponse catalogError = (ErrorResponse) catalogResponse.getEntity();
+    Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, catalogError.getCode());
+    Assertions.assertEquals(
+        ServiceUnavailableException.class.getSimpleName(), catalogError.getType());
   }
 
   @Test
