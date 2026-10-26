@@ -189,6 +189,11 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
     return chainedAction(plugin -> plugin.onOwnerSet(metadataObject, preOwner, newOwner));
   }
 
+  @Override
+  public boolean requiresLocations() {
+    return plugins.stream().anyMatch(AuthorizationPlugin::requiresLocations);
+  }
+
   private Boolean chainedAction(Function<AuthorizationPlugin, Boolean> action) {
     for (AuthorizationPlugin plugin : plugins) {
       if (!action.apply(plugin)) {

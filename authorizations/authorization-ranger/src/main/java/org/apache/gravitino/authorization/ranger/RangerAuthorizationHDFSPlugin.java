@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -131,6 +132,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   @Override
   public List<String> policyResourceDefinesRule() {
     return ImmutableList.of(RangerDefines.PolicyResource.PATH.getName());
+  }
+
+  @Override
+  public boolean requiresLocations() {
+    return true;
   }
 
   String getAuthorizationPath(PathBasedMetadataObject pathBasedMetadataObject) {
@@ -299,13 +305,75 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       removeTableMetadataObject(authzMetadataObject);
     } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.FILESET) {
       removePolicyByMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.METALAKE
-        || authzMetadataObject.metadataObjectType() == MetadataObject.Type.CATALOG) {
+    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.CATALOG) {
+      removeCatalogMetadataObject(authzMetadataObject);
+    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.METALAKE) {
       // Do nothing
     } else {
       throw new IllegalArgumentException(
           "Unsupported authorization metadata object type: " + authzMetadataObject.type());
     }
+  }
+
+  /**
+   * Remove the CATALOG, need to remove the Gravitino-managed items of the policy on the catalog
+   * location. A location that another Hive catalog in the metalake still uses keeps its policy,
+   * because that policy also carries the other catalog's privileges. Only catalog locations are
+   * compared: a schema or fileset of another catalog placed exactly at this location is not
+   * detected.
+   */
+  private void removeCatalogMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
+    Preconditions.checkArgument(
+        authzMetadataObject instanceof PathBasedMetadataObject,
+        "The metadata object must be a PathBasedMetadataObject");
+    PathBasedMetadataObject pathBasedMetadataObject = (PathBasedMetadataObject) authzMetadataObject;
+    String path = getAuthorizationPath(pathBasedMetadataObject);
+    if (isPathUsedByOtherCatalog(pathBasedMetadataObject.name(), path)) {
+      LOG.info(
+          "Keep the policy of path {} because another catalog in metalake {} uses it",
+          path,
+          metalake);
+      return;
+    }
+    removePolicyByMetadataObject(authzMetadataObject);
+  }
+
+  private boolean isPathUsedByOtherCatalog(String catalogName, String path) {
+    String normalizedPath = StringUtils.removeEnd(path, "/");
+    // Catalog info comes from the entity store, so other catalogs are not loaded here.
+    Catalog[] catalogs =
+        GravitinoEnv.getInstance()
+            .internalCatalogDispatcher()
+            .listCatalogsInfo(Namespace.of(metalake));
+    for (Catalog catalog : catalogs) {
+      // Only Hive catalogs have catalog-level locations.
+      if (catalog.name().equals(catalogName) || !"hive".equals(catalog.provider())) {
+        continue;
+      }
+      List<String> locations;
+      try {
+        locations =
+            AuthorizationUtils.loadMetadataObjectLocation(
+                NameIdentifier.of(metalake, catalog.name()), Entity.EntityType.CATALOG);
+      } catch (AuthorizationPluginException e) {
+        // Without the other catalog's locations, removing the policy could revoke its privileges.
+        throw new AuthorizationPluginException(
+            e,
+            "Cannot remove the HDFS policy of catalog %s.%s: failed to check whether catalog %s"
+                + " uses the same path %s",
+            metalake,
+            catalogName,
+            catalog.name(),
+            path);
+      }
+      for (String location : locations) {
+        String otherPath = HDFS_PATTERN.matcher(location).replaceAll("");
+        if (StringUtils.removeEnd(otherPath, "/").equals(normalizedPath)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**

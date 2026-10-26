@@ -34,4 +34,16 @@ interface MetadataAuthorizationPlugin {
    * @throws RuntimeException If update role encounters storage issues.
    */
   Boolean onMetadataUpdated(MetadataObjectChange... changes) throws RuntimeException;
+
+  /**
+   * Whether this plugin needs the storage locations of a removed metadata object to remove its
+   * privileges, for example because it grants privileges on storage paths. <br>
+   * When this returns true and Gravitino cannot look up those locations, Gravitino refuses the
+   * removal instead of telling the plugin there is nothing to remove.
+   *
+   * @return True if the plugin needs storage locations to remove privileges; False otherwise.
+   */
+  default boolean requiresLocations() {
+    return false;
+  }
 }

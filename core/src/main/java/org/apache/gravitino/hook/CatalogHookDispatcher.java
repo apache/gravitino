@@ -19,7 +19,6 @@
 package org.apache.gravitino.hook;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -168,9 +167,7 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       return false;
     }
 
-    List<String> locations =
-        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
-    AuthorizationUtils.removeCatalogPrivileges(ident, locations);
+    AuthorizationUtils.removeCatalogPrivileges(ident);
 
     // We should call the authorization plugin before dropping the catalog, because the dropping
     // catalog will close the authorization plugin. Child schema/fileset write-through secrets are
