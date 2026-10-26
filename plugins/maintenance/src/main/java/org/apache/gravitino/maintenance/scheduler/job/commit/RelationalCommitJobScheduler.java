@@ -22,6 +22,7 @@ import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
 import com.github.kagkarlsson.scheduler.task.TaskInstance;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -85,7 +86,8 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
    * @param chainCollector returns the collected onCommit chain for a table id
    * @param occupancyGate cooldown / in-flight checks for enqueue gating
    */
-  RelationalCommitJobScheduler(
+  @VisibleForTesting
+  public RelationalCommitJobScheduler(
       DataSource dataSource,
       Config gravitinoConfig,
       Function<Long, Optional<CollectedCommitChain>> chainCollector,
@@ -125,7 +127,8 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
    * @param dataSource entity-store pool
    * @return client bound to {@link TableMaintenanceSchedulerPools#COMMIT_TASKS_TABLE}
    */
-  static SchedulerClient client(DataSource dataSource) {
+  @VisibleForTesting
+  public static SchedulerClient client(DataSource dataSource) {
     return SchedulerClient.Builder.create(
             AutocommitDataSources.wrap(dataSource), TableMaintenanceSchedulerPools.commitJobTask())
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))

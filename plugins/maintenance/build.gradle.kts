@@ -46,10 +46,12 @@ dependencies {
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":core", "testArtifacts"))
+  testImplementation(project(":iceberg:iceberg-rest-server"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(libs.awaitility)
+  testImplementation(libs.bundles.iceberg)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
@@ -90,8 +92,22 @@ tasks {
     dependsOn(runtimeJars)
   }
 
+  // testImplementation(:iceberg:iceberg-rest-server) resolves the jar under build/libs, which
+  // that module also fills via copyDepends (finalizedBy jar). Declare copyDepends so
+  // compileTestJava does not race it.
+  compileTestJava {
+    dependsOn(":iceberg:iceberg-rest-server:copyDepends")
+  }
+
   test {
     useJUnitPlatform()
     environment("GRAVITINO_HOME", rootDir.path)
+
+    val skipITs = project.hasProperty("skipITs")
+    if (skipITs) {
+      exclude("**/integration/test/**")
+    } else {
+      dependsOn(":iceberg:iceberg-rest-server:jar")
+    }
   }
 }

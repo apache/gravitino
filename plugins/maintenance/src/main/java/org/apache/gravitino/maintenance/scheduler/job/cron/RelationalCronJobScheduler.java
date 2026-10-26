@@ -23,6 +23,7 @@ import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
 import com.github.kagkarlsson.scheduler.task.TaskInstance;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -128,7 +129,8 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
    * @param dataSource entity-store pool
    * @return client bound to {@link TableMaintenanceSchedulerPools#CRON_TASKS_TABLE}
    */
-  static SchedulerClient client(DataSource dataSource) {
+  @VisibleForTesting
+  public static SchedulerClient client(DataSource dataSource) {
     return SchedulerClient.Builder.create(
             AutocommitDataSources.wrap(dataSource), TableMaintenanceSchedulerPools.cronJobTask())
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
