@@ -19,6 +19,9 @@
 package org.apache.gravitino.catalog.starrocks.operation;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -46,6 +49,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
+import org.mockito.Mockito;
 
 public class TestStarRocksTableOperationsSqlGeneration {
 
@@ -98,6 +102,11 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     public String alterTableSql(String tableName, TableChange... changes) {
       return generateAlterTableSql("database", tableName, changes);
+    }
+
+    List<Index> indexes(Connection connection, String databaseName, String tableName)
+        throws SQLException {
+      return getIndexes(connection, databaseName, tableName);
     }
 
     @Override
@@ -409,6 +418,43 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     Assertions.assertEquals(
         "StarRocks does not support adding an auto-increment column: col2", exception.getMessage());
+  }
+
+  @Test
+  void testGetIndexesMapsTypesAndSkipsUnsupported() throws SQLException {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement statement = Mockito.mock(PreparedStatement.class);
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(connection.prepareStatement("SHOW INDEX FROM `table` FROM `database`"))
+        .thenReturn(statement);
+    Mockito.when(statement.executeQuery()).thenReturn(resultSet);
+    Mockito.when(resultSet.next()).thenReturn(true, true, true, true, true, true, false);
+    Mockito.when(resultSet.getString("Key_name"))
+        .thenReturn("idx_region", "idx_ngram", "idx_text", "idx_vector", "idx_unknown", "idx_null");
+    Mockito.when(resultSet.getString("Column_name"))
+        .thenReturn("region", "name", "text", "embedding", "c5", "c6");
+    Mockito.when(resultSet.getString("Index_type"))
+        .thenReturn(
+            "BITMAP",
+            "NGRAMBF(\"gram_num\" = \"4\")",
+            "GIN(\"parser\" = \"english\")",
+            "VECTOR(\"index_type\" = \"hnsw\", \"dim\" = \"3\")",
+            "UNKNOWN",
+            null);
+
+    List<Index> indexes = ops.indexes(connection, "database", "table");
+
+    Assertions.assertEquals(3, indexes.size());
+    Assertions.assertEquals(Index.IndexType.BITMAP, indexes.get(0).type());
+    Assertions.assertEquals("idx_region", indexes.get(0).name());
+    Assertions.assertArrayEquals(new String[][] {{"region"}}, indexes.get(0).fieldNames());
+    Assertions.assertEquals(Index.IndexType.INVERTED, indexes.get(1).type());
+    Assertions.assertEquals("idx_text", indexes.get(1).name());
+    Assertions.assertArrayEquals(new String[][] {{"text"}}, indexes.get(1).fieldNames());
+    Assertions.assertEquals(Index.IndexType.VECTOR, indexes.get(2).type());
+    Assertions.assertEquals("idx_vector", indexes.get(2).name());
+    Assertions.assertArrayEquals(new String[][] {{"embedding"}}, indexes.get(2).fieldNames());
   }
 
   @Test

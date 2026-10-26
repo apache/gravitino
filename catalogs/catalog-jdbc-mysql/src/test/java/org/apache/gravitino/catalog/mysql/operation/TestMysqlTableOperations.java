@@ -521,14 +521,20 @@ public class TestMysqlTableOperations extends TestMysql {
     assertionsTableInfo(
         tableName, newComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
-    TableChange updateColumn =
-        TableChange.updateColumnNullability(new String[] {col3.name()}, !col3.nullable());
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), tableName, updateColumn));
-    Assertions.assertTrue(
-        exception.getMessage().contains("with null default value cannot be changed to not null"));
+    // A nullable column whose default is NULL can be changed to not null.
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnNullability(new String[] {col3.name()}, false));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    JdbcColumn updatedCol3 =
+        (JdbcColumn)
+            Arrays.stream(load.columns())
+                .filter(c -> c.name().equals(col3.name()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Column not found: " + col3.name()));
+    Assertions.assertFalse(updatedCol3.nullable());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, updatedCol3.defaultValue());
   }
 
   @Test

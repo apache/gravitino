@@ -116,3 +116,21 @@ class TestIndexSerdes(unittest.TestCase):
         json_dict = json.loads(json_string)
         serialized_dict = json.loads(mock_data_class.to_json())
         self.assertDictEqual(json_dict, serialized_dict)
+
+    def test_index_serdes_bitmap_inverted_vector(self):
+        for index_type in (
+            Index.IndexType.BITMAP,
+            Index.IndexType.INVERTED,
+            Index.IndexType.VECTOR,
+        ):
+            index = IndexSerdes.deserialize(
+                {
+                    "indexType": index_type.value,
+                    "name": "idx",
+                    "fieldNames": [["col"]],
+                }
+            )
+            self.assertEqual(index_type, index.type())
+            self.assertEqual(
+                index_type.value, IndexSerdes.serialize(index)["indexType"]
+            )
