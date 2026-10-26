@@ -27,7 +27,7 @@ Gravitino credential vending is used to generate temporary or static credentials
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs.
+- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
 
 ## General Configurations
 
@@ -37,6 +37,8 @@ Gravitino credential vending is used to generate temporary or static credentials
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`          | The credential provider types, separated by comma.                                         | (none)        | Yes      |
 | `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       |
 | `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       |
+
+If a catalog does not set `credential-providers`, Gravitino infers providers from the credential properties present. The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
 
 ## Build-in Credentials Configurations
 
@@ -223,7 +225,7 @@ Clients retrieve vended credentials from:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
-The server returns short-lived or static credentials that the client can use to access the underlying storage directly.
+The server returns short-lived or static credentials that the client can use to access the underlying storage directly. These credentials are catalog-level and are not refreshed: token providers such as `s3-token` vend nothing at catalog level, and `aws-irsa` credentials expire after `s3-token-expire-in-secs`.
 
 ### Spark and Flink Connector Integration
 

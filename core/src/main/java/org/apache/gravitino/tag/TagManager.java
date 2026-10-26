@@ -53,6 +53,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -176,11 +177,8 @@ public class TagManager implements TagDispatcher {
                 "Tag with name %s under metalake %s does not exist", name, metalake);
           } catch (EntityAlreadyExistsException e) {
             String newName =
-                Arrays.stream(changes)
-                    .filter(c -> c instanceof TagChange.RenameTag)
-                    .map(c -> ((TagChange.RenameTag) c).getNewName())
-                    .findFirst()
-                    .orElse(name);
+                RenameUtils.getLastRenameName(
+                    name, changes, TagChange.RenameTag.class, TagChange.RenameTag::getNewName);
             throw new TagAlreadyExistsException(
                 e, "Tag with name %s under metalake %s already exists", newName, metalake);
           } catch (IOException ioe) {

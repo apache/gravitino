@@ -51,6 +51,8 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestMysqlTableOperations extends TestMysql {
@@ -193,6 +195,80 @@ public class TestMysqlTableOperations extends TestMysql {
         TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName), "table should be dropped");
     Assertions.assertFalse(
         TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName), "table should be non-existent");
+  }
+
+  @Test
+  public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_type_default_table";
+    JdbcColumn col_1 =
+        JdbcColumn.builder().withName("col_1").withType(INT).withNullable(false).build();
+    JdbcColumn col_2 =
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.VarCharType.of(16))
+            .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
+            .withNullable(false)
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        new JdbcColumn[] {col_1, col_2},
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnType(new String[] {col_2.name()}, Types.VarCharType.of(32)));
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Column updated = load.columns()[1];
+    Assertions.assertEquals(Types.VarCharType.of(32), updated.dataType());
+    Assertions.assertEquals(Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
+  }
+
+  @Test
+  public void testUpdateColumnPositionWithSpecialReferenceColumn() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_position_table";
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build(),
+          JdbcColumn.builder().withName("status").withType(VARCHAR).build(),
+          JdbcColumn.builder().withName("order-id").withType(VARCHAR).build(),
+          JdbcColumn.builder().withName("key").withType(VARCHAR).build()
+        };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnPosition(
+            new String[] {"status"}, TableChange.ColumnPosition.after("order-id")));
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertArrayEquals(
+        new String[] {"id", "order-id", "status", "key"},
+        Arrays.stream(load.columns()).map(Column::name).toArray(String[]::new));
+
+    // A null position moves the column after the last column `key`, a reserved word.
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnPosition(new String[] {"id"}, null));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertArrayEquals(
+        new String[] {"order-id", "status", "key", "id"},
+        Arrays.stream(load.columns()).map(Column::name).toArray(String[]::new));
   }
 
   @Test
@@ -445,14 +521,20 @@ public class TestMysqlTableOperations extends TestMysql {
     assertionsTableInfo(
         tableName, newComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
-    TableChange updateColumn =
-        TableChange.updateColumnNullability(new String[] {col3.name()}, !col3.nullable());
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), tableName, updateColumn));
-    Assertions.assertTrue(
-        exception.getMessage().contains("with null default value cannot be changed to not null"));
+    // A nullable column whose default is NULL can be changed to not null.
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME.toString(),
+        tableName,
+        TableChange.updateColumnNullability(new String[] {col3.name()}, false));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    JdbcColumn updatedCol3 =
+        (JdbcColumn)
+            Arrays.stream(load.columns())
+                .filter(c -> c.name().equals(col3.name()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Column not found: " + col3.name()));
+    Assertions.assertFalse(updatedCol3.nullable());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, updatedCol3.defaultValue());
   }
 
   @Test
@@ -639,6 +721,37 @@ public class TestMysqlTableOperations extends TestMysql {
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     assertionsTableInfo(
         tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, loaded);
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_clear_comment";
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("col comment").build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME.toString(),
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          new HashMap<>(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME.toString(),
+          tableName,
+          TableChange.updateColumnComment(new String[] {"col_1"}, null),
+          TableChange.updateComment(null));
+
+      JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertTrue(StringUtils.isEmpty(load.comment()), load.comment());
+      Assertions.assertTrue(
+          StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
+    }
   }
 
   @Test
@@ -1255,5 +1368,59 @@ public class TestMysqlTableOperations extends TestMysql {
     Assertions.assertNull(
         operationsWithOldDriver.calculateDatetimePrecision("TIME", 16, 0),
         "TIME type should return null for unsupported driver version");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"O'Brien", "quote\\' and \\new\\path; \"double\"", "ends with \\"})
+  void testStringDefaultValueRoundTrips(String defaultValue) {
+    String tableName = RandomNameUtils.genRandomName("mysql_default_round_trip");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withDefaultValue(Literals.varcharLiteral(255, defaultValue))
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        new JdbcColumn[] {column},
+        null,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[0].defaultValue());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME.toString(),
+          tableName,
+          TableChange.addColumn(
+              new String[] {"col2"},
+              VARCHAR,
+              null,
+              TableChange.ColumnPosition.defaultPos(),
+              true,
+              false,
+              Literals.varcharLiteral(255, defaultValue)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[1].defaultValue());
+
+      String updated = defaultValue + " updated";
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME.toString(),
+          tableName,
+          TableChange.updateColumnDefaultValue(
+              new String[] {"col1"}, Literals.varcharLiteral(255, updated)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, updated), table.columns()[0].defaultValue());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
+    }
   }
 }

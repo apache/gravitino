@@ -494,6 +494,16 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+          // Expose the inferred provider names (never the credential values) so that clients
+          // make routing decisions from the same provider list the server vends credentials
+          // with. An explicitly configured list is returned as-is.
+          if (StringUtils.isBlank(tempProperties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+            String inferredProviders =
+                propertiesWithCredentialProviders().get(CredentialConstants.CREDENTIAL_PROVIDERS);
+            if (StringUtils.isNotBlank(inferredProviders)) {
+              tempProperties.put(CredentialConstants.CREDENTIAL_PROVIDERS, inferredProviders);
+            }
+          }
 
           properties = tempProperties;
         }

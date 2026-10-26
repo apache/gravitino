@@ -29,14 +29,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -53,6 +56,8 @@ import org.mockito.Mockito;
 public class TestClickHouseTableOperationsUnit {
 
   private static final class ExposedClickHouseTableOperations extends ClickHouseTableOperations {
+    private JdbcTable table;
+
     List<Index> callGetIndexes(Connection connection, String databaseName, String tableName)
         throws Exception {
       return getIndexes(connection, databaseName, tableName);
@@ -91,10 +96,43 @@ public class TestClickHouseTableOperationsUnit {
           Indexes.EMPTY_INDEXES,
           getSortOrders("id"));
     }
+
+    void setTable(JdbcTable table) {
+      this.table = table;
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      return table;
+    }
+
+    String callGenerateAlterTableSql(TableChange... changes) {
+      return generateAlterTableSql("db", "test_table", changes);
+    }
   }
 
   private ExposedClickHouseTableOperations newOps() {
     return newOps(null);
+  }
+
+  private ExposedClickHouseTableOperations newAlterOps(Map<String, String> properties) {
+    ExposedClickHouseTableOperations ops = newOps();
+    JdbcColumn idColumn =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    ops.setTable(
+        JdbcTable.builder()
+            .withName("test_table")
+            .withColumns(new JdbcColumn[] {idColumn})
+            .withIndexes(Indexes.EMPTY_INDEXES)
+            .withProperties(properties)
+            .withTableOperation(null)
+            .build());
+    return ops;
   }
 
   @Test
@@ -735,6 +773,43 @@ public class TestClickHouseTableOperationsUnit {
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> newOps().callGenerateCreateTableSql(properties));
     Assertions.assertTrue(exception.getMessage().contains("balanced"));
+  }
+
+  @Test
+  void testClearCommentsWithNull() {
+    ExposedClickHouseTableOperations ops = newAlterOps(new HashMap<>());
+
+    String tableSql = ops.callGenerateAlterTableSql(TableChange.updateComment(null));
+    Assertions.assertTrue(tableSql.contains("MODIFY COMMENT ''"), tableSql);
+
+    String columnSql =
+        ops.callGenerateAlterTableSql(TableChange.updateColumnComment(new String[] {"id"}, null));
+    Assertions.assertTrue(columnSql.contains("COMMENT COLUMN `id` ''"), columnSql);
+  }
+
+  @Test
+  void testClearCommentsWithNullOnCluster() {
+    ExposedClickHouseTableOperations ops =
+        newAlterOps(
+            Map.of(
+                ClusterConstants.ON_CLUSTER,
+                "true",
+                ClusterConstants.CLUSTER_NAME,
+                "test_cluster"));
+
+    String tableSql = ops.callGenerateAlterTableSql(TableChange.updateComment(null));
+    Assertions.assertTrue(
+        tableSql.startsWith("ALTER TABLE `test_table` ON CLUSTER `test_cluster`"), tableSql);
+    String clusterComment =
+        ClickHouseClusterUtils.escapeSingleQuotes(
+            ClickHouseClusterUtils.embedClusterInComment("", "test_cluster"));
+    Assertions.assertTrue(tableSql.contains("MODIFY COMMENT '" + clusterComment + "'"), tableSql);
+
+    String columnSql =
+        ops.callGenerateAlterTableSql(TableChange.updateColumnComment(new String[] {"id"}, null));
+    Assertions.assertTrue(
+        columnSql.startsWith("ALTER TABLE `test_table` ON CLUSTER `test_cluster`"), columnSql);
+    Assertions.assertTrue(columnSql.contains("COMMENT COLUMN `id` ''"), columnSql);
   }
 
   private RenameMocks renameMocks(String storedComment, String engineFull) throws Exception {
