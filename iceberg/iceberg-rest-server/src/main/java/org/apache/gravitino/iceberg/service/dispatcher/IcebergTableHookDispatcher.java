@@ -56,13 +56,30 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   private final IcebergTableOperationDispatcher dispatcher;
   private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
+  private final boolean trackCreates;
   private String metalake;
 
   public IcebergTableHookDispatcher(
       IcebergTableOperationDispatcher dispatcher,
       IcebergNamespaceOperationDispatcher namespaceDispatcher) {
+    this(dispatcher, namespaceDispatcher, true);
+  }
+
+  /**
+   * Creates the table hook dispatcher.
+   *
+   * @param dispatcher the dispatcher this hook decorates
+   * @param namespaceDispatcher the raw namespace dispatcher used for orphan-schema cleanup
+   * @param trackCreates whether creates import the new entity into Gravitino and assign its owner.
+   *     Off when authorization is off; drop and rename keep the entity store in step either way.
+   */
+  public IcebergTableHookDispatcher(
+      IcebergTableOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher,
+      boolean trackCreates) {
     this.dispatcher = dispatcher;
     this.namespaceDispatcher = namespaceDispatcher;
+    this.trackCreates = trackCreates;
     this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
   }
 
@@ -72,7 +89,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
     // Skip import and ownership for staged creates (credential vending).
     // The table will be imported when the staged table is committed via updateTable.
-    if (!createTableRequest.stageCreate()) {
+    if (trackCreates && !createTableRequest.stageCreate()) {
       importTableAndSetOwner(context, namespace, createTableRequest.name());
     }
 
@@ -92,7 +109,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     boolean isStagedCreateCommit =
         updateTableRequest.requirements().stream()
             .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
-    if (isStagedCreateCommit) {
+    if (trackCreates && isStagedCreateCommit) {
       importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
     }
     return response;

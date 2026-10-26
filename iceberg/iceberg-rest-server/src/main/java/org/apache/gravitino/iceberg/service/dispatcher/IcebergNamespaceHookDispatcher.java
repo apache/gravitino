@@ -58,15 +58,33 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
 
   private final IcebergNamespaceOperationDispatcher dispatcher;
   private final String metalake;
+  private final boolean trackCreates;
 
   public IcebergNamespaceHookDispatcher(IcebergNamespaceOperationDispatcher dispatcher) {
+    this(dispatcher, true);
+  }
+
+  /**
+   * Creates the namespace hook dispatcher.
+   *
+   * @param dispatcher the dispatcher this hook decorates
+   * @param trackCreates whether namespace creates and table or view registrations import the new
+   *     entity into Gravitino and assign its owner. Off when authorization is off; drop keeps the
+   *     entity store in step either way.
+   */
+  public IcebergNamespaceHookDispatcher(
+      IcebergNamespaceOperationDispatcher dispatcher, boolean trackCreates) {
     this.dispatcher = dispatcher;
     this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    this.trackCreates = trackCreates;
   }
 
   @Override
   public CreateNamespaceResponse createNamespace(
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
+    if (!trackCreates) {
+      return dispatcher.createNamespace(context, createRequest);
+    }
     String catalogName = context.catalogName();
     Namespace leaf = createRequest.namespace();
     List<Namespace> newlyOwned = new ArrayList<>();
@@ -189,7 +207,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       RegisterTableRequest registerTableRequest) {
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
-    if (hasTableEntityInStore(context, namespace, registerTableRequest.name())) {
+    if (!trackCreates || hasTableEntityInStore(context, namespace, registerTableRequest.name())) {
       // Gravitino already tracks this table: preserve table_id and existing role/owner/tag/policy
       // bindings after the backend registerTable completes.
       return response;
@@ -216,7 +234,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
     LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
 
-    if (hasViewEntityInStore(context, namespace, registerViewRequest.name())) {
+    if (!trackCreates || hasViewEntityInStore(context, namespace, registerViewRequest.name())) {
       // Gravitino already tracks this view: preserve view_id and existing role/owner/tag/policy
       // bindings after the backend registerView completes.
       return response;

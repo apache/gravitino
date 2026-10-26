@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.security.CodeSource;
 import java.util.List;
@@ -167,10 +168,12 @@ public class RESTService implements GravitinoAuxiliaryService {
     // Table: EventDispatcher -> HookDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
+    boolean authorizationEnabled = authorizationContext.isAuthorizationEnabled();
+    boolean installHooks = shouldInstallHookDispatchers(auxMode, authorizationEnabled);
+    if (installHooks) {
       icebergTableOperationDispatcher =
           new IcebergTableHookDispatcher(
-              icebergTableOperationDispatcher, namespaceOperationDispatcher);
+              icebergTableOperationDispatcher, namespaceOperationDispatcher, authorizationEnabled);
     }
     IcebergTableOperationDispatcher icebergTableDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
@@ -178,18 +181,21 @@ public class RESTService implements GravitinoAuxiliaryService {
     // View: EventDispatcher -> HookDispatcher -> OperationExecutor
     IcebergViewOperationDispatcher icebergViewOperationDispatcher =
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
+    if (installHooks) {
       icebergViewOperationDispatcher =
           new IcebergViewHookDispatcher(
-              icebergViewOperationDispatcher, namespaceOperationDispatcher, metalakeName);
+              icebergViewOperationDispatcher,
+              namespaceOperationDispatcher,
+              metalakeName,
+              authorizationEnabled);
     }
     IcebergViewOperationDispatcher icebergViewDispatcher =
         new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
 
     // Namespace: EventDispatcher -> HookDispatcher -> OperationExecutor
-    if (authorizationContext.isAuthorizationEnabled()) {
+    if (installHooks) {
       namespaceOperationDispatcher =
-          new IcebergNamespaceHookDispatcher(namespaceOperationDispatcher);
+          new IcebergNamespaceHookDispatcher(namespaceOperationDispatcher, authorizationEnabled);
     }
     IcebergNamespaceOperationDispatcher icebergNamespaceDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
@@ -246,6 +252,17 @@ public class RESTService implements GravitinoAuxiliaryService {
     } else {
       server.addCustomFilters(ICEBERG_SPEC);
     }
+  }
+
+  /**
+   * The hook dispatchers keep Gravitino entities in step with Iceberg REST drops and renames, so
+   * they are installed whenever an entity store exists (the auxiliary mode), not only when
+   * authorization is on. Without authorization they only do that bookkeeping: creates are neither
+   * imported nor given an owner.
+   */
+  @VisibleForTesting
+  static boolean shouldInstallHookDispatchers(boolean auxMode, boolean authorizationEnabled) {
+    return auxMode || authorizationEnabled;
   }
 
   static boolean shouldEnableMetrics(boolean auxiliaryMode, IcebergConfig icebergConfig) {

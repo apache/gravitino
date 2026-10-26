@@ -289,6 +289,64 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
+  public void testDropTableWithAuthorizationOffDeletesEntity() throws Exception {
+    // With authorization off there is no owner dispatcher, but the entity store must still
+    // forget a table dropped through Iceberg REST.
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", null, true);
+    IcebergTableHookDispatcher bookkeepingOnly =
+        new IcebergTableHookDispatcher(mockDispatcher, mockNamespaceDispatcher, false);
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+
+    bookkeepingOnly.dropTable(mockContext, tableId, false);
+
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    verify(mockEntityStore)
+        .delete(
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                TEST_METALAKE, TEST_CATALOG, tableId, ":"),
+            Entity.EntityType.TABLE);
+  }
+
+  @Test
+  public void testRenameTableWithAuthorizationOffMovesEntity() throws Exception {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", null, true);
+    IcebergTableHookDispatcher bookkeepingOnly =
+        new IcebergTableHookDispatcher(mockDispatcher, mockNamespaceDispatcher, false);
+    TableIdentifier source = TableIdentifier.of("schema1", "old_table");
+    TableIdentifier dest = TableIdentifier.of("schema1", "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+
+    bookkeepingOnly.renameTable(mockContext, request);
+
+    verify(mockEntityStore)
+        .update(
+            eq(
+                IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                    TEST_METALAKE, TEST_CATALOG, source, ":")),
+            eq(TableEntity.class),
+            eq(Entity.EntityType.TABLE),
+            any());
+  }
+
+  @Test
+  public void testCreateTableWithAuthorizationOffSkipsImportAndOwnership() {
+    IcebergTableHookDispatcher bookkeepingOnly =
+        new IcebergTableHookDispatcher(mockDispatcher, mockNamespaceDispatcher, false);
+    Namespace namespace = Namespace.of("test_schema");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.createTable(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    Assertions.assertSame(
+        mockResponse, bookkeepingOnly.createTable(mockContext, namespace, request));
+
+    verify(mockInternalTableDispatcher, never()).loadTable(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
   public void testRenameTableUpdatesEntity() throws IOException {
     TableIdentifier source = TableIdentifier.of("schema1", "old_table");
     TableIdentifier dest = TableIdentifier.of("schema2", "new_table");

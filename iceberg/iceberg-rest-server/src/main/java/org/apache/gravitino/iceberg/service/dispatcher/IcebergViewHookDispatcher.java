@@ -55,14 +55,33 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private final IcebergViewOperationDispatcher dispatcher;
   private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
   private final String metalake;
+  private final boolean trackCreates;
 
   public IcebergViewHookDispatcher(
       IcebergViewOperationDispatcher dispatcher,
       IcebergNamespaceOperationDispatcher namespaceDispatcher,
       String metalake) {
+    this(dispatcher, namespaceDispatcher, metalake, true);
+  }
+
+  /**
+   * Creates the view hook dispatcher.
+   *
+   * @param dispatcher the dispatcher this hook decorates
+   * @param namespaceDispatcher the raw namespace dispatcher used for orphan-schema cleanup
+   * @param metalake the metalake containing the Iceberg REST catalogs
+   * @param trackCreates whether creates import the new entity into Gravitino and assign its owner.
+   *     Off when authorization is off; drop and rename keep the entity store in step either way.
+   */
+  public IcebergViewHookDispatcher(
+      IcebergViewOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher,
+      String metalake,
+      boolean trackCreates) {
     this.dispatcher = dispatcher;
     this.namespaceDispatcher = namespaceDispatcher;
     this.metalake = metalake;
+    this.trackCreates = trackCreates;
   }
 
   @Override
@@ -70,6 +89,9 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       IcebergRequestContext context, Namespace namespace, CreateViewRequest createViewRequest) {
     // First, create the view in the underlying catalog
     LoadViewResponse response = dispatcher.createView(context, namespace, createViewRequest);
+    if (!trackCreates) {
+      return response;
+    }
 
     // Then import it into Gravitino so Gravitino is aware of the view
     importView(context.catalogName(), namespace, createViewRequest.name());
