@@ -263,9 +263,10 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
         continue;
       }
 
+      MetadataObject mdObj;
       String cacheKey;
       try {
-        MetadataObject mdObj = metadataObjectFromChangeLog(metalake, fullName, mdType);
+        mdObj = metadataObjectFromChangeLog(metalake, fullName, mdType);
         cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, mdObj);
       } catch (RuntimeException e) {
         LOG.warn(
@@ -278,7 +279,10 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
       }
 
       if (JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(mdType)) {
-        addCoalescedPrefix(containerPrefixes, cacheKey);
+        for (String prefix :
+            JcasbinAuthorizationCacheKeys.nestedInvalidationPrefixes(metalake, mdObj)) {
+          addCoalescedPrefix(containerPrefixes, prefix);
+        }
       } else {
         leafKeys.add(cacheKey);
       }

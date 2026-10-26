@@ -21,6 +21,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Cache key factory for JCasbin authorization caches. */
 final class JcasbinAuthorizationCacheKeys {
@@ -85,6 +86,32 @@ final class JcasbinAuthorizationCacheKeys {
 
   static String groupRoleKey(String metalake, String groupname) {
     return String.join(KEY_SEPARATOR, metalake, GROUP_ROLE_REL, groupname);
+  }
+
+  /**
+   * Returns the cache key prefixes that cover a container object and every object nested under it.
+   *
+   * <p>The first prefix is the object's own key. A hierarchical schema name such as {@code A:B} is
+   * stored as one key part, so the key of schema {@code A} is not a prefix of the keys of {@code
+   * A:B}, {@code A:B:C} or the objects under them. For a schema, a second prefix ending with the
+   * schema separator ({@code ...SCHEMA␟A:}) covers those descendants, while a sibling such as
+   * {@code AB} keeps its entries.
+   *
+   * @param metalake the metalake name
+   * @param metadataObject a container object, see {@link #hasNestedMetadataObjects}
+   * @return the prefixes to invalidate
+   */
+  static List<String> nestedInvalidationPrefixes(String metalake, MetadataObject metadataObject) {
+    String key = metadataIdCacheKey(metalake, metadataObject);
+    List<String> prefixes = new ArrayList<>();
+    prefixes.add(key);
+    if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
+      // The schema key ends with KEY_SEPARATOR; replace it with the hierarchical separator.
+      prefixes.add(
+          key.substring(0, key.length() - KEY_SEPARATOR.length())
+              + HierarchicalSchemaUtil.schemaSeparator());
+    }
+    return prefixes;
   }
 
   static boolean hasNestedMetadataObjects(MetadataObject.Type type) {

@@ -793,12 +793,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject);
     if (JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(metadataObject.type())) {
-      // Prefix invalidation removes the object and all nested objects under the same name path.
-      metadataIdCache.invalidateByPrefix(cacheKey);
+      // Prefix invalidation removes the object and all nested objects under the same name path,
+      // including hierarchical schema descendants such as A:B under A.
+      List<String> prefixes =
+          JcasbinAuthorizationCacheKeys.nestedInvalidationPrefixes(metalake, metadataObject);
+      metadataIdCache.runInvalidationBatch(
+          () -> prefixes.forEach(metadataIdCache::invalidateByPrefix));
     } else {
-      metadataIdCache.invalidate(cacheKey);
+      metadataIdCache.invalidate(
+          JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject));
     }
   }
 
