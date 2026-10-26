@@ -180,6 +180,34 @@ public class TestPolicyContents {
   }
 
   @Test
+  void testIcebergCompactionContentRejectsUnknownOrInvalidRewriteOptions() {
+    IllegalArgumentException unknown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PolicyContents.icebergDataCompaction(1000L, 1L, mapOf("no-such-option", "x"))
+                    .validate());
+    Assertions.assertTrue(unknown.getMessage().contains("no-such-option"));
+
+    IllegalArgumentException negative =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PolicyContents.icebergDataCompaction(
+                        1000L, 1L, mapOf("target-file-size-bytes", "-1"))
+                    .validate());
+    Assertions.assertTrue(negative.getMessage().contains("target-file-size-bytes"));
+
+    IllegalArgumentException notBool =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PolicyContents.icebergDataCompaction(1000L, 1L, mapOf("rewrite-all", "yes"))
+                    .validate());
+    Assertions.assertTrue(notBool.getMessage().contains("rewrite-all"));
+  }
+
+  @Test
   void testAccessControlContent() {
     AccessControlContent content =
         (AccessControlContent)

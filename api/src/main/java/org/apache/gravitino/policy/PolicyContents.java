@@ -171,21 +171,60 @@ public class PolicyContents {
   }
 
   /**
-   * Creates placeholder Iceberg rewrite-manifests policy content.
+   * Creates a manifest rewrite policy with default thresholds targeting Iceberg's current default
+   * partition spec.
    *
-   * @return rewrite-manifests policy content
+   * @return manifest rewrite policy
    */
   public static PolicyContent icebergRewriteManifests() {
-    return new IcebergRewriteManifestsContent();
+    return icebergRewriteManifests(null, null, null, null, null);
   }
 
   /**
-   * Creates placeholder Iceberg snapshot-expiration policy content.
+   * Creates a manifest rewrite policy. Null thresholds use the built-in defaults.
+   *
+   * @param manifestCountCritical count that triggers regardless of size
+   * @param manifestCountWarning minimum count for the size trigger
+   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param specId requested existing spec, or null to resolve Iceberg's current default at
+   *     evaluation
+   * @param useCaching caching option, or null for the Iceberg default
+   * @return manifest rewrite policy
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable Long manifestCountCritical,
+      @Nullable Long manifestCountWarning,
+      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching) {
+    return new IcebergRewriteManifestsContent(
+        manifestCountCritical,
+        manifestCountWarning,
+        avgManifestSizeThresholdBytes,
+        specId,
+        useCaching);
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content with built-in defaults.
    *
    * @return snapshot-expiration policy content
    */
   public static PolicyContent icebergSnapshotExpiration() {
-    return new IcebergSnapshotExpirationContent();
+    return icebergSnapshotExpiration(null, null, null);
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content. Null arguments use built-in defaults.
+   *
+   * @param olderThanDays minimum snapshot age in days, or null for the default
+   * @param retainLast minimum recent snapshots to keep, or null for the default
+   * @param streamResults whether to stream intermediate delete results, or null for the default
+   * @return snapshot-expiration policy content
+   */
+  public static IcebergSnapshotExpirationContent icebergSnapshotExpiration(
+      @Nullable Long olderThanDays, @Nullable Long retainLast, @Nullable Boolean streamResults) {
+    return new IcebergSnapshotExpirationContent(olderThanDays, retainLast, streamResults);
   }
 
   /**

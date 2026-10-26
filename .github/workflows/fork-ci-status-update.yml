@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       pull-request:
-        description: 'Optional PR number to force-refresh, including settled checks'
+        description: 'Optional PR number to force-refresh, including settled statuses'
         required: false
         type: string
       sweep:
@@ -37,7 +37,7 @@ permissions: {}
 # Commit statuses are append-only with no compare-and-swap. Signals and dispatches share one
 # queue, so a burst of PR events is processed in order and none replaces another. Sweeps poll
 # every minute for 11 minutes in their own group, so signals never wait behind a sleeping sweep;
-# both re-read the check before writing the status, and the next pass repairs any interleaving.
+# both re-read the status before writing it, and the next pass repairs any interleaving.
 jobs:
   update:
     if: >-
@@ -55,7 +55,6 @@ jobs:
     timeout-minutes: 14
     permissions:
       actions: read
-      checks: write
       statuses: write
       contents: read
       pull-requests: read
@@ -84,7 +83,6 @@ jobs:
       chain: ${{ steps.sweep.outputs.chain }}
     permissions:
       actions: read
-      checks: write
       statuses: write
       contents: read
       pull-requests: read

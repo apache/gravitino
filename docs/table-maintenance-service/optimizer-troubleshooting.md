@@ -64,13 +64,16 @@ These are the hard ones, because success and "the policy decided not to act" loo
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-**`submit-update-stats-job` fails with JDBC metrics errors** — when `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the JDBC driver has to be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the same thing:
+**`submit-update-stats-job` fails with JDBC metrics errors** — when `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the JDBC driver has to be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the same thing. With the k8s job executor, add it in `--spark-conf`; with the local job executor, install it into `SPARK_HOME/jars`, as the driver applies `--spark-conf` only after it starts:
 
 ```json
 {
-  "spark.jars": "/path/to/postgresql-42.7.4.jar"
+  "spark.jars": "https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar"
 }
 ```
+
+`spark.jars` in `spark_conf` replaces a `spark.jars` default of the k8s job executor, so if that
+default provides the Iceberg runtime, list it in `spark_conf` as well.
 
 **`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino endpoint needs `auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options` for `builtin-iceberg-update-stats`. A secured Iceberg REST catalog needs `rest.auth.*` in `spark-conf` for any built-in job that reads the table. See [Configuration](./optimizer-configuration.md).
 
@@ -79,13 +82,17 @@ Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jo
 classpath after `SparkSession` starts and exit with a non-zero status when the Iceberg Spark
 runtime is absent. The templates configure Iceberg classes but leave `jars` empty, and
 `gravitino-jobs` does not bundle `iceberg-spark-runtime`. A stock Spark install is not enough.
-Put a version-matched Iceberg Spark runtime on the job classpath, for example:
+Put a version-matched Iceberg Spark runtime on the job classpath: install it into `SPARK_HOME/jars`
+or the Spark image, or, with the k8s job executor, set it in `spark_conf`:
 
 ```json
 {
-  "spark.jars": "/path/to/iceberg-spark-runtime-3.5_2.12-1.11.0.jar"
+  "spark.jars": "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.11.0/iceberg-spark-runtime-3.5_2.12-1.11.0.jar"
 }
 ```
+
+With the local job executor, `spark.jars` in `spark_conf` doesn't add it: the driver applies
+`spark_conf` only after spark-submit has built its classpath.
 
 Use the Spark, Scala, and Iceberg versions that match your cluster. See
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).

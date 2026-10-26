@@ -87,7 +87,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
                 "--spark-conf",
                 "{{spark_conf:-}}"))
         .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
-        .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v1"))
+        .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v2"))
         .build();
   }
 
@@ -118,7 +118,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
             arguments.get("updater-options"), "updater-options");
     Map<String, String> properties = buildOptimizerProperties(options);
     Map<String, String> sparkConfigs =
-        IcebergSparkConfigUtils.parseFlatJsonMap(arguments.get("spark-conf"), "spark-conf");
+        IcebergJobUtils.parseCustomSparkConfigs(arguments.get("spark-conf"));
     try (StatisticsUpdater updater =
         ProviderUtils.createStatisticsUpdaterInstance(
             options.getOrDefault("statistics_updater", DEFAULT_STATISTICS_UPDATER).trim())) {
