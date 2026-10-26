@@ -671,6 +671,13 @@ public class TestSparkApplicationUtils {
             () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
     Assertions.assertTrue(e.getMessage().contains("BAD NAME"), e.getMessage());
 
+    // Nor in the configs of a template.
+    SparkJobTemplate inConfigs =
+        newTemplate("s3a://bucket/app.jar", ImmutableMap.of("spark.executorEnv.BAD NAME", "v"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, inConfigs, configs));
+
     SparkJobTemplate valid =
         newTemplateBuilder()
             .withName("builtin-iceberg-update-stats")

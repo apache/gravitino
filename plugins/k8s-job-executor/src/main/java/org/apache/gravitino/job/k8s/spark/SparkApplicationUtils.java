@@ -282,6 +282,7 @@ public final class SparkApplicationUtils {
         .forEach(
             (key, value) -> {
               if (StringUtils.isNotBlank(value)) {
+                checkExecutorEnvironmentName(template, key);
                 jobSparkConf.put(key, value);
               }
             });
@@ -313,11 +314,7 @@ public final class SparkApplicationUtils {
                     template.name(),
                     SPARK_KUBERNETES_PREFIX);
               } else {
-                // Checked like the environment variables of the template, as an invalid name
-                // would only fail the executor pods.
-                if (key.startsWith(SPARK_EXECUTOR_ENV_PREFIX)) {
-                  checkEnvironmentName(template, key.substring(SPARK_EXECUTOR_ENV_PREFIX.length()));
-                }
+                checkExecutorEnvironmentName(template, key);
                 jobSparkConf.put(key, value);
               }
             });
@@ -389,6 +386,14 @@ public final class SparkApplicationUtils {
       return configs.sparkBuiltinJobsJar();
     }
     return template.executable();
+  }
+
+  // Checks the environment variable name of a spark.executorEnv.* configuration like those of the
+  // environments of the template, as an invalid name would only fail the executor pods.
+  private static void checkExecutorEnvironmentName(SparkJobTemplate template, String key) {
+    if (key.startsWith(SPARK_EXECUTOR_ENV_PREFIX)) {
+      checkEnvironmentName(template, key.substring(SPARK_EXECUTOR_ENV_PREFIX.length()));
+    }
   }
 
   private static void checkEnvironmentName(SparkJobTemplate template, String name) {

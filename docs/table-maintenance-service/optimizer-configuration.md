@@ -112,7 +112,8 @@ and the defaults of each template.
 Built-in Iceberg templates also need an Iceberg Spark runtime on the Spark classpath. They do not
 ship that JAR or fill template `jars`, so include it yourself — for example by installing it into
 `SPARK_HOME/jars`, or, with the k8s job executor, by
-`"spark.jars":"https://.../iceberg-spark-runtime-....jar"` inside `spark_conf`. With the local job
+`"spark.jars":"https://.../iceberg-spark-runtime-....jar"` inside `spark_conf`, which replaces a
+`spark.jars` default of the k8s job executor, so list every jar the job needs there. With the local job
 executor, `spark.jars` inside `spark_conf` doesn't add it, as the driver applies `spark_conf` only
 after it starts. Match the artifact to
 your Spark, Scala, and Iceberg versions. Details are under
