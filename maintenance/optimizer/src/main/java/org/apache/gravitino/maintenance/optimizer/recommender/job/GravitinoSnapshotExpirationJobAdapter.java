@@ -93,8 +93,18 @@ public class GravitinoSnapshotExpirationJobAdapter implements GravitinoJobAdapte
     config.put(
         TABLE_IDENTIFIER_KEY,
         IdentifierUtils.removeCatalogFromIdentifier(expire.nameIdentifier()).toString());
-    config.put(OLDER_THAN_KEY, cutoff(days));
-    config.put(RETAIN_LAST_KEY, Long.toString(retainLast));
+    // Match template placeholders {{older_than:-}} / {{retain_last:-}}: omit when using the same
+    // defaults as Iceberg's procedure so table history.expire.* properties remain authoritative.
+    if (days == IcebergSnapshotExpirationContent.DEFAULT_OLDER_THAN_DAYS) {
+      config.put(OLDER_THAN_KEY, "");
+    } else {
+      config.put(OLDER_THAN_KEY, cutoff(days));
+    }
+    if (retainLast == IcebergSnapshotExpirationContent.DEFAULT_RETAIN_LAST) {
+      config.put(RETAIN_LAST_KEY, "");
+    } else {
+      config.put(RETAIN_LAST_KEY, Long.toString(retainLast));
+    }
     config.put(STREAM_RESULTS_KEY, Boolean.toString(Boolean.parseBoolean(streamResults)));
     return Map.copyOf(config);
   }

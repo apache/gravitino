@@ -79,7 +79,8 @@ class TestGravitinoSnapshotExpirationJobAdapter {
       Map<String, String> job = GravitinoJobSubmitter.buildJobConfig(config, context, adapter);
       Assertions.assertEquals("spark_catalog", job.get("catalog_name"));
       Assertions.assertEquals("db.table", job.get("table_identifier"));
-      Assertions.assertEquals("2026-09-22 12:30:00Z", job.get("older_than"));
+      // olderThanDays=5 matches Iceberg default → omit so table properties can apply
+      Assertions.assertEquals("", job.get("older_than"));
       Assertions.assertEquals("3", job.get("retain_last"));
       Assertions.assertEquals("true", job.get("stream_results"));
     }
@@ -88,8 +89,8 @@ class TestGravitinoSnapshotExpirationJobAdapter {
   @Test
   void defaultsFillOptionalPlaceholders() {
     Map<String, String> job = adapter.jobConfig(context(Map.of()));
-    Assertions.assertEquals("2026-09-22 12:30:00Z", job.get("older_than"));
-    Assertions.assertEquals("1", job.get("retain_last"));
+    Assertions.assertEquals("", job.get("older_than"));
+    Assertions.assertEquals("", job.get("retain_last"));
     Assertions.assertEquals("false", job.get("stream_results"));
     Assertions.assertEquals(
         "2026-09-26 12:30:00Z",
@@ -135,7 +136,8 @@ class TestGravitinoSnapshotExpirationJobAdapter {
         new GravitinoSnapshotExpirationJobAdapter(Clock.fixed(Instant.MIN, ZoneOffset.UTC));
     IllegalArgumentException error =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> ancient.jobConfig(context(Map.of())));
+            IllegalArgumentException.class,
+            () -> ancient.jobConfig(context(Map.of("olderThanDays", "2"))));
     Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
     Assertions.assertNotNull(error.getCause());
   }

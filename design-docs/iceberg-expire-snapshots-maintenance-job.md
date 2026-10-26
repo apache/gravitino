@@ -283,8 +283,9 @@ public class SnapshotExpirationJobContext implements JobExecutionContext {
 
 ```java
 public class GravitinoSnapshotExpirationJobAdapter implements GravitinoJobAdapter {
-  // olderThanDays → older_than (UTC timestamp with Z)
-  // retainLast → retain_last
+  // olderThanDays == 5 → omit older_than (Iceberg / table history.expire.*)
+  // olderThanDays != 5 → older_than as UTC timestamp with Z
+  // retainLast == 1 → omit retain_last; else emit retain_last
   // streamResults → stream_results
   // plus table_identifier (catalog_name from shared submitter config)
 }
