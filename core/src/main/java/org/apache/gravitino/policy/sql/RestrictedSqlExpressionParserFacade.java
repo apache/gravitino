@@ -54,6 +54,6 @@ public final class RestrictedSqlExpressionParserFacade {
       throw new IllegalArgumentException(
           "restricted-sql-v1 source must not exceed 16384 UTF-8 bytes");
     }
-    return new RestrictedSqlParser(source).parse(mask);
+    return RestrictedSqlSourceParser.parse(source, mask);
   }
 }

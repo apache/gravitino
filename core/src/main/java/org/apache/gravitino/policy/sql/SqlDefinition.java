@@ -24,13 +24,37 @@ import java.util.Map;
 
 /** A validated definition; parameter names are local and have no physical field IDs yet. */
 final class SqlDefinition {
-  final Map<String, SqlType> parameters;
-  final SqlType resultType;
-  final SqlExpression body;
+  private final Map<String, SqlType> parameters;
+  private final SqlType resultType;
+  private final SqlExpression body;
 
   SqlDefinition(Map<String, SqlType> parameters, SqlType resultType, SqlExpression body) {
     this.parameters = Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
     this.resultType = resultType;
     this.body = body;
+  }
+
+  Map<String, SqlType> parameters() {
+    return parameters;
+  }
+
+  SqlType resultType() {
+    return resultType;
+  }
+
+  SqlExpression body() {
+    return body;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String toString() {
+    return "SqlDefinition{parameters="
+        + parameters
+        + ", resultType="
+        + resultType
+        + ", body="
+        + body
+        + "}";
   }
 }

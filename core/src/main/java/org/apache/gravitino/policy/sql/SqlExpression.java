@@ -21,25 +21,51 @@ package org.apache.gravitino.policy.sql;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 
-/** An immutable source node. CASE and SQL nulls are preserved for subsequent binding. */
-final class SqlExpression {
-  final String operator;
-  final String value;
-  final List<SqlExpression> children;
-  @Nullable final SqlType type;
+/** Base for immutable, typed SQL AST nodes. Each operation has its own node class. */
+abstract class SqlExpression {
+  private final List<SqlExpression> children;
 
-  SqlExpression(
-      String operator, String value, @Nullable SqlType type, List<SqlExpression> children) {
-    this.operator = operator;
-    this.value = value;
-    this.type = type;
+  SqlExpression(List<SqlExpression> children) {
     this.children = Collections.unmodifiableList(new ArrayList<>(children));
+    this.children.forEach(Objects::requireNonNull);
+  }
+
+  List<SqlExpression> children() {
+    return children;
+  }
+
+  @Nullable
+  SqlType type() {
+    return null;
   }
 
   int depth() {
-    int childDepth = children.stream().mapToInt(SqlExpression::depth).max().orElse(0);
-    return children.isEmpty() && !operator.equals("CALL") ? 0 : childDepth + 1;
+    return 1 + children.stream().mapToInt(SqlExpression::depth).max().orElse(0);
+  }
+
+  abstract List<?> attributes();
+
+  boolean sameContents(SqlExpression other) {
+    return attributes().equals(other.attributes()) && children.equals(other.children());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public final int hashCode() {
+    return Objects.hash(getClass(), attributes(), children);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public final String toString() {
+    return getClass().getSimpleName()
+        + "{attributes="
+        + attributes()
+        + ", children="
+        + children
+        + "}";
   }
 }

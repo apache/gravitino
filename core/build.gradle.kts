@@ -22,12 +22,15 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
+  antlr
   alias(libs.plugins.jcstress)
   alias(libs.plugins.jmh)
   alias(libs.plugins.aspectj.post.compile.weaving)
 }
 
 dependencies {
+  antlr(libs.antlr.tool)
+  implementation(libs.antlr.runtime)
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
@@ -202,11 +205,12 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 
 // :core:test is kept for IDEs and local habit, and is deprecated: run a lane instead. CI skips it
 // (`build` passes `-x :core:test`) and runs each lane in its own `core-test` job.
-// TestRestrictedRegoGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
+// TestRestrictedSqlGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
 // the legacy :core:test run it; the database lanes don't need the input.
 listOf("coreUnitTest", "test").forEach {
   tasks.named<Test>(it) {
     inputs.file(rootProject.file("docs/policies.md"))
+    inputs.property("updateRestrictedSqlGolden", providers.environmentVariable("GRAVITINO_UPDATE_RESTRICTED_SQL_GOLDEN").orElse("false"))
     systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
   }
 }
@@ -227,9 +231,23 @@ tasks.test {
 }
 
 tasks.withType<JavaCompile>().configureEach {
+  options.errorprone.excludedPaths.set(".*/generated-src/antlr/.*")
   if (name.contains("jcstress", ignoreCase = true)) {
-    options.errorprone.excludedPaths.set(".*/generated/.*")
+    options.errorprone.excludedPaths.set(".*/(generated|generated-src/antlr)/.*")
   }
+}
+
+// The generator is build tooling; only antlr4-runtime belongs on the server classpath.
+configurations.matching { it.name in setOf("api", "implementation") }.configureEach {
+  setExtendsFrom(extendsFrom.filterNot { it.name == "antlr" })
+}
+
+tasks.generateGrammarSource {
+  arguments = arguments + listOf("-visitor", "-no-listener", "-package", "org.apache.gravitino.policy.sql.antlr")
+}
+
+tasks.javadoc {
+  exclude("**/policy/sql/antlr/**")
 }
 
 tasks.named<JavaCompile>("jmhCompileGeneratedClasses").configure {

@@ -254,21 +254,26 @@ class TestRestrictedSqlExpressionParser {
         RestrictedSqlExpressionParserFacade.parse(
             "(x STRING) RETURNS BOOLEAN -> CASE WHEN x = 'US' THEN TRUE WHEN x IS NULL THEN FALSE END",
             false);
-    Assertions.assertEquals("CASE", definition.body.operator);
-    Assertions.assertEquals(5, definition.body.children.size());
-    Assertions.assertEquals("=", definition.body.children.get(0).operator);
-    Assertions.assertEquals("IS NULL", definition.body.children.get(2).operator);
-    Assertions.assertEquals("NULL", definition.body.children.get(4).operator);
+    CaseExpression expression =
+        Assertions.assertInstanceOf(CaseExpression.class, definition.body());
+    Assertions.assertEquals(2, expression.branches().size());
+    Assertions.assertInstanceOf(Comparison.class, expression.branches().get(0).condition());
+    Assertions.assertInstanceOf(IsNull.class, expression.branches().get(1).condition());
+    Assertions.assertNull(expression.fallback());
     SqlDefinition negation =
         RestrictedSqlExpressionParserFacade.parse(
             "(x STRING) RETURNS BOOLEAN -> NOT x = 'US' OR x IS NULL AND FALSE", false);
-    Assertions.assertEquals("OR", negation.body.operator);
-    Assertions.assertEquals("NOT", negation.body.children.get(0).operator);
-    Assertions.assertEquals("AND", negation.body.children.get(1).operator);
+    LogicalExpression logical =
+        Assertions.assertInstanceOf(LogicalExpression.class, negation.body());
+    Assertions.assertEquals(LogicalOperator.OR, logical.operator());
+    Assertions.assertInstanceOf(Not.class, logical.operands().get(0));
+    LogicalExpression conjunction =
+        Assertions.assertInstanceOf(LogicalExpression.class, logical.operands().get(1));
+    Assertions.assertEquals(LogicalOperator.AND, conjunction.operator());
     Assertions.assertThrows(
-        UnsupportedOperationException.class, () -> definition.parameters.clear());
+        UnsupportedOperationException.class, () -> definition.parameters().clear());
     Assertions.assertThrows(
-        UnsupportedOperationException.class, () -> definition.body.children.clear());
+        UnsupportedOperationException.class, () -> definition.body().children().clear());
   }
 
   @Test
@@ -276,15 +281,19 @@ class TestRestrictedSqlExpressionParser {
     SqlDefinition definition =
         RestrictedSqlExpressionParserFacade.parse(
             "(\"a\"\"b\" STRING) RETURNS BOOLEAN -> \"a\"\"b\" = 'O''Brien\\n😀'", false);
-    Assertions.assertTrue(definition.parameters.containsKey("a\"b"));
-    Assertions.assertEquals("O'Brien\\n😀", definition.body.children.get(1).value);
+    Assertions.assertTrue(definition.parameters().containsKey("a\"b"));
+    Comparison comparison = Assertions.assertInstanceOf(Comparison.class, definition.body());
+    Literal value = Assertions.assertInstanceOf(Literal.class, comparison.right());
+    Assertions.assertEquals("O'Brien\\n😀", value.value());
     SqlDefinition mask =
         RestrictedSqlExpressionParserFacade.parse(
             "(local_name STRING) RETURNS STRING -> show_last_4(local_name)", true);
-    Assertions.assertEquals("LOCAL_NAME", mask.body.children.get(0).value);
+    FunctionCall call = Assertions.assertInstanceOf(FunctionCall.class, mask.body());
+    Assertions.assertEquals(SqlFunction.SHOW_LAST_4, call.function());
+    Assertions.assertEquals("LOCAL_NAME", ((InputReference) call.arguments().get(0)).name());
     SqlDefinition zero =
         RestrictedSqlExpressionParserFacade.parse("(x DOUBLE) RETURNS DOUBLE -> -0.0", true);
-    Assertions.assertEquals("-0.0", zero.body.value);
+    Assertions.assertEquals("-0.0", ((Literal) zero.body()).value());
   }
 
   @Test
@@ -309,19 +318,28 @@ class TestRestrictedSqlExpressionParser {
 
   @Test
   void testDepthNodeAndListLimits() {
-    filter("NOT ".repeat(8) + "TRUE");
-    rejectBody("NOT ".repeat(9) + "TRUE");
+    filter("NOT ".repeat(16) + "TRUE");
+    rejectBody("NOT ".repeat(17) + "TRUE");
     rejectBody("NOT ".repeat(2000) + "TRUE");
-    filter("(".repeat(256) + "TRUE" + ")".repeat(256));
-    rejectBody("(".repeat(257) + "TRUE" + ")".repeat(257));
-    filter(String.join(" OR ", Collections.nCopies(255, "TRUE")));
-    rejectBody(String.join(" OR ", Collections.nCopies(256, "TRUE")));
-    // A list has a predicate node, a left operand, and one node per literal.
-    filter("1 IN (" + numbers(254) + ")");
-    rejectBody("1 IN (" + numbers(255) + ")");
-    rejectBody("1 IN (" + numbers(257) + ")");
-    rejectBody("CASE WHEN TRUE THEN ".repeat(9) + "TRUE" + " END".repeat(9));
-    rejectBody("show_last_4(".repeat(9) + "'x'" + ")".repeat(9) + " IS NULL");
+    rejectBody("TRUE OR (".repeat(17) + "FALSE" + ")".repeat(17));
+    filter("(".repeat(64) + "TRUE" + ")".repeat(64));
+    rejectBody("(".repeat(65) + "TRUE" + ")".repeat(65));
+    filter(String.join(" OR ", Collections.nCopies(1023, "TRUE")));
+    rejectBody(String.join(" OR ", Collections.nCopies(1024, "TRUE")));
+    filter("1 IN (" + numbers(1000) + ")");
+    rejectBody("1 IN (" + numbers(1001) + ")");
+    filter("1 IN (" + numbers(500) + ") AND 2 IN (" + numbers(500) + ")");
+    rejectBody("1 IN (" + numbers(500) + ") AND 2 IN (" + numbers(501) + ")");
+    filter("CASE WHEN TRUE THEN ".repeat(16) + "TRUE" + " END".repeat(16));
+    rejectBody("CASE WHEN TRUE THEN ".repeat(17) + "TRUE" + " END".repeat(17));
+    Assertions.assertDoesNotThrow(
+        () ->
+            RestrictedSqlExpressionParserFacade.validateColumnMask(
+                "(x STRING) RETURNS STRING -> "
+                    + "show_last_4(".repeat(16)
+                    + "x"
+                    + ")".repeat(16)));
+    rejectBody("show_last_4(".repeat(17) + "'x'" + ")".repeat(17) + " IS NULL");
   }
 
   @Test

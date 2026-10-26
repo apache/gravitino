@@ -163,13 +163,166 @@ escaping. Backslashes are literal and Unicode is preserved; isolated surrogates 
 Comments, statements, semicolons, casts, arithmetic, qualified names, nested fields, subqueries,
 unknown functions, exponents, leading `+`, leading zeroes and trailing decimal points are rejected.
 
-Limits apply to source before normalization: 16 KiB UTF-8 per complete definition, operation
-depth 8 (including CASE and calls), 256 expression nodes, 4 KiB per decoded quoted token, 256
-bytes per numeric literal, 256 total IN elements, and 256 parenthesis levels. The node limit
-also bounds how many literal list elements can fit in a complete expression.
+Limits apply before normalization and serve different purposes:
 
-The complete grammar and execution semantics are in the
-[read-restriction design](../design-docs/tag-based-read-restrictions-for-iceberg-rest.md).
+| Resource | Limit |
+| --- | --- |
+| Complete definition, including declarations | 16 KiB of UTF-8 |
+| Expression nodes | 1024 |
+| Operation depth, including CASE and function calls | 16 |
+| IN elements, both per list and across the complete definition | 1000 |
+| Parenthesis nesting | 64 |
+| Declared parameters | 256 |
+| Each decoded quoted identifier or string literal | 4 KiB of UTF-8 |
+| Each numeric literal | 256 bytes |
+
+Node and IN limits allow ordinary SQL predicates and membership lists while bounding parsing and
+validation work. Depth limits bound recursive operations independently of expression width. A
+consecutive AND/OR chain is one n-ary operation; parentheses alone add no AST nodes or operation
+depth. Literal lists and every CASE arm count toward the node limit even if a branch is unreachable.
+
+#### Complete SQL Grammar
+
+The stored definition must match this grammar and consume the complete input. Keywords and
+allowlisted function names are case-insensitive; arbitrary function names remain invalid.
+
+```text
+definition  := "(" (parameter ("," parameter)*)? ")" RETURNS type "->" expr EOF
+parameter   := identifier type
+type        := BOOLEAN | INTEGER | LONG | FLOAT | DOUBLE | STRING | BINARY | DATE
+             | DECIMAL "(" unsignedInteger "," unsignedInteger ")"
+             | TIME ("(" "6" ")")?
+             | TIMESTAMP ("(" "6" ")")? ((WITH | WITHOUT) TIME ZONE)?
+expr        := orExpr
+orExpr      := andExpr (OR andExpr)*
+andExpr     := notExpr (AND notExpr)*
+notExpr     := NOT* predicate
+predicate   := scalar (compareOp scalar
+             | IS NOT? NULL
+             | NOT? IN "(" literal ("," literal)* ")"
+             | NOT? BETWEEN scalar AND scalar
+             | NOT? LIKE string)?
+scalar      := identifier | literal | functionCall | caseExpr | "(" expr ")"
+functionCall := identifier "(" (expr ("," expr)*)? ")"
+caseExpr    := CASE expr? (WHEN expr THEN expr)+ (ELSE expr)? END
+compareOp   := "=" | "<>" | "!=" | "<" | "<=" | ">" | ">="
+literal     := string | number | TRUE | FALSE | NULL | temporal
+temporal    := (DATE | TIME | TIMESTAMP) string | TIMESTAMP WITH TIME ZONE string
+number      := "-"? ("0" | nonZeroDigit digit*) ("." digit+)?
+unsignedInteger := "0" | nonZeroDigit digit*
+digit       := "0" | nonZeroDigit
+nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+identifier  := unquotedIdentifier | quotedIdentifier
+unquotedIdentifier := (asciiLetter | "_") (asciiLetter | digit | "_")*
+quotedIdentifier := '"' (nonDoubleQuote | '""')+ '"'
+string      := "'" (nonSingleQuote | "''")* "'"
+```
+
+`asciiLetter` means A–Z or a–z. Keywords shown in the grammar are reserved; quote them when used
+as parameter names. Quoted identifiers and strings preserve Unicode and decode doubled quotes
+once. There is no backslash escape layer inside SQL literals. Every number must end at a token
+boundary: `1and TRUE` is invalid. The `AND` in `BETWEEN` separates its two scalar bounds;
+`NOT active = TRUE` means `NOT (active = TRUE)`. Chained comparisons are invalid.
+
+#### Result Types and Binding Contract
+
+Each declared row-filter input must resolve to exactly one table column under the identifier
+matching rules; each declared type must match exactly. Missing, ambiguous or mismatched inputs
+are errors. A context-only filter can declare no inputs:
+
+```sql
+() RETURNS BOOLEAN -> is_group_member('auditors')
+```
+
+A column mask has exactly one local parameter and the same result type, including decimal
+precision/scale and timestamp time-zone characteristics. Binding applies that parameter to the
+selected column regardless of its physical name and inherits that column's nullability. A physical
+name that was not declared is not an alias. For example, this can mask either `phone_number` or
+`card`, provided its selected column has type STRING:
+
+```sql
+(value STRING) RETURNS STRING -> show_last_4(value)
+```
+
+BINARY supports null tests and compatible scalar masks, but no value comparisons. BOOLEAN
+supports equality and membership; all other supported predicate types also support ordering and
+ranges. Temporal literals require matching type keywords, valid calendar/clock values and at most
+six fractional digits; timestamp-with-timezone literals require an explicit offset. Integer
+literals must fit the signed range and be mathematical integers. Decimals must fit without
+rounding. Floating-point literals retain negative zero and reject overflow, infinity and NaN.
+Strings compare case-sensitively without Unicode normalization.
+
+#### CASE and SQL NULL Semantics
+
+A searched CASE evaluates conditions in source order; only TRUE selects a branch. FALSE and
+UNKNOWN skip it. A simple CASE compares its selector with each match using SQL equality, so a
+NULL selector does not match a NULL match value. Only the selected result is evaluated. If no arm
+matches, CASE returns ELSE, or SQL NULL when ELSE is absent. Every result arm is statically type
+checked, including unreachable arms. Nested CASE and function calls obey the same limits.
+
+A filter retains rows only when its result is TRUE. These are SQL three-valued rules:
+
+| Expression | Result |
+| --- | --- |
+| `NULL IS NULL` / `NULL IS NOT NULL` | TRUE / FALSE |
+| Comparison with a NULL operand | UNKNOWN |
+| `NOT NULL` | UNKNOWN |
+| `FALSE AND NULL` / `TRUE AND NULL` | FALSE / UNKNOWN |
+| `TRUE OR NULL` / `FALSE OR NULL` | TRUE / UNKNOWN |
+| NULL input to IN, BETWEEN, LIKE or is_nan | UNKNOWN |
+| Nonmatching IN list containing NULL | UNKNOWN |
+| Nonmatching NOT IN list containing NULL | UNKNOWN |
+
+For example, both `region <> 'US'` and `NOT (region = 'US')` exclude null regions. Use
+`region IS NULL OR region <> 'US'` to include them. A constant FALSE filter returns no rows.
+A mask that can return NULL, including an omitted ELSE, requires a nullable target. The binding
+and enforcement layer must reject a nullable result for a required column.
+
+#### Function Contract
+
+`CURRENT_USER()` returns the non-null STRING name of the trusted effective subject.
+`is_group_member('group')` returns BOOLEAN for exact flat membership in the current metalake.
+An unknown group, unavailable subject or failed lookup is an error; an existing group without
+the subject returns FALSE. Nested group expansion is unsupported.
+
+`user_attribute('key')` reads a trusted scalar attribute with a declared type compatible with its
+use. Keys are non-empty, case-sensitive string literals. An absent or null value of a declared
+attribute is SQL NULL. Unknown keys, incompatible types, lists, objects and failed lookups are
+errors. Context values are stable for a request; no implicit string-to-number conversion occurs.
+
+Date parts `year`, `month`, and `day` return INTEGER and preserve null input. Timestamp-with-timezone
+values use UTC; timestamps without timezone use their recorded calendar fields. Dates use the
+proleptic Gregorian calendar. `month(order_date) = 3` means March in any year.
+
+Mask function behavior is as follows; each call takes one compatible scalar argument and preserves
+its input logical type:
+
+| Function | Behavior |
+| --- | --- |
+| `mask_alphanum` | ASCII digits become `n`; `(),.@-` are preserved; other Unicode code points become `x` |
+| `show_first_4` / `show_last_4` | Preserve the first/last four code points and mask the remainder as above; strings of four or fewer code points are unchanged |
+| `mask_to_fixed_value` | Return `XXXXXXXX` for STRING, zero for numeric values, FALSE for BOOLEAN, or the epoch date/timestamp, including for null input |
+| `replace_with_null` | Return a typed null |
+| `truncate_to_year` / `truncate_to_month` | Truncate to the start of the year/month, using UTC for timestamps with time zone |
+| `sha256_global` / `sha256_query_local` | Type-preserving SHA-256; the query-local variant prepends a cryptographically random salt of at least 16 bytes, shared within one query |
+
+All masks except `mask_to_fixed_value` preserve null input. Hash input encoding is UTF-8 for
+strings, little-endian two's-complement for signed integers, and raw bytes for BINARY. STRING
+results are 64 lowercase hexadecimal characters; INTEGER/LONG results are the first four/eight
+digest bytes interpreted as signed little-endian; BINARY results contain the complete 32-byte
+digest. Separate queries require independent query-local salts.
+
+#### Validation Boundary
+
+ANTLR parses the complete stored definition, then an AST visitor builds separate typed operation
+nodes. Static validation checks parameter/result declarations, unique names, available local
+references, every CASE arm, operand types, allowlisted calls and arguments, exact literal ranges,
+and source limits. Golden fixtures pin parsed ASTs and rejected-input diagnostics.
+
+This parser does not evaluate expressions or establish enforcement support. Table/schema and
+trusted-context binding must still check actual types, nullability, attribute availability and
+identity lookup results. Any binding, translation, or enforcement-capability error must fail
+closed; an unsupported required restriction must never become an unrestricted read.
 
 ### Policy-to-Tag Associations
 

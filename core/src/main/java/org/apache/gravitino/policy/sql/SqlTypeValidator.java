@@ -43,95 +43,86 @@ final class SqlTypeValidator {
             || expected.equals(actual),
         "expected " + expected + ", found " + actual);
     SqlType hint = expected == null ? actual : expected;
-    List<SqlExpression> args = node.children;
-    switch (node.operator) {
-      case "INPUT":
-      case "NULL":
-      case "STRING":
-      case "BOOLEAN":
-        return;
-      case "NUMBER":
-        validateNumber(node.value, hint);
-        return;
-      case "TEMPORAL":
-        validateTemporal(node);
-        return;
-      case "AND":
-      case "OR":
-      case "NOT":
-        args.forEach(arg -> validate(arg, SqlType.BOOLEAN));
-        return;
-      case "IS NULL":
-      case "IS NOT NULL":
-        validate(args.get(0), null);
-        return;
-      case "LIKE":
-        args.forEach(arg -> validate(arg, SqlType.STRING));
-        return;
-      case "CASE":
-      case "SIMPLE CASE":
-        boolean simple = node.operator.equals("SIMPLE CASE");
-        List<SqlExpression> matches = new ArrayList<>();
-        if (simple) {
-          matches.add(args.get(0));
-        }
-        for (int i = simple ? 1 : 0; i < args.size() - 1; i += 2) {
-          if (simple) {
-            matches.add(args.get(i));
-          } else {
-            validate(args.get(i), SqlType.BOOLEAN);
-          }
-          validate(args.get(i + 1), hint);
-        }
-        if (simple) {
-          validateCompatible(matches, false);
-        }
-        validate(args.get(args.size() - 1), hint);
-        return;
-      case "CALL":
-        validateCall(node, hint);
-        return;
-      default:
-        validateCompatible(args, node.operator.matches("<|<=|>|>=|BETWEEN"));
+    if (node instanceof Literal) {
+      Literal literal = (Literal) node;
+      if (literal.literalType() == LiteralType.NUMBER) {
+        validateNumber(literal.value(), hint);
+      }
+      if (literal.literalType() == LiteralType.TEMPORAL) {
+        validateTemporal(literal);
+      }
+    } else if (node instanceof InputReference) {
+      return;
+    } else if (node instanceof LogicalExpression || node instanceof Not) {
+      node.children().forEach(arg -> validate(arg, SqlType.BOOLEAN));
+    } else if (node instanceof IsNull) {
+      validate(((IsNull) node).operand(), null);
+    } else if (node instanceof Like) {
+      node.children().forEach(arg -> validate(arg, SqlType.STRING));
+    } else if (node instanceof CaseExpression) {
+      validateCase((CaseExpression) node, hint);
+    } else if (node instanceof FunctionCall) {
+      validateCall((FunctionCall) node, hint);
+    } else if (node instanceof Comparison) {
+      validateCompatible(node.children(), ((Comparison) node).operator().ordered());
+    } else if (node instanceof In || node instanceof Between) {
+      validateCompatible(node.children(), node instanceof Between);
+    } else {
+      throw new IllegalArgumentException(
+          "Unsupported SQL AST node: " + node.getClass().getSimpleName());
     }
   }
 
   @Nullable
   private SqlType naturalType(SqlExpression node) {
-    if (node.type != null) {
-      return node.type;
+    if (node.type() != null) {
+      return node.type();
     }
-    switch (node.operator) {
-      case "NULL":
-        return null;
-      case "NUMBER":
-        return SqlType.NUMBER;
-      case "CALL":
-        switch (node.value) {
-          case "CURRENT_USER":
-            return SqlType.STRING;
-          case "IS_GROUP_MEMBER":
-          case "IS_NAN":
-            return SqlType.BOOLEAN;
-          case "YEAR":
-          case "MONTH":
-          case "DAY":
-            return SqlType.INTEGER;
-          case "USER_ATTRIBUTE":
-            return null;
-          default:
-            return node.children.size() == 1 ? naturalType(node.children.get(0)) : null;
-        }
-      case "CASE":
-      case "SIMPLE CASE":
-        List<SqlExpression> results = new ArrayList<>();
-        for (int i = node.operator.equals("CASE") ? 1 : 2; i < node.children.size() - 1; i += 2) {
-          results.add(node.children.get(i));
-        }
-        results.add(node.children.get(node.children.size() - 1));
-        return commonType(results);
-      default:
-        return SqlType.BOOLEAN;
+    if (node instanceof Literal) {
+      return ((Literal) node).literalType() == LiteralType.NUMBER ? SqlType.NUMBER : null;
+    }
+    if (node instanceof FunctionCall) {
+      FunctionCall call = (FunctionCall) node;
+      switch (call.function()) {
+        case CURRENT_USER:
+          return SqlType.STRING;
+        case IS_GROUP_MEMBER:
+        case IS_NAN:
+          return SqlType.BOOLEAN;
+        case YEAR:
+        case MONTH:
+        case DAY:
+          return SqlType.INTEGER;
+        case USER_ATTRIBUTE:
+          return null;
+        default:
+          return call.arguments().size() == 1 ? naturalType(call.arguments().get(0)) : null;
+      }
+    }
+    if (node instanceof CaseExpression) {
+      return commonType(((CaseExpression) node).results());
+    }
+    return SqlType.BOOLEAN;
+  }
+
+  private void validateCase(CaseExpression expression, @Nullable SqlType hint) {
+    List<SqlExpression> matches = new ArrayList<>();
+    if (expression.selector() != null) {
+      matches.add(expression.selector());
+    }
+    for (CaseBranch branch : expression.branches()) {
+      if (expression.selector() == null) {
+        validate(branch.condition(), SqlType.BOOLEAN);
+      } else {
+        matches.add(branch.condition());
+      }
+      validate(branch.result(), hint);
+    }
+    if (expression.selector() != null) {
+      validateCompatible(matches, false);
+    }
+    if (expression.fallback() != null) {
+      validate(expression.fallback(), hint);
     }
   }
 
@@ -156,58 +147,62 @@ final class SqlTypeValidator {
     args.forEach(arg -> validate(arg, type));
   }
 
-  private void validateCall(SqlExpression node, @Nullable SqlType hint) {
-    List<SqlExpression> args = node.children;
-    if (node.value.equals("CURRENT_USER")) {
+  private void validateCall(FunctionCall node, @Nullable SqlType hint) {
+    List<SqlExpression> args = node.arguments();
+    if (node.function() == SqlFunction.CURRENT_USER) {
       require(args.isEmpty(), "CURRENT_USER requires no arguments");
       return;
     }
-    require(args.size() == 1, node.value + " requires exactly one argument");
+    require(args.size() == 1, node.function() + " requires exactly one argument");
     SqlExpression arg = args.get(0);
     SqlType type = naturalType(arg);
-    switch (node.value) {
-      case "IS_GROUP_MEMBER":
-      case "USER_ATTRIBUTE":
+    switch (node.function()) {
+      case IS_GROUP_MEMBER:
+      case USER_ATTRIBUTE:
         require(
-            arg.operator.equals("STRING") && !arg.value.isEmpty(),
+            arg instanceof Literal
+                && ((Literal) arg).literalType() == LiteralType.STRING
+                && !((Literal) arg).value().isEmpty(),
             "context key must be a non-empty string literal");
-        if (node.value.equals("USER_ATTRIBUTE") && hint != null && !hint.equals(SqlType.NUMBER)) {
-          SqlType previous = attributeTypes.putIfAbsent(arg.value, hint);
+        if (node.function() == SqlFunction.USER_ATTRIBUTE
+            && hint != null
+            && !hint.equals(SqlType.NUMBER)) {
+          SqlType previous = attributeTypes.putIfAbsent(((Literal) arg).value(), hint);
           require(
               previous == null || previous.equals(hint),
-              "inconsistent user attribute type for " + arg.value);
+              "inconsistent user attribute type for " + ((Literal) arg).value());
         }
         return;
-      case "IS_NAN":
+      case IS_NAN:
         require(
             type != null && type.name.matches("FLOAT|DOUBLE"), "IS_NAN requires FLOAT or DOUBLE");
         validate(arg, type);
         return;
-      case "YEAR":
-      case "MONTH":
-      case "DAY":
-        require(type != null && type.temporal(), node.value + " requires DATE or TIMESTAMP");
+      case YEAR:
+      case MONTH:
+      case DAY:
+        require(type != null && type.temporal(), node.function() + " requires DATE or TIMESTAMP");
         validate(arg, type);
         return;
-      case "MASK_ALPHANUM":
-      case "SHOW_FIRST_4":
-      case "SHOW_LAST_4":
+      case MASK_ALPHANUM:
+      case SHOW_FIRST_4:
+      case SHOW_LAST_4:
         require(hint == null || hint.equals(SqlType.STRING), "string mask requires STRING result");
         validate(arg, SqlType.STRING);
         return;
-      case "TRUNCATE_TO_YEAR":
-      case "TRUNCATE_TO_MONTH":
+      case TRUNCATE_TO_YEAR:
+      case TRUNCATE_TO_MONTH:
         type = hint == null ? type : hint;
         require(type != null && type.temporal(), "truncation requires DATE or TIMESTAMP");
         break;
-      case "SHA256_GLOBAL":
-      case "SHA256_QUERY_LOCAL":
+      case SHA256_GLOBAL:
+      case SHA256_QUERY_LOCAL:
         type = hint == null ? type : hint;
         require(
             type != null && type.name.matches("STRING|INTEGER|LONG|BINARY"),
             "unsupported hash input type");
         break;
-      case "MASK_TO_FIXED_VALUE":
+      case MASK_TO_FIXED_VALUE:
         type = hint == null ? type : hint;
         require(
             type != null
@@ -215,12 +210,13 @@ final class SqlTypeValidator {
                     "STRING|INTEGER|LONG|FLOAT|DOUBLE|DECIMAL|BOOLEAN|DATE|TIMESTAMP"),
             "unsupported fixed-value input type");
         break;
-      case "REPLACE_WITH_NULL":
+      case REPLACE_WITH_NULL:
         type = hint == null ? type : hint;
         require(type != null, "replace_with_null requires a typed scalar");
         break;
       default:
-        throw new IllegalArgumentException("Unknown restricted-sql-v1 function: " + node.value);
+        throw new IllegalArgumentException(
+            "Unknown restricted-sql-v1 function: " + node.function());
     }
     validate(arg, type);
   }
@@ -257,9 +253,9 @@ final class SqlTypeValidator {
     }
   }
 
-  private static void validateTemporal(SqlExpression node) {
-    String value = node.value;
-    SqlType type = node.type;
+  private static void validateTemporal(Literal node) {
+    String value = node.value();
+    SqlType type = node.type();
     require(type != null, "temporal literal requires a type");
     try {
       if (type.name.equals("DATE")) {
