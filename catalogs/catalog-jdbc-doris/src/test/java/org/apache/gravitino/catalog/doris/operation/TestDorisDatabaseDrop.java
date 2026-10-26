@@ -33,7 +33,7 @@ import org.mockito.Mockito;
 class TestDorisDatabaseDrop {
 
   @ParameterizedTest
-  @CsvSource({"true, false", "false, false", "true, true"})
+  @CsvSource({"true, false", "false, false", "true, true", "false, true"})
   void testDropRespectsNonEmptySchemaContract(boolean nonEmpty, boolean cascade) throws Exception {
     DataSource dataSource = Mockito.mock(DataSource.class);
     Connection connection = Mockito.mock(Connection.class);
@@ -62,8 +62,11 @@ class TestDorisDatabaseDrop {
     } else {
       Mockito.verify(tables).close();
     }
-    int connections = !nonEmpty && !cascade ? 2 : 1;
-    Mockito.verify(statement, Mockito.times(connections)).close();
+    int statements = !nonEmpty && !cascade ? 2 : 1;
+    Mockito.verify(statement, Mockito.times(statements)).close();
+    // Non-cascading drops borrow a check connection while holding the execution connection.
+    int connections = cascade ? 1 : 2;
+    Mockito.verify(dataSource, Mockito.times(connections)).getConnection();
     Mockito.verify(connection, Mockito.times(connections)).close();
   }
 }
