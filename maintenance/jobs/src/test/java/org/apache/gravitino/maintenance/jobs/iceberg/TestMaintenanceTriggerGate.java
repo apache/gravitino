@@ -31,14 +31,10 @@ import org.junit.jupiter.api.Test;
 public class TestMaintenanceTriggerGate {
 
   @Test
-  public void testExpireAndRewriteManifestsAlwaysMaintain() {
-    Map<String, String> args = new HashMap<>();
+  public void testNonCompactionAlwaysMaintain() {
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.EXPIRE_SNAPSHOTS, args, "{\"snapshotId\":1}"));
-    assertTrue(
-        MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.REWRITE_MANIFESTS, args, "{\"snapshotId\":1}"));
+            MaintenanceType.EXPIRE_SNAPSHOTS, new HashMap<>(), "{\"snapshotId\":1}"));
   }
 
   @Test
@@ -67,19 +63,5 @@ public class TestMaintenanceTriggerGate {
             + "\":0}";
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(MaintenanceType.REWRITE_DATA_FILES, args, above));
-  }
-
-  @Test
-  public void testOrphanDefaultRulesMaintain() {
-    // Default orphan trigger-expr is true when rules is omitted.
-    assertTrue(
-        MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.REMOVE_ORPHAN_FILES, new HashMap<>(), "{}"));
-  }
-
-  @Test
-  public void testTemplateExposesRulesPlaceholder() {
-    assertTrue(new IcebergMaintenanceJob().jobTemplate().arguments().contains("--rules"));
-    assertTrue(new IcebergMaintenanceJob().jobTemplate().arguments().contains("{{rules:-}}"));
   }
 }

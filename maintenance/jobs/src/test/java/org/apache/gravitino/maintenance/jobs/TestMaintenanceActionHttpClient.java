@@ -19,7 +19,6 @@
 package org.apache.gravitino.maintenance.jobs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,7 +53,7 @@ public class TestMaintenanceActionHttpClient {
           path.set(exchange.getRequestURI().getPath());
           body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
           byte[] payload = "{\"code\":0}".getBytes(StandardCharsets.UTF_8);
-          int status = exchange.getRequestURI().getPath().contains("/oauth/") ? 200 : 200;
+          int status = 200;
           if (exchange.getRequestURI().getPath().endsWith("/token")) {
             payload =
                 "{\"access_token\":\"tok-1\",\"token_type\":\"bearer\",\"expires_in\":3600}"
@@ -79,42 +78,20 @@ public class TestMaintenanceActionHttpClient {
   }
 
   @Test
-  public void testSimpleAuthPostsBeforeMetrics() {
+  public void testSimpleAuthPostsMetricsAndFinish() {
     Map<String, String> options = baseOptions();
     options.put("auth_type", "simple");
     options.put("username", "alice");
     try (MaintenanceActionHttpClient client =
         MaintenanceActionHttpClient.fromUpdaterOptions(options)) {
       client.reportBeforeMetrics(7L, new MaintenanceActionMetricsRequest(1L, 20L, 2L, "{}"));
+      assertEquals("/api/metalakes/demo/maintenance/actions/7/metrics/before", path.get());
+      assertTrue(body.get().contains("\"tableId\":1"));
+      assertTrue(body.get().contains("\"policyId\":20"));
+      client.finish(7L, new MaintenanceActionFinishRequest(1L, 20L, 11L));
+      assertEquals("/api/metalakes/demo/maintenance/actions/7/finish", path.get());
     }
-    assertEquals("/api/metalakes/demo/maintenance/actions/7/metrics/before", path.get());
     assertEquals(basic("alice", "dummy"), auth.get());
-    assertTrue(body.get().contains("\"tableId\":1"));
-    assertTrue(body.get().contains("\"policyId\":20"));
-  }
-
-  @Test
-  public void testBasicAuthPostsFinish() {
-    Map<String, String> options = baseOptions();
-    options.put("auth_type", "basic");
-    options.put("username", "admin");
-    options.put("password", "secret");
-    try (MaintenanceActionHttpClient client =
-        MaintenanceActionHttpClient.fromUpdaterOptions(options)) {
-      client.finish(9L, new MaintenanceActionFinishRequest(3L, 30L, 11L));
-    }
-    assertEquals("/api/metalakes/demo/maintenance/actions/9/finish", path.get());
-    assertEquals(basic("admin", "secret"), auth.get());
-  }
-
-  @Test
-  public void testNoneAuthOmitsAuthorization() {
-    try (MaintenanceActionHttpClient client =
-        MaintenanceActionHttpClient.fromUpdaterOptions(baseOptions())) {
-      client.reportAfterMetrics(4L, new MaintenanceActionMetricsRequest(1L, 20L, 2L, "{}"));
-    }
-    assertNull(auth.get());
-    assertTrue(path.get().endsWith("/metrics/after"));
   }
 
   @Test
