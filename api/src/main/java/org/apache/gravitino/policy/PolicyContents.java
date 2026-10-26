@@ -370,7 +370,62 @@ public class PolicyContents {
    */
   public static IcebergSnapshotExpirationContent icebergSnapshotExpiration(
       @Nullable Long olderThanDays, @Nullable Long retainLast, @Nullable Boolean streamResults) {
-    return new IcebergSnapshotExpirationContent(olderThanDays, retainLast, streamResults);
+    return icebergSnapshotExpiration(
+        olderThanDays, retainLast, streamResults, null, null, null, null, null);
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content with default thresholds and execution peers.
+   *
+   * <p>Prefer this over mixing peers into the thresholds overload so {@code (Long, Long, Boolean)}
+   * stays unambiguous.
+   *
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return snapshot-expiration policy content
+   */
+  public static PolicyContent icebergSnapshotExpiration(
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return icebergSnapshotExpiration(
+        null, null, null, timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content with thresholds and execution peers. Null
+   * thresholds use built-in defaults.
+   *
+   * @param olderThanDays minimum snapshot age in days, or null for the default
+   * @param retainLast minimum recent snapshots to keep, or null for the default
+   * @param streamResults whether to stream intermediate delete results, or null for the default
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return snapshot-expiration policy content
+   */
+  public static IcebergSnapshotExpirationContent icebergSnapshotExpiration(
+      @Nullable Long olderThanDays,
+      @Nullable Long retainLast,
+      @Nullable Boolean streamResults,
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return new IcebergSnapshotExpirationContent(
+        olderThanDays,
+        retainLast,
+        streamResults,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**

@@ -267,6 +267,15 @@ public final class ExecutablePolicyContentSerde {
         IcebergRewriteManifestsContent value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
       gen.writeStartObject();
+      gen.writeNumberField("manifestCountCritical", value.manifestCountCritical());
+      gen.writeNumberField("manifestCountWarning", value.manifestCountWarning());
+      gen.writeNumberField("avgManifestSizeThresholdBytes", value.avgManifestSizeThresholdBytes());
+      if (value.specId() != null) {
+        gen.writeNumberField("specId", value.specId());
+      }
+      if (value.useCaching() != null) {
+        gen.writeBooleanField("useCaching", value.useCaching());
+      }
       writeExecutionPeerFields(value.executionSpec(), gen);
       gen.writeEndObject();
     }
@@ -283,13 +292,17 @@ public final class ExecutablePolicyContentSerde {
           node != null && node.isObject(),
           "Cannot parse rewrite-manifests content from invalid JSON: %s",
           node);
-      return (IcebergRewriteManifestsContent)
-          PolicyContents.icebergRewriteManifests(
-              textOrNull(node, "timeTrigger"),
-              booleanOrNull(node, "commitTrigger"),
-              longOrNull(node, "minIntervalMs"),
-              stringMapOrNull(node, "jobOptions"),
-              stringMapOrNull(node, "updaterOptions"));
+      return PolicyContents.icebergRewriteManifests(
+          longOrNull(node, "manifestCountCritical"),
+          longOrNull(node, "manifestCountWarning"),
+          longOrNull(node, "avgManifestSizeThresholdBytes"),
+          integerOrNull(node, "specId"),
+          booleanOrNull(node, "useCaching"),
+          textOrNull(node, "timeTrigger"),
+          booleanOrNull(node, "commitTrigger"),
+          longOrNull(node, "minIntervalMs"),
+          stringMapOrNull(node, "jobOptions"),
+          stringMapOrNull(node, "updaterOptions"));
     }
   }
 
@@ -301,6 +314,9 @@ public final class ExecutablePolicyContentSerde {
         IcebergSnapshotExpirationContent value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
       gen.writeStartObject();
+      gen.writeNumberField("olderThanDays", value.olderThanDays());
+      gen.writeNumberField("retainLast", value.retainLast());
+      gen.writeBooleanField("streamResults", value.streamResults());
       writeExecutionPeerFields(value.executionSpec(), gen);
       gen.writeEndObject();
     }
@@ -317,13 +333,15 @@ public final class ExecutablePolicyContentSerde {
           node != null && node.isObject(),
           "Cannot parse snapshot-expiration content from invalid JSON: %s",
           node);
-      return (IcebergSnapshotExpirationContent)
-          PolicyContents.icebergSnapshotExpiration(
-              textOrNull(node, "timeTrigger"),
-              booleanOrNull(node, "commitTrigger"),
-              longOrNull(node, "minIntervalMs"),
-              stringMapOrNull(node, "jobOptions"),
-              stringMapOrNull(node, "updaterOptions"));
+      return PolicyContents.icebergSnapshotExpiration(
+          longOrNull(node, "olderThanDays"),
+          longOrNull(node, "retainLast"),
+          booleanOrNull(node, "streamResults"),
+          textOrNull(node, "timeTrigger"),
+          booleanOrNull(node, "commitTrigger"),
+          longOrNull(node, "minIntervalMs"),
+          stringMapOrNull(node, "jobOptions"),
+          stringMapOrNull(node, "updaterOptions"));
     }
   }
 
@@ -349,6 +367,14 @@ public final class ExecutablePolicyContentSerde {
       return null;
     }
     return node.get(property).asLong();
+  }
+
+  @Nullable
+  private static Integer integerOrNull(JsonNode node, String property) {
+    if (!node.has(property) || node.get(property).isNull()) {
+      return null;
+    }
+    return node.get(property).asInt();
   }
 
   @Nullable

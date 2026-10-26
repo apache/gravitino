@@ -29,9 +29,9 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.apache.gravitino.policy.PolicyExecutionSpec;
 
 public class TestPolicyDTO {
 
@@ -321,5 +321,4 @@ public class TestPolicyDTO {
             .build();
     Assertions.assertDoesNotThrow(opaqueCron::validate);
   }
-
 }
