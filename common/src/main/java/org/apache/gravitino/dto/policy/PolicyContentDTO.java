@@ -474,19 +474,27 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
-  /** Typed snapshot-expiration policy content for REST requests and responses. */
+  /**
+   * Typed snapshot-expiration policy content for REST requests and responses.
+   *
+   * <p>{@code updateContent} replaces the whole content object: omitted fields fall back to
+   * defaults rather than merging with the previous content.
+   */
   @EqualsAndHashCode
   @ToString
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
     @JsonProperty("olderThanDays")
+    @JsonDeserialize(using = SnapshotLongDeserializer.class)
     private Long olderThanDays;
 
     @JsonProperty("retainLast")
+    @JsonDeserialize(using = SnapshotLongDeserializer.class)
     private Long retainLast;
 
     @JsonProperty("streamResults")
+    @JsonDeserialize(using = SnapshotBooleanDeserializer.class)
     private Boolean streamResults;
 
     private IcebergSnapshotExpirationContentDTO() {}
@@ -535,6 +543,31 @@ public interface PolicyContentDTO extends PolicyContent {
     public void validate() {
       PolicyContentDTO.super.validate();
       toDomainContent().validate();
+    }
+
+    /** Reads a long option without silently coercing fractional values or strings. */
+    public static class SnapshotLongDeserializer extends JsonDeserializer<Long> {
+      @Override
+      public Long deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(
+              Long.class, "olderThanDays and retainLast must be 64-bit integers");
+        }
+        return parser.getLongValue();
+      }
+    }
+
+    /** Reads streamResults without silently coercing numbers or strings to booleans. */
+    public static class SnapshotBooleanDeserializer extends JsonDeserializer<Boolean> {
+      @Override
+      public Boolean deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
+          return context.reportInputMismatch(Boolean.class, "streamResults must be a boolean");
+        }
+        return parser.getBooleanValue();
+      }
     }
 
     private PolicyContent toDomainContent() {

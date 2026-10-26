@@ -517,7 +517,11 @@ components:
 
     IcebergSnapshotExpirationContent:
       type: object
-      description: Snapshot expiration options for system_iceberg_snapshot_expiration. Scheduling is configured separately.
+      description: >
+        Snapshot expiration options for system_iceberg_snapshot_expiration. Scheduling is
+        configured separately. On updateContent, newContent fully replaces the previous content;
+        omitted fields use these defaults rather than merging with stored values. Integer fields
+        must be JSON integers (not strings or floats); streamResults must be a JSON boolean.
       additionalProperties: false
       properties:
         olderThanDays:
