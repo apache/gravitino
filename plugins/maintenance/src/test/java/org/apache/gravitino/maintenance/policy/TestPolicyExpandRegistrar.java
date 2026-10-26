@@ -22,7 +22,9 @@ import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -92,7 +94,7 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testRunningPoolsLeaveOverdueExpandRowsUnpicked() throws Exception {
+  void testRunningPoolsRemoveExpandRowForMissingPolicy() throws Exception {
     Instant overdue = Instant.now().minusSeconds(30).truncatedTo(ChronoUnit.MICROS);
     PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
     DataSource dataSource = entityStoreDataSource();
@@ -105,15 +107,25 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
             .build();
     TaskInstanceId instanceId =
         TaskInstanceId.of(TableMaintenanceSchedulerPools.POLICY_EXPAND, "11");
-    Instant stored = client.getScheduledExecution(instanceId).orElseThrow().getExecutionTime();
+    Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
 
     TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();
-    pools.start(dataSource, TableMaintenanceConfig.forTest(1, 1, 1, 100L, 1_000L, 4, 10));
+    Config gravitinoConfig = new Config(false) {};
+    gravitinoConfig.loadFromMap(
+        Map.of(
+            MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_URI.getKey(),
+            "http://localhost:8090"),
+        k -> true);
+    pools.start(
+        dataSource, TableMaintenanceConfig.forTest(1, 1, 1, 100L, 1_000L, 4, 10), gravitinoConfig);
     try {
-      Thread.sleep(400L);
-      Assertions.assertFalse(client.getScheduledExecution(instanceId).orElseThrow().isPicked());
-      Assertions.assertEquals(
-          stored, client.getScheduledExecution(instanceId).orElseThrow().getExecutionTime());
+      long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+      while (client.getScheduledExecution(instanceId).isPresent()) {
+        Assertions.assertTrue(
+            System.nanoTime() < deadline,
+            "expand row for missing policy should be removed after pick");
+        Thread.sleep(100L);
+      }
     } finally {
       pools.stop();
     }
