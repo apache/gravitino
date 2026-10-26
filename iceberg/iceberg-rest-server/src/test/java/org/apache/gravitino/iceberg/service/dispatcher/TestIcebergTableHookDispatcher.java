@@ -587,8 +587,8 @@ public class TestIcebergTableHookDispatcher {
     }
 
     // Core import treats any same-name entity as already imported for tables with no stored
-    // Gravitino id, which is every IRC table. The stale entity and its plugin policies must be
-    // removed before the import, or the new table inherits the old table's id and bindings.
+    // Gravitino id, which is every Iceberg REST table. The stale entity and its plugin policies
+    // must be removed before the import, or the new table inherits the old table's id and bindings.
     Assertions.assertEquals(List.of("delete", "removePrivileges", "import"), calls);
   }
 
