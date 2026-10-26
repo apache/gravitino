@@ -89,6 +89,17 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
+   * Unbound in-flight claims for a table (any policy). Used by callback lazy-bind when the Spark
+   * job reports before submit-side {@code bindJobId}.
+   *
+   * @param tableId table entity id
+   * @return SELECT statement
+   */
+  public String selectUnboundByTableId(@Param("tableId") long tableId) {
+    return selectColumns() + " WHERE table_id = #{tableId} AND job_id IS NULL AND finished_at = 0";
+  }
+
+  /**
    * Live unbound claim still within TTL on the database clock.
    *
    * @param tableId table entity id
@@ -139,10 +150,34 @@ public class TableMaintenanceActionBaseSQLProvider {
 
   /**
    * @param jobId Gravitino job run id
-   * @return SELECT statement
+   * @return SELECT statement (one job may cover multiple tables)
    */
   public String selectByJobId(@Param("jobId") long jobId) {
     return selectColumns() + " WHERE job_id = #{jobId}";
+  }
+
+  /**
+   * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @return SELECT statement
+   */
+  public String selectByJobIdAndTableId(
+      @Param("jobId") long jobId, @Param("tableId") long tableId) {
+    return selectColumns() + " WHERE job_id = #{jobId} AND table_id = #{tableId}";
+  }
+
+  /**
+   * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return SELECT statement
+   */
+  public String selectByJobIdAndTableIdAndPolicyId(
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId) {
+    return selectColumns()
+        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}";
   }
 
   /**
@@ -150,36 +185,47 @@ public class TableMaintenanceActionBaseSQLProvider {
    * Callers treat an already-matching value as an idempotent no-op in Java.
    *
    * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param beforeSnapshotId sampled snapshot id
    * @return UPDATE statement
    */
   public String updateBeforeSnapshot(
-      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId) {
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("beforeSnapshotId") long beforeSnapshotId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET before_snapshot_id = #{beforeSnapshotId}"
-        + " WHERE job_id = #{jobId} AND before_snapshot_id IS NULL AND finished_at = 0";
+        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND before_snapshot_id IS NULL AND finished_at = 0";
   }
 
   /**
-   * Sets terminal snapshot pointers when the Spark Job finishes and releases the soft slot.
+   * Sets terminal snapshot pointers for one bound table/policy row and releases its soft slot.
    *
    * <p>Only one in-flight row exists per {@code (table_id, policy_id)} ({@code finished_at = 0}),
    * so finish timestamps do not contend across concurrent submitters.
    *
    * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param afterSnapshotId terminal snapshot id
    * @param finishedAt finish time millis; must be {@code > 0}
    * @return UPDATE statement
    */
   public String markFinished(
       @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt) {
     return "UPDATE "
         + TABLE_NAME
         + " SET after_snapshot_id = #{afterSnapshotId}, finished_at = #{finishedAt}"
-        + " WHERE job_id = #{jobId} AND finished_at = 0";
+        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND finished_at = 0";
   }
 
   /**
@@ -187,15 +233,21 @@ public class TableMaintenanceActionBaseSQLProvider {
    * still null (finish listener raced after reclaim).
    *
    * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
    * @param afterSnapshotId terminal snapshot id; must be non-null
    * @return UPDATE statement
    */
   public String backfillAfterSnapshot(
-      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId) {
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterSnapshotId") long afterSnapshotId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET after_snapshot_id = #{afterSnapshotId}"
-        + " WHERE job_id = #{jobId} AND finished_at > 0 AND after_snapshot_id IS NULL";
+        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND finished_at > 0 AND after_snapshot_id IS NULL";
   }
 
   /**

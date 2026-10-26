@@ -52,6 +52,11 @@ public interface TableMaintenanceActionMapper {
   TableMaintenanceActionPO selectUnboundByTableAndPolicy(
       @Param("tableId") long tableId, @Param("policyId") long policyId);
 
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectUnboundByTableId")
+  List<TableMaintenanceActionPO> selectUnboundByTableId(@Param("tableId") long tableId);
+
   @Nullable
   @SelectProvider(
       type = TableMaintenanceActionSQLProviderFactory.class,
@@ -71,19 +76,37 @@ public interface TableMaintenanceActionMapper {
   @SelectProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "selectById")
   TableMaintenanceActionPO selectById(@Param("id") long id);
 
-  @Nullable
   @SelectProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "selectByJobId")
-  TableMaintenanceActionPO selectByJobId(@Param("jobId") long jobId);
+  List<TableMaintenanceActionPO> selectByJobId(@Param("jobId") long jobId);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectByJobIdAndTableId")
+  TableMaintenanceActionPO selectByJobIdAndTableId(
+      @Param("jobId") long jobId, @Param("tableId") long tableId);
+
+  @Nullable
+  @SelectProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "selectByJobIdAndTableIdAndPolicyId")
+  TableMaintenanceActionPO selectByJobIdAndTableIdAndPolicyId(
+      @Param("jobId") long jobId, @Param("tableId") long tableId, @Param("policyId") long policyId);
 
   @UpdateProvider(
       type = TableMaintenanceActionSQLProviderFactory.class,
       method = "updateBeforeSnapshot")
   int updateBeforeSnapshot(
-      @Param("jobId") long jobId, @Param("beforeSnapshotId") long beforeSnapshotId);
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("beforeSnapshotId") long beforeSnapshotId);
 
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "markFinished")
   int markFinished(
       @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
       @Param("afterSnapshotId") Long afterSnapshotId,
       @Param("finishedAt") long finishedAt);
 
@@ -91,7 +114,10 @@ public interface TableMaintenanceActionMapper {
       type = TableMaintenanceActionSQLProviderFactory.class,
       method = "backfillAfterSnapshot")
   int backfillAfterSnapshot(
-      @Param("jobId") long jobId, @Param("afterSnapshotId") long afterSnapshotId);
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterSnapshotId") long afterSnapshotId);
 
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteById")
   int deleteById(@Param("id") long id);
