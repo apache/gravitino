@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -42,6 +43,7 @@ import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequ
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
+import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTUtils;
 
 /**
@@ -56,14 +58,20 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
 
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String JSON = "application/json";
+  private static final String FORM_URLENCODED = "application/x-www-form-urlencoded";
+  private static final String SIMPLE_AUTH_DUMMY_PASSWORD = "dummy";
   private static final int CONNECT_TIMEOUT_MS = 30_000;
   private static final int READ_TIMEOUT_MS = 60_000;
+  private static final int OAUTH_EXPIRY_SKEW_SECONDS = 30;
+  private static final int DEFAULT_OAUTH_EXPIRES_IN_SECONDS = 300;
+  private static final int ERROR_BODY_TRUNCATE = 512;
 
   private final ObjectMapper mapper;
   private final String baseUri;
   private final String metalakeName;
   private final GravitinoAuthSettings authSettings;
-  private String cachedBearer;
+
+  @Nullable private String cachedBearer;
   private long bearerExpiresAtMillis;
 
   @VisibleForTesting
@@ -72,10 +80,10 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
       String baseUri,
       String metalakeName,
       GravitinoAuthSettings authSettings) {
-    this.mapper = mapper;
-    this.baseUri = trimTrailingSlash(baseUri);
-    this.metalakeName = metalakeName;
-    this.authSettings = authSettings;
+    this.mapper = Preconditions.checkNotNull(mapper, "mapper");
+    this.baseUri = trimTrailingSlash(Preconditions.checkNotNull(baseUri, "baseUri"));
+    this.metalakeName = Preconditions.checkNotNull(metalakeName, "metalakeName");
+    this.authSettings = Preconditions.checkNotNull(authSettings, "authSettings");
   }
 
   /**
@@ -89,9 +97,9 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
     String uri = properties.get(OptimizerConfig.GRAVITINO_URI);
     String metalake = properties.get(OptimizerConfig.GRAVITINO_METALAKE);
     Preconditions.checkArgument(
-        uri != null && !uri.trim().isEmpty(), "updater_options must contain gravitino_uri");
+        StringUtils.isNotBlank(uri), "updater_options must contain gravitino_uri");
     Preconditions.checkArgument(
-        metalake != null && !metalake.trim().isEmpty(), "updater_options must contain metalake");
+        StringUtils.isNotBlank(metalake), "updater_options must contain metalake");
     GravitinoAuthSettings auth = GravitinoAuthSettings.from(new OptimizerConfig(properties));
     return new MaintenanceActionHttpClient(
         JsonUtils.objectMapper(), uri.trim(), metalake.trim(), auth);
@@ -129,24 +137,21 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
 
   @Override
   public void close() {
-    // HttpURLConnection instances are closed per request.
+    cachedBearer = null;
+    bearerExpiresAtMillis = 0L;
   }
 
-  private void postJson(long jobId, String action, Object request) {
+  private void postJson(long jobId, String action, RESTRequest request) {
     Preconditions.checkArgument(request != null, "request must not be null");
-    if (request instanceof MaintenanceActionMetricsRequest) {
-      ((MaintenanceActionMetricsRequest) request).validate();
-    } else if (request instanceof MaintenanceActionFinishRequest) {
-      ((MaintenanceActionFinishRequest) request).validate();
-    }
+    request.validate();
     String path =
         String.format(
             "/api/metalakes/%s/maintenance/actions/%d/%s",
             RESTUtils.encodeString(metalakeName), jobId, action);
     try {
-      String body = mapper.writeValueAsString(request);
-      HttpResult result = post(baseUri + path, JSON, body, authorizationHeader());
-      if (result.status < 200 || result.status >= 300) {
+      HttpResult result =
+          post(baseUri + path, JSON, mapper.writeValueAsString(request), authorizationHeader());
+      if (!isSuccess(result.status)) {
         throw new IllegalStateException(
             String.format(
                 "TMS %s failed: HTTP %d body=%s", action, result.status, truncate(result.body)));
@@ -164,14 +169,10 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
   private String authorizationHeader() {
     switch (authSettings.authType()) {
       case GravitinoAuthSettings.TYPE_SIMPLE:
-        return basicAuthorization(simpleUsername(), "dummy");
+        return basicAuthorization(simpleUsername(), SIMPLE_AUTH_DUMMY_PASSWORD);
       case GravitinoAuthSettings.TYPE_BASIC:
-        Preconditions.checkArgument(
-            StringUtils.isNotBlank(authSettings.username()),
-            "username is required for basic authentication");
-        Preconditions.checkArgument(
-            StringUtils.isNotBlank(authSettings.password()),
-            "password is required for basic authentication");
+        requireAuthValue(authSettings.username(), "username is required for basic authentication");
+        requireAuthValue(authSettings.password(), "password is required for basic authentication");
         return basicAuthorization(authSettings.username(), authSettings.password());
       case GravitinoAuthSettings.TYPE_OAUTH:
         return AuthConstants.AUTHORIZATION_BEARER_HEADER + oauthAccessToken();
@@ -198,18 +199,34 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
     if (cachedBearer != null && now < bearerExpiresAtMillis) {
       return cachedBearer;
     }
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(authSettings.oauthServerUri()),
-        "oauth server URI is required for oauth authentication");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(authSettings.oauthPath()),
-        "oauth path is required for oauth authentication");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(authSettings.oauthCredential()),
-        "oauth credential is required for oauth authentication");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(authSettings.oauthScope()),
-        "oauth scope is required for oauth authentication");
+    requireAuthValue(
+        authSettings.oauthServerUri(), "oauth server URI is required for oauth authentication");
+    requireAuthValue(authSettings.oauthPath(), "oauth path is required for oauth authentication");
+    requireAuthValue(
+        authSettings.oauthCredential(), "oauth credential is required for oauth authentication");
+    requireAuthValue(authSettings.oauthScope(), "oauth scope is required for oauth authentication");
+
+    String tokenUrl = joinUrl(authSettings.oauthServerUri(), authSettings.oauthPath());
+    try {
+      HttpResult result = post(tokenUrl, FORM_URLENCODED, buildClientCredentialsForm(), null);
+      if (!isSuccess(result.status)) {
+        throw new IllegalStateException("OAuth token request failed: HTTP " + result.status);
+      }
+      OAuth2TokenResponse token = mapper.readValue(result.body, OAuth2TokenResponse.class);
+      if (StringUtils.isBlank(token.getAccessToken())) {
+        throw new IllegalStateException("OAuth token response did not include access_token");
+      }
+      cachedBearer = token.getAccessToken();
+      int expiresIn =
+          token.getExpiresIn() == null ? DEFAULT_OAUTH_EXPIRES_IN_SECONDS : token.getExpiresIn();
+      bearerExpiresAtMillis = now + Math.max(1, expiresIn - OAUTH_EXPIRY_SKEW_SECONDS) * 1000L;
+      return cachedBearer;
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to request OAuth token: " + e.getMessage(), e);
+    }
+  }
+
+  private String buildClientCredentialsForm() {
     String credential = authSettings.oauthCredential().trim();
     String clientId = null;
     String clientSecret = credential;
@@ -218,31 +235,13 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
       clientId = credential.substring(0, split);
       clientSecret = credential.substring(split + 1);
     }
-    StringBuilder form = new StringBuilder();
-    form.append("grant_type=client_credentials");
+    StringBuilder form = new StringBuilder("grant_type=client_credentials");
     if (StringUtils.isNotBlank(clientId)) {
       form.append("&client_id=").append(urlEncode(clientId));
     }
     form.append("&client_secret=").append(urlEncode(clientSecret));
     form.append("&scope=").append(urlEncode(authSettings.oauthScope().trim()));
-    String tokenUrl = joinUrl(authSettings.oauthServerUri(), authSettings.oauthPath());
-    try {
-      HttpResult result =
-          post(tokenUrl, "application/x-www-form-urlencoded", form.toString(), null);
-      if (result.status < 200 || result.status >= 300) {
-        throw new IllegalStateException("OAuth token request failed: HTTP " + result.status);
-      }
-      OAuth2TokenResponse token = mapper.readValue(result.body, OAuth2TokenResponse.class);
-      if (StringUtils.isBlank(token.getAccessToken())) {
-        throw new IllegalStateException("OAuth token response did not include access_token");
-      }
-      cachedBearer = token.getAccessToken();
-      int expiresIn = token.getExpiresIn() == null ? 300 : token.getExpiresIn();
-      bearerExpiresAtMillis = now + Math.max(1, expiresIn - 30) * 1000L;
-      return cachedBearer;
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to request OAuth token: " + e.getMessage(), e);
-    }
+    return form.toString();
   }
 
   private static HttpResult post(
@@ -260,15 +259,17 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
     }
     byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
     connection.setFixedLengthStreamingMode(bytes.length);
-    try (OutputStream out = connection.getOutputStream()) {
-      out.write(bytes);
+    try {
+      try (OutputStream out = connection.getOutputStream()) {
+        out.write(bytes);
+      }
+      int status = connection.getResponseCode();
+      InputStream stream =
+          isSuccess(status) ? connection.getInputStream() : connection.getErrorStream();
+      return new HttpResult(status, readUtf8(stream));
+    } finally {
+      connection.disconnect();
     }
-    int status = connection.getResponseCode();
-    InputStream stream =
-        status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
-    String responseBody = readUtf8(stream);
-    connection.disconnect();
-    return new HttpResult(status, responseBody);
   }
 
   @VisibleForTesting
@@ -295,6 +296,14 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
     }
   }
 
+  private static void requireAuthValue(@Nullable String value, String message) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(value), message);
+  }
+
+  private static boolean isSuccess(int status) {
+    return status >= 200 && status < 300;
+  }
+
   private static String basicAuthorization(String user, String password) {
     String userInformation = user + ":" + password;
     return AuthConstants.AUTHORIZATION_BASIC_HEADER
@@ -310,7 +319,7 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
   private static String urlEncode(String value) {
     try {
       return URLEncoder.encode(value, StandardCharsets.UTF_8.name());
-    } catch (java.io.UnsupportedEncodingException e) {
+    } catch (UnsupportedEncodingException e) {
       throw new IllegalStateException(e);
     }
   }
@@ -342,7 +351,9 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
     if (body == null) {
       return "";
     }
-    return body.length() <= 512 ? body : body.substring(0, 512) + "...";
+    return body.length() <= ERROR_BODY_TRUNCATE
+        ? body
+        : body.substring(0, ERROR_BODY_TRUNCATE) + "...";
   }
 
   private static final class HttpResult {
