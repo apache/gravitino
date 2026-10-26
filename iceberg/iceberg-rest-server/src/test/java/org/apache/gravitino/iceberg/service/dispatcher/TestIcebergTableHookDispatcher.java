@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -40,15 +41,23 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -547,5 +556,53 @@ public class TestIcebergTableHookDispatcher {
     verify(mockTableDispatcher, never()).loadTable(any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testAsyncPurgeEnqueueFailureStillCleansUpEntity() throws Exception {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+
+    // Real executor under the hook, so the async-purge path runs as in production.
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    TableMetadata metadata = mock(TableMetadata.class);
+    when(metadata.metadataFileLocation()).thenReturn("s3://b/test_schema/test_table/m/0.json");
+    when(wrapper.loadTableMetadata(tableId)).thenReturn(metadata);
+    when(wrapper.fileIOImpl()).thenReturn("io");
+    when(wrapper.fileIOProperties()).thenReturn(Collections.emptyMap());
+    // The backend drop commits; the table no longer exists.
+    when(wrapper.tableExists(tableId)).thenReturn(false);
+    IcebergCatalogWrapperManager wrapperManager = mock(IcebergCatalogWrapperManager.class);
+    when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    IcebergCleanupManager cleanupManager = mock(IcebergCleanupManager.class);
+    when(cleanupManager.addJob(any())).thenThrow(new RuntimeException("job store unavailable"));
+    IcebergTableHookDispatcher asyncHook =
+        new IcebergTableHookDispatcher(
+            new IcebergTableOperationExecutor(wrapperManager, Optional.of(cleanupManager)),
+            mockNamespaceDispatcher);
+    when(mockContext.asyncPurge()).thenReturn(true);
+
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    CatalogEntity catalogEntity = mock(CatalogEntity.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    when(catalog.entity()).thenReturn(catalogEntity);
+    when(catalogEntity.id()).thenReturn(42L);
+    Object previousCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    try {
+      // The catalog drop is committed before the enqueue fails. The request must not report a
+      // failed drop, and the hook must still remove the entity of the dropped table.
+      Assertions.assertDoesNotThrow(() -> asyncHook.dropTable(mockContext, tableId, true));
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
+    }
+
+    verify(wrapper).dropTable(tableId);
+    verify(mockEntityStore).delete(ident, Entity.EntityType.TABLE);
   }
 }
