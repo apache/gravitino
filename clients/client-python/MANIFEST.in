@@ -18,7 +18,13 @@
 
 include requirements.txt
 include requirements-dev.txt
+include requirements-gvfs.txt
+include requirements-hdfs.txt
 include requirements-lance.txt
+include requirements-s3.txt
+include requirements-gcs.txt
+include requirements-oss.txt
+include requirements-azure.txt
 include README.md
 include LICENSE
 include NOTICE

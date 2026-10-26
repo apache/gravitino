@@ -427,7 +427,7 @@ ${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/oss_catalog
 ### GVFS Python client
 
 ```bash
-pip install apache-gravitino==${GRAVITINO_VERSION}
+pip install "apache-gravitino[oss]==${GRAVITINO_VERSION}"
 ```
 
 On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Alibaba Cloud OSS

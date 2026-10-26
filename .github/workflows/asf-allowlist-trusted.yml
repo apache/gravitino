@@ -38,14 +38,13 @@ jobs:
     if: >-
       github.repository == 'apache/gravitino' &&
       (github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request')
-    # A required check: keep it off the shared ubuntu-latest pool, where small jobs can queue for hours.
+    # Keep this quick check off the shared ubuntu-latest pool, where small jobs can queue for hours.
     # The allowlist action installs its own Python, so it supports ubuntu-slim.
     runs-on: ubuntu-slim
     timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
-      checks: write
       statuses: write
     steps:
       - uses: actions/checkout@v4
