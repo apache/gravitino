@@ -1235,9 +1235,8 @@ public class ExceptionHandlers {
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
 
-      // A configured dependency that is temporarily down is not an internal Gravitino bug: surface
-      // it as 503 Service Unavailable so callers can distinguish retryable outages from 502 gateway
-      // / connection failures and from 500 server bugs.
+      // A configured dependency that is temporarily unavailable is not an internal Gravitino error:
+      // surface it as 503 Service Unavailable so callers can tell an outage from a server bug.
       if (e instanceof ServiceUnavailableException) {
         LOG.warn(errorMsg, e);
         return Utils.serviceUnavailable(errorMsg, e);

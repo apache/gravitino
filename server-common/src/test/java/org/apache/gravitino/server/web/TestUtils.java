@@ -36,6 +36,7 @@ import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -124,9 +125,8 @@ public class TestUtils {
     assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     assertEquals("secret provider 'vault' is unavailable", errorResponse.getMessage());
-    assertEquals(
-        org.apache.gravitino.exceptions.ServiceUnavailableException.class.getSimpleName(),
-        errorResponse.getType());
+    assertEquals(ServiceUnavailableException.class.getSimpleName(), errorResponse.getType());
+    assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, errorResponse.getCode());
   }
 
   @Test

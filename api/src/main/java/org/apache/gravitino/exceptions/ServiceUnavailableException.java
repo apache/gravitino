@@ -21,15 +21,8 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/**
- * An exception thrown when a configured dependency is temporarily unavailable.
- *
- * <p>Unlike {@link ConnectionFailedException} (HTTP 502), this exception is intended for cases
- * where the dependency itself reports an outage or cannot be reached and callers should treat the
- * failure as retryable service unavailability (HTTP 503).
- */
+/** An exception thrown when a configured dependency is temporarily unavailable. */
 public class ServiceUnavailableException extends GravitinoRuntimeException {
-
   /**
    * Constructs a new exception with the specified detail message.
    *
