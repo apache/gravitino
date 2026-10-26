@@ -106,6 +106,31 @@ public class TestNamespacedResourceCache {
   }
 
   @Test
+  public void testSlowListFailureIsCachedFromWhenItFailed() {
+    NamespacedResourceCache<ConfigMap> cache =
+        new NamespacedResourceCache<>(
+            100L,
+            namespace -> {
+              listed.add(namespace);
+              // The listing times out after longer than the TTL.
+              now.addAndGet(150L);
+              throw new IllegalStateException("timed out");
+            },
+            e -> false,
+            now::get);
+
+    Assertions.assertFalse(cache.find("ns1", "a").isPresent());
+    // The failure isn't expired as soon as it is cached, so the next query doesn't wait for
+    // another listing.
+    Assertions.assertFalse(cache.find("ns1", "b").isPresent());
+    Assertions.assertEquals(ImmutableList.of("ns1"), listed);
+
+    now.addAndGet(100L);
+    Assertions.assertFalse(cache.find("ns1", "a").isPresent());
+    Assertions.assertEquals(ImmutableList.of("ns1", "ns1"), listed);
+  }
+
+  @Test
   public void testInvalidatedWhileListing() {
     AtomicReference<NamespacedResourceCache<ConfigMap>> cache = new AtomicReference<>();
     cache.set(

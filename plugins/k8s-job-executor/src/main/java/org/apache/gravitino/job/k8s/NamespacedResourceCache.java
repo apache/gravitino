@@ -179,14 +179,15 @@ final class NamespacedResourceCache<T extends HasMetadata> {
         throw e;
       }
       // Cache the failure as an empty listing, so that the callers get the resources one by one
-      // instead of each of them failing to list the namespace again.
+      // instead of each of them failing to list the namespace again. It is cached from when the
+      // listing failed: a listing that timed out may have taken longer than the TTL.
       LOG.warn(
           "Failed to list the resources in namespace {}, getting them one by one for the next {}"
               + " ms: {}",
           namespace,
           ttlMs,
           e.toString());
-      return new Snapshot<>(listedAtMs, ImmutableMap.of());
+      return new Snapshot<>(clock.getAsLong(), ImmutableMap.of());
     }
   }
 }
