@@ -94,6 +94,11 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       return response;
     }
 
+    // The backend create just succeeded, so no view had this name. Any entity or plugin policy
+    // under it belongs to a dropped view; remove it, or the import adopts its id and bindings.
+    IcebergStaleEntityCleaner.removeStaleView(
+        metalake, context.catalogName(), TableIdentifier.of(namespace, createViewRequest.name()));
+
     // Then import it into Gravitino so Gravitino is aware of the view. The import is not
     // best-effort here: if it fails, the view has no Gravitino entity, so setting the owner below
     // would fail with a misleading "not found". Surface the import failure instead, as the table
@@ -269,7 +274,9 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     try {
       reconcileViewEntity(context, viewIdentifier);
     } catch (RuntimeException e) {
-      LOG.warn(
+      // Kept best-effort so the client sees the committed backend result, but logged at ERROR: a
+      // stale entity left here keeps its grants until the name is created again.
+      LOG.error(
           "Failed to reconcile Gravitino view entity after the Iceberg backend operation "
               + "succeeded. catalog={}, view={}",
           context.catalogName(),

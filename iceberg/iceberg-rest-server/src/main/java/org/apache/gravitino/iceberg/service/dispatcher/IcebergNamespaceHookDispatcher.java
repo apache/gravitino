@@ -220,10 +220,24 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       RegisterTableRequest registerTableRequest) {
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
-    if (!trackCreates || hasTableEntityInStore(context, namespace, registerTableRequest.name())) {
-      // Gravitino already tracks this table: preserve table_id and existing role/owner/tag/policy
-      // bindings after the backend registerTable completes.
+    if (!trackCreates) {
       return response;
+    }
+
+    if (registerTableRequest.overwrite()) {
+      if (hasTableEntityInStore(context, namespace, registerTableRequest.name())) {
+        // Gravitino already tracks this table: preserve table_id and existing
+        // role/owner/tag/policy bindings after the backend registerTable completes.
+        return response;
+      }
+    } else {
+      // A register without overwrite succeeded, so no table had this name. Any entity or plugin
+      // policy under it belongs to a dropped table; remove it, or the import adopts its id and
+      // bindings.
+      IcebergStaleEntityCleaner.removeStaleTable(
+          metalake,
+          context.catalogName(),
+          TableIdentifier.of(namespace, registerTableRequest.name()));
     }
 
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
@@ -247,11 +261,15 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
     LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
 
-    if (!trackCreates || hasViewEntityInStore(context, namespace, registerViewRequest.name())) {
-      // Gravitino already tracks this view: preserve view_id and existing role/owner/tag/policy
-      // bindings after the backend registerView completes.
+    if (!trackCreates) {
       return response;
     }
+
+    // Register view has no overwrite, so its success means no view had this name. Any entity or
+    // plugin policy under it belongs to a dropped view; remove it, or the import adopts its id and
+    // bindings.
+    IcebergStaleEntityCleaner.removeStaleView(
+        metalake, context.catalogName(), TableIdentifier.of(namespace, registerViewRequest.name()));
 
     // Import is intentionally NOT wrapped in try-catch: if it fails the view exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
@@ -278,25 +296,6 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
               catalogName,
               TableIdentifier.of(namespace, viewName),
               HierarchicalSchemaUtil.schemaSeparator()));
-    }
-  }
-
-  private boolean hasViewEntityInStore(
-      IcebergRequestContext context, Namespace namespace, String viewName) {
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    if (entityStore == null) {
-      return false;
-    }
-    try {
-      return entityStore.exists(
-          IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake,
-              context.catalogName(),
-              TableIdentifier.of(namespace, viewName),
-              HierarchicalSchemaUtil.schemaSeparator()),
-          Entity.EntityType.VIEW);
-    } catch (IOException ioe) {
-      throw new RuntimeException("io exception when checking view entity existence", ioe);
     }
   }
 

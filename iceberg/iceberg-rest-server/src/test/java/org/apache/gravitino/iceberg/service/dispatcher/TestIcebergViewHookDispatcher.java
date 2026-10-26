@@ -23,14 +23,19 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -667,5 +672,66 @@ public class TestIcebergViewHookDispatcher {
                   any(), any(), any(NameIdentifier.class), any()),
           never());
     }
+  }
+
+  @Test
+  public void testCreateViewRemovesStaleEntityBeforeImport() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    CreateViewRequest createRequest =
+        ImmutableCreateViewRequest.builder()
+            .name(VIEW_NAME)
+            .schema(VIEW_SCHEMA)
+            .viewVersion(
+                ImmutableViewVersion.builder()
+                    .versionId(1)
+                    .timestampMillis(System.currentTimeMillis())
+                    .schemaId(1)
+                    .defaultNamespace(namespace)
+                    .addRepresentations(
+                        ImmutableSQLViewRepresentation.builder()
+                            .sql("SELECT * FROM test")
+                            .dialect("spark")
+                            .build())
+                    .build())
+            .build();
+    when(mockExecutor.createView(mockContext, namespace, createRequest))
+        .thenReturn(mock(LoadViewResponse.class));
+
+    // A ViewEntity is still stored under the name, left by a dropped view whose entity cleanup
+    // failed. The backend create succeeded, so no view had this name and the entity is stale.
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, SCHEMA_NAME, VIEW_NAME);
+    List<String> calls = new ArrayList<>();
+    doAnswer(
+            invocation -> {
+              calls.add("delete");
+              return true;
+            })
+        .when(mockEntityStore)
+        .delete(ident, Entity.EntityType.VIEW);
+    doAnswer(
+            invocation -> {
+              calls.add("import");
+              return null;
+            })
+        .when(mockInternalViewDispatcher)
+        .loadView(ident);
+
+    try (MockedStatic<AuthorizationUtils> authz = mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                calls.add("removePrivileges");
+                return null;
+              });
+      hookDispatcher.createView(mockContext, namespace, createRequest);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  eq(ident), eq(Entity.EntityType.VIEW), eq(Collections.emptyList())));
+    }
+
+    // Without the removal the import adopts the stale view id and every grant, tag and policy.
+    assertEquals(List.of("delete", "removePrivileges", "import"), calls);
   }
 }

@@ -267,6 +267,10 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   private void importTableAndSetOwner(
       IcebergRequestContext context, Namespace namespace, String tableName) {
+    // The backend create just succeeded, so no table had this name. Any entity or plugin policy
+    // under it belongs to a dropped table; remove it, or the import adopts its id and bindings.
+    IcebergStaleEntityCleaner.removeStaleTable(
+        metalake, context.catalogName(), TableIdentifier.of(namespace, tableName));
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
@@ -315,7 +319,9 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     try {
       reconcileTableEntity(context, tableIdentifier);
     } catch (RuntimeException e) {
-      LOG.warn(
+      // Kept best-effort so the client sees the committed backend result, but logged at ERROR: a
+      // stale entity left here keeps its grants until the name is created again.
+      LOG.error(
           "Failed to reconcile Gravitino table entity after the Iceberg backend operation "
               + "succeeded. catalog={}, table={}",
           context.catalogName(),

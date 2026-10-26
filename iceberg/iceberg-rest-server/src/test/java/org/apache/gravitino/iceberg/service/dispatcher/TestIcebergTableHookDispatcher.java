@@ -20,14 +20,18 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -756,5 +760,119 @@ public class TestIcebergTableHookDispatcher {
                   any(), any(), any(NameIdentifier.class), any()),
           never());
     }
+  }
+
+  @Test
+  public void testCreateTableAfterFailedDropReconcileDoesNotAdoptStaleEntity() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+
+    // The backend drop succeeds, but the entity delete fails. The hook swallows the failure, so
+    // the old TableEntity (old id, role grants, tags, policies) stays under the name.
+    doThrow(new IOException("store unavailable"))
+        .when(mockEntityStore)
+        .delete(ident, Entity.EntityType.TABLE);
+    Assertions.assertDoesNotThrow(() -> hookDispatcher.dropTable(mockContext, tableId, false));
+
+    // Another user creates a new table under the same name. The backend create succeeded, so no
+    // table had this name: any entity stored under it belongs to the dropped table and is stale.
+    clearInvocations(mockEntityStore);
+    List<String> calls = recordStaleCleanupCalls(ident, Entity.EntityType.TABLE);
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, tableId.namespace(), request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    try (MockedStatic<AuthorizationUtils> authz = recordPluginRemoval(calls)) {
+      hookDispatcher.createTable(mockContext, tableId.namespace(), request);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  eq(ident), eq(Entity.EntityType.TABLE), eq(Collections.emptyList())));
+    }
+
+    // Core import treats any same-name entity as already imported for tables with no stored
+    // Gravitino id, which is every IRC table. The stale entity and its plugin policies must be
+    // removed before the import, or the new table inherits the old table's id and bindings.
+    Assertions.assertEquals(List.of("delete", "removePrivileges", "import"), calls);
+  }
+
+  @Test
+  public void testStagedCreateCommitRemovesStaleEntityBeforeImport() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    List<String> calls = recordStaleCleanupCalls(ident, Entity.EntityType.TABLE);
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
+    when(mockDispatcher.updateTable(mockContext, tableId, request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    try (MockedStatic<AuthorizationUtils> ignored = recordPluginRemoval(calls)) {
+      hookDispatcher.updateTable(mockContext, tableId, request);
+    }
+
+    // The staged create committed with AssertTableDoesNotExist, so the name was free.
+    Assertions.assertEquals(List.of("delete", "removePrivileges", "import"), calls);
+  }
+
+  @Test
+  public void testCreateTableFailsWhenStaleEntityCannotBeRemoved() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    doThrow(new IOException("store unavailable"))
+        .when(mockEntityStore)
+        .delete(ident, Entity.EntityType.TABLE);
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, tableId.namespace(), request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    // Importing now would adopt whatever entity is still under the name, so fail instead.
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createTable(mockContext, tableId.namespace(), request));
+    Assertions.assertInstanceOf(IOException.class, thrown.getCause());
+    verify(mockInternalTableDispatcher, never()).loadTable(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  private List<String> recordStaleCleanupCalls(NameIdentifier ident, Entity.EntityType type)
+      throws IOException {
+    List<String> calls = new ArrayList<>();
+    doAnswer(
+            invocation -> {
+              calls.add("delete");
+              return true;
+            })
+        .when(mockEntityStore)
+        .delete(ident, type);
+    doAnswer(
+            invocation -> {
+              calls.add("import");
+              return null;
+            })
+        .when(mockInternalTableDispatcher)
+        .loadTable(ident);
+    return calls;
+  }
+
+  private static MockedStatic<AuthorizationUtils> recordPluginRemoval(List<String> calls) {
+    MockedStatic<AuthorizationUtils> authz = mockStatic(AuthorizationUtils.class);
+    authz
+        .when(() -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              calls.add("removePrivileges");
+              return null;
+            });
+    return authz;
   }
 }
