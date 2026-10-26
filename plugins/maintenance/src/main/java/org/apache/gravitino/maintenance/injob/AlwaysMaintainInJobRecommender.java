@@ -21,9 +21,9 @@ package org.apache.gravitino.maintenance.injob;
 /**
  * In-job recommender that always returns {@link RecommendDecision#MAINTAIN}.
  *
- * <p>Production {@link TypeDispatchingInJobRecommender} uses this for expire / rewrite-manifests
- * placeholders: cron already scheduled the work, while policy content still ships {@code
- * trigger-expr=false} for optimizer-only gating. Also available for tests and injectable overrides.
+ * <p>Production {@link TypeDispatchingInJobRecommender} uses this for expire / rewrite-manifests:
+ * cron already scheduled the work, so the in-job gate always maintains. Also available for tests
+ * and injectable overrides.
  */
 public final class AlwaysMaintainInJobRecommender implements InJobRecommender {
 

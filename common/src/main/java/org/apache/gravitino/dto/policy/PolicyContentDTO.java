@@ -845,10 +845,10 @@ public interface PolicyContentDTO extends PolicyContent {
    * defaults rather than merging with the previous content.
    */
   @EqualsAndHashCode
-  @ToString
+  @ToString(exclude = {"jobOptions", "updaterOptions"})
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = AccessLevel.PRIVATE)
-  class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+  class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
     @JsonProperty("olderThanDays")
     @JsonDeserialize(using = SnapshotLongDeserializer.class)
     private Long olderThanDays;
@@ -860,6 +860,34 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("streamResults")
     @JsonDeserialize(using = SnapshotBooleanDeserializer.class)
     private Boolean streamResults;
+
+    @EqualsAndHashCode.Exclude
+    @Nullable
+    @JsonProperty("timeTrigger")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String timeTrigger;
+
+    @EqualsAndHashCode.Exclude
+    @Nullable
+    @JsonProperty("commitTrigger")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Boolean commitTrigger;
+
+    @EqualsAndHashCode.Exclude
+    @Nullable
+    @JsonProperty("minIntervalMs")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long minIntervalMs;
+
+    @EqualsAndHashCode.Exclude
+    @JsonProperty("jobOptions")
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private Map<String, String> jobOptions;
+
+    @EqualsAndHashCode.Exclude
+    @JsonProperty("updaterOptions")
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private Map<String, String> updaterOptions;
 
     private IcebergSnapshotExpirationContentDTO() {}
 
@@ -943,34 +971,20 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
-    /** Reads a long option without silently coercing fractional values or strings. */
-    public static class SnapshotLongDeserializer extends JsonDeserializer<Long> {
-      @Override
-      public Long deserialize(JsonParser parser, DeserializationContext context)
-          throws IOException {
-        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
-          return context.reportInputMismatch(
-              Long.class, "olderThanDays and retainLast must be 64-bit integers");
-        }
-        return parser.getLongValue();
-      }
-    }
-
-    /** Reads streamResults without silently coercing numbers or strings to booleans. */
-    public static class SnapshotBooleanDeserializer extends JsonDeserializer<Boolean> {
-      @Override
-      public Boolean deserialize(JsonParser parser, DeserializationContext context)
-          throws IOException {
-        if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
-          return context.reportInputMismatch(Boolean.class, "streamResults must be a boolean");
-        }
-        return parser.getBooleanValue();
-      }
-    }
-
-    private PolicyContent toDomainContent() {
+    /**
+     * @return domain policy content including execution peers
+     */
+    public PolicyContent toDomainContent() {
+      PolicyExecutionSpec spec = executionSpec();
       return PolicyContents.icebergSnapshotExpiration(
-          olderThanDays(), retainLast(), streamResults());
+          olderThanDays(),
+          retainLast(),
+          streamResults(),
+          spec.timeTrigger(),
+          spec.commitTrigger(),
+          spec.minIntervalMs(),
+          spec.jobOptions(),
+          spec.updaterOptions());
     }
 
     /** Lombok builder customization: unpack PolicyExecutionSpec into flat peer fields. */
@@ -996,6 +1010,31 @@ public interface PolicyContentDTO extends PolicyContent {
                 ? null
                 : new LinkedHashMap<>(executionSpec.updaterOptions());
         return this;
+      }
+    }
+
+    /** Reads a long option without silently coercing fractional values or strings. */
+    public static class SnapshotLongDeserializer extends JsonDeserializer<Long> {
+      @Override
+      public Long deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(
+              Long.class, "olderThanDays and retainLast must be 64-bit integers");
+        }
+        return parser.getLongValue();
+      }
+    }
+
+    /** Reads streamResults without silently coercing numbers or strings to booleans. */
+    public static class SnapshotBooleanDeserializer extends JsonDeserializer<Boolean> {
+      @Override
+      public Boolean deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
+          return context.reportInputMismatch(Boolean.class, "streamResults must be a boolean");
+        }
+        return parser.getBooleanValue();
       }
     }
   }

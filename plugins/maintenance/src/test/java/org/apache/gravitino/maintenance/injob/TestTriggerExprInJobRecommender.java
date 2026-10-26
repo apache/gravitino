@@ -42,18 +42,8 @@ class TestTriggerExprInJobRecommender {
   }
 
   @Test
-  void testExpirePlaceholderTriggerFalseSkips() {
-    PolicyEntity policy = mock(PolicyEntity.class);
-    when(policy.content()).thenReturn(PolicyContents.icebergSnapshotExpiration());
-
-    TriggerExprInJobRecommender recommender =
-        new TriggerExprInJobRecommender(policyId -> Optional.of(policy));
-    Assertions.assertEquals(
-        RecommendDecision.SKIP, recommender.recommend(2L, 1L, 9L, "{}", policy));
-  }
-
-  @Test
-  void testManifestPlaceholderTriggerFalseSkips() {
+  void testMissingTriggerExprDefaultsToSkip() {
+    // rewrite-manifests rules omit trigger-expr; recommender defaults the expression to false.
     PolicyEntity policy = mock(PolicyEntity.class);
     when(policy.content()).thenReturn(PolicyContents.icebergRewriteManifests());
 

@@ -715,6 +715,7 @@ public class DTOConverters {
           .withOlderThanDays(content.olderThanDays())
           .withRetainLast(content.retainLast())
           .withStreamResults(content.streamResults())
+          .withExecutionSpec(executionSpec)
           .build();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
@@ -1608,10 +1609,8 @@ public class DTOConverters {
           .toDomainContent();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
-      PolicyContentDTO.IcebergSnapshotExpirationContentDTO content =
-          (PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO;
-      return PolicyContents.icebergSnapshotExpiration(
-          content.olderThanDays(), content.retainLast(), content.streamResults());
+      return ((PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO)
+          .toDomainContent();
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
       return ((PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO).toDomainContent();

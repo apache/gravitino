@@ -77,6 +77,15 @@ public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyCo
 
   IcebergSnapshotExpirationContent(
       @Nullable Long olderThanDays, @Nullable Long retainLast, @Nullable Boolean streamResults) {
+    this(olderThanDays, retainLast, streamResults, PolicyExecutionSpec.empty());
+  }
+
+  IcebergSnapshotExpirationContent(
+      @Nullable Long olderThanDays,
+      @Nullable Long retainLast,
+      @Nullable Boolean streamResults,
+      @Nullable PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
     this.olderThanDays = olderThanDays == null ? DEFAULT_OLDER_THAN_DAYS : olderThanDays;
     this.retainLast = retainLast == null ? DEFAULT_RETAIN_LAST : retainLast;
     this.streamResults = streamResults == null ? DEFAULT_STREAM_RESULTS : streamResults;
@@ -152,7 +161,7 @@ public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyCo
 
   @Override
   public void validate() {
-    PolicyContent.super.validate();
+    super.validate();
     validateOlderThanDays(olderThanDays);
     validateRetainLast(retainLast);
   }
@@ -163,25 +172,30 @@ public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyCo
       return false;
     }
     IcebergSnapshotExpirationContent that = (IcebergSnapshotExpirationContent) other;
-    return olderThanDays == that.olderThanDays
+    return executionFieldsEqual(that)
+        && olderThanDays == that.olderThanDays
         && retainLast == that.retainLast
         && streamResults == that.streamResults;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(olderThanDays, retainLast, streamResults);
+    return Objects.hash(executionFieldsHashCode(), olderThanDays, retainLast, streamResults);
   }
 
   @Override
   public String toString() {
-    return "IcebergSnapshotExpirationContent{"
-        + "olderThanDays="
-        + olderThanDays
-        + ", retainLast="
-        + retainLast
-        + ", streamResults="
-        + streamResults
-        + '}';
+    StringBuilder sb =
+        new StringBuilder("IcebergSnapshotExpirationContent{")
+            .append("olderThanDays=")
+            .append(olderThanDays)
+            .append(", retainLast=")
+            .append(retainLast)
+            .append(", streamResults=")
+            .append(streamResults)
+            .append(", ");
+    appendExecutionFields(sb);
+    sb.append('}');
+    return sb.toString();
   }
 }
