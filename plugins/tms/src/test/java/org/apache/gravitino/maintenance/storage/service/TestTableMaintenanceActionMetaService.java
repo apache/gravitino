@@ -40,38 +40,71 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long after = System.currentTimeMillis();
     Assertions.assertNull(actionService.getById(claim.id()).jobId());
     Assertions.assertEquals(0L, actionService.getById(claim.id()).finishedAt());
-    // DB clock may skew slightly from the JVM; allow a small window.
     Assertions.assertTrue(claim.createdAt() >= before - 5_000L);
     Assertions.assertTrue(claim.createdAt() <= after + 5_000L);
     Assertions.assertEquals(claim.createdAt(), actionService.getById(claim.id()).createdAt());
 
     long jobId = 999L;
+    long tableId = 10L;
+    long policyId = 20L;
     actionService.bindJobId(claim, jobId);
-    Assertions.assertEquals(jobId, actionService.getByJobId(jobId).jobId());
-    Assertions.assertEquals(0L, actionService.getByJobId(jobId).finishedAt());
+    Assertions.assertEquals(jobId, actionService.getByJobIdAndTableId(jobId, tableId).jobId());
+    Assertions.assertEquals(0L, actionService.getByJobIdAndTableId(jobId, tableId).finishedAt());
 
-    actionService.recordBeforeSnapshot(jobId, 100L);
-    Assertions.assertEquals(100L, actionService.getByJobId(jobId).beforeSnapshotId());
-    // Same S0 is idempotent (in-job / cron retry after a partial sample).
-    actionService.recordBeforeSnapshot(jobId, 100L);
-    Assertions.assertEquals(100L, actionService.getByJobId(jobId).beforeSnapshotId());
-    Assertions.assertThrows(
-        IllegalStateException.class, () -> actionService.recordBeforeSnapshot(jobId, 101L));
-
-    metricsService.insertMetrics(10L, 20L, 100L, "{\"mse\":1}");
-    actionService.markFinished(jobId, 200L, System.currentTimeMillis());
+    actionService.recordBeforeSnapshot(jobId, tableId, policyId, 100L);
+    Assertions.assertEquals(
+        100L, actionService.getByJobIdAndTableId(jobId, tableId).beforeSnapshotId());
+    actionService.recordBeforeSnapshot(jobId, tableId, policyId, 100L);
+    Assertions.assertEquals(
+        100L, actionService.getByJobIdAndTableId(jobId, tableId).beforeSnapshotId());
     Assertions.assertThrows(
         IllegalStateException.class,
-        () -> actionService.markFinished(jobId, 201L, System.currentTimeMillis()));
-    metricsService.insertMetrics(10L, 20L, 200L, "{\"mse\":2}");
+        () -> actionService.recordBeforeSnapshot(jobId, tableId, policyId, 101L));
+
+    metricsService.insertMetrics(tableId, policyId, 100L, "{\"mse\":1}");
+    actionService.markFinished(jobId, tableId, policyId, 200L, System.currentTimeMillis());
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            actionService.markFinished(jobId, tableId, policyId, 201L, System.currentTimeMillis()));
+    metricsService.insertMetrics(tableId, policyId, 200L, "{\"mse\":2}");
 
     actionService.deleteByJobId(jobId);
 
-    Assertions.assertNull(actionService.getByJobId(jobId));
+    Assertions.assertTrue(actionService.listByJobId(jobId).isEmpty());
     Assertions.assertEquals(
-        "{\"mse\":1}", metricsService.getMetrics(10L, 20L, 100L).metricsValue());
+        "{\"mse\":1}", metricsService.getMetrics(tableId, policyId, 100L).metricsValue());
     Assertions.assertEquals(
-        "{\"mse\":2}", metricsService.getMetrics(10L, 20L, 200L).metricsValue());
+        "{\"mse\":2}", metricsService.getMetrics(tableId, policyId, 200L).metricsValue());
+  }
+
+  @TestTemplate
+  void testOneJobBindsMultipleTablesAndMarkFinishedClosesPerRow() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long jobId = 777L;
+    OccupancyClaim claimA = actions.insertInFlight(101L, 201L, config);
+    OccupancyClaim claimB = actions.insertInFlight(102L, 202L, config);
+    actions.bindJobId(claimA, jobId);
+    actions.bindJobId(claimB, jobId);
+
+    Assertions.assertEquals(2, actions.listByJobId(jobId).size());
+    Assertions.assertThrows(IllegalStateException.class, () -> actions.getByJobId(jobId));
+
+    actions.recordBeforeSnapshot(jobId, 101L, 201L, 11L);
+    actions.recordBeforeSnapshot(jobId, 102L, 202L, 22L);
+
+    long finishedAtA = System.currentTimeMillis();
+    actions.markFinished(jobId, 101L, 201L, null, finishedAtA);
+    Assertions.assertEquals(finishedAtA, actions.getByJobIdAndTableId(jobId, 101L).finishedAt());
+    Assertions.assertEquals(0L, actions.getByJobIdAndTableId(jobId, 102L).finishedAt());
+
+    long finishedAtB = finishedAtA + 10;
+    actions.markFinished(jobId, 102L, 202L, 33L, finishedAtB);
+    Assertions.assertEquals(finishedAtB, actions.getByJobIdAndTableId(jobId, 102L).finishedAt());
+    Assertions.assertEquals(33L, actions.getByJobIdAndTableId(jobId, 102L).afterSnapshotId());
+    // Idempotent null-after finish for already closed A.
+    actions.markFinished(jobId, 101L, 201L, null, finishedAtA + 1);
   }
 
   @TestTemplate
@@ -79,25 +112,123 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableMaintenanceActionMetaService actionService =
         TableMaintenanceActionMetaService.getInstance();
     long jobId = 1999L;
+    long tableId = 12L;
+    long policyId = 22L;
     OccupancyClaim claim =
         actionService.insertInFlight(
-            12L, 22L, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
+            tableId, policyId, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
     actionService.bindJobId(claim, jobId);
-    actionService.recordBeforeSnapshot(jobId, 100L);
+    actionService.recordBeforeSnapshot(jobId, tableId, policyId, 100L);
 
     long reclaimFinishedAt = System.currentTimeMillis();
-    // Failsafe reclaim closes with null S1.
-    actionService.markFinished(jobId, null, reclaimFinishedAt);
-    Assertions.assertEquals(reclaimFinishedAt, actionService.getByJobId(jobId).finishedAt());
-    Assertions.assertNull(actionService.getByJobId(jobId).afterSnapshotId());
+    actionService.markFinished(jobId, tableId, policyId, null, reclaimFinishedAt);
+    Assertions.assertEquals(
+        reclaimFinishedAt, actionService.getByJobIdAndTableId(jobId, tableId).finishedAt());
+    Assertions.assertNull(actionService.getByJobIdAndTableId(jobId, tableId).afterSnapshotId());
 
-    // Late finish listener still records the real terminal snapshot.
-    actionService.markFinished(jobId, 200L, System.currentTimeMillis());
-    Assertions.assertEquals(200L, actionService.getByJobId(jobId).afterSnapshotId());
-    Assertions.assertEquals(reclaimFinishedAt, actionService.getByJobId(jobId).finishedAt());
+    actionService.markFinished(jobId, tableId, policyId, 200L, System.currentTimeMillis());
+    Assertions.assertEquals(
+        200L, actionService.getByJobIdAndTableId(jobId, tableId).afterSnapshotId());
+    Assertions.assertEquals(
+        reclaimFinishedAt, actionService.getByJobIdAndTableId(jobId, tableId).finishedAt());
     Assertions.assertThrows(
         IllegalStateException.class,
-        () -> actionService.markFinished(jobId, 201L, System.currentTimeMillis()));
+        () ->
+            actionService.markFinished(jobId, tableId, policyId, 201L, System.currentTimeMillis()));
+  }
+
+  @TestTemplate
+  void testBindJobIdIdempotentWhenAlreadyBoundToSameJob() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long tableId = 31L;
+    long policyId = 41L;
+    long jobId = 5100L;
+    OccupancyClaim claim = actions.insertInFlight(tableId, policyId, config);
+    actions.bindJobId(claim, jobId);
+    // Spark lazy-bound first; submit-side bind must not fail.
+    actions.bindJobId(claim, jobId);
+    Assertions.assertEquals(jobId, actions.getByJobIdAndTableId(jobId, tableId).jobId());
+  }
+
+  @TestTemplate
+  void testBindJobIdFailsWhenBoundToDifferentJob() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    OccupancyClaim claim = actions.insertInFlight(32L, 42L, config);
+    actions.bindJobId(claim, 5200L);
+    Assertions.assertThrows(IllegalStateException.class, () -> actions.bindJobId(claim, 5201L));
+  }
+
+  @TestTemplate
+  void testBindJobIdIfUnboundLazyBindsSoleClaim() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long tableId = 33L;
+    long policyId = 43L;
+    long jobId = 5300L;
+    actions.insertInFlight(tableId, policyId, config);
+
+    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, policyId, jobId));
+    Assertions.assertEquals(
+        jobId, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId).jobId());
+    // Already bound to same job — still reports success via idempotent bind.
+    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, policyId, jobId));
+  }
+
+  @TestTemplate
+  void testBindJobIdIfUnboundDisambiguatesPoliciesOnSameTable() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long tableId = 34L;
+    long policyA = 44L;
+    long policyB = 45L;
+    long jobId = 5400L;
+    // Two policies → two soft slots on the same table; policyId selects which claim to bind.
+    actions.insertInFlight(tableId, policyA, config);
+    actions.insertInFlight(tableId, policyB, config);
+
+    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, policyA, jobId));
+    Assertions.assertEquals(
+        jobId, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyA).jobId());
+    Assertions.assertNull(actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB));
+    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, policyB, jobId));
+    Assertions.assertEquals(
+        jobId, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB).jobId());
+  }
+
+  @TestTemplate
+  void testOneJobMultiplePoliciesOnSameTableRecordAndFinishPerPolicy() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
+    long tableId = 36L;
+    long policyA = 46L;
+    long policyB = 47L;
+    long jobId = 5600L;
+    OccupancyClaim claimA = actions.insertInFlight(tableId, policyA, config);
+    OccupancyClaim claimB = actions.insertInFlight(tableId, policyB, config);
+    actions.bindJobId(claimA, jobId);
+    actions.bindJobId(claimB, jobId);
+
+    actions.recordBeforeSnapshot(jobId, tableId, policyA, 11L);
+    actions.recordBeforeSnapshot(jobId, tableId, policyB, 22L);
+    Assertions.assertEquals(
+        11L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyA).beforeSnapshotId());
+    Assertions.assertEquals(
+        22L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB).beforeSnapshotId());
+
+    long finishedAt = System.currentTimeMillis();
+    actions.markFinished(jobId, tableId, policyA, null, finishedAt);
+    Assertions.assertEquals(
+        finishedAt, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyA).finishedAt());
+    Assertions.assertEquals(
+        0L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB).finishedAt());
+  }
+
+  @TestTemplate
+  void testBindJobIdIfUnboundReturnsFalseWhenNoClaim() {
+    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
+    Assertions.assertFalse(actions.bindJobIdIfUnbound(35L, 55L, 5500L));
   }
 
   @TestTemplate
