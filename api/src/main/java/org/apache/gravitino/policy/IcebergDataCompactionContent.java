@@ -284,6 +284,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
           StringUtils.isNotBlank(sortOrder),
           "sortOrder must be set when rewriteStrategy is '%s'",
           REWRITE_STRATEGY_SORT);
+      IcebergSortOrderSyntax.validate(sortOrder);
     } else {
       Preconditions.checkArgument(
           StringUtils.isBlank(sortOrder),
@@ -293,7 +294,6 @@ public class IcebergDataCompactionContent implements PolicyContent {
 
     rewriteOptions.forEach(
         (key, value) -> {
-          Preconditions.checkArgument(StringUtils.isNotBlank(key), "rewrite option key is blank");
           Preconditions.checkArgument(
               OPTION_KEY_PATTERN.matcher(key).matches(),
               "rewrite option key '%s' contains illegal characters",
@@ -303,9 +303,8 @@ public class IcebergDataCompactionContent implements PolicyContent {
               "rewrite option key '%s' must not start with '%s'",
               key,
               JOB_OPTIONS_PREFIX);
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(value), "rewrite option '%s' must have non-empty value", key);
         });
+    IcebergRewriteDataFilesOptionValidator.validate(rewriteOptions);
   }
 
   @Override

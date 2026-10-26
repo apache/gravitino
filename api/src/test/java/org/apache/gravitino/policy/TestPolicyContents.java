@@ -180,6 +180,65 @@ public class TestPolicyContents {
   }
 
   @Test
+  void testIcebergCompactionContentRejectsUnparseableSortOrder() {
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent)
+            PolicyContents.icebergDataCompaction(
+                1000L, 1L, 1L, 100L, 50L, "sort", "not a valid ((( order", Map.of());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
+    Assertions.assertTrue(exception.getMessage().contains("sortOrder"));
+  }
+
+  @Test
+  void testIcebergCompactionContentAcceptsFieldAndZOrderSortOrders() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyContents.icebergDataCompaction(
+                    1000L, 1L, 1L, 100L, 50L, "sort", "id DESC NULLS LAST", Map.of())
+                .validate());
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyContents.icebergDataCompaction(
+                    1000L, 1L, 1L, 100L, 50L, "sort", "a ASC, b DESC NULLS FIRST", Map.of())
+                .validate());
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyContents.icebergDataCompaction(
+                    1000L, 1L, 1L, 100L, 50L, "sort", "zorder(c1,c2)", Map.of())
+                .validate());
+  }
+
+  @Test
+  void testIcebergCompactionContentRejectsUnknownOrInvalidRewriteOptions() {
+    IllegalArgumentException unknown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PolicyContents.icebergDataCompaction(1000L, 1L, mapOf("no-such-option", "x"))
+                    .validate());
+    Assertions.assertTrue(unknown.getMessage().contains("no-such-option"));
+
+    IllegalArgumentException negative =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PolicyContents.icebergDataCompaction(
+                        1000L, 1L, mapOf("target-file-size-bytes", "-1"))
+                    .validate());
+    Assertions.assertTrue(negative.getMessage().contains("target-file-size-bytes"));
+
+    IllegalArgumentException notBool =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PolicyContents.icebergDataCompaction(1000L, 1L, mapOf("rewrite-all", "yes"))
+                    .validate());
+    Assertions.assertTrue(notBool.getMessage().contains("rewrite-all"));
+  }
+
+  @Test
   void testAccessControlContent() {
     AccessControlContent content =
         (AccessControlContent)

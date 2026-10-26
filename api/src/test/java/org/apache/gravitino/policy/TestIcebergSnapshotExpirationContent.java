@@ -61,4 +61,10 @@ public class TestIcebergSnapshotExpirationContent {
                     .validate());
     assertTrue(tooOld.getMessage().contains("olderThanDays"));
   }
+
+  @Test
+  public void testValidateAcceptsDefaults() {
+    PolicyContents.icebergSnapshotExpiration().validate();
+    PolicyContents.icebergSnapshotExpiration(5L, 1L, true).validate();
+  }
 }
