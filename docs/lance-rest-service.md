@@ -138,6 +138,7 @@ To enable the Lance REST service within Gravitino server, configure the followin
 | `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
 | `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       |
 | `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include server-side stack traces in `detail`. Set this to `false` in new deployments | true | No |
+| `gravitino.lance-rest.trustedProxies`     | Comma-separated IP addresses or CIDR blocks of reverse proxies whose `X-Forwarded-For` is trusted for audit client addresses | (none) | No |
 | `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      |
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI. Not required in auxiliary mode.                        | http://localhost:8090   | No       |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      |
@@ -184,14 +185,20 @@ To run Lance REST service independently without Gravitino server (You need to st
 
 Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-server.conf` or passing command-line arguments:
 
-| Configuration Property                    | Description                | Default Value         | Required |
-| ----------------------------------------- | -------------------------- | --------------------- | -------- |
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend | gravitino             | Yes      |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI       | http://localhost:8090 | Yes      |
-| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name    | (none)                | Yes      |
-| `gravitino.lance-rest.httpPort`           | Service port number        | 9101                  | No       |
-| `gravitino.lance-rest.host`               | Service hostname           | 0.0.0.0               | No       |
-| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include stack traces | true | No |
+| Configuration Property                        | Description                                  | Default Value          | Required |
+|-----------------------------------------------|----------------------------------------------|------------------------|----------|
+| `gravitino.lance-rest.namespace-backend`      | Namespace metadata backend                   | gravitino              | Yes      |
+| `gravitino.lance-rest.gravitino-uri`          | Gravitino server URI                         | http://localhost:8090  | Yes      |
+| `gravitino.lance-rest.gravitino-metalake`     | Gravitino metalake name                      | (none)                 | Yes      |
+| `gravitino.lance-rest.httpPort`               | Service port number                          | 9101                   | No       |
+| `gravitino.lance-rest.host`                   | Service hostname                             | 0.0.0.0                | No       |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include stack traces | true                   | No       |
+| `gravitino.lance-rest.metrics.enabled`        | Enable standalone metrics endpoints          | false                  | No       |
+| `gravitino.lance-rest.trustedProxies`         | Reverse proxies trusted for X-Forwarded-For  | (none)                 | No       |
+
+`trustedProxies` works as described for
+[`gravitino.server.webserver.trustedProxies`](./gravitino-server-config.md#http-server). When it is
+empty, `X-Forwarded-For` is ignored and the audit log records the TCP peer address.
 
 :::tip
 In standalone deployments, you only need to configure `gravitino.lance-rest.gravitino-metalake`,

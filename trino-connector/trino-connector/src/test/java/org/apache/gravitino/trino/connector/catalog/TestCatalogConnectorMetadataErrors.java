@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
@@ -58,7 +59,9 @@ public class TestCatalogConnectorMetadataErrors {
     TrinoException e =
         assertThrows(
             TrinoException.class,
-            () -> new CatalogConnectorMetadata(metalake, NameIdentifier.of("m", "c")));
+            () ->
+                new CatalogConnectorMetadata(
+                    metalake, NameIdentifier.of("m", "c"), mock(GravitinoConfig.class)));
     assertEquals(PERMISSION_DENIED.toErrorCode(), e.getErrorCode());
     assertEquals(DENIED_MESSAGE, e.getMessage());
   }
@@ -174,7 +177,9 @@ public class TestCatalogConnectorMetadataErrors {
     TrinoException e =
         assertThrows(
             TrinoException.class,
-            () -> new CatalogConnectorMetadata(metalake, NameIdentifier.of("m", "c")));
+            () ->
+                new CatalogConnectorMetadata(
+                    metalake, NameIdentifier.of("m", "c"), mock(GravitinoConfig.class)));
     assertEquals(CATALOG_UNAVAILABLE.toErrorCode(), e.getErrorCode());
     assertEquals(message, e.getMessage());
   }
@@ -218,6 +223,7 @@ public class TestCatalogConnectorMetadataErrors {
     when(catalog.asSchemas()).thenReturn(schemas);
     when(catalog.asTableCatalog()).thenReturn(tableCatalog);
     when(catalog.asFunctionCatalog()).thenThrow(new UnsupportedOperationException("unsupported"));
-    return new CatalogConnectorMetadata(metalake, NameIdentifier.of("m", "c"));
+    return new CatalogConnectorMetadata(
+        metalake, NameIdentifier.of("m", "c"), mock(GravitinoConfig.class));
   }
 }

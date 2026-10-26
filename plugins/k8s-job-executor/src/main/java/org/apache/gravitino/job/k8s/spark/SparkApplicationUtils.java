@@ -29,13 +29,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.job.JobContext;
+import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.job.k8s.K8sJobExecutorConfigs;
 import org.apache.gravitino.job.k8s.K8sJobResourceUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Builds the SparkApplication of a Spark job, a custom resource of <a
@@ -43,6 +45,8 @@ import org.apache.gravitino.job.k8s.K8sJobResourceUtils;
  * 0.9.x.
  */
 public final class SparkApplicationUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(SparkApplicationUtils.class);
 
   /** The SparkApplication resource definition. */
   public static final ResourceDefinitionContext SPARK_APPLICATION =
@@ -75,14 +79,22 @@ public final class SparkApplicationUtils {
 
   private static final String SPARK_MASTER = "spark.master";
   private static final String SPARK_DEPLOY_MODE = "spark.submit.deployMode";
+  private static final String CLUSTER_DEPLOY_MODE = "cluster";
   private static final String SPARK_IMAGE = "spark.kubernetes.container.image";
   private static final String SPARK_DRIVER_SERVICE_ACCOUNT =
       "spark.kubernetes.authenticate.driver.serviceAccountName";
   private static final String SPARK_JARS = "spark.jars";
   private static final String SPARK_FILES = "spark.files";
   private static final String SPARK_ARCHIVES = "spark.archives";
+  private static final String SPARK_DRIVER_ENV_PREFIX = "spark.kubernetes.driverEnv.";
+  private static final String SPARK_EXECUTOR_ENV_PREFIX = "spark.executorEnv.";
 
-  private static final Pattern URI_SCHEME = Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*):");
+  // The environment variable names that Spark passes to the executors: Spark 3.5 drops any other
+  // spark.executorEnv.* key with only a warning, while the driver would still get it. Kubernetes
+  // without the relaxed environment variable validation accepts the same names, except '.' and
+  // the names starting with '..', which are rejected separately.
+  private static final Pattern ENVIRONMENT_NAME_PATTERN =
+      Pattern.compile("[-._a-zA-Z][-._a-zA-Z0-9]*");
 
   private static final Pattern URI_USER_INFO = Pattern.compile("(?<=://)[^/?#@]*@");
 
@@ -91,7 +103,15 @@ public final class SparkApplicationUtils {
   private SparkApplicationUtils() {}
 
   /**
-   * Builds the SparkApplication of a Spark job.
+   * Builds the SparkApplication of a Spark job. A built-in job, whose executable is the jobs jar on
+   * the Gravitino server, runs the jar of {@link K8sJobExecutorConfigs#SPARK_BUILTIN_JOBS_JAR}
+   * instead.
+   *
+   * <p>The environment variables of the job template are set for the driver and the executors
+   * through the Spark configurations {@code spark.kubernetes.driverEnv.*} and {@code
+   * spark.executorEnv.*}, which means their values are visible in the SparkApplication and in its
+   * pods. They override the default Spark configurations of the job executor, and the Spark
+   * configurations of the job template override them.
    *
    * @param context the context of the job run
    * @param template the runtime job template, whose resources are the URIs given in the template
@@ -101,22 +121,32 @@ public final class SparkApplicationUtils {
    */
   public static GenericKubernetesResource buildSparkApplication(
       JobContext context, SparkJobTemplate template, K8sJobExecutorConfigs configs) {
-    if (!template.environments().isEmpty()) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Job template %s sets environment variables %s, which the k8s job executor doesn't"
-                  + " support yet. Pass them as Spark configurations instead, for example"
-                  + " spark.kubernetes.driverEnv.<name> and spark.executorEnv.<name>",
-              template.name(), template.environments().keySet()));
-    }
-
-    checkClusterReachable(template.executable());
+    String executable = getExecutableUri(context, template, configs);
+    checkClusterReachable(executable);
     template.jars().forEach(SparkApplicationUtils::checkClusterReachable);
     template.files().forEach(SparkApplicationUtils::checkClusterReachable);
     template.archives().forEach(SparkApplicationUtils::checkClusterReachable);
 
     Map<String, String> sparkConf = new TreeMap<>(configs.sparkConf());
+    template
+        .environments()
+        .forEach(
+            (name, value) -> {
+              checkEnvironmentName(template, name);
+              sparkConf.put(SPARK_DRIVER_ENV_PREFIX + name, value);
+              sparkConf.put(SPARK_EXECUTOR_ENV_PREFIX + name, value);
+            });
     sparkConf.putAll(template.configs());
+    // The operator only supports cluster mode, so a job that asks for client mode is rejected
+    // rather than silently run in cluster mode.
+    String deployMode = StringUtils.trimToNull(sparkConf.get(SPARK_DEPLOY_MODE));
+    if (deployMode != null && !CLUSTER_DEPLOY_MODE.equalsIgnoreCase(deployMode)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s is set to %s by job template %s or by the k8s job executor configurations, but"
+                  + " the k8s job executor only runs Spark jobs in %s mode",
+              SPARK_DEPLOY_MODE, deployMode, template.name(), CLUSTER_DEPLOY_MODE));
+    }
     // The operator decides the master and the deploy mode.
     sparkConf.remove(SPARK_MASTER);
     sparkConf.remove(SPARK_DEPLOY_MODE);
@@ -150,7 +180,7 @@ public final class SparkApplicationUtils {
       spec.put("mainClass", template.className());
     }
     // The operator takes the main resource of a Python application from pyFiles.
-    spec.put(isPythonFile(template.executable()) ? "pyFiles" : "jars", template.executable());
+    spec.put(isPythonFile(executable) ? "pyFiles" : "jars", executable);
     spec.put("driverArgs", new ArrayList<>(template.arguments()));
     spec.put("sparkConf", sparkConf);
     spec.put("runtimeVersions", ImmutableMap.of("sparkVersion", configs.sparkVersion()));
@@ -186,6 +216,42 @@ public final class SparkApplicationUtils {
     return app;
   }
 
+  private static String getExecutableUri(
+      JobContext context, SparkJobTemplate template, K8sJobExecutorConfigs configs) {
+    // The executable of a built-in job template is the path of the jobs jar on the Gravitino
+    // server, which is what the local job executor runs. An executable that is already reachable
+    // from the cluster is kept as it is.
+    if (template.name().startsWith(JobTemplateProvider.BUILTIN_NAME_PREFIX)
+        && !K8sJobResourceUtils.isClusterReachable(template.executable())) {
+      // The job records the executable of the template, so log the jar that actually runs. It must
+      // be the same version as the jobs jar of the server, which the template comes from.
+      LOG.info(
+          "Job {} of built-in job template {} runs the jobs jar {} set by {} instead of {} on the"
+              + " Gravitino server",
+          context.jobId(),
+          template.name(),
+          configs.sparkBuiltinJobsJar(),
+          K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR,
+          template.executable());
+      return configs.sparkBuiltinJobsJar();
+    }
+    return template.executable();
+  }
+
+  private static void checkEnvironmentName(SparkJobTemplate template, String name) {
+    // Checked here, as an invalid name would otherwise only miss the executors, or fail the job
+    // when the operator creates the driver pod.
+    if (!ENVIRONMENT_NAME_PATTERN.matcher(name).matches()
+        || ".".equals(name)
+        || name.startsWith("..")) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Environment variable name '%s' of job template %s is invalid: it must match %s,"
+                  + " must not be '.' and must not start with '..'",
+              name, template.name(), ENVIRONMENT_NAME_PATTERN.pattern()));
+    }
+  }
+
   /**
    * Checks that a resource of the job, or each of them if it is a comma-separated list as Spark
    * accepts, is a URI that the cluster can reach rather than a path on the Gravitino server.
@@ -197,11 +263,7 @@ public final class SparkApplicationUtils {
       if (uris.length > 1 && StringUtils.isBlank(uri)) {
         continue;
       }
-      Matcher scheme = URI_SCHEME.matcher(uri.trim());
-      // No scheme, a Windows drive letter, or a file URI.
-      if (!scheme.find()
-          || scheme.group(1).length() == 1
-          || "file".equalsIgnoreCase(scheme.group(1))) {
+      if (!K8sJobResourceUtils.isClusterReachable(uri)) {
         throw new IllegalArgumentException(
             String.format(
                 "Resource %s of the job is a path on the Gravitino server, which the Spark job on"

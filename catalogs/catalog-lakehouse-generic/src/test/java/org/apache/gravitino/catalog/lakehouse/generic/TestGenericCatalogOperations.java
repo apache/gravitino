@@ -19,10 +19,14 @@
 package org.apache.gravitino.catalog.lakehouse.generic;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -46,6 +50,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -54,6 +60,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -88,6 +96,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.lance.Dataset;
+import org.lance.WriteParams;
 import org.mockito.Mockito;
 
 public class TestGenericCatalogOperations {
@@ -130,6 +143,10 @@ public class TestGenericCatalogOperations {
     when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(false);
@@ -182,6 +199,133 @@ public class TestGenericCatalogOperations {
     opsWithDefaultProvider = new GenericCatalogOperations(store, idGenerator);
     opsWithDefaultProvider.initialize(
         ImmutableMap.of(), null /* CatalogInfo, unused */, new GenericCatalog());
+  }
+
+  @TempDir private Path lanceDataDir;
+
+  /** The provider must see effective ownership before allocating a registered table location. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {"NULL", "false", "true"},
+      nullValues = "NULL")
+  void testRegisterPropertiesAreExternalBeforeProvisioning(String external) {
+    NameIdentifier schemaIdent = createSchema();
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "registered");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                "lance.register",
+                "true",
+                Table.PROPERTY_LOCATION,
+                lanceDataDir.resolve("existing").toString()));
+    properties.putAll(
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    Map<String, String> original = Map.copyOf(properties);
+
+    Table created =
+        opsWithFakeProvider.createTable(
+            ident,
+            new Column[0],
+            null,
+            properties,
+            new Transform[0],
+            null,
+            new SortOrder[0],
+            new Index[0]);
+
+    Assertions.assertEquals("true", created.properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals(
+        "true",
+        FakeTableLocationProvider.provisioned()
+            .get(0)
+            .tableProperties()
+            .get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals(original, properties);
+    Assertions.assertTrue(opsWithFakeProvider.dropTable(ident));
+    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+  }
+
+  /** Legacy registrations preserve real data and avoid provider reclamation on drop/cascade. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {
+        "NULL,drop",
+        "false,drop",
+        "NULL,purge",
+        "false,purge",
+        "NULL,cascade",
+        "false,cascade"
+      },
+      nullValues = "NULL")
+  void testLegacyRegisteredLanceOwnership(String external, String operation) throws Exception {
+    NameIdentifier schemaIdent = createSchema();
+    String location = lanceDataDir.resolve("legacy").toString();
+    // Arrow Schema and Gravitino Schema share a simple name in this test class.
+    try (Dataset ignored =
+        Dataset.write()
+            .schema(
+                new org.apache.arrow.vector.types.pojo.Schema(
+                    List.of(Field.nullable("id", new ArrowType.Int(32, true)))))
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .execute()) {
+      // The dataset predates its catalog registration.
+    }
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "legacy");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                "lance.register",
+                "true",
+                Table.PROPERTY_LOCATION,
+                location));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    TableEntity entity =
+        TableEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    store.put(entity, false);
+
+    if ("purge".equals(operation)) {
+      Assertions.assertTrue(opsWithFakeProvider.purgeTable(ident));
+    } else if ("cascade".equals(operation)) {
+      Assertions.assertTrue(opsWithFakeProvider.dropSchema(schemaIdent, true));
+    } else {
+      Assertions.assertTrue(opsWithFakeProvider.dropTable(ident));
+    }
+
+    Assertions.assertFalse(opsWithFakeProvider.tableExists(ident));
+    if ("purge".equals(operation)) {
+      Assertions.assertFalse(Files.exists(lanceDataDir.resolve("legacy/_versions")));
+      Assertions.assertEquals(1, FakeTableLocationProvider.unprovisioned().size());
+      Assertions.assertEquals(
+          location,
+          FakeTableLocationProvider.unprovisioned()
+              .get(0)
+              .tableProperties()
+              .get(Table.PROPERTY_LOCATION));
+    } else {
+      Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+      try (Dataset dataset = Dataset.open().uri(location).build()) {
+        Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+      }
+    }
   }
 
   @BeforeEach

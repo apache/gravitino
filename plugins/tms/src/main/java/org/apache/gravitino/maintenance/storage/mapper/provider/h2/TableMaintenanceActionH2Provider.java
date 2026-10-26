@@ -21,4 +21,13 @@ package org.apache.gravitino.maintenance.storage.mapper.provider.h2;
 import org.apache.gravitino.maintenance.storage.mapper.provider.base.TableMaintenanceActionBaseSQLProvider;
 
 /** H2 SQL provider for {@code table_maintenance_action}. */
-public class TableMaintenanceActionH2Provider extends TableMaintenanceActionBaseSQLProvider {}
+public class TableMaintenanceActionH2Provider extends TableMaintenanceActionBaseSQLProvider {
+
+  /** Returns H2 epoch milliseconds without rounding the fractional part across a second. */
+  @Override
+  protected String currentTimeMillisExpr() {
+    // H2 rounds CURRENT_TIMESTAMP(3) up near a second boundary, while UNIX_TIMESTAMP() truncates
+    // the original timestamp. Combining them can move the lease clock backwards by a second.
+    return "CAST(FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP(9)) * 1000) AS BIGINT)";
+  }
+}

@@ -58,6 +58,7 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
@@ -133,6 +134,8 @@ public class RelationalEntityStore
         new EntityChangeLogPoller(
             config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
             config.get(Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE),
+            config.get(Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS),
+            config.get(Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES),
             changeLogMetrics);
     this.entityChangeLogCleaner =
         new EntityChangeLogCleaner(
@@ -226,6 +229,7 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
+    long epochBeforeWrite = cacheInvalidationEpoch.get();
     try {
       backend.insert(e, overwritten);
     } catch (RuntimeException re) {
@@ -237,7 +241,7 @@ public class RelationalEntityStore
       // does not carry, so the next read is served from the backend instead.
       invalidateCache(e.nameIdentifier(), e.type());
     } else {
-      cache.put(e);
+      cacheIfEpochUnchanged(e, epochBeforeWrite);
     }
   }
 
@@ -267,8 +271,10 @@ public class RelationalEntityStore
             return entityFromCache.get();
           }
 
+          long epochBeforeRead = cacheInvalidationEpoch.get();
           E entity = backend.get(ident, entityType);
-          cache.put(entity);
+          // The SPI does not require reentrant locks. Publish under the lock already held here.
+          publishIfEpochUnchanged(entity, epochBeforeRead);
           return entity;
         });
   }
@@ -286,35 +292,13 @@ public class RelationalEntityStore
                   return entity.isEmpty();
                 })
             .toList();
-    // Unlike get(), the backend read is not done under the entries' cache locks: holding one lock
-    // per key across a batch DB round trip would stall unrelated reads on the same segments. So an
-    // invalidation can land between the read and the write-back. The epoch sampled here detects
-    // that and skips the write-back, otherwise the stale copy would survive until the TTL. The
-    // per-key lock makes the check and the put atomic against an invalidation of the same key.
+    // Batch reads avoid holding multiple key locks across database I/O. Both point and batch
+    // reads use an epoch guard: ancestor invalidation can race a point read too, because ancestor
+    // and child keys need not share a segment lock.
     long epochBeforeRead = cacheInvalidationEpoch.get();
     List<E> fetchEntities = backend.batchGet(noCacheIdents, entityType);
     for (E entity : fetchEntities) {
-      if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
-        // BaseEntityCache.put may invalidate a related entry even when it does not cache this
-        // entity. Keep that hook, but avoid taking a key lock for a value that cannot be cached.
-        if (cacheInvalidationEpoch.get() == epochBeforeRead) {
-          cache.put(entity);
-        }
-        allEntities.add(entity);
-        continue;
-      }
-      cache.withCacheLock(
-          EntityCacheKey.of(entity.nameIdentifier(), entity.type()),
-          () -> {
-            if (cacheInvalidationEpoch.get() == epochBeforeRead) {
-              cache.put(entity);
-              // Invalidation of another key or an ancestor can advance the epoch while this key
-              // lock is held. Remove the value if that happened during the put.
-              if (cacheInvalidationEpoch.get() != epochBeforeRead) {
-                cache.invalidate(entity.nameIdentifier(), entity.type());
-              }
-            }
-          });
+      cacheIfEpochUnchanged(entity, epochBeforeRead);
       allEntities.add(entity);
     }
     return allEntities;
@@ -348,6 +332,19 @@ public class RelationalEntityStore
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
       invalidateCache(ident, entityType);
+    }
+  }
+
+  @Override
+  public Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    try {
+      return backend.deleteSchemaAndGet(ident, cascadeFunctions, postDeleteAction);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.SCHEMA, ident);
+    } finally {
+      invalidateCache(ident, Entity.EntityType.SCHEMA);
     }
   }
 
@@ -664,6 +661,34 @@ public class RelationalEntityStore
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> void cacheIfEpochUnchanged(E entity, long epoch) {
+    if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
+      // Uncached entities still invoke the cache's related-invalidation hook. There is no stale
+      // value to publish, and taking this entity's key lock can nest locks inside that hook.
+      cache.put(entity);
+      return;
+    }
+    cache.withCacheLock(
+        EntityCacheKey.of(entity.nameIdentifier(), entity.type()),
+        () -> publishIfEpochUnchanged(entity, epoch));
+  }
+
+  // The caller holds the entry's cache lock; do not acquire it again here.
+  private <E extends Entity & HasIdentifier> void publishIfEpochUnchanged(E entity, long epoch) {
+    if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
+      cache.put(entity);
+      return;
+    }
+    if (cacheInvalidationEpoch.get() == epoch) {
+      cache.put(entity);
+      // The key lock excludes same-key invalidation, but an ancestor can advance the epoch
+      // while put runs on another segment. Remove a raced publication before releasing it.
+      if (cacheInvalidationEpoch.get() != epoch) {
+        cache.invalidate(entity.nameIdentifier(), entity.type());
+      }
     }
   }
 
