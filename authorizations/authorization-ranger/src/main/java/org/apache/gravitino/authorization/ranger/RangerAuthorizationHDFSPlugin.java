@@ -25,8 +25,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,6 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -41,12 +44,14 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.common.ErrorMessages;
 import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
@@ -54,6 +59,7 @@ import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -66,6 +72,13 @@ import org.slf4j.LoggerFactory;
 public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationHDFSPlugin.class);
   private static final Pattern HDFS_PATTERN = Pattern.compile("^hdfs://[^/]*");
+  // Securable object types that have storage locations.
+  private static final Set<MetadataObject.Type> LOCATED_TYPES =
+      ImmutableSet.of(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.FILESET);
 
   public RangerAuthorizationHDFSPlugin(String metalake, Map<String, String> config) {
     super(metalake, config);
@@ -317,31 +330,110 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   /**
-   * Remove the CATALOG, need to remove the Gravitino-managed items of the policy on the catalog
-   * location and of the policies of its schemas and tables. A force drop deletes the schemas and
-   * tables without their own drop hooks, so this is the only place their policies are removed. A
-   * location that another Hive catalog in the metalake still uses keeps its policies, because they
-   * also carry the other catalog's privileges. Only catalog locations are compared: a schema or
-   * fileset of another catalog placed exactly at this location is not detected.
+   * Remove the CATALOG, need to remove the Gravitino-managed principals of the policy on the
+   * catalog location that are there only for the dropped catalog, and the policies of its schemas
+   * and tables. A force drop deletes the schemas and tables without their own drop hooks, so this
+   * is the only place their policies are removed. Every location is looked up before any policy
+   * changes, so a failed lookup refuses the drop.
+   *
+   * <p>Another Hive catalog on the same location shares the metastore's schemas and tables, so
+   * their policies stay in that case.
    */
   private void removeCatalogMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     Preconditions.checkArgument(
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
     PathBasedMetadataObject pathBasedMetadataObject = (PathBasedMetadataObject) authzMetadataObject;
+    String catalogName = pathBasedMetadataObject.name();
     String path = getAuthorizationPath(pathBasedMetadataObject);
-    if (isPathUsedByOtherCatalog(pathBasedMetadataObject.name(), path)) {
+    boolean sharedWithHiveCatalog = isPathUsedByOtherCatalog(catalogName, path);
+    List<PathBasedMetadataObject> children =
+        sharedWithHiveCatalog
+            ? Collections.emptyList()
+            : loadChildrenMetadataObjects(catalogName, path);
+    RangerPolicy policy = findManagedPolicy(authzMetadataObject);
+    if (policy != null) {
+      removeCatalogPathPrincipals(policy, catalogName, path, sharedWithHiveCatalog);
+    }
+    children.forEach(this::removeMetadataObject);
+  }
+
+  /**
+   * Removes the principals of the catalog location policy that are there only for the dropped
+   * catalog. Gravitino keeps one Ranger policy per path, so the policy also carries the privileges
+   * of other objects on the same path, and a principal stays when it still has a reason to be
+   * there:
+   *
+   * <ul>
+   *   <li>A Gravitino role stays when one of its securable objects outside the dropped catalog is
+   *       located at the path.
+   *   <li>The owner role of another catalog stays.
+   *   <li>Metalake-level grants, the metalake owner role, and schema, table or fileset owners stay
+   *       when another object uses the path: a kept role, another catalog's owner role, or another
+   *       Hive catalog with the same location.
+   * </ul>
+   *
+   * Owners have no securable objects to check, so an owner of another catalog's object on the path,
+   * with no grants or catalog there, is removed.
+   */
+  private void removeCatalogPathPrincipals(
+      RangerPolicy policy, String catalogName, String path, boolean sharedWithHiveCatalog) {
+    List<List<? extends RangerPolicy.RangerPolicyItem>> itemLists =
+        ImmutableList.of(
+            policy.getPolicyItems(),
+            policy.getDenyPolicyItems(),
+            policy.getRowFilterPolicyItems(),
+            policy.getDataMaskPolicyItems());
+    Set<String> rangerRoles =
+        itemLists.stream()
+            .flatMap(List::stream)
+            .filter(RangerHelper::isGravitinoManagedPolicyItemAccess)
+            .flatMap(item -> item.getRoles().stream())
+            .filter(
+                role ->
+                    role.startsWith(RangerHelper.GRAVITINO_ROLE_PREFIX)
+                        && !role.equalsIgnoreCase(RangerHelper.GRAVITINO_OWNER_ROLE))
+            .collect(Collectors.toSet());
+
+    Set<String> rolesToRemove = new HashSet<>();
+    Set<String> rolesKeptIfShared = new HashSet<>();
+    boolean pathShared = sharedWithHiveCatalog;
+    for (String rangerRole : rangerRoles) {
+      switch (catalogPathRoleUse(rangerRole, catalogName, path)) {
+        case KEEP:
+          pathShared = true;
+          break;
+        case KEEP_IF_SHARED:
+          rolesKeptIfShared.add(rangerRole);
+          break;
+        default:
+          rolesToRemove.add(rangerRole);
+          break;
+      }
+    }
+    if (!pathShared) {
+      rolesToRemove.addAll(rolesKeptIfShared);
+    }
+
+    boolean changed = false;
+    for (List<? extends RangerPolicy.RangerPolicyItem> items : itemLists) {
+      changed |= removeCatalogPrincipals(items, rolesToRemove, !pathShared);
+    }
+    if (!changed) {
       LOG.info(
-          "Keep the policy of path {} because another catalog in metalake {} uses it",
-          path,
-          metalake);
+          "Keep the policy of path {} because other objects in metalake {} use it", path, metalake);
       return;
     }
-    // Look up every child location first, so a failed lookup refuses before any policy changes.
-    List<PathBasedMetadataObject> children =
-        loadChildrenMetadataObjects(pathBasedMetadataObject.name(), path);
-    removePolicyByMetadataObject(authzMetadataObject);
-    children.forEach(this::removeMetadataObject);
+    try {
+      if (itemLists.stream().allMatch(List::isEmpty)) {
+        rangerClient.deletePolicy(policy.getId());
+      } else {
+        rangerClient.updatePolicy(policy.getId(), policy);
+      }
+    } catch (RangerServiceException e) {
+      throw new AuthorizationPluginException(
+          e, "Failed to remove the HDFS policy of catalog %s.%s", metalake, catalogName);
+    }
   }
 
   /**
@@ -398,7 +490,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   private boolean isPathUsedByOtherCatalog(String catalogName, String path) {
-    String normalizedPath = StringUtils.removeEnd(path, "/");
+    String normalizedPath = normalizePath(path);
     // Catalog info comes from the entity store, so other catalogs are not loaded here.
     Catalog[] catalogs =
         GravitinoEnv.getInstance()
@@ -426,13 +518,154 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             path);
       }
       for (String location : locations) {
-        String otherPath = HDFS_PATTERN.matcher(location).replaceAll("");
-        if (StringUtils.removeEnd(otherPath, "/").equals(normalizedPath)) {
+        if (normalizePath(location).equals(normalizedPath)) {
           return true;
         }
       }
     }
     return false;
+  }
+
+  /** How a Gravitino role on the dropped catalog's path policy is treated. */
+  private enum CatalogPathRoleUse {
+    /** The role is there only for the dropped catalog. */
+    REMOVE,
+    /** The role is there for another object on the path. */
+    KEEP,
+    /** The role covers every catalog, so it stays only when another object uses the path. */
+    KEEP_IF_SHARED
+  }
+
+  private CatalogPathRoleUse catalogPathRoleUse(
+      String rangerRole, String catalogName, String path) {
+    String catalogOwnerRolePrefix = RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE + "_";
+    if (rangerRole.equalsIgnoreCase(RangerHelper.generateCatalogOwnerRoleName(catalogId))) {
+      return CatalogPathRoleUse.REMOVE;
+    }
+    if (StringUtils.startsWithIgnoreCase(rangerRole, catalogOwnerRolePrefix)) {
+      return CatalogPathRoleUse.KEEP;
+    }
+    // The legacy catalog owner role is shared by all catalogs.
+    if (rangerRole.equalsIgnoreCase(RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE)
+        || StringUtils.startsWithIgnoreCase(
+            rangerRole, RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE)) {
+      return CatalogPathRoleUse.KEEP_IF_SHARED;
+    }
+
+    Role role = loadGravitinoRole(rangerRole, catalogName);
+    if (role == null) {
+      return CatalogPathRoleUse.REMOVE;
+    }
+    String normalizedPath = normalizePath(path);
+    boolean grantsOnMetalake = false;
+    for (SecurableObject securableObject : role.securableObjects()) {
+      if (securableObject.type() == MetadataObject.Type.METALAKE) {
+        grantsOnMetalake = true;
+        continue;
+      }
+      if (!LOCATED_TYPES.contains(securableObject.type())) {
+        continue;
+      }
+      NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, securableObject);
+      String objectCatalog =
+          securableObject.type() == MetadataObject.Type.CATALOG
+              ? ident.name()
+              : ident.namespace().level(1);
+      if (objectCatalog.equals(catalogName)) {
+        continue;
+      }
+      List<String> locations;
+      try {
+        locations =
+            AuthorizationUtils.loadMetadataObjectLocation(
+                ident, MetadataObjectUtil.toEntityType(securableObject));
+      } catch (AuthorizationPluginException e) {
+        // Without the object's locations, removing the role could revoke its privileges.
+        throw new AuthorizationPluginException(
+            e,
+            "Cannot remove the HDFS policy of catalog %s.%s: failed to check whether %s %s of"
+                + " role %s uses the same path %s",
+            metalake,
+            catalogName,
+            securableObject.type(),
+            securableObject.fullName(),
+            role.name(),
+            path);
+      }
+      if (locations.stream()
+          .map(RangerAuthorizationHDFSPlugin::normalizePath)
+          .anyMatch(normalizedPath::equals)) {
+        return CatalogPathRoleUse.KEEP;
+      }
+    }
+    return grantsOnMetalake ? CatalogPathRoleUse.KEEP_IF_SHARED : CatalogPathRoleUse.REMOVE;
+  }
+
+  /**
+   * Loads the Gravitino role behind a Ranger role name, or null when the role no longer exists. The
+   * Ranger name is the Gravitino name with the Gravitino prefix, unless the Gravitino name already
+   * starts with it.
+   */
+  @Nullable
+  private Role loadGravitinoRole(String rangerRole, String catalogName) {
+    AccessControlDispatcher accessControl =
+        GravitinoEnv.getInstance().internalAccessControlDispatcher();
+    List<String> candidates =
+        ImmutableList.of(
+            rangerRole.substring(RangerHelper.GRAVITINO_ROLE_PREFIX.length()), rangerRole);
+    for (String roleName : candidates) {
+      try {
+        Role role = accessControl.getRole(metalake, roleName);
+        if (role != null) {
+          return role;
+        }
+      } catch (NoSuchRoleException e) {
+        // Try the next candidate name.
+      } catch (RuntimeException e) {
+        throw new AuthorizationPluginException(
+            e,
+            "Cannot remove the HDFS policy of catalog %s.%s: failed to load role %s",
+            metalake,
+            catalogName,
+            roleName);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Removes the given Gravitino roles from the items, and the owner users and groups too when
+   * {@code removeOwners} is true. Items left without principals are removed.
+   *
+   * @return true if the items changed
+   */
+  private static boolean removeCatalogPrincipals(
+      List<? extends RangerPolicy.RangerPolicyItem> items,
+      Set<String> rolesToRemove,
+      boolean removeOwners) {
+    boolean changed = false;
+    Iterator<? extends RangerPolicy.RangerPolicyItem> iterator = items.iterator();
+    while (iterator.hasNext()) {
+      RangerPolicy.RangerPolicyItem item = iterator.next();
+      if (!RangerHelper.isGravitinoManagedPolicyItemAccess(item)) {
+        continue;
+      }
+      changed |= item.getRoles().removeAll(rolesToRemove);
+      if (removeOwners && item.getRoles().remove(RangerHelper.GRAVITINO_OWNER_ROLE)) {
+        item.getUsers().clear();
+        item.getGroups().clear();
+        changed = true;
+      }
+      if (item.getRoles().isEmpty() && item.getUsers().isEmpty() && item.getGroups().isEmpty()) {
+        iterator.remove();
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  private static String normalizePath(String location) {
+    return StringUtils.removeEnd(HDFS_PATTERN.matcher(location).replaceAll(""), "/");
   }
 
   /**

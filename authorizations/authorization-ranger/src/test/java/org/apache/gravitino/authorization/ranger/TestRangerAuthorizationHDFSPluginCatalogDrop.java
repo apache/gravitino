@@ -30,19 +30,27 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.ThrowableFunction;
@@ -58,10 +66,16 @@ import org.mockito.Mockito;
 /** Drops a Hive catalog through the hook dispatcher and checks the Ranger HDFS policies left. */
 public class TestRangerAuthorizationHDFSPluginCatalogDrop {
 
+  private static final Privilege READ = Privileges.ReadFileset.allow();
+
   private static final String METALAKE = "metalake";
   private static final NameIdentifier CATALOG = NameIdentifier.of(METALAKE, "hive_catalog");
   private static final NameIdentifier OTHER_CATALOG = NameIdentifier.of(METALAKE, "other_catalog");
+  private static final NameIdentifier FILESET_CATALOG =
+      NameIdentifier.of(METALAKE, "fileset_catalog");
   private static final String WAREHOUSE = "hdfs://ns/user/hive/warehouse";
+  private static final String WAREHOUSE_PATH = "/user/hive/warehouse";
+  private static final String CATALOG_ID = "1";
 
   private final List<RangerPolicy> policies = new ArrayList<>();
   private RangerClientExtension rangerClient;
@@ -69,6 +83,8 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
   private CatalogDispatcher internalCatalogDispatcher;
   private SchemaDispatcher schemaDispatcher;
   private TableDispatcher tableDispatcher;
+  private FilesetDispatcher filesetDispatcher;
+  private AccessControlDispatcher accessControlDispatcher;
   private MockedStatic<GravitinoEnv> envStatic;
 
   @BeforeEach
@@ -92,6 +108,7 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
             plugin.ownerMappingRule(),
             plugin.policyResourceDefinesRule()));
     FieldUtils.writeField(plugin, "metalake", METALAKE, true);
+    FieldUtils.writeField(plugin, "catalogId", CATALOG_ID, true);
 
     BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
     Mockito.when(catalog.name()).thenReturn(CATALOG.name());
@@ -111,16 +128,22 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
     Mockito.when(hiveCatalog.type()).thenReturn(Catalog.Type.RELATIONAL);
     Mockito.when(internalCatalogDispatcher.loadCatalog(any())).thenReturn(hiveCatalog);
     givenCatalogs(catalogInfo(CATALOG, "hive"));
+    Catalog filesetCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(filesetCatalog.provider()).thenReturn("fileset");
+    Mockito.when(filesetCatalog.type()).thenReturn(Catalog.Type.FILESET);
+    Mockito.when(internalCatalogDispatcher.loadCatalog(FILESET_CATALOG)).thenReturn(filesetCatalog);
     schemaDispatcher = Mockito.mock(SchemaDispatcher.class);
     givenDefaultSchemaLocation(CATALOG, WAREHOUSE);
     // By default the catalog has only its default schema, which has no tables.
     tableDispatcher = Mockito.mock(TableDispatcher.class);
     Mockito.when(tableDispatcher.listTables(any())).thenReturn(new NameIdentifier[0]);
     givenSchemas("default");
+    filesetDispatcher = Mockito.mock(FilesetDispatcher.class);
+    accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
 
     GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
-    Mockito.when(env.internalAccessControlDispatcher())
-        .thenReturn(Mockito.mock(AccessControlDispatcher.class));
+    Mockito.when(env.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(env.internalFilesetDispatcher()).thenReturn(filesetDispatcher);
     Mockito.when(env.internalCatalogDispatcher()).thenReturn(internalCatalogDispatcher);
     Mockito.when(env.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
     Mockito.when(env.internalTableDispatcher()).thenReturn(tableDispatcher);
@@ -180,16 +203,18 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
   }
 
   @Test
-  public void testDropCatalogKeepsPolicyOfPathSharedWithOtherCatalog() throws Exception {
-    RangerPolicy policy = addPolicy(1, "/user/hive/warehouse", "GRAVITINO_role");
+  public void testDropCatalogKeepsOwnersOfPathSharedWithOtherCatalog() throws Exception {
+    givenRole("catalog_role", catalogObject(CATALOG));
+    RangerPolicy policy = addPolicy(1, WAREHOUSE_PATH, "GRAVITINO_catalog_role");
+    addOwnerItem(policy, "alice");
     givenOtherCatalogWithLocation(WAREHOUSE + "/");
 
     Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
 
-    // The other catalog's grants live on the same policy, so it stays untouched.
+    // The other catalog's owners live on the same policy, so only the dropped catalog's role goes.
+    Assertions.assertEquals(List.of(RangerHelper.GRAVITINO_OWNER_ROLE), rolesOf(policy));
+    Assertions.assertEquals(List.of("alice"), usersOf(policy));
     Mockito.verify(rangerClient, Mockito.never()).deletePolicy(anyLong());
-    Mockito.verify(rangerClient, Mockito.never()).updatePolicy(anyLong(), any());
-    Assertions.assertEquals(List.of("GRAVITINO_role"), rolesOf(policy));
     Mockito.verify(innerDispatcher).dropCatalog(CATALOG, true);
   }
 
@@ -359,8 +384,8 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
     Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
 
     // Catalogs on one warehouse share its schemas, so their policies stay with the other catalog.
-    Mockito.verify(rangerClient, Mockito.never()).deletePolicy(anyLong());
-    Mockito.verify(rangerClient, Mockito.never()).updatePolicy(anyLong(), any());
+    Mockito.verify(rangerClient, Mockito.never()).deletePolicy(2L);
+    Mockito.verify(rangerClient, Mockito.never()).updatePolicy(Mockito.eq(2L), any());
     Assertions.assertEquals(List.of("GRAVITINO_role"), rolesOf(schemaPolicy));
     Mockito.verify(schemaDispatcher, Mockito.never()).listSchemas(any());
   }
@@ -398,9 +423,172 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
     Mockito.when(tableDispatcher.loadTable(ident)).thenReturn(table);
   }
 
+  @Test
+  public void testDropCatalogKeepsGrantOfOtherCatalogSchemaAtWarehouse() throws Exception {
+    NameIdentifier schema = NameIdentifier.of(METALAKE, FILESET_CATALOG.name(), "s");
+    givenSchemaLocation(schema, WAREHOUSE);
+    givenRole("catalog_role", catalogObject(CATALOG));
+    givenRole("schema_role", schemaObject(schema));
+    RangerPolicy policy =
+        addPolicy(
+            1, WAREHOUSE_PATH, "GRAVITINO_catalog_role", "GRAVITINO_schema_role", "external_role");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Assertions.assertEquals(List.of("GRAVITINO_schema_role", "external_role"), rolesOf(policy));
+    Mockito.verify(rangerClient).updatePolicy(Mockito.eq(1L), Mockito.any());
+    Mockito.verify(innerDispatcher).dropCatalog(CATALOG, true);
+  }
+
+  @Test
+  public void testDropCatalogKeepsGrantOfOtherCatalogFilesetAtWarehouse() throws Exception {
+    NameIdentifier fileset = NameIdentifier.of(METALAKE, FILESET_CATALOG.name(), "s", "f");
+    givenFilesetLocation(fileset, WAREHOUSE + "/");
+    givenRole("catalog_role", catalogObject(CATALOG));
+    givenRole("fileset_role", filesetObject(fileset));
+    RangerPolicy policy =
+        addPolicy(1, WAREHOUSE_PATH, "GRAVITINO_catalog_role", "GRAVITINO_fileset_role");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Assertions.assertEquals(List.of("GRAVITINO_fileset_role"), rolesOf(policy));
+    Mockito.verify(rangerClient, Mockito.never()).deletePolicy(anyLong());
+  }
+
+  @Test
+  public void testDropCatalogKeepsOwnersWhenOtherCatalogSchemaIsGrantedAtWarehouse()
+      throws Exception {
+    NameIdentifier schema = NameIdentifier.of(METALAKE, FILESET_CATALOG.name(), "s");
+    givenSchemaLocation(schema, WAREHOUSE);
+    givenRole("schema_role", catalogObject(CATALOG), schemaObject(schema));
+    RangerPolicy policy = addPolicy(1, WAREHOUSE_PATH, "GRAVITINO_schema_role");
+    addOwnerItem(policy, "alice");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    // A role that grants on both catalogs keeps its item, and the schema's owner stays.
+    Assertions.assertEquals(
+        List.of("GRAVITINO_schema_role", RangerHelper.GRAVITINO_OWNER_ROLE), rolesOf(policy));
+    Assertions.assertEquals(List.of("alice"), usersOf(policy));
+  }
+
+  @Test
+  public void testDropCatalogRemovesGrantOfOtherCatalogSchemaAtAnotherPath() throws Exception {
+    NameIdentifier schema = NameIdentifier.of(METALAKE, FILESET_CATALOG.name(), "s");
+    givenSchemaLocation(schema, "hdfs://ns/data/s");
+    givenRole("schema_role", schemaObject(schema));
+    RangerPolicy policy = addPolicy(1, WAREHOUSE_PATH, "GRAVITINO_schema_role");
+    addOwnerItem(policy, "alice");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Mockito.verify(rangerClient).deletePolicy(1L);
+  }
+
+  @Test
+  public void testDropCatalogRefusedWhenRoleObjectLocationLookupFails() throws Exception {
+    NameIdentifier schema = NameIdentifier.of(METALAKE, FILESET_CATALOG.name(), "s");
+    Mockito.when(schemaDispatcher.loadSchema(schema))
+        .thenThrow(new NoSuchSchemaException("metastore unreachable"));
+    givenRole("schema_role", schemaObject(schema));
+    RangerPolicy policy = addPolicy(1, WAREHOUSE_PATH, "GRAVITINO_schema_role");
+
+    AuthorizationPluginException e =
+        Assertions.assertThrows(
+            AuthorizationPluginException.class,
+            () -> new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Assertions.assertTrue(e.getMessage().contains("schema_role"), e.getMessage());
+    Assertions.assertEquals(List.of("GRAVITINO_schema_role"), rolesOf(policy));
+    Mockito.verify(innerDispatcher, Mockito.never())
+        .dropCatalog(Mockito.any(), Mockito.anyBoolean());
+    Mockito.verify(rangerClient, Mockito.never()).deletePolicy(anyLong());
+    Mockito.verify(rangerClient, Mockito.never()).updatePolicy(anyLong(), any());
+  }
+
+  @Test
+  public void testDropCatalogKeepsOtherCatalogOwnerRoleAndRemovesItsOwn() throws Exception {
+    String ownOwnerRole = RangerHelper.generateCatalogOwnerRoleName(CATALOG_ID);
+    String otherOwnerRole = RangerHelper.generateCatalogOwnerRoleName("2");
+    RangerPolicy policy = addPolicy(1, WAREHOUSE_PATH, ownOwnerRole, otherOwnerRole);
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Assertions.assertEquals(List.of(otherOwnerRole), rolesOf(policy));
+  }
+
+  @Test
+  public void testDropCatalogKeepsMetalakeGrantOnlyWhenPathIsShared() throws Exception {
+    givenRole("metalake_role", SecurableObjects.ofMetalake(METALAKE, List.of(READ)));
+    RangerPolicy policy = addPolicy(1, WAREHOUSE_PATH, "GRAVITINO_metalake_role");
+    givenOtherCatalogWithLocation(WAREHOUSE);
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Assertions.assertEquals(List.of("GRAVITINO_metalake_role"), rolesOf(policy));
+    Mockito.verify(rangerClient, Mockito.never()).deletePolicy(anyLong());
+  }
+
+  @Test
+  public void testDropCatalogRemovesMetalakeGrantWhenPathIsNotShared() throws Exception {
+    givenRole("metalake_role", SecurableObjects.ofMetalake(METALAKE, List.of(READ)));
+    addPolicy(1, WAREHOUSE_PATH, "GRAVITINO_metalake_role");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Mockito.verify(rangerClient).deletePolicy(1L);
+  }
+
   private void givenOtherCatalogWithLocation(String location) {
     givenCatalogs(catalogInfo(CATALOG, "hive"), catalogInfo(OTHER_CATALOG, "hive"));
     givenDefaultSchemaLocation(OTHER_CATALOG, location);
+  }
+
+  private void givenRole(String name, SecurableObject... securableObjects) {
+    Role role = Mockito.mock(Role.class);
+    Mockito.when(role.name()).thenReturn(name);
+    Mockito.when(role.securableObjects()).thenReturn(List.of(securableObjects));
+    Mockito.when(accessControlDispatcher.getRole(METALAKE, name)).thenReturn(role);
+  }
+
+  private static SecurableObject catalogObject(NameIdentifier catalog) {
+    return SecurableObjects.parse(catalog.name(), MetadataObject.Type.CATALOG, List.of(READ));
+  }
+
+  private static SecurableObject schemaObject(NameIdentifier schema) {
+    return SecurableObjects.parse(
+        schema.namespace().level(1) + "." + schema.name(),
+        MetadataObject.Type.SCHEMA,
+        List.of(READ));
+  }
+
+  private static SecurableObject filesetObject(NameIdentifier fileset) {
+    return SecurableObjects.parse(
+        String.join(
+            ".", fileset.namespace().level(1), fileset.namespace().level(2), fileset.name()),
+        MetadataObject.Type.FILESET,
+        List.of(READ));
+  }
+
+  private void givenSchemaLocation(NameIdentifier schema, String location) {
+    Schema schemaObj = Mockito.mock(Schema.class);
+    Mockito.when(schemaObj.name()).thenReturn(schema.name());
+    Mockito.when(schemaObj.properties()).thenReturn(ImmutableMap.of("location", location));
+    Mockito.when(schemaDispatcher.loadSchema(schema)).thenReturn(schemaObj);
+  }
+
+  private void givenFilesetLocation(NameIdentifier fileset, String location) {
+    Fileset filesetObj = Mockito.mock(Fileset.class);
+    Mockito.when(filesetObj.storageLocation()).thenReturn(location);
+    Mockito.when(filesetDispatcher.loadFileset(fileset)).thenReturn(filesetObj);
+  }
+
+  private static void addOwnerItem(RangerPolicy policy, String owner) {
+    RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
+    item.setUsers(new ArrayList<>(List.of(owner)));
+    item.setRoles(new ArrayList<>(List.of(RangerHelper.GRAVITINO_OWNER_ROLE)));
+    item.setAccesses(List.of(new RangerPolicy.RangerPolicyItemAccess("read")));
+    policy.getPolicyItems().add(item);
   }
 
   private void givenCatalogs(Catalog... catalogs) {
@@ -432,7 +620,7 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
             PolicyResource.PATH.getName(), new RangerPolicy.RangerPolicyResource(path)));
     for (String role : roles) {
       RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
-      item.setRoles(List.of(role));
+      item.setRoles(new ArrayList<>(List.of(role)));
       item.setAccesses(List.of(new RangerPolicy.RangerPolicyItemAccess("read")));
       policy.getPolicyItems().add(item);
     }
@@ -448,6 +636,12 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
                 Objects.equals(
                     policy.getResources().get(PolicyResource.PATH.getName()).getValues().get(0),
                     path))
+        .collect(Collectors.toList());
+  }
+
+  private static List<String> usersOf(RangerPolicy policy) {
+    return policy.getPolicyItems().stream()
+        .flatMap(item -> item.getUsers().stream())
         .collect(Collectors.toList());
   }
 
