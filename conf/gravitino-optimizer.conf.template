@@ -33,6 +33,12 @@ gravitino.optimizer.recommender.tableMetaProvider = gravitino-table-metadata-pro
 # The job submitter for the recommender (noop-job-submitter keeps recommendations local).
 gravitino.optimizer.recommender.jobSubmitter = noop-job-submitter
 
+# Built-in strategy handlers (optional overrides; Recommender has the same defaults in code).
+# gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
+# gravitino.optimizer.strategyHandler.iceberg-rewrite-manifests.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler
+# gravitino.optimizer.strategyHandler.iceberg-orphan-file-removal.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler
+# gravitino.optimizer.strategyHandler.iceberg-snapshot-expiration.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationStrategyHandler
+
 # Updater plugins (push statistics/metrics back into Gravitino)
 # The statistics updater for the recommender/update-statistics tool.
 gravitino.optimizer.updater.statisticsUpdater = gravitino-statistics-updater

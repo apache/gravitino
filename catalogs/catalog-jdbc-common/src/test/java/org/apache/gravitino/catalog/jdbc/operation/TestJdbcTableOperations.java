@@ -46,6 +46,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -243,6 +244,70 @@ public class TestJdbcTableOperations {
     Assertions.assertTrue(
         JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("org.postgresql.Driver"));
     Assertions.assertTrue(JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("org.sqlite.JDBC"));
+  }
+
+  @Test
+  public void testWithPendingDefaultValueAndNullability() {
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(Types.IntegerType.get())
+            .withComment("comment")
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    String[] fieldName = {"col_1"};
+
+    // A NULL default is dropped when the column becomes not null.
+    JdbcColumn pending =
+        JdbcTableOperations.withPendingDefaultValueAndNullability(
+            column, TableChange.updateColumnNullability(fieldName, false));
+    Assertions.assertFalse(pending.nullable());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, pending.defaultValue());
+    Assertions.assertEquals("comment", pending.comment());
+    Assertions.assertEquals(Types.IntegerType.get(), pending.dataType());
+
+    // A new default in the same request is kept, whichever order the changes come in.
+    TableChange setDefault =
+        TableChange.updateColumnDefaultValue(fieldName, Literals.integerLiteral(5));
+    TableChange setNotNull = TableChange.updateColumnNullability(fieldName, false);
+    for (TableChange[] changes :
+        new TableChange[][] {{setDefault, setNotNull}, {setNotNull, setDefault}}) {
+      pending = JdbcTableOperations.withPendingDefaultValueAndNullability(column, changes);
+      Assertions.assertFalse(pending.nullable());
+      Assertions.assertEquals(Literals.integerLiteral(5), pending.defaultValue());
+    }
+
+    // Changes to other columns are ignored.
+    pending =
+        JdbcTableOperations.withPendingDefaultValueAndNullability(
+            column,
+            TableChange.updateColumnNullability(new String[] {"col_2"}, false),
+            TableChange.updateColumnDefaultValue(
+                new String[] {"col_2"}, Literals.integerLiteral(5)));
+    Assertions.assertTrue(pending.nullable());
+    Assertions.assertEquals(Literals.NULL, pending.defaultValue());
+
+    // A NULL default requested for a column that ends up not null is rejected.
+    TableChange setNullDefault = TableChange.updateColumnDefaultValue(fieldName, Literals.NULL);
+    for (TableChange[] changes :
+        new TableChange[][] {{setNullDefault, setNotNull}, {setNotNull, setNullDefault}}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> JdbcTableOperations.withPendingDefaultValueAndNullability(column, changes));
+    }
+    JdbcColumn notNullColumn =
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .withDefaultValue(Literals.integerLiteral(5))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            JdbcTableOperations.withPendingDefaultValueAndNullability(
+                notNullColumn, setNullDefault));
   }
 
   private static JdbcColumn[] generateRandomColumn(int minSize, int maxSize) {

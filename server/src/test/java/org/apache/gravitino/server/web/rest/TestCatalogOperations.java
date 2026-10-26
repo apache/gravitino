@@ -572,6 +572,27 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testRenameCatalogToExistingName() {
+    CatalogAlreadyExistsException exception =
+        new CatalogAlreadyExistsException("Catalog existing already exists");
+    doThrow(exception).when(manager).alterCatalog(any(), any());
+    CatalogUpdatesRequest request =
+        new CatalogUpdatesRequest(
+            Collections.singletonList(new CatalogUpdateRequest.RenameCatalogRequest("existing")));
+    try (Response response =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(CatalogAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+  }
+
+  @Test
   public void testAlterCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog2");
 
