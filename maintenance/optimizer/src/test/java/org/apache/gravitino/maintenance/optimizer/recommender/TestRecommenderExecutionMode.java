@@ -36,6 +36,8 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 class TestRecommenderExecutionMode {
@@ -210,6 +212,54 @@ class TestRecommenderExecutionMode {
     Assertions.assertTrue(exception.getMessage().contains("limit must be > 0"));
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"initialize", "shouldTrigger", "evaluate"})
+  void testInvalidHandlerInputSkipsOnlyAffectedTable(String failureStage) throws Exception {
+    NameIdentifier bad = NameIdentifier.of("catalog", "db", failureStage);
+    NameIdentifier healthy = NameIdentifier.of("catalog", "db", "healthy");
+    Strategy strategy = new TestStrategy("s1", STRATEGY_TYPE, "tpl-1");
+    StrategyProvider strategies = Mockito.mock(StrategyProvider.class);
+    Mockito.when(strategies.strategies(Mockito.any())).thenReturn(List.of(strategy));
+    Mockito.when(strategies.strategy("s1")).thenReturn(strategy);
+    JobSubmitter submitter = Mockito.mock(JobSubmitter.class);
+    try (Recommender recommender =
+        createRecommender(
+            strategies,
+            Mockito.mock(StatisticsProvider.class),
+            Mockito.mock(TableMetadataProvider.class),
+            submitter)) {
+      List<Recommender.RecommendationResult> results =
+          recommender.recommendForStrategyName(List.of(bad, healthy), "s1", Integer.MAX_VALUE);
+      Assertions.assertEquals(1, results.size());
+      Assertions.assertEquals(healthy, results.get(0).identifier());
+      Mockito.verifyNoInteractions(submitter);
+    }
+  }
+
+  @Test
+  void testMissingHandlerConfigurationStillFails() throws Exception {
+    NameIdentifier identifier = NameIdentifier.of("catalog", "db", "table");
+    Strategy strategy = new TestStrategy("s1", STRATEGY_TYPE, "tpl-1");
+    StrategyProvider strategies = Mockito.mock(StrategyProvider.class);
+    Mockito.when(strategies.strategies(identifier)).thenReturn(List.of(strategy));
+    Mockito.when(strategies.strategy("s1")).thenReturn(strategy);
+    try (Recommender recommender =
+        new Recommender(
+            strategies,
+            Mockito.mock(StatisticsProvider.class),
+            Mockito.mock(TableMetadataProvider.class),
+            Mockito.mock(JobSubmitter.class),
+            new OptimizerEnv(new OptimizerConfig(Map.of())))) {
+      IllegalArgumentException failure =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  recommender.recommendForStrategyName(
+                      List.of(identifier), "s1", Integer.MAX_VALUE));
+      Assertions.assertTrue(failure.getMessage().contains("No StrategyHandler class configured"));
+    }
+  }
+
   private static Recommender createRecommender(
       StrategyProvider strategyProvider,
       StatisticsProvider statisticsProvider,
@@ -224,12 +274,14 @@ class TestRecommenderExecutionMode {
         strategyProvider, statisticsProvider, tableMetadataProvider, jobSubmitter, optimizerEnv);
   }
 
+  /** Handler that rejects the table named for a lifecycle stage at that stage. */
   public static class TestStrategyHandler implements StrategyHandler {
     private StrategyHandlerContext context;
 
     @Override
     public void initialize(StrategyHandlerContext context) {
       this.context = context;
+      rejectInvalidTable("initialize");
     }
 
     @Override
@@ -239,11 +291,13 @@ class TestRecommenderExecutionMode {
 
     @Override
     public boolean shouldTrigger() {
+      rejectInvalidTable("shouldTrigger");
       return true;
     }
 
     @Override
     public StrategyEvaluation evaluate() {
+      rejectInvalidTable("evaluate");
       Strategy strategy = context.strategy();
       JobExecutionContext jobExecutionContext =
           new JobExecutionContext() {
@@ -273,6 +327,12 @@ class TestRecommenderExecutionMode {
           return Optional.of(jobExecutionContext);
         }
       };
+    }
+
+    private void rejectInvalidTable(String stage) {
+      if (stage.equals(context.nameIdentifier().name())) {
+        throw new IllegalArgumentException("Invalid table input at " + stage);
+      }
     }
   }
 
