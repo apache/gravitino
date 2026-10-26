@@ -46,11 +46,10 @@ If a catalog does not set `credential-providers`, Gravitino infers providers fro
 
 #### S3 IRSA Credential
 
-A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with temporary credentials, typically used in EKS environments. This provider supports both basic IRSA credentials and fine-grained path-based access control with dynamically generated IAM policies.
+A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with temporary credentials, typically used in EKS environments. This provider scopes path-based requests with dynamically generated IAM session policies.
 
 **Features:**
-- **Basic IRSA mode**: Returns credentials with full permissions of the associated IAM role (for non-path-based contexts)
-- **Fine-grained mode**: Generates path-specific credentials with minimal required permissions (for table access with `X-Iceberg-Access-Delegation: vended-credentials`)
+- **Path-based access**: Generates credentials scoped to requested paths (for table access with `X-Iceberg-Access-Delegation: vended-credentials`)
 - **Automatic policy generation**: Creates custom IAM policies scoped to specific table paths including data, metadata, and write locations
 - **EKS integration**: Leverages existing IRSA setup while providing enhanced security through path-based restrictions
 
@@ -63,7 +62,7 @@ A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with t
 | `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       |
 | `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services.       | (none)        | No       |
 
-**Note**: Set `s3-role-arn` or provide `AWS_ROLE_ARN` in the pod environment. Gravitino selects that role when credentials are requested. For table-path requests, it adds a session policy covering the requested data, metadata, and write locations. Catalog-level requests have no path to scope and return credentials with the selected role's full permissions.
+**Note**: Set `s3-role-arn` or provide `AWS_ROLE_ARN` in the pod environment. Gravitino selects that role when credentials are requested. For path-based requests, it adds a session policy covering the requested data, metadata, and write locations. Catalog-level requests do not vend `aws-irsa` credentials because they provide no paths for a session policy.
 
 **Prerequisites for fine-grained mode:**
 - EKS cluster with IRSA properly configured
