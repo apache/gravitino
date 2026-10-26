@@ -75,8 +75,8 @@ import org.junit.jupiter.api.TestTemplate;
 /**
  * An external object (for example one created through the Iceberg REST server) can carry a {@code
  * gravitino.identifier} property that names the id of another, live entity. Importing that object
- * must never reuse the other entity: the existing entity keeps its name, its parent and its id, so its
- * owner and role grants stay with it, and the new object is imported under a fresh id.
+ * must never reuse the other entity: the existing entity keeps its name, its parent and its id, so
+ * its owner and role grants stay with it, and the new object is imported under a fresh id.
  */
 public class TestImportStringIdentifierReuse extends TestJDBCBackend {
 
@@ -192,10 +192,10 @@ public class TestImportStringIdentifierReuse extends TestJDBCBackend {
   @TestTemplate
   public void testImportedTableCannotAdoptAnotherCatalogsTableId() throws IOException {
     // The existing entity lives in another catalog; only its id leaks into the new table.
-    Namespace existing entityNs = NamespaceUtil.ofTable(METALAKE, OTHER_CATALOG, SCHEMA);
+    Namespace existingNs = NamespaceUtil.ofTable(METALAKE, OTHER_CATALOG, SCHEMA);
     long existingId = RandomIdGenerator.INSTANCE.nextId();
-    NameIdentifier existingIdent = NameIdentifier.of(existing entityNs, "existing_table");
-    store.put(createTableEntity(existingId, existing entityNs, existingIdent.name(), AUDIT_INFO), false);
+    NameIdentifier existingIdent = NameIdentifier.of(existingNs, "existing_table");
+    store.put(createTableEntity(existingId, existingNs, existingIdent.name(), AUDIT_INFO), false);
 
     NameIdentifier newIdent =
         NameIdentifier.of(NamespaceUtil.ofTable(METALAKE, CATALOG, SCHEMA), "new_table");
@@ -221,10 +221,10 @@ public class TestImportStringIdentifierReuse extends TestJDBCBackend {
 
   @TestTemplate
   public void testImportedSchemaCannotAdoptAnotherCatalogsSchemaId() throws IOException {
-    Namespace existing entityNs = NamespaceUtil.ofSchema(METALAKE, OTHER_CATALOG);
+    Namespace existingNs = NamespaceUtil.ofSchema(METALAKE, OTHER_CATALOG);
     long existingId = RandomIdGenerator.INSTANCE.nextId();
-    NameIdentifier existingIdent = NameIdentifier.of(existing entityNs, "existing_schema");
-    store.put(createSchemaEntity(existingId, existing entityNs, existingIdent.name(), AUDIT_INFO), false);
+    NameIdentifier existingIdent = NameIdentifier.of(existingNs, "existing_schema");
+    store.put(createSchemaEntity(existingId, existingNs, existingIdent.name(), AUDIT_INFO), false);
 
     NameIdentifier newIdent =
         NameIdentifier.of(NamespaceUtil.ofSchema(METALAKE, CATALOG), "new_schema");
@@ -239,7 +239,8 @@ public class TestImportStringIdentifierReuse extends TestJDBCBackend {
             catalogManager, store, RandomIdGenerator.INSTANCE, mock(SecretManager.class));
     dispatcher.loadSchema(newIdent);
 
-    assertExistingUntouched(existingIdent, Entity.EntityType.SCHEMA, SchemaEntity.class, existingId);
+    assertExistingUntouched(
+        existingIdent, Entity.EntityType.SCHEMA, SchemaEntity.class, existingId);
     assertNotAdopted(newIdent, Entity.EntityType.SCHEMA, SchemaEntity.class, existingId);
   }
 

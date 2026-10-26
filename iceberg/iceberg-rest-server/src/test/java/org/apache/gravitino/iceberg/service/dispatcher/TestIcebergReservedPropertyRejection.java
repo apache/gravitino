@@ -112,7 +112,10 @@ public class TestIcebergReservedPropertyRejection {
   @Test
   public void testCreateNamespaceRejectsReservedProperty() {
     CreateNamespaceRequest request =
-        CreateNamespaceRequest.builder().withNamespace(NAMESPACE).setProperties(RESERVED_ID_PROPERTIES).build();
+        CreateNamespaceRequest.builder()
+            .withNamespace(NAMESPACE)
+            .setProperties(RESERVED_ID_PROPERTIES)
+            .build();
 
     assertRejected(() -> namespaceExecutor.createNamespace(context, request));
   }
@@ -140,7 +143,8 @@ public class TestIcebergReservedPropertyRejection {
 
   private static UpdateTableRequest setPropertiesRequest() {
     return new UpdateTableRequest(
-        ImmutableList.of(), ImmutableList.of(new MetadataUpdate.SetProperties(RESERVED_ID_PROPERTIES)));
+        ImmutableList.of(),
+        ImmutableList.of(new MetadataUpdate.SetProperties(RESERVED_ID_PROPERTIES)));
   }
 
   private void assertRejected(Executable call) {
