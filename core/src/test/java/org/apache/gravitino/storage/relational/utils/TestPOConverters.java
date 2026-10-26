@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.utils;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1030,6 +1031,46 @@ public class TestPOConverters {
     assertEquals(expectedPolicy.comment(), convertedPolicy.comment());
     assertEquals(expectedPolicy.enabled(), convertedPolicy.enabled());
     assertEquals(expectedPolicy.content(), convertedPolicy.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergSnapshotExpiration() throws JsonProcessingException {
+    PolicyContent content = PolicyContents.icebergSnapshotExpiration(14L, 5L, true);
+    String stored = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    assertTrue(stored.contains("\"olderThanDays\":14"));
+    assertTrue(stored.contains("\"retainLast\":5"));
+    assertTrue(stored.contains("\"streamResults\":true"));
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                2L,
+                "snapshot-expiration",
+                "system_iceberg_snapshot_expiration",
+                1L,
+                createPolicyVersionPO(2L, 1L, 1L, "expire", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergRewriteManifestsPersists() throws JsonProcessingException {
+    PolicyContent content = PolicyContents.icebergRewriteManifests();
+    String stored = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    assertFalse(stored.isEmpty());
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                3L,
+                "rewrite-manifests",
+                "system_iceberg_rewrite_manifests",
+                1L,
+                createPolicyVersionPO(3L, 1L, 1L, "rewrite", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS, converted.policyType());
+    assertEquals(content, converted.content());
   }
 
   @Test

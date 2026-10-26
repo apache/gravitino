@@ -43,6 +43,7 @@ import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.RowFilterContent;
@@ -473,17 +474,54 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
-  /** Placeholder DTO for Iceberg snapshot-expiration policy content. */
+  /**
+   * Typed snapshot-expiration policy content for REST requests and responses.
+   *
+   * <p>{@code updateContent} replaces the whole content object: omitted fields fall back to
+   * defaults rather than merging with the previous content.
+   */
   @EqualsAndHashCode
   @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO {
+    @JsonProperty("olderThanDays")
+    @JsonDeserialize(using = SnapshotLongDeserializer.class)
+    private Long olderThanDays;
+
+    @JsonProperty("retainLast")
+    @JsonDeserialize(using = SnapshotLongDeserializer.class)
+    private Long retainLast;
+
+    @JsonProperty("streamResults")
+    @JsonDeserialize(using = SnapshotBooleanDeserializer.class)
+    private Boolean streamResults;
+
     private IcebergSnapshotExpirationContentDTO() {}
 
     /**
-     * @return empty snapshot-expiration content DTO
+     * @return minimum snapshot age in days, defaulting to five
      */
-    public static IcebergSnapshotExpirationContentDTO instance() {
-      return new IcebergSnapshotExpirationContentDTO();
+    public long olderThanDays() {
+      return olderThanDays == null
+          ? IcebergSnapshotExpirationContent.DEFAULT_OLDER_THAN_DAYS
+          : olderThanDays;
+    }
+
+    /**
+     * @return minimum recent snapshots to keep, defaulting to one
+     */
+    public long retainLast() {
+      return retainLast == null ? IcebergSnapshotExpirationContent.DEFAULT_RETAIN_LAST : retainLast;
+    }
+
+    /**
+     * @return whether to stream intermediate delete results
+     */
+    public boolean streamResults() {
+      return streamResults == null
+          ? IcebergSnapshotExpirationContent.DEFAULT_STREAM_RESULTS
+          : streamResults;
     }
 
     @Override
@@ -507,8 +545,34 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
+    /** Reads a long option without silently coercing fractional values or strings. */
+    public static class SnapshotLongDeserializer extends JsonDeserializer<Long> {
+      @Override
+      public Long deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(
+              Long.class, "olderThanDays and retainLast must be 64-bit integers");
+        }
+        return parser.getLongValue();
+      }
+    }
+
+    /** Reads streamResults without silently coercing numbers or strings to booleans. */
+    public static class SnapshotBooleanDeserializer extends JsonDeserializer<Boolean> {
+      @Override
+      public Boolean deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
+          return context.reportInputMismatch(Boolean.class, "streamResults must be a boolean");
+        }
+        return parser.getBooleanValue();
+      }
+    }
+
     private PolicyContent toDomainContent() {
-      return PolicyContents.icebergSnapshotExpiration();
+      return PolicyContents.icebergSnapshotExpiration(
+          olderThanDays(), retainLast(), streamResults());
     }
   }
 

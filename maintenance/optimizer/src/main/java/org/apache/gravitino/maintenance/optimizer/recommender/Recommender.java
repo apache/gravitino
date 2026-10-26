@@ -50,7 +50,13 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationStrategyHandler;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -380,9 +386,21 @@ public class Recommender implements AutoCloseable {
    */
   private String getStrategyHandlerClassName(String strategyType) {
     String configured = optimizerEnv.config().getStrategyHandlerClassName(strategyType);
-    if (StringUtils.isBlank(configured)
-        && IcebergRewriteManifestsContent.STRATEGY_TYPE_VALUE.equals(strategyType)) {
+    if (StringUtils.isNotBlank(configured)) {
+      return configured;
+    }
+    // Built-in defaults so policy-driven jobs work without copying docs into conf.
+    if (IcebergDataCompactionContent.STRATEGY_TYPE_VALUE.equals(strategyType)) {
+      return CompactionStrategyHandler.class.getName();
+    }
+    if (IcebergRewriteManifestsContent.STRATEGY_TYPE_VALUE.equals(strategyType)) {
       return ManifestRewriteStrategyHandler.class.getName();
+    }
+    if (IcebergOrphanFileRemovalContent.STRATEGY_TYPE_VALUE.equals(strategyType)) {
+      return OrphanFileRemovalStrategyHandler.class.getName();
+    }
+    if (IcebergSnapshotExpirationContent.STRATEGY_TYPE_VALUE.equals(strategyType)) {
+      return SnapshotExpirationStrategyHandler.class.getName();
     }
     return configured;
   }

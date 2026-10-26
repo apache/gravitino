@@ -50,7 +50,7 @@ gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
 # Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
-gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
+gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS":"file:///"}
 ```
 
 For manifest rewrite policies, the mapping
@@ -96,7 +96,7 @@ A direct job submission carries its own `jobConf`. This is `builtin-iceberg-upda
   "table_identifier": "db.t1",
   "update_mode": "all",
   "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\",\"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}",
-  "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
+  "spark_conf": "{\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
   "spark_master": "local[2]",
   "spark_executor_instances": "1",
   "spark_executor_cores": "1",
@@ -117,8 +117,12 @@ that lists the missing keys. See
 and the defaults of each template.
 
 Built-in Iceberg templates also need an Iceberg Spark runtime on the Spark classpath. They do not
-ship that JAR or fill template `jars`, so include it yourself — for example
-`"spark.jars":"/path/to/iceberg-spark-runtime-....jar"` inside `spark_conf`. Match the artifact to
+ship that JAR or fill template `jars`, so include it yourself — for example by installing it into
+`SPARK_HOME/jars`, or, with the k8s job executor, by
+`"spark.jars":"https://.../iceberg-spark-runtime-....jar"` inside `spark_conf`, which replaces a
+`spark.jars` default of the k8s job executor, so list every jar the job needs there. With the local job
+executor, `spark.jars` inside `spark_conf` doesn't add it, as the driver applies `spark_conf` only
+after it starts. Match the artifact to
 your Spark, Scala, and Iceberg versions. Details are under
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 
@@ -198,9 +202,54 @@ See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for 
 complete submission example. For policy-driven submission, configure the handler
 and policy below. Periodic scheduling remains separate.
 
+### Snapshot expiration policy integration
+
+Register the handler alongside the existing optimizer providers (optional; the
+Recommender also defaults this class when the property is unset):
+
+```properties
+gravitino.optimizer.strategyHandler.iceberg-snapshot-expiration.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationStrategyHandler
+```
+
+The built-in job adapter is registered automatically. Keep the same Spark and
+catalog submission configuration as for direct expire-snapshots runs, including
+`catalog_name` and `spark_conf`. The adapter supplies `table_identifier` and
+`stream_results`. For `older_than` / `retain_last`, values equal to Iceberg's
+procedure defaults (`olderThanDays=5`, `retainLast=1`) are omitted so the job
+template placeholders stay empty and Iceberg table `history.expire.*`
+properties remain authoritative; non-default values are emitted explicitly.
+
+Create a policy through `POST /api/metalakes/{metalake}/policies`:
+
+```json
+{
+  "name": "expire_snapshots",
+  "policyType": "system_iceberg_snapshot_expiration",
+  "enabled": true,
+  "content": {
+    "olderThanDays": 5,
+    "retainLast": 1,
+    "streamResults": false
+  }
+}
+```
+
+Associate the policy with a tag and attach that tag to the target table, schema,
+or catalog, following the [policy setup walkthrough](./optimizer.md).
+`olderThanDays` defaults to 5 (Iceberg's expire default) and must be between 1 and 36500.
+`retainLast` defaults to 1. `streamResults` defaults to false.
+
+When `olderThanDays` is not the Iceberg default of 5, the adapter subtracts it
+from the current instant and emits `older_than` as an explicit UTC timestamp
+ending in `Z`. Each optimizer invocation may submit expire when the policy is
+attached (`trigger-expr` is `true`). This does not install a periodic
+scheduler, cooldown, or last-run tracking—same as orphan cleanup. Operators
+must control how often `submit-strategy-jobs` (or an external cron) runs.
+
 ### Orphan cleanup policy integration
 
-Register the handler alongside the existing optimizer providers:
+Register the handler alongside the existing optimizer providers (optional; the
+Recommender also defaults this class when the property is unset):
 
 ```properties
 gravitino.optimizer.strategyHandler.iceberg-orphan-file-removal.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler
