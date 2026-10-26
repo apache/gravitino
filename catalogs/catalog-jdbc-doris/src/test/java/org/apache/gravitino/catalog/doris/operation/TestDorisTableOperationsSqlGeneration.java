@@ -561,6 +561,19 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testClearCommentsWithNull() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+
+    String columnSql =
+        ops.alterTableSql(
+            "test_table", TableChange.updateColumnComment(new String[] {"col1"}, null));
+    Assertions.assertTrue(columnSql.contains("MODIFY COLUMN `col1` COMMENT ''"), columnSql);
+
+    String tableSql = ops.alterTableSql("test_table", TableChange.updateComment(null));
+    Assertions.assertTrue(tableSql.contains("MODIFY COMMENT \"\""), tableSql);
+  }
+
+  @Test
   public void testEscapeAddColumnCommentInGeneratedSql() {
     TestableDorisTableOperations ops = new TestableDorisTableOperations();
     String comment = "owner\\'s \"comment\"; --";

@@ -1130,7 +1130,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       // Load the existing table once. We need it for two purposes:
       //   1. Preserve the Gravitino StringIdentifier embedded in the old comment, so Gravitino can
       //      still identify the table after the comment is changed.
@@ -1326,6 +1326,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
+    // appendColumnDefinition omits an empty COMMENT, and MODIFY COLUMN without COMMENT keeps the
+    // existing one, so use COMMENT COLUMN to clear it.
+    if (StringUtils.isEmpty(newComment)) {
+      return "COMMENT COLUMN %s ''".formatted(quoteIdentifier(col));
+    }
+
     JdbcColumn updateColumn =
         JdbcColumn.builder()
             .withName(col)
