@@ -27,20 +27,25 @@ on:
         required: true
         type: string
 permissions: {}
+# Serialize scan verdicts too: an older scan must not append success after a newer failure.
+concurrency:
+  group: asf-allowlist-publish
+  queue: max
+  cancel-in-progress: false
 jobs:
   scan:
     name: Scan PR workflow files
     if: >-
       github.repository == 'apache/gravitino' &&
       (github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request')
-    # A required check: keep it off the shared ubuntu-latest pool, where small jobs can queue for hours.
+    # Keep this quick check off the shared ubuntu-latest pool, where small jobs can queue for hours.
     # The allowlist action installs its own Python, so it supports ubuntu-slim.
     runs-on: ubuntu-slim
     timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
-      checks: write
+      statuses: write
     steps:
       - uses: actions/checkout@v4
         with:

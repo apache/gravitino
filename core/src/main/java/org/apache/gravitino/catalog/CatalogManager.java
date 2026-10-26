@@ -87,6 +87,7 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -821,6 +822,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       Map<String, SecretReference> secretReferences)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    if (secretBindings != null) {
+      checkCredentialProvidersNotSecret(secretBindings.keySet());
+    }
+    if (secretReferences != null) {
+      checkCredentialProvidersNotSecret(secretReferences.keySet());
+    }
 
     Map<String, String> mergedConfig =
         SecretPropertyUtils.copyEntityProperties(
@@ -1027,6 +1034,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       metadata.catalogPropertiesMetadata(),
                       alterProperty.getLeft(),
                       alterProperty.getRight());
+                  storedCatalog.validateCredentialProviders(alterProperty.getLeft());
                   return null;
                 });
 
@@ -1187,6 +1195,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             f.catalogPropertiesMetadata(),
                             alterProperty.getLeft(),
                             alterProperty.getRight());
+                        catalog.validateCredentialProviders(alterProperty.getLeft());
                         return null;
                       });
             } catch (IllegalArgumentException e1) {
@@ -1706,11 +1715,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               } else if (catalogChange instanceof CatalogChange.SetSecretBinding) {
                 CatalogChange.SetSecretBinding setSecretBinding =
                     (CatalogChange.SetSecretBinding) catalogChange;
+                checkCredentialProvidersNotSecret(Set.of(setSecretBinding.getProperty()));
                 upserts.put(
                     setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
               } else if (catalogChange instanceof CatalogChange.SetSecretReference) {
                 CatalogChange.SetSecretReference setSecretReference =
                     (CatalogChange.SetSecretReference) catalogChange;
+                checkCredentialProvidersNotSecret(Set.of(setSecretReference.getProperty()));
                 upserts.put(setSecretReference.getProperty(), setSecretReference.getProperty());
               } else if (catalogChange instanceof RemoveProperty) {
                 RemoveProperty removeProperty = (RemoveProperty) catalogChange;
@@ -1719,6 +1730,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             });
 
     return Pair.of(upserts, deletes);
+  }
+
+  private static void checkCredentialProvidersNotSecret(Set<String> secretKeys) {
+    // Credential providers must stay plaintext so they can be validated against the catalog.
+    Preconditions.checkArgument(
+        !secretKeys.contains(CredentialConstants.CREDENTIAL_PROVIDERS),
+        "Property %s cannot be set as a secret",
+        CredentialConstants.CREDENTIAL_PROVIDERS);
   }
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
@@ -1827,6 +1846,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       wrapper.classLoader.withClassLoader(
           cl -> {
             validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
+            catalog.validateCredentialProviders(propsToValidate);
+            if (propsToValidate == null) {
+              // Loading stays lenient for catalogs persisted with unsupported providers, so only
+              // warn about them. Providers persisted as a secret are checked by their plaintext.
+              try {
+                catalog.validateCredentialProviders(
+                    secretManager.toPlaintextProperties(entity.getProperties()));
+              } catch (IllegalArgumentException e) {
+                LOG.warn(
+                    "Catalog {} has credential providers that cannot vend credentials: {}",
+                    entity.nameIdentifier(),
+                    e.getMessage());
+              }
+            }
             // Preload properties() and capability() inside the IsolatedClassLoader so that
             // AppClassLoader can read them later without needing the isolated context.
             catalog.properties();
