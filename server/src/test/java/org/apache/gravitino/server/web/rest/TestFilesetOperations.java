@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
@@ -450,6 +451,27 @@ public class TestFilesetOperations extends BaseOperationsTest {
             .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
 
     assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  void testRenameFilesetToExistingName() {
+    FilesetAlreadyExistsException exception =
+        new FilesetAlreadyExistsException("Fileset existing already exists");
+    doThrow(exception).when(dispatcher).alterFileset(any(), any(FilesetChange.class));
+    FilesetUpdatesRequest request =
+        new FilesetUpdatesRequest(
+            Collections.singletonList(new FilesetUpdateRequest.RenameFilesetRequest("existing")));
+    try (Response response =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(FilesetAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
   }
 
   @Test

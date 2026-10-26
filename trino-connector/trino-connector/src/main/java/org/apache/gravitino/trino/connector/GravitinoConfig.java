@@ -953,11 +953,10 @@ public class GravitinoConfig {
         GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
         String.format(
             "Cannot route an Iceberg catalog through the Iceberg REST server: "
-                + "gravitino.client.authType=%s has no equivalent Trino Iceberg REST security "
-                + "mode, so no credentials would be sent to it. If the REST server requires "
-                + "authentication, set 'gravitino.iceberg.rest-catalog.security' (and any "
-                + "matching oauth2.* properties) explicitly. If it does not, set "
-                + "'gravitino.iceberg.rest-catalog.security=NONE' to confirm that.",
+                + "Trino's Iceberg REST client cannot carry gravitino.client.authType=%s "
+                + "credentials. If the server requires authentication, set "
+                + "'gravitino.iceberg.rest-catalog.security=OAUTH2' and the matching oauth2.* "
+                + "properties.",
             authType));
   }
 

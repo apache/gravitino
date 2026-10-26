@@ -155,7 +155,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(deleteColumnFieldDefinition(deleteColumn, lazyLoadTable));
+        String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
+        if (StringUtils.isNotEmpty(deleteColSql)) {
+          alterSql.add(deleteColSql);
+        }
       } else if (change instanceof TableChange.RemoveProperty) {
         throw new IllegalArgumentException("Remove property is not supported yet.");
       } else if (change instanceof TableChange.RenameColumn) {
@@ -177,7 +180,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateComment) {
         TableChange.UpdateComment updateComment = (TableChange.UpdateComment) change;
-        String newComment = updateComment.getNewComment();
+        String newComment = StringUtils.defaultString(updateComment.getNewComment());
         if (StringIdentifier.fromComment(newComment) == null) {
           lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
           StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
@@ -212,6 +215,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       }
     }
 
+    // An empty ALTER TABLE statement is treated as OPTIMIZE by StarRocks, so skip it.
+    if (alterSql.isEmpty()) {
+      return "";
+    }
     String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
@@ -560,7 +567,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     try {
       getJdbcColumnFromTable(jdbcTable, renameColumn.getNewName());
     } catch (NoSuchColumnException ex) {
-      return String.format("RENAME COLUMN %s TO %s", oldColName, renameColumn.getNewName());
+      return "RENAME COLUMN "
+          + quoteIdentifier(oldColName)
+          + " TO "
+          + quoteIdentifier(renameColumn.getNewName());
     }
     throw new IllegalArgumentException("Column already exists: " + renameColumn.getNewName());
   }
@@ -604,7 +614,13 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append("AFTER ").append(s));
+          .ifPresent(
+              s ->
+                  columnDefinition
+                      .append("AFTER ")
+                      .append(BACK_QUOTE)
+                      .append(s)
+                      .append(BACK_QUOTE));
     }
     return columnDefinition.toString();
   }

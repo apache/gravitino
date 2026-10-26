@@ -50,8 +50,6 @@ class Index(ABC):
         columns that are not designated as the primary key. The uniqueness constraint imposed by
         UNIQUE KEY helps in avoiding redundancy and ensuring data accuracy in the database."""
 
-<<<<<<< HEAD
-=======
         BITMAP = "BITMAP"
         """Bitmap index, which uses bit arrays to represent the presence of values in a column."""
 
@@ -61,16 +59,6 @@ class Index(ABC):
         VECTOR = "VECTOR"
         """Vector index, which speeds up similarity searches in high-dimensional vector spaces."""
 
-        DATA_SKIPPING_ANNOY = "DATA_SKIPPING_ANNOY"
-        """Legacy ClickHouse Annoy index metadata. This type is metadata-only."""
-
-        DATA_SKIPPING_USEARCH = "DATA_SKIPPING_USEARCH"
-        """Legacy ClickHouse USearch index metadata. This type is metadata-only."""
-
-        DATA_SKIPPING_VECTOR_SIMILARITY = "DATA_SKIPPING_VECTOR_SIMILARITY"
-        """ClickHouse vector similarity data skipping index."""
-
->>>>>>> d4d95ebfe ([#14066] fix(starrocks): Map index types when loading StarRocks tables (#14067))
     @abstractmethod
     def type(self) -> IndexType:
         """Returns the type of the index. eg: `PRIMARY_KEY` and `UNIQUE_KEY`.

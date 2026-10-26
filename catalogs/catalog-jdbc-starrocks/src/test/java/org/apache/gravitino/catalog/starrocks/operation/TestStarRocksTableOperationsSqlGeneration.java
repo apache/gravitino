@@ -19,13 +19,10 @@
 package org.apache.gravitino.catalog.starrocks.operation;
 
 import java.sql.Connection;
-<<<<<<< HEAD
-=======
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
->>>>>>> d4d95ebfe ([#14066] fix(starrocks): Map index types when loading StarRocks tables (#14067))
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.StringIdentifier;
@@ -58,14 +55,22 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
   private static class TestableStarRocksTableOperations extends StarRocksTableOperations {
 
+    private final String[] columnNames;
+
     public TestableStarRocksTableOperations() {
+      this(new String[0]);
+    }
+
+    private TestableStarRocksTableOperations(String... columnNames) {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new StarRocksTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+      this.columnNames = columnNames;
     }
 
-    private TestableStarRocksTableOperations(ConnectionCountingDataSource connections) {
-      this();
+    private TestableStarRocksTableOperations(
+        ConnectionCountingDataSource connections, String... columnNames) {
+      this(columnNames);
       dataSource = connections.dataSource();
     }
 
@@ -109,6 +114,15 @@ public class TestStarRocksTableOperationsSqlGeneration {
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
       return JdbcTable.builder()
           .withName(tableName)
+          .withColumns(
+              Arrays.stream(columnNames)
+                  .map(
+                      name ->
+                          JdbcColumn.builder()
+                              .withName(name)
+                              .withType(Types.IntegerType.get())
+                              .build())
+                  .toArray(JdbcColumn[]::new))
           .withComment(
               StringIdentifier.addToComment(StringIdentifier.fromId(42), "existing comment"))
           .build();
@@ -293,6 +307,23 @@ public class TestStarRocksTableOperationsSqlGeneration {
             "COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
                 + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
         clearCommentSql);
+    Assertions.assertEquals(
+        clearCommentSql, ops.alterTableSql("test_table", TableChange.updateComment(null)));
+  }
+
+  @Test
+  public void testClearTableCommentWithNull() {
+    TestableStarRocksTableOperations ops =
+        new TestableStarRocksTableOperations() {
+          @Override
+          protected JdbcTable getOrCreateTable(
+              String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+            return JdbcTable.builder().withName(tableName).build();
+          }
+        };
+
+    String alterSql = ops.alterTableSql("test_table", TableChange.updateComment(null));
+    Assertions.assertTrue(alterSql.contains("COMMENT = \"\""), alterSql);
   }
 
   @Test
@@ -388,8 +419,6 @@ public class TestStarRocksTableOperationsSqlGeneration {
     Assertions.assertEquals(
         "StarRocks does not support adding an auto-increment column: col2", exception.getMessage());
   }
-<<<<<<< HEAD
-=======
 
   @Test
   void testGetIndexesMapsTypesAndSkipsUnsupported() throws SQLException {
@@ -464,5 +493,4 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     Assertions.assertEquals("ALTER TABLE `test_table`\nDROP COLUMN `col1`;", alterSql);
   }
->>>>>>> d4d95ebfe ([#14066] fix(starrocks): Map index types when loading StarRocks tables (#14067))
 }
