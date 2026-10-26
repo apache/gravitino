@@ -55,16 +55,16 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
   }
 
   /**
-   * Validates universal {@link PolicyContent} rules plus shared execution-peer checks.
+   * Validates universal {@link PolicyContent} rules.
    *
-   * <p>Does not enforce type-specific maintenance contracts (for example orphan cleanup forbidding
-   * {@code commitTrigger}, or cron parsing). Those belong on concrete subclasses or the server
+   * <p>Shared execution-peer constraints are enforced when constructing {@link
+   * PolicyExecutionSpec}. Type-specific maintenance contracts (for example orphan cleanup
+   * forbidding {@code commitTrigger}, or cron parsing) belong on concrete subclasses or the server
    * create/alter path with the real {@link Policy.BuiltInType}.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     ExecutablePolicyContent.super.validate();
-    executionSpec().validate();
   }
 
   /**
