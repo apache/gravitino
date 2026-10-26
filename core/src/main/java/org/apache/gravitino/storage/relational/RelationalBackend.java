@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -139,67 +141,10 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws IOException;
 
   /**
-<<<<<<< HEAD
-=======
-   * Deletes an entity and returns the snapshot used by that delete.
-   *
-   * <p>Backends with a native compare-and-set delete should override this method so the returned
-   * entity and the deleted row are based on the same read.
-   *
-   * @param ident the identifier of the entity
-   * @param entityType the entity type
-   * @param clazz the concrete entity class
-   * @param <E> the concrete entity type
-   * @return the deleted entity, or empty when it did not exist
-   * @throws IOException if the store operation fails
-   */
-  default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> clazz) throws IOException {
-    return deleteAndGet(ident, entityType, clazz, EntityStore.noPostDeleteAction());
-  }
-
-  /**
-   * Deletes an entity and runs an action against the deleted snapshot before commit when supported.
-   *
-   * @param ident the identifier of the entity
-   * @param entityType the entity type
-   * @param clazz the concrete entity class
-   * @param postDeleteAction the action to run after deletion but before commit when supported
-   * @param <E> the concrete entity type
-   * @return the deleted entity, or empty when it did not exist
-   * @throws IOException if the store operation fails
-   */
-  default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
-      NameIdentifier ident,
-      Entity.EntityType entityType,
-      Class<E> clazz,
-      Consumer<E> postDeleteAction)
-      throws IOException {
-    if (postDeleteAction != EntityStore.NO_POST_DELETE_ACTION) {
-      // This implementation can only run the action once the delete is committed, which is the
-      // opposite of what the contract promises. Refusing is better than silently leaving the
-      // caller with a committed delete and a failed cleanup.
-      throw new UnsupportedOperationException(
-          "This store cannot run a post-delete action while the delete can still be rolled back");
-    }
-
-    try {
-      E entity = get(ident, entityType);
-      if (!delete(ident, entityType, false)) {
-        return Optional.empty();
-      }
-      postDeleteAction.accept(entity);
-      return Optional.of(entity);
-    } catch (NoSuchEntityException e) {
-      return Optional.empty();
-    }
-  }
-
-  /**
    * Deletes a schema and optionally its functions, then runs an action before commit.
    *
-   * <p>Remaining children, including filesets, must prevent deletion. Function cleanup, schema
-   * deletion, and the action share one metadata transaction.
+   * <p>Remaining filesets must prevent deletion. Function cleanup, schema deletion, and the action
+   * share one metadata transaction.
    *
    * @param ident the schema identifier
    * @param cascadeFunctions whether to delete functions in the same metadata transaction
@@ -216,7 +161,6 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
   }
 
   /**
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
    * Deletes the entities in the specified namespace and entity type.
    *
    * @param entitiesToDelete The list of identifiers and their entity types to be deleted.

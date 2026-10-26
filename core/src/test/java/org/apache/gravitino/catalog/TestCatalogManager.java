@@ -102,7 +102,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
@@ -1345,13 +1344,9 @@ public class TestCatalogManager {
     Mockito.verify(catalogWrapper, Mockito.never()).doWithSchemaOps(any());
   }
 
-<<<<<<< HEAD
-=======
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testForceDropManagedCatalogPreservesMetadataOnSchemaFailure(boolean conflict)
-      throws Exception {
-    NameIdentifier ident = NameIdentifier.of("metalake", "test_force_drop_failure_" + conflict);
+  @Test
+  void testForceDropManagedCatalogPreservesMetadataOnSchemaFailure() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test_force_drop_failure");
     Map<String, String> props =
         ImmutableMap.of(
             "provider",
@@ -1367,7 +1362,7 @@ public class TestCatalogManager {
     entityStore.put(
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("schema_occ")
+            .withName("schema_cleanup_failure")
             .withNamespace(Namespace.of("metalake", ident.name()))
             .withAuditInfo(
                 AuditInfo.builder()
@@ -1384,30 +1379,25 @@ public class TestCatalogManager {
     Mockito.doReturn(CapabilityResult.SUPPORTED).when(capability).managedStorage(any());
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
     RuntimeException failure =
-        conflict
-            ? new OptimisticLockException("lock wait timeout")
-            : new RuntimeException("Failed to delete fileset storage", new IOException("denied"));
+        new RuntimeException("Failed to delete fileset storage", new IOException("denied"));
     Mockito.doThrow(failure).when(catalogWrapper).doWithSchemaOps(any());
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
 
     RuntimeException thrown =
         Assertions.assertThrows(
             RuntimeException.class, () -> catalogManager.dropCatalog(ident, true));
-    if (conflict) {
-      Assertions.assertSame(failure, thrown);
-    } else {
-      String schemaError =
-          "Failed to drop schema " + NameIdentifier.of("metalake", ident.name(), "schema_occ");
-      Assertions.assertTrue(thrown.getMessage().contains(schemaError));
-      Assertions.assertTrue(ExceptionUtils.getThrowableList(thrown).contains(failure));
-    }
+    String schemaError =
+        "Failed to drop schema "
+            + NameIdentifier.of("metalake", ident.name(), "schema_cleanup_failure");
+    Assertions.assertTrue(thrown.getMessage().contains(schemaError));
+    Assertions.assertTrue(ExceptionUtils.getThrowableList(thrown).contains(failure));
     Assertions.assertTrue(entityStore.exists(ident, EntityType.CATALOG));
     Assertions.assertTrue(
         entityStore.exists(
-            NameIdentifier.of("metalake", ident.name(), "schema_occ"), EntityType.SCHEMA));
+            NameIdentifier.of("metalake", ident.name(), "schema_cleanup_failure"),
+            EntityType.SCHEMA));
   }
 
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
   @Test
   void testDropCatalogInvalidatesCacheAfterStoreDelete() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "cache_drop_test");

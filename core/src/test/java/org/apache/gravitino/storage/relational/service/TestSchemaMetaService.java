@@ -36,6 +36,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -49,28 +50,18 @@ import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
-import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
-import org.apache.gravitino.storage.relational.po.CatalogPO;
-import org.apache.gravitino.storage.relational.po.FunctionPO;
-import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
-<<<<<<< HEAD
-=======
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
 
 public class TestSchemaMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_catalog_test";
@@ -206,12 +197,9 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     for (RuntimeException failure :
         List.of(
             new NoSuchEntityException("function disappeared"),
-            new OptimisticLockException("function changed"))) {
+            new IllegalStateException("function cleanup failed"))) {
       FunctionMetaService failingService = Mockito.spy(functionService);
-      Mockito.doThrow(failure)
-          .when(failingService)
-          .deleteFunctionWithVersion(
-              Mockito.eq(function.nameIdentifier()), Mockito.any(FunctionPO.class));
+      Mockito.doThrow(failure).when(failingService).deleteFunction(function.nameIdentifier());
       try (MockedStatic<FunctionMetaService> mocked =
           Mockito.mockStatic(FunctionMetaService.class)) {
         mocked.when(FunctionMetaService::getInstance).thenReturn(failingService);
@@ -236,6 +224,23 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
       assertTrue(backend.exists(function.nameIdentifier(), Entity.EntityType.FUNCTION));
     }
+
+    FunctionMetaService failingService = Mockito.spy(functionService);
+    Mockito.doReturn(false).when(failingService).deleteFunction(function.nameIdentifier());
+    try (MockedStatic<FunctionMetaService> mocked = Mockito.mockStatic(FunctionMetaService.class)) {
+      mocked.when(FunctionMetaService::getInstance).thenReturn(failingService);
+      RuntimeException failure =
+          assertThrows(
+              RuntimeException.class,
+              () ->
+                  backend.deleteSchemaAndGet(
+                      schema.nameIdentifier(),
+                      true,
+                      ignored -> Assertions.fail("Cleanup must not run when a function remains")));
+      Assertions.assertInstanceOf(NoSuchEntityException.class, failure.getCause());
+    }
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertTrue(backend.exists(function.nameIdentifier(), Entity.EntityType.FUNCTION));
   }
 
   @TestTemplate

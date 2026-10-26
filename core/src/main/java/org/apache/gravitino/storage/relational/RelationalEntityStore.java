@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -49,16 +50,10 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-<<<<<<< HEAD
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.UserEntity;
-=======
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.metrics.MetricsSystem;
-import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -228,10 +223,8 @@ public class RelationalEntityStore
       throws IOException {
     try {
       return backend.deleteSchemaAndGet(ident, cascadeFunctions, postDeleteAction);
-    } catch (RuntimeException re) {
-      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.SCHEMA, ident);
     } finally {
-      invalidateCache(ident, Entity.EntityType.SCHEMA);
+      cache.invalidate(ident, Entity.EntityType.SCHEMA);
     }
   }
 

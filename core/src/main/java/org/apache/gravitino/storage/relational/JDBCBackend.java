@@ -28,8 +28,9 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -85,6 +86,7 @@ import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -395,7 +397,6 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-<<<<<<< HEAD
     switch (entityType) {
       case METALAKE:
         return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
@@ -435,60 +436,31 @@ public class JDBCBackend implements RelationalBackend {
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
     }
-=======
-    if (!shouldRecordEntityDrop(entityType)) {
-      return deleteEntity(ident, entityType, cascade);
-    }
-
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
-    try {
-      boolean deleted = deleteEntity(ident, entityType, cascade);
-      if (deleted) {
-        EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
-      }
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return deleted;
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
-      NameIdentifier ident,
-      Entity.EntityType entityType,
-      Class<E> clazz,
-      Consumer<E> postDeleteAction)
-      throws IOException {
-    if (entityType != Entity.EntityType.FILESET) {
-      return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
-    }
-    return deleteWithCallback(
-        ident,
-        entityType,
-        () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
-        postDeleteAction);
   }
 
   @Override
   public Optional<SchemaEntity> deleteSchemaAndGet(
       NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
       throws IOException {
-    return deleteWithCallback(
-        ident,
-        Entity.EntityType.SCHEMA,
-        () -> SchemaMetaService.getInstance().deleteSchemaAndGet(ident, false, cascadeFunctions),
-        postDeleteAction);
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
+    SessionUtils.beginTransaction();
+    boolean committed = false;
+    try {
+      SchemaEntity deletedSchema;
+      try {
+        deletedSchema = SchemaMetaService.getInstance().deleteSchemaAndGet(ident, cascadeFunctions);
+      } catch (NoSuchEntityException e) {
+        return Optional.empty();
+      }
+      // Keep schema and function metadata recoverable until directory cleanup succeeds.
+      postDeleteAction.accept(deletedSchema);
+      SessionUtils.commitTransaction();
+      committed = true;
+      return Optional.of(deletedSchema);
+    } finally {
+      if (!committed) {
+        SessionUtils.rollbackTransaction();
+      }
+    }
   }
 
   @Override
@@ -840,136 +812,6 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-<<<<<<< HEAD
-=======
-  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
-      throws IOException {
-    if (!query.relationValue().isPresent()) {
-      return listEntitiesByRelation(
-          query.relationType(),
-          query.anchorIdentifier(),
-          query.anchorEntityType(),
-          query.allFields());
-    }
-
-    switch (query.relationType()) {
-      case TAG_METADATA_OBJECT_REL:
-        Preconditions.checkArgument(
-            query.anchorEntityType() == Entity.EntityType.TAG,
-            "Relation value filter is only supported when listing metadata objects for a tag");
-        return (List<E>)
-            TagMetaService.getInstance()
-                .listAssociatedMetadataObjectsForTag(
-                    query.anchorIdentifier(), query.relationValue().get());
-      default:
-        throw new IllegalArgumentException(
-            String.format(
-                "Relation value filter is not supported for relation type %s",
-                query.relationType()));
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(RelationUpdate update)
-      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    switch (update.relationType()) {
-      case TAG_METADATA_OBJECT_REL:
-        return (List<E>)
-            TagMetaService.getInstance()
-                .associateTagValuesWithMetadataObject(
-                    update.sourceIdentifier(),
-                    update.sourceEntityType(),
-                    toTagValues(update.targetsToAdd()),
-                    toTagValues(update.targetsToRemove()));
-      case POLICY_TAG_REL:
-        Preconditions.checkArgument(
-            update.sourceEntityType() == Entity.EntityType.TAG,
-            "Policy-to-tag relation updates must use a tag as the source entity");
-        return (List<E>)
-            PolicyTagRelService.getInstance()
-                .updateRelations(
-                    update.sourceIdentifier(), update.targetsToAdd(), update.targetsToRemove());
-      default:
-        Preconditions.checkArgument(
-            !update.hasRelationValues(),
-            "Relation values are not supported for relation type %s",
-            update.relationType());
-        return updateEntityRelations(
-            update.relationType(),
-            update.sourceIdentifier(),
-            update.sourceEntityType(),
-            toNameIdentifiers(update.targetsToAdd()),
-            toNameIdentifiers(update.targetsToRemove()));
-    }
-  }
-
-  private <E extends Entity & HasIdentifier> Optional<E> deleteWithCallback(
-      NameIdentifier ident,
-      Entity.EntityType entityType,
-      Supplier<E> deleteAction,
-      Consumer<E> postDeleteAction) {
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
-    try {
-      E deletedEntity;
-      try {
-        deletedEntity = deleteAction.get();
-      } catch (NoSuchEntityException e) {
-        // Only the delete itself may report the entity as missing. A NoSuchEntityException from
-        // any later step means the delete did happen and something else failed, which must not be
-        // reported to the caller as "there was nothing to delete".
-        return Optional.empty();
-      }
-      EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
-      // Run external cleanup while the metadata delete can still be rolled back. The callback uses
-      // the same snapshot whose OCC token won above, so it cannot act on stale locations.
-      postDeleteAction.accept(deletedEntity);
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return Optional.of(deletedEntity);
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
-  }
-
-  private static NameIdentifier[] toNameIdentifiers(RelationEdgeTarget[] relationTargets) {
-    if (relationTargets == null) {
-      return null;
-    }
-
-    return Arrays.stream(relationTargets)
-        .map(RelationEdgeTarget::nameIdentifier)
-        .toArray(NameIdentifier[]::new);
-  }
-
-  private static TagValue[] toTagValues(RelationEdgeTarget[] relationTargets) {
-    if (relationTargets == null) {
-      return null;
-    }
-
-    return Arrays.stream(relationTargets).map(JDBCBackend::toTagValue).toArray(TagValue[]::new);
-  }
-
-  private static TagValue toTagValue(RelationEdgeTarget relationTarget) {
-    Preconditions.checkArgument(
-        relationTarget.entityType() == Entity.EntityType.TAG,
-        "Relation target type must be TAG for tag metadata object relations, but is %s",
-        relationTarget.entityType());
-    return relationTarget
-        .relationValue()
-        .map(value -> TagValue.of(relationTarget.nameIdentifier().name(), value))
-        .orElseGet(() -> TagValue.noValue(relationTarget.nameIdentifier().name()));
-  }
-
-  @Override
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
   public <E extends Entity & HasIdentifier> E getEntityByRelation(
       Type relType,
       NameIdentifier srcIdentifier,

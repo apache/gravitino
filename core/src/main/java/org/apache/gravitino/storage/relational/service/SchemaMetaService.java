@@ -41,6 +41,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -48,7 +49,6 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -68,12 +68,6 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
-import org.apache.gravitino.storage.relational.po.CatalogPO;
-import org.apache.gravitino.storage.relational.po.FunctionPO;
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -271,30 +265,50 @@ public class SchemaMetaService {
     }
   }
 
+  /**
+   * Deletes a schema and optionally its functions within the caller's metadata transaction.
+   *
+   * <p>The caller must keep the transaction open until any external cleanup succeeds. Remaining
+   * filesets reject the non-cascading schema deletion and roll back function cleanup with it.
+   *
+   * @param identifier the schema identifier
+   * @param cascadeFunctions whether to remove functions before the non-cascading schema delete
+   * @return the schema snapshot used for external cleanup
+   */
+  public SchemaEntity deleteSchemaAndGet(NameIdentifier identifier, boolean cascadeFunctions) {
+    SchemaEntity schema = getSchemaByIdentifier(identifier);
+    try {
+      List<FunctionEntity> functions =
+          FunctionMetaService.getInstance()
+              .listFunctionsByNamespace(
+                  NamespaceUtil.ofFunction(
+                      identifier.namespace().level(0),
+                      identifier.namespace().level(1),
+                      identifier.name()));
+      if (!functions.isEmpty() && !cascadeFunctions) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+      }
+      for (FunctionEntity function : functions) {
+        if (!FunctionMetaService.getInstance().deleteFunction(function.nameIdentifier())) {
+          throw new NoSuchEntityException("Function %s does not exist", function.nameIdentifier());
+        }
+      }
+    } catch (NoSuchEntityException e) {
+      throw new RuntimeException("Failed to delete functions under schema " + identifier, e);
+    }
+    deleteSchema(identifier, false);
+    return schema;
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSchema")
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
-    deleteSchemaAndGet(identifier, cascade, false);
-    return true;
-  }
-
-  /**
-   * Deletes a schema and returns the exact entity snapshot protected by the delete CAS.
-   *
-   * @param identifier the schema identifier
-   * @param cascade whether to delete child entities
-   * @param cascadeFunctions whether a non-cascading delete should remove functions before checking
-   *     for remaining children
-   * @return the schema snapshot that was deleted
-   */
-  public SchemaEntity deleteSchemaAndGet(
-      NameIdentifier identifier, boolean cascade, boolean cascadeFunctions) {
     NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
-    SchemaEntity deletedSchema = POConverters.fromSchemaPO(schemaPO, identifier.namespace());
     Long schemaId = schemaPO.getSchemaId();
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
@@ -378,7 +392,6 @@ public class SchemaMetaService {
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaIds(schemaIds)),
           () -> {
-<<<<<<< HEAD
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -441,22 +454,6 @@ public class SchemaMetaService {
               SessionUtils.doWithoutCommit(
                   SchemaMetaMapper.class,
                   mapper -> mapper.softDeleteSchemaMetasBySchemaIds(singleSchemaId)),
-=======
-            // Delete the schema first and check that it was empty afterwards. The order matters:
-            // the delete locks the schema row, and every child write locks that same row first, so
-            // a table or view being created either lands before this delete and shows up in the
-            // check, or it waits for this transaction. Checking first would leave a gap for a child
-            // to appear in between. A non-empty result throws, which rolls the delete back.
-            lockCatalogForSchemaDelete(identifier, schemaPO);
-            deleteSchemaWithVersion(identifier, schemaPO);
-            if (cascadeFunctions) {
-              // The schema row lock excludes new children. Delete functions in this transaction
-              // so a remaining fileset or a later cleanup failure restores them with the schema.
-              deleteSchemaFunctions(identifier, schemaId);
-            }
-            checkSchemaIsEmpty(identifier, schemaPO);
-          },
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -496,7 +493,7 @@ public class SchemaMetaService {
                         OperateType.DROP));
           });
     }
-    return deletedSchema;
+    return true;
   }
 
   @Monitored(
@@ -538,201 +535,7 @@ public class SchemaMetaService {
    * A:B}); {@link HierarchicalConversionPOStorageOps} translates to storage form before running the
    * SQL prefix match, so this method only deals in logical names.
    */
-<<<<<<< HEAD
   private List<Long> listSchemaIdsForCascade(SchemaPO schemaPO) {
-=======
-  private void lockCatalogForSchemaCreate(
-      CatalogPO observedCatalogPO, boolean createsImplicitAncestors) {
-    OccWriteSupport.lockParentForChildWrite(
-        observedCatalogPO.getCatalogName(),
-        Entity.EntityType.CATALOG,
-        () ->
-            SessionUtils.getWithoutCommit(
-                CatalogMetaMapper.class,
-                mapper ->
-                    createsImplicitAncestors
-                        ? mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId())
-                        : mapper.selectCatalogMetaByIdForShare(observedCatalogPO.getCatalogId())),
-        null,
-        current ->
-            Objects.equals(current.getCatalogName(), observedCatalogPO.getCatalogName())
-                && Objects.equals(current.getMetalakeId(), observedCatalogPO.getMetalakeId()));
-  }
-
-  /**
-   * Holds the parent catalog row while a schema is dropped. The lock is exclusive here, because a
-   * drop removes descendants and must not run next to another drop or create under the same
-   * catalog. Taking the catalog before any schema row also gives every drop the same lock order, so
-   * two overlapping cascades cannot deadlock.
-   */
-  private void lockCatalogForSchemaDelete(NameIdentifier identifier, SchemaPO observedSchemaPO) {
-    String catalogName = identifier.namespace().level(1);
-    OccWriteSupport.lockParentForChildWrite(
-        catalogName,
-        Entity.EntityType.CATALOG,
-        () ->
-            SessionUtils.getWithoutCommit(
-                CatalogMetaMapper.class,
-                mapper -> mapper.selectCatalogMetaByIdForUpdate(observedSchemaPO.getCatalogId())),
-        null,
-        current ->
-            Objects.equals(current.getCatalogName(), catalogName)
-                && Objects.equals(current.getMetalakeId(), observedSchemaPO.getMetalakeId()));
-  }
-
-  /**
-   * Runs schema-scoped writes while holding a shared lock on their parent schema.
-   *
-   * <p>This method owns the transaction boundary on purpose. If callers locked the schema in one
-   * transaction and wrote the child in another, the lock would be released too early and a schema
-   * deletion could slip between those two steps. Keeping the lock and every supplied operation in
-   * the same transaction makes that mistake impossible for callers of this entry point.
-   */
-  void doWithSchemaWriteLock(
-      NameIdentifier entityIdentifier,
-      Long observedSchemaId,
-      Long observedCatalogId,
-      Long observedMetalakeId,
-      Runnable... entityWriteOperations) {
-    Runnable[] transactionOperations = new Runnable[entityWriteOperations.length + 1];
-    transactionOperations[0] =
-        () ->
-            lockSchemaForEntityWrite(
-                entityIdentifier, observedSchemaId, observedCatalogId, observedMetalakeId);
-    System.arraycopy(
-        entityWriteOperations, 0, transactionOperations, 1, entityWriteOperations.length);
-    SessionUtils.doMultipleWithCommit(transactionOperations);
-  }
-
-  /**
-   * Takes a shared lock on the parent catalog row before a cross-schema child move.
-   *
-   * <p>A cascade schema delete holds an exclusive catalog lock before any schema lock. Taking the
-   * same shared catalog lock here first ensures that a cross-schema child move blocks the cascade
-   * delete until both schema locks are acquired, and a cascade delete blocks new cross-schema moves
-   * until it finishes. Without this catalog fence, a move that holds schema A could deadlock
-   * against a cascade that holds the catalog and is waiting for schema A.
-   */
-  void lockCatalogForEntityWrite(NameIdentifier entityIdentifier, Long catalogId, Long metalakeId) {
-    String catalogName = entityIdentifier.namespace().level(1);
-    OccWriteSupport.lockParentForChildWrite(
-        catalogName,
-        Entity.EntityType.CATALOG,
-        () ->
-            SessionUtils.getWithoutCommit(
-                CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaByIdForShare(catalogId)),
-        null,
-        current ->
-            Objects.equals(current.getCatalogName(), catalogName)
-                && Objects.equals(current.getMetalakeId(), metalakeId));
-  }
-
-  void lockSchemaForEntityWrite(
-      NameIdentifier entityIdentifier,
-      Long observedSchemaId,
-      Long observedCatalogId,
-      Long observedMetalakeId) {
-    NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(entityIdentifier);
-    OccWriteSupport.lockParentForChildWrite(
-        schemaIdentifier.name(),
-        Entity.EntityType.SCHEMA,
-        () ->
-            SessionUtils.getWithoutCommit(
-                SchemaMetaMapper.class,
-                mapper -> mapper.selectSchemaMetaByIdForShare(observedSchemaId)),
-        SchemaMetaService::physicalToLogicalSchemaPO,
-        current ->
-            Objects.equals(current.getSchemaName(), schemaIdentifier.name())
-                && Objects.equals(current.getCatalogId(), observedCatalogId)
-                && Objects.equals(current.getMetalakeId(), observedMetalakeId));
-  }
-
-  /**
-   * Decides which error a failed compare-and-set should report. The write matched no row either
-   * because somebody else changed the schema, which is a conflict, or because the schema was
-   * deleted or renamed away, which is a missing entity.
-   */
-  private RuntimeException schemaWriteFailure(
-      NameIdentifier identifier, SchemaPO observedSchemaPO) {
-    return OccWriteSupport.writeFailure(
-        identifier,
-        Entity.EntityType.SCHEMA,
-        () ->
-            SessionUtils.getWithoutCommit(
-                SchemaMetaMapper.class,
-                mapper -> mapper.selectSchemaMetaByIdForUpdate(observedSchemaPO.getSchemaId())),
-        SchemaMetaService::physicalToLogicalSchemaPO,
-        current ->
-            Objects.equals(current.getSchemaName(), observedSchemaPO.getSchemaName())
-                && Objects.equals(current.getCatalogId(), observedSchemaPO.getCatalogId())
-                && Objects.equals(current.getMetalakeId(), observedSchemaPO.getMetalakeId()));
-  }
-
-  /**
-   * Soft-deletes the nested schemas below the dropped one, each guarded by the version read in the
-   * same transaction.
-   */
-  private void deleteDescendantSchemasWithVersions(
-      NameIdentifier schemaIdentifier, List<SchemaPO> descendants) {
-    OccWriteSupport.deleteChildrenWithVersions(
-        schemaIdentifier,
-        Entity.EntityType.SCHEMA,
-        Entity.EntityType.SCHEMA,
-        descendants,
-        children ->
-            SessionUtils.getWithoutCommit(
-                SchemaMetaMapper.class,
-                mapper -> mapper.softDeleteSchemaMetasWithVersion(children)));
-  }
-
-  private void deleteSchemaFunctions(NameIdentifier schemaIdentifier, Long schemaId) {
-    try {
-      // Resolve by ID because the schema row has already been soft-deleted in this transaction.
-      List<FunctionPO> functions =
-          SessionUtils.getWithoutCommit(
-              FunctionMetaMapper.class, mapper -> mapper.listFunctionPOsBySchemaId(schemaId));
-      Namespace namespace =
-          NamespaceUtil.ofFunction(
-              schemaIdentifier.namespace().level(0),
-              schemaIdentifier.namespace().level(1),
-              schemaIdentifier.name());
-      for (FunctionPO function : functions) {
-        NameIdentifier functionIdentifier = NameIdentifier.of(namespace, function.functionName());
-        FunctionMetaService.getInstance().deleteFunctionWithVersion(functionIdentifier, function);
-        EntityChangeLogWriter.append(
-            functionIdentifier, Entity.EntityType.FUNCTION, OperateType.DROP);
-      }
-    } catch (NoSuchEntityException e) {
-      // A missing function must not be reported as a missing schema. Other failures, including
-      // optimistic conflicts, retain their original exception type.
-      throw new RuntimeException("Failed to delete functions under schema " + schemaIdentifier, e);
-    }
-  }
-
-  /** Checks that no active schema or metadata object is left below the schema. */
-  private void checkSchemaIsEmpty(NameIdentifier identifier, SchemaPO schemaPO) {
-    boolean hasDescendantSchemas = !listDescendantSchemaPOs(schemaPO).isEmpty();
-    // A non-cascade delete only needs to know whether any direct child exists. Asking the database
-    // for one literal avoids building every child PO and loading its version details while the
-    // schema delete lock is held.
-    boolean hasDirectChild =
-        SessionUtils.getWithoutCommit(
-                SchemaMetaMapper.class,
-                mapper -> mapper.selectActiveChildBySchemaId(schemaPO.getSchemaId()))
-            != null;
-    if (hasDescendantSchemas || hasDirectChild) {
-      throw new NonEmptyEntityException(
-          "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-    }
-  }
-
-  /**
-   * Collects every HierarchicalSchema descendant of the target schema. The {@link SchemaPO} arrives
-   * in logical form (e.g. {@code A:B}); {@link HierarchicalConversionPOStorageOps} translates to
-   * storage form before running the SQL prefix match.
-   */
-  private List<SchemaPO> listDescendantSchemaPOs(SchemaPO schemaPO) {
->>>>>>> c816482b8 ([#14119] fix(fileset): Preserve metadata on cascade cleanup failure (#14120))
     List<SchemaPO> matched =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
