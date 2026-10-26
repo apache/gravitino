@@ -49,6 +49,8 @@ import org.apache.gravitino.maintenance.optimizer.common.CloseableGroup;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -264,29 +266,40 @@ public class Recommender implements AutoCloseable {
 
     PriorityQueue<StrategyEvaluation> scoreQueue = new PriorityQueue<>(evaluationComparator());
     for (NameIdentifier identifier : identifiers) {
-      StrategyHandler strategyHandler = loadStrategyHandler(strategy, identifier);
-      if (!strategyHandler.shouldTrigger()) {
+      StrategyHandler strategyHandler = createStrategyHandler(strategy.strategyType());
+      StrategyHandlerContext context =
+          loadStrategyHandlerContext(strategy, identifier, strategyHandler.dataRequirements());
+      try {
+        strategyHandler.initialize(context);
+        if (!strategyHandler.shouldTrigger()) {
+          LOG.info(
+              "Skip strategy {} for identifier {} because strategy handler trigger condition is not met",
+              strategyName,
+              identifier);
+          continue;
+        }
+        StrategyEvaluation evaluation = strategyHandler.evaluate();
+        if (evaluation.score() < 0 || evaluation.jobExecutionContext().isEmpty()) {
+          LOG.info(
+              "Skip strategy {} for identifier {} because evaluation score is negative "
+                  + "or job execution context is missing",
+              strategyName,
+              identifier);
+          continue;
+        }
         LOG.info(
-            "Skip strategy {} for identifier {} because strategy handler trigger condition is not met",
+            "Recommend strategy {} for identifier {} score: {}",
             strategyName,
-            identifier);
-        continue;
-      }
-      StrategyEvaluation evaluation = strategyHandler.evaluate();
-      if (evaluation.score() < 0 || evaluation.jobExecutionContext().isEmpty()) {
-        LOG.info(
-            "Skip strategy {} for identifier {} because evaluation score is negative "
-                + "or job execution context is missing",
+            identifier,
+            evaluation.score());
+        scoreQueue.add(evaluation);
+      } catch (IllegalArgumentException e) {
+        LOG.warn(
+            "Skip strategy {} for identifier {} because policy rules or statistics are invalid",
             strategyName,
-            identifier);
-        continue;
+            identifier,
+            e);
       }
-      LOG.info(
-          "Recommend strategy {} for identifier {} score: {}",
-          strategyName,
-          identifier,
-          evaluation.score());
-      scoreQueue.add(evaluation);
     }
 
     List<StrategyEvaluation> results = new ArrayList<>();
@@ -307,10 +320,8 @@ public class Recommender implements AutoCloseable {
                     .orElse(""));
   }
 
-  private StrategyHandler loadStrategyHandler(Strategy strategy, NameIdentifier nameIdentifier) {
-    StrategyHandler strategyHandler = createStrategyHandler(strategy.strategyType());
-
-    Set<DataRequirement> declaredRequirements = strategyHandler.dataRequirements();
+  private StrategyHandlerContext loadStrategyHandlerContext(
+      Strategy strategy, NameIdentifier nameIdentifier, Set<DataRequirement> declaredRequirements) {
     EnumSet<DataRequirement> requirements =
         declaredRequirements.isEmpty()
             ? EnumSet.noneOf(DataRequirement.class)
@@ -318,10 +329,6 @@ public class Recommender implements AutoCloseable {
     Table tableMetadata = null;
     List<StatisticEntry<?>> statistics = Collections.emptyList();
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics = Collections.emptyMap();
-
-    if (requirements.contains(DataRequirement.TABLE_METADATA)) {
-      tableMetadata = tableMetadataProvider.tableMetadata(nameIdentifier);
-    }
 
     if (requirements.contains(DataRequirement.TABLE_STATISTICS)
         || requirements.contains(DataRequirement.PARTITION_STATISTICS)) {
@@ -334,15 +341,16 @@ public class Recommender implements AutoCloseable {
       }
     }
 
-    StrategyHandlerContext context =
-        StrategyHandlerContext.builder(nameIdentifier, strategy)
-            .withTableMetadata(tableMetadata)
-            .withTableStatistics(statistics)
-            .withPartitionStatistics(partitionStatistics)
-            .build();
-    strategyHandler.initialize(context);
+    // Read metadata after statistics so the freshness check sees intervening snapshot changes.
+    if (requirements.contains(DataRequirement.TABLE_METADATA)) {
+      tableMetadata = tableMetadataProvider.tableMetadata(nameIdentifier);
+    }
 
-    return strategyHandler;
+    return StrategyHandlerContext.builder(nameIdentifier, strategy)
+        .withTableMetadata(tableMetadata)
+        .withTableStatistics(statistics)
+        .withPartitionStatistics(partitionStatistics)
+        .build();
   }
 
   private StrategyHandler createStrategyHandler(String strategyType) {
@@ -371,7 +379,12 @@ public class Recommender implements AutoCloseable {
    * {@code COMPACTION}) to {@link StrategyHandler} implementations.
    */
   private String getStrategyHandlerClassName(String strategyType) {
-    return optimizerEnv.config().getStrategyHandlerClassName(strategyType);
+    String configured = optimizerEnv.config().getStrategyHandlerClassName(strategyType);
+    if (StringUtils.isBlank(configured)
+        && IcebergRewriteManifestsContent.STRATEGY_TYPE_VALUE.equals(strategyType)) {
+      return ManifestRewriteStrategyHandler.class.getName();
+    }
+    return configured;
   }
 
   private Map<String, List<NameIdentifier>> getIdentifiersByStrategyName(

@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.idp.dto.requests;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import lombok.Builder;
@@ -27,64 +26,41 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
-import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to update a built-in IdP user password and/or enabled flag. */
+/** Represents a request to update a built-in IdP user's enabled flag. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class UpdateUserRequest implements RESTRequest {
-
-  @JsonProperty("password")
-  @ToString.Exclude
-  private final String password;
+public class UpdateUserEnabledRequest implements RESTRequest {
 
   @JsonProperty("enabled")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Boolean enabled;
 
-  /** Default constructor for UpdateUserRequest. (Used for Jackson deserialization.) */
-  public UpdateUserRequest() {
-    this(null, null);
+  /** Default constructor for UpdateUserEnabledRequest. (Used for Jackson deserialization.) */
+  public UpdateUserEnabledRequest() {
+    this(null);
   }
 
   /**
-   * Creates a new UpdateUserRequest that updates only the password.
+   * Creates an UpdateUserEnabledRequest.
    *
-   * @param password The new password of the built-in IdP user.
+   * @param enabled Whether the built-in IdP user should be enabled.
    */
-  public UpdateUserRequest(String password) {
-    this(password, null);
-  }
-
-  /**
-   * Creates a new UpdateUserRequest.
-   *
-   * @param password The new password of the built-in IdP user, or {@code null} to leave it
-   *     unchanged.
-   * @param enabled Whether the built-in IdP user should be enabled, or {@code null} to leave it
-   *     unchanged.
-   */
-  public UpdateUserRequest(String password, Boolean enabled) {
+  public UpdateUserEnabledRequest(Boolean enabled) {
     super();
-    this.password = password;
     this.enabled = enabled;
   }
 
   /**
-   * Validates the {@link UpdateUserRequest} request.
+   * Validates the {@link UpdateUserEnabledRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(
-        password != null || enabled != null, "\"password\" or \"enabled\" field is required");
-    if (password != null) {
-      IdpCredentialValidator.validatePassword(password);
-    }
+    Preconditions.checkArgument(enabled != null, "\"enabled\" field is required");
   }
 }

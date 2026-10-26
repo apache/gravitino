@@ -19,11 +19,13 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
 public class PolicyContents {
@@ -169,12 +171,38 @@ public class PolicyContents {
   }
 
   /**
-   * Creates placeholder Iceberg rewrite-manifests policy content.
+   * Creates a manifest rewrite policy with default thresholds targeting Iceberg's current default
+   * partition spec.
    *
-   * @return rewrite-manifests policy content
+   * @return manifest rewrite policy
    */
   public static PolicyContent icebergRewriteManifests() {
-    return new IcebergRewriteManifestsContent();
+    return icebergRewriteManifests(null, null, null, null, null);
+  }
+
+  /**
+   * Creates a manifest rewrite policy. Null thresholds use the built-in defaults.
+   *
+   * @param manifestCountCritical count that triggers regardless of size
+   * @param manifestCountWarning minimum count for the size trigger
+   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param specId requested existing spec, or null to resolve Iceberg's current default at
+   *     evaluation
+   * @param useCaching caching option, or null for the Iceberg default
+   * @return manifest rewrite policy
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable Long manifestCountCritical,
+      @Nullable Long manifestCountWarning,
+      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching) {
+    return new IcebergRewriteManifestsContent(
+        manifestCountCritical,
+        manifestCountWarning,
+        avgManifestSizeThresholdBytes,
+        specId,
+        useCaching);
   }
 
   /**
@@ -216,6 +244,19 @@ public class PolicyContents {
    */
   public static ColumnMaskContent columnMask(String expression) {
     return new ColumnMaskContent(expression);
+  }
+
+  /**
+   * Creates an access control policy content.
+   *
+   * @param privileges the privileges the rule confers on the tagged object, each of which must be
+   *     in {@link AccessControlContent#PERMITTED_PRIVILEGES}
+   * @param applicableRoles the roles that satisfy the rule's condition
+   * @return access control policy content
+   */
+  public static PolicyContent accessControl(
+      List<Privilege.Name> privileges, List<String> applicableRoles) {
+    return new AccessControlContent(privileges, applicableRoles);
   }
 
   private PolicyContents() {}

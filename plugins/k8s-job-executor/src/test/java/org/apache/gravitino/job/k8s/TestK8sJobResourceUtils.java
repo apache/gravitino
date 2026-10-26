@@ -55,6 +55,27 @@ public class TestK8sJobResourceUtils {
   }
 
   @Test
+  public void testIsJobResource() {
+    Assertions.assertTrue(K8sJobResourceUtils.isJobResource(resource("gravitino-job-42", 42L)));
+    Assertions.assertTrue(K8sJobResourceUtils.isJobResource(resource("other-prefix-42", 42L)));
+    // Another job's resource with this name, for example of another deployment.
+    Assertions.assertFalse(K8sJobResourceUtils.isJobResource(resource("gravitino-job-42", 43L)));
+    Assertions.assertFalse(K8sJobResourceUtils.isJobResource(resource("gravitino-job-142", 42L)));
+    // Not managed by Gravitino.
+    ConfigMap unmanaged = resource("gravitino-job-42", 42L);
+    unmanaged.getMetadata().setLabels(ImmutableMap.of(K8sJobResourceUtils.LABEL_JOB_ID, "42"));
+    Assertions.assertFalse(K8sJobResourceUtils.isJobResource(unmanaged));
+    Assertions.assertFalse(
+        K8sJobResourceUtils.isJobResource(
+            new ConfigMapBuilder()
+                .withNewMetadata()
+                .withName("gravitino-job-42")
+                .endMetadata()
+                .build()));
+    Assertions.assertFalse(K8sJobResourceUtils.isJobResource(new ConfigMap()));
+  }
+
+  @Test
   public void testIsCancelRequested() {
     Assertions.assertFalse(
         K8sJobResourceUtils.isCancelRequested(
@@ -73,6 +94,35 @@ public class TestK8sJobResourceUtils {
         new String[] {null, "", "Team", "team_a", "-team", "team-", "a/b", "a".repeat(64)}) {
       Assertions.assertFalse(K8sJobResourceUtils.isValidNamespace(invalid), invalid);
     }
+  }
+
+  @Test
+  public void testIsClusterReachable() {
+    for (String uri :
+        new String[] {
+          "local:///opt/app.jar",
+          "https://repo/app.jar",
+          "s3a://bucket/app.jar",
+          "hdfs://nn/app.jar",
+          " s3a://bucket/app jar "
+        }) {
+      Assertions.assertTrue(K8sJobResourceUtils.isClusterReachable(uri), uri);
+    }
+
+    // Paths on the Gravitino server.
+    for (String uri :
+        new String[] {"/opt/app.jar", "app.jar", "file:///opt/app.jar", "FILE:/a", "C:\\app.jar"}) {
+      Assertions.assertFalse(K8sJobResourceUtils.isClusterReachable(uri), uri);
+    }
+  }
+
+  private static ConfigMap resource(String name, long jobId) {
+    return new ConfigMapBuilder()
+        .withNewMetadata()
+        .withName(name)
+        .withLabels(K8sJobResourceUtils.jobLabels(jobId))
+        .endMetadata()
+        .build();
   }
 
   private static ConfigMap annotated(String cancelRequested) {

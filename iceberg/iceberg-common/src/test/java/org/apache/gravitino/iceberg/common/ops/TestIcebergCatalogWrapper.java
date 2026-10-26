@@ -33,6 +33,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
@@ -40,13 +41,71 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchViewException;
+import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.view.ViewOperations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
+
+  @Test
+  void testLoadViewReportsMissingAfterNativeRename(@TempDir Path warehouseDir) throws Exception {
+    Namespace namespace = Namespace.of("views");
+    TableIdentifier oldName = TableIdentifier.of(namespace, "old_name");
+    TableIdentifier newName = TableIdentifier.of(namespace, "new_name");
+    AtomicBoolean renameDuringLoad = new AtomicBoolean();
+    AtomicInteger operationLoads = new AtomicInteger();
+    try (JdbcCatalog catalog =
+        new JdbcCatalog() {
+          @Override
+          protected ViewOperations newViewOps(TableIdentifier identifier) {
+            // BaseMetastoreViewCatalog checks one operations instance, then returns a BaseView
+            // backed by another. Rename between those two instances, without timing or threads.
+            if (renameDuringLoad.get()
+                && identifier.equals(oldName)
+                && operationLoads.incrementAndGet() == 2) {
+              renameView(oldName, newName);
+            }
+            return super.newViewOps(identifier);
+          }
+        }) {
+      catalog.initialize(
+          "rename-test",
+          Map.of(
+              CatalogProperties.URI,
+              "jdbc:sqlite:" + warehouseDir.resolve("catalog.db"),
+              CatalogProperties.WAREHOUSE_LOCATION,
+              warehouseDir.toUri().toString(),
+              "jdbc.schema-version",
+              "V1"));
+      catalog.createNamespace(namespace);
+      catalog
+          .buildView(oldName)
+          .withSchema(new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())))
+          .withDefaultNamespace(namespace)
+          .withQuery("spark", "SELECT 1 AS id")
+          .create();
+      IcebergCatalogWrapper wrapper =
+          Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+      Mockito.doReturn(catalog).when(wrapper).getCatalog();
+      renameDuringLoad.set(true);
+
+      NoSuchViewException failure =
+          Assertions.assertThrows(NoSuchViewException.class, () -> wrapper.loadView(oldName));
+      Assertions.assertTrue(failure.getMessage().contains(oldName.toString()));
+      Assertions.assertFalse(catalog.viewExists(oldName));
+      LoadViewResponse response = wrapper.loadView(newName);
+      Assertions.assertNotNull(response.metadata());
+      Assertions.assertEquals(
+          response.metadata().metadataFileLocation(), response.metadataLocation());
+    }
+  }
 
   @Test
   public void testCatalogShouldBeLazyLoaded() {

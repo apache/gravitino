@@ -25,9 +25,11 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -36,6 +38,9 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -47,9 +52,11 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -63,6 +70,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,6 +100,145 @@ public class TestLanceTableOperations {
     schemaOps = mock(ManagedSchemaOperations.class);
     idGenerator = mock(IdGenerator.class);
     lanceTableOps = spy(new LanceTableOperations(store, schemaOps, idGenerator));
+  }
+
+  /** Registered tables persist external ownership and retain the existing dataset on drop. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {"NULL", "false", "true"},
+      nullValues = "NULL")
+  void testRegisterPersistsExternalAndDropPreservesDataset(String external) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "registered");
+    String location = tempDir.resolve("registered").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    when(idGenerator.nextId()).thenReturn(10L);
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+      // Seed a dataset owned by the caller before registering it.
+    }
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(LANCE_TABLE_REGISTER, "true");
+    properties.putAll(StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(1L), null));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    Map<String, String> original = Map.copyOf(properties);
+    AtomicReference<TableEntity> stored = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              stored.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(store)
+        .put(any(TableEntity.class), eq(false));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> stored.get());
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+
+    Table created =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    columns,
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertEquals("true", created.properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals("true", stored.get().properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals(
+        "true", lanceTableOps.loadTable(ident).properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals(original, properties);
+    Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    verify(store).delete(ident, Entity.EntityType.TABLE);
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  /** Legacy registration flags also protect drop and overwrite, while purge remains destructive. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {
+        "NULL,drop",
+        "false,drop",
+        "true,drop",
+        "NULL,purge",
+        "false,purge",
+        "true,purge",
+        "NULL,overwrite",
+        "false,overwrite"
+      },
+      nullValues = "NULL")
+  void testLegacyRegistrationRemoval(String external, String operation) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "legacy");
+    String location = tempDir.resolve("legacy").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    when(idGenerator.nextId()).thenReturn(10L);
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+      // A historical registration must never transfer ownership to Gravitino implicitly.
+    }
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_REGISTER,
+                "true"));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    AtomicReference<TableEntity> stored =
+        new AtomicReference<>(tableEntity(ident, List.of(), properties));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> stored.get());
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    if ("overwrite".equals(operation)) {
+      Map<String, String> replacement = Maps.newHashMap(properties);
+      replacement.put(LANCE_CREATION_MODE, "OVERWRITE");
+      replacement.putAll(StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(2L), null));
+      Mockito.doAnswer(
+              invocation -> {
+                stored.set(invocation.getArgument(0));
+                return null;
+              })
+          .when(store)
+          .put(any(TableEntity.class), eq(false));
+      Table replaced =
+          PrincipalUtils.doAs(
+              new UserPrincipal("tester"),
+              () ->
+                  lanceTableOps.createTable(
+                      ident,
+                      columns,
+                      null,
+                      replacement,
+                      new Transform[0],
+                      null,
+                      new SortOrder[0],
+                      new Index[0]));
+      Assertions.assertEquals("true", replaced.properties().get(Table.PROPERTY_EXTERNAL));
+    } else if ("purge".equals(operation)) {
+      Assertions.assertTrue(lanceTableOps.purgeTable(ident));
+    } else {
+      Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    }
+    verify(store).delete(ident, Entity.EntityType.TABLE);
+    if ("purge".equals(operation)) {
+      Assertions.assertFalse(Files.exists(Paths.get(location, "_versions")));
+    } else {
+      try (Dataset dataset = Dataset.open().uri(location).build()) {
+        Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+      }
+    }
   }
 
   @Test
@@ -196,6 +343,99 @@ public class TestLanceTableOperations {
 
     Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
     verify(store, never()).delete(any(), any());
+  }
+
+  /**
+   * Verifies a conflict of the table metadata, such as a lock wait timeout, reaches the caller as a
+   * conflict and the dataset created for the table is dropped again, so that a retry can create it.
+   */
+  @Test
+  public void testCreateTableDropsDatasetOnMetadataConflict() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table_conflict");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    String location = tempDir.resolve("conflict-create").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    when(idGenerator.nextId()).thenReturn(2L);
+    doThrow(new OptimisticLockException("mock conflict")).when(store).put(any(), anyBoolean());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            lanceTableOps.createTable(
+                ident,
+                columns,
+                null,
+                StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(1L), properties),
+                new Transform[0],
+                null,
+                new SortOrder[0],
+                new Index[0]));
+    Assertions.assertFalse(
+        Files.exists(Paths.get(location, "_versions")), "the created dataset must be dropped");
+  }
+
+  /** Verifies failed cleanup preserves the registration conflict and the cleanup failure. */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testCreateTablePreservesRegistrationFailureWhenDatasetCleanupFails(boolean conflict)
+      throws IOException {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table_cleanup_conflict");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    String location = tempDir.resolve("conflict-cleanup").toString();
+    Map<String, String> properties =
+        Map.of(Table.PROPERTY_LOCATION, location, Table.PROPERTY_TABLE_FORMAT, "lance");
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.version()).thenReturn(1L);
+    Mockito.doReturn(dataset).when(lanceTableOps).createDataset(eq(location), eq(columns), any());
+    when(idGenerator.nextId()).thenReturn(2L);
+    RuntimeException failure =
+        conflict
+            ? new OptimisticLockException("metadata lock timeout")
+            : new TableAlreadyExistsException("table already registered");
+    doThrow(failure).when(store).put(any(), anyBoolean());
+    // The native drop throws an IOException if the dataset disappeared before cleanup.
+    RuntimeException actual =
+        Assertions.assertThrows(
+            failure.getClass(),
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    columns,
+                    null,
+                    StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(1L), properties),
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+    Assertions.assertSame(failure, actual);
+    Assertions.assertEquals(1, actual.getSuppressed().length);
+    Assertions.assertInstanceOf(IOException.class, actual.getSuppressed()[0]);
+    Assertions.assertTrue(actual.getSuppressed()[0].getMessage().contains("Not found:"));
+    verify(dataset).close();
+  }
+
+  /** Verifies a conflict of the table metadata on drop reaches the caller as a conflict. */
+  @Test
+  public void testDropTablePropagatesMetadataConflict() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table_drop_conflict");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_LOCATION,
+                    tempDir.resolve("conflict-drop").toString(),
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance")));
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(store)
+        .delete(eq(ident), eq(Entity.EntityType.TABLE));
+
+    Assertions.assertThrows(OptimisticLockException.class, () -> lanceTableOps.dropTable(ident));
+    Assertions.assertThrows(OptimisticLockException.class, () -> lanceTableOps.purgeTable(ident));
   }
 
   /** Verifies the purge guard preserves the original IllegalArgumentException. */
@@ -371,6 +611,51 @@ public class TestLanceTableOperations {
     Assertions.assertInstanceOf(OptimisticLockException.class, failure.getCause());
     verify(store, Mockito.times(5))
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  /** Lock timeouts must not consume the CAS retry budget on either metadata-repair path. */
+  @ParameterizedTest
+  @CsvSource({
+    "true, 1205, 40001",
+    "true, 50200, HYT00",
+    "true, 0, 55P03",
+    "false, 1205, 40001",
+    "false, 50200, HYT00",
+    "false, 0, 55P03"
+  })
+  public void testLoadDoesNotRetryLockWaitTimeout(
+      boolean nonEmptyDataset, int vendorCode, String sqlState) throws Exception {
+    NameIdentifier ident;
+    if (nonEmptyDataset) {
+      ident = prepareDeclaredTableForRepair("repair-lock-timeout");
+    } else {
+      ident = NameIdentifier.of("schema", "table");
+      String location = tempDir.resolve("empty-lock-timeout").toString();
+      TableEntity entity = tableEntity(ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location));
+      when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+          .thenReturn(entity);
+      Dataset dataset = mock(Dataset.class);
+      when(dataset.getSchema()).thenReturn(new Schema(List.of()));
+      when(dataset.version()).thenReturn(3L);
+      Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+    }
+    RuntimeException driverFailure =
+        new RuntimeException(new SQLException("lock wait timeout", sqlState, vendorCode));
+    RuntimeException conflict =
+        ExceptionUtils.lockWaitTimeoutAsConflict(driverFailure, Entity.EntityType.TABLE, ident);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(conflict);
+
+    OptimisticLockException failure =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident)));
+    Assertions.assertSame(conflict, failure);
+    Assertions.assertSame(driverFailure, failure.getCause());
+    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+    verify(lanceTableOps, never()).backoffBeforeRetry(any());
   }
 
   @Test
