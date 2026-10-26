@@ -109,7 +109,7 @@ If a tag selecting this policy is assigned only to `sales.orders`, only that tab
 filter:
 
 ```sql
-region = 'US'
+(region STRING) RETURNS BOOLEAN -> region = 'US'
 ```
 
 The resolver binds `region` to field ID 4 when loading `orders`. If the same tag is assigned to the
@@ -154,12 +154,13 @@ The content of a row-filter policy contains exactly one `expression`.
   "policyType": "system_row_filter",
   "enabled": false,
   "content": {
-    "expression": "CASE WHEN is_group_member('auditors') THEN region = 'US' ELSE owner = CURRENT_USER() END"
+    "expression": "(region STRING, owner STRING) RETURNS BOOLEAN -> CASE WHEN is_group_member('auditors') THEN region = 'US' ELSE owner = CURRENT_USER() END"
   }
 }
 ```
 
-The expression returns a Boolean value. In the example, SQL `CASE` means “if the subject is an
+The definition declares two string parameters and a Boolean result. `region` and `owner` bind to
+the corresponding columns of the target table. In the body, SQL `CASE` means “if the subject is an
 auditor, then use the region predicate; otherwise use the owner predicate.” It does not select
 another policy rule. The expression may use trusted request context and row values in either
 conditions or results. The first policy-on-tag selector version
@@ -177,15 +178,17 @@ same logical type as the target column.
   "policyType": "system_column_mask",
   "enabled": false,
   "content": {
-    "expression": "CASE WHEN is_group_member('auditors') THEN show_last_4(value) ELSE NULL END"
+    "expression": "(value STRING) RETURNS STRING -> CASE WHEN is_group_member('auditors') THEN show_last_4(value) ELSE NULL END"
   }
 }
 ```
 
-`value` is the input parameter supplied by column-mask evaluation. It contains the original value
-of the column selected by policy and tag resolution; it is not the name of a physical column.
+`value` is explicitly declared as a string parameter. Column-mask evaluation binds that sole
+parameter to the original value of the column selected by policy and tag resolution; the
+parameter name is local to this definition, not the name of a physical column.
 For example, the same expression receives a phone number when applied to `phone_number` and a
-card number when applied to `card`. Its type and nullability come from that selected column.
+card number when applied to `card`. Both columns must match the declared `STRING` type. Parameter
+nullability is inherited from the selected column, and the return type must match that column.
 
 The SQL expression returns a masked value rather than an action name. `CASE` selects the first
 true condition, returning the transformed column value or a typed null. A mask may also return a
@@ -231,32 +234,34 @@ an Iceberg `read-restrictions` response.
 ## SQL Expressions
 
 Both built-in policy types keep exactly one `expression` string. The proposed authoring language
-is `restricted-sql-v1`, using Snowflake-style SQL expressions and `CASE` for conditional results.
-Row-filter expressions return Boolean; column-mask expressions return the masked column's logical
-type. This section defines expression syntax only. SQL parser and enforcement changes require
-separate implementation work; the existing implementation still accepts `restricted-rego-v1`.
+is `restricted-sql-v1`, using a Snowflake-style typed definition and SQL `CASE` for conditional
+results. Every definition contains a parameter list, `RETURNS`, a result type, and `->` followed
+by the SQL body. Row filters declare `BOOLEAN`; column masks declare the masked column's logical
+type. There is no separate function name or creation statement. SQL parser and enforcement changes
+require separate implementation work; the existing implementation still accepts `restricted-rego-v1`.
 
 ### Authoring Examples
 
-With a string input `region`, a row filter may be a direct Boolean expression:
+With a string parameter `region`, a row filter declares a Boolean result:
 
 ```sql
-region = user_attribute('region')
+(region STRING) RETURNS BOOLEAN ->
+  region = user_attribute('region')
 ```
 
 The same filter can express conditional behavior with SQL `CASE`:
 
 ```sql
-CASE
+(region STRING) RETURNS BOOLEAN -> CASE
   WHEN CURRENT_USER() = 'alice' THEN TRUE
   ELSE region = user_attribute('region')
 END
 ```
 
-With a string target column, a mask may return its original input `value` or a transformed value:
+With a string target column, a mask declares a string parameter and a string result:
 
 ```sql
-CASE
+(value STRING) RETURNS STRING -> CASE
   WHEN CURRENT_USER() = 'alice' THEN value
   ELSE mask_alphanum(value)
 END
@@ -265,7 +270,7 @@ END
 It may also return a literal or null of the expected type:
 
 ```sql
-CASE
+(value STRING) RETURNS STRING -> CASE
   WHEN value IS NULL THEN NULL
   ELSE 'XXXXXXXX'
 END
@@ -273,19 +278,23 @@ END
 
 ### Expression Inputs and Results
 
-The data inputs depend on the expression's policy type:
+Every data input must be declared in the parameter list with its logical type. Parameter names
+must be unique under the identifier rules below. The body may reference only those parameters
+and allowlisted context functions; a column existing in a table does not implicitly declare it.
 
-- A row filter references columns of the target table by name. For example, `region` and `owner`
-  in the row-filter example must be columns in that table's schema. Missing or ambiguous columns
-  are errors.
-- A column mask has one data input, `value`, supplied automatically for each selected column.
-  `value` has that column's original value, logical type, and nullability. The target column's
-  physical name is not available as an implicit alias, and other table columns are not exposed.
+- A row filter has zero or more parameters. Each parameter binds to a column of the target table
+  with the same name under the identifier matching rules. Its declared type must match the column
+  exactly. Missing or ambiguous columns are errors. A context-only or constant filter may use an
+  empty parameter list, for example `() RETURNS BOOLEAN -> TRUE`.
+- A column mask has exactly one parameter. It binds to the selected column regardless of its
+  local name, and its declared type must match that column. For example,
+  `(xxx STRING) RETURNS STRING -> show_last_4(xxx)` and
+  `(value STRING) RETURNS STRING -> show_last_4(value)` differ only in the local parameter name.
+  Neither requires a physical column named `xxx` or `value`.
 
-`value` is an ordinary identifier in the mask's input scope, not a new SQL keyword. No separate
-parameter declaration is needed in the expression string. In a row filter, `value` refers to an
-actual table column of that name if one exists; the mask input convention does not apply there.
-Context functions are available in both scopes. The expected result type is known before evaluation:
+Bound parameters inherit the columns' nullability. No implicit `value` parameter is injected, and
+the column's physical name is not an additional alias in a mask body. Trusted context functions
+do not require parameter declarations. The definition also declares the result type:
 
 | Use | Expected result | Accepted expression forms |
 | --- | --- | --- |
@@ -293,18 +302,24 @@ Context functions are available in both scopes. The expected result type is know
 | Column mask | Target column's logical type | Original input, literal, null, function result, scalar `CASE` |
 
 A mask's result type must match the target column, including precision, scale, and timezone
-characteristics. Its conditions may use `value` and trusted context functions. A non-Boolean
-filter result or incompatible mask result is an error. When one policy applies to several
-columns, each mask evaluation binds `value` independently to its selected column.
+characteristics. Its conditions may use its declared parameter and trusted context functions.
+A non-Boolean filter result or incompatible mask result is an error. When one policy applies to several
+columns, each mask evaluation binds the parameter independently to its selected column.
 
 ### SQL Expression Language
 
 #### Grammar
 
-The expression grammar is:
+The complete stored definition includes the parameter and result declarations. The remaining
+productions describe its SQL body:
 
 ```text
-expression  := expr EOF
+expression  := "(" (parameter ("," parameter)*)? ")" RETURNS type "->" expr EOF
+parameter   := identifier type
+type        := BOOLEAN | INTEGER | LONG | FLOAT | DOUBLE | STRING | BINARY | DATE
+             | DECIMAL "(" unsignedInteger "," unsignedInteger ")"
+             | TIME ("(" "6" ")")?
+             | TIMESTAMP ("(" "6" ")")? ((WITH | WITHOUT) TIME ZONE)?
 expr        := orExpr
 orExpr      := andExpr (OR andExpr)*
 andExpr     := notExpr (AND notExpr)*
@@ -327,11 +342,18 @@ null        := NULL
 number      := "-"? ("0" | nonZeroDigit digit*) ("." digit+)?
 digit       := "0" | nonZeroDigit
 nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+unsignedInteger := "0" | nonZeroDigit digit*
 ```
 
 Keywords and allowlisted built-in function names are case-insensitive. `functionCall` does not
 permit arbitrary functions: names and signatures must match the function tables below. `EOF`
 requires complete consumption. Semantic validation restricts operand and result types.
+Decimal precision must be between 1 and 38, with scale between zero and the precision. Row
+definitions must declare `BOOLEAN`; mask definitions must have one parameter and declare its
+exact logical type as their result. A body-only string without these declarations is invalid.
+
+Predicate and `CASE` snippets below illustrate the body portion; the stored `expression` always
+includes the complete definition shown above.
 
 Precedence, from highest to lowest, is parentheses and function calls, predicates, `NOT`, `AND`,
 and `OR`. `NOT active = TRUE` means `NOT (active = TRUE)`. The `AND` inside `BETWEEN` separates
@@ -345,7 +367,7 @@ digits, or underscores. Keywords in this grammar are reserved. A quoted identifi
 quotes, escaping an embedded double quote by doubling it, for example `"Customer Region"`.
 Unquoted input names normalize to uppercase; quoted names preserve case, following Snowflake's
 identifier convention. Names must be unique after that normalization. `val` and `VAL` refer to
-the same input; `"val"` is distinct. Names bind only within the supplied input context;
+the same parameter; `"val"` is distinct. Names bind only within the declared parameter list;
 qualified input references and nested paths are unsupported.
 
 String literals use single quotes; an embedded single quote is doubled, as in `'O''Brien'`.
@@ -430,9 +452,11 @@ Nested `CASE` expressions and built-in calls are allowed within the resource lim
 
 ### Type and Context Binding
 
-Row-filter input names, types, and nullability come from the target table schema. Column-mask
-evaluation binds the selected column to the local input `value` before type checking and inherits
-its logical type and nullability. This binding is independent of the physical column name.
+Parameter names and types are explicit in the definition. Type checking validates the SQL body
+against those declarations and the result type before evaluation. Binding verifies row-filter
+parameters against their target table columns, or the sole mask parameter against the selected
+column. Declared types must match exactly; bound nullability comes from the column. A mask's local
+parameter name is independent of the physical column name.
 Missing or ambiguous names, unavailable inputs, unsupported types, incompatible operands, and
 invalid function arguments are errors.
 
@@ -514,8 +538,8 @@ rather than denying access to the table.
 The Gravitino mask functions defined by this profile remain available inside a SQL mask expression.
 They are ordinary typed scalar calls and may appear in `CASE` branches or nested calls with matching
 types. They are Gravitino functions rather than a claim of Snowflake function compatibility. Each
-function preserves its input logical type. In the examples below, `value` is the column-mask
-input and must have a type accepted by the function.
+function preserves its input logical type. In the examples below, `value` denotes the explicitly
+declared mask parameter, which must have a type accepted by the function.
 
 | SQL expression | Input types | Meaning |
 | --- | --- | --- |
@@ -546,8 +570,8 @@ separate queries use independent salts.
 
 Only allowlisted functions and the shared expression grammar are accepted. Each mask function
 takes one compatible scalar argument; additional arguments to these calls are invalid. Conditions
-may use the mask input `value` and trusted context functions. Conditional disclosure is expressed with
-ordinary SQL `CASE`, as in the email mask example above.
+may use the declared mask parameter and trusted context functions. Conditional disclosure is
+expressed with ordinary SQL `CASE`, as in the email mask example above.
 
 A mask expression must have the expected result type on every branch. Returning null, explicitly or
 through an omitted `ELSE`, is allowed only for a nullable target column. An expression whose inferred
@@ -556,13 +580,15 @@ mask cannot return a number in one branch, and a required target cannot use `THE
 
 ### Validation and Failure Behavior
 
-Static validation checks complete expression parsing, Boolean row-filter results, exact mask
-result types, every `CASE` branch, supported operand shapes, allowlisted functions, function
-arguments, and resource limits. Input and context validation check unique names, compatible types,
-literal ranges, nullability, and trusted context values. Invalid content is rejected; an input or
+Static validation checks complete definitions, declared parameter and result types, unique parameter
+names, Boolean row-filter results, exact mask result types, every `CASE` branch, supported operand
+shapes, allowlisted functions, function arguments, and resource limits. Binding and context
+validation check compatible types, literal ranges, nullability, and trusted context values.
+Invalid content is rejected; an input or
 context error must never silently remove a required restriction.
 
-The expression limits remain:
+The expression limits apply to the complete stored definition, including its parameter list,
+return type, and SQL body:
 
 - Source length: 16 KiB of UTF-8.
 - Operation depth: 8, including nested `CASE` expressions and function calls.
@@ -591,10 +617,13 @@ Input cases must verify unknown names, incompatible types, and expected result t
 cases must verify unquoted case folding and quoted exact names. All expression forms share the
 same null, type, and resource-limit rules.
 
-Mask-input cases must apply the same `show_last_4(value)` expression to differently named string
-columns and verify independent binding, inherited nullability, and type checks. A column-mask
-reference to `phone_number` or `email` must be rejected because neither is the mask input name.
-Row-filter cases must resolve actual column names from the target table schema.
+Definition cases must reject missing parameter lists, missing `RETURNS`, duplicate names,
+undeclared body references, non-Boolean filter results, and mismatched mask parameter/result types.
+Mask-input cases must apply `(value STRING) RETURNS STRING -> show_last_4(value)` to differently
+named string columns and verify independent binding, local parameter renaming, inherited
+nullability, and type checks. A reference to `phone_number` or `email` in a mask body is invalid
+unless it is the explicitly declared parameter. Row-filter cases must resolve declared parameters
+against the target table schema and reject mismatched column types.
 
 ## Resolution and Conflicts
 
