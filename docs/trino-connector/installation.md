@@ -150,6 +150,11 @@ gravitino.metalake=test
 
 Full configurations for Apache Gravitino Trino connector can be seen [here](configuration.md)
 
+If the Gravitino server requires authentication, Iceberg catalogs routed through the Iceberg REST
+server need OAuth2, because Trino's Iceberg REST client does not support Basic or Kerberos. Set
+`gravitino.iceberg.rest-catalog.security=OAUTH2` and its `oauth2.*` properties; see
+[Authenticating to the Iceberg REST Server](./catalog-iceberg.md#authenticating-to-the-iceberg-rest-server).
+
 If you haven't created the metalake named `test`, you can use the following command to create it.
 
 ```shell

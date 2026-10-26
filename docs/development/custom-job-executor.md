@@ -67,6 +67,9 @@ gravitino.job.executor = airflow
 gravitino.jobExecutor.airflow.class = com.example.MyAirflowJobExecutor
 ```
 
+The names `local` and `k8s` belong to the built-in job executors, so give your job executor another
+name: a `gravitino.jobExecutor.local.class` or `gravitino.jobExecutor.k8s.class` setting is ignored.
+
 Configure the job executor with additional properties, like:
 
 ```

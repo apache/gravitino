@@ -25,7 +25,8 @@ import org.apache.gravitino.secret.SecretReference;
 
 /**
  * A fileset change is a change to a fileset. It can be used to rename a fileset, update the comment
- * of a fileset, set a property and value pair for a fileset, or remove a property from a fileset.
+ * of a fileset, update the type of a fileset, set a property and value pair for a fileset, or
+ * remove a property from a fileset.
  */
 @Evolving
 public interface FilesetChange {
@@ -48,6 +49,22 @@ public interface FilesetChange {
    */
   static FilesetChange updateComment(String newComment) {
     return new UpdateFilesetComment(newComment);
+  }
+
+  /**
+   * Creates a new fileset change to update the fileset type.
+   *
+   * <p>Changing the type preserves the fileset's identity, storage locations, and existing files.
+   * Changing to {@link Fileset.Type#EXTERNAL} relinquishes management of the data, so dropping the
+   * fileset retains it. Changing to {@link Fileset.Type#MANAGED} accepts management of the data,
+   * including deleting it when the fileset is dropped. Setting the current type is allowed.
+   *
+   * @param newType The new type of the fileset.
+   * @return The fileset change.
+   * @throws IllegalArgumentException if the new type is null.
+   */
+  static FilesetChange updateType(Fileset.Type newType) {
+    return new UpdateFilesetType(newType);
   }
 
   /**
@@ -212,6 +229,48 @@ public interface FilesetChange {
     @Override
     public String toString() {
       return "UPDATEFILESETCOMMENT " + newComment;
+    }
+  }
+
+  /** A fileset change to update the fileset type without changing its data or locations. */
+  final class UpdateFilesetType implements FilesetChange {
+    private final Fileset.Type newType;
+
+    private UpdateFilesetType(Fileset.Type newType) {
+      if (newType == null) {
+        throw new IllegalArgumentException("New fileset type cannot be null");
+      }
+      this.newType = newType;
+    }
+
+    /**
+     * Returns the new type of the fileset.
+     *
+     * @return The new fileset type.
+     */
+    public Fileset.Type getNewType() {
+      return newType;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateFilesetType that = (UpdateFilesetType) o;
+      return newType == that.newType;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+      return Objects.hash(newType);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+      return "UPDATEFILESETTYPE " + newType;
     }
   }
 
