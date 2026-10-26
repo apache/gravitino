@@ -813,6 +813,12 @@ public class ExceptionHandlers {
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);
 
+      } else if (e instanceof ConnectionFailedException) {
+        // Secret-provider outages are dependency failures: return 503 so callers can distinguish a
+        // temporary dependency problem from a server bug. Catalog create/alter that hits the same
+        // exception still uses CatalogExceptionHandler (502).
+        return Utils.serviceUnavailable(ErrorResponse.connectionFailed(errorMsg, e));
+
       } else {
         return super.handle(op, secret, parent, e);
       }

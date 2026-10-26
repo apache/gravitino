@@ -22,6 +22,7 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -179,5 +180,20 @@ public class TestExceptionHandlers {
           Assertions.assertEquals(
               UnmodifiableStatisticException.class.getSimpleName(), errorResponse.getType());
         });
+  }
+
+  @Test
+  void testSecretProviderConnectionFailureReturnsServiceUnavailable() {
+    try (Response response =
+        ExceptionHandlers.handleSecretException(
+            OperationType.GET,
+            "catalog",
+            new ConnectionFailedException("secret provider 'vault' is unavailable"))) {
+      Assertions.assertEquals(
+          Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("secret provider 'vault' is unavailable"));
+    }
   }
 }
