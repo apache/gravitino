@@ -155,7 +155,7 @@ Reviewing and triaging helps maintain the project. You can:
 
 * Use feature branches
 * Write clear commit messages and PR descriptions
-* Link to issues (e.g., `Fixes #123`)
+* Link to issues in the PR description using a [GitHub closing keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword) (e.g., `Fixes #123` or `Fix: #123`; for multiple issues, repeat the keyword for each issue, e.g., `Fixes #123, fixes #456`). Do not replace the keyword with the issue type (e.g., `Improvement: #123`), as that prevents GitHub from automatically closing the issue.
 * Respond to reviewer feedback
 * Please add Copilot on the PR. Automatic review runs once when the PR is marked ready; later pushes do not re-review, so add Copilot again after you push. Treat Copilot comments as hints: implement the suggestion, or reply with why you are not taking it. Human reviewers remain responsible for the merge decision. Project-specific Copilot guidance lives in [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
