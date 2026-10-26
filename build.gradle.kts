@@ -1188,7 +1188,7 @@ tasks {
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
         ":plugins:idp-basic:copyLibAndConfigs",
-        ":plugins:tms:copyLibAndConfigs",
+        ":plugins:maintenance:copyLibAndConfigs",
         ":plugins:k8s-job-executor:copyLibAndConfigs"
       )
     if (!skipWeb) {
