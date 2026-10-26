@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -85,20 +86,34 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   }
 
   @Test
-  void testEnabledOnlyWhenPolicyDispatcherIsAvailable() throws Exception {
+  void testEnabledWithPolicyDispatcherEvenWhenAuthorizationIsDisabled() throws Exception {
     GravitinoEnv environment = GravitinoEnv.getInstance();
     PolicyDispatcher original = environment.internalPolicyDispatcher();
+    AccessControlDispatcher originalAccessControl = environment.internalAccessControlDispatcher();
     ExperimentalIcebergReadRestrictionLoader loader =
         new ExperimentalIcebergReadRestrictionLoader();
     try {
       FieldUtils.writeField(environment, "internalPolicyDispatcher", null, true);
+      FieldUtils.writeField(environment, "internalAccessControlDispatcher", null, true);
       assertFalse(loader.enabled());
 
       FieldUtils.writeField(
           environment, "internalPolicyDispatcher", mock(PolicyDispatcher.class), true);
       assertTrue(loader.enabled());
+
+      FieldUtils.writeField(
+          environment,
+          "internalAccessControlDispatcher",
+          mock(AccessControlDispatcher.class),
+          true);
+      assertTrue(loader.enabled());
+
+      FieldUtils.writeField(environment, "internalPolicyDispatcher", null, true);
+      assertFalse(loader.enabled());
     } finally {
       FieldUtils.writeField(environment, "internalPolicyDispatcher", original, true);
+      FieldUtils.writeField(
+          environment, "internalAccessControlDispatcher", originalAccessControl, true);
     }
   }
 
@@ -135,6 +150,29 @@ public class TestExperimentalIcebergReadRestrictionLoader {
 
     assertSame(response, result.response());
     assertFalse(result.etagSeed().isPresent());
+  }
+
+  @Test
+  void testLoadWithoutAuthorizationFailsBeforeResolvingPolicies() throws Exception {
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    LoadTableResponse response = response(SCHEMA);
+
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                load(
+                    dispatcher,
+                    null,
+                    METALAKE,
+                    "catalog",
+                    TableIdentifier.of("schema", "table"),
+                    response));
+
+    assertEquals(
+        "Iceberg read restrictions require authorization; set gravitino.authorization.enable=true",
+        exception.getMessage());
+    verifyNoInteractions(dispatcher);
   }
 
   @Test
@@ -505,13 +543,28 @@ public class TestExperimentalIcebergReadRestrictionLoader {
       TableIdentifier table,
       LoadTableResponse response)
       throws Exception {
+    return load(
+        dispatcher, mock(AccessControlDispatcher.class), metalake, catalog, table, response);
+  }
+
+  private static IcebergReadRestrictionLoader.Result load(
+      PolicyDispatcher dispatcher,
+      AccessControlDispatcher accessControlDispatcher,
+      String metalake,
+      String catalog,
+      TableIdentifier table,
+      LoadTableResponse response)
+      throws Exception {
     GravitinoEnv environment = GravitinoEnv.getInstance();
     PolicyDispatcher originalDispatcher = environment.internalPolicyDispatcher();
+    AccessControlDispatcher originalAccessControl = environment.internalAccessControlDispatcher();
     Class<?> contextHolder =
         Class.forName(IcebergRESTServerContext.class.getName() + "$InstanceHolder");
     Object originalContext = FieldUtils.readStaticField(contextHolder, "INSTANCE", true);
     try {
       FieldUtils.writeField(environment, "internalPolicyDispatcher", dispatcher, true);
+      FieldUtils.writeField(
+          environment, "internalAccessControlDispatcher", accessControlDispatcher, true);
       IcebergConfigProvider configProvider = mock(IcebergConfigProvider.class);
       when(configProvider.getMetalakeName()).thenReturn(metalake);
       IcebergRESTServerContext.create(configProvider, false, true, false, null);
@@ -521,6 +574,8 @@ public class TestExperimentalIcebergReadRestrictionLoader {
       return new ExperimentalIcebergReadRestrictionLoader().load(request, table, response);
     } finally {
       FieldUtils.writeField(environment, "internalPolicyDispatcher", originalDispatcher, true);
+      FieldUtils.writeField(
+          environment, "internalAccessControlDispatcher", originalAccessControl, true);
       FieldUtils.writeStaticField(contextHolder, "INSTANCE", originalContext, true);
     }
   }

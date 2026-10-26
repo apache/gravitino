@@ -113,7 +113,12 @@ fails the load-table request rather than omitting the mask and exposing the orig
 Unselected actions do not need to be applicable to that column. For example, `replace-with-null`
 cannot apply to a required column when that action is selected.
 
-When the experimental Iceberg REST service has a policy dispatcher, load-table does not support
+Experimental Iceberg REST read restrictions require authorization to be enabled with
+`gravitino.authorization.enable=true` and a policy dispatcher to be available. When a policy dispatcher
+is available but authorization is disabled, load-table fails with an error identifying the required
+configuration, even when no policy applies.
+
+When the experimental Iceberg REST read-restriction loader is enabled, load-table does not support
 names containing `.` in the metalake, catalog, schema, table, or top-level column path. The
 metadata-object API reserves `.` as a qualified-name separator, so a tag cannot be assigned
 directly to such an object. The loader returns HTTP 400 for these names even when no policy is

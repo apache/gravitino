@@ -79,8 +79,13 @@ public final class ExperimentalIcebergReadRestrictionLoader
       IcebergRequestContext context, TableIdentifier tableIdentifier, LoadTableResponse response) {
     GravitinoEnv environment = GravitinoEnv.getInstance();
     PolicyDispatcher policyDispatcher = environment.internalPolicyDispatcher();
+    AccessControlDispatcher accessControlDispatcher = environment.internalAccessControlDispatcher();
     if (policyDispatcher == null) {
       return Result.of(response, Optional.empty());
+    }
+    if (accessControlDispatcher == null) {
+      throw new IllegalStateException(
+          "Iceberg read restrictions require authorization; set gravitino.authorization.enable=true");
     }
 
     String metalake = IcebergRESTServerContext.getInstance().metalakeName();
@@ -118,8 +123,7 @@ public final class ExperimentalIcebergReadRestrictionLoader
     }
 
     IdentityBindingContext bindingContext =
-        new IdentityBindingContext(
-            context.userName(), metalake, environment.internalAccessControlDispatcher());
+        new IdentityBindingContext(context.userName(), metalake, accessControlDispatcher);
     ReadRestrictions restrictions =
         resolveForLoad(rowPolicies, maskPolicies, schema, bindingContext);
     if (restrictions.isEmpty()) {
