@@ -58,31 +58,35 @@ public class TestPolicyExecutionSpec {
   }
 
   @Test
-  void validateAcceptsScalarTriggers() {
+  void ofAcceptsScalarTriggers() {
     PolicyExecutionSpec spec =
-        PolicyExecutionSpec.of(
-            "0 0 2 * * ?",
-            true,
-            100L,
-            ImmutableMap.of("uri", "http://irc"),
-            ImmutableMap.of("metalake", "ml"));
-    Assertions.assertDoesNotThrow(spec::validate);
+        Assertions.assertDoesNotThrow(
+            () ->
+                PolicyExecutionSpec.of(
+                    "0 0 2 * * ?",
+                    true,
+                    100L,
+                    ImmutableMap.of("uri", "http://irc"),
+                    ImmutableMap.of("metalake", "ml")));
+    Assertions.assertEquals("0 0 2 * * ?", spec.timeTrigger());
+    Assertions.assertEquals(Boolean.TRUE, spec.commitTrigger());
   }
 
   @Test
-  void validateAcceptsCommitTriggerTrueAlone() {
-    PolicyExecutionSpec spec =
-        PolicyExecutionSpec.of(null, true, null, Collections.emptyMap(), Collections.emptyMap());
-    Assertions.assertDoesNotThrow(spec::validate);
+  void ofAcceptsCommitTriggerTrueAlone() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyExecutionSpec.of(
+                null, true, null, Collections.emptyMap(), Collections.emptyMap()));
   }
 
   @Test
   void doesNotParseTimeTriggerCron() {
     // Cron syntax is owned by the scheduler registration path, not this API type.
-    PolicyExecutionSpec spec =
-        PolicyExecutionSpec.of(
-            "0 2 * *", null, null, Collections.emptyMap(), Collections.emptyMap());
-    Assertions.assertDoesNotThrow(spec::validate);
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyExecutionSpec.of(
+                "0 2 * *", null, null, Collections.emptyMap(), Collections.emptyMap()));
   }
 
   @Test
@@ -90,14 +94,23 @@ public class TestPolicyExecutionSpec {
     Assertions.assertSame(
         PolicyExecutionSpec.EMPTY,
         PolicyExecutionSpec.of("   ", null, null, Collections.emptyMap(), Collections.emptyMap()));
-    Assertions.assertDoesNotThrow(PolicyExecutionSpec.EMPTY::validate);
   }
 
   @Test
-  void validateRejectsNegativeMinInterval() {
-    PolicyExecutionSpec spec = PolicyExecutionSpec.of(null, null, -1L, null, null);
+  void ofRejectsNegativeMinInterval() {
     IllegalArgumentException ex =
-        Assertions.assertThrows(IllegalArgumentException.class, spec::validate);
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PolicyExecutionSpec.of(null, null, -1L, null, null));
     Assertions.assertTrue(ex.getMessage().contains("minIntervalMs"));
+  }
+
+  @Test
+  void ofRejectsBlankOptionValue() {
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PolicyExecutionSpec.of(null, null, null, ImmutableMap.of("uri", " "), null));
+    Assertions.assertTrue(ex.getMessage().contains("jobOptions"));
   }
 }
