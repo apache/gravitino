@@ -30,7 +30,7 @@ import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests REST error handling for optimistic-lock conflicts. */
+/** Tests REST error handling for cross-cutting error codes. */
 public class TestErrorHandlers {
 
   @Test

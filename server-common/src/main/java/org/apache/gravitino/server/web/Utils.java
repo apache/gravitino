@@ -131,7 +131,10 @@ public class Utils {
   }
 
   public static Response serviceUnavailable(String message) {
-    return serviceUnavailable(message, null);
+    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+        .entity(ErrorResponse.serviceUnavailable(message))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
   }
 
   public static Response serviceUnavailable(String message, Throwable throwable) {

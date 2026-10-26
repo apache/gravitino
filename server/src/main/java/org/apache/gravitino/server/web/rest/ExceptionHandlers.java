@@ -227,6 +227,9 @@ public class ExceptionHandlers {
     if (e instanceof IllegalArgumentException) {
       response = ErrorResponse.illegalArguments(e.getMessage(), throwable);
 
+    } else if (e instanceof ServiceUnavailableException) {
+      response = ErrorResponse.serviceUnavailable(e.getMessage(), throwable);
+
     } else if (e instanceof ConnectionFailedException) {
       response = ErrorResponse.connectionFailed(e.getMessage(), throwable);
 
@@ -808,7 +811,8 @@ public class ExceptionHandlers {
 
     @Override
     public Response handle(OperationType op, String secret, String parent, Exception e) {
-      String errorMsg = getSecretErrorMsg(parent, getErrorMsg(e));
+      String reason = e instanceof ServiceUnavailableException ? e.getMessage() : getErrorMsg(e);
+      String errorMsg = getSecretErrorMsg(parent, reason);
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -1048,6 +1052,9 @@ public class ExceptionHandlers {
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
+      } else if (e instanceof ServiceUnavailableException) {
+        return Utils.serviceUnavailable(errorMsg, e);
+
       } else if (e instanceof ConnectionFailedException) {
         return Utils.connectionFailed(errorMsg, e);
 
@@ -1238,6 +1245,7 @@ public class ExceptionHandlers {
       // A configured dependency that is temporarily unavailable is not an internal Gravitino error:
       // surface it as 503 Service Unavailable so callers can tell an outage from a server bug.
       if (e instanceof ServiceUnavailableException) {
+        // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
         LOG.warn(errorMsg, e);
         return Utils.serviceUnavailable(errorMsg, e);
       }

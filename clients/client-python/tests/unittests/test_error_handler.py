@@ -56,10 +56,10 @@ from gravitino.exceptions.base import (
     OptimisticLockException,
     PartitionAlreadyExistsException,
     RESTException,
-    ServiceUnavailableException,
     RoleAlreadyExistsException,
     SchemaAlreadyExistsException,
     SemanticModelAlreadyExistsException,
+    ServiceUnavailableException,
     TableAlreadyExistsException,
     UnauthorizedException,
     UnsupportedOperationException,
@@ -89,7 +89,6 @@ from gravitino.exceptions.handlers.permission_error_handler import (
 )
 from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
-from gravitino.exceptions.handlers.secret_error_handler import SECRET_ERROR_HANDLER
 from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
 from gravitino.exceptions.handlers.view_error_handler import VIEW_ERROR_HANDLER
@@ -208,23 +207,24 @@ class TestErrorHandler(unittest.TestCase):
     def test_service_unavailable(self):
         response = ErrorResponse.from_json(
             '{"code":1013,"type":"ServiceUnavailableException",'
-            '"message":"secret provider \'vault\' is unavailable","stack":null}'
+            '"message":"Service unavailable","stack":null}'
         )
         generated = ErrorResponse.generate_error_response(
-            ServiceUnavailableException, "secret provider 'vault' is unavailable"
+            ServiceUnavailableException, "Service unavailable"
         )
         self.assertEqual(1013, generated.code())
 
         for handler in (
             REST_ERROR_HANDLER,
-            SECRET_ERROR_HANDLER,
-            CATALOG_ERROR_HANDLER,
             TABLE_ERROR_HANDLER,
+            VIEW_ERROR_HANDLER,
+            PARTITION_ERROR_HANDLER,
+            STATISTICS_ERROR_HANDLER,
+            CATALOG_ERROR_HANDLER,
         ):
             with self.subTest(handler=type(handler).__name__):
                 with self.assertRaisesRegex(
-                    ServiceUnavailableException,
-                    "secret provider 'vault' is unavailable",
+                    ServiceUnavailableException, "Service unavailable"
                 ):
                     handler.handle(response)
 

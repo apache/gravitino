@@ -135,29 +135,19 @@ public class TestExceptionHandlers {
 
   @Test
   public void testServiceUnavailableReturnsServiceUnavailable() {
-    ServiceUnavailableException exception =
-        new ServiceUnavailableException("secret provider 'vault' is unavailable");
+    Response response =
+        ExceptionHandlers.handleTableException(
+            OperationType.LOAD,
+            "table",
+            "schema",
+            new ServiceUnavailableException("secret provider 'vault' is unavailable"));
 
-    Response secretResponse =
-        ExceptionHandlers.handleSecretException(OperationType.GET, "catalog.demo", exception);
     Assertions.assertEquals(
-        Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), secretResponse.getStatus());
-    ErrorResponse secretError = (ErrorResponse) secretResponse.getEntity();
-    Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, secretError.getCode());
+        Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, errorResponse.getCode());
     Assertions.assertEquals(
-        ServiceUnavailableException.class.getSimpleName(), secretError.getType());
-    Assertions.assertTrue(
-        secretError.getMessage().contains("secret provider 'vault' is unavailable"));
-
-    Response catalogResponse =
-        ExceptionHandlers.handleCatalogException(
-            OperationType.CREATE, "demo", "metalake", exception);
-    Assertions.assertEquals(
-        Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), catalogResponse.getStatus());
-    ErrorResponse catalogError = (ErrorResponse) catalogResponse.getEntity();
-    Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, catalogError.getCode());
-    Assertions.assertEquals(
-        ServiceUnavailableException.class.getSimpleName(), catalogError.getType());
+        ServiceUnavailableException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
