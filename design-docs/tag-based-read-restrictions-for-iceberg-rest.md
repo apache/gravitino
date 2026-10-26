@@ -177,10 +177,15 @@ same logical type as the target column.
   "policyType": "system_column_mask",
   "enabled": false,
   "content": {
-    "expression": "CASE WHEN is_group_member('auditors') THEN show_last_4(phone_number) ELSE NULL END"
+    "expression": "CASE WHEN is_group_member('auditors') THEN show_last_4(value) ELSE NULL END"
   }
 }
 ```
+
+`value` is the input parameter supplied by column-mask evaluation. It contains the original value
+of the column selected by policy and tag resolution; it is not the name of a physical column.
+For example, the same expression receives a phone number when applied to `phone_number` and a
+card number when applied to `card`. Its type and nullability come from that selected column.
 
 The SQL expression returns a masked value rather than an action name. `CASE` selects the first
 true condition, returning the transformed column value or a typed null. A mask may also return a
@@ -248,12 +253,12 @@ CASE
 END
 ```
 
-With a string input `email`, a mask may return the original value or a transformed value:
+With a string target column, a mask may return its original input `value` or a transformed value:
 
 ```sql
 CASE
-  WHEN CURRENT_USER() = 'alice' THEN email
-  ELSE mask_alphanum(email)
+  WHEN CURRENT_USER() = 'alice' THEN value
+  ELSE mask_alphanum(value)
 END
 ```
 
@@ -261,16 +266,26 @@ It may also return a literal or null of the expected type:
 
 ```sql
 CASE
-  WHEN email IS NULL THEN NULL
+  WHEN value IS NULL THEN NULL
   ELSE 'XXXXXXXX'
 END
 ```
 
 ### Expression Inputs and Results
 
-An expression may reference only inputs supplied by its policy context. Each input has a known
-logical type and nullability. Input names must be unique under the identifier rules below. The
-expected result type is also known before evaluation:
+The data inputs depend on the expression's policy type:
+
+- A row filter references columns of the target table by name. For example, `region` and `owner`
+  in the row-filter example must be columns in that table's schema. Missing or ambiguous columns
+  are errors.
+- A column mask has one data input, `value`, supplied automatically for each selected column.
+  `value` has that column's original value, logical type, and nullability. The target column's
+  physical name is not available as an implicit alias, and other table columns are not exposed.
+
+`value` is an ordinary identifier in the mask's input scope, not a new SQL keyword. No separate
+parameter declaration is needed in the expression string. In a row filter, `value` refers to an
+actual table column of that name if one exists; the mask input convention does not apply there.
+Context functions are available in both scopes. The expected result type is known before evaluation:
 
 | Use | Expected result | Accepted expression forms |
 | --- | --- | --- |
@@ -278,9 +293,9 @@ expected result type is also known before evaluation:
 | Column mask | Target column's logical type | Original input, literal, null, function result, scalar `CASE` |
 
 A mask's result type must match the target column, including precision, scale, and timezone
-characteristics. A mask may use other available inputs in conditions. A non-Boolean filter result
-or incompatible mask result is an error. This expression specification does not define how the
-surrounding policy selects or binds those inputs.
+characteristics. Its conditions may use `value` and trusted context functions. A non-Boolean
+filter result or incompatible mask result is an error. When one policy applies to several
+columns, each mask evaluation binds `value` independently to its selected column.
 
 ### SQL Expression Language
 
@@ -415,9 +430,11 @@ Nested `CASE` expressions and built-in calls are allowed within the resource lim
 
 ### Type and Context Binding
 
-Input names, logical types, and nullability come from the policy context. Missing or ambiguous
-names, unavailable inputs, unsupported types, incompatible operands, and invalid function
-arguments are errors.
+Row-filter input names, types, and nullability come from the target table schema. Column-mask
+evaluation binds the selected column to the local input `value` before type checking and inherits
+its logical type and nullability. This binding is independent of the physical column name.
+Missing or ambiguous names, unavailable inputs, unsupported types, incompatible operands, and
+invalid function arguments are errors.
 
 | Gravitino type | Supported value predicates |
 | --- | --- |
@@ -496,26 +513,27 @@ rather than denying access to the table.
 
 The Gravitino mask functions defined by this profile remain available inside a SQL mask expression.
 They are ordinary typed scalar calls and may appear in `CASE` branches or nested calls with matching
-types. They are Gravitino functions rather than a claim of Snowflake function compatibility. Each function
-preserves its input logical type. Examples below assume matching input names and types.
+types. They are Gravitino functions rather than a claim of Snowflake function compatibility. Each
+function preserves its input logical type. In the examples below, `value` is the column-mask
+input and must have a type accepted by the function.
 
 | SQL expression | Input types | Meaning |
 | --- | --- | --- |
-| `mask_alphanum(email)` | `STRING` | ASCII digits become `n`; `(),.@-` are preserved; every other Unicode code point becomes `x` |
-| `show_first_4(email)` | `STRING` | Keep the first four code points; apply the same masking rules to the remainder |
-| `show_last_4(card)` | `STRING` | Keep the last four code points; apply the same masking rules to the preceding portion |
-| `mask_to_fixed_value(region)` | Types with a defined fixed value | Replace with the type's fixed value, including null input |
-| `replace_with_null(email)` | Any typed scalar | Return a null of the input's type; the result is nullable |
-| `truncate_to_year(order_date)` | Date and supported timestamp types | Truncate to the beginning of the year |
-| `truncate_to_month(order_date)` | Date and supported timestamp types | Truncate to the beginning of the month |
-| `sha256_global(customer_id)` | `STRING`, signed `INTEGER`, signed `LONG`, `BINARY` | Stable type-preserving SHA-256 transformation |
-| `sha256_query_local(customer_id)` | Same as `sha256_global` | Type-preserving SHA-256 transformation salted per query |
+| `mask_alphanum(value)` | `STRING` | ASCII digits become `n`; `(),.@-` are preserved; every other Unicode code point becomes `x` |
+| `show_first_4(value)` | `STRING` | Keep the first four code points; apply the same masking rules to the remainder |
+| `show_last_4(value)` | `STRING` | Keep the last four code points; apply the same masking rules to the preceding portion |
+| `mask_to_fixed_value(value)` | Types with a defined fixed value | Replace with the type's fixed value, including null input |
+| `replace_with_null(value)` | Any typed scalar | Return a null of the input's type; the result is nullable |
+| `truncate_to_year(value)` | Date and supported timestamp types | Truncate to the beginning of the year |
+| `truncate_to_month(value)` | Date and supported timestamp types | Truncate to the beginning of the month |
+| `sha256_global(value)` | `STRING`, signed `INTEGER`, signed `LONG`, `BINARY` | Stable type-preserving SHA-256 transformation |
+| `sha256_query_local(value)` | Same as `sha256_global` | Type-preserving SHA-256 transformation salted per query |
 
 The mask behaviors remain the same. All masks except `mask_to_fixed_value` preserve null input.
 Strings of four or fewer Unicode code points are returned unchanged by
 `show_first_4` and `show_last_4`. Timestamp-with-timezone truncation uses UTC.
 
-For example, `show_last_4(card)` changes `4111-1111-1111-4444` to `nnnn-nnnn-nnnn-4444`.
+For example, `show_last_4(value)` changes `4111-1111-1111-4444` to `nnnn-nnnn-nnnn-4444`.
 `mask_to_fixed_value` returns `'XXXXXXXX'` for strings, zero for numbers, false for booleans,
 and the epoch date or timestamp for those temporal types.
 
@@ -527,8 +545,8 @@ a cryptographically random salt of at least 16 bytes, shared by every evaluation
 separate queries use independent salts.
 
 Only allowlisted functions and the shared expression grammar are accepted. Each mask function
-takes one compatible scalar argument; additional arguments to these calls are invalid. Other
-available inputs may be used elsewhere in the expression. Conditional disclosure is expressed with
+takes one compatible scalar argument; additional arguments to these calls are invalid. Conditions
+may use the mask input `value` and trusted context functions. Conditional disclosure is expressed with
 ordinary SQL `CASE`, as in the email mask example above.
 
 A mask expression must have the expected result type on every branch. Returning null, explicitly or
@@ -572,6 +590,12 @@ types and nullability; invalid type/function pairs; and all resource limits.
 Input cases must verify unknown names, incompatible types, and expected result types. Identifier
 cases must verify unquoted case folding and quoted exact names. All expression forms share the
 same null, type, and resource-limit rules.
+
+Mask-input cases must apply the same `show_last_4(value)` expression to differently named string
+columns and verify independent binding, inherited nullability, and type checks. A column-mask
+reference to `phone_number` or `email` must be rejected because neither is the mask input name.
+Row-filter cases must resolve actual column names from the target table schema.
+
 ## Resolution and Conflicts
 
 For one authenticated subject and table load:
