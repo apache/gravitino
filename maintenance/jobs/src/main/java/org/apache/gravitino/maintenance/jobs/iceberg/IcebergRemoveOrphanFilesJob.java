@@ -52,7 +52,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRemoveOrphanFilesJob.class);
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v3";
 
   @Override
   public SparkJobTemplate jobTemplate() {

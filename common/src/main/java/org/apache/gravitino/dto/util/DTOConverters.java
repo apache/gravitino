@@ -690,10 +690,22 @@ public class DTOConverters {
           .build();
     }
     if (policyContent instanceof IcebergRewriteManifestsContent) {
-      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.instance();
+      IcebergRewriteManifestsContent content = (IcebergRewriteManifestsContent) policyContent;
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
+          .withManifestCountCritical(content.manifestCountCritical())
+          .withManifestCountWarning(content.manifestCountWarning())
+          .withAvgManifestSizeThresholdBytes(content.avgManifestSizeThresholdBytes())
+          .withSpecId(content.specId())
+          .withUseCaching(content.useCaching())
+          .build();
     }
     if (policyContent instanceof IcebergSnapshotExpirationContent) {
-      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.instance();
+      IcebergSnapshotExpirationContent content = (IcebergSnapshotExpirationContent) policyContent;
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withRetainLast(content.retainLast())
+          .withStreamResults(content.streamResults())
+          .build();
     }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
@@ -1583,10 +1595,20 @@ public class DTOConverters {
           content.olderThanDays(), content.location(), content.dryRun());
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
-      return PolicyContents.icebergRewriteManifests();
+      PolicyContentDTO.IcebergRewriteManifestsContentDTO content =
+          (PolicyContentDTO.IcebergRewriteManifestsContentDTO) policyContentDTO;
+      return PolicyContents.icebergRewriteManifests(
+          content.manifestCountCritical(),
+          content.manifestCountWarning(),
+          content.avgManifestSizeThresholdBytes(),
+          content.specId(),
+          content.useCaching());
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
-      return PolicyContents.icebergSnapshotExpiration();
+      PolicyContentDTO.IcebergSnapshotExpirationContentDTO content =
+          (PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO;
+      return PolicyContents.icebergSnapshotExpiration(
+          content.olderThanDays(), content.retainLast(), content.streamResults());
     }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
       PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =

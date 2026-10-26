@@ -143,6 +143,19 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
     Preconditions.checkArgument(
         location == null || location.equals(StringUtils.strip(location.trim())),
         "location must not have leading or trailing whitespace");
+    if (location != null) {
+      // Mirror OrphanFileLocationUtils.normalizeLocation safety without needing a table root.
+      Preconditions.checkArgument(
+          !location.contains(".."), "location must not contain '..' path segments: %s", location);
+      Preconditions.checkArgument(
+          !location.contains("\\"), "location must not contain '\\': %s", location);
+      Preconditions.checkArgument(
+          !location.contains("%"), "location must not contain percent-encoding: %s", location);
+      Preconditions.checkArgument(
+          !location.contains("?") && !location.contains("#"),
+          "location must not contain query or fragment: %s",
+          location);
+    }
   }
 
   @Override
