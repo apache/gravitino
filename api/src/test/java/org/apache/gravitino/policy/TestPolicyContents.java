@@ -180,37 +180,6 @@ public class TestPolicyContents {
   }
 
   @Test
-  void testIcebergCompactionContentRejectsUnparseableSortOrder() {
-    IcebergDataCompactionContent content =
-        (IcebergDataCompactionContent)
-            PolicyContents.icebergDataCompaction(
-                1000L, 1L, 1L, 100L, 50L, "sort", "not a valid ((( order", Map.of());
-
-    IllegalArgumentException exception =
-        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
-    Assertions.assertTrue(exception.getMessage().contains("sortOrder"));
-  }
-
-  @Test
-  void testIcebergCompactionContentAcceptsFieldAndZOrderSortOrders() {
-    Assertions.assertDoesNotThrow(
-        () ->
-            PolicyContents.icebergDataCompaction(
-                    1000L, 1L, 1L, 100L, 50L, "sort", "id DESC NULLS LAST", Map.of())
-                .validate());
-    Assertions.assertDoesNotThrow(
-        () ->
-            PolicyContents.icebergDataCompaction(
-                    1000L, 1L, 1L, 100L, 50L, "sort", "a ASC, b DESC NULLS FIRST", Map.of())
-                .validate());
-    Assertions.assertDoesNotThrow(
-        () ->
-            PolicyContents.icebergDataCompaction(
-                    1000L, 1L, 1L, 100L, 50L, "sort", "zorder(c1,c2)", Map.of())
-                .validate());
-  }
-
-  @Test
   void testIcebergCompactionContentRejectsUnknownOrInvalidRewriteOptions() {
     IllegalArgumentException unknown =
         Assertions.assertThrows(

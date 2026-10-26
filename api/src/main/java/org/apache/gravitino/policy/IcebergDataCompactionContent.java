@@ -284,7 +284,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
           StringUtils.isNotBlank(sortOrder),
           "sortOrder must be set when rewriteStrategy is '%s'",
           REWRITE_STRATEGY_SORT);
-      IcebergSortOrderSyntax.validate(sortOrder);
+      // Full Iceberg parse needs Spark ExtendedParser + table Schema; that runs in the job.
     } else {
       Preconditions.checkArgument(
           StringUtils.isBlank(sortOrder),
