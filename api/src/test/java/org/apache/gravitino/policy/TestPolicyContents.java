@@ -177,26 +177,29 @@ public class TestPolicyContents {
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
-    Assertions.assertTrue(exception.g  @Test
-  void testValidateRejectsNegativeMinIntervalMsOnExecutableContent() {
-    PolicyContent content =
-        PolicyContents.icebergDataCompaction(
-            IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
-            IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
-            IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
-            IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
-            IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
-            IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
-            IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
-            null,
-            null,
-            null,
-            -1L,
-            null,
-            null);
+    Assertions.assertTrue(exception.getMessage().contains("maxPartitionNum"));
+  }
 
+  @Test
+  void testOfRejectsNegativeMinIntervalMsOnExecutableContent() {
     IllegalArgumentException exception =
-        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PolicyContents.icebergDataCompaction(
+                    IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+                    IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+                    IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+                    IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+                    IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+                    IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+                    IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
+                    null,
+                    null,
+                    null,
+                    -1L,
+                    null,
+                    null));
     Assertions.assertTrue(exception.getMessage().contains("minIntervalMs"));
   }
 
@@ -239,9 +242,6 @@ public class TestPolicyContents {
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
     Assertions.assertTrue(exception.getMessage().contains("commitTrigger"));
-  }
-
-etMessage().contains("maxPartitionNum"));
   }
 
   @Test
