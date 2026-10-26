@@ -29,7 +29,8 @@ import java.util.Map.Entry;
 import javax.annotation.Nullable;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
-import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -39,13 +40,14 @@ import org.slf4j.LoggerFactory;
 /**
  * In-Spark maintain-or-skip gate after S0 metrics (§5.2.2).
  *
- * <p>Evaluates enqueue-time policy rules locally. Does not call Gravitino. Expire /
- * rewrite-manifests placeholders always maintain (optimizer-only {@code trigger-expr=false} on
- * those types).
+ * <p>Evaluates enqueue-time policy rules locally with the same QL stack as the optimizer. Does not
+ * call Gravitino. Expire / rewrite-manifests placeholders always maintain (optimizer-only {@code
+ * trigger-expr=false} on those types).
  */
 final class MaintenanceTriggerGate {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceTriggerGate.class);
+  private static final ExpressionEvaluator EVALUATOR = new QLExpressionEvaluator();
 
   /** Spark job argument key: JSON map of wire maintenance type → policy {@code rules()} object. */
   static final String RULES_ARG = "rules";
@@ -74,13 +76,41 @@ final class MaintenanceTriggerGate {
       return false;
     }
 
-    boolean maintain = CompactionTriggerEvaluator.shouldMaintain(rules, metrics);
+    boolean maintain = evaluateTrigger(rules, metrics);
     LOG.info(
         "In-Spark recommend type={} expr={} -> {}",
         type.wireName(),
         rules.get(IcebergDataCompactionContent.TRIGGER_EXPR_KEY),
         maintain ? "MAINTAIN" : "SKIP");
     return maintain;
+  }
+
+  /**
+   * Same binding rules as {@code CompactionTriggerEvaluator}: numeric policy rules become QL
+   * bindings, then metric values overlay them, then {@code trigger-expr} is evaluated.
+   */
+  private static boolean evaluateTrigger(
+      Map<String, Object> rules, Map<String, Object> metricValues) {
+    Map<String, Object> context = new HashMap<>();
+    rules.forEach(
+        (key, value) -> {
+          if (value == null) {
+            return;
+          }
+          try {
+            context.put(key, Long.parseLong(value.toString()));
+          } catch (NumberFormatException ignored) {
+            // Non-numeric rule values (expressions, strings) are not QL bindings.
+          }
+        });
+    context.putAll(metricValues);
+
+    Object trigger = rules.get(IcebergDataCompactionContent.TRIGGER_EXPR_KEY);
+    String expression =
+        trigger == null || trigger.toString().trim().isEmpty()
+            ? "false"
+            : trigger.toString().trim();
+    return EVALUATOR.evaluateBool(expression, context);
   }
 
   private static Map<String, Object> rulesForType(
