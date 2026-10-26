@@ -66,6 +66,101 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
+     * Rebuilds peers with a replaced {@code timeTrigger} via {@link PolicyExecutionSpec#of}.
+     *
+     * @param current current peers; {@code null} treated as empty
+     * @param timeTrigger replacement cron expression
+     * @return normalized spec for DTO storage
+     */
+    static PolicyExecutionSpec withTimeTrigger(
+        @Nullable PolicyExecutionSpec current, @Nullable String timeTrigger) {
+      PolicyExecutionSpec cur = current == null ? PolicyExecutionSpec.empty() : current;
+      return normalize(
+          PolicyExecutionSpec.of(
+              timeTrigger,
+              cur.commitTrigger(),
+              cur.minIntervalMs(),
+              cur.jobOptions(),
+              cur.updaterOptions()));
+    }
+
+    /**
+     * Rebuilds peers with a replaced {@code commitTrigger} via {@link PolicyExecutionSpec#of}.
+     *
+     * @param current current peers; {@code null} treated as empty
+     * @param commitTrigger replacement commit-trigger flag
+     * @return normalized spec for DTO storage
+     */
+    static PolicyExecutionSpec withCommitTrigger(
+        @Nullable PolicyExecutionSpec current, @Nullable Boolean commitTrigger) {
+      PolicyExecutionSpec cur = current == null ? PolicyExecutionSpec.empty() : current;
+      return normalize(
+          PolicyExecutionSpec.of(
+              cur.timeTrigger(),
+              commitTrigger,
+              cur.minIntervalMs(),
+              cur.jobOptions(),
+              cur.updaterOptions()));
+    }
+
+    /**
+     * Rebuilds peers with a replaced {@code minIntervalMs} via {@link PolicyExecutionSpec#of}.
+     *
+     * @param current current peers; {@code null} treated as empty
+     * @param minIntervalMs replacement cooldown
+     * @return normalized spec for DTO storage
+     */
+    static PolicyExecutionSpec withMinIntervalMs(
+        @Nullable PolicyExecutionSpec current, @Nullable Long minIntervalMs) {
+      PolicyExecutionSpec cur = current == null ? PolicyExecutionSpec.empty() : current;
+      return normalize(
+          PolicyExecutionSpec.of(
+              cur.timeTrigger(),
+              cur.commitTrigger(),
+              minIntervalMs,
+              cur.jobOptions(),
+              cur.updaterOptions()));
+    }
+
+    /**
+     * Rebuilds peers with replaced {@code jobOptions} via {@link PolicyExecutionSpec#of}.
+     *
+     * @param current current peers; {@code null} treated as empty
+     * @param jobOptions replacement job options
+     * @return normalized spec for DTO storage
+     */
+    static PolicyExecutionSpec withJobOptions(
+        @Nullable PolicyExecutionSpec current, @Nullable Map<String, String> jobOptions) {
+      PolicyExecutionSpec cur = current == null ? PolicyExecutionSpec.empty() : current;
+      return normalize(
+          PolicyExecutionSpec.of(
+              cur.timeTrigger(),
+              cur.commitTrigger(),
+              cur.minIntervalMs(),
+              jobOptions,
+              cur.updaterOptions()));
+    }
+
+    /**
+     * Rebuilds peers with replaced {@code updaterOptions} via {@link PolicyExecutionSpec#of}.
+     *
+     * @param current current peers; {@code null} treated as empty
+     * @param updaterOptions replacement updater options
+     * @return normalized spec for DTO storage
+     */
+    static PolicyExecutionSpec withUpdaterOptions(
+        @Nullable PolicyExecutionSpec current, @Nullable Map<String, String> updaterOptions) {
+      PolicyExecutionSpec cur = current == null ? PolicyExecutionSpec.empty() : current;
+      return normalize(
+          PolicyExecutionSpec.of(
+              cur.timeTrigger(),
+              cur.commitTrigger(),
+              cur.minIntervalMs(),
+              cur.jobOptions(),
+              updaterOptions));
+    }
+
+    /**
      * @return immutable execution peers; never {@code null}
      */
     @JsonIgnore
@@ -310,31 +405,27 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("timeTrigger")
     private void setTimeTrigger(String timeTrigger) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
+      this.executionSpec = ExecutionPeersDTO.withTimeTrigger(this.executionSpec, timeTrigger);
     }
 
     @JsonProperty("commitTrigger")
     private void setCommitTrigger(Boolean commitTrigger) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
+      this.executionSpec = ExecutionPeersDTO.withCommitTrigger(this.executionSpec, commitTrigger);
     }
 
     @JsonProperty("minIntervalMs")
     private void setMinIntervalMs(Long minIntervalMs) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
+      this.executionSpec = ExecutionPeersDTO.withMinIntervalMs(this.executionSpec, minIntervalMs);
     }
 
     @JsonProperty("jobOptions")
     private void setJobOptions(Map<String, String> jobOptions) {
-      this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
+      this.executionSpec = ExecutionPeersDTO.withJobOptions(this.executionSpec, jobOptions);
     }
 
     @JsonProperty("updaterOptions")
     private void setUpdaterOptions(Map<String, String> updaterOptions) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
+      this.executionSpec = ExecutionPeersDTO.withUpdaterOptions(this.executionSpec, updaterOptions);
     }
 
     @Override
@@ -436,31 +527,27 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("timeTrigger")
     private void setTimeTrigger(String timeTrigger) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
+      this.executionSpec = ExecutionPeersDTO.withTimeTrigger(this.executionSpec, timeTrigger);
     }
 
     @JsonProperty("commitTrigger")
     private void setCommitTrigger(Boolean commitTrigger) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
+      this.executionSpec = ExecutionPeersDTO.withCommitTrigger(this.executionSpec, commitTrigger);
     }
 
     @JsonProperty("minIntervalMs")
     private void setMinIntervalMs(Long minIntervalMs) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
+      this.executionSpec = ExecutionPeersDTO.withMinIntervalMs(this.executionSpec, minIntervalMs);
     }
 
     @JsonProperty("jobOptions")
     private void setJobOptions(Map<String, String> jobOptions) {
-      this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
+      this.executionSpec = ExecutionPeersDTO.withJobOptions(this.executionSpec, jobOptions);
     }
 
     @JsonProperty("updaterOptions")
     private void setUpdaterOptions(Map<String, String> updaterOptions) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
+      this.executionSpec = ExecutionPeersDTO.withUpdaterOptions(this.executionSpec, updaterOptions);
     }
 
     @Override
@@ -534,31 +621,27 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("timeTrigger")
     private void setTimeTrigger(String timeTrigger) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
+      this.executionSpec = ExecutionPeersDTO.withTimeTrigger(this.executionSpec, timeTrigger);
     }
 
     @JsonProperty("commitTrigger")
     private void setCommitTrigger(Boolean commitTrigger) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
+      this.executionSpec = ExecutionPeersDTO.withCommitTrigger(this.executionSpec, commitTrigger);
     }
 
     @JsonProperty("minIntervalMs")
     private void setMinIntervalMs(Long minIntervalMs) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
+      this.executionSpec = ExecutionPeersDTO.withMinIntervalMs(this.executionSpec, minIntervalMs);
     }
 
     @JsonProperty("jobOptions")
     private void setJobOptions(Map<String, String> jobOptions) {
-      this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
+      this.executionSpec = ExecutionPeersDTO.withJobOptions(this.executionSpec, jobOptions);
     }
 
     @JsonProperty("updaterOptions")
     private void setUpdaterOptions(Map<String, String> updaterOptions) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
+      this.executionSpec = ExecutionPeersDTO.withUpdaterOptions(this.executionSpec, updaterOptions);
     }
 
     @Override
@@ -626,31 +709,27 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("timeTrigger")
     private void setTimeTrigger(String timeTrigger) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withTimeTrigger(timeTrigger));
+      this.executionSpec = ExecutionPeersDTO.withTimeTrigger(this.executionSpec, timeTrigger);
     }
 
     @JsonProperty("commitTrigger")
     private void setCommitTrigger(Boolean commitTrigger) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withCommitTrigger(commitTrigger));
+      this.executionSpec = ExecutionPeersDTO.withCommitTrigger(this.executionSpec, commitTrigger);
     }
 
     @JsonProperty("minIntervalMs")
     private void setMinIntervalMs(Long minIntervalMs) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withMinIntervalMs(minIntervalMs));
+      this.executionSpec = ExecutionPeersDTO.withMinIntervalMs(this.executionSpec, minIntervalMs);
     }
 
     @JsonProperty("jobOptions")
     private void setJobOptions(Map<String, String> jobOptions) {
-      this.executionSpec = ExecutionPeersDTO.normalize(executionSpec().withJobOptions(jobOptions));
+      this.executionSpec = ExecutionPeersDTO.withJobOptions(this.executionSpec, jobOptions);
     }
 
     @JsonProperty("updaterOptions")
     private void setUpdaterOptions(Map<String, String> updaterOptions) {
-      this.executionSpec =
-          ExecutionPeersDTO.normalize(executionSpec().withUpdaterOptions(updaterOptions));
+      this.executionSpec = ExecutionPeersDTO.withUpdaterOptions(this.executionSpec, updaterOptions);
     }
 
     @Override
