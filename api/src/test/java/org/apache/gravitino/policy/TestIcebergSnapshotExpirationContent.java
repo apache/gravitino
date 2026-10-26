@@ -34,7 +34,7 @@ public class TestIcebergSnapshotExpirationContent {
     assertEquals(IcebergSnapshotExpirationContent.DEFAULT_OLDER_THAN_DAYS, content.olderThanDays());
     assertEquals(IcebergSnapshotExpirationContent.DEFAULT_RETAIN_LAST, content.retainLast());
     assertEquals(IcebergSnapshotExpirationContent.DEFAULT_STREAM_RESULTS, content.streamResults());
-    assertEquals("false", content.rules().get(IcebergSnapshotExpirationContent.TRIGGER_EXPR_KEY));
+    assertEquals("true", content.rules().get(IcebergSnapshotExpirationContent.TRIGGER_EXPR_KEY));
     assertEquals(
         content.olderThanDays(),
         content

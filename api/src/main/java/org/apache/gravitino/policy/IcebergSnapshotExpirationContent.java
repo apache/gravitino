@@ -118,8 +118,8 @@ public class IcebergSnapshotExpirationContent implements PolicyContent {
   @Override
   public Map<String, Object> rules() {
     Map<String, Object> rules = new LinkedHashMap<>();
-    // No SnapshotExpirationStrategyHandler yet; keep false so the optimizer does not auto-trigger.
-    rules.put(TRIGGER_EXPR_KEY, "false");
+    // Eligibility is evaluated when the optimizer is invoked. Scheduling is owned by the caller.
+    rules.put(TRIGGER_EXPR_KEY, "true");
     rules.put(SCORE_EXPR_KEY, "1");
     rules.put(JOB_OPTIONS_PREFIX + OLDER_THAN_DAYS_KEY, olderThanDays);
     rules.put(JOB_OPTIONS_PREFIX + RETAIN_LAST_KEY, retainLast);

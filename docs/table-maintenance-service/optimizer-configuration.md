@@ -198,6 +198,45 @@ See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for 
 complete submission example. For policy-driven submission, configure the handler
 and policy below. Periodic scheduling remains separate.
 
+### Snapshot expiration policy integration
+
+Register the handler alongside the existing optimizer providers:
+
+```properties
+gravitino.optimizer.strategyHandler.iceberg-snapshot-expiration.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationStrategyHandler
+```
+
+The built-in job adapter is registered automatically. Keep the same Spark and
+catalog submission configuration as for direct expire-snapshots runs, including
+`catalog_name` and `spark_conf`. The adapter supplies `table_identifier`,
+`older_than`, `retain_last`, and `stream_results`. These policy-derived values
+override shared submission defaults.
+
+Create a policy through `POST /api/metalakes/{metalake}/policies`:
+
+```json
+{
+  "name": "expire_snapshots",
+  "policyType": "system_iceberg_snapshot_expiration",
+  "enabled": true,
+  "content": {
+    "olderThanDays": 5,
+    "retainLast": 1,
+    "streamResults": false
+  }
+}
+```
+
+Associate the policy with a tag and attach that tag to the target table, schema,
+or catalog, following the [policy setup walkthrough](./optimizer.md).
+`olderThanDays` defaults to 5 (Iceberg's expire default) and must be between 1 and 36500.
+`retainLast` defaults to 1. `streamResults` defaults to false.
+
+The policy adapter subtracts `olderThanDays` from the current instant and always
+emits `older_than` as an explicit UTC timestamp ending in `Z`. Each optimizer
+invocation may submit expire when the policy is attached (`trigger-expr` is
+`true`); scheduling remains separate.
+
 ### Orphan cleanup policy integration
 
 Register the handler alongside the existing optimizer providers:
