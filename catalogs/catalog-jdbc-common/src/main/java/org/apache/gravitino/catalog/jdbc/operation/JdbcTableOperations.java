@@ -587,17 +587,70 @@ public abstract class JdbcTableOperations implements TableOperation {
     return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
   }
 
-  protected void validateUpdateColumnNullable(
+  /**
+   * Validates a nullability change and returns the column it applies to.
+   *
+   * @param change the nullability change
+   * @param table the table that contains the column
+   * @return the current column
+   */
+  protected JdbcColumn validateUpdateColumnNullable(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
     if (change.fieldName().length > 1) {
       throw new UnsupportedOperationException("Nested column names are not supported");
     }
-    String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    if (!change.nullable() && column.defaultValue().equals(Literals.NULL)) {
-      throw new IllegalArgumentException(
-          "column " + col + " with null default value cannot be changed to not null");
+    return getJdbcColumnFromTable(table, change.fieldName()[0]);
+  }
+
+  /**
+   * Returns a copy of the column with the default value and nullability it has after all default
+   * value and nullability changes to it in the same alter request are applied. Dialects that
+   * regenerate the whole column definition for one change use it, so that the regenerated
+   * definition does not revert another change to the same column. A NULL default conflicts with NOT
+   * NULL: the existing NULL default is dropped when the column ends up non-nullable, while a NULL
+   * default requested in the same alter request is rejected.
+   *
+   * @param column the current column
+   * @param changes all changes in the alter request
+   * @return the column with the pending default value and nullability
+   * @throws IllegalArgumentException if the request sets a NULL default on a column that ends up
+   *     non-nullable
+   */
+  protected static JdbcColumn withPendingDefaultValueAndNullability(
+      JdbcColumn column, TableChange... changes) {
+    Expression defaultValue = column.defaultValue();
+    boolean defaultValueChanged = false;
+    boolean nullable = column.nullable();
+    for (TableChange change : changes) {
+      if (!(change instanceof TableChange.ColumnChange)) {
+        continue;
+      }
+      String[] fieldName = ((TableChange.ColumnChange) change).fieldName();
+      if (fieldName.length != 1 || !fieldName[0].equals(column.name())) {
+        continue;
+      }
+      if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        defaultValue = ((TableChange.UpdateColumnDefaultValue) change).getNewDefaultValue();
+        defaultValueChanged = true;
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        nullable = ((TableChange.UpdateColumnNullability) change).nullable();
+      }
     }
+    if (!nullable && Literals.NULL.equals(defaultValue)) {
+      Preconditions.checkArgument(
+          !defaultValueChanged,
+          "Column %s cannot have a NULL default value because it is not nullable",
+          column.name());
+      defaultValue = DEFAULT_VALUE_NOT_SET;
+    }
+    return JdbcColumn.builder()
+        .withName(column.name())
+        .withType(column.dataType())
+        .withComment(column.comment())
+        .withNullable(nullable)
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(defaultValue)
+        .build();
   }
 
   /**

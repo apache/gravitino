@@ -1080,7 +1080,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.UpdateColumnDefaultValue updateColumnDefaultValue) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
-            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
+            updateColumnDefaultValueFieldDefinition(
+                updateColumnDefaultValue, lazyLoadTable, changes));
 
       } else if (change instanceof TableChange.UpdateColumnType updateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -1106,7 +1107,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnNullabilityDefinition(
-                (TableChange.UpdateColumnNullability) change, lazyLoadTable));
+                (TableChange.UpdateColumnNullability) change, lazyLoadTable, changes));
 
       } else if (change instanceof TableChange.AddIndex addIndex) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -1294,20 +1295,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private String updateColumnNullabilityDefinition(
-      TableChange.UpdateColumnNullability change, JdbcTable table) {
-    validateUpdateColumnNullable(change, table);
+      TableChange.UpdateColumnNullability change, JdbcTable table, TableChange... changes) {
+    JdbcColumn column = validateUpdateColumnNullable(change, table);
 
     String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    JdbcColumn updateColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(change.nullable())
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withAutoIncrement(column.autoIncrement())
-            .build();
+    JdbcColumn updateColumn = withPendingDefaultValueAndNullability(column, changes);
 
     return "%s %s %s"
         .formatted(
@@ -1460,7 +1452,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private String updateColumnDefaultValueFieldDefinition(
-      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue,
+      JdbcTable jdbcTable,
+      TableChange... changes) {
     if (updateColumnDefaultValue.fieldName().length > 1) {
       throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
@@ -1468,14 +1462,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String col = updateColumnDefaultValue.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quoteIdentifier(col));
-    JdbcColumn newColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withType(column.dataType())
-            .withNullable(column.nullable())
-            .withComment(column.comment())
-            .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
-            .build();
+    JdbcColumn newColumn = withPendingDefaultValueAndNullability(column, changes);
 
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
