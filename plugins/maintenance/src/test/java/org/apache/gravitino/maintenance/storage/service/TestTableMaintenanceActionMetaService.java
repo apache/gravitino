@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.maintenance.storage.service;
 
+import static org.apache.gravitino.maintenance.storage.TableMaintenanceActionTestUtils.expireClaim;
+
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
@@ -41,6 +43,7 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long after = System.currentTimeMillis();
     Assertions.assertNull(actionService.getById(claim.id()).jobId());
     Assertions.assertEquals(0L, actionService.getById(claim.id()).finishedAt());
+    // DB clock may skew slightly from the JVM; allow a small window.
     Assertions.assertTrue(claim.createdAt() >= before - 5_000L);
     Assertions.assertTrue(claim.createdAt() <= after + 5_000L);
     Assertions.assertEquals(claim.createdAt(), actionService.getById(claim.id()).createdAt());
@@ -255,23 +258,22 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long tableId = 11L;
     long policyId = 21L;
-    long timeoutMs = 200L;
+    long timeoutMs = TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS;
 
     Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(first.isPresent());
     Assertions.assertEquals(0L, actions.getById(first.get().id()).finishedAt());
     Assertions.assertTrue(actions.tryAcquireInFlight(tableId, policyId, timeoutMs).isEmpty());
 
-    Thread.sleep(timeoutMs + 50L);
+    OccupancyClaim expired = expireClaim(first.get(), timeoutMs);
 
     Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
     Assertions.assertEquals(first.get().id(), reclaimed.get().id());
-    Assertions.assertTrue(reclaimed.get().createdAt() >= first.get().createdAt());
+    Assertions.assertTrue(reclaimed.get().createdAt() > expired.createdAt());
     Assertions.assertEquals(0L, actions.getById(reclaimed.get().id()).finishedAt());
 
-    Assertions.assertThrows(
-        IllegalStateException.class, () -> actions.bindJobId(first.get(), 1001L));
+    Assertions.assertThrows(IllegalStateException.class, () -> actions.bindJobId(expired, 1001L));
     actions.bindJobId(reclaimed.get(), 1002L);
     Assertions.assertEquals(1002L, actions.getById(reclaimed.get().id()).jobId());
   }
@@ -281,7 +283,7 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long tableId = 12L;
     long policyId = 22L;
-    long timeoutMs = 200L;
+    long timeoutMs = TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS;
 
     Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(first.isPresent());
@@ -290,11 +292,14 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
 
     Optional<OccupancyClaim> second = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(second.isPresent());
-    Thread.sleep(timeoutMs + 50L);
+    OccupancyClaim expired = expireClaim(second.get(), timeoutMs);
+    // Let the DB clock advance so reclaim cannot reuse the original fencing token.
+    Thread.sleep(2L);
     Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
     Assertions.assertEquals(second.get().id(), reclaimed.get().id());
-    Assertions.assertTrue(reclaimed.get().createdAt() >= second.get().createdAt());
+    Assertions.assertTrue(reclaimed.get().createdAt() > expired.createdAt());
+    Assertions.assertNotEquals(second.get().createdAt(), reclaimed.get().createdAt());
 
     // Stale submitter cleanup must not delete the reclaimed live claim.
     Assertions.assertFalse(actions.deleteUnboundClaim(second.get()));
@@ -311,15 +316,15 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long tableId = 38L;
     long policyId = 50L;
-    long timeoutMs = 200L;
+    long timeoutMs = TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS;
 
     Optional<OccupancyClaim> first = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(first.isPresent());
-    Thread.sleep(timeoutMs + 50L);
+    OccupancyClaim expired = expireClaim(first.get(), timeoutMs);
     Optional<OccupancyClaim> reclaimed = actions.tryAcquireInFlight(tableId, policyId, timeoutMs);
     Assertions.assertTrue(reclaimed.isPresent());
     Assertions.assertEquals(first.get().id(), reclaimed.get().id());
-    Assertions.assertTrue(reclaimed.get().createdAt() >= first.get().createdAt());
+    Assertions.assertTrue(reclaimed.get().createdAt() > expired.createdAt());
 
     // Failed submit cleanup uses deleteClaims; stale created_at must not remove live claim.
     actions.deleteClaims(List.of(first.get()));

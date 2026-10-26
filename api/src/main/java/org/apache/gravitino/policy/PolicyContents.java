@@ -19,11 +19,13 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
 public class PolicyContents {
@@ -250,31 +252,101 @@ public class PolicyContents {
   }
 
   /**
-   * Creates placeholder Iceberg rewrite-manifests policy content.
+   * Creates a manifest rewrite policy with default thresholds targeting Iceberg's current default
+   * partition spec.
    *
-   * @return rewrite-manifests policy content
+   * @return manifest rewrite policy
    */
-  public static PolicyContent icebergRewriteManifests() {
-    return icebergRewriteManifests(null, null, null, null, null);
+  public static IcebergRewriteManifestsContent icebergRewriteManifests() {
+    return new IcebergRewriteManifestsContent(
+        null, null, null, null, null, PolicyExecutionSpec.empty());
   }
 
   /**
-   * Creates placeholder Iceberg rewrite-manifests policy content with execution peers.
+   * Creates a manifest rewrite policy. Null thresholds use the built-in defaults.
    *
+   * @param manifestCountCritical count that triggers regardless of size
+   * @param manifestCountWarning minimum count for the size trigger
+   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param specId requested existing spec, or null to resolve Iceberg's current default at
+   *     evaluation
+   * @param useCaching caching option, or null for the Iceberg default
+   * @return manifest rewrite policy
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable Long manifestCountCritical,
+      @Nullable Long manifestCountWarning,
+      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching) {
+    return icebergRewriteManifests(
+        manifestCountCritical,
+        manifestCountWarning,
+        avgManifestSizeThresholdBytes,
+        specId,
+        useCaching,
+        null,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Creates Iceberg rewrite-manifests policy content with default thresholds and the given
+   * execution peers.
+   *
+   * <p>Prefer this over a peers-only five-arg overload so it does not clash with the thresholds
+   * factory {@code (Long, Long, Long, Integer, Boolean)}.
+   *
+   * @param executionSpec execution peers, or null for empty peers
+   * @return rewrite-manifests policy content
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable PolicyExecutionSpec executionSpec) {
+    return new IcebergRewriteManifestsContent(
+        null,
+        null,
+        null,
+        null,
+        null,
+        executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec);
+  }
+
+  /**
+   * Creates a manifest rewrite policy with thresholds and execution peers. Null thresholds use the
+   * built-in defaults.
+   *
+   * @param manifestCountCritical count that triggers regardless of size
+   * @param manifestCountWarning minimum count for the size trigger
+   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param specId requested existing spec, or null to resolve Iceberg's current default at
+   *     evaluation
+   * @param useCaching caching option, or null for the Iceberg default
    * @param timeTrigger optional cron expression
    * @param commitTrigger optional commit-trigger flag
    * @param minIntervalMs optional cooldown ms
    * @param jobOptions optional job options
    * @param updaterOptions optional updater options
-   * @return rewrite-manifests policy content
+   * @return manifest rewrite policy
    */
-  public static PolicyContent icebergRewriteManifests(
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable Long manifestCountCritical,
+      @Nullable Long manifestCountWarning,
+      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching,
       @Nullable String timeTrigger,
       @Nullable Boolean commitTrigger,
       @Nullable Long minIntervalMs,
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updaterOptions) {
     return new IcebergRewriteManifestsContent(
+        manifestCountCritical,
+        manifestCountWarning,
+        avgManifestSizeThresholdBytes,
+        specId,
+        useCaching,
         PolicyExecutionSpec.of(
             timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
@@ -339,6 +411,19 @@ public class PolicyContents {
    */
   public static ColumnMaskContent columnMask(String expression) {
     return new ColumnMaskContent(expression);
+  }
+
+  /**
+   * Creates an access control policy content.
+   *
+   * @param privileges the privileges the rule confers on the tagged object, each of which must be
+   *     in {@link AccessControlContent#PERMITTED_PRIVILEGES}
+   * @param applicableRoles the roles that satisfy the rule's condition
+   * @return access control policy content
+   */
+  public static PolicyContent accessControl(
+      List<Privilege.Name> privileges, List<String> applicableRoles) {
+    return new AccessControlContent(privileges, applicableRoles);
   }
 
   private PolicyContents() {}

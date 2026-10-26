@@ -53,8 +53,9 @@ paths:
       summary: Create a Semantic Model
       description: >-
         Creates a schema-scoped Semantic Model in a relational catalog. The complete definition is
-        validated before the model is stored, including source identifier shape. Source existence,
-        source columns, and source authorization checks are not yet implemented.
+        validated before the model is stored, including source identifier shape, source existence,
+        and primary-key, unique-key, and relationship columns. When authorization is enabled,
+        source lookups also require the caller's permission to access the source metadata.
       operationId: createSemanticModel
       requestBody:
         required: true
@@ -95,6 +96,10 @@ paths:
       summary: Import an Apache Ossie Semantic Model
       description: >-
         Imports one standalone Apache Ossie document and creates the represented Semantic Model.
+        The imported definition is validated before the model is stored, including source identifier
+        shape, source existence, and primary-key, unique-key, and relationship columns. When
+        authorization is enabled, source lookups also require the caller's permission to access the
+        source metadata.
         The request body is the raw JSON or YAML document, not a JSON-encoded string. Content-Type
         selects the parser; when the header is absent, the body is parsed as YAML. Parsing does not
         fall back to another format.
@@ -182,8 +187,10 @@ paths:
       description: >-
         Applies the ordered updates atomically. The server validates and converts the complete
         update batch before dispatch; if any update or the resulting model is invalid, none of the
-        updates is applied. Only replaceDefinition revalidates the complete definition. Source
-        existence, source columns, and source authorization checks are not yet implemented.
+        updates is applied. Each replaceDefinition revalidates the complete definition, source
+        existence, and primary-key, unique-key, and relationship columns. When authorization is
+        enabled, source lookups also require the caller's permission to access the source metadata.
+        Metadata-only updates do not revalidate sources.
       operationId: alterSemanticModel
       requestBody:
         required: true

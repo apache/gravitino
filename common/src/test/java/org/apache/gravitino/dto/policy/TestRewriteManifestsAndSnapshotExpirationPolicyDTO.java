@@ -49,6 +49,11 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
     assertResponseRoundTripWithPeers(
         "system_iceberg_rewrite_manifests",
         PolicyContents.icebergRewriteManifests(
+            null,
+            null,
+            null,
+            null,
+            null,
             "0 30 1 * * ?",
             true,
             900_000L,

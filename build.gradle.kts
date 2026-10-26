@@ -1184,10 +1184,12 @@ tasks {
         "copyJobsLib",
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+        ":iceberg:iceberg-rest-server-experiment:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
         ":plugins:idp-basic:copyLibAndConfigs",
-        ":plugins:maintenance:copyLibAndConfigs"
+        ":plugins:maintenance:copyLibAndConfigs",
+        ":plugins:k8s-job-executor:copyLibAndConfigs"
       )
     if (!skipWeb) {
       dependencies.add(":web:web:build")

@@ -19,7 +19,7 @@
 package org.apache.gravitino.iceberg;
 
 import com.google.common.collect.Lists;
-import java.util.ArrayList;
+import java.security.CodeSource;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,6 +57,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -65,6 +66,7 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.filter.IcebergRESTAuthInterceptionService;
+import org.apache.iceberg.IcebergBuild;
 import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -91,7 +93,8 @@ public class RESTService implements GravitinoAuxiliaryService {
   private boolean auxMode;
 
   private void initServer(IcebergConfig icebergConfig) {
-    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
+    JettyServerConfig serverConfig =
+        JettyServerConfig.fromServiceConfig(icebergConfig, IcebergConfig.ICEBERG_CONFIG_PREFIX);
     IcebergRESTUtils.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
     server =
         new JettyServer() {
@@ -105,6 +108,10 @@ public class RESTService implements GravitinoAuxiliaryService {
         };
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
+    boolean metricsEnabled = shouldEnableMetrics(auxMode, icebergConfig);
+    if (metricsEnabled) {
+      server.addMetricsServlets(metricsSystem);
+    }
 
     ResourceConfig config = new ResourceConfig();
     config.packages(getIcebergRESTPackages(icebergConfig));
@@ -212,52 +219,37 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addServlet(servlet, ICEBERG_SPEC);
     // Registered before HttpAuditFilter so audit events dispatched during this request carry the
     // request's query parameters and remote address, exactly as on the main server.
-    server.addFilter(new RequestContextFilter(eventBus), ICEBERG_SPEC);
-    server.addFilter(
-        new HttpAuditFilter(
-            eventBus,
-            EventSource.GRAVITINO_ICEBERG_REST_SERVER,
-            new IcebergHealthCheckPathMatcher()),
-        ICEBERG_SPEC);
+    ClientAddressResolver clientAddressResolver = serverConfig.getClientAddressResolver();
+    server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), ICEBERG_SPEC);
+    server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), ICEBERG_SPEC);
+    if (metricsEnabled) {
+      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+        server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), pathSpec);
+        server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), pathSpec);
+      }
+    }
     server.addSystemFilters(ICEBERG_SPEC);
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
-    // systems that expect a /health endpoint. Not part of JettyServer.METRICS_PATH_SPECS below:
+    // systems that expect a /health endpoint.
     // HealthAliasServlet forwards every request into /iceberg/health*, which ICEBERG_SPEC already
     // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
     // here would double-log every probe.
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health/*");
     server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
 
-    registerMetricsPathFilters(server, eventBus);
-
-    // Custom filters are registered once, across every filtered path in a single call, so a
-    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
-    // once per pathSpec.
-    List<String> customFilterPaths = new ArrayList<>(JettyServer.METRICS_PATH_SPECS);
-    customFilterPaths.add(ICEBERG_SPEC);
-    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
+    if (metricsEnabled) {
+      server.addCustomFilters(
+          ICEBERG_SPEC,
+          JettyServer.METRICS_PATH_SPECS.get(0),
+          JettyServer.METRICS_PATH_SPECS.get(1));
+    } else {
+      server.addCustomFilters(ICEBERG_SPEC);
+    }
   }
 
-  /**
-   * Registers request-context tracking and audit-on-failure coverage on {@link
-   * JettyServer#METRICS_PATH_SPECS}. {@code /metrics} and {@code /prometheus/metrics} used to
-   * receive no such coverage at all, with nothing in the build catching it; {@code
-   * RequestContextFilter} is included too so query-parameter capture applies uniformly, matching
-   * {@link #ICEBERG_SPEC}. Package-private and static so a unit test can exercise it directly
-   * against a plain {@link JettyServer}, without booting the rest of {@link #initServer}. See
-   * GH-12760.
-   *
-   * @param server the Jetty server whose {@link JettyServer#METRICS_PATH_SPECS} need filter
-   *     coverage
-   * @param eventBus the event bus audit events are dispatched through
-   */
-  static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
-    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
-      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
-      server.addFilter(
-          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_ICEBERG_REST_SERVER), pathSpec);
-    }
+  static boolean shouldEnableMetrics(boolean auxiliaryMode, IcebergConfig icebergConfig) {
+    return !auxiliaryMode && icebergConfig.get(IcebergConfig.METRICS_ENABLED);
   }
 
   @Override
@@ -268,6 +260,11 @@ public class RESTService implements GravitinoAuxiliaryService {
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
     this.auxMode = auxMode;
+    CodeSource icebergCodeSource = IcebergBuild.class.getProtectionDomain().getCodeSource();
+    LOG.info(
+        "Iceberg REST service runtime: {}, loaded from {}",
+        IcebergBuild.fullVersion(),
+        icebergCodeSource == null ? "unknown" : icebergCodeSource.getLocation());
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     initServer(icebergConfig);
     LOG.info("Iceberg REST service init. Running in {} mode", auxMode ? "auxiliary" : "standalone");
@@ -318,5 +315,14 @@ public class RESTService implements GravitinoAuxiliaryService {
     List<String> packages = Lists.newArrayList(ICEBERG_REST_SPEC_PACKAGE);
     packages.addAll(icebergConfig.get(IcebergConfig.REST_API_EXTENSION_PACKAGES));
     return packages.toArray(new String[0]);
+  }
+
+  private static HttpAuditFilter createHttpAuditFilter(
+      EventBus eventBus, ClientAddressResolver clientAddressResolver) {
+    return new HttpAuditFilter(
+        eventBus,
+        EventSource.GRAVITINO_ICEBERG_REST_SERVER,
+        new IcebergHealthCheckPathMatcher(),
+        clientAddressResolver);
   }
 }

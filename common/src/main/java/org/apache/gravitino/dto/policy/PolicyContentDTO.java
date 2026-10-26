@@ -21,20 +21,31 @@ package org.apache.gravitino.dto.policy;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.PolicyExecutionSpec;
@@ -571,12 +582,31 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
-  /** Placeholder DTO for Iceberg rewrite-manifests policy content. */
+  /** Typed manifest rewrite policy content. */
   @EqualsAndHashCode
   @ToString(exclude = {"jobOptions", "updaterOptions"})
   @Builder(setterPrefix = "with")
-  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
+    @JsonProperty("manifest_count_critical")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    private Long manifestCountCritical;
+
+    @JsonProperty("manifest_count_warning")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    private Long manifestCountWarning;
+
+    @JsonProperty("avg_manifest_size_threshold_bytes")
+    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    private Long avgManifestSizeThresholdBytes;
+
+    @JsonProperty("spec_id")
+    @JsonDeserialize(using = ManifestSpecIdDeserializer.class)
+    private Integer specId;
+
+    @JsonProperty("use_caching")
+    @JsonDeserialize(using = ManifestUseCachingDeserializer.class)
+    private Boolean useCaching;
 
     @EqualsAndHashCode.Exclude
     @Nullable
@@ -609,10 +639,65 @@ public interface PolicyContentDTO extends PolicyContent {
     private IcebergRewriteManifestsContentDTO() {}
 
     /**
-     * @return empty rewrite-manifests content DTO
+     * Returns manifest rewrite content with default thresholds.
+     *
+     * @return default rewrite-manifests content DTO
      */
     public static IcebergRewriteManifestsContentDTO instance() {
       return new IcebergRewriteManifestsContentDTO();
+    }
+
+    /**
+     * Returns manifest_count_critical.
+     *
+     * @return manifest_count_critical
+     */
+    public Long manifestCountCritical() {
+      return manifestCountCritical == null
+          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_CRITICAL
+          : manifestCountCritical;
+    }
+
+    /**
+     * Returns manifest_count_warning.
+     *
+     * @return manifest_count_warning
+     */
+    public Long manifestCountWarning() {
+      return manifestCountWarning == null
+          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_WARNING
+          : manifestCountWarning;
+    }
+
+    /**
+     * Returns avg_manifest_size_threshold_bytes.
+     *
+     * @return avg_manifest_size_threshold_bytes
+     */
+    public Long avgManifestSizeThresholdBytes() {
+      return avgManifestSizeThresholdBytes == null
+          ? IcebergRewriteManifestsContent.DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES
+          : avgManifestSizeThresholdBytes;
+    }
+
+    /**
+     * Returns spec_id.
+     *
+     * @return spec_id or null when omitted
+     */
+    @Nullable
+    public Integer specId() {
+      return specId;
+    }
+
+    /**
+     * Returns use_caching.
+     *
+     * @return use_caching or null when omitted
+     */
+    @Nullable
+    public Boolean useCaching() {
+      return useCaching;
     }
 
     @Override
@@ -670,12 +755,54 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
+    /** Reads a manifest threshold without silently coercing fractional values or strings. */
+    public static class ManifestThresholdDeserializer extends JsonDeserializer<Long> {
+      @Override
+      public Long deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(
+              Long.class, "Manifest thresholds must be 64-bit integers");
+        }
+        return parser.getLongValue();
+      }
+    }
+
+    /** Reads a partition spec ID without silently coercing fractional values or strings. */
+    public static class ManifestSpecIdDeserializer extends JsonDeserializer<Integer> {
+      @Override
+      public Integer deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+          return context.reportInputMismatch(Integer.class, "spec_id must be a 32-bit integer");
+        }
+        return parser.getIntValue();
+      }
+    }
+
+    /** Reads the caching option without silently coercing numbers or strings to booleans. */
+    public static class ManifestUseCachingDeserializer extends JsonDeserializer<Boolean> {
+      @Override
+      public Boolean deserialize(JsonParser parser, DeserializationContext context)
+          throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
+          return context.reportInputMismatch(Boolean.class, "use_caching must be a boolean");
+        }
+        return parser.getBooleanValue();
+      }
+    }
+
     /**
-     * @return domain policy content including execution peers
+     * @return domain policy content including thresholds and execution peers
      */
     public PolicyContent toDomainContent() {
       PolicyExecutionSpec spec = executionSpec();
       return PolicyContents.icebergRewriteManifests(
+          manifestCountCritical(),
+          manifestCountWarning(),
+          avgManifestSizeThresholdBytes(),
+          specId(),
+          useCaching(),
           spec.timeTrigger(),
           spec.commitTrigger(),
           spec.minIntervalMs(),
@@ -946,6 +1073,70 @@ public interface PolicyContentDTO extends PolicyContent {
 
     private ColumnMaskContent toDomainContent() {
       return PolicyContents.columnMask(expression);
+    }
+  }
+
+  /** Represents typed access-control policy content. */
+  @EqualsAndHashCode
+  @ToString
+  @Builder(setterPrefix = "with")
+  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+  class AccessControlContentDTO implements PolicyContentDTO {
+
+    @JsonProperty("privileges")
+    private List<Privilege.Name> privileges;
+
+    @JsonProperty("applicableRoles")
+    private List<String> applicableRoles;
+
+    // Default constructor for Jackson deserialization only.
+    private AccessControlContentDTO() {}
+
+    /**
+     * Returns the privileges the rule confers on the tagged object.
+     *
+     * @return the conferred privileges
+     */
+    public List<Privilege.Name> privileges() {
+      return privileges == null
+          ? Collections.emptyList()
+          : Collections.unmodifiableList(new ArrayList<>(privileges));
+    }
+
+    /**
+     * Returns the roles that satisfy the rule's condition.
+     *
+     * @return the applicable role names
+     */
+    public List<String> applicableRoles() {
+      return applicableRoles == null
+          ? Collections.emptyList()
+          : Collections.unmodifiableList(new ArrayList<>(applicableRoles));
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return toDomainContent().supportedObjectTypes();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return toDomainContent().properties();
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      return toDomainContent().rules();
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      PolicyContentDTO.super.validate();
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.accessControl(privileges(), applicableRoles());
     }
   }
 }

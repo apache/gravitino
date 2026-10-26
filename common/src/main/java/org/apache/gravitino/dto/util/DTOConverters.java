@@ -104,6 +104,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.AccessControlContent;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -698,7 +699,13 @@ public class DTOConverters {
           .build();
     }
     if (policyContent instanceof IcebergRewriteManifestsContent) {
+      IcebergRewriteManifestsContent content = (IcebergRewriteManifestsContent) policyContent;
       return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
+          .withManifestCountCritical(content.manifestCountCritical())
+          .withManifestCountWarning(content.manifestCountWarning())
+          .withAvgManifestSizeThresholdBytes(content.avgManifestSizeThresholdBytes())
+          .withSpecId(content.specId())
+          .withUseCaching(content.useCaching())
           .withExecutionSpec(executionSpec)
           .build();
     }
@@ -734,6 +741,14 @@ public class DTOConverters {
       ColumnMaskContent content = (ColumnMaskContent) policyContent;
       return PolicyContentDTO.ColumnMaskContentDTO.builder()
           .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof AccessControlContent) {
+      AccessControlContent accessControlContent = (AccessControlContent) policyContent;
+      return PolicyContentDTO.AccessControlContentDTO.builder()
+          .withPrivileges(accessControlContent.privileges())
+          .withApplicableRoles(accessControlContent.applicableRoles())
           .build();
     }
 
@@ -1607,6 +1622,13 @@ public class DTOConverters {
       PolicyContentDTO.ColumnMaskContentDTO contentDTO =
           (PolicyContentDTO.ColumnMaskContentDTO) policyContentDTO;
       return PolicyContents.columnMask(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.AccessControlContentDTO) {
+      PolicyContentDTO.AccessControlContentDTO accessControlContentDTO =
+          (PolicyContentDTO.AccessControlContentDTO) policyContentDTO;
+      return PolicyContents.accessControl(
+          accessControlContentDTO.privileges(), accessControlContentDTO.applicableRoles());
     }
 
     throw new IllegalArgumentException(

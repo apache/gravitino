@@ -115,12 +115,21 @@ public final class SparkApplicationStatusUtils {
    *
    * <ul>
    *   <li>A SparkApplication that Gravitino requested to cancel is cancelled once it is being
-   *       deleted or has stopped.
+   *       deleted, unless it had stopped before, as the operator recorded it: by an outcome or a
+   *       stopped state recorded before the deletion, or whose time is unknown. A driver that
+   *       terminated before the deletion doesn't count, as the operator may never record its
+   *       outcome once the application is deleted. The cancel mark alone doesn't cancel it: a
+   *       cancellation that failed after marking it, for example because the server stopped or a
+   *       response was lost, leaves the mark on a job that keeps running, which then keeps the
+   *       outcome it reaches.
    *   <li>A SparkApplication being deleted by someone else, for example by its TTL, keeps the
    *       outcome it reached, or fails if it has none.
    *   <li>The stopped states walk back through the state transition history to the last outcome.
    *   <li>A SparkApplication without any status after the timeout fails, for example if its
-   *       namespace isn't watched by the operator.
+   *       namespace isn't watched by the operator. One with a status that has no state this version
+   *       can read stays queued, even if it was started before, and nothing ends it until the
+   *       operator deletes it after its TTL. It means the operator is newer than this version
+   *       supports, which must be fixed rather than waited out.
    *   <li>An unknown state, of a newer operator, after an outcome is a stopped state too. Before
    *       any outcome it keeps the job unfinished: started if the application has reached a started
    *       state, queued otherwise.
@@ -133,8 +142,8 @@ public final class SparkApplicationStatusUtils {
    * reached a started state, and finished when it reached its outcome. As the driver container
    * status is only known once the job finished, the started time of a running job is refined to the
    * driver's when it finishes. A job that stopped without an outcome finished when its driver
-   * container terminated if that is known, else when it was deleted, or else when it entered its
-   * last state.
+   * container terminated if that is known, else when it entered its stopped state if that is known,
+   * or else when it was deleted.
    *
    * @param app the SparkApplication
    * @param driver the driver pod, or null if unknown
@@ -151,7 +160,7 @@ public final class SparkApplicationStatusUtils {
     Instant deletedAt = parseTime(app.getMetadata().getDeletionTimestamp());
 
     ContainerState driverState =
-        driver == null ? null : driverContainerState(driver, driverContainerName(app));
+        driver == null ? null : driverContainerState(driver, getDriverContainerName(app));
     Instant driverStartedAt = null;
     Instant driverFinishedAt = null;
     if (driverState != null && driverState.getTerminated() != null) {
@@ -163,24 +172,33 @@ public final class SparkApplicationStatusUtils {
     Instant startedAt = startedAt(history, driverStartedAt, createdAt);
     // When the application stopped: when the driver container terminated if that is known, even
     // before the operator records an outcome, else when the application reached its outcome, else
-    // when it was deleted, else when it entered its current state. A deletion time is in whole
-    // seconds, so it may read earlier than a started time of the same second, which Gravitino
-    // would then drop.
+    // when it was deleted if it hadn't stopped by then, else when it entered its current state. A
+    // deletion time is in whole seconds, so it may read earlier than a started time of the same
+    // second, which Gravitino would then drop.
+    Instant deletedOrStartedAt =
+        deletedAt != null && startedAt != null && deletedAt.isBefore(startedAt)
+            ? startedAt
+            : deletedAt;
     Instant stoppedAt;
     if (driverFinishedAt != null) {
       stoppedAt = driverFinishedAt;
     } else if (outcome != null) {
       stoppedAt = outcome.driverFinishedAt != null ? outcome.driverFinishedAt : outcome.time;
-    } else if (deletedAt != null) {
-      stoppedAt = startedAt != null && deletedAt.isBefore(startedAt) ? startedAt : deletedAt;
+    } else if (deletedAt != null && !isStopped(current, outcome)) {
+      stoppedAt = deletedOrStartedAt;
     } else {
       stoppedAt = current == null ? null : current.time;
+    }
+    if (stoppedAt == null) {
+      // The time of the state it stopped in is unknown, the deletion is the best known one.
+      stoppedAt = deletedOrStartedAt;
     }
 
     JobHandle.Status status;
     Instant finishedAt = null;
     if (K8sJobResourceUtils.isCancelRequested(app)
-        && (deletedAt != null || isStopped(current, outcome))) {
+        && deletedAt != null
+        && !stoppedBefore(history, deletedAt)) {
       status = JobHandle.Status.CANCELLED;
       finishedAt = stoppedAt;
     } else if (deletedAt != null || isStopped(current, outcome)) {
@@ -188,7 +206,15 @@ public final class SparkApplicationStatusUtils {
       status = outcome == null ? JobHandle.Status.FAILED : statusOf(outcome);
       finishedAt = stoppedAt;
     } else if (current == null) {
-      if (createdAt != null && createdAt.plusMillis(noStatusTimeoutMs).isBefore(now)) {
+      if (hasStatus(app)) {
+        // The operator wrote a status this version can't read, for example a newer operator. The
+        // application is known to the operator, so the job stays unfinished rather than failing.
+        status = JobHandle.Status.QUEUED;
+        LOG.warn(
+            "Can't read the status of SparkApplication {}, considering it as {}",
+            nameOf(app),
+            status);
+      } else if (createdAt != null && createdAt.plusMillis(noStatusTimeoutMs).isBefore(now)) {
         LOG.warn(
             "SparkApplication {} has no status after {} ms, is its namespace watched by the Spark"
                 + " operator? Considering it as failed",
@@ -222,6 +248,36 @@ public final class SparkApplicationStatusUtils {
         .withStartedAt(startedAt)
         .withFinishedAt(finishedAt)
         .build();
+  }
+
+  /**
+   * Returns whether the driver of a SparkApplication is still pending or running. It is decided by
+   * the driver container, as a sidecar can keep the pod running after the driver exited, and by the
+   * pod only if the driver container can't be told.
+   *
+   * @param app the SparkApplication
+   * @param driver the driver pod
+   * @return true if the driver hasn't terminated
+   */
+  public static boolean isDriverRunning(GenericKubernetesResource app, Pod driver) {
+    ContainerState state = driverContainerState(driver, getDriverContainerName(app));
+    if (state != null) {
+      return state.getTerminated() == null;
+    }
+    String phase = driver.getStatus() == null ? null : driver.getStatus().getPhase();
+    return !"Succeeded".equals(phase) && !"Failed".equals(phase);
+  }
+
+  /**
+   * Returns whether the operator has written a status of the SparkApplication, whether or not this
+   * version can read a state from it.
+   *
+   * @param app the SparkApplication
+   * @return true if the application has a non-empty status
+   */
+  public static boolean hasStatus(GenericKubernetesResource app) {
+    Object status = app.getAdditionalProperties().get("status");
+    return status instanceof Map && !((Map<?, ?>) status).isEmpty();
   }
 
   /**
@@ -260,6 +316,20 @@ public final class SparkApplicationStatusUtils {
     return isOutcome(current)
         || STOPPED_STATES.contains(current.summary)
         || (!running && outcome != null);
+  }
+
+  /**
+   * Returns whether the application had reached an outcome or a stopped state before it was
+   * deleted. A deletion time is in whole seconds, so a state of the same second counts as after. A
+   * state whose time is unknown counts as before, like {@link #isStopped(State, State)}, which
+   * doesn't need the times either.
+   */
+  private static boolean stoppedBefore(List<State> history, Instant deletedAt) {
+    return history.stream()
+        .anyMatch(
+            s ->
+                (isOutcome(s) || STOPPED_STATES.contains(s.summary))
+                    && (s.time == null || s.time.isBefore(deletedAt)));
   }
 
   private static boolean isOutcome(State state) {
@@ -321,7 +391,7 @@ public final class SparkApplicationStatusUtils {
     if (!(status instanceof Map)) {
       return history;
     }
-    String driverContainer = driverContainerName(app);
+    String driverContainer = getDriverContainerName(app);
 
     Object transitions = ((Map<String, Object>) status).get("stateTransitionHistory");
     if (transitions instanceof Map) {
@@ -392,10 +462,13 @@ public final class SparkApplicationStatusUtils {
   }
 
   /**
-   * Returns the name of the driver container: the one a job names with a pod template, or else the
-   * one Spark gives it.
+   * Returns the name of the driver container of a SparkApplication: the one the job names for its
+   * driver pod template, or else the one Spark gives it.
+   *
+   * @param app the SparkApplication
+   * @return the name of the driver container
    */
-  private static String driverContainerName(GenericKubernetesResource app) {
+  public static String getDriverContainerName(GenericKubernetesResource app) {
     Map<String, Object> spec = mapOf(app.getAdditionalProperties().get("spec"));
     Map<String, Object> sparkConf = spec == null ? null : mapOf(spec.get("sparkConf"));
     Object name =

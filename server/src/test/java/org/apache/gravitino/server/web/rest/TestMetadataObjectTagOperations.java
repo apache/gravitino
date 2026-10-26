@@ -42,8 +42,10 @@ import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
+import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
@@ -164,9 +166,11 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
-    TagListResponse tagListResponse = response.readEntity(TagListResponse.class);
+    MetadataObjectTagListResponse tagListResponse =
+        response.readEntity(MetadataObjectTagListResponse.class);
     Assertions.assertEquals(0, tagListResponse.getCode());
     Assertions.assertEquals(catalogTagInfos.length, tagListResponse.getTags().length);
+    Assertions.assertFalse(tagListResponse.hasInaccessibleTags());
 
     Map<String, Tag> resultTags =
         Arrays.stream(tagListResponse.getTags())
@@ -186,9 +190,10 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response1.getStatus());
 
-    NameListResponse nameListResponse = response1.readEntity(NameListResponse.class);
+    TagNameListResponse nameListResponse = response1.readEntity(TagNameListResponse.class);
     Assertions.assertEquals(0, nameListResponse.getCode());
     Assertions.assertEquals(catalogTagInfos.length, nameListResponse.getNames().length);
+    Assertions.assertFalse(nameListResponse.hasInaccessibleTags());
     Assertions.assertArrayEquals(
         Arrays.stream(catalogTagInfos).map(Tag::name).toArray(String[]::new),
         nameListResponse.getNames());
