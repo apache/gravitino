@@ -115,8 +115,15 @@ cannot apply to a required column when that action is selected.
 
 Experimental Iceberg REST read restrictions require authorization to be enabled with
 `gravitino.authorization.enable=true` and a policy dispatcher to be available. When a policy dispatcher
-is available but authorization is disabled, load-table fails with an error identifying the required
-configuration, even when no policy applies.
+is available but authorization is disabled, the Iceberg REST service fails to start with an error
+identifying the required configuration, even when no policy applies.
+
+`is_group_member` uses group membership supplied by the authenticated principal; enabling
+authorization does not populate these groups. An empty group list is valid and means that the user
+is not a member of any group. Authenticators that do not supply groups, including `simple`, therefore
+select the non-member branch of group-based policies, which may be unrestricted if the policy allows
+it. The referenced group must still exist in Gravitino; an unknown group or an unresolved identity
+causes the load-table request to fail.
 
 When the experimental Iceberg REST read-restriction loader is enabled, load-table does not support
 names containing `.` in the metalake, catalog, schema, table, or top-level column path. The

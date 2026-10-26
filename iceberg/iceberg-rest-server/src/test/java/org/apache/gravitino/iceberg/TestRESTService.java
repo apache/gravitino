@@ -18,15 +18,64 @@
  */
 package org.apache.gravitino.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 public class TestRESTService {
+
+  @Test
+  void testReadRestrictionStartupRequiresAuthorization() {
+    IcebergReadRestrictionLoader loader = mock(IcebergReadRestrictionLoader.class);
+    when(loader.enabled()).thenReturn(true);
+    GravitinoEnv environment = mock(GravitinoEnv.class);
+    Config config = mock(Config.class);
+    when(environment.config()).thenReturn(config);
+    when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(false);
+    try (MockedStatic<IcebergReadRestrictionLoader> discovery =
+            mockStatic(IcebergReadRestrictionLoader.class);
+        MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class)) {
+      discovery.when(IcebergReadRestrictionLoader::load).thenReturn(loader);
+      environments.when(GravitinoEnv::getInstance).thenReturn(environment);
+
+      IllegalStateException exception =
+          assertThrows(
+              IllegalStateException.class,
+              () -> new RESTService().serviceInit(Collections.emptyMap(), true));
+      assertEquals(
+          "Iceberg read restrictions require authorization; set gravitino.authorization.enable=true",
+          exception.getMessage());
+      assertSame(loader, RESTService.loadReadRestrictionLoader(true));
+    }
+  }
+
+  @Test
+  void testDisabledReadRestrictionLoaderDoesNotRequireAuthorization() {
+    IcebergReadRestrictionLoader loader = mock(IcebergReadRestrictionLoader.class);
+    when(loader.enabled()).thenReturn(false);
+    try (MockedStatic<IcebergReadRestrictionLoader> discovery =
+        mockStatic(IcebergReadRestrictionLoader.class)) {
+      discovery.when(IcebergReadRestrictionLoader::load).thenReturn(loader);
+
+      assertSame(loader, RESTService.loadReadRestrictionLoader(false));
+      assertSame(loader, RESTService.loadReadRestrictionLoader(true));
+    }
+  }
 
   /** The documented Iceberg REST key reaches the value the service passes to its error builder. */
   @Test

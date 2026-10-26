@@ -94,6 +94,8 @@ public class RESTService implements GravitinoAuxiliaryService {
   private boolean auxMode;
 
   private void initServer(IcebergConfig icebergConfig) {
+    boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
+    IcebergReadRestrictionLoader readRestrictionLoader = loadReadRestrictionLoader(enableAuth);
     JettyServerConfig serverConfig =
         JettyServerConfig.fromServiceConfig(icebergConfig, IcebergConfig.ICEBERG_CONFIG_PREFIX);
     IcebergRESTUtils.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
@@ -131,7 +133,6 @@ public class RESTService implements GravitinoAuxiliaryService {
     boolean skipAuthorizationForRestBackend =
         icebergConfig.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ);
 
-    Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
@@ -194,7 +195,6 @@ public class RESTService implements GravitinoAuxiliaryService {
     }
     IcebergNamespaceOperationDispatcher icebergNamespaceDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
-    IcebergReadRestrictionLoader readRestrictionLoader = IcebergReadRestrictionLoader.load();
 
     config.register(
         new AbstractBinder() {
@@ -249,6 +249,15 @@ public class RESTService implements GravitinoAuxiliaryService {
     } else {
       server.addCustomFilters(ICEBERG_SPEC);
     }
+  }
+
+  static IcebergReadRestrictionLoader loadReadRestrictionLoader(boolean enableAuthorization) {
+    IcebergReadRestrictionLoader loader = IcebergReadRestrictionLoader.load();
+    if (loader.enabled() && !enableAuthorization) {
+      throw new IllegalStateException(
+          "Iceberg read restrictions require authorization; set gravitino.authorization.enable=true");
+    }
+    return loader;
   }
 
   static boolean shouldEnableMetrics(boolean auxiliaryMode, IcebergConfig icebergConfig) {

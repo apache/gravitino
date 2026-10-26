@@ -465,6 +465,47 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   }
 
   @Test
+  void testEmptyGroupsSelectNonMemberBranchIncludingUnrestrictedFallback() throws Exception {
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    when(dispatcher.getGroup(METALAKE, "auditors")).thenReturn(mock(Group.class));
+
+    PrincipalUtils.doAs(
+        new UserPrincipal("alice"),
+        () -> {
+          IcebergReadRestrictionConverter.BindingContext bindingContext =
+              new ExperimentalIcebergReadRestrictionLoader.IdentityBindingContext(
+                  "alice", METALAKE, dispatcher);
+          ReadRestrictions unrestricted =
+              ExperimentalIcebergReadRestrictionLoader.resolveForLoad(
+                  new PolicyEntity[] {
+                    rowPolicy(
+                        1,
+                        "restrict_members",
+                        "filter := false if is_group_member(\"auditors\") else := true")
+                  },
+                  Collections.emptyMap(),
+                  SCHEMA,
+                  bindingContext);
+          assertTrue(unrestricted.isEmpty());
+
+          ReadRestrictions restricted =
+              ExperimentalIcebergReadRestrictionLoader.resolveForLoad(
+                  new PolicyEntity[] {
+                    rowPolicy(
+                        2,
+                        "restrict_non_members",
+                        "filter := true if is_group_member(\"auditors\") "
+                            + "else := col(\"owner\") == session_user()")
+                  },
+                  Collections.emptyMap(),
+                  SCHEMA,
+                  bindingContext);
+          assertNotNull(restricted.rowFilter());
+          return null;
+        });
+  }
+
+  @Test
   void testInconsistentIdentityDoesNotBecomeNonMembership() throws Exception {
     AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
     when(dispatcher.getGroup(METALAKE, "auditors")).thenReturn(mock(Group.class));
