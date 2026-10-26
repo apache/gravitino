@@ -16,17 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy.rego;
+package org.apache.gravitino.policy.sql;
 
-/** Resource limits for {@code restricted-rego-v1} source programs. */
-final class RestrictedRegoLimits {
-  static final int MAX_SOURCE_DEPTH = 8;
-  static final int MAX_AST_NODES = 256;
-  static final int MAX_STRING_BYTES = 4 * 1024;
-  static final int MAX_ARRAY_ELEMENTS = 256;
-  static final int MAX_TOTAL_ARRAY_ELEMENTS = 256;
-  static final int MAX_NUMERIC_LITERAL_BYTES = 256;
-  static final int MAX_PARENTHESIS_NESTING = 256;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-  private RestrictedRegoLimits() {}
+/** A validated definition; parameter names are local and have no physical field IDs yet. */
+final class SqlDefinition {
+  final Map<String, SqlType> parameters;
+  final SqlType resultType;
+  final SqlExpression body;
+
+  SqlDefinition(Map<String, SqlType> parameters, SqlType resultType, SqlExpression body) {
+    this.parameters = Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
+    this.resultType = resultType;
+    this.body = body;
+  }
 }

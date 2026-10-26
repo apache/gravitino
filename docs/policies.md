@@ -51,58 +51,34 @@ do not restrict data access.
 
 ### Read-Restriction Expressions
 
-Row-filter and column-mask expressions use `restricted-rego-v1`, a small, fail-closed Rego-like
-syntax owned by Gravitino. Each expression is one complete rule, not an arbitrary Rego module. A
-row filter starts with `filter :=` and produces a Boolean predicate. A column mask starts with
-`mask := action("...")` and produces an allowlisted masking action.
+Row-filter and column-mask expressions use `restricted-sql-v1`. A complete definition declares
+its parameters and result type before the SQL body:
 
-The complete grammar is:
-
-```text
-program     := filterRule | maskRule
-filterRule  := unconditionalFilter | conditionalFilter
-unconditionalFilter := "filter" ":=" expr
-conditionalFilter := "filter" ":=" expr "if" expr filterElse* filterFallback
-filterElse  := "else" ":=" expr "if" expr
-filterFallback := "else" ":=" expr
-maskRule    := unconditionalMask | conditionalMask
-unconditionalMask := "mask" ":=" maskAction
-conditionalMask := "mask" ":=" maskAction "if" contextExpr maskElse* maskFallback
-maskElse    := "else" ":=" maskAction "if" contextExpr
-maskFallback := "else" ":=" maskAction
-maskAction  := "action" "(" string ")"
-contextExpr := expr
-expr        := orExpr
-orExpr      := andExpr ("or" andExpr)*
-andExpr     := notExpr ("and" notExpr)*
-notExpr     := "not" notExpr | compareExpr
-compareExpr := primary (("==" | "!=" | "<" | "<=" | ">" | ">=" | "in") primary)?
-primary     := colRef | sessionUser | groupMember | literal | array | "(" expr ")"
-colRef      := "col" "(" string ")"
-sessionUser := "session_user" "(" ")"
-groupMember := "is_group_member" "(" string ")"
-literal     := string | number | boolean | null
-array       := "[" literal ("," literal)* "]"
-boolean     := "true" | "false"
-null        := "null"
-number      := "-"? ("0" | nonZeroDigit digit*) ("." digit+)?
-digit       := "0" | nonZeroDigit
-nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+```sql
+(region STRING, owner STRING) RETURNS BOOLEAN -> CASE
+  WHEN is_group_member('auditors') THEN region = 'US'
+  ELSE owner = CURRENT_USER()
+END
 ```
 
-For example, a row-filter program can select the first matching predicate:
-
-```restricted-rego-v1
-filter := col("region") == "US" if is_group_member("auditors")
-else := col("owner") == session_user()
+```sql
+(value STRING) RETURNS STRING -> CASE
+  WHEN CURRENT_USER() = 'alice' THEN value
+  ELSE show_last_4(value)
+END
 ```
 
-This column-mask program selects a masking action in the same way:
+The server validates complete definitions on policy creation and content updates. It does not
+reparse content on reads, renames, or comment updates. The SQL parser rejects the previous
+`filter :=` and `mask :=` syntax.
+This validation does not enable enforcement. Schema binding, trusted context lookup, target
+nullability checks, expression evaluation, and Iceberg translation require the enforcement path.
 
-```restricted-rego-v1
-mask := action("show-last-4") if is_group_member("support")
-else := action("replace-with-null")
-```
+A row filter declares zero or more parameters and `RETURNS BOOLEAN`. Parameters bind to table
+columns by name and must match their logical types. A mask declares exactly one parameter and
+returns that exact type. Its parameter name is local: `(xxx STRING) RETURNS STRING -> show_last_4(xxx)`
+can apply to a column named `phone_number`. No physical column alias or implicit `value` is injected.
+Masks can return the input, a literal, NULL, a scalar function result, or CASE branches.
 
 When the experimental Iceberg REST read-restriction loader resolves several row-filter policies
 for one table, a filter that resolves to `true` adds no restriction and is ignored. Identical
@@ -136,79 +112,64 @@ assigned. A standalone service without a policy dispatcher does not perform poli
 Conditional branches are evaluated from left to right. The first true condition selects its result,
 and every conditional rule must end with an unconditional `else`. Row-filter conditions and results
 must be Boolean. Column-mask conditions may use only request context; they cannot reference columns.
+Supported declaration types are `BOOLEAN`, signed `INTEGER` and `LONG`, `FLOAT`, `DOUBLE`,
+`DECIMAL(p,s)`, `STRING`, `BINARY`, `DATE`, `TIME(6)` and `TIMESTAMP(6)` with or without time zone.
+Decimal precision is 1–38 and scale is 0–precision. Omitted temporal precision means 6.
+Numeric literals are exact until type validation; overflow, rounding, and implicit cross-family
+conversions are rejected. Temporal literals use `DATE '2026-01-01'`, `TIME '12:30:00'`,
+`TIMESTAMP '2026-01-01 12:30:00'`, or
+`TIMESTAMP WITH TIME ZONE '2026-01-01 12:30:00+00:00'`.
 
-The syntax supports these constructs:
+The expression body supports:
 
-- `col("name")`, `session_user()`, and `is_group_member("group")`;
-- JSON string literals, exact decimal numbers, `true`, `false`, `null`, and homogeneous non-null
-  literal arrays;
-- comparisons `==`, `!=`, `<`, `<=`, `>`, `>=`, and `in`; and
-- Boolean operators `and`, `or`, and `not`.
+- Comparisons `=`, `<>` (`!=`), `<`, `<=`, `>`, `>=` between compatible scalar values.
+- `IS NULL` and `IS NOT NULL`; Boolean equality and membership, without ordering.
+- `IN` and `NOT IN` with non-empty literal lists, including NULL members.
+- Inclusive `BETWEEN` and `NOT BETWEEN` ranges.
+- `LIKE` and `NOT LIKE` with a non-empty fixed prefix followed by exactly one `%`.
+  Other `%` positions, `_` wildcards and `ESCAPE` are rejected.
+- `NOT`, `AND`, `OR`, in that precedence order after predicates; parentheses may nest.
+- Searched `CASE WHEN condition THEN result ... ELSE result END` and simple
+  `CASE selector WHEN match THEN result ... ELSE result END`. ELSE is optional.
 
-Keywords and built-in function names are case-sensitive. For example, only lowercase `in` is an
-operator; `In`, `IN`, and `iN` are invalid.
+CASE preserves branch order and every branch is type checked, even if unreachable. SQL nulls
+are retained in the parsed tree: only TRUE keeps a row, NOT NULL remains unknown, and ordinary
+comparisons with NULL are unknown. A missing ELSE returns NULL. Schema binding must reject a
+nullable mask result for a required column. Binary values support null tests and compatible mask
+functions, but not value predicates.
 
-Strings use JSON double-quoted syntax and are decoded exactly once after the enclosing HTTP JSON is
-decoded. Raw U+0000 through U+001F characters, decoded NUL, isolated Unicode surrogates,
-single-quoted strings, and invalid JSON escapes are rejected. Valid JSON escapes for control
-characters other than NUL, such as `\n`, are decoded and preserved. U+007F is also preserved in
-literal or escaped form. Gravitino does not normalize, trim, or case-fold decoded column names,
-group names, or values. Numbers are exact decimals; exponent notation, a leading `+`, leading
-zeroes, and a trailing decimal point are invalid.
+Context functions are `CURRENT_USER()`, `is_group_member('group')`, and `user_attribute('key')`.
+Group and attribute names must be non-empty string literals. Context values come from the trusted
+effective subject. Attribute types and key availability must be verified during context binding;
+missing values of declared attributes are SQL NULL. Unknown keys or lookup failures are errors.
+`is_nan(value)` accepts FLOAT or DOUBLE; `year(value)`, `month(value)`, and `day(value)` accept DATE
+or supported TIMESTAMP values and return INTEGER.
 
-Supported operand shapes are:
+The type-preserving mask functions each take one scalar argument:
 
-| Form | Operators | Requirements |
-| --- | --- | --- |
-| Boolean predicates | `and`, `or`, `not` | Every operand must be Boolean. |
-| Column and non-null literal | `==`, `!=`, `<`, `<=`, `>`, `>=` | Either operand order; types must be compatible. Boolean literals support only `==` and `!=`. |
-| String column and `session_user()` | `==`, `!=` | Either operand order. |
-| `session_user()` and string literal | `==`, `!=` | Either operand order. |
-| Column and `null` | `==`, `!=` | Either operand order. |
-| Column and literal array | `in` | Column on the left; array must be non-empty and homogeneous. |
-| `session_user()` and string array | `in` | `session_user()` on the left; array must be non-empty. |
-| `is_group_member("group")` | none | Produces a Boolean request-context predicate. |
+| Function | Input type |
+| --- | --- |
+| `mask_alphanum`, `show_first_4`, `show_last_4` | STRING |
+| `mask_to_fixed_value` | STRING, numeric, BOOLEAN, DATE or TIMESTAMP |
+| `replace_with_null` | Any typed scalar |
+| `truncate_to_year`, `truncate_to_month` | DATE or TIMESTAMP |
+| `sha256_global`, `sha256_query_local` | STRING, signed INTEGER, signed LONG or BINARY |
 
-Column-to-column and literal-to-literal comparisons, ordering on `session_user()`, null array
-elements, nested arrays, and comparisons on `is_group_member(...)` are invalid.
+Keywords and built-in function names are case-insensitive. Unquoted identifiers use ASCII
+letters or underscore followed by letters, digits or underscores, and normalize to uppercase.
+Double-quoted identifiers preserve case; double a quote to escape it. Parameter names must be
+unique after normalization. String literals use single quotes, with doubled single quotes for
+escaping. Backslashes are literal and Unicode is preserved; isolated surrogates and NUL are rejected.
+Comments, statements, semicolons, casts, arithmetic, qualified names, nested fields, subqueries,
+unknown functions, exponents, leading `+`, leading zeroes and trailing decimal points are rejected.
 
-Column-mask actions are `mask-alphanum`, `mask-to-fixed-value`, `replace-with-null`, `show-first-4`,
-`show-last-4`, `truncate-to-year`, `truncate-to-month`, `sha-256-global`, and
-`sha-256-query-local`.
+Limits apply to source before normalization: 16 KiB UTF-8 per complete definition, operation
+depth 8 (including CASE and calls), 256 expression nodes, 4 KiB per decoded quoted token, 256
+bytes per numeric literal, 256 total IN elements, and 256 parenthesis levels. The node limit
+also bounds how many literal list elements can fit in a complete expression.
 
-Validation applies these limits when a policy is created or its content is updated:
-
-- 16 KiB of UTF-8 source;
-- operation depth 8 for the source AST;
-- 256 nodes for the source AST;
-- 4 KiB of UTF-8 for each decoded string literal;
-- 256 bytes for each numeric literal;
-- 256 elements in each literal array;
-- 256 array elements in total in the source; and
-- 256 levels of parenthesis nesting.
-
-These limits apply to user-provided source, not to the generated predicate. Gravitino lowers an
-ordered row-filter branch chain to a linear nested Boolean expression in which each condition appears
-at most twice. The source limits therefore bound generated work without reducing the array allowance
-as branches are added. Under the 256-node source limit, 127 minimal branches lower to a predicate
-with depth 256 and 890 node occurrences. A generated predicate may exceed the source depth or node
-limits.
-
-Bare identifiers, arbitrary functions, comments, packages, imports, variables, chained
-comparisons, nested arrays, and a conditional rule without a final `else` are rejected. Read paths
-do not re-parse stored policy expressions.
-
-A custom policy's rules live in `customRules`. Gravitino stores them and returns them to clients;
-it does not interpret their names or values. Built-in types have a defined content shape. See
-[Iceberg compaction policy](./iceberg-compaction-policy.md) for the compaction rules,
-[Iceberg manifest rewrite policy](./iceberg-rewrite-manifests-policy.md) for manifest thresholds, and
-[Table maintenance service](./table-maintenance-service/optimizer.md) for a worked example.
-
-Policy content also has `properties` and `supportedObjectTypes`. Properties describe the policy
-itself, such as its owner or consumer. `supportedObjectTypes` is required when creating a custom
-policy. A custom policy content update replaces the whole content and can change this field; for a
-built-in policy, the field cannot be changed after creation. Object policy lookup does not filter
-by this field; each consumer decides whether a policy type applies to the object it is processing.
+The complete grammar and execution semantics are in the
+[read-restriction design](../design-docs/tag-based-read-restrictions-for-iceberg-rest.md).
 
 ### Policy-to-Tag Associations
 

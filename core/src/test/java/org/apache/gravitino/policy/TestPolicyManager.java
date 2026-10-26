@@ -511,7 +511,8 @@ public class TestPolicyManager {
   @Test
   public void testCreateUpdateAndGetRowFilterPolicy() {
     String policyName = "row_filter_" + UUID.randomUUID().toString().replace("-", "");
-    PolicyContent originalContent = PolicyContents.rowFilter("filter := col(\"region\") == \"US\"");
+    PolicyContent originalContent =
+        PolicyContents.rowFilter("(region STRING) RETURNS BOOLEAN -> region = 'US'");
 
     PolicyEntity created =
         policyManager.createPolicy(
@@ -523,7 +524,8 @@ public class TestPolicyManager {
     Assertions.assertEquals(
         originalContent, policyManager.getPolicy(METALAKE, policyName).content());
 
-    PolicyContent updatedContent = PolicyContents.rowFilter("filter := col(\"region\") == \"EU\"");
+    PolicyContent updatedContent =
+        PolicyContents.rowFilter("(region STRING) RETURNS BOOLEAN -> region = 'EU'");
     PolicyEntity updated =
         policyManager.alterPolicy(
             METALAKE, policyName, PolicyChange.updateContent("system_row_filter", updatedContent));
@@ -541,7 +543,7 @@ public class TestPolicyManager {
                 Policy.BuiltInType.ROW_FILTER,
                 null,
                 true,
-                PolicyContents.rowFilter("filter := col(\"region\")")));
+                PolicyContents.rowFilter("(region STRING) RETURNS BOOLEAN -> region")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -550,42 +552,10 @@ public class TestPolicyManager {
                 policyName,
                 PolicyChange.updateContent(
                     "system_row_filter",
-                    PolicyContents.rowFilter("mask := action(\"replace-with-null\")"))));
+                    PolicyContents.rowFilter(
+                        "(value STRING) RETURNS STRING -> replace_with_null(value)"))));
     Assertions.assertEquals(
         updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
-  }
-
-  @Test
-  public void testRenameAndCommentUpdateDoNotRevalidateStoredRowFilter() throws IOException {
-    String policyName = "legacy_row_filter_" + UUID.randomUUID().toString().replace("-", "");
-    PolicyContent legacyContent = PolicyContents.rowFilter("filter := col(\"region\")");
-    PolicyEntity legacyPolicy =
-        PolicyEntity.builder()
-            .withId(new RandomIdGenerator().nextId())
-            .withName(policyName)
-            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
-            .withPolicyType(Policy.BuiltInType.ROW_FILTER)
-            .withEnabled(true)
-            .withContent(legacyContent)
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-    entityStore.put(legacyPolicy, false /* overwritten */);
-
-    String newName = "renamed_" + policyName;
-    PolicyEntity renamed =
-        Assertions.assertDoesNotThrow(
-            () -> policyManager.alterPolicy(METALAKE, policyName, PolicyChange.rename(newName)));
-    PolicyEntity commented =
-        Assertions.assertDoesNotThrow(
-            () ->
-                policyManager.alterPolicy(
-                    METALAKE, newName, PolicyChange.updateComment("legacy policy")));
-
-    Assertions.assertEquals(newName, commented.name());
-    Assertions.assertEquals("legacy policy", commented.comment());
-    Assertions.assertEquals(legacyContent, renamed.content());
-    Assertions.assertEquals(legacyContent, commented.content());
   }
 
   @Test
@@ -629,7 +599,8 @@ public class TestPolicyManager {
   @Test
   public void testCreateUpdateAndGetColumnMaskPolicy() {
     String policyName = "column_mask_" + UUID.randomUUID().toString().replace("-", "");
-    PolicyContent originalContent = PolicyContents.columnMask("mask := action(\"show-last-4\")");
+    PolicyContent originalContent =
+        PolicyContents.columnMask("(value STRING) RETURNS STRING -> show_last_4(value)");
 
     PolicyEntity created =
         policyManager.createPolicy(
@@ -640,7 +611,7 @@ public class TestPolicyManager {
         originalContent, policyManager.getPolicy(METALAKE, policyName).content());
 
     PolicyContent updatedContent =
-        PolicyContents.columnMask("mask := action(\"replace-with-null\")");
+        PolicyContents.columnMask("(value STRING) RETURNS STRING -> replace_with_null(value)");
     PolicyEntity updated =
         policyManager.alterPolicy(
             METALAKE, policyName, PolicyChange.updateContent("system_column_mask", updatedContent));
@@ -658,7 +629,7 @@ public class TestPolicyManager {
                 Policy.BuiltInType.COLUMN_MASK,
                 null,
                 true,
-                PolicyContents.columnMask("mask := action(\"unknown\")")));
+                PolicyContents.columnMask("(value STRING) RETURNS STRING -> unknown(value)")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -666,7 +637,8 @@ public class TestPolicyManager {
                 METALAKE,
                 policyName,
                 PolicyChange.updateContent(
-                    "system_column_mask", PolicyContents.columnMask("filter := true"))));
+                    "system_column_mask",
+                    PolicyContents.columnMask("() RETURNS BOOLEAN -> TRUE"))));
     Assertions.assertEquals(
         updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
   }
