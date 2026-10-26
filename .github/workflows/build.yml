@@ -2,20 +2,31 @@ name: build
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main", "branch-*" ]
-    paths-ignore:
-      - 'docs/assets/**'
-      - 'web-v2/**'
-  pull_request:
-    branches: [ "main", "branch-*" ]
-    paths-ignore:
-      - 'docs/assets/**'
-      - 'web-v2/**'
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: fork-ci-build-${{ inputs.head-sha || github.ref }}
   cancel-in-progress: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -24,13 +35,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
       - name: Test source license-reference checker
         run: bash dev/release/test-check-license.sh
+      - name: Test Fork CI contracts
+        run: node --test .github/scripts/tests/*.test.cjs
       - name: Disable Git automatic maintenance
         run: git config --local maintenance.auto false
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
         id: filter
         with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
           list-files: shell
           filters: |
             source_changes:
@@ -105,6 +130,15 @@ jobs:
     if: needs.changes.outputs.source_changes != 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: ./.github/actions/setup-java-toolchains
         with:
@@ -122,6 +156,15 @@ jobs:
     if: needs.changes.outputs.spark_connector_changes == 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: actions/setup-java@v4
         with:
@@ -152,13 +195,23 @@ jobs:
     strategy:
       matrix:
         java-version: [ 17 ]
-    timeout-minutes: 120
+    timeout-minutes: 180
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: build-checkout
 
       - uses: ./.github/actions/setup-java-toolchains
         with:
@@ -206,6 +259,8 @@ jobs:
             -x :catalogs-contrib:catalog-jdbc-clickhouse:test
             -x :catalogs-contrib:catalog-jdbc-hologres:test
             -x :catalogs-contrib:catalog-jdbc-oceanbase:test
+            # Core's tests run in the core-test job, one lane per job; :core:test is deprecated.
+            -x :core:test
           )
 
           if [ "${{ needs.changes.outputs.mcp_server_changes }}" != "true" ]; then
@@ -223,40 +278,18 @@ jobs:
 
           ./gradlew "${gradle_args[@]}"
 
-      - name: Fetch base branch for coverage diff
-        if: github.event_name == 'pull_request'
-        run: git fetch origin ${{ github.base_ref }} --depth=1
-
-      - name: Generate Coverage Report
-        id: coverage
-        if: github.event_name == 'pull_request'
-        run: |
-          python3 dev/ci/jacoco_report.py \
-            --base-ref "${{ github.base_ref }}" \
-            --head-sha "${{ github.event.pull_request.head.sha }}" \
-            --repo-url "${{ github.event.pull_request.head.repo.html_url }}" \
-            --min-overall 40 \
-            --min-changed 60 \
-            --output coverage-report.md
-
-      - name: Save PR number
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
-        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
-
-      - name: Upload Coverage Report
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+      - name: Upload coverage data
+        if: steps.build-checkout.outputs.pull-request == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-report
+          name: jacoco-build
+          # build.gradle.kts anchors the artifact at the repository root, so the report paths keep
+          # their module prefix, which jacoco_report.py uses to name modules.
           path: |
-            coverage-report.md
-            pr-number.txt
-
-      - name: Output Coverage Info
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
-        run: |
-          echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
-          echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
+            build.gradle.kts
+            **/build/reports/jacoco/test/jacocoTestReport.xml
+          if-no-files-found: ignore
+          retention-days: 1
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v7
@@ -269,3 +302,184 @@ jobs:
             catalogs-contrib/**/*.tar
             catalogs/**/*.log
             catalogs/**/*.tar
+
+  core-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: [ 17 ]
+        # One job per core test lane, so each lane's results and coverage inputs are inspectable on
+        # their own. Lanes are defined in core/build.gradle.kts.
+        lane: [ unit, h2, mysql, postgresql ]
+        include:
+          - lane: unit
+            task: coreUnitTest
+            skip-docker-tests: true
+          - lane: h2
+            task: coreH2Test
+            skip-docker-tests: true
+          - lane: mysql
+            task: coreMySQLTest
+            skip-docker-tests: false
+          - lane: postgresql
+            task: corePostgreSQLTest
+            skip-docker-tests: false
+    timeout-minutes: 120
+    needs: changes
+    if: >-
+      needs.changes.outputs.source_changes == 'true' &&
+      needs.changes.outputs.maintenance_module_only_changes != 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: ${{ matrix.java-version }}
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Run core ${{ matrix.lane }} lane
+        run: |
+          ./gradlew :core:${{ matrix.task }} \
+            -PskipWeb=true \
+            -PskipITs \
+            -PskipDockerTests=${{ matrix.skip-docker-tests }}
+
+      - name: Validate core test evidence
+        run: |
+          junit_xml="$(find "core/build/test-results/${{ matrix.task }}" \
+            -type f -name 'TEST-*.xml' -print -quit)"
+          test -n "${junit_xml}"
+          test -s "${junit_xml}"
+          test -s "build/reports/tests/core/${{ matrix.task }}/index.html"
+          test -s "core/build/jacoco/${{ matrix.task }}.exec"
+
+      - name: Upload core test evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-${{ matrix.lane }}-test-evidence
+          path: |
+            core/build/test-results/${{ matrix.task }}
+            build/reports/tests/core/${{ matrix.task }}
+            core/build/jacoco/${{ matrix.task }}.exec
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload core test report
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: core test report ${{ matrix.lane }}
+          path: |
+            build/reports/tests/core
+            core/build/test-results
+
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [ changes, build, core-test ]
+    if: >-
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.changes.outputs.maintenance_module_only_changes == 'true' ||
+      needs['core-test'].result == 'success')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: coverage-checkout
+
+      - uses: ./.github/actions/setup-java-toolchains
+        if: >-
+          steps.coverage-checkout.outputs.pull-request == 'true' &&
+          needs.changes.outputs.maintenance_module_only_changes != 'true'
+        with:
+          java-version: 17
+
+      - name: Fetch base branch for coverage diff
+        if: steps.coverage-checkout.outputs.pull-request == 'true'
+        run: git fetch origin ${{ steps.coverage-checkout.outputs.base-ref }} --depth=1
+
+      - name: Download coverage data
+        if: steps.coverage-checkout.outputs.pull-request == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: jacoco-*
+          merge-multiple: true
+
+      - name: Download core test evidence
+        if: >-
+          steps.coverage-checkout.outputs.pull-request == 'true' &&
+          needs.changes.outputs.maintenance_module_only_changes != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: core-*-test-evidence
+          path: core-test-evidence
+
+      - name: Generate combined core coverage
+        if: >-
+          steps.coverage-checkout.outputs.pull-request == 'true' &&
+          needs.changes.outputs.maintenance_module_only_changes != 'true'
+        run: |
+          mkdir -p core/build/jacoco
+          for task in coreUnitTest coreH2Test coreMySQLTest corePostgreSQLTest; do
+            exec_file="$(find core-test-evidence -path "*/core/build/jacoco/${task}.exec" -print -quit)"
+            test -n "${exec_file}"
+            install -m 0644 "${exec_file}" "core/build/jacoco/${task}.exec"
+          done
+          ./gradlew \
+            :core:jacocoTestReport \
+            -PcoreSuiteCoverage=true \
+            -PskipWeb=true
+          test -s core/build/reports/jacoco/test/jacocoTestReport.xml
+
+      - name: Generate Coverage Report
+        id: coverage
+        if: steps.coverage-checkout.outputs.pull-request == 'true'
+        run: |
+          python3 dev/ci/jacoco_report.py \
+            --base-ref "${{ steps.coverage-checkout.outputs.base-ref }}" \
+            --head-sha "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --repo-url "${{ github.event.pull_request.head.repo.html_url || format('{0}/{1}', github.server_url, github.repository) }}" \
+            --min-overall 40 \
+            --min-changed 60 \
+            --output coverage-report.md
+
+      # coverage-comment.yml posts the report for pull_request runs in this repository.
+      - name: Save PR number
+        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
+
+      - name: Upload Coverage Report
+        if: steps.coverage-checkout.outputs.pull-request == 'true' && steps.coverage.outputs.has_reports == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: |
+            coverage-report.md
+            pr-number.txt
+
+      - name: Output Coverage Info
+        if: steps.coverage-checkout.outputs.pull-request == 'true' && steps.coverage.outputs.has_reports == 'true'
+        run: |
+          echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
+          echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"

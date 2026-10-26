@@ -48,6 +48,7 @@ import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
+import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
@@ -391,6 +392,46 @@ public class TestResponses {
   }
 
   @Test
+  void testTagNameListResponse() throws JsonProcessingException {
+    String[] names = new String[] {"tag1", "tag2"};
+    TagNameListResponse response = new TagNameListResponse(names, true);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    TagNameListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, TagNameListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(names, deserResponse.getNames());
+    assertTrue(deserResponse.hasInaccessibleTags());
+
+    NameListResponse backwardCompatibleResponse =
+        JsonUtils.objectMapper().readValue(serJson, NameListResponse.class);
+    assertArrayEquals(names, backwardCompatibleResponse.getNames());
+
+    assertFalse(new TagNameListResponse(new String[0], false).hasInaccessibleTags());
+  }
+
+  @Test
+  void testPolicyNameListResponse() throws JsonProcessingException {
+    String[] names = new String[] {"policy1", "policy2"};
+    PolicyNameListResponse response = new PolicyNameListResponse(names, true);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    PolicyNameListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, PolicyNameListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(names, deserResponse.getNames());
+    assertTrue(deserResponse.hasInaccessiblePolicies());
+
+    NameListResponse backwardCompatibleResponse =
+        JsonUtils.objectMapper().readValue(serJson, NameListResponse.class);
+    assertArrayEquals(names, backwardCompatibleResponse.getNames());
+
+    assertFalse(new PolicyNameListResponse(new String[0], false).hasInaccessiblePolicies());
+  }
+
+  @Test
   void testTagListResponse() throws JsonProcessingException {
     TagDTO tag1 = TagDTO.builder().withName("tag1").withComment("comment1").build();
     TagDTO tag2 = TagDTO.builder().withName("tag2").withComment("comment2").build();
@@ -407,6 +448,43 @@ public class TestResponses {
     TagListResponse response1 = new TagListResponse();
     Exception e = assertThrows(IllegalArgumentException.class, response1::validate);
     assertEquals("\"tags\" must not be null", e.getMessage());
+  }
+
+  @Test
+  void testMetadataObjectTagListResponse() throws JsonProcessingException {
+    TagDTO tag = TagDTO.builder().withName("tag1").build();
+    MetadataObjectTagListResponse response =
+        new MetadataObjectTagListResponse(new TagDTO[] {tag}, true);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    MetadataObjectTagListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, MetadataObjectTagListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(new TagDTO[] {tag}, deserResponse.getTags());
+    assertTrue(deserResponse.hasInaccessibleTags());
+
+    TagListResponse backwardCompatibleResponse =
+        JsonUtils.objectMapper().readValue(serJson, TagListResponse.class);
+    assertArrayEquals(new TagDTO[] {tag}, backwardCompatibleResponse.getTags());
+  }
+
+  @Test
+  void testMetadataObjectPolicyListResponse() throws JsonProcessingException {
+    MetadataObjectPolicyListResponse response =
+        new MetadataObjectPolicyListResponse(new PolicyDTO[0], true);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    MetadataObjectPolicyListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, MetadataObjectPolicyListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(new PolicyDTO[0], deserResponse.getPolicies());
+    assertTrue(deserResponse.hasInaccessiblePolicies());
+
+    PolicyListResponse backwardCompatibleResponse =
+        JsonUtils.objectMapper().readValue(serJson, PolicyListResponse.class);
+    assertArrayEquals(new PolicyDTO[0], backwardCompatibleResponse.getPolicies());
   }
 
   @Test

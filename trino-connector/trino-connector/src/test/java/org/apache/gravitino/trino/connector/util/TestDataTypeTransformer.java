@@ -114,6 +114,42 @@ public class TestDataTypeTransformer {
             Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
             Types.StructType.Field.nullableField("b", Types.VarCharType.of(10))));
 
+    // Trino allows anonymous row fields (e.g. ROW(1, 'x') with no AS), but Gravitino's
+    // StructType.Field requires a name; it must be synthesized instead of throwing.
+    Assertions.assertEquals(
+        dataTypeTransformer.getGravitinoType(
+            RowType.from(
+                ImmutableList.of(
+                    new Field(Optional.empty(), IntegerType.INTEGER),
+                    new Field(Optional.of("b"), VarcharType.createVarcharType(10))))),
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("field0", Types.IntegerType.get()),
+            Types.StructType.Field.nullableField("b", Types.VarCharType.of(10))));
+
+    // The synthesized name for an anonymous field must not collide with a sibling field that is
+    // explicitly named "field0".
+    Assertions.assertEquals(
+        dataTypeTransformer.getGravitinoType(
+            RowType.from(
+                ImmutableList.of(
+                    new Field(Optional.empty(), IntegerType.INTEGER),
+                    new Field(Optional.of("field0"), VarcharType.createVarcharType(10))))),
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("field1", Types.IntegerType.get()),
+            Types.StructType.Field.nullableField("field0", Types.VarCharType.of(10))));
+
+    // Trino resolves row fields case-insensitively, so the collision check against an
+    // explicitly-named sibling must also be case-insensitive (e.g. a sibling named "FIELD0").
+    Assertions.assertEquals(
+        dataTypeTransformer.getGravitinoType(
+            RowType.from(
+                ImmutableList.of(
+                    new Field(Optional.empty(), IntegerType.INTEGER),
+                    new Field(Optional.of("FIELD0"), VarcharType.createVarcharType(10))))),
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("field1", Types.IntegerType.get()),
+            Types.StructType.Field.nullableField("FIELD0", Types.VarCharType.of(10))));
+
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(UuidType.UUID), Types.UUIDType.get());
 

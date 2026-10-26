@@ -36,6 +36,7 @@ val sparkMajorVersion = "3.5"
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":clients:client-java"))
   implementation(project(":maintenance:optimizer-api"))
   implementation(project(":maintenance:updaters"))
 
@@ -53,10 +54,10 @@ dependencies {
   }
 
   testImplementation(project(":api"))
+  testImplementation(project(":maintenance:optimizer"))
   testImplementation(project(":common"))
   // Used to check that the placeholders of the built-in templates resolve the way the server does.
   testImplementation(project(":core"))
-  testImplementation(project(":clients:client-java"))
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.common) {
     exclude("org.slf4j")
@@ -81,6 +82,12 @@ dependencies {
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:2.7.0")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+// The optimizer packages its runtime dependencies beside its jar in build/libs.
+// Order the integration-test compile after that directory has been populated.
+tasks.compileTestJava {
+  dependsOn(":maintenance:optimizer:copyDepends")
 }
 
 tasks.test {

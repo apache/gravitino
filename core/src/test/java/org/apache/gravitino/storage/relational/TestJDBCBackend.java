@@ -29,7 +29,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,10 +79,20 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+/**
+ * Base class for tests that run against a real relational backend. Write each test as a
+ * {@code @TestTemplate}: {@link BackendTestExtension} runs it once per backend and sets {@link
+ * #backend} and {@link #backendType} before it. A plain {@code @Test} gets neither, nor a reset.
+ *
+ * <p>The class shares one database; before each test, and before the test's own
+ * {@code @BeforeEach}, the tables written to are emptied ({@link ResetStrategy#DELETE_ROWS}). Use
+ * {@link DatabaseFixture} on the class or a method to choose another {@link ResetStrategy}. The
+ * backend is not built yet in {@code @BeforeAll}.
+ */
+@CoreBackend.All
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith({
   BackendTestExtension.class,
@@ -105,59 +114,12 @@ public abstract class TestJDBCBackend {
     this.backendType = backendType;
   }
 
-  @BeforeEach
-  public void init() throws SQLException {
-    truncateAllTables();
-  }
-
-  private void truncateAllTables() throws SQLException {
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection()) {
-        try (Statement statement = connection.createStatement()) {
-          if ("postgresql".equalsIgnoreCase(backendType)) {
-            truncateAllTablesForPostgreSQL(connection);
-          } else {
-            String query = "SHOW TABLES";
-            List<String> tableList = new ArrayList<>();
-            try (ResultSet rs = statement.executeQuery(query)) {
-              while (rs.next()) {
-                tableList.add(rs.getString(1));
-              }
-            }
-            for (String table : tableList) {
-              statement.execute("TRUNCATE TABLE " + table);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  private void truncateAllTablesForPostgreSQL(Connection connection) throws SQLException {
-    List<String> tableList = new ArrayList<>();
-    try (Statement statement = connection.createStatement()) {
-      String query =
-          "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()";
-      try (ResultSet rs = statement.executeQuery(query)) {
-        while (rs.next()) {
-          tableList.add(rs.getString(1));
-        }
-      }
-
-      if (tableList.isEmpty()) {
-        return;
-      }
-
-      // Merge all TRUNCATE operations into a single DO block to improve efficiency
-      StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
-      for (String table : tableList) {
-        pgTruncateCommand.append(
-            String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", table));
-      }
-      pgTruncateCommand.append("END $$;");
-      statement.execute(pgTruncateCommand.toString());
-    }
+  /**
+   * Empties the shared database mid-test ({@link ResetStrategy#DELETE_ROWS}), for a test that runs
+   * several scenarios in a loop.
+   */
+  protected void resetDatabase() throws SQLException {
+    DatabaseResetter.reset(backendType, ResetStrategy.DELETE_ROWS);
   }
 
   protected BaseMetalake createAndInsertMakeLake(String metalakeName) throws IOException {

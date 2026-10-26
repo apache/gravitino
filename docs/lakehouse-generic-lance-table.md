@@ -297,7 +297,14 @@ tableCatalog.createTable(
 
 #### Register External Tables
 
-Register existing Lance tables without moving or copying data:
+Register existing Lance tables without moving or copying data. A table with `lance.register=true`
+is always external, including when the request omits `external` or sets it to `false`. Dropping it
+through the Gravitino table API removes only the metadata. Explicit `purgeTable` and Lance REST
+`drop` still delete both the metadata and the dataset; use Lance REST `deregister` to preserve data.
+
+Existing registrations with a missing or false stored `external` flag receive the same protection
+when dropped or deregistered. Their stored properties are not automatically migrated.
+
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
