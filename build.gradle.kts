@@ -625,6 +625,7 @@ subprojects {
     ":catalogs:hadoop-auth",
     ":catalogs:hadoop-common",
     ":maintenance:jobs",
+    ":maintenance:maintenance-common",
     ":maintenance:optimizer-api",
     ":maintenance:updaters",
     ":clients",

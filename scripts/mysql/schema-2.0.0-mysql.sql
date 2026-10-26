@@ -729,7 +729,7 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
     `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tma_job_id` (`job_id`),
+    KEY `idx_tma_job_id` (`job_id`),
     -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
     UNIQUE KEY `uk_tma_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
     KEY `idx_tma_before_sid` (`table_id`, `before_snapshot_id`),

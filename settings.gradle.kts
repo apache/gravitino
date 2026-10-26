@@ -136,6 +136,7 @@ include(":plugins:idp-basic")
 include(":plugins:k8s-job-executor")
 include(":plugins:tms")
 include(
+  ":maintenance:maintenance-common",
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
   ":maintenance:optimizer",
