@@ -58,7 +58,7 @@ public class TestIcebergRegisterOverwriteAuthorization {
   private static final String METALAKE = "test_metalake";
   private static final String CATALOG = "test_catalog";
   private static final String SCHEMA = "test_schema";
-  private static final String TABLE = "victim_table";
+  private static final String TABLE = "existing_table";
   private static final String PROCEEDED = "PROCEEDED";
 
   private static final Set<String> USE =
@@ -75,7 +75,7 @@ public class TestIcebergRegisterOverwriteAuthorization {
   @Test
   public void testRegisterOverwriteDeniedWithCreateTableOnly() throws Throwable {
     Object result =
-        invokeRegister(true, with("SCHEMA::CREATE_TABLE"), "attacker-without-table-rights");
+        invokeRegister(true, with("SCHEMA::CREATE_TABLE"), "user-without-table-rights");
     assertForbidden(result);
   }
 
@@ -121,7 +121,7 @@ public class TestIcebergRegisterOverwriteAuthorization {
     RegisterTableRequest request =
         ImmutableRegisterTableRequest.builder()
             .name(TABLE)
-            .metadataLocation("file:///tmp/attacker/metadata/00000-attacker.metadata.json")
+            .metadataLocation("file:///tmp/other/metadata/00000-other.metadata.json")
             .overwrite(overwrite)
             .build();
     return invoke(method, new Object[] {CATALOG + "/", SCHEMA, request, null}, privileges, user);
