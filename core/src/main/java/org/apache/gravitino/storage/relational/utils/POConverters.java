@@ -21,10 +21,12 @@ package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,6 +65,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.AccessControlContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
@@ -83,6 +86,7 @@ import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyRoleRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
@@ -1610,6 +1614,39 @@ public class POConverters {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
+  }
+
+  /**
+   * Builds the role reference rows derived from a policy's content.
+   *
+   * <p>Only access control content names roles, so every other policy type yields no rows.
+   * Duplicate names in the content collapse to one row, matching the table's uniqueness over
+   * (policy, role).
+   *
+   * @param policyId the ID of the policy row the references belong to
+   * @param policyEntity the policy being written
+   * @return the references the content currently names
+   */
+  public static List<PolicyRoleRelPO> initializePolicyRoleRelPOs(
+      Long policyId, PolicyEntity policyEntity) {
+    PolicyContent content = policyEntity.content();
+    if (!(content instanceof AccessControlContent)) {
+      return ImmutableList.of();
+    }
+
+    ImmutableList.Builder<PolicyRoleRelPO> relations = ImmutableList.builder();
+    for (String roleName :
+        new LinkedHashSet<>(((AccessControlContent) content).applicableRoles())) {
+      relations.add(
+          PolicyRoleRelPO.builder()
+              .withPolicyId(policyId)
+              .withRoleName(roleName)
+              .withCurrentVersion(INIT_VERSION)
+              .withLastVersion(INIT_VERSION)
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .build());
+    }
+    return relations.build();
   }
 
   public static OwnerRelPO initializeOwnerRelPOsWithVersion(

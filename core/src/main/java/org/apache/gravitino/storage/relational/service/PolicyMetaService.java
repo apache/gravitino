@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -42,6 +43,7 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -49,6 +51,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyRoleRelPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -149,7 +152,8 @@ public class PolicyMetaService {
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
       SessionUtils.doMultipleWithCommit(
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
-          () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO));
+          () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
+          () -> updateRoleRelationsWithoutCommit(newPolicyPO.getPolicyId(), updatedPolicyEntity));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
@@ -198,6 +202,9 @@ public class PolicyMetaService {
                   PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId)),
           () ->
               SessionUtils.doWithoutCommit(
+                  PolicyRoleRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId)),
+          () ->
+              SessionUtils.doWithoutCommit(
                   TagMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
@@ -234,7 +241,12 @@ public class PolicyMetaService {
             PolicyVersionMapper.class,
             mapper -> mapper.deletePolicyVersionsByLegacyTimeline(legacyTimeline, limit));
 
-    return policyDeletedCount + policyVersionDeletedCount;
+    int roleRelationDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            PolicyRoleRelMapper.class,
+            mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit));
+
+    return policyDeletedCount + policyVersionDeletedCount + roleRelationDeletedCount;
   }
 
   @Monitored(
@@ -339,7 +351,16 @@ public class PolicyMetaService {
   }
 
   /**
-   * Writes the policy row and its content snapshot.
+   * Writes the policy row, its content snapshot, and the role references derived from that content.
+   */
+  private void insertPolicyWithoutCommit(
+      PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
+    long policyId = writePolicyRowWithoutCommit(policyEntity, initializedPolicyPO, overwritten);
+    updateRoleRelationsWithoutCommit(policyId, policyEntity);
+  }
+
+  /**
+   * Writes the policy row and its content snapshot, and returns the ID the row ended up with.
    *
    * <p>An overwrite is not an upsert any more: the existing row is located and locked first, and
    * the replacement is written as the next version of that row, so the snapshot history survives
@@ -351,11 +372,11 @@ public class PolicyMetaService {
    * Such a row keeps the primary key, so the insert is rejected as an already-existing policy,
    * which is the honest answer: the snapshots and relations of the deleted policy are gone with it.
    */
-  private void insertPolicyWithoutCommit(
+  private long writePolicyRowWithoutCommit(
       PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
     if (!overwritten) {
       insertNewPolicyWithoutCommit(initializedPolicyPO);
-      return;
+      return initializedPolicyPO.getPolicyId();
     }
 
     PolicyPO existingPolicyPO = findAndLockPolicyForOverwrite(initializedPolicyPO);
@@ -369,7 +390,7 @@ public class PolicyMetaService {
             initializedPolicyPO.getPolicyId());
       }
       insertNewPolicyWithoutCommit(initializedPolicyPO);
-      return;
+      return initializedPolicyPO.getPolicyId();
     }
 
     PolicyPO replacementPolicyPO =
@@ -378,6 +399,46 @@ public class PolicyMetaService {
         NameIdentifier.of(policyEntity.namespace(), existingPolicyPO.getPolicyName());
     updatePolicyRootWithVersion(observedIdentifier, existingPolicyPO, replacementPolicyPO);
     insertPolicyVersionIfAllocated(existingPolicyPO, replacementPolicyPO);
+    return replacementPolicyPO.getPolicyId();
+  }
+
+  /**
+   * Brings the role references derived from a policy's content in line with that content.
+   *
+   * <p>The references are written only here and never by a caller, so {@code content} stays the one
+   * authority on which roles a policy names.
+   *
+   * <p>Only the difference is written: a reference the content still names keeps its row. A policy
+   * edit that leaves {@code applicableRoles} alone therefore writes no reference rows at all, and
+   * two edits landing in the same millisecond cannot collide on the table's uniqueness over
+   * (policy, role, deleted_at).
+   */
+  private void updateRoleRelationsWithoutCommit(long policyId, PolicyEntity policyEntity) {
+    List<PolicyRoleRelPO> desired = POConverters.initializePolicyRoleRelPOs(policyId, policyEntity);
+    List<PolicyRoleRelPO> current =
+        SessionUtils.getWithoutCommit(
+            PolicyRoleRelMapper.class, mapper -> mapper.listByPolicyId(policyId));
+
+    Set<String> desiredRoles =
+        desired.stream().map(PolicyRoleRelPO::getRoleName).collect(Collectors.toSet());
+    Set<String> currentRoles =
+        current.stream().map(PolicyRoleRelPO::getRoleName).collect(Collectors.toSet());
+
+    for (PolicyRoleRelPO superseded : current) {
+      if (desiredRoles.contains(superseded.getRoleName())) {
+        continue;
+      }
+      // A zero-row update means the reference is already gone, which is the intended end state.
+      SessionUtils.doWithoutCommit(
+          PolicyRoleRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(superseded));
+    }
+
+    for (PolicyRoleRelPO added : desired) {
+      if (currentRoles.contains(added.getRoleName())) {
+        continue;
+      }
+      SessionUtils.doWithoutCommit(PolicyRoleRelMapper.class, mapper -> mapper.insert(added));
+    }
   }
 
   /**
