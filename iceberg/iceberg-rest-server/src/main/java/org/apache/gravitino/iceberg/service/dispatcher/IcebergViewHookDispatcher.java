@@ -71,6 +71,11 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // First, create the view in the underlying catalog
     LoadViewResponse response = dispatcher.createView(context, namespace, createViewRequest);
 
+    // The backend create just succeeded, so no view had this name. Any entity or plugin policy
+    // under it belongs to a dropped view; remove it, or the import adopts its id and bindings.
+    IcebergStaleEntityCleaner.removeStaleView(
+        metalake, context.catalogName(), TableIdentifier.of(namespace, createViewRequest.name()));
+
     // Then import it into Gravitino so Gravitino is aware of the view
     importView(context.catalogName(), namespace, createViewRequest.name());
 
@@ -238,7 +243,9 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     try {
       reconcileViewEntity(context, viewIdentifier);
     } catch (RuntimeException e) {
-      LOG.warn(
+      // Kept best-effort so the client sees the committed backend result, but logged at ERROR: a
+      // stale entity left here keeps its grants until the name is created again.
+      LOG.error(
           "Failed to reconcile Gravitino view entity after the Iceberg backend operation "
               + "succeeded. catalog={}, view={}",
           context.catalogName(),
