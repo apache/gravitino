@@ -255,12 +255,16 @@ The same applies to a job template that passes its job configuration on to these
 configurations, for example through a placeholder. The `spark_conf` parameter of the built-in
 Iceberg jobs can't set the `spark.kubernetes.*` configurations, see [Built-In Jobs](#built-in-jobs),
 but anyone who can run one of these jobs can set its other Spark configurations, such as
-`spark.jars`, which adds code to the job.
+`spark.jars`, which adds code to the job. That code runs in the driver and the executors, with
+their service accounts and the credentials of the job.
 
 To limit what jobs can do:
 
 - Run the jobs in dedicated namespaces that hold only the Secrets the jobs need, and grant the Role
   of the job executor only in those namespaces.
+- Give the driver service account, `spark.serviceAccount`, only the permissions that Spark needs to
+  manage the executors in the namespace of the job, like the `spark-workload-clusterrole` of the
+  operator chart, and nothing else.
 - Enforce [Pod Security Admission](https://kubernetes.io/docs/concepts/security/pod-security-admission/)
   in those namespaces, for example at the `baseline` level, which rejects pods with `hostPath`
   volumes.
