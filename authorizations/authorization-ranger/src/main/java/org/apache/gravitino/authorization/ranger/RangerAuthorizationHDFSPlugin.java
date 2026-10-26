@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -317,10 +318,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
   /**
    * Remove the CATALOG, need to remove the Gravitino-managed items of the policy on the catalog
-   * location. A location that another Hive catalog in the metalake still uses keeps its policy,
-   * because that policy also carries the other catalog's privileges. Only catalog locations are
-   * compared: a schema or fileset of another catalog placed exactly at this location is not
-   * detected.
+   * location and of the policies of its schemas and tables. A force drop deletes the schemas and
+   * tables without their own drop hooks, so this is the only place their policies are removed. A
+   * location that another Hive catalog in the metalake still uses keeps its policies, because they
+   * also carry the other catalog's privileges. Only catalog locations are compared: a schema or
+   * fileset of another catalog placed exactly at this location is not detected.
    */
   private void removeCatalogMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
     Preconditions.checkArgument(
@@ -335,7 +337,64 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           metalake);
       return;
     }
+    // Look up every child location first, so a failed lookup refuses before any policy changes.
+    List<PathBasedMetadataObject> children =
+        loadChildrenMetadataObjects(pathBasedMetadataObject.name(), path);
     removePolicyByMetadataObject(authzMetadataObject);
+    children.forEach(this::removeMetadataObject);
+  }
+
+  /**
+   * Load the path-based metadata objects of the catalog's schemas and tables, whose policies
+   * dropping each of them would remove. A schema on the catalog location, usually the default
+   * schema, is skipped because it shares the catalog's policy.
+   */
+  private List<PathBasedMetadataObject> loadChildrenMetadataObjects(
+      String catalogName, String catalogPath) {
+    List<PathBasedMetadataObject> children = new ArrayList<>();
+    for (NameIdentifier schema :
+        listChildren(Namespace.of(metalake, catalogName), Entity.EntityType.SCHEMA)) {
+      for (String location :
+          AuthorizationUtils.loadMetadataObjectLocation(schema, Entity.EntityType.SCHEMA)) {
+        PathBasedMetadataObject schemaObject =
+            new PathBasedMetadataObject(
+                catalogName, schema.name(), location, PathBasedMetadataObject.SCHEMA_PATH);
+        if (!StringUtils.removeEnd(getAuthorizationPath(schemaObject), "/")
+            .equals(StringUtils.removeEnd(catalogPath, "/"))) {
+          children.add(schemaObject);
+        }
+      }
+      for (NameIdentifier table :
+          listChildren(
+              Namespace.of(metalake, catalogName, schema.name()), Entity.EntityType.TABLE)) {
+        for (String location :
+            AuthorizationUtils.loadMetadataObjectLocation(table, Entity.EntityType.TABLE)) {
+          children.add(
+              new PathBasedMetadataObject(
+                  catalogName + "." + schema.name(),
+                  table.name(),
+                  location,
+                  PathBasedMetadataObject.TABLE_PATH));
+        }
+      }
+    }
+    return children;
+  }
+
+  private NameIdentifier[] listChildren(Namespace namespace, Entity.EntityType type) {
+    try {
+      return type == Entity.EntityType.SCHEMA
+          ? GravitinoEnv.getInstance().internalSchemaDispatcher().listSchemas(namespace)
+          : GravitinoEnv.getInstance().internalTableDispatcher().listTables(namespace);
+    } catch (Exception e) {
+      throw new AuthorizationPluginException(
+          e,
+          "Cannot remove the HDFS policies of catalog %s.%s: failed to list the %ss of %s",
+          namespace.level(0),
+          namespace.level(1),
+          type.name().toLowerCase(Locale.ROOT),
+          namespace);
+    }
   }
 
   private boolean isPathUsedByOtherCatalog(String catalogName, String path) {

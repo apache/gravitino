@@ -38,10 +38,13 @@ import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyR
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.util.SearchFilter;
@@ -65,6 +68,7 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
   private CatalogDispatcher innerDispatcher;
   private CatalogDispatcher internalCatalogDispatcher;
   private SchemaDispatcher schemaDispatcher;
+  private TableDispatcher tableDispatcher;
   private MockedStatic<GravitinoEnv> envStatic;
 
   @BeforeEach
@@ -104,16 +108,22 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
     internalCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
     Catalog hiveCatalog = Mockito.mock(Catalog.class);
     Mockito.when(hiveCatalog.provider()).thenReturn("hive");
+    Mockito.when(hiveCatalog.type()).thenReturn(Catalog.Type.RELATIONAL);
     Mockito.when(internalCatalogDispatcher.loadCatalog(any())).thenReturn(hiveCatalog);
     givenCatalogs(catalogInfo(CATALOG, "hive"));
     schemaDispatcher = Mockito.mock(SchemaDispatcher.class);
     givenDefaultSchemaLocation(CATALOG, WAREHOUSE);
+    // By default the catalog has only its default schema, which has no tables.
+    tableDispatcher = Mockito.mock(TableDispatcher.class);
+    Mockito.when(tableDispatcher.listTables(any())).thenReturn(new NameIdentifier[0]);
+    givenSchemas("default");
 
     GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
     Mockito.when(env.internalAccessControlDispatcher())
         .thenReturn(Mockito.mock(AccessControlDispatcher.class));
     Mockito.when(env.internalCatalogDispatcher()).thenReturn(internalCatalogDispatcher);
     Mockito.when(env.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
+    Mockito.when(env.internalTableDispatcher()).thenReturn(tableDispatcher);
     Mockito.when(env.catalogManager()).thenReturn(catalogManager);
     envStatic = Mockito.mockStatic(GravitinoEnv.class);
     envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
@@ -240,6 +250,152 @@ public class TestRangerAuthorizationHDFSPluginCatalogDrop {
 
     Mockito.verify(rangerClient, Mockito.never()).deletePolicy(anyLong());
     Mockito.verify(innerDispatcher).dropCatalog(CATALOG, true);
+  }
+
+  @Test
+  public void testForceDropCatalogRemovesGravitinoItemsOfSchemaPolicy() throws Exception {
+    addPolicy(1, "/user/hive/warehouse", "GRAVITINO_role");
+    RangerPolicy schemaPolicy =
+        addPolicy(2, "/user/hive/warehouse/db.db", "GRAVITINO_role", "external_role");
+    givenSchemas("default", "db");
+    givenSchemaLocation("db", WAREHOUSE + "/db.db");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    // Only the Gravitino-managed item goes; the item Ranger admins added stays.
+    Mockito.verify(rangerClient).updatePolicy(Mockito.eq(2L), Mockito.any());
+    Assertions.assertEquals(List.of("external_role"), rolesOf(schemaPolicy));
+    Mockito.verify(innerDispatcher).dropCatalog(CATALOG, true);
+  }
+
+  @Test
+  public void testForceDropCatalogRemovesTablePolicy() throws Exception {
+    addPolicy(1, "/user/hive/warehouse", "GRAVITINO_role");
+    addPolicy(2, "/user/hive/warehouse/db.db", "GRAVITINO_role");
+    addPolicy(3, "/user/hive/warehouse/db.db/t", "GRAVITINO_role");
+    givenSchemas("default", "db");
+    givenSchemaLocation("db", WAREHOUSE + "/db.db");
+    givenTable("db", "t", WAREHOUSE + "/db.db/t");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Mockito.verify(rangerClient).deletePolicy(1L);
+    Mockito.verify(rangerClient).deletePolicy(2L);
+    Mockito.verify(rangerClient).deletePolicy(3L);
+    Mockito.verify(innerDispatcher).dropCatalog(CATALOG, true);
+  }
+
+  @Test
+  public void testForceDropCatalogRemovesPolicyOfSchemaOutsideWarehouse() throws Exception {
+    addPolicy(1, "/user/hive/warehouse", "GRAVITINO_role");
+    addPolicy(2, "/external/db", "GRAVITINO_role");
+    givenSchemas("default", "db");
+    givenSchemaLocation("db", "hdfs://ns/external/db");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    // The schema's policy is found by its own location, not by being under the warehouse.
+    Mockito.verify(rangerClient).deletePolicy(2L);
+  }
+
+  @Test
+  public void testForceDropCatalogRefusedWhenSchemaLocationLookupFails() throws Exception {
+    addPolicy(1, "/user/hive/warehouse", "GRAVITINO_role");
+    addPolicy(2, "/user/hive/warehouse/db.db", "GRAVITINO_role");
+    givenSchemas("default", "db");
+    Mockito.when(schemaDispatcher.loadSchema(NameIdentifier.of(METALAKE, CATALOG.name(), "db")))
+        .thenThrow(new NoSuchSchemaException("metastore unreachable"));
+
+    AuthorizationPluginException e =
+        Assertions.assertThrows(
+            AuthorizationPluginException.class,
+            () -> new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    // Every lookup runs before any change, so the catalog policy is untouched as well.
+    Assertions.assertTrue(e.getMessage().contains("db"), e.getMessage());
+    assertRefusedWithoutPolicyChanges();
+  }
+
+  @Test
+  public void testForceDropCatalogRefusedWhenSchemaListingFails() throws Exception {
+    addPolicy(1, "/user/hive/warehouse", "GRAVITINO_role");
+    Mockito.when(schemaDispatcher.listSchemas(Namespace.of(METALAKE, CATALOG.name())))
+        .thenThrow(new NoSuchCatalogException("metastore unreachable"));
+
+    AuthorizationPluginException e =
+        Assertions.assertThrows(
+            AuthorizationPluginException.class,
+            () -> new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Assertions.assertTrue(e.getMessage().contains(CATALOG.toString()), e.getMessage());
+    assertRefusedWithoutPolicyChanges();
+  }
+
+  @Test
+  public void testForceDropCatalogRefusedWhenTableListingFails() throws Exception {
+    addPolicy(1, "/user/hive/warehouse", "GRAVITINO_role");
+    givenSchemas("default", "db");
+    givenSchemaLocation("db", WAREHOUSE + "/db.db");
+    Mockito.when(tableDispatcher.listTables(Namespace.of(METALAKE, CATALOG.name(), "db")))
+        .thenThrow(new NoSuchSchemaException("metastore unreachable"));
+
+    AuthorizationPluginException e =
+        Assertions.assertThrows(
+            AuthorizationPluginException.class,
+            () -> new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    Assertions.assertTrue(e.getMessage().contains(CATALOG.toString()), e.getMessage());
+    assertRefusedWithoutPolicyChanges();
+  }
+
+  @Test
+  public void testForceDropCatalogKeepsSchemaPoliciesOfSharedWarehouse() throws Exception {
+    addPolicy(1, "/user/hive/warehouse", "GRAVITINO_role");
+    RangerPolicy schemaPolicy = addPolicy(2, "/user/hive/warehouse/db.db", "GRAVITINO_role");
+    givenOtherCatalogWithLocation(WAREHOUSE);
+    givenSchemas("default", "db");
+    givenSchemaLocation("db", WAREHOUSE + "/db.db");
+
+    Assertions.assertTrue(new CatalogHookDispatcher(innerDispatcher).dropCatalog(CATALOG, true));
+
+    // Catalogs on one warehouse share its schemas, so their policies stay with the other catalog.
+    Mockito.verify(rangerClient, Mockito.never()).deletePolicy(anyLong());
+    Mockito.verify(rangerClient, Mockito.never()).updatePolicy(anyLong(), any());
+    Assertions.assertEquals(List.of("GRAVITINO_role"), rolesOf(schemaPolicy));
+    Mockito.verify(schemaDispatcher, Mockito.never()).listSchemas(any());
+  }
+
+  private void assertRefusedWithoutPolicyChanges() throws Exception {
+    Mockito.verify(innerDispatcher, Mockito.never())
+        .dropCatalog(Mockito.any(), Mockito.anyBoolean());
+    Mockito.verify(rangerClient, Mockito.never()).deletePolicy(anyLong());
+    Mockito.verify(rangerClient, Mockito.never()).updatePolicy(anyLong(), any());
+  }
+
+  private void givenSchemas(String... schemas) {
+    NameIdentifier[] idents = new NameIdentifier[schemas.length];
+    for (int i = 0; i < schemas.length; i++) {
+      idents[i] = NameIdentifier.of(METALAKE, CATALOG.name(), schemas[i]);
+    }
+    Mockito.when(schemaDispatcher.listSchemas(Namespace.of(METALAKE, CATALOG.name())))
+        .thenReturn(idents);
+  }
+
+  private void givenSchemaLocation(String schemaName, String location) {
+    Schema schema = Mockito.mock(Schema.class);
+    Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", location));
+    Mockito.when(
+            schemaDispatcher.loadSchema(NameIdentifier.of(METALAKE, CATALOG.name(), schemaName)))
+        .thenReturn(schema);
+  }
+
+  private void givenTable(String schemaName, String tableName, String location) {
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG.name(), schemaName, tableName);
+    Mockito.when(tableDispatcher.listTables(Namespace.of(METALAKE, CATALOG.name(), schemaName)))
+        .thenReturn(new NameIdentifier[] {ident});
+    Table table = Mockito.mock(Table.class);
+    Mockito.when(table.properties()).thenReturn(ImmutableMap.of("location", location));
+    Mockito.when(tableDispatcher.loadTable(ident)).thenReturn(table);
   }
 
   private void givenOtherCatalogWithLocation(String location) {
