@@ -93,7 +93,7 @@ public class TableMetaService {
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
     TablePO tablePO = getTablePOByIdentifier(identifier, snapshotOps);
     return POConverters.fromTableAndColumnPOs(
-        tablePO, tablePO.getColumnPOs(), identifier.namespace());
+        tablePO, tablePO.requireColumnPOs(), identifier.namespace());
   }
 
   @Monitored(
@@ -201,7 +201,7 @@ public class TableMetaService {
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     TablePO oldTablePO = getTablePOByIdentifier(identifier, snapshotOps);
-    List<ColumnPO> oldTableColumns = oldTablePO.getColumnPOs();
+    List<ColumnPO> oldTableColumns = oldTablePO.requireColumnPOs();
     TableEntity oldTableEntity =
         POConverters.fromTableAndColumnPOs(oldTablePO, oldTableColumns, identifier.namespace());
 

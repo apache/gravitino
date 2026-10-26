@@ -22,7 +22,6 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.RolePO;
-import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -31,7 +30,6 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -128,26 +126,6 @@ public interface RoleMetaMapper {
 
   @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "batchGetRoleUpdatedAt")
   List<RoleUpdatedAt> batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds);
-  /**
-   * Defines the nested result mapping for single-statement role reads.
-   *
-   * @return unused; this declaration is never executed
-   */
-  @Results(
-      id = "rolePrivilegeSnapshot",
-      value = {
-        @Result(property = "id", column = "relationId", id = true),
-        @Result(property = "roleId", column = "roleId"),
-        @Result(property = "metadataObjectId", column = "metadataObjectId"),
-        @Result(property = "type", column = "type"),
-        @Result(property = "privilegeNames", column = "privilegeNames"),
-        @Result(property = "privilegeConditions", column = "privilegeConditions"),
-        @Result(property = "currentVersion", column = "currentVersion"),
-        @Result(property = "lastVersion", column = "lastVersion"),
-        @Result(property = "deletedAt", column = "deletedAt")
-      })
-  @Select("SELECT 1")
-  SecurableObjectPO rolePrivilegeSnapshot();
 
   /**
    * Reads a role and its live privileges from one statement snapshot.
@@ -193,23 +171,4 @@ public interface RoleMetaMapper {
   List<RolePO> listRolesWithPrivilegesByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
-  /**
-   * Defines the role metadata mapping shared by principal snapshot reads.
-   *
-   * @return unused; this declaration is never executed
-   */
-  @Results(
-      id = "membershipRoleSnapshot",
-      value = {
-        @Result(property = "roleId", column = "roleId", id = true),
-        @Result(property = "roleName", column = "roleName"),
-        @Result(property = "metalakeId", column = "metalakeId"),
-        @Result(property = "properties", column = "properties"),
-        @Result(property = "auditInfo", column = "auditInfo"),
-        @Result(property = "currentVersion", column = "currentVersion"),
-        @Result(property = "lastVersion", column = "lastVersion"),
-        @Result(property = "deletedAt", column = "deletedAt")
-      })
-  @Select("SELECT 1")
-  RolePO membershipRoleSnapshot();
 }

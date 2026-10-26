@@ -19,11 +19,14 @@
 package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -485,6 +488,109 @@ public class TestConsistentEntityReads extends TestJDBCBackend {
         });
   }
 
+  @TestTemplate
+  void testMetadataOnlyReadsDoNotMasqueradeAsEmptySnapshots() throws Exception {
+    parents();
+    TableEntity table = table(RandomIdGenerator.INSTANCE.nextId(), "before", "column");
+    RoleEntity role = role("before", CATALOG);
+    UserEntity user =
+        createUserEntity(
+            12347L,
+            AuthorizationUtils.ofUserNamespace(METALAKE),
+            "user",
+            AUDIT_INFO,
+            List.of(),
+            List.of());
+    GroupEntity group =
+        createGroupEntity(
+            12348L,
+            AuthorizationUtils.ofGroupNamespace(METALAKE),
+            "group",
+            AUDIT_INFO,
+            List.of(),
+            List.of());
+    backend.insert(table, false);
+    backend.insert(role, false);
+    backend.insert(user, false);
+    backend.insert(group, false);
+    long metalakeId =
+        EntityIdService.getEntityId(NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE);
+    long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, table.name()));
+    RolePO rolePO =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class,
+            mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, role.name()));
+    UserPO userPO =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserMetaByMetalakeIdAndName(metalakeId, user.name()));
+    GroupPO groupPO =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class,
+            mapper -> mapper.selectGroupMetaByMetalakeIdAndName(metalakeId, group.name()));
+    assertNull(tablePO.getColumnPOs());
+    assertNull(rolePO.getSecurableObjectPOs());
+    assertNull(userPO.getRolePOs());
+    assertNull(groupPO.getRolePOs());
+    assertThrows(IllegalStateException.class, tablePO::requireColumnPOs);
+    assertThrows(IllegalStateException.class, rolePO::requireSecurableObjectPOs);
+    assertThrows(IllegalStateException.class, userPO::requireRolePOs);
+    assertThrows(IllegalStateException.class, groupPO::requireRolePOs);
+    assertMetadataOnlySnapshotRejected(TableMetaMapper.class, tablePO, table);
+    assertMetadataOnlySnapshotRejected(RoleMetaMapper.class, rolePO, role);
+    assertMetadataOnlySnapshotRejected(UserMetaMapper.class, userPO, user);
+    assertMetadataOnlySnapshotRejected(GroupMetaMapper.class, groupPO, group);
+    // A real aggregate mapper must initialize an empty collection even without a joined child.
+    UserPO loadedUser =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserWithRolesByMetalakeIdAndName(metalakeId, user.name()));
+    GroupPO loadedGroup =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class,
+            mapper -> mapper.selectGroupWithRolesByMetalakeIdAndName(metalakeId, group.name()));
+    assertTrue(loadedUser.requireRolePOs().isEmpty());
+    assertTrue(loadedGroup.requireRolePOs().isEmpty());
+  }
+
+  private <E extends Entity & HasIdentifier> void assertMetadataOnlySnapshotRejected(
+      Class<?> mapper, Object metadataOnly, E entity) throws Exception {
+    AtomicBoolean updaterInvoked = new AtomicBoolean();
+    try (MockedStatic<SessionUtils> ignored =
+        Mockito.mockStatic(
+            SessionUtils.class,
+            invocation -> {
+              Object result = invocation.callRealMethod();
+              if (invocation.getMethod().getName().equals("getWithoutCommit")
+                  && invocation.getArgument(0) == mapper
+                  && result != null
+                  && result.getClass() == metadataOnly.getClass()) {
+                return metadataOnly;
+              }
+              return result;
+            })) {
+      assertThrows(
+          IllegalStateException.class, () -> backend.get(entity.nameIdentifier(), entity.type()));
+      assertThrows(
+          IllegalStateException.class,
+          () ->
+              backend.<E>update(
+                  entity.nameIdentifier(),
+                  entity.type(),
+                  current -> {
+                    updaterInvoked.set(true);
+                    return current;
+                  }));
+      assertFalse(updaterInvoked.get(), "metadata-only input must be rejected before the updater");
+    }
+  }
+
   private <E extends Entity & HasIdentifier> void assertUpdaterSnapshot(
       Class<?> mapper, E before, E after, BiConsumer<E, E> assertSnapshot) throws Exception {
     backend.insert(before, false);
@@ -569,7 +675,18 @@ public class TestConsistentEntityReads extends TestJDBCBackend {
         .withId(id)
         .withName("table")
         .withNamespace(Namespace.of(METALAKE, CATALOG, SCHEMA))
-        .withColumns(List.of(column))
+        .withColumns(
+            List.of(
+                column,
+                ColumnEntity.builder()
+                    .withId(RandomIdGenerator.INSTANCE.nextId())
+                    .withName(columnName + "_second")
+                    .withPosition(1)
+                    .withDataType(Types.StringType.get())
+                    .withNullable(false)
+                    .withAutoIncrement(false)
+                    .withAuditInfo(AUDIT_INFO)
+                    .build()))
         .withComment(comment)
         .withAuditInfo(AUDIT_INFO)
         .build();
@@ -592,8 +709,17 @@ public class TestConsistentEntityReads extends TestJDBCBackend {
   private void assertTableSnapshot(TableEntity expected, TableEntity actual) {
     assertEquals(expected.id(), actual.id());
     assertEquals(expected.comment(), actual.comment());
-    assertEquals(1, actual.columns().size());
-    assertEquals(expected.columns().get(0).name(), actual.columns().get(0).name());
+    assertEquals(expected.columns().size(), actual.columns().size());
+    Map<Long, ColumnEntity> actualById = new HashMap<>();
+    actual.columns().forEach(column -> actualById.put(column.id(), column));
+    assertEquals(expected.columns().size(), actualById.size());
+    for (ColumnEntity column : expected.columns()) {
+      ColumnEntity observed = actualById.get(column.id());
+      assertEquals(column.name(), observed.name());
+      assertEquals(column.position(), observed.position());
+      assertEquals(column.dataType(), observed.dataType());
+      assertEquals(column.nullable(), observed.nullable());
+    }
   }
 
   private <T> T afterRootRead(Class<?> rootMapper, CheckedRead<T> read, CheckedWrite write)

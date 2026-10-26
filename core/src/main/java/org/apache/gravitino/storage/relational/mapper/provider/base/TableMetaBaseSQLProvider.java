@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -465,6 +466,11 @@ public class TableMetaBaseSQLProvider {
     // each column would be quadratic for long histories. Root subqueries have independent bound
     // parameters on all supported backends. Exclude DELETE markers only after resolving history,
     // otherwise a dropped column would reappear through its earlier CREATE/UPDATE row.
+    // Derived tables accept static SELECTs only. MyBatis handles <script> only at the start of
+    // the complete statement, so a dynamic provider cannot be embedded here.
+    Preconditions.checkArgument(
+        !tableSql.stripLeading().startsWith("<script>"),
+        "Aggregate table reads require static root SQL, not a MyBatis <script>");
     String rootSql = tableSql.strip().replaceFirst(";\\s*$", "");
     return "SELECT t.*, "
         + "c.column_id AS col_columnId, "

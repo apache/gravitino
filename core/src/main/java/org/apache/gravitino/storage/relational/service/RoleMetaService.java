@@ -452,14 +452,6 @@ public class RoleMetaService {
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "listSecurableObjectsByRoleId")
-  public static List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
-    return SessionUtils.getWithoutCommit(
-        SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listRolesByNamespace")
   public List<RoleEntity> listRolesByNamespace(Namespace namespace) {
     AuthorizationUtils.checkRoleNamespace(namespace);
@@ -518,7 +510,7 @@ public class RoleMetaService {
 
   private static List<SecurableObject> listSecurableObjects(RolePO po) {
     // Full role conversions must use privileges from the same statement as the role metadata.
-    List<SecurableObjectPO> securableObjectPOs = po.getSecurableObjectPOs();
+    List<SecurableObjectPO> securableObjectPOs = po.requireSecurableObjectPOs();
     List<SecurableObject> securableObjects = Lists.newArrayList();
 
     securableObjectPOs.stream()

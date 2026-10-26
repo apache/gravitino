@@ -113,7 +113,7 @@ public class UserMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
-    List<RolePO> rolePOs = userPO.getRolePOs();
+    List<RolePO> rolePOs = userPO.requireRolePOs();
 
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
@@ -247,7 +247,7 @@ public class UserMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
-    List<RolePO> rolePOs = oldUserPO.getRolePOs();
+    List<RolePO> rolePOs = oldUserPO.requireRolePOs();
     UserEntity oldUserEntity = POConverters.fromUserPO(oldUserPO, rolePOs, identifier.namespace());
 
     UserEntity newEntity = (UserEntity) updater.apply((E) oldUserEntity);

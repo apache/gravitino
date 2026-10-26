@@ -20,8 +20,8 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 
 public class RolePO {
   private Long roleId;
@@ -33,14 +33,29 @@ public class RolePO {
   private Long lastVersion;
   private Long deletedAt;
 
-  private List<SecurableObjectPO> securableObjectPOs = new ArrayList<>();
+  @Nullable private List<SecurableObjectPO> securableObjectPOs;
 
   /**
-   * Returns privileges read in the same statement as this role.
+   * Returns the privilege rows loaded in the same statement as this entity.
    *
-   * @return the privilege snapshot, or an empty list for metadata-only reads
+   * @return the snapshot, empty when loaded without children, or null for metadata-only reads
    */
+  @Nullable
   public List<SecurableObjectPO> getSecurableObjectPOs() {
+    return securableObjectPOs;
+  }
+
+  /**
+   * Requires the aggregate snapshot before a complete entity is assembled or updated.
+   *
+   * @return the loaded privilege snapshot, which may be empty
+   * @throws IllegalStateException if only the entity metadata was loaded
+   */
+  public List<SecurableObjectPO> requireSecurableObjectPOs() {
+    Preconditions.checkState(
+        securableObjectPOs != null,
+        "The privilege snapshot was not loaded for role %s; use an aggregate mapper",
+        roleId);
     return securableObjectPOs;
   }
 

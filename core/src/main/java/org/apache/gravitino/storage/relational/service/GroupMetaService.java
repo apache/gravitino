@@ -115,7 +115,7 @@ public class GroupMetaService {
     NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
     long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
     GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
-    List<RolePO> rolePOs = groupPO.getRolePOs();
+    List<RolePO> rolePOs = groupPO.requireRolePOs();
 
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
@@ -289,7 +289,7 @@ public class GroupMetaService {
     Long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
 
     GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
-    List<RolePO> rolePOs = oldGroupPO.getRolePOs();
+    List<RolePO> rolePOs = oldGroupPO.requireRolePOs();
     GroupEntity oldGroupEntity =
         POConverters.fromGroupPO(oldGroupPO, rolePOs, identifier.namespace());
 

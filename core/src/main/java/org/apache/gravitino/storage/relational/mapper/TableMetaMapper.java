@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -30,7 +29,6 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -44,34 +42,6 @@ import org.apache.ibatis.annotations.UpdateProvider;
  */
 public interface TableMetaMapper {
   String TABLE_NAME = "table_meta";
-
-  /**
-   * Defines the nested result mapping used by the table aggregate reads.
-   *
-   * @return unused; this mapping declaration is never executed
-   */
-  @Results(
-      id = "tableColumnSnapshot",
-      value = {
-        @Result(property = "columnId", column = "columnId", id = true),
-        @Result(property = "columnName", column = "columnName"),
-        @Result(property = "columnPosition", column = "columnPosition"),
-        @Result(property = "metalakeId", column = "metalakeId"),
-        @Result(property = "catalogId", column = "catalogId"),
-        @Result(property = "schemaId", column = "schemaId"),
-        @Result(property = "tableId", column = "tableId"),
-        @Result(property = "tableVersion", column = "tableVersion", id = true),
-        @Result(property = "columnType", column = "columnType"),
-        @Result(property = "columnComment", column = "columnComment"),
-        @Result(property = "nullable", column = "nullable"),
-        @Result(property = "autoIncrement", column = "autoIncrement"),
-        @Result(property = "defaultValue", column = "defaultValue"),
-        @Result(property = "columnOpType", column = "columnOpType"),
-        @Result(property = "deletedAt", column = "deletedAt"),
-        @Result(property = "auditInfo", column = "auditInfo")
-      })
-  @Select("SELECT 1")
-  ColumnPO tableColumnSnapshot();
 
   /**
    * Reads table metadata, its current version, and columns from one database statement snapshot.
