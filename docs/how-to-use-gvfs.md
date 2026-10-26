@@ -519,12 +519,19 @@ For fileset with multiple locations, you can specify which location to access us
 3. If neither is specified, the system will use the value of `default-location-name` from the fileset properties
 :::
 
-1. Make sure to obtain the Gravitino library.
-   You can get it by [pip](https://pip.pypa.io/en/stable/installation/):
+1. Install the Gravitino Python client with the extra for your storage backend using
+   [pip](https://pip.pypa.io/en/stable/installation/). The base installation provides only the
+   metadata client and does not install GVFS dependencies. The following HDFS example requires
+   the `hdfs` extra:
 
     ```shell
-    pip install apache-gravitino
+    pip install "apache-gravitino[hdfs]"
     ```
+
+   For local `file://` paths, use `apache-gravitino[gvfs]`. For cloud storage, choose
+   `apache-gravitino[s3]`, `apache-gravitino[gcs]`, `apache-gravitino[oss]`, or
+   `apache-gravitino[azure]` for the corresponding backend. Each backend extra includes the shared
+   GVFS dependencies. Use `apache-gravitino[storage]` to install all supported GVFS backends.
 
 2. Configuring the Hadoop environment.
    You should ensure that the Python client has Kerberos authentication information and

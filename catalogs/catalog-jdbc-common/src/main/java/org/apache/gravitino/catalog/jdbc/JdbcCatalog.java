@@ -81,6 +81,11 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
     return new JdbcCatalogCapability();
   }
 
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
   /**
    * Returns the effective {@link JdbcConfig#VERIFY_ON_CREATE verify-on-create} setting for this
    * catalog. A relational JDBC catalog verifies its backend at create time by default; an

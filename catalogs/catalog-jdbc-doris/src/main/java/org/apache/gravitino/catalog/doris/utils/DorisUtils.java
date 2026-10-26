@@ -85,7 +85,9 @@ public final class DorisUtils {
     String[] lines = createTableSql.split("\n");
 
     boolean isProperties = false;
-    final String sProperties = "\"(.*)\"\\s*=\\s*\"(.*)\",?";
+    // Escape alternatives exclude the closing delimiter, so no backtracking is needed.
+    final String sProperties =
+        "\"((?:\\\\.|\"\"|[^\"\\\\])*+)\"\\s*=\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*+)\",?";
     final Pattern patternProperties = Pattern.compile(sProperties);
 
     for (String line : lines) {
@@ -98,8 +100,8 @@ public final class DorisUtils {
         if (matcherProperties.find()) {
           // generatePropertiesSql escapes keys and values for double-quoted literals, and SHOW
           // CREATE echoes them escaped; unescape both so callers observe the original text.
-          final String key = unescapeSqlLiteral(matcherProperties.group(1).trim(), '"');
-          String value = unescapeSqlLiteral(matcherProperties.group(2).trim(), '"');
+          final String key = unescapeSqlLiteral(matcherProperties.group(1), '"');
+          String value = unescapeSqlLiteral(matcherProperties.group(2), '"');
           properties.put(key, value);
         }
       }
@@ -171,11 +173,18 @@ public final class DorisUtils {
     if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
       partitionValues = "LESS THAN MAXVALUE";
     } else if (Literals.NULL.equals(lower)) {
-      partitionValues = String.format("LESS THAN (\"%s\")", upper.value());
+      partitionValues =
+          String.format("LESS THAN (\"%s\")", escapeSqlLiteral(String.valueOf(upper.value()), '"'));
     } else if (Literals.NULL.equals(upper)) {
-      partitionValues = String.format("[(\"%s\"), (MAXVALUE))", lower.value());
+      partitionValues =
+          String.format(
+              "[(\"%s\"), (MAXVALUE))", escapeSqlLiteral(String.valueOf(lower.value()), '"'));
     } else {
-      partitionValues = String.format("[(\"%s\"), (\"%s\"))", lower.value(), upper.value());
+      partitionValues =
+          String.format(
+              "[(\"%s\"), (\"%s\"))",
+              escapeSqlLiteral(String.valueOf(lower.value()), '"'),
+              escapeSqlLiteral(String.valueOf(upper.value()), '"'));
     }
     return partitionValues;
   }
@@ -190,10 +199,10 @@ public final class DorisUtils {
             String.format(
                 "(%s)",
                 Arrays.stream(part)
-                    .map(p -> "\"" + p.value() + "\"")
+                    .map(p -> "\"" + escapeSqlLiteral(String.valueOf(p.value()), '"') + "\"")
                     .collect(Collectors.joining(",")));
       } else {
-        values = String.format("\"%s\"", part[0].value());
+        values = String.format("\"%s\"", escapeSqlLiteral(String.valueOf(part[0].value()), '"'));
       }
       listValues.add(values);
     }

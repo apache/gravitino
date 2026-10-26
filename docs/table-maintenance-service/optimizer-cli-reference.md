@@ -524,7 +524,7 @@ Leave `use_caching` unset to use the installed Iceberg version's default (`false
 
 ### How to find `spec_id`
 
-Omit `spec_id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read `default-spec-id` and the `partition-specs` array from the table's current Iceberg metadata JSON. The array maps each `spec-id` to its partition fields and transforms; `default-spec-id` identifies the current spec. These are Iceberg table metadata fields, not Gravitino catalog properties.
+Omit `spec_id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read the reserved, read-only Gravitino table property `default-spec-id` for the current default. Use the `partition-specs` array in the table's Iceberg metadata JSON to see each `spec-id`'s partition fields and transforms.
 
 To discover which specs have manifests in the current snapshot, run:
 
@@ -533,7 +533,7 @@ SELECT DISTINCT partition_spec_id
 FROM rest_catalog.db.t1.manifests;
 ```
 
-This query lists represented specs, not which one is current. A defined spec with no manifests may be absent; use the metadata JSON to identify the default and interpret the transforms.
+This query lists represented specs, not which one is current. A defined spec with no manifests may be absent; use `default-spec-id` to identify the current default and the metadata JSON to interpret the transforms.
 
 For example, suppose metadata shows spec `0` uses `day(event_time)` and the current spec `1` uses `hour(event_time)`. Omitting `spec_id` rewrites eligible manifests for spec `1`. Passing `"spec_id": "0"` consolidates the old day-spec manifests. Neither run converts day-partitioned data files to hour partitioning or rewrites manifests belonging to the other spec.
 
@@ -586,6 +586,9 @@ Rewrite Manifests Results: Rewritten manifests: 24, Added manifests: 2
 ```
 
 Both counts at zero indicate a successful no-op, for example when no manifests for the selected spec need rewriting. Other specs remain unchanged.
+
+The [manifest rewrite policy](../iceberg-rewrite-manifests-policy.md) evaluates fresh per-spec
+measurements from the table-wide collector and submits this job with the evaluated `spec_id`.
 
 ## Related
 
