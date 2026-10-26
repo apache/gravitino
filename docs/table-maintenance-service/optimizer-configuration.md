@@ -53,6 +53,13 @@ gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
 ```
 
+For manifest rewrite policies, the mapping
+`gravitino.optimizer.strategyHandler.iceberg-rewrite-manifests.className` is optional. When
+omitted or blank, the recommender uses the built-in
+`org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler`.
+An explicit class name overrides that default. An omitted policy `spec_id` uses Iceberg's
+current default spec from table metadata; see [Iceberg manifest rewrite policy](../iceberg-rewrite-manifests-policy.md).
+
 When the Gravitino server has authentication enabled, `builtin-iceberg-update-stats` needs
 credentials in `--updater-options` / `updater_options` for the Gravitino client (statistics
 updater and `submit-update-stats-job` `runJob` calls):
