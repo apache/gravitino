@@ -152,11 +152,11 @@ gravitino.lance-rest.namespace-backend = gravitino
 # gravitino.maintenance.snapshot-expiry.minIntervalMs = 3600000
 # gravitino.maintenance.orphan-cleanup.minIntervalMs = 86400000
 
-# Base URI Spark jobs use for TMS sample/finish callbacks (updater_options.gravitino_uri).
+# Base URI Spark jobs use for maintenance sample/finish callbacks (updater_options.gravitino_uri).
 # Required for cron Spark submit when the policy does not set updaterOptions.gravitino_uri.
 # gravitino.maintenance.gravitinoUri = http://localhost:8090
 
-# IRC → post-commit maintenance listener (§5.2.3). Requires colocated iceberg-rest aux service and TMS Feature.
+# IRC → post-commit maintenance listener (§5.2.3). Requires colocated iceberg-rest aux service and TableMaintenanceRESTFeature.
 # gravitino.eventListener.names = post-commit-maintenance-listener
 # gravitino.eventListener.post-commit-maintenance-listener.class = org.apache.gravitino.maintenance.listener.PostCommitMaintenanceListener
 

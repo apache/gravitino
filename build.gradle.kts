@@ -1187,7 +1187,7 @@ tasks {
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
         ":plugins:idp-basic:copyLibAndConfigs",
-        ":plugins:tms:copyLibAndConfigs"
+        ":plugins:maintenance:copyLibAndConfigs"
       )
     if (!skipWeb) {
       dependencies.add(":web:web:build")

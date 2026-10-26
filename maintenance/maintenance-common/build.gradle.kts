@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "Gravitino Maintenance shared common (TMS wire types)"
+description = "Gravitino Maintenance shared common (wire types)"
 
 plugins {
   `maven-publish`
