@@ -59,8 +59,8 @@ public class IcebergSnapshotExpirationContent implements PolicyContent {
   public static final String STRATEGY_TYPE_VALUE = "iceberg-snapshot-expiration";
   /** Built-in job template name for expire snapshots. */
   public static final String JOB_TEMPLATE_NAME_VALUE = "builtin-iceberg-expire-snapshots";
-  /** Default retention in days. */
-  public static final long DEFAULT_OLDER_THAN_DAYS = 7;
+  /** Default retention in days (Iceberg expire_snapshots default: five days ago). */
+  public static final long DEFAULT_OLDER_THAN_DAYS = 5;
   /** Default number of recent snapshots to keep. */
   public static final long DEFAULT_RETAIN_LAST = 1;
   /** Default stream-results flag. */

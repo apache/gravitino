@@ -525,8 +525,8 @@ components:
           format: int64
           minimum: 1
           maximum: 36500
-          default: 7
-          description: Minimum age of snapshots eligible for expiration, in days.
+          default: 5
+          description: Minimum age of snapshots eligible for expiration, in days (Iceberg default).
         retainLast:
           type: integer
           format: int64

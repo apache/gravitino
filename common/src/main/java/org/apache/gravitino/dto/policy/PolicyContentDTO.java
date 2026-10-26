@@ -492,7 +492,7 @@ public interface PolicyContentDTO extends PolicyContent {
     private IcebergSnapshotExpirationContentDTO() {}
 
     /**
-     * @return minimum snapshot age in days, defaulting to seven
+     * @return minimum snapshot age in days, defaulting to five
      */
     public long olderThanDays() {
       return olderThanDays == null
