@@ -17,68 +17,92 @@
   under the License.
 -->
 
-# Design: SQL Expressions for Read Restriction Policies
+# Design: Snowflake-Style SQL Policy Expressions
 
 ## Scope
 
-This document defines the SQL expressions used for row filters and column masks. It covers
-expression syntax, supported operands and functions, type checking, null semantics, and validation.
+This document defines Snowflake-style SQL expressions for row filters and column masks. It covers
+expression syntax, supported functions, type checking, SQL null semantics, and validation.
+Conditional behavior is written as an ordinary Boolean expression or SQL `CASE` expression.
 
-The policy name, target, `FOR GROUP`, and `EXCEPT GROUP` clauses retain their existing meaning.
-This proposal changes only the expression following `USING`. It does not introduce a new policy
-structure, conditional-rule fields, or policy-selection behavior.
-
-The authoring dialect is `restricted-sql-v1`. A row-filter expression returns a Boolean result;
-only rows for which it returns `TRUE` are visible. A column-mask expression returns a replacement
-value of the target column's logical type. Existing authorization still determines table access.
+The authoring dialect is `restricted-sql-v1`. Row-filter expressions return `BOOLEAN`; only true
+retains a row. Mask expressions return the target column's logical type. Both use the same
+expression grammar. The surrounding policy supplies the available input names, their types, and
+the expected result type. This specification defines expressions only.
 
 ## Authoring Examples
 
-The following policy statements illustrate where the expression is used; this document defines
-the expression language rather than a new policy DDL grammar.
+With a string input `region`, a row filter may be a direct Boolean expression:
 
 ```sql
-CREATE ROW FILTER analyst_region ON sales.crm.customers
-  FOR GROUP analyst
-  USING region = user_attribute('region');
-
-CREATE COLUMN MASK email_mask ON sales.crm.customers (email)
-  EXCEPT GROUP pii_reader
-  USING mask_alphanum(email);
-
-CREATE COLUMN MASK card_mask ON sales.crm.customers (card)
-  EXCEPT GROUP pii_reader
-  USING show_last_4(card);
+region = user_attribute('region')
 ```
 
-Group inclusion and exclusion remain policy clauses. They do not need to be repeated inside the
-filter or mask expression.
+The same filter can express conditional behavior with SQL `CASE`:
 
-## Row Filter Language
+```sql
+CASE
+  WHEN CURRENT_USER() = 'alice' THEN TRUE
+  ELSE region = user_attribute('region')
+END
+```
+
+With a string input `email`, a mask may return the original value or a transformed value:
+
+```sql
+CASE
+  WHEN CURRENT_USER() = 'alice' THEN email
+  ELSE mask_alphanum(email)
+END
+```
+
+It may also return a literal or null of the expected type:
+
+```sql
+CASE
+  WHEN email IS NULL THEN NULL
+  ELSE 'XXXXXXXX'
+END
+```
+
+## Expression Inputs and Results
+
+An expression may reference only inputs supplied by its policy context. Each input has a known
+logical type and nullability. Input names must be unique under the identifier rules below. The
+expected result type is also known before evaluation:
+
+| Use | Expected result | Accepted expression forms |
+| --- | --- | --- |
+| Row filter | `BOOLEAN` | Predicate, Boolean input or literal, Boolean function result, Boolean `CASE` |
+| Column mask | Target column's logical type | Original input, literal, null, function result, scalar `CASE` |
+
+A mask's result type must match the target column, including precision, scale, and timezone
+characteristics. A mask may use other available inputs in conditions. A non-Boolean filter result
+or incompatible mask result is an error. This expression specification does not define how the
+surrounding policy selects or binds those inputs.
+
+## SQL Expression Language
 
 ### Grammar
 
 The expression grammar is:
 
 ```text
-rowFilter   := expr EOF
+expression  := expr EOF
 expr        := orExpr
 orExpr      := andExpr (OR andExpr)*
 andExpr     := notExpr (AND notExpr)*
-notExpr     := NOT notExpr | primary
-primary     := "(" expr ")" | predicate | boolean | null
-predicate   := value compareOp value
-             | column IS NOT? NULL
-             | column NOT? IN "(" literal ("," literal)* ")"
-             | column NOT? BETWEEN literal AND literal
-             | column NOT? LIKE string
-             | "is_nan" "(" column ")"
-value       := column | sessionUser | userAttribute | datePart | literal
+notExpr     := NOT notExpr | predicate
+predicate   := scalar (compareOp scalar
+             | IS NOT? NULL
+             | NOT? IN "(" literal ("," literal)* ")"
+             | NOT? BETWEEN scalar AND scalar
+             | NOT? LIKE string)?
+scalar      := inputRef | literal | functionCall | caseExpr | "(" expr ")"
+inputRef    := identifier
+functionCall := identifier "(" (expr ("," expr)*)? ")"
+caseExpr    := CASE expr? (WHEN expr THEN expr)+ (ELSE expr)? END
 compareOp   := "=" | "<>" | "!=" | "<" | "<=" | ">" | ">="
-column      := identifier
-sessionUser := "session_user" "(" ")"
-userAttribute := "user_attribute" "(" string ")"
-datePart    := ("year" | "month" | "day") "(" column ")"
 literal     := string | number | boolean | null | temporal
 temporal    := (DATE | TIME | TIMESTAMP) string
              | TIMESTAMP WITH TIME ZONE string
@@ -89,8 +113,9 @@ digit       := "0" | nonZeroDigit
 nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 ```
 
-Keywords and built-in function names are case-insensitive. `EOF` requires complete consumption
-of the expression. Semantic validation further restricts operand combinations as described below.
+Keywords and allowlisted built-in function names are case-insensitive. `functionCall` does not
+permit arbitrary functions: names and signatures must match the function tables below. `EOF`
+requires complete consumption. Semantic validation restricts operand and result types.
 
 Precedence, from highest to lowest, is parentheses and function calls, predicates, `NOT`, `AND`,
 and `OR`. `NOT active = TRUE` means `NOT (active = TRUE)`. The `AND` inside `BETWEEN` separates
@@ -102,8 +127,10 @@ is invalid.
 An unquoted identifier starts with an ASCII letter or underscore, followed by ASCII letters,
 digits, or underscores. Keywords in this grammar are reserved. A quoted identifier uses double
 quotes, escaping an embedded double quote by doubling it, for example `"Customer Region"`.
-Both forms reference the exact decoded top-level column name; unquoted names are not case-folded.
-Qualified names and nested paths are unsupported. `"a.b"` names one top-level column.
+Unquoted input names normalize to uppercase; quoted names preserve case, following Snowflake's
+identifier convention. Names must be unique after that normalization. `val` and `VAL` refer to
+the same input; `"val"` is distinct. Names bind only within the supplied input context;
+qualified input references and nested paths are unsupported.
 
 String literals use single quotes; an embedded single quote is doubled, as in `'O''Brien'`.
 Backslashes are literal characters. Unicode is not normalized, and isolated surrogates are invalid.
@@ -126,36 +153,70 @@ TIMESTAMP WITH TIME ZONE '2026-01-01 12:30:00+00:00'
 ```
 
 Comments, semicolons, additional statements, and square-bracket literal arrays are not accepted
-as part of an expression. The semicolons in the policy examples terminate the surrounding DDL.
+as part of an expression.
 
 ### Supported Predicates
 
 | Category | Examples | Requirements |
 | --- | --- | --- |
-| Comparison | `amount = 100`, `amount <> 100`, `amount < 100`, `amount <= 100`, `amount > 100`, `amount >= 100` | Column and compatible non-null literal, in either order |
+| Comparison | `amount = 100`, `amount <> 100`, `amount < 100`, `amount <= 100`, `amount > 100`, `amount >= 100` | Compatible scalar operands, including available inputs |
 | Range | `amount BETWEEN 10 AND 100`, `amount NOT BETWEEN 10 AND 100` | Inclusive bounds; compatible ordered type |
-| Membership | `region IN ('US', 'CA')`, `region NOT IN ('US', 'CA')` | Non-empty homogeneous literal list without null elements |
-| Null test | `email IS NULL`, `email IS NOT NULL` | Top-level column reference |
-| NaN test | `is_nan(score)`, `NOT is_nan(score)` | Floating-point column |
-| Prefix matching | `name LIKE 'Acme%'`, `name NOT LIKE 'Acme%'` | String column; non-empty fixed prefix followed by exactly one `%` |
+| Membership | `region IN ('US', 'CA')`, `region NOT IN ('US', 'CA')` | Non-empty literal list; non-null values have compatible types |
+| Null test | `val IS NULL`, `user_attribute('region') IS NOT NULL` | Typed scalar operand |
+| NaN test | `is_nan(score)`, `NOT is_nan(score)` | Floating-point argument |
+| Prefix matching | `name LIKE 'Acme%'`, `name NOT LIKE 'Acme%'` | String operand; non-empty fixed prefix followed by exactly one `%` |
 | Boolean composition | `region = 'US' AND amount < 100`, `region = 'US' OR region = 'CA'`, `NOT (region = 'US')` | Boolean operands; parentheses may nest |
 | Boolean constant | `TRUE`, `FALSE` | Visible-row predicate |
 | Date part | `year(order_date) = 2026`, `month(order_date) = 3`, `day(order_date) = 15` | Date-part result compared with a compatible integer literal |
-| Current user | `owner = session_user()` | String column and current user; equality or inequality, in either order |
-| User attribute | `region = user_attribute('region')` | Column and compatible declared scalar attribute, in either order |
+| Current user | `owner = CURRENT_USER()` | Compatible string operands |
+| User attribute | `region = user_attribute('region')` | Compatible declared scalar types |
 
 `!=` is accepted as an alias for `<>`. `BETWEEN` is equivalent to inclusive lower and upper
 comparisons joined by `AND`; `NOT BETWEEN` negates that result. Prefix patterns cannot contain
 `_` or any other `%`, and the first version has no `ESCAPE` clause. Matching is case-sensitive.
 
-Column-to-column and literal-to-literal comparisons are unsupported. A bare column or non-Boolean
-value is invalid at the root. Comparisons with a `NULL` literal are rejected; use `IS NULL` or
-`IS NOT NULL`. Lists cannot contain expressions, references, nested lists, or null elements.
+Comparisons between available inputs and constant comparisons are valid when types match.
+A non-Boolean result is invalid for a row filter, while a bare input is a valid mask expression when
+it has the expected result type. Comparisons with a null value produce `UNKNOWN`; use `IS NULL`
+or `IS NOT NULL` to test for null. Lists contain literals only and cannot contain expressions,
+references, or nested lists. Null members are accepted with ordinary SQL membership semantics:
+if no non-null member matches and at least one member is null, both `IN` and `NOT IN` are unknown.
+
+### CASE Expressions
+
+Both Snowflake forms of `CASE` are supported:
+
+```sql
+CASE
+  WHEN region IS NULL THEN FALSE
+  WHEN region = 'US' THEN TRUE
+  ELSE region = user_attribute('region')
+END
+
+CASE region
+  WHEN 'US' THEN TRUE
+  WHEN 'CA' THEN TRUE
+  ELSE FALSE
+END
+```
+
+In searched `CASE`, every condition must be Boolean. Conditions are evaluated in order, and the
+first true condition selects its result; false and unknown conditions do not match. In simple
+`CASE`, the selector and each match expression must have compatible types. Matching uses SQL
+equality, so a null selector does not match a null match value. Only the selected result is
+evaluated. No match returns the `ELSE` result, or null if `ELSE` is omitted.
+
+All result branches of one `CASE` must resolve to one logical type compatible with its surrounding
+expression. Null literals take the type expected at that position. The complete expression must
+match the expected result type. Every branch is statically validated, including branches that
+cannot be reached for a particular row.
+Nested `CASE` expressions and built-in calls are allowed within the resource limits.
 
 ## Type and Context Binding
 
-Column references bind against the concrete Gravitino table schema. Missing or ambiguous names,
-unsupported types, incompatible operands, and invalid function arguments are errors.
+Input names, logical types, and nullability come from the policy context. Missing or ambiguous
+names, unavailable inputs, unsupported types, incompatible operands, and invalid function
+arguments are errors.
 
 | Gravitino type | Supported value predicates |
 | --- | --- |
@@ -183,11 +244,13 @@ most six fractional-second digits. Timestamp-with-timezone literals require an e
 
 | Function | Result | Meaning |
 | --- | --- | --- |
-| `session_user()` | Non-null `STRING` | Trusted effective subject name |
+| `CURRENT_USER()` | Non-null `STRING` | Trusted effective subject name |
 | `user_attribute('key')` | Declared scalar type, possibly null | Trusted attribute of the effective subject |
 
+`CURRENT_USER()` follows Snowflake's context-function spelling. `user_attribute` remains a
+Gravitino-specific function with the same existing meaning; it is not a Snowflake built-in.
 Attribute keys are non-empty, case-sensitive string literals. Attribute types must be compatible
-with the referenced column. Lists, objects, and implicit string-to-number conversions are
+with their use in the body. Lists, objects, and implicit string-to-number conversions are
 unsupported. Context values are stable for one request and use the effective subject.
 
 An absent or explicitly null value for a declared attribute returns SQL `NULL`. For example,
@@ -224,19 +287,12 @@ Consequently, `region <> 'US'` and `NOT (region = 'US')` both exclude null regio
 them, write `region IS NULL OR region <> 'US'`. A constant-false filter returns an empty result,
 rather than denying access to the table.
 
-## Column Mask Language
+## Mask Functions
 
-The expression following `USING` is one of the following function calls over the target column:
-
-```text
-maskExpression := maskFunction "(" column ")" EOF
-maskFunction   := "mask_alphanum" | "mask_to_fixed_value" | "replace_with_null"
-                | "show_first_4" | "show_last_4" | "truncate_to_year"
-                | "truncate_to_month" | "sha256_global" | "sha256_query_local"
-```
-
-Identifier and literal rules are shared with row filters. The argument must reference the column
-being masked. Each function preserves its input logical type.
+The Gravitino mask functions defined by this profile remain available inside a SQL mask expression.
+They are ordinary typed scalar calls and may appear in `CASE` branches or nested calls with matching types. They
+are Gravitino functions rather than a claim of Snowflake function compatibility. Each function
+preserves its input logical type. Examples below assume matching input names and types.
 
 | SQL expression | Input types | Meaning |
 | --- | --- | --- |
@@ -244,15 +300,14 @@ being masked. Each function preserves its input logical type.
 | `show_first_4(email)` | `STRING` | Keep the first four code points; apply the same masking rules to the remainder |
 | `show_last_4(card)` | `STRING` | Keep the last four code points; apply the same masking rules to the preceding portion |
 | `mask_to_fixed_value(region)` | Types with a defined fixed value | Replace with the type's fixed value, including null input |
-| `replace_with_null(email)` | Nullable columns | Return a null of the target column's type |
+| `replace_with_null(email)` | Any typed scalar | Return a null of the input's type; the result is nullable |
 | `truncate_to_year(order_date)` | Date and supported timestamp types | Truncate to the beginning of the year |
 | `truncate_to_month(order_date)` | Date and supported timestamp types | Truncate to the beginning of the month |
 | `sha256_global(customer_id)` | `STRING`, signed `INTEGER`, signed `LONG`, `BINARY` | Stable type-preserving SHA-256 transformation |
 | `sha256_query_local(customer_id)` | Same as `sha256_global` | Type-preserving SHA-256 transformation salted per query |
 
-The mask behaviors remain the same; this proposal changes their authoring form to SQL function
-calls. All masks except `mask_to_fixed_value` preserve null input. `replace_with_null` is invalid
-for a required column. Strings of four or fewer Unicode code points are returned unchanged by
+The mask behaviors remain the same. All masks except `mask_to_fixed_value` preserve null input.
+Strings of four or fewer Unicode code points are returned unchanged by
 `show_first_4` and `show_last_4`. Timestamp-with-timezone truncation uses UTC.
 
 For example, `show_last_4(card)` changes `4111-1111-1111-4444` to `nnnn-nnnn-nnnn-4444`.
@@ -266,43 +321,54 @@ little-endian type; binary output is the complete 32-byte digest. Query-local ha
 a cryptographically random salt of at least 16 bytes, shared by every evaluation in one query;
 separate queries use independent salts.
 
-Only the listed calls are accepted. Additional arguments, nested calls, references to other
-columns, and arbitrary transformations are unsupported. Group exemptions continue to use the
-policy's `EXCEPT GROUP` clause.
+Only allowlisted functions and the shared expression grammar are accepted. Each mask function
+takes one compatible scalar argument; additional arguments to these calls are invalid. Other
+available inputs may be used elsewhere in the expression. Conditional disclosure is expressed with
+ordinary SQL `CASE`, as in the email mask example above.
+
+A mask expression must have the expected result type on every branch. Returning null, explicitly or
+through an omitted `ELSE`, is allowed only for a nullable target column. An expression whose inferred
+nullability is incompatible with a required target is rejected. For example, a string-returning
+mask cannot return a number in one branch, and a required target cannot use `THEN NULL`.
 
 ## Validation and Failure Behavior
 
-Static validation checks complete expression parsing, Boolean row-filter roots, mask-call roots,
-supported operand shapes, allowlisted functions, function arguments, and resource limits.
-Schema and context binding check exact column names, compatible types, literal ranges, nullability,
-and trusted context values. Invalid content is rejected; a binding or context error must never
-silently remove a required restriction.
+Static validation checks complete expression parsing, Boolean row-filter results, exact mask
+result types, every `CASE` branch, supported operand shapes, allowlisted functions, function
+arguments, and resource limits. Input and context validation check unique names, compatible types,
+literal ranges, nullability, and trusted context values. Invalid content is rejected; an input or
+context error must never silently remove a required restriction.
 
 The expression limits remain:
 
 - Source length: 16 KiB of UTF-8.
-- Operation depth: 8.
+- Operation depth: 8, including nested `CASE` expressions and function calls.
 - Expression nodes: 256.
 - Decoded string literal: 4 KiB of UTF-8.
 - `IN` list elements: 256.
 
 Limits apply before normalization. Unknown functions, unsupported types, and expressions outside
-this grammar are errors. The first version rejects SQL statements, `CASE`, casts, arithmetic,
-column-to-column comparisons, nested fields, subqueries, custom functions, general regular
-expressions, and general wildcard patterns such as `'%Acme'` or `'A_me'`.
+this grammar are errors. This Snowflake-style expression profile supports conditional SQL
+expressions without adopting every Snowflake SQL feature. The first version rejects SQL statements,
+casts, arithmetic, undeclared column references, nested fields, subqueries, custom functions,
+general regular expressions, and general wildcard patterns such as `'%Acme'` or `'A_me'`.
 
 ## Conformance
 
 Examples and validation cases cover every supported operator and type; SQL quoting and escaping;
 numeric boundaries, decimal scale, and temporal precision; null comparisons and nested negation;
-prefix matching; NaN tests; date parts; user and attribute binding; every mask function; invalid
-type/function pairs; and all resource limits.
+prefix matching; NaN tests; date parts; current-user and attribute binding; every mask function;
+expected result types; available inputs; searched and simple `CASE`; first-match
+evaluation; null conditions and selectors; omitted `ELSE`; nested expressions; incompatible branch
+types and nullability; invalid type/function pairs; and all resource limits.
 
-Policy scope, group inclusion and exclusion, target binding, and policy conflict behavior retain
-their existing contracts. This expression change must not alter them.
+Input cases must verify unknown names, incompatible types, and expected result types. Identifier
+cases must verify unquoted case folding and quoted exact names. All expression forms share the
+same null, type, and resource-limit rules.
 
 ## References
 
-- [Databricks row-filter and column-mask expressions](https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply)
 - [Snowflake row access policy expressions](https://docs.snowflake.com/en/sql-reference/sql/create-row-access-policy)
 - [Snowflake masking policy expressions](https://docs.snowflake.com/en/sql-reference/sql/create-masking-policy)
+- [Snowflake CASE expressions](https://docs.snowflake.com/en/sql-reference/functions/case)
+- [Snowflake CURRENT_USER](https://docs.snowflake.com/en/sql-reference/functions/current_user)
