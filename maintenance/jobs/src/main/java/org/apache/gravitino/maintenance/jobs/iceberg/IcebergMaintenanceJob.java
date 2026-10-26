@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -69,7 +68,7 @@ import org.slf4j.LoggerFactory;
  * comma-separated policy entity ids), {@code tables} (JSON targets with system-filled {@code
  * table_id}), {@code updater_options}, {@code rules}. Shared procedure / Spark keys match other
  * Iceberg built-ins. The Gravitino job id is read from the local executor staging directory ({@code
- * job-} plus the numeric id), or from {@link #GRAVITINO_JOB_ID_ENV}.
+ * job-} plus the numeric id), or from {@code GRAVITINO_JOB_ID}.
  */
 public class IcebergMaintenanceJob implements BuiltInJob {
 
@@ -79,7 +78,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    * Optional job-id override. Not injected by {@code JobManager}; the local executor staging
    * directory is the default source.
    */
-  @VisibleForTesting static final String GRAVITINO_JOB_ID_ENV = "GRAVITINO_JOB_ID";
+  private static final String GRAVITINO_JOB_ID_ENV = "GRAVITINO_JOB_ID";
 
   /** Built-in template name submitted by TMS cron / commit. */
   public static final String NAME =
@@ -180,8 +179,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
   /**
    * @param args template-expanded jobConf as named arguments
+   * @return process exit code ({@code 0} success, {@code 1} failure)
    */
-  @VisibleForTesting
   static int run(String[] args) {
     Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
@@ -189,19 +188,19 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     List<Long> policyIds;
     long jobId;
     List<TableTarget> tables;
+    Map<String, String> updaterOptions;
     try {
       types = parseMaintenanceTypes(argMap.get("maintenance-types"));
       policyIds = parsePolicyIds(argMap.get("policy-ids"), types.size());
       jobId = resolveGravitinoJobId();
-      tables = resolveTableTargets(argMap);
+      tables = parseTables(IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("tables")));
+      updaterOptions =
+          parseUpdaterOptions(
+              IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("updater-options")));
     } catch (IllegalArgumentException | IllegalStateException e) {
       LOG.error("Invalid TMS maintenance arguments: {}", e.getMessage());
       return 1;
     }
-
-    Map<String, String> updaterOptions =
-        parseUpdaterOptions(
-            IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("updater-options")));
 
     String appLabel =
         types.size() == 1
@@ -230,11 +229,12 @@ public class IcebergMaintenanceJob implements BuiltInJob {
               try {
                 SnapshotSample s0 =
                     sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
-                reportBeforeQuietly(client, jobId, table.tableId, policyId, s0);
+                reportMetricsQuietly(client, jobId, table.tableId, policyId, s0, /*after=*/ false);
 
                 if (s0.snapshotId != s0.headSnapshotId) {
                   LOG.info(
-                      "TMS type {} skipped for job {} table {} policy {} due to snapshot drift (s0={} head={})",
+                      "TMS type {} skipped for job {} table {} policy {} due to snapshot drift"
+                          + " (s0={} head={})",
                       type.wireName,
                       jobId,
                       table.tableId,
@@ -246,7 +246,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
                 if (!MaintenanceTriggerGate.shouldMaintain(type, argMap, s0.metricsJson)) {
                   LOG.info(
-                      "TMS type {} skipped for job {} table {} policy {} due to in-Spark recommend skip",
+                      "TMS type {} skipped for job {} table {} policy {} due to in-Spark recommend"
+                          + " skip",
                       type.wireName,
                       jobId,
                       table.tableId,
@@ -258,7 +259,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                 SnapshotSample s1 =
                     sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
                 afterSnapshotId = s1.snapshotId;
-                reportAfterQuietly(client, jobId, table.tableId, policyId, s1);
+                reportMetricsQuietly(client, jobId, table.tableId, policyId, s1, /*after=*/ true);
               } finally {
                 finishQuietly(client, jobId, table.tableId, policyId, afterSnapshotId);
                 finishedSlots.add(slotKey(table.tableId, policyId));
@@ -282,22 +283,11 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  /**
-   * Resolves table targets from jobConf {@code tables} JSON (required for TMS sample/finish).
-   * Single- and multi-table submits use the same payload shape.
-   */
-  @VisibleForTesting
-  static List<TableTarget> resolveTableTargets(Map<String, String> argMap) {
-    String tablesJson = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("tables"));
+  private static List<TableTarget> parseTables(@Nullable String tablesJson) {
     if (tablesJson == null || tablesJson.trim().isEmpty()) {
       throw new IllegalArgumentException(
           "tables JSON is required (array of table_id, catalog_name, table_identifier)");
     }
-    return parseTables(tablesJson);
-  }
-
-  @VisibleForTesting
-  static List<TableTarget> parseTables(String tablesJson) {
     try {
       List<Map<String, Object>> raw =
           JsonUtils.anyFieldMapper()
@@ -337,12 +327,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  /**
-   * @param maintenanceTypes one wire name, or a comma-separated commit chain
-   * @return ordered types to run
-   */
-  @VisibleForTesting
-  static ImmutableList<MaintenanceType> parseMaintenanceTypes(@Nullable String maintenanceTypes) {
+  private static ImmutableList<MaintenanceType> parseMaintenanceTypes(
+      @Nullable String maintenanceTypes) {
     String chain = IcebergJobUtils.nullIfUnresolvedPlaceholder(maintenanceTypes);
     if (chain == null || chain.trim().isEmpty()) {
       throw new IllegalArgumentException("maintenance_types is required");
@@ -361,13 +347,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     return types;
   }
 
-  /**
-   * @param policyIds comma-separated policy entity ids parallel to {@code maintenance_types}
-   * @param expectedCount number of maintenance types
-   * @return ordered policy ids
-   */
-  @VisibleForTesting
-  static List<Long> parsePolicyIds(@Nullable String policyIds, int expectedCount) {
+  private static List<Long> parsePolicyIds(@Nullable String policyIds, int expectedCount) {
     String raw = IcebergJobUtils.nullIfUnresolvedPlaceholder(policyIds);
     if (raw == null || raw.trim().isEmpty()) {
       throw new IllegalArgumentException("policy_ids is required");
@@ -401,8 +381,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     return tableId + ":" + policyId;
   }
 
-  @VisibleForTesting
-  static void runProcedure(
+  private static void runProcedure(
       SparkSession spark,
       MaintenanceType type,
       String catalogName,
@@ -483,8 +462,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  @VisibleForTesting
-  static SnapshotSample sampleSnapshot(
+  private static SnapshotSample sampleSnapshot(
       SparkSession spark, String catalogName, String tableIdentifier, MaintenanceType type) {
     // Capture S0 first, then collect metrics (may take time), then re-read HEAD for the drift gate.
     long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
@@ -495,7 +473,12 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       payload.putAll(collectCompactionMetrics(spark, catalogName, tableIdentifier));
     }
     long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-    return new SnapshotSample(snapshotId, headSnapshotId, toMetricsJson(payload));
+    try {
+      return new SnapshotSample(
+          snapshotId, headSnapshotId, JsonUtils.anyFieldMapper().writeValueAsString(payload));
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to serialize metrics JSON", e);
+    }
   }
 
   /**
@@ -503,8 +486,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    * IcebergUpdateStatsAndMetricsJob}). For partitioned tables, uses max partition MSE and sum of
    * delete-file counts so any hot partition can trip {@code trigger-expr}.
    */
-  @VisibleForTesting
-  static Map<String, Object> collectCompactionMetrics(
+  private static Map<String, Object> collectCompactionMetrics(
       SparkSession spark, String catalogName, String tableIdentifier) {
     boolean partitioned =
         IcebergUpdateStatsAndMetricsJob.isPartitionedTable(spark, catalogName, tableIdentifier);
@@ -526,14 +508,13 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
     String sql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql(catalogName, tableIdentifier);
     Row[] rows = (Row[]) spark.sql(sql).collect();
+    Map<String, Object> metrics = new HashMap<>();
     if (rows.length == 0) {
-      Map<String, Object> empty = new HashMap<>();
-      empty.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 0D);
-      empty.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, 0L);
-      return empty;
+      metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 0D);
+      metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, 0L);
+      return metrics;
     }
     Row row = rows[0];
-    Map<String, Object> metrics = new HashMap<>();
     metrics.put(
         IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, numberAsDouble(row, "data-file-mse"));
     metrics.put(
@@ -552,8 +533,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     return number == null ? 0L : number.longValue();
   }
 
-  @VisibleForTesting
-  static long currentSnapshotId(SparkSession spark, String catalogName, String tableIdentifier) {
+  private static long currentSnapshotId(
+      SparkSession spark, String catalogName, String tableIdentifier) {
     // Catch Exception (not Spark NoSuchTableException) so BuiltInJobTemplateProvider can load this
     // class on the Gravitino server classpath, which does not ship Spark catalyst types.
     try {
@@ -571,40 +552,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       throw new IllegalStateException(
           "Failed to load Iceberg snapshot for " + catalogName + "." + tableIdentifier, e);
     }
-  }
-
-  @VisibleForTesting
-  static String stubMetricsJson(String maintenanceType, long snapshotId) {
-    Map<String, Object> payload = new HashMap<>();
-    payload.put("maintenanceType", maintenanceType);
-    payload.put("snapshotId", snapshotId);
-    return toMetricsJson(payload);
-  }
-
-  private static String toMetricsJson(Map<String, Object> payload) {
-    try {
-      return JsonUtils.anyFieldMapper().writeValueAsString(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to serialize metrics JSON", e);
-    }
-  }
-
-  private static void reportBeforeQuietly(
-      MaintenanceActionHttpClient client,
-      long jobId,
-      long tableId,
-      long policyId,
-      SnapshotSample sample) {
-    reportMetricsQuietly(client, jobId, tableId, policyId, sample, /*after=*/ false);
-  }
-
-  private static void reportAfterQuietly(
-      MaintenanceActionHttpClient client,
-      long jobId,
-      long tableId,
-      long policyId,
-      SnapshotSample sample) {
-    reportMetricsQuietly(client, jobId, tableId, policyId, sample, /*after=*/ true);
   }
 
   private static void finishQuietly(
@@ -657,22 +604,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  private static long parsePositiveLongArg(@Nullable String raw, String argName) {
-    String value = IcebergJobUtils.nullIfUnresolvedPlaceholder(raw);
-    if (value == null || value.trim().isEmpty()) {
-      throw new IllegalArgumentException("--" + argName + " is required");
-    }
-    try {
-      long parsed = Long.parseLong(value.trim());
-      if (parsed <= 0) {
-        throw new IllegalArgumentException("--" + argName + " must be a positive long: " + value);
-      }
-      return parsed;
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("--" + argName + " must be a long: " + value, e);
-    }
-  }
-
   private static Map<String, String> parseUpdaterOptions(@Nullable String json) {
     if (json == null || json.trim().isEmpty()) {
       return Collections.emptyMap();
@@ -687,21 +618,11 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * Resolves the Gravitino job id for TMS callbacks.
-   *
-   * <p>Prefers {@link #GRAVITINO_JOB_ID_ENV}. Falls back to parsing a {@code job-} plus numeric id
-   * segment from {@code user.dir} (local executor staging directory).
-   *
-   * @return numeric Gravitino job id
+   * Prefers {@code GRAVITINO_JOB_ID}. Falls back to parsing a {@code job-} plus numeric id segment
+   * from {@code user.dir} (local executor staging directory).
    */
-  @VisibleForTesting
-  static long resolveGravitinoJobId() {
-    return resolveGravitinoJobId(
-        System.getenv(GRAVITINO_JOB_ID_ENV), System.getProperty("user.dir"));
-  }
-
-  @VisibleForTesting
-  static long resolveGravitinoJobId(@Nullable String envValue, @Nullable String userDir) {
+  private static long resolveGravitinoJobId() {
+    String envValue = System.getenv(GRAVITINO_JOB_ID_ENV);
     if (envValue != null && !envValue.trim().isEmpty()) {
       try {
         long parsed = Long.parseLong(envValue.trim());
@@ -714,6 +635,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         throw new IllegalStateException(GRAVITINO_JOB_ID_ENV + " must be a long: " + envValue, e);
       }
     }
+    String userDir = System.getProperty("user.dir");
     if (userDir != null && !userDir.trim().isEmpty()) {
       Path dir = Paths.get(userDir).toAbsolutePath().normalize();
       for (Path current = dir; current != null; current = current.getParent()) {
@@ -722,16 +644,16 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           continue;
         }
         String name = fileName.toString();
-        if (name.startsWith(JobHandle.JOB_ID_PREFIX)) {
-          String idPart = name.substring(JobHandle.JOB_ID_PREFIX.length());
-          try {
-            long parsed = Long.parseLong(idPart);
-            if (parsed > 0) {
-              return parsed;
-            }
-          } catch (NumberFormatException ignored) {
-            // Keep walking parents; staging dirs use job-<numericId>.
+        if (!name.startsWith(JobHandle.JOB_ID_PREFIX)) {
+          continue;
+        }
+        try {
+          long parsed = Long.parseLong(name.substring(JobHandle.JOB_ID_PREFIX.length()));
+          if (parsed > 0) {
+            return parsed;
           }
+        } catch (NumberFormatException ignored) {
+          // Keep walking parents; staging dirs use job-<numericId>.
         }
       }
     }
@@ -792,26 +714,24 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         "{{rules:-}}");
   }
 
-  @VisibleForTesting
-  static final class TableTarget {
-    final long tableId;
-    final String catalogName;
-    final String tableIdentifier;
+  private static final class TableTarget {
+    private final long tableId;
+    private final String catalogName;
+    private final String tableIdentifier;
 
-    TableTarget(long tableId, String catalogName, String tableIdentifier) {
+    private TableTarget(long tableId, String catalogName, String tableIdentifier) {
       this.tableId = tableId;
       this.catalogName = catalogName;
       this.tableIdentifier = tableIdentifier;
     }
   }
 
-  @VisibleForTesting
-  static final class SnapshotSample {
-    final long snapshotId;
-    final long headSnapshotId;
-    final String metricsJson;
+  private static final class SnapshotSample {
+    private final long snapshotId;
+    private final long headSnapshotId;
+    private final String metricsJson;
 
-    SnapshotSample(long snapshotId, long headSnapshotId, String metricsJson) {
+    private SnapshotSample(long snapshotId, long headSnapshotId, String metricsJson) {
       this.snapshotId = snapshotId;
       this.headSnapshotId = headSnapshotId;
       this.metricsJson = metricsJson;

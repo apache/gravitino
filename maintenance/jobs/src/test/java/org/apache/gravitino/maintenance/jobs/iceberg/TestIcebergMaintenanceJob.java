@@ -24,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import java.util.Map;
-import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
 import org.junit.jupiter.api.Test;
@@ -52,44 +50,34 @@ public class TestIcebergMaintenanceJob {
   }
 
   @Test
-  public void testResolveTablesAndTypes() {
-    List<IcebergMaintenanceJob.TableTarget> targets =
-        IcebergMaintenanceJob.resolveTableTargets(
-            Map.of(
-                "tables",
-                "[{\"table_id\":10,\"catalog_name\":\"iceberg\",\"table_identifier\":\"db.t1\"},"
-                    + "{\"table_id\":11,\"catalog_name\":\"iceberg\",\"table_identifier\":\"db.t2\"}]"));
-    assertEquals(2, targets.size());
-    assertEquals(11L, targets.get(1).tableId);
-
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergMaintenanceJob.resolveTableTargets(Map.of("catalog", "iceberg")));
-
-    List<MaintenanceType> chain =
-        IcebergMaintenanceJob.parseMaintenanceTypes(
-            "rewrite_data_files, rewrite_manifests, expire_snapshots");
+  public void testMaintenanceTypeFromWire() {
+    assertEquals(MaintenanceType.EXPIRE_SNAPSHOTS, MaintenanceType.fromWire("expire_snapshots"));
     assertEquals(
-        List.of(
-            MaintenanceType.REWRITE_DATA_FILES,
-            MaintenanceType.REWRITE_MANIFESTS,
-            MaintenanceType.EXPIRE_SNAPSHOTS),
-        chain);
-    assertEquals(List.of(10L, 20L), IcebergMaintenanceJob.parsePolicyIds("10, 20", 2));
-    assertThrows(
-        IllegalArgumentException.class, () -> IcebergMaintenanceJob.parsePolicyIds("10", 2));
+        MaintenanceType.REWRITE_DATA_FILES, MaintenanceType.fromWire("REWRITE_DATA_FILES"));
+    assertThrows(IllegalArgumentException.class, () -> MaintenanceType.fromWire("unknown"));
+    assertThrows(IllegalArgumentException.class, () -> MaintenanceType.fromWire(null));
   }
 
   @Test
-  public void testResolveGravitinoJobIdAndMissingTables() {
-    assertEquals(
-        42L,
-        IcebergMaintenanceJob.resolveGravitinoJobId(
-            null, "/tmp/gravitino/job-runs/" + JobHandle.JOB_ID_PREFIX + "42"));
-    assertThrows(
-        IllegalStateException.class,
-        () -> IcebergMaintenanceJob.resolveGravitinoJobId(null, "/tmp/not-a-job-dir"));
+  public void testRunRejectsInvalidArgs() {
     assertEquals(
         1, IcebergMaintenanceJob.run(new String[] {"--maintenance-types", "expire_snapshots"}));
+    assertEquals(
+        1,
+        IcebergMaintenanceJob.run(
+            new String[] {
+              "--maintenance-types",
+              "expire_snapshots,rewrite_manifests",
+              "--policy-ids",
+              "10",
+              "--tables",
+              "[{\"table_id\":1,\"catalog_name\":\"c\",\"table_identifier\":\"db.t\"}]"
+            }));
+    assertEquals(
+        1,
+        IcebergMaintenanceJob.run(
+            new String[] {
+              "--maintenance-types", "expire_snapshots", "--policy-ids", "10", "--tables", "[]"
+            }));
   }
 }

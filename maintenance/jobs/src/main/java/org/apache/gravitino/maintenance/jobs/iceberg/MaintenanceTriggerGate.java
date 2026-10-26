@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,10 +47,7 @@ final class MaintenanceTriggerGate {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceTriggerGate.class);
 
-  /** JobConf / CLI key: JSON map of wire maintenance type → policy {@code rules()} object. */
-  static final String RULES_KEY = "rules";
-
-  /** CLI flag matching {@link #RULES_KEY} after {@code --} stripping. */
+  /** Spark job argument key: JSON map of wire maintenance type → policy {@code rules()} object. */
   static final String RULES_ARG = "rules";
 
   private MaintenanceTriggerGate() {}
@@ -69,14 +65,13 @@ final class MaintenanceTriggerGate {
     }
 
     Map<String, Object> rules = rulesForType(type, argMap);
-    Map<String, Object> metrics = parseNumericValues(metricsJson);
-    if (type == MaintenanceType.REWRITE_DATA_FILES) {
-      if (metrics.isEmpty()
-          || !metrics.containsKey(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)
-          || !metrics.containsKey(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC)) {
-        LOG.warn("Compaction recommend skip: metrics JSON missing compaction fields");
-        return false;
-      }
+    Map<String, Object> metrics = parseNumericMetrics(metricsJson);
+    if (type == MaintenanceType.REWRITE_DATA_FILES
+        && (metrics.isEmpty()
+            || !metrics.containsKey(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)
+            || !metrics.containsKey(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC))) {
+      LOG.warn("Compaction recommend skip: metrics JSON missing compaction fields");
+      return false;
     }
 
     boolean maintain = CompactionTriggerEvaluator.shouldMaintain(rules, metrics);
@@ -88,17 +83,28 @@ final class MaintenanceTriggerGate {
     return maintain;
   }
 
-  @VisibleForTesting
-  static Map<String, Object> rulesForType(MaintenanceType type, Map<String, String> argMap) {
-    Map<String, Map<String, Object>> byType = parseRulesByType(argMap);
+  private static Map<String, Object> rulesForType(
+      MaintenanceType type, Map<String, String> argMap) {
+    Map<String, Map<String, Object>> byType = Collections.emptyMap();
+    if (argMap != null) {
+      String raw = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get(RULES_ARG));
+      if (raw != null && !raw.trim().isEmpty()) {
+        try {
+          Map<String, Map<String, Object>> parsed =
+              JsonUtils.anyFieldMapper()
+                  .readValue(raw, new TypeReference<Map<String, Map<String, Object>>>() {});
+          if (parsed != null) {
+            byType = parsed;
+          }
+        } catch (IOException | RuntimeException e) {
+          LOG.warn("Failed to parse {}: {}", RULES_ARG, e.toString());
+        }
+      }
+    }
     Map<String, Object> rules = byType.get(type.wireName());
     if (rules != null && !rules.isEmpty()) {
       return rules;
     }
-    return defaultRules(type);
-  }
-
-  private static Map<String, Object> defaultRules(MaintenanceType type) {
     if (type == MaintenanceType.REWRITE_DATA_FILES) {
       return new HashMap<>(PolicyContents.icebergDataCompaction().rules());
     }
@@ -110,30 +116,7 @@ final class MaintenanceTriggerGate {
     return empty;
   }
 
-  @VisibleForTesting
-  static Map<String, Map<String, Object>> parseRulesByType(Map<String, String> argMap) {
-    if (argMap == null) {
-      return Collections.emptyMap();
-    }
-    String raw =
-        IcebergJobUtils.nullIfUnresolvedPlaceholder(
-            firstNonNull(argMap.get(RULES_ARG), argMap.get(RULES_KEY)));
-    if (raw == null || raw.trim().isEmpty()) {
-      return Collections.emptyMap();
-    }
-    try {
-      Map<String, Map<String, Object>> parsed =
-          JsonUtils.anyFieldMapper()
-              .readValue(raw, new TypeReference<Map<String, Map<String, Object>>>() {});
-      return parsed == null ? Collections.emptyMap() : parsed;
-    } catch (IOException | RuntimeException e) {
-      LOG.warn("Failed to parse {}: {}", RULES_KEY, e.toString());
-      return Collections.emptyMap();
-    }
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> parseNumericValues(@Nullable String metricsJson) {
+  private static Map<String, Object> parseNumericMetrics(@Nullable String metricsJson) {
     Map<String, Object> metrics = new HashMap<>();
     if (metricsJson == null || metricsJson.trim().isEmpty()) {
       return metrics;
@@ -147,21 +130,12 @@ final class MaintenanceTriggerGate {
         if (value == null || value.isNull() || !value.isNumber()) {
           continue;
         }
-        if (value.isIntegralNumber()) {
-          metrics.put(field.getKey(), value.longValue());
-        } else {
-          metrics.put(field.getKey(), value.doubleValue());
-        }
+        metrics.put(
+            field.getKey(), value.isIntegralNumber() ? value.longValue() : value.doubleValue());
       }
-      return metrics;
     } catch (IOException | RuntimeException e) {
       LOG.warn("Failed to parse metrics JSON: {}", e.toString());
-      return metrics;
     }
-  }
-
-  @Nullable
-  private static String firstNonNull(@Nullable String a, @Nullable String b) {
-    return a != null ? a : b;
+    return metrics;
   }
 }
