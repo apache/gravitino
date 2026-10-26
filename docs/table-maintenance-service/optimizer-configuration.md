@@ -198,9 +198,54 @@ See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for 
 complete submission example. For policy-driven submission, configure the handler
 and policy below. Periodic scheduling remains separate.
 
+### Snapshot expiration policy integration
+
+Register the handler alongside the existing optimizer providers (optional; the
+Recommender also defaults this class when the property is unset):
+
+```properties
+gravitino.optimizer.strategyHandler.iceberg-snapshot-expiration.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationStrategyHandler
+```
+
+The built-in job adapter is registered automatically. Keep the same Spark and
+catalog submission configuration as for direct expire-snapshots runs, including
+`catalog_name` and `spark_conf`. The adapter supplies `table_identifier` and
+`stream_results`. For `older_than` / `retain_last`, values equal to Iceberg's
+procedure defaults (`olderThanDays=5`, `retainLast=1`) are omitted so the job
+template placeholders stay empty and Iceberg table `history.expire.*`
+properties remain authoritative; non-default values are emitted explicitly.
+
+Create a policy through `POST /api/metalakes/{metalake}/policies`:
+
+```json
+{
+  "name": "expire_snapshots",
+  "policyType": "system_iceberg_snapshot_expiration",
+  "enabled": true,
+  "content": {
+    "olderThanDays": 5,
+    "retainLast": 1,
+    "streamResults": false
+  }
+}
+```
+
+Associate the policy with a tag and attach that tag to the target table, schema,
+or catalog, following the [policy setup walkthrough](./optimizer.md).
+`olderThanDays` defaults to 5 (Iceberg's expire default) and must be between 1 and 36500.
+`retainLast` defaults to 1. `streamResults` defaults to false.
+
+When `olderThanDays` is not the Iceberg default of 5, the adapter subtracts it
+from the current instant and emits `older_than` as an explicit UTC timestamp
+ending in `Z`. Each optimizer invocation may submit expire when the policy is
+attached (`trigger-expr` is `true`). This does not install a periodic
+scheduler, cooldown, or last-run tracking—same as orphan cleanup. Operators
+must control how often `submit-strategy-jobs` (or an external cron) runs.
+
 ### Orphan cleanup policy integration
 
-Register the handler alongside the existing optimizer providers:
+Register the handler alongside the existing optimizer providers (optional; the
+Recommender also defaults this class when the property is unset):
 
 ```properties
 gravitino.optimizer.strategyHandler.iceberg-orphan-file-removal.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler
