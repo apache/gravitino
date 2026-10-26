@@ -40,8 +40,7 @@ public class CredentialUtils {
           AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE,
           OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE,
           GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
-          ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE,
-          COSTokenCredential.COS_TOKEN_CREDENTIAL_TYPE);
+          ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE);
 
   public static Map<String, CredentialProvider> loadCredentialProviders(
       Map<String, String> catalogProperties) {

@@ -40,7 +40,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -86,20 +85,6 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretConstants;
-import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
-import org.apache.gravitino.secret.SecretPropertyUtils;
-import org.apache.gravitino.secret.SecretProvider;
-import org.apache.gravitino.secret.SecretProviderRegistry;
-import org.apache.gravitino.secret.SecretReference;
-import org.apache.gravitino.secret.SecretUrn;
-import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
-import org.apache.gravitino.storage.IdGenerator;
->>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -301,64 +286,6 @@ public class TestCatalogManager {
   }
 
   @Test
-<<<<<<< HEAD
-=======
-  void testAlterCatalogRejectsMaskedHiddenProperty() throws IOException {
-    NameIdentifier ident = NameIdentifier.of("metalake", "masked_hidden");
-    Map<String, String> props =
-        ImmutableMap.<String, String>builder()
-            .put(PROPERTY_KEY1, "value1")
-            .put(PROPERTY_KEY2, "value2")
-            .put(PROPERTY_KEY3, "3")
-            .put(PROPERTY_KEY4, "value4")
-            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
-            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
-            .put(PROPERTY_HIDDEN_KEY, "secret")
-            .put("mock", "mock")
-            .build();
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
-
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalogManager.alterCatalog(
-                    ident,
-                    CatalogChange.setProperty(
-                        PROPERTY_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE)));
-
-    Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
-    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    Assertions.assertEquals("secret", entity.getProperties().get(PROPERTY_HIDDEN_KEY));
-    reset();
-  }
-
-  @Test
-  void testCreateCatalogRejectsMaskedHiddenProperty() throws IOException {
-    NameIdentifier ident = NameIdentifier.of("metalake", "masked_create");
-    Map<String, String> props =
-        ImmutableMap.<String, String>builder()
-            .put(PROPERTY_KEY1, "value1")
-            .put(PROPERTY_KEY2, "value2")
-            .put(PROPERTY_KEY3, "3")
-            .put(PROPERTY_KEY4, "value4")
-            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
-            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
-            .put(PROPERTY_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE)
-            .put("mock", "mock")
-            .build();
-
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalogManager.createCatalog(
-                    ident, Catalog.Type.RELATIONAL, provider, "comment", props));
-    Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
-    reset();
-  }
-
-  @Test
   void testPathBasedCredentialProviderValidation() throws IOException {
     NameIdentifier ident = NameIdentifier.of("metalake", "token_provider");
     Map<String, String> props =
@@ -421,7 +348,6 @@ public class TestCatalogManager {
   }
 
   @Test
->>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
   void testPropertyValidationInCreate() throws IOException {
     // key1 is required and immutable and do not have default value, is not hidden and not reserved
     // key2 is required and mutable and do not have default value, is not hidden and not reserved
@@ -1782,6 +1708,65 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testLoadWarnsForUnsupportedCredentialProviders() throws Exception {
+    LoggerContext context =
+        (LoggerContext) LogManager.getContext(CatalogManager.class.getClassLoader(), false);
+    Configuration logConfig = context.getConfiguration();
+    List<LogEvent> events = new ArrayList<>();
+    AbstractAppender appender =
+        new AbstractAppender("credentialProvidersCapture", null, null, true, null) {
+          @Override
+          public void append(LogEvent event) {
+            events.add(event.toImmutable());
+          }
+        };
+    appender.start();
+    LoggerConfig logger = new LoggerConfig(CatalogManager.class.getName(), Level.WARN, false);
+    logger.addAppender(appender, Level.WARN, null);
+    logConfig.addLogger(CatalogManager.class.getName(), logger);
+    context.updateLoggers();
+
+    try (CatalogManager manager =
+        new CatalogManager(config, entityStore, new RandomIdGenerator())) {
+      // A catalog persisted before unsupported credential providers were rejected.
+      NameIdentifier ident = NameIdentifier.of("metalake", "legacy_token_providers");
+      Map<String, String> props =
+          ImmutableMap.<String, String>builder()
+              .put(PROPERTY_KEY1, "value1")
+              .put(PROPERTY_KEY2, "value2")
+              .put(PROPERTY_KEY3, "3")
+              .put(PROPERTY_KEY4, "value4")
+              .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+              .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+              .put("mock", "mock")
+              .put(CredentialConstants.CREDENTIAL_PROVIDERS, "gcs-token")
+              .build();
+      entityStore.put(
+          CatalogEntity.builder()
+              .withId(new RandomIdGenerator().nextId())
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider(provider)
+              .withComment("comment")
+              .withProperties(props)
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build());
+
+      Assertions.assertDoesNotThrow(() -> manager.loadCatalog(ident));
+      Assertions.assertTrue(
+          events.stream()
+              .anyMatch(e -> e.getMessage().getFormattedMessage().contains("gcs-token")));
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+    } finally {
+      logConfig.removeLogger(CatalogManager.class.getName());
+      context.updateLoggers();
+      appender.stop();
+    }
+  }
+
+  @Test
   public void testCatalogCacheRemoveListener() throws IOException {
     NameIdentifier ident = NameIdentifier.of(metalake, "catalog");
     Map<String, String> props =
@@ -1832,320 +1817,6 @@ public class TestCatalogManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-<<<<<<< HEAD
     Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
-=======
-    Assertions.assertFalse(
-        testProps.containsKey(ID_KEY),
-        "`gravitino.identifier` is reserved+hidden and should be omitted from responses");
-  }
-
-  @Test
-  void testSecrets() throws Exception {
-    try (SecretManager secrets = memorySecretManager();
-        CatalogManager manager =
-            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
-      NameIdentifier ident = NameIdentifier.of("metalake", "secret_ok");
-      Catalog catalog =
-          manager.createCatalog(
-              ident,
-              Catalog.Type.RELATIONAL,
-              provider,
-              "comment",
-              catalogProps(),
-              Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
-              Map.of());
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, catalog.properties().get(PROPERTY_KEY4));
-      String urn =
-          entityStore
-              .get(ident, EntityType.CATALOG, CatalogEntity.class)
-              .getProperties()
-              .get(PROPERTY_KEY4);
-      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urn));
-      Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
-
-      manager.alterCatalog(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
-      Assertions.assertFalse(
-          entityStore
-              .get(ident, EntityType.CATALOG, CatalogEntity.class)
-              .getProperties()
-              .containsKey(PROPERTY_KEY4));
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
-
-      Assertions.assertTrue(manager.dropCatalog(ident, true));
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
-    }
-  }
-
-  @Test
-  void testCredentialProvidersCannotBeSecret() throws Exception {
-    try (SecretManager secrets = memorySecretManager();
-        CatalogManager manager =
-            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
-      NameIdentifier ident = NameIdentifier.of("metalake", "secret_credential_providers");
-      SecretReference reference = new SecretReference("reference", Map.of("path", "providers"));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              manager.createCatalog(
-                  ident,
-                  Catalog.Type.RELATIONAL,
-                  provider,
-                  "comment",
-                  catalogProps(),
-                  Map.of(
-                      CredentialConstants.CREDENTIAL_PROVIDERS,
-                      new SecretBinding("memory", "gcs-token")),
-                  Map.of()));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              manager.createCatalog(
-                  ident,
-                  Catalog.Type.RELATIONAL,
-                  provider,
-                  "comment",
-                  catalogProps(),
-                  Map.of(),
-                  Map.of(CredentialConstants.CREDENTIAL_PROVIDERS, reference)));
-      Assertions.assertFalse(manager.catalogExists(ident));
-
-      manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", catalogProps());
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              manager.alterCatalog(
-                  ident,
-                  CatalogChange.setSecretBinding(
-                      CredentialConstants.CREDENTIAL_PROVIDERS,
-                      new SecretBinding("memory", "gcs-token"))));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              manager.alterCatalog(
-                  ident,
-                  CatalogChange.setSecretReference(
-                      CredentialConstants.CREDENTIAL_PROVIDERS, reference)));
-      Assertions.assertTrue(manager.dropCatalog(ident, true));
-    }
-  }
-
-  @Test
-  void testLoadWarnsForSecretCredentialProviders() throws Exception {
-    LoggerContext context =
-        (LoggerContext) LogManager.getContext(CatalogManager.class.getClassLoader(), false);
-    Configuration logConfig = context.getConfiguration();
-    List<LogEvent> events = new ArrayList<>();
-    AbstractAppender appender =
-        new AbstractAppender("credentialProvidersCapture", null, null, true, null) {
-          @Override
-          public void append(LogEvent event) {
-            events.add(event.toImmutable());
-          }
-        };
-    appender.start();
-    LoggerConfig logger = new LoggerConfig(CatalogManager.class.getName(), Level.WARN, false);
-    logger.addAppender(appender, Level.WARN, null);
-    logConfig.addLogger(CatalogManager.class.getName(), logger);
-    context.updateLoggers();
-
-    try (SecretManager secrets = memorySecretManager();
-        CatalogManager manager =
-            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
-      // A catalog persisted before credential providers were rejected as secrets.
-      NameIdentifier ident = NameIdentifier.of("metalake", "legacy_secret_providers");
-      long id = new RandomIdGenerator().nextId();
-      SecretUrn urn = writeThroughUrn("catalog", id, CredentialConstants.CREDENTIAL_PROVIDERS);
-      secrets.writeSecrets(List.of(new SecretMaterial(urn, "gcs-token")));
-      Map<String, String> props = new HashMap<>(catalogProps());
-      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, urn.toString());
-      entityStore.put(
-          CatalogEntity.builder()
-              .withId(id)
-              .withName(ident.name())
-              .withNamespace(ident.namespace())
-              .withType(Catalog.Type.RELATIONAL)
-              .withProvider(provider)
-              .withComment("comment")
-              .withProperties(props)
-              .withAuditInfo(
-                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-              .build());
-
-      Assertions.assertDoesNotThrow(() -> manager.loadCatalog(ident));
-      Assertions.assertTrue(
-          events.stream()
-              .anyMatch(e -> e.getMessage().getFormattedMessage().contains("gcs-token")));
-      Assertions.assertTrue(manager.dropCatalog(ident, true));
-    } finally {
-      logConfig.removeLogger(CatalogManager.class.getName());
-      context.updateLoggers();
-      appender.stop();
-    }
-  }
-
-  @Test
-  void testConnectionChangesDoNotMutateSecrets() throws Exception {
-    try (SecretManager secrets = memorySecretManager();
-        CatalogManager manager =
-            Mockito.spy(
-                new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets))) {
-      NameIdentifier ident = NameIdentifier.of("metalake", "secret_connection_test");
-      manager.createCatalog(
-          ident,
-          Catalog.Type.RELATIONAL,
-          provider,
-          "comment",
-          catalogProps(),
-          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "stored-secret")),
-          Map.of());
-      CatalogEntity stored = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      String storedUrn = stored.getProperties().get(PROPERTY_KEY4);
-      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
-      SecretUrn proposedUrn = writeThroughUrn("catalog", stored.id(), PROPERTY_KEY2);
-
-      CatalogManager.CatalogWrapper temporaryWrapper =
-          Mockito.mock(CatalogManager.CatalogWrapper.class);
-      AtomicReference<CatalogEntity> effectiveEntity = new AtomicReference<>();
-      Mockito.doAnswer(
-              invocation -> {
-                effectiveEntity.set(invocation.getArgument(0));
-                return temporaryWrapper;
-              })
-          .when(manager)
-          .createCatalogWrapper(any(CatalogEntity.class), eq(null));
-      Mockito.doReturn(null).when(temporaryWrapper).doWithCatalogOps(any());
-
-      manager.testConnection(
-          ident,
-          CatalogChange.setSecretBinding(
-              PROPERTY_KEY4, new SecretBinding("memory", "temporary-secret")),
-          CatalogChange.setSecretBinding(
-              PROPERTY_KEY2, new SecretBinding("memory", "temporary-new-secret")));
-      Assertions.assertEquals(
-          "temporary-secret", effectiveEntity.get().getProperties().get(PROPERTY_KEY4));
-      Assertions.assertEquals(
-          "temporary-new-secret", effectiveEntity.get().getProperties().get(PROPERTY_KEY2));
-      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> secrets.readSecret(proposedUrn));
-
-      manager.testConnection(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
-      Assertions.assertFalse(effectiveEntity.get().getProperties().containsKey(PROPERTY_KEY4));
-      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
-
-      manager.testConnection(
-          ident,
-          CatalogChange.setSecretReference(
-              PROPERTY_KEY4, new SecretReference("reference", Map.of("path", "external-secret"))));
-      String referenceUrn = effectiveEntity.get().getProperties().get(PROPERTY_KEY4);
-      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, referenceUrn));
-      Assertions.assertEquals(
-          "resolved-external-secret",
-          secrets.toPlaintextProperties(effectiveEntity.get().getProperties()).get(PROPERTY_KEY4));
-      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
-
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> manager.testConnection(ident, CatalogChange.setProperty(PROPERTY_KEY4, storedUrn)));
-      CatalogEntity storedAfter = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      Assertions.assertEquals(stored.getProperties(), storedAfter.getProperties());
-      Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
-      Mockito.verify(manager, Mockito.times(4)).acquireCatalogLease(ident);
-      Mockito.verify(temporaryWrapper, Mockito.times(3)).close();
-    }
-  }
-
-  @Test
-  void testSecretRollback() throws Exception {
-    try (SecretManager secrets = memorySecretManager()) {
-      IdGenerator ids = new AtomicLong(4242L)::getAndIncrement;
-      CatalogManager manager = Mockito.spy(new CatalogManager(config, entityStore, ids, secrets));
-      NameIdentifier ident = NameIdentifier.of("metalake", "secret_fail");
-      Mockito.doThrow(new RuntimeException("init failed"))
-          .when(manager)
-          .createCatalogWrapper(any(CatalogEntity.class), any());
-      SecretUrn urn = writeThroughUrn("catalog", 4242L, PROPERTY_KEY4);
-      Assertions.assertThrows(
-          RuntimeException.class,
-          () ->
-              manager.createCatalog(
-                  ident,
-                  Catalog.Type.RELATIONAL,
-                  provider,
-                  "comment",
-                  catalogProps(),
-                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
-                  Map.of()));
-      Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
-      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
-      manager.close();
-    }
-  }
-
-  @Test
-  void testSecretNoMetalake() throws Exception {
-    try (SecretManager secrets = memorySecretManager();
-        CatalogManager manager =
-            new CatalogManager(
-                config, entityStore, new AtomicLong(4343L)::getAndIncrement, secrets)) {
-      NameIdentifier ident = NameIdentifier.of("missing_metalake", "secret_catalog");
-      SecretUrn urn = writeThroughUrn("catalog", 4343L, PROPERTY_KEY4);
-      Assertions.assertThrows(
-          NoSuchMetalakeException.class,
-          () ->
-              manager.createCatalog(
-                  ident,
-                  Catalog.Type.RELATIONAL,
-                  provider,
-                  "comment",
-                  catalogProps(),
-                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
-                  Map.of()));
-      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
-    }
-  }
-
-  private static Map<String, String> catalogProps() {
-    return ImmutableMap.of(
-        "provider",
-        "test",
-        PROPERTY_KEY1,
-        "value1",
-        PROPERTY_KEY2,
-        "value2",
-        PROPERTY_KEY5_PREFIX + "1",
-        "value3");
-  }
-
-  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
-    return SecretUrn.buildWriteThrough(
-        "memory",
-        Map.of(
-            SecretConstants.ATTR_ENTITY_TYPE, entityType,
-            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
-            SecretConstants.ATTR_PROPERTY_KEY, key));
-  }
-
-  private static SecretManager memorySecretManager() {
-    Config c = new Config(false) {};
-    Properties p = new Properties();
-    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory,reference");
-    p.setProperty(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "memory."
-            + SecretProviderRegistry.CLASS_NAME,
-        InMemorySecretsProvider.class.getName());
-    p.setProperty(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "reference."
-            + SecretProviderRegistry.CLASS_NAME,
-        TestReferenceSecretsProvider.class.getName());
-    c.loadFromProperties(p);
-    return new SecretManager(c);
->>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
   }
 }

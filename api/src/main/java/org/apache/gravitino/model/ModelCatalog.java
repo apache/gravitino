@@ -312,10 +312,11 @@ public interface ModelCatalog {
    * @param changes the several {@link ModelChange} instances to apply to the model
    * @return the updated {@link Model} instance
    * @throws NoSuchModelException If the model does not exist
+   * @throws ModelAlreadyExistsException If the new name is already used by another model.
    * @throws IllegalArgumentException If the change is rejected by the implementation
    */
   Model alterModel(NameIdentifier ident, ModelChange... changes)
-      throws NoSuchModelException, IllegalArgumentException;
+      throws NoSuchModelException, ModelAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Applies the specified {@link ModelVersionChange changes} to a model version identified by its

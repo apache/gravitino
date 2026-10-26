@@ -89,7 +89,6 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -119,6 +118,7 @@ import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -801,12 +801,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    if (secretBindings != null) {
-      checkCredentialProvidersNotSecret(secretBindings.keySet());
-    }
-    if (secretReferences != null) {
-      checkCredentialProvidersNotSecret(secretReferences.keySet());
-    }
 
     Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
     long uid = idGenerator.nextId();
@@ -1161,11 +1155,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param changes The changes to apply to the catalog.
    * @return A metadata snapshot of the altered catalog.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
+   * @throws CatalogAlreadyExistsException If the new name is already used by another catalog.
    * @throws IllegalArgumentException If an unsupported catalog change is provided.
    */
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
-      throws NoSuchCatalogException, IllegalArgumentException {
+      throws NoSuchCatalogException, CatalogAlreadyExistsException, IllegalArgumentException {
 
     TreeLockUtils.doWithTreeLock(
         ident,
@@ -1262,6 +1257,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           } catch (IllegalArgumentException iae) {
             LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
             throw iae;
+
+          } catch (EntityAlreadyExistsException e) {
+            String newName =
+                RenameUtils.getLastRenameName(
+                    ident.name(),
+                    changes,
+                    CatalogChange.RenameCatalog.class,
+                    CatalogChange.RenameCatalog::getNewName);
+            throw new CatalogAlreadyExistsException(
+                e, "Catalog %s already exists", NameIdentifier.of(ident.namespace(), newName));
 
           } catch (IOException ioe) {
             LOG.error("Failed to alter catalog {}", ident, ioe);
@@ -1632,20 +1637,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               if (catalogChange instanceof SetProperty) {
                 SetProperty setProperty = (SetProperty) catalogChange;
                 upserts.put(setProperty.getProperty(), setProperty.getValue());
-<<<<<<< HEAD
-=======
-              } else if (catalogChange instanceof CatalogChange.SetSecretBinding) {
-                CatalogChange.SetSecretBinding setSecretBinding =
-                    (CatalogChange.SetSecretBinding) catalogChange;
-                checkCredentialProvidersNotSecret(Set.of(setSecretBinding.getProperty()));
-                upserts.put(
-                    setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
-              } else if (catalogChange instanceof CatalogChange.SetSecretReference) {
-                CatalogChange.SetSecretReference setSecretReference =
-                    (CatalogChange.SetSecretReference) catalogChange;
-                checkCredentialProvidersNotSecret(Set.of(setSecretReference.getProperty()));
-                upserts.put(setSecretReference.getProperty(), setSecretReference.getProperty());
->>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
               } else if (catalogChange instanceof RemoveProperty) {
                 RemoveProperty removeProperty = (RemoveProperty) catalogChange;
                 deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
@@ -1653,14 +1644,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             });
 
     return Pair.of(upserts, deletes);
-  }
-
-  private static void checkCredentialProvidersNotSecret(Set<String> secretKeys) {
-    // Credential providers must stay plaintext so they can be validated against the catalog.
-    Preconditions.checkArgument(
-        !secretKeys.contains(CredentialConstants.CREDENTIAL_PROVIDERS),
-        "Property %s cannot be set as a secret",
-        CredentialConstants.CREDENTIAL_PROVIDERS);
   }
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
@@ -1719,12 +1702,24 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     IsolatedClassLoader classLoader = createClassLoader(provider, conf);
     BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
 
-<<<<<<< HEAD
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
     // Validate catalog properties and initialize the config
     classLoader.withClassLoader(
         cl -> {
           validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
+          catalog.validateCredentialProviders(propsToValidate);
+          if (propsToValidate == null) {
+            // Loading stays lenient for catalogs persisted with unsupported providers, so only
+            // warn about them.
+            try {
+              catalog.validateCredentialProviders(conf);
+            } catch (IllegalArgumentException e) {
+              LOG.warn(
+                  "Catalog {} has credential providers that cannot vend credentials: {}",
+                  entity.nameIdentifier(),
+                  e.getMessage());
+            }
+          }
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why do we do this? Because wrapper.catalog.properties() needs to be called in
@@ -1747,41 +1742,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         },
         IllegalArgumentException.class,
         ConnectionFailedException.class);
-=======
-  /**
-   * Creates the catalog instance, validates properties, and preloads property/capability values
-   * into the given wrapper.
-   */
-  private CatalogWrapper initCatalogWrapper(
-      CatalogWrapper wrapper,
-      CatalogEntity entity,
-      @Nullable Map<String, String> propsToValidate,
-      boolean validateBackend) {
-    BaseCatalog<?> catalog = createBaseCatalog(wrapper.classLoader, entity);
-    wrapper.catalog = catalog;
-    try {
-      wrapper.classLoader.withClassLoader(
-          cl -> {
-            validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
-            catalog.validateCredentialProviders(propsToValidate);
-            if (propsToValidate == null) {
-              // Loading stays lenient for catalogs persisted with unsupported providers, so only
-              // warn about them. Providers persisted as a secret are checked by their plaintext.
-              try {
-                catalog.validateCredentialProviders(
-                    secretManager.toPlaintextProperties(entity.getProperties()));
-              } catch (IllegalArgumentException e) {
-                LOG.warn(
-                    "Catalog {} has credential providers that cannot vend credentials: {}",
-                    entity.nameIdentifier(),
-                    e.getMessage());
-              }
-            }
-            // Preload properties() and capability() inside the IsolatedClassLoader so that
-            // AppClassLoader can read them later without needing the isolated context.
-            catalog.properties();
-            catalog.capability();
->>>>>>> 10ba57615 ([#14069] fix(core): Reject token credential providers on catalogs without path-based credentials (#14080))
 
     return wrapper;
   }

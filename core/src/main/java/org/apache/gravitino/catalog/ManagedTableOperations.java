@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Entity;
@@ -164,10 +165,11 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
-      throws NoSuchTableException, IllegalArgumentException {
+      throws NoSuchTableException, TableAlreadyExistsException, IllegalArgumentException {
     // The alterTable in ManagedTableOperations only updates the table metadata in the entity store.
     // It doesn't handle any additional operations like modifying physical data, etc. Those
     // operations should be handled in the specific catalog implementation.
+    AtomicReference<NameIdentifier> targetIdent = new AtomicReference<>(ident);
     try {
       TableEntity newTableEntity =
           store()
@@ -175,14 +177,17 @@ public abstract class ManagedTableOperations implements TableCatalog {
                   ident,
                   TableEntity.class,
                   Entity.EntityType.TABLE,
-                  oldEntity -> applyChanges(oldEntity, changes));
+                  oldEntity -> {
+                    TableEntity updatedEntity = applyChanges(oldEntity, changes);
+                    targetIdent.set(updatedEntity.nameIdentifier());
+                    return updatedEntity;
+                  });
 
       return toGenericTable(newTableEntity);
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
-      throw new IllegalArgumentException(
-          "Failed to rename table " + ident + " due to table already exists: ", e);
+      throw new TableAlreadyExistsException(e, "Table %s already exists", targetIdent.get());
     } catch (IOException e) {
       throw new RuntimeException("Failed to alter table " + ident, e);
     }
@@ -233,7 +238,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
             rename
                 .getNewSchemaName()
                 .map(s -> NamespaceUtil.ofTable(oldNs.level(0), oldNs.level(1), s))
-                .orElse(oldNs);
+                .orElse(newNs);
 
       } else if (change instanceof TableChange.UpdateComment updateComment) {
         newComment = updateComment.getNewComment();
