@@ -74,8 +74,7 @@ public class TestIcebergRegisterOverwriteAuthorization {
 
   @Test
   public void testRegisterOverwriteDeniedWithCreateTableOnly() throws Throwable {
-    Object result =
-        invokeRegister(true, with("SCHEMA::CREATE_TABLE"), "user-without-table-rights");
+    Object result = invokeRegister(true, with("SCHEMA::CREATE_TABLE"), "user-without-table-rights");
     assertForbidden(result);
   }
 
