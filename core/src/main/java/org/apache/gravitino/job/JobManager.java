@@ -491,7 +491,7 @@ public class JobManager implements JobOperationDispatcher {
         maxBytes == null || maxBytes > 0, "maxBytes must be positive if specified");
 
     // A caller-specified maxLines/maxBytes can only narrow the globally configured cap, never
-    // widen it - the global configuration remains a hard upper bound on read cost/response size.
+    // widen it - the global configuration remains a hard upper bound on the response size.
     int effectiveMaxLines = clampToGlobalMax(maxLines, jobOutputMaxLines);
     int effectiveMaxBytes = clampToGlobalMax(maxBytes, jobOutputMaxBytes);
 

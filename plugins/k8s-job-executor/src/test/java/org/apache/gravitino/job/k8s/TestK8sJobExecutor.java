@@ -874,8 +874,15 @@ public class TestK8sJobExecutor {
         .always();
 
     try (KubernetesClient slow =
-        clientWithoutRetries(
-            new ConfigBuilder(client.getConfiguration()).withRequestTimeout(200).build())) {
+        // Retried like the client of the executor, after which the timeout is still the cause.
+        new KubernetesClientBuilder()
+            .withConfig(
+                new ConfigBuilder(client.getConfiguration())
+                    .withRequestTimeout(200)
+                    .withRequestRetryBackoffLimit(2)
+                    .withRequestRetryBackoffInterval(10)
+                    .build())
+            .build()) {
       executor.initialize(
           TestSparkApplicationUtils.newConfigs(
               ImmutableMap.of(K8sJobExecutorConfigs.STATUS_CACHE_TTL_MS, "60000")),

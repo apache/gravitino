@@ -96,11 +96,14 @@ public class TestNamespacedResourceCache {
             now::get);
 
     Assertions.assertFalse(cache.find("ns1", "a").isPresent());
-    // The namespace isn't listed again until the failure expires.
+    // The namespace isn't listed again until the failure expires, which takes longer than the TTL
+    // of a listing.
+    Assertions.assertFalse(cache.find("ns1", "b").isPresent());
+    now.addAndGet(100L);
     Assertions.assertFalse(cache.find("ns1", "b").isPresent());
     Assertions.assertEquals(ImmutableList.of("ns1"), listed);
 
-    now.addAndGet(100L);
+    now.addAndGet(NamespacedResourceCache.FAILED_LIST_TTL_MS - 100L);
     Assertions.assertFalse(cache.find("ns1", "a").isPresent());
     Assertions.assertEquals(ImmutableList.of("ns1", "ns1"), listed);
   }
@@ -112,8 +115,8 @@ public class TestNamespacedResourceCache {
             100L,
             namespace -> {
               listed.add(namespace);
-              // The listing times out after longer than the TTL.
-              now.addAndGet(150L);
+              // The listing times out after longer than a failure is cached.
+              now.addAndGet(NamespacedResourceCache.FAILED_LIST_TTL_MS + 50L);
               throw new IllegalStateException("timed out");
             },
             e -> false,
@@ -125,7 +128,7 @@ public class TestNamespacedResourceCache {
     Assertions.assertFalse(cache.find("ns1", "b").isPresent());
     Assertions.assertEquals(ImmutableList.of("ns1"), listed);
 
-    now.addAndGet(100L);
+    now.addAndGet(NamespacedResourceCache.FAILED_LIST_TTL_MS);
     Assertions.assertFalse(cache.find("ns1", "a").isPresent());
     Assertions.assertEquals(ImmutableList.of("ns1", "ns1"), listed);
   }
