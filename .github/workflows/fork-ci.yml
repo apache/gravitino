@@ -211,6 +211,17 @@ jobs:
       sync: ${{ needs.eligibility.outputs.sync }}
     uses: ./.github/workflows/maintenance-integration-test.yml
 
+  tms:
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    with:
+      base-ref: ${{ needs.eligibility.outputs.base-ref }}
+      base-sha: ${{ needs.eligibility.outputs.base-sha }}
+      head-repository: ${{ needs.eligibility.outputs.head-repository }}
+      head-sha: ${{ needs.eligibility.outputs.head-sha }}
+      sync: ${{ needs.eligibility.outputs.sync }}
+    uses: ./.github/workflows/tms-test.yml
+
   web_ui:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
@@ -295,6 +306,7 @@ jobs:
       - idp_basic
       - mcp
       - maintenance
+      - tms
       - web_ui
       - charts
       - contrib_catalog

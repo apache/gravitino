@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -232,6 +233,56 @@ public class TestOccWriteSupport {
                 Entity.EntityType.METALAKE,
                 children,
                 list -> 1));
+  }
+
+  @Test
+  void testDeleteChildrenWithVersionsSplitsIntoChunks() {
+    NameIdentifier parentIdent = NameIdentifier.of("parent");
+    int batchSize = OccWriteSupport.CHILD_DELETE_BATCH_SIZE;
+    List<DummyPO> children = new ArrayList<>();
+    for (int i = 0; i < batchSize * 2 + 1; i++) {
+      children.add(new DummyPO("c" + i, 1L));
+    }
+    List<Integer> chunkSizes = new ArrayList<>();
+
+    OccWriteSupport.deleteChildrenWithVersions(
+        parentIdent,
+        Entity.EntityType.SCHEMA,
+        Entity.EntityType.CATALOG,
+        children,
+        chunk -> {
+          chunkSizes.add(chunk.size());
+          return chunk.size();
+        });
+
+    assertEquals(List.of(batchSize, batchSize, 1), chunkSizes);
+  }
+
+  @Test
+  void testDeleteChildrenWithVersionsStopsAtFirstShortChunk() {
+    NameIdentifier parentIdent = NameIdentifier.of("parent");
+    int batchSize = OccWriteSupport.CHILD_DELETE_BATCH_SIZE;
+    List<DummyPO> children = new ArrayList<>();
+    for (int i = 0; i < batchSize * 2 + 1; i++) {
+      children.add(new DummyPO("c" + i, 1L));
+    }
+    List<Integer> chunkSizes = new ArrayList<>();
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            OccWriteSupport.deleteChildrenWithVersions(
+                parentIdent,
+                Entity.EntityType.SCHEMA,
+                Entity.EntityType.CATALOG,
+                children,
+                chunk -> {
+                  chunkSizes.add(chunk.size());
+                  // The second chunk misses one child, as if it was changed concurrently.
+                  return chunkSizes.size() == 2 ? chunk.size() - 1 : chunk.size();
+                }));
+
+    assertEquals(List.of(batchSize, batchSize), chunkSizes);
   }
 
   @Test

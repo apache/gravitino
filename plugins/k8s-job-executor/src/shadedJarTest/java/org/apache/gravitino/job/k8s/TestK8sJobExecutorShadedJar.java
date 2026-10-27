@@ -169,7 +169,8 @@ public class TestK8sJobExecutorShadedJar {
               .withName("builtin-sparkpi")
               .withExecutable("/gravitino/auxlib/gravitino-jobs.jar")
               .withClassName("org.apache.gravitino.maintenance.jobs.spark.SparkPiJob")
-              .withConfigs(ImmutableMap.of("spark.master", "local[*]"))
+              // What the built-in template's {{spark_master:-}} resolves to by default.
+              .withConfigs(ImmutableMap.of("spark.master", ""))
               .build();
 
       // The factory finds the built-in k8s job executor by its class name.

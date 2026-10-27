@@ -33,6 +33,7 @@ import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUti
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 
 /** Submits optimizer jobs to Gravitino using job template adapters. */
 public class GravitinoJobSubmitter implements JobSubmitter {
@@ -55,7 +56,9 @@ public class GravitinoJobSubmitter implements JobSubmitter {
           IcebergRewriteManifestsContent.JOB_TEMPLATE_NAME_VALUE,
           GravitinoManifestRewriteJobAdapter.class,
           IcebergOrphanFileRemovalContent.JOB_TEMPLATE_NAME_VALUE,
-          GravitinoOrphanFileRemovalJobAdapter.class);
+          GravitinoOrphanFileRemovalJobAdapter.class,
+          IcebergSnapshotExpirationContent.JOB_TEMPLATE_NAME_VALUE,
+          GravitinoSnapshotExpirationJobAdapter.class);
 
   @Override
   public String name() {

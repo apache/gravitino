@@ -31,15 +31,18 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.commons.lang3)
   implementation(libs.jackson.databind)
+  implementation(libs.ql.expression)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
+  compileOnly(libs.slf4j.api)
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testRuntimeOnly(libs.junit.jupiter.engine)
+  testRuntimeOnly("org.slf4j:slf4j-simple:1.7.36")
 }
 
 tasks.test {
