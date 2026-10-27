@@ -18,13 +18,22 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetCatalog;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -92,5 +101,42 @@ public class TestFilesetMetadataCache {
 
     // If we got here without exceptions, the test passes
     assertTrue(true, "Cache close completed successfully");
+  }
+
+  /**
+   * Tests that {@link FilesetMetadataCache} caches and reuses catalog, schema, and fileset
+   * instances across lookups without redundant client calls.
+   */
+  @Test
+  public void testCacheReusesCatalogSchemaAndFileset() throws IOException {
+    GravitinoClient mockClient = mock(GravitinoClient.class);
+    Catalog mockCatalog = mock(Catalog.class);
+    FilesetCatalog mockFilesetCatalog = mock(FilesetCatalog.class);
+    SupportsSchemas mockSchemas = mock(SupportsSchemas.class);
+    Schema mockSchema = mock(Schema.class);
+    Fileset mockFileset = mock(Fileset.class);
+
+    when(mockClient.loadCatalog("catalog")).thenReturn(mockCatalog);
+    when(mockCatalog.asFilesetCatalog()).thenReturn(mockFilesetCatalog);
+    when(mockCatalog.asSchemas()).thenReturn(mockSchemas);
+    when(mockSchemas.loadSchema("schema")).thenReturn(mockSchema);
+    when(mockFilesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(mockFileset);
+
+    try (FilesetMetadataCache cache = new FilesetMetadataCache(mockClient)) {
+      NameIdentifier catalogIdent = NameIdentifier.of("ml", "catalog");
+      NameIdentifier schemaIdent = NameIdentifier.of("ml", "catalog", "schema");
+      NameIdentifier filesetIdent = NameIdentifier.of("ml", "catalog", "schema", "fs");
+
+      assertSame(mockCatalog, cache.getCatalog(catalogIdent));
+      assertSame(mockFilesetCatalog, cache.getFilesetCatalog(catalogIdent));
+      assertSame(mockSchema, cache.getSchema(schemaIdent));
+      assertSame(mockSchema, cache.getSchema(schemaIdent));
+      assertSame(mockFileset, cache.getFileset(filesetIdent));
+      assertSame(mockFileset, cache.getFileset(filesetIdent));
+
+      verify(mockClient, times(1)).loadCatalog("catalog");
+      verify(mockSchemas, times(1)).loadSchema("schema");
+      verify(mockFilesetCatalog, times(1)).loadFileset(NameIdentifier.of("schema", "fs"));
+    }
   }
 }
