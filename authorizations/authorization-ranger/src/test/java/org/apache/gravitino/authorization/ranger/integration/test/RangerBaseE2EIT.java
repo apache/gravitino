@@ -193,7 +193,9 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // The Ranger Spark plugin polls Ranger admin every `ranger.plugin.spark.policy.pollIntervalMs`
     // (see `resources/ranger-spark-security.xml.template`), but on a busy machine a poll can come
     // later than the sleep below. Download the policies and roles now instead.
-    if (usesRangerSparkPlugin() && SparkRangerAdminPlugin.getPolicyVersion() >= 0) {
+    // Kyuubi exposes getPolicyVersion(), but RangerBasePlugin in Ranger 2.4 does not implement
+    // it. getServiceDef() is compatible with both jars and is null until a policy engine exists.
+    if (usesRangerSparkPlugin() && SparkRangerAdminPlugin.getServiceDef() != null) {
       SparkRangerAdminPlugin.refreshPoliciesAndTags();
     }
 
