@@ -127,7 +127,7 @@ Fork runs cannot notify `apache/gravitino` when they finish, so a sweep polls re
 
 The publishers report **Fork CI** and **ASF Allowlist Check** only as commit statuses, each listed once on the PR and linking to the corresponding run; the **Fork CI** link names the run attempt, which also records what the status reports. Commit statuses do not appear on the PR's **Checks** tab. Queued and running CI both have a pending status, with the description distinguishing whether jobs have started; this also applies to PRs that edit CI definitions. Failed tests report failure and cancellation reports error, both suggesting a re-run in the fork when the description has room. A successful fork run with changed CI definitions stays pending as **Fork CI passed; trusted verification required** until a trusted run verifies the PR. The job that stops a run on the first failure only observes the other jobs: its own errors never fail the run.
 
-The status publisher checks required suites against the trusted workflow version used by the run. Adding a suite on the default branch does not invalidate earlier successful runs. Fork runs use the PR base snapshot whose CI definitions match the contributor head; trusted runs use the upstream dispatch commit.
+The status publisher checks required suites against the upstream commit the run tested: the base-branch commit merged into the head for fork runs, or the dispatch commit for trusted runs. Adding a suite on the default branch does not invalidate earlier successful runs. A later run that tests a base commit with the new suite needs it, so merge the latest base branch and push if the status reports a missing suite.
 
 Known limitations of Fork CI:
 

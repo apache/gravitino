@@ -85,6 +85,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     if (!availableBases.has(pr.base.sha)) {
       availableBases.set(pr.base.sha, readWorkflow(pr.base.sha).then(() => true, error => {
         if (error.status === 404) return false;
+        availableBases.delete(pr.base.sha); // Retry transient lookup failures on the next pass.
         throw error;
       }));
     }

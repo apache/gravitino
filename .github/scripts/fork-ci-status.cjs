@@ -92,7 +92,11 @@ function evaluateExecution(pr, run, jobs, baseSha) {
 function evaluateSuites(jobs, suites) {
   for (const suite of suites) {
     const children = jobs.filter(job => job.name.startsWith(`${suite} / `));
-    if (!children.length || !children.some(job => job.conclusion === 'success') ||
+    if (!children.length) {
+      return requiredAction(`The run has no ${suite} jobs. If the base branch added this suite, ` +
+        'merge the latest base branch and push.');
+    }
+    if (!children.some(job => job.conclusion === 'success') ||
         children.some(job => !['success', 'skipped'].includes(job.conclusion))) {
       return requiredAction(`The ${suite} caller did not report successful jobs. Open the run and verify its suites.`);
     }
@@ -232,11 +236,12 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     let result = evaluateExecution(pr, run, jobs, base);
     const needsSuiteChecks = !result;
     if (needsSuiteChecks) {
-      // Ordinary definitions have been compared against this PR's immutable base snapshot.
-      // Trusted dispatches instead execute the upstream workflow at run.head_sha. The tested
-      // merge base can differ from either definition version and must not select the callers.
+      // Require the callers of the commit the run tested: the upstream dispatch commit for trusted
+      // runs, or the base-branch commit merged into the head for fork runs. A suite added on the
+      // base branch after that commit does not fail the run, but one the tested code already had
+      // must have run, even when the head's own workflow predates it.
       result = !selected.trusted && !sameDefinitions ? requiredAction(TRUSTED_REQUIRED)
-        : evaluateSuites(jobs, await suitesAt(selected.trusted ? run.head_sha : pr.base.sha));
+        : evaluateSuites(jobs, await suitesAt(base));
     }
     if (selected.trusted && result.conclusion === 'success' && await acceptedBase(pr, base) !== base) {
       result = requiredAction('Trusted CI tested a commit outside the current base branch. Dispatch trusted Fork CI again from the current default branch.');
