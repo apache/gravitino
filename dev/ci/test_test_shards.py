@@ -28,19 +28,21 @@ import tempfile
 import textwrap
 import unittest
 
-
 SCRIPT = Path(__file__).with_name("test-shards.sh")
 ROOT = SCRIPT.parents[2]
 
 
 def arguments(suite, shard):
-    return subprocess.check_output(["bash", str(SCRIPT), suite, shard], text=True).splitlines()
+    return subprocess.check_output(
+        ["bash", str(SCRIPT), suite, shard], text=True
+    ).splitlines()
 
 
 class TestShardTasks(unittest.TestCase):
     def test_build_leaves_core_to_dedicated_lanes(self):
-        shards = json.loads(subprocess.check_output(
-            ["bash", str(SCRIPT), "build", "--list"], text=True))
+        shards = json.loads(
+            subprocess.check_output(["bash", str(SCRIPT), "build", "--list"], text=True)
+        )
         self.assertEqual(["docker", "others"], shards)
         for shard in shards:
             self.assertNotIn(":core:test", arguments("build", shard))
@@ -51,10 +53,15 @@ class TestShardTasks(unittest.TestCase):
     def test_each_named_task_has_exactly_one_owner_and_is_excluded_from_others(self):
         for suite, root in [("build", "build"), ("backend-it", "test")]:
             with self.subTest(suite=suite):
-                shards = json.loads(subprocess.check_output(
-                    ["bash", str(SCRIPT), suite, "--list"], text=True))
+                shards = json.loads(
+                    subprocess.check_output(
+                        ["bash", str(SCRIPT), suite, "--list"], text=True
+                    )
+                )
                 self.assertEqual("others", shards[-1])
-                tasks = [task for shard in shards[:-1] for task in arguments(suite, shard)]
+                tasks = [
+                    task for shard in shards[:-1] for task in arguments(suite, shard)
+                ]
                 self.assertTrue(tasks)
                 self.assertEqual(len(tasks), len(set(tasks)))
                 others = arguments(suite, "others")
@@ -68,22 +75,37 @@ class TestShardTasks(unittest.TestCase):
         self.assertNotIn(task, arguments("backend-it", "hive"))
         others = arguments("backend-it", "others")
         self.assertIn(task, others[2::2])
-        self.assertTrue(all(not t.endswith(":experimentalTest")
-                            for t in arguments("build", "docker")))
+        self.assertTrue(
+            all(
+                not t.endswith(":experimentalTest")
+                for t in arguments("build", "docker")
+            )
+        )
 
     def test_cron_preserves_the_complete_backend_suite(self):
-        self.assertEqual(["test", ":iceberg:iceberg-rest-server:experimentalTest"],
-                         arguments("backend-it", "all"))
+        self.assertEqual(
+            ["test", ":iceberg:iceberg-rest-server:experimentalTest"],
+            arguments("backend-it", "all"),
+        )
         cron = SCRIPT.parents[2] / ".github/workflows/cron-integration-test.yml"
         self.assertIn("      shard: all", cron.read_text())
 
     def test_unknown_suite_or_shard_fails(self):
-        for suite, shard in [("unknown", "--list"), ("build", "core"), ("build", "all"),
-                             ("backend-it", "unknown"), ("flink", "mysql"),
-                             ("access-control", "embedded")]:
+        for suite, shard in [
+            ("unknown", "--list"),
+            ("build", "core"),
+            ("build", "all"),
+            ("backend-it", "unknown"),
+            ("flink", "mysql"),
+            ("access-control", "embedded"),
+        ]:
             with self.subTest(suite=suite, shard=shard):
-                result = subprocess.run(["bash", str(SCRIPT), suite, shard],
-                                        text=True, capture_output=True, check=False)
+                result = subprocess.run(
+                    ["bash", str(SCRIPT), suite, shard],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
                 self.assertNotEqual(0, result.returncode)
                 self.assertIn("Unknown", result.stderr)
                 self.assertEqual("", result.stdout)
@@ -112,10 +134,18 @@ class TestIntegrationShardExecution(unittest.TestCase):
     def execute(self, suite, shard, exit_code=0):
         result = subprocess.run(
             ["bash", str(self.root / "dev/ci/run-integration-shard.sh"), suite, shard],
-            cwd=self.root, env=self.env, text=True, capture_output=True, check=False,
+            cwd=self.root,
+            env=self.env,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         self.assertEqual(exit_code, result.returncode, result.stderr)
-        return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
+        return (
+            [json.loads(line) for line in self.log.read_text().splitlines()]
+            if self.log.exists()
+            else []
+        )
 
     def execute_workflow(self, filename, step_name, expressions, exit_code=0):
         source = (ROOT / ".github/workflows" / filename).read_text()
@@ -130,34 +160,54 @@ class TestIntegrationShardExecution(unittest.TestCase):
                 break
             lines.append(line)
         script = textwrap.dedent("\n".join(lines))
-        script = re.sub(r"\$\{\{\s*(.*?)\s*\}\}", lambda match: expressions[match[1]], script)
+        script = re.sub(
+            r"\$\{\{\s*(.*?)\s*\}\}", lambda match: expressions[match[1]], script
+        )
         result = subprocess.run(
             ["bash", "-e", "-o", "pipefail", "-c", script],
-            cwd=self.root, env=self.env, text=True, capture_output=True, check=False,
+            cwd=self.root,
+            env=self.env,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         self.assertEqual(exit_code, result.returncode, result.stderr)
-        return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
+        return (
+            [json.loads(line) for line in self.log.read_text().splitlines()]
+            if self.log.exists()
+            else []
+        )
 
     def test_backend_workflow_executes_all_shards_with_existing_filters(self):
         (self.root / "catalogs-contrib/catalog-future").mkdir(parents=True)
         task_owners = []
-        for backend, mode in [("h2", "embedded"), ("mysql", "deploy"), ("postgresql", "deploy")]:
+        for backend, mode in [
+            ("h2", "embedded"),
+            ("mysql", "deploy"),
+            ("postgresql", "deploy"),
+        ]:
             for shard in ("hive", "lakehouse", "others"):
                 self.log.unlink(missing_ok=True)
                 calls = self.execute_workflow(
                     "backend-integration-test-action.yml",
                     "Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})",
-                    {"inputs.shard": shard, "inputs.test-mode": mode, "inputs.backend": backend},
+                    {
+                        "inputs.shard": shard,
+                        "inputs.test-mode": mode,
+                        "inputs.backend": backend,
+                    },
                 )
                 self.assertEqual(1, len(calls))
                 args = calls[0]
                 selected = arguments("backend-it", shard)
-                self.assertEqual(selected, args[:len(selected)])
+                self.assertEqual(selected, args[: len(selected)])
                 self.assertIn("-PskipTests", args)
                 self.assertIn("-PtestMode=" + mode, args)
                 self.assertIn("-PjdbcBackend=" + backend, args)
                 self.assertIn("-PskipDockerTests=false", args)
-                excluded = [args[i + 1] for i, value in enumerate(args) if value == "-x"]
+                excluded = [
+                    args[i + 1] for i, value in enumerate(args) if value == "-x"
+                ]
                 self.assertIn(":catalogs-contrib:catalog-future:test", excluded)
                 self.assertIn(":flink-connector:flink-2.2:test", excluded)
                 self.assertIn(":plugins:maintenance:test", excluded)
@@ -174,9 +224,13 @@ class TestIntegrationShardExecution(unittest.TestCase):
                     with self.subTest(maintenance=maintenance, mcp=mcp, shard=shard):
                         self.log.unlink(missing_ok=True)
                         calls = self.execute_workflow(
-                            "build.yml", "Build with Gradle",
-                            {"needs.changes.outputs.maintenance_module_only_changes": maintenance,
-                             "needs.changes.outputs.mcp_server_changes": mcp, "matrix.shard": shard},
+                            "build.yml",
+                            "Build with Gradle",
+                            {
+                                "needs.changes.outputs.maintenance_module_only_changes": maintenance,
+                                "needs.changes.outputs.mcp_server_changes": mcp,
+                                "matrix.shard": shard,
+                            },
                         )
                         if maintenance == "true" and shard == "docker":
                             self.assertEqual([], calls)
@@ -189,14 +243,18 @@ class TestIntegrationShardExecution(unittest.TestCase):
                             self.assertIn(":maintenance:maintenance-common:build", args)
                             continue
                         selected = arguments("build", shard)
-                        self.assertEqual(selected, args[:len(selected)])
-                        excluded = [args[i + 1] for i, value in enumerate(args) if value == "-x"]
+                        self.assertEqual(selected, args[: len(selected)])
+                        excluded = [
+                            args[i + 1] for i, value in enumerate(args) if value == "-x"
+                        ]
                         self.assertIn(":core:test", excluded)
                         self.assertEqual(mcp == "false", ":mcp-server:test" in excluded)
 
     def test_flink_modes_cover_every_registered_version_once(self):
         settings = (ROOT / "settings.gradle.kts").read_text()
-        versions = set(re.findall(r'project\(":flink-connector:flink-(\d+\.\d+)"\)', settings))
+        versions = set(
+            re.findall(r'project\(":flink-connector:flink-(\d+\.\d+)"\)', settings)
+        )
         self.assertTrue(versions)
         selected = []
         for mode in ("embedded", "deploy"):
@@ -215,7 +273,9 @@ class TestIntegrationShardExecution(unittest.TestCase):
                 task = next(arg for arg in args if arg.endswith(":test"))
                 version = re.fullmatch(r":flink-connector:flink-(.+):test", task)[1]
                 selected.append((mode, version))
-        expected = {(mode, version) for mode in ("embedded", "deploy") for version in versions}
+        expected = {
+            (mode, version) for mode in ("embedded", "deploy") for version in versions
+        }
         self.assertEqual(expected, set(selected))
         self.assertEqual(len(expected), len(selected))
         self.log.unlink()
@@ -223,9 +283,20 @@ class TestIntegrationShardExecution(unittest.TestCase):
         self.assertEqual(len(expected), len(all_calls))
         self.assertCountEqual(
             selected,
-            [(next(arg.removeprefix("-PtestMode=") for arg in args if arg.startswith("-PtestMode=")),
-              re.fullmatch(r":flink-connector:flink-(.+):test", next(arg for arg in args if arg.endswith(":test")))[1])
-             for args in all_calls],
+            [
+                (
+                    next(
+                        arg.removeprefix("-PtestMode=")
+                        for arg in args
+                        if arg.startswith("-PtestMode=")
+                    ),
+                    re.fullmatch(
+                        r":flink-connector:flink-(.+):test",
+                        next(arg for arg in args if arg.endswith(":test")),
+                    )[1],
+                )
+                for args in all_calls
+            ],
         )
 
     def test_authorization_retains_all_backend_mode_combinations_and_unit_tests(self):
@@ -236,8 +307,13 @@ class TestIntegrationShardExecution(unittest.TestCase):
             calls = self.execute("access-control", backend)
             self.assertEqual(1, len(calls))
             self.assertEqual(
-                ["-PtestMode=" + mode, "-PjdbcBackend=" + backend,
-                 "-PskipDockerTests=false", "-PskipWeb=true", ":authorizations:test"],
+                [
+                    "-PtestMode=" + mode,
+                    "-PjdbcBackend=" + backend,
+                    "-PskipDockerTests=false",
+                    "-PskipWeb=true",
+                    ":authorizations:test",
+                ],
                 calls[0],
             )
             self.assertNotIn("-PskipTests", calls[0])
@@ -246,8 +322,12 @@ class TestIntegrationShardExecution(unittest.TestCase):
         self.assertEqual(calls_by_shard, self.execute("access-control", "all"))
 
     def test_invalid_selections_start_no_gradle_process(self):
-        for suite, shard in [("unknown", "all"), ("build", "docker"),
-                             ("flink", "mysql"), ("access-control", "embedded")]:
+        for suite, shard in [
+            ("unknown", "all"),
+            ("build", "docker"),
+            ("flink", "mysql"),
+            ("access-control", "embedded"),
+        ]:
             with self.subTest(suite=suite, shard=shard):
                 self.assertEqual([], self.execute(suite, shard, exit_code=1))
 
@@ -264,26 +344,48 @@ class TestWorkflowShardContracts(unittest.TestCase):
             ("build.yml", "build", "build_shards"),
             ("backend-integration-test.yml", "backend-it", "backend_it_shards"),
             ("flink-integration-test.yml", "flink", "flink_shards"),
-            ("access-control-integration-test.yml", "access-control", "access_control_shards"),
+            (
+                "access-control-integration-test.yml",
+                "access-control",
+                "access_control_shards",
+            ),
         ]:
             with self.subTest(workflow=filename):
                 source = (ROOT / ".github/workflows" / filename).read_text()
                 self.assertIn("dev/ci/test-shards.sh " + suite + " --list", source)
-                self.assertIn("shard: ${{ fromJSON(needs.changes.outputs." + output + ") }}", source)
+                self.assertIn(
+                    "shard: ${{ fromJSON(needs.changes.outputs." + output + ") }}",
+                    source,
+                )
                 self.assertIn("fail-fast: false", source)
                 self.assertIn("checkout-and-sync", source)
                 if suite != "build":
                     self.assertIn("shard: ${{ matrix.shard }}", source)
-                for key in ("base-ref", "base-sha", "head-repository", "head-sha", "sync"):
+                for key in (
+                    "base-ref",
+                    "base-sha",
+                    "head-repository",
+                    "head-sha",
+                    "sync",
+                ):
                     self.assertIn(key + ": ${{ inputs." + key + " }}", source)
 
     def test_runner_wiring_and_artifacts_include_the_shard(self):
         for suite in ("flink", "access-control"):
-            source = (ROOT / ".github/workflows" / (suite + "-integration-test-action.yml")).read_text()
-            self.assertIn('run: dev/ci/run-integration-shard.sh ' + suite + ' "${TEST_SHARD}"', source)
+            source = (
+                ROOT / ".github/workflows" / (suite + "-integration-test-action.yml")
+            ).read_text()
+            self.assertIn(
+                "run: dev/ci/run-integration-shard.sh " + suite + ' "${TEST_SHARD}"',
+                source,
+            )
             self.assertIn("TEST_SHARD: ${{ inputs.shard }}", source)
-            self.assertIn("name: JDK${{ inputs.java-version }}-${{ inputs.shard }}", source)
-            self.assertRegex(source, r"name: \S+-integrate-test-reports-.*\$\{\{ inputs.shard \}\}")
+            self.assertIn(
+                "name: JDK${{ inputs.java-version }}-${{ inputs.shard }}", source
+            )
+            self.assertRegex(
+                source, r"name: \S+-integrate-test-reports-.*\$\{\{ inputs.shard \}\}"
+            )
             self.assertIn("default: 'all'", source)
 
     def test_cron_explicitly_selects_all_three_complete_suites(self):
@@ -296,14 +398,25 @@ class TestWorkflowShardContracts(unittest.TestCase):
         # Independent project registry, rather than only checking one script-generated list
         # against another. A newly registered project must still belong to the catch-all.
         settings = (ROOT / "settings.gradle.kts").read_text()
-        projects = {":" + name.lstrip(":") for name in re.findall(r'"([\w:.-]+:[\w:.-]+)"', settings)}
+        projects = {
+            ":" + name.lstrip(":")
+            for name in re.findall(r'"([\w:.-]+:[\w:.-]+)"', settings)
+        }
         self.assertGreater(len(projects), 50)
         projects.add(":future:new-project")
         universe = {project + ":test" for project in projects}
         for suite in ("build", "backend-it"):
-            shards = json.loads(subprocess.check_output(["bash", str(SCRIPT), suite, "--list"], text=True))
-            assigned = [task for shard in shards[:-1] for task in arguments(suite, shard)
-                        if task.endswith(":test")]
+            shards = json.loads(
+                subprocess.check_output(
+                    ["bash", str(SCRIPT), suite, "--list"], text=True
+                )
+            )
+            assigned = [
+                task
+                for shard in shards[:-1]
+                for task in arguments(suite, shard)
+                if task.endswith(":test")
+            ]
             self.assertTrue(set(assigned).issubset(universe))
             others = arguments(suite, "others")[2::2]
             expanded = [task for task in universe if task not in others] + assigned
