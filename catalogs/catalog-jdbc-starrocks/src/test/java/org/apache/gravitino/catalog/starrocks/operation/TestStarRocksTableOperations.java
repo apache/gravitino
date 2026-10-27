@@ -846,4 +846,29 @@ public class TestStarRocksTableOperations extends TestStarRocks {
       TABLE_OPERATIONS.drop(databaseName, tableName);
     }
   }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"PRIMARY", "UNIQUE", "DUPLICATE"})
+  void testLoadTableReportsOnlySecondaryIndexes(String keyType) throws SQLException {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_index");
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "CREATE TABLE `%s`.`%s` (`id` INT NOT NULL, `region` VARCHAR(32) NOT NULL, "
+                  + "INDEX `idx_region` (`region`) USING BITMAP) "
+                  + "%s KEY(`id`, `region`) DISTRIBUTED BY HASH(`id`) BUCKETS 1 "
+                  + "PROPERTIES (\"replication_num\" = \"1\")",
+              databaseName, tableName, keyType));
+    }
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(databaseName, tableName);
+      Assertions.assertEquals(1, table.index().length);
+      Assertions.assertEquals(Index.IndexType.BITMAP, table.index()[0].type());
+      Assertions.assertEquals("idx_region", table.index()[0].name());
+      Assertions.assertArrayEquals(new String[][] {{"region"}}, table.index()[0].fieldNames());
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
+  }
 }

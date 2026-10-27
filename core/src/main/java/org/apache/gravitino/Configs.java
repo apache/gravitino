@@ -663,12 +663,12 @@ public class Configs {
   public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_BYTES =
       new ConfigBuilder("gravitino.job.outputMaxBytes")
           .doc(
-              "The maximum number of bytes read from the tail of a job's captured stdout/stderr "
-                  + "when retrieving its output. Bounds both the read cost and the response size "
-                  + "regardless of how the content is shaped (e.g. a single very long line). "
-                  + "This is resolved by JobManager and passed as an argument to "
-                  + "JobExecutor#getJobStdout and JobExecutor#getJobStderr, so all executors "
-                  + "honor the same cap.")
+              "The maximum number of bytes returned from the tail of a job's captured "
+                  + "stdout/stderr when retrieving its output. Bounds the response size regardless "
+                  + "of how the content is shaped (e.g. a single very long line). Whether it also "
+                  + "bounds the bytes read depends on the job executor. This is resolved by "
+                  + "JobManager and passed as an argument to JobExecutor#getJobStdout and "
+                  + "JobExecutor#getJobStderr, so all executors honor the same cap.")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
