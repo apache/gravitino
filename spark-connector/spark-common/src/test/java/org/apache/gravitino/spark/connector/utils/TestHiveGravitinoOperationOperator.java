@@ -54,7 +54,6 @@ public class TestHiveGravitinoOperationOperator {
     InternalRow ident = new GenericInternalRow(new Object[] {20240101, null});
     operator(partitions).dropPartition(ident, SCHEMA);
 
-    // HMS stores a null partition value as the default partition marker.
     assertEquals("dt=20240101/region=__HIVE_DEFAULT_PARTITION__", name.getValue());
   }
 
@@ -67,7 +66,6 @@ public class TestHiveGravitinoOperationOperator {
     InternalRow ident = new GenericInternalRow(new Object[] {20240101, null});
     operator(partitions).createPartition(ident, Collections.emptyMap(), SCHEMA);
 
-    // The partition that the drop above looks up must be the one that ADD PARTITION creates.
     Literal<?>[] values = ((IdentityPartition) partition.getValue()).values();
     assertEquals(20240101, values[0].value());
     assertEquals("__HIVE_DEFAULT_PARTITION__", values[1].value());

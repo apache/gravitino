@@ -64,7 +64,7 @@ public class HiveGravitinoOperationOperator {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
       fields.add(new String[] {structField.name()});
-      // HMS stores a null partition value as the default partition name.
+      // Hive and Spark write a null partition value as __HIVE_DEFAULT_PARTITION__.
       values.add(
           ident.isNullAt(i)
               ? Literals.stringLiteral(SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME)
@@ -166,7 +166,7 @@ public class HiveGravitinoOperationOperator {
       StructField structField = partitionSchema.apply(names[i]);
       DataType dataType = structField.dataType();
       String value = SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType);
-      // HMS stores a null partition value as the default partition name.
+      // Hive and Spark write a null partition value as __HIVE_DEFAULT_PARTITION__.
       partitionName.append(
           names[i]
               + PARTITION_VALUE_DELIMITER
