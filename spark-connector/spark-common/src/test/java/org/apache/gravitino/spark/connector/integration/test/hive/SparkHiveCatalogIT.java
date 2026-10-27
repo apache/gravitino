@@ -24,12 +24,14 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.ViewCatalog;
@@ -59,6 +61,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.testcontainers.containers.Container;
 import scala.collection.JavaConverters;
 
 @Tag("gravitino-docker-test")
@@ -637,35 +640,87 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
   @Test
   void testSelectViewWithUnqualifiedSqlResolvesInViewNamespace() {
     String tableName = "view_base_table_unq";
-    String viewName = "test_hive_view_unq";
     String schemaName = getDefaultDatabase();
     String otherDb = "db_view_unq_other";
+    String ownView = "test_hive_view_unq_own";
+    String recordedView = "test_hive_view_unq_recorded";
 
-    // The view's base table lives in the view's own database; the SQL references it UNQUALIFIED.
+    // The real table is in the default database; a same-named table in otherDb holds other rows.
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
     sql(String.format("INSERT INTO %s VALUES (1, '1', 1)", tableName));
-
-    // A same-named shadow table in another database must NOT be read by the view when the
-    // session's current database points there.
     createDatabaseIfNotExists(otherDb, getProvider());
-    dropTableIfExists(String.join(".", otherDb, tableName));
-    createSimpleTable(String.join(".", otherDb, tableName));
-    sql(
-        String.format(
-            "INSERT INTO %s VALUES (9, 'shadow', 9)", String.join(".", otherDb, tableName)));
+    String shadowTable = String.join(".", otherDb, tableName);
+    dropTableIfExists(shadowTable);
+    createSimpleTable(shadowTable);
+    sql(String.format("INSERT INTO %s VALUES (9, 'shadow', 9)", shadowTable));
 
     ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
-    NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
+    NameIdentifier ownIdent = NameIdentifier.of(schemaName, ownView);
+    NameIdentifier recordedIdent = NameIdentifier.of(otherDb, recordedView);
+    // No recorded namespace: the SQL resolves in the view's own database.
+    createUnqualifiedView(viewCatalog, ownIdent, tableName, ImmutableMap.of());
+    // Like a Spark view created by "USE default_db; CREATE VIEW otherDb.v AS SELECT * FROM t".
+    createUnqualifiedView(
+        viewCatalog,
+        recordedIdent,
+        tableName,
+        ImmutableMap.of(
+            "view.catalogAndNamespace.numParts", "2",
+            "view.catalogAndNamespace.part.0", "spark_catalog",
+            "view.catalogAndNamespace.part.1", schemaName));
+    // A view created by Hive itself, whose expanded text qualifies the table with default_db.
+    String hiveView = "test_hive_view_unq_hive";
+    NameIdentifier hiveIdent = NameIdentifier.of(otherDb, hiveView);
+    Container.ExecResult created =
+        ContainerSuite.getInstance()
+            .getHiveContainer()
+            .executeInContainer(
+                "hive",
+                "-e",
+                String.format(
+                    "USE %s; CREATE VIEW %s.%s AS SELECT * FROM %s",
+                    schemaName, otherDb, hiveView, tableName));
+    Assertions.assertEquals(0, created.getExitCode(), created.getStderr());
+
+    try {
+      // The session is in another catalog, so unqualified names in the session resolve elsewhere.
+      sql("USE spark_catalog.default");
+      for (NameIdentifier view : new NameIdentifier[] {ownIdent, recordedIdent, hiveIdent}) {
+        List<String> data =
+            getQueryData(
+                String.format(
+                    "SELECT * FROM %s.%s.%s",
+                    getCatalogName(), view.namespace().level(0), view.name()));
+        Assertions.assertEquals(Arrays.asList("1,1,1"), data, view.toString());
+      }
+      Assertions.assertEquals("spark_catalog", getSparkSession().catalog().currentCatalog());
+    } finally {
+      sql("USE " + String.join(".", getCatalogName(), getDefaultDatabase()));
+      viewCatalog.dropView(ownIdent);
+      viewCatalog.dropView(recordedIdent);
+      viewCatalog.dropView(hiveIdent);
+      dropTableIfExists(shadowTable);
+      dropDatabaseIfExists(otherDb);
+      dropTableIfExists(tableName);
+    }
+  }
+
+  private void createUnqualifiedView(
+      ViewCatalog viewCatalog,
+      NameIdentifier viewIdent,
+      String tableName,
+      Map<String, String> extraProperties) {
     if (viewCatalog.viewExists(viewIdent)) {
       viewCatalog.dropView(viewIdent);
     }
-
     SQLRepresentation sparkRep =
         SQLRepresentation.builder()
             .withDialect("spark")
             .withSql(String.format("SELECT * FROM %s", tableName))
             .build();
+    Map<String, String> properties = new HashMap<>(extraProperties);
+    properties.put("spark.sql.create.version", getSparkSession().version());
     viewCatalog.createView(
         viewIdent,
         "unqualified view",
@@ -675,25 +730,9 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
           Column.of("age", Types.IntegerType.get(), null)
         },
         new SQLRepresentation[] {sparkRep},
-        getCatalogName(),
-        schemaName,
-        ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
-
-    try {
-      sql("USE " + String.join(".", getCatalogName(), otherDb));
-      List<String> data =
-          getQueryData(
-              String.format("SELECT * FROM %s.%s.%s", getCatalogName(), schemaName, viewName));
-      Assertions.assertEquals(1, data.size());
-      Assertions.assertEquals(
-          "1,1,1", data.get(0), "the view must read its own namespace's table, not the shadow");
-    } finally {
-      sql("USE " + getDefaultDatabase());
-      viewCatalog.dropView(viewIdent);
-      dropTableIfExists(String.join(".", otherDb, tableName));
-      dropDatabaseIfExists(otherDb);
-      dropTableIfExists(tableName);
-    }
+        null,
+        null,
+        properties);
   }
 
   @Test
