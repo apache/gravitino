@@ -635,6 +635,68 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  void testSelectViewWithUnqualifiedSqlResolvesInViewNamespace() {
+    String tableName = "view_base_table_unq";
+    String viewName = "test_hive_view_unq";
+    String schemaName = getDefaultDatabase();
+    String otherDb = "db_view_unq_other";
+
+    // The view's base table lives in the view's own database; the SQL references it UNQUALIFIED.
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    sql(String.format("INSERT INTO %s VALUES (1, '1', 1)", tableName));
+
+    // A same-named shadow table in another database must NOT be read by the view when the
+    // session's current database points there.
+    createDatabaseIfNotExists(otherDb, getProvider());
+    dropTableIfExists(String.join(".", otherDb, tableName));
+    createSimpleTable(String.join(".", otherDb, tableName));
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (9, 'shadow', 9)", String.join(".", otherDb, tableName)));
+
+    ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
+    NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
+    if (viewCatalog.viewExists(viewIdent)) {
+      viewCatalog.dropView(viewIdent);
+    }
+
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder()
+            .withDialect("spark")
+            .withSql(String.format("SELECT * FROM %s", tableName))
+            .build();
+    viewCatalog.createView(
+        viewIdent,
+        "unqualified view",
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), null),
+          Column.of("name", Types.StringType.get(), null),
+          Column.of("age", Types.IntegerType.get(), null)
+        },
+        new SQLRepresentation[] {sparkRep},
+        getCatalogName(),
+        schemaName,
+        ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
+
+    try {
+      sql("USE " + String.join(".", getCatalogName(), otherDb));
+      List<String> data =
+          getQueryData(
+              String.format("SELECT * FROM %s.%s.%s", getCatalogName(), schemaName, viewName));
+      Assertions.assertEquals(1, data.size());
+      Assertions.assertEquals(
+          "1,1,1", data.get(0), "the view must read its own namespace's table, not the shadow");
+    } finally {
+      sql("USE " + getDefaultDatabase());
+      viewCatalog.dropView(viewIdent);
+      dropTableIfExists(String.join(".", otherDb, tableName));
+      dropDatabaseIfExists(otherDb);
+      dropTableIfExists(tableName);
+    }
+  }
+
+  @Test
   void testTableExistsForView() {
     String viewName = "test_view_exists";
     String schemaName = getDefaultDatabase();

@@ -31,11 +31,13 @@ import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
+import org.apache.spark.sql.RuntimeConfig;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.connector.read.LocalScan;
 import org.apache.spark.sql.connector.read.Scan;
 import org.apache.spark.sql.connector.read.ScanBuilder;
+import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.MetadataBuilder;
@@ -63,22 +65,30 @@ public class SparkHiveView extends HiveTable {
 
   private final View gravitinoView;
   private final SparkTypeConverter sparkTypeConverter;
+  private final String catalogName;
+  private final String schemaName;
 
   /**
    * Creates a SparkHiveView that wraps a Gravitino view with Hive HMS backing.
    *
    * @param gravitinoView the Gravitino view metadata
+   * @param catalogName the Spark catalog name the view was loaded from
+   * @param schemaName the view's schema (database) name
    * @param hiveTable the backing Kyuubi HiveTable from HMS
    * @param hiveTableCatalog the Kyuubi HiveTableCatalog for HMS access
    * @param sparkTypeConverter converter for Gravitino-to-Spark type mapping
    */
   public SparkHiveView(
       View gravitinoView,
+      String catalogName,
+      String schemaName,
       HiveTable hiveTable,
       HiveTableCatalog hiveTableCatalog,
       SparkTypeConverter sparkTypeConverter) {
     super(SparkSession.active(), hiveTable.catalogTable(), hiveTableCatalog);
     this.gravitinoView = gravitinoView;
+    this.catalogName = catalogName;
+    this.schemaName = schemaName;
     this.sparkTypeConverter = sparkTypeConverter;
   }
 
@@ -149,7 +159,7 @@ public class SparkHiveView extends HiveTable {
                       gravitinoView.name());
                   return hiveSql;
                 });
-    return new ViewScanBuilder(spark, viewSql, schema());
+    return new ViewScanBuilder(spark, viewSql, schema(), catalogName, schemaName, spark.conf());
   }
 
   /**
@@ -161,11 +171,23 @@ public class SparkHiveView extends HiveTable {
     private final SparkSession spark;
     private final String viewSql;
     private final StructType schema;
+    private final String viewCatalogName;
+    private final String viewSchemaName;
+    private final RuntimeConfig sessionConf;
 
-    ViewScanBuilder(SparkSession spark, String viewSql, StructType schema) {
+    ViewScanBuilder(
+        SparkSession spark,
+        String viewSql,
+        StructType schema,
+        String viewCatalogName,
+        String viewSchemaName,
+        RuntimeConfig sessionConf) {
       this.spark = spark;
       this.viewSql = viewSql;
       this.schema = schema;
+      this.viewCatalogName = viewCatalogName;
+      this.viewSchemaName = viewSchemaName;
+      this.sessionConf = sessionConf;
     }
 
     @Override
@@ -181,11 +203,36 @@ public class SparkHiveView extends HiveTable {
     @Override
     public InternalRow[] rows() {
       // executeCollect() pulls all rows to driver memory — see class-level Javadoc for why.
+      // Standard view semantics resolve unqualified names in the view SQL against the view's
+      // OWN catalog/database, not the session's current ones: without the switch, a session
+      // with a different default namespace silently reads a different (same-named) table or
+      // fails with TABLE_OR_VIEW_NOT_FOUND.
+      String previousCatalog = sessionConf.get(SQLConf.DEFAULT_CATALOG().key(), null);
+      String previousDatabase = null;
       try {
+        // Route unqualified names to the view's own catalog and schema. The previous current
+        // database must be captured BEFORE the catalog switch: currentDatabase() reads whatever
+        // catalog is current at call time.
+        previousDatabase = spark.catalog().currentDatabase();
+        sessionConf.set(SQLConf.DEFAULT_CATALOG().key(), viewCatalogName);
+        spark.catalog().setCurrentDatabase(viewSchemaName);
         return spark.sql(viewSql).queryExecution().executedPlan().executeCollect();
       } catch (RuntimeException e) {
         throw new RuntimeException(
             String.format("Failed to execute view SQL [%s]: %s", viewSql, e.getMessage()), e);
+      } finally {
+        try {
+          if (previousCatalog != null) {
+            sessionConf.set(SQLConf.DEFAULT_CATALOG().key(), previousCatalog);
+          }
+          if (previousDatabase != null) {
+            spark.catalog().setCurrentDatabase(previousDatabase);
+          }
+        } catch (RuntimeException restoreFailure) {
+          LOG.warn(
+              "Failed to restore the session catalog/database after executing view SQL",
+              restoreFailure);
+        }
       }
     }
   }
