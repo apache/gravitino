@@ -441,6 +441,10 @@ only tracks the jobs it runs itself:
   `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
   `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
   directory.
+- To clear such a job sooner, cancel it. If the job is still `CANCELLING` more than three times
+  `gravitino.job.statusPullIntervalInMs` after the cancel request, the server running it is
+  considered gone, and another server marks the job as `CANCELLED` when it pulls job statuses. Its
+  job template can then be deleted.
 
 :::caution
 The local job executor can't tell a job left behind by an exited server from a job that is still
@@ -456,8 +460,31 @@ server doesn't recognize the jobs it ran before the restart. This also applies t
 deployment. The processes of these jobs are usually gone with the previous server process, but the
 jobs are only marked as `FAILED` once they expire as described above, which can take up to about
 1.1 times `gravitino.job.stagingDirKeepTimeInMs` (about 7.7 days by default), as the cleanup runs
-every tenth of that time. Until then, they are still reported as queued, started or cancelling.
-Cancelling such a job only marks it as `CANCELLING`, which also restarts the expiration.
+every tenth of that time. Until then, they are still reported as queued, started or cancelling, and
+they keep their job templates from being deleted.
+
+To clear these jobs sooner, cancel them. A cancelled job is marked as `CANCELLED` within about four
+times `gravitino.job.statusPullIntervalInMs`, as described above. Lowering
+`gravitino.job.stagingDirKeepTimeInMs` also shortens the time, but finished jobs are then kept for
+a shorter time, and a job that runs longer than that without changing its status is marked as
+`FAILED`.
+:::
+
+:::caution
+Telling a gone server from a live one by how long a job stays `CANCELLING` requires all servers to
+use the same `gravitino.job.statusPullIntervalInMs` and to have their clocks in sync. A job is also
+marked as `CANCELLED` while its server is still running it if that server doesn't answer the
+cancellation in time, for example because:
+
+- it uses a longer `gravitino.job.statusPullIntervalInMs` than the other servers, or its clock is
+  off,
+- it fails to pull job statuses for that long, or
+- the job process takes longer than one pull interval to exit, e.g. as
+  `gravitino.jobExecutor.local.cancelForceKillDelayInMs` is longer than the pull interval.
+
+If the server hasn't asked the job process to stop yet, it never does once the job is `CANCELLED`,
+so the process keeps running until it finishes, and deleting its job template also deletes the
+staging directory the process uses.
 :::
 
 ## Future Work

@@ -438,6 +438,56 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     adminFilesetCatalog.dropFileset(filesetIdent);
   }
 
+  /** Verifies that writers can change the fileset lifecycle without gaining drop permission. */
+  @Test
+  @Order(9)
+  public void testWriterCanConvertFilesetTypeButCannotDrop() {
+    String filesetName = "type_conversion_fileset";
+    NameIdentifier filesetIdent = NameIdentifier.of(SCHEMA, filesetName);
+    MetadataObject filesetObject =
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, filesetName), MetadataObject.Type.FILESET);
+    GravitinoMetalake metalake = client.loadMetalake(METALAKE);
+    FilesetCatalog ownerFilesetCatalog = metalake.loadCatalog(CATALOG).asFilesetCatalog();
+    FilesetCatalog writerFilesetCatalog =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+
+    ownerFilesetCatalog.createFileset(
+        filesetIdent,
+        "comment",
+        Fileset.Type.EXTERNAL,
+        storageLocation(GravitinoITUtils.genRandomName("FilesetAuthorizationIT_type_conversion")),
+        new HashMap<>());
+    try {
+      metalake.grantPrivilegesToRole(
+          role, filesetObject, ImmutableList.of(Privileges.ReadFileset.allow()));
+      assertThrows(
+          ForbiddenException.class,
+          () ->
+              writerFilesetCatalog.alterFileset(
+                  filesetIdent, FilesetChange.updateType(Fileset.Type.MANAGED)));
+      assertEquals(Fileset.Type.EXTERNAL, ownerFilesetCatalog.loadFileset(filesetIdent).type());
+
+      metalake.grantPrivilegesToRole(
+          role, filesetObject, ImmutableList.of(Privileges.WriteFileset.allow()));
+      Fileset managedFileset =
+          writerFilesetCatalog.alterFileset(
+              filesetIdent, FilesetChange.updateType(Fileset.Type.MANAGED));
+      assertEquals(Fileset.Type.MANAGED, managedFileset.type());
+      assertThrows(ForbiddenException.class, () -> writerFilesetCatalog.dropFileset(filesetIdent));
+      assertEquals(Fileset.Type.MANAGED, writerFilesetCatalog.loadFileset(filesetIdent).type());
+
+      Fileset externalFileset =
+          writerFilesetCatalog.alterFileset(
+              filesetIdent, FilesetChange.updateType(Fileset.Type.EXTERNAL));
+      assertEquals(Fileset.Type.EXTERNAL, externalFileset.type());
+      assertThrows(ForbiddenException.class, () -> writerFilesetCatalog.dropFileset(filesetIdent));
+      assertEquals(Fileset.Type.EXTERNAL, writerFilesetCatalog.loadFileset(filesetIdent).type());
+    } finally {
+      ownerFilesetCatalog.dropFileset(filesetIdent);
+    }
+  }
+
   private String defaultBaseLocation() {
     if (defaultBaseLocation == null) {
       defaultBaseLocation =

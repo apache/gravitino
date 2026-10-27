@@ -19,31 +19,30 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
-import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.Network;
+import org.testcontainers.utility.DockerImageName;
 
-public class PostgreSQLContainer extends BaseContainer {
+public class PostgreSQLContainer extends DatabaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(PostgreSQLContainer.class);
   public static final PGImageName DEFAULT_IMAGE = PGImageName.VERSION_13;
   public static final String HOST_NAME = "gravitino-ci-pg";
   public static final int PG_PORT = 5432;
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
+  private static final String DATA_DIR = "/var/lib/postgresql/data";
 
   public static Builder builder() {
     return new Builder();
@@ -51,13 +50,39 @@ public class PostgreSQLContainer extends BaseContainer {
 
   protected PostgreSQLContainer(
       String image,
+      Durability durability,
       String hostName,
       Set<Integer> ports,
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
-    super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+    super(
+        // The image may be a mirror or a custom tag; the module only needs a PostgreSQL server.
+        new org.testcontainers.containers.PostgreSQLContainer<>(
+                DockerImageName.parse(image).asCompatibleSubstituteFor("postgres"))
+            .withUsername(USER_NAME)
+            .withPassword(PASSWORD)
+            // getJdbcUrl() names no database, so connections use the one named after the user.
+            .withDatabaseName(USER_NAME),
+        durability,
+        hostName,
+        ports,
+        extraHosts,
+        filesToMount,
+        envVars,
+        network);
+    // Same path as the tmpfs mount, so a newer image cannot place the data elsewhere.
+    db.withEnv("PGDATA", DATA_DIR);
+    applyDurability(
+        DATA_DIR,
+        "postgres",
+        "-c",
+        "fsync=off",
+        "-c",
+        "synchronous_commit=off",
+        "-c",
+        "full_page_writes=off");
   }
 
   @Override
@@ -69,51 +94,23 @@ public class PostgreSQLContainer extends BaseContainer {
   @Override
   public void start() {
     super.start();
-    Preconditions.check("PostgreSQL container startup failed!", checkContainerStatus(5));
-  }
-
-  @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
-    boolean isPostgreSQLContainerReady = false;
-    int sleepTimeMillis = 20_00;
-    while (nRetry++ < retryLimit) {
-      try {
-        String[] commandAndArgs =
-            new String[] {
-              "pg_isready", "-h", "localhost", "-U", getUsername(),
-            };
-        Container.ExecResult execResult = executeInContainer(commandAndArgs);
-        if (execResult.getExitCode() != 0) {
-          String message =
-              format(
-                  "Command [%s] exited with %s",
-                  String.join(" ", commandAndArgs), execResult.getExitCode());
-          LOG.error("{}", message);
-          LOG.error("stderr: {}", execResult.getStderr());
-          LOG.error("stdout: {}", execResult.getStdout());
-        } else {
-          LOG.info("PostgreSQL container startup success!");
-          isPostgreSQLContainerReady = true;
-          break;
-        }
-        LOG.info(
-            "PostgreSQL container is not ready, recheck({}/{}) after {}ms",
-            nRetry,
-            retryLimit,
-            sleepTimeMillis);
-        await().atLeast(sleepTimeMillis, TimeUnit.MILLISECONDS);
-      } catch (RuntimeException e) {
-        LOG.error(e.getMessage(), e);
-      }
-    }
-
-    return isPostgreSQLContainerReady;
+    logDurability(
+        List.of("data_directory", "fsync", "synchronous_commit", "full_page_writes"),
+        "psql",
+        "-U",
+        getUsername(),
+        "-d",
+        "postgres",
+        "--no-align",
+        "--tuples-only",
+        "--field-separator=\t",
+        "-c",
+        "SELECT current_setting('data_directory'), current_setting('fsync'),"
+            + " current_setting('synchronous_commit'), current_setting('full_page_writes')");
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
-    try (Connection connection =
-            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
+    try (Connection connection = db.createConnection("");
         Statement statement = connection.createStatement()) {
 
       String query = format("CREATE DATABASE \"%s\"", testDatabaseName);
@@ -125,14 +122,6 @@ public class PostgreSQLContainer extends BaseContainer {
         LOG.info("PostgreSQL Database {} already exists, skipping", testDatabaseName);
       } else throw new RuntimeException(e);
     }
-  }
-
-  public String getUsername() {
-    return USER_NAME;
-  }
-
-  public String getPassword() {
-    return PASSWORD;
   }
 
   /** getJdbcUrl without database name. */
@@ -150,7 +139,7 @@ public class PostgreSQLContainer extends BaseContainer {
   }
 
   public static class Builder
-      extends BaseContainer.Builder<PostgreSQLContainer.Builder, PostgreSQLContainer> {
+      extends DatabaseContainer.Builder<PostgreSQLContainer.Builder, PostgreSQLContainer> {
 
     private Builder() {
       this.image = DEFAULT_IMAGE.toString();
@@ -161,7 +150,7 @@ public class PostgreSQLContainer extends BaseContainer {
     @Override
     public PostgreSQLContainer build() {
       return new PostgreSQLContainer(
-          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+          image, durability, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
 }
