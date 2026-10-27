@@ -30,8 +30,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -191,7 +191,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       return false;
     }
 
-    IcebergCatalogWrapperManager wrapperManager =
+    CatalogWrapperManager wrapperManager =
         IcebergRESTServerContext.getInstance().catalogWrapperManager();
     if (wrapperManager == null) {
       return false;

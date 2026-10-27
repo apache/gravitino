@@ -37,6 +37,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
+import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
@@ -46,7 +47,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IcebergCatalogWrapperManager implements AutoCloseable {
+public class IcebergCatalogWrapperManager implements CatalogWrapperManager, AutoCloseable {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapperManager.class);
 
@@ -115,6 +116,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     return getCatalogWrapper(catalogName);
   }
 
+  @Override
   public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
     if (LOG.isDebugEnabled()) {
       boolean cacheHit = catalogWrapperCache.getIfPresent(catalogName) != null;
