@@ -19,10 +19,6 @@
 
 # Design: Domain
 
-| Version | Author     | Date       | Status |
-| :------ | :--------- | :--------- | :----- |
-| 1.27    | Jerry Shao | 2026-10-27 | Draft  |
-
 ## Goals
 
 1. **Business grouping**: group assets from any catalog under named domains (e.g. "Finance") for discovery, browsing and agent retrieval. An asset can belong to several domains.
