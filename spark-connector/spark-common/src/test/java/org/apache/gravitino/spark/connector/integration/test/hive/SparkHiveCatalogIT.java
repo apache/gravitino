@@ -658,13 +658,20 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
     NameIdentifier ownIdent = NameIdentifier.of(schemaName, ownView);
     NameIdentifier recordedIdent = NameIdentifier.of(otherDb, recordedView);
-    // No recorded namespace: the SQL resolves in the view's own database.
-    createUnqualifiedView(viewCatalog, ownIdent, tableName, ImmutableMap.of());
+    // No recorded namespace: the SQL resolves in the view's own database. The CTE and the
+    // subquery check that their table names are qualified too.
+    createUnqualifiedView(
+        viewCatalog,
+        ownIdent,
+        String.format(
+            "WITH x AS (SELECT * FROM %1$s) SELECT * FROM x WHERE id IN (SELECT id FROM %1$s)",
+            tableName),
+        ImmutableMap.of());
     // Like a Spark view created by "USE default_db; CREATE VIEW otherDb.v AS SELECT * FROM t".
     createUnqualifiedView(
         viewCatalog,
         recordedIdent,
-        tableName,
+        String.format("SELECT * FROM %s", tableName),
         ImmutableMap.of(
             "view.catalogAndNamespace.numParts", "2",
             "view.catalogAndNamespace.part.0", "spark_catalog",
@@ -709,16 +716,13 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
   private void createUnqualifiedView(
       ViewCatalog viewCatalog,
       NameIdentifier viewIdent,
-      String tableName,
+      String viewSql,
       Map<String, String> extraProperties) {
     if (viewCatalog.viewExists(viewIdent)) {
       viewCatalog.dropView(viewIdent);
     }
     SQLRepresentation sparkRep =
-        SQLRepresentation.builder()
-            .withDialect("spark")
-            .withSql(String.format("SELECT * FROM %s", tableName))
-            .build();
+        SQLRepresentation.builder().withDialect("spark").withSql(viewSql).build();
     Map<String, String> properties = new HashMap<>(extraProperties);
     properties.put("spark.sql.create.version", getSparkSession().version());
     viewCatalog.createView(
