@@ -22,6 +22,7 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_WRITE_ID;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import java.util.Arrays;
@@ -85,7 +86,10 @@ public final class SecretUrn {
    * Builds a write-through secret URN for an entity property secret.
    *
    * <p>Required attributes: {@link SecretConstants#ATTR_ENTITY_TYPE}, {@link
-   * SecretConstants#ATTR_ENTITY_ID}, and {@link SecretConstants#ATTR_PROPERTY_KEY}.
+   * SecretConstants#ATTR_ENTITY_ID}, and {@link SecretConstants#ATTR_PROPERTY_KEY}. When {@link
+   * SecretConstants#ATTR_WRITE_ID} is present, the identifier is {@code
+   * entityType:entityId:writeId:propertyKey}; otherwise it is {@code
+   * entityType:entityId:propertyKey}.
    *
    * @param providerName the configured provider name
    * @param attributes write-through attributes
@@ -98,6 +102,7 @@ public final class SecretUrn {
     String entityType = requiredAttribute(attributes, ATTR_ENTITY_TYPE);
     String entityId = requiredAttribute(attributes, ATTR_ENTITY_ID);
     String propertyKey = requiredAttribute(attributes, ATTR_PROPERTY_KEY);
+    String writeId = attributes.get(ATTR_WRITE_ID);
     try {
       Long.parseLong(entityId);
     } catch (NumberFormatException e) {
@@ -108,9 +113,15 @@ public final class SecretUrn {
     validateSegment(entityType);
     validateSegment(entityId);
     validateSegment(propertyKey);
+    if (writeId == null) {
+      return new SecretUrn(
+          providerName,
+          Collections.unmodifiableList(Arrays.asList(entityType, entityId, propertyKey)));
+    }
+    validateSegment(writeId);
     return new SecretUrn(
         providerName,
-        Collections.unmodifiableList(Arrays.asList(entityType, entityId, propertyKey)));
+        Collections.unmodifiableList(Arrays.asList(entityType, entityId, writeId, propertyKey)));
   }
 
   /**

@@ -214,13 +214,14 @@ fileset **names** do not invalidate stored URNs.
 ##### Write-through / `in-memory`: `type-specific-identifier` naming
 
 ```text
-<type-specific-identifier>  ::=  <entityType>:<entityId>:<propertyKey>
+<type-specific-identifier>  ::=  <entityType>:<entityId>[:<writeId>]:<propertyKey>
 ```
 
 | Segment         | Values                            | Notes                                                       |
 | --------------- | --------------------------------- | ----------------------------------------------------------- |
 | `<entityType>`  | `catalog`, `schema`, or `fileset` | Discriminator for property-bag owner                        |
 | `<entityId>`    | Stable numeric id                 | From `SecretWriteContext`; survives rename                  |
+| `<writeId>`     | Random UUID, alter writes only    | Gives each alter write its own URN (see below)              |
 | `<propertyKey>` | Entity property key               | e.g. `jdbc-password`, `s3-secret-access-key` (last segment) |
 
 Examples:
@@ -232,7 +233,11 @@ urn:gravitino-secret:memory:fileset:30019:s3-secret-access-key
 ```
 
 The property key from `SecretWriteContext` is the last segment (not an opaque ordinal).
-Re-writing the same property key overwrites that URN / map entry (no ordinal allocation).
+Create writes the three-segment form. An alter (`setSecretBinding`, or `setProperty` on a
+write-through secret) writes the new value under a new URN with a random `<writeId>` and deletes the
+replaced URN only after the alter commits. A failed alter therefore keeps the old value, and the
+deletion of a replaced URN cannot remove material that a concurrent alter on another server wrote
+for the same property.
 
 Write-through URNs (including in-memory) embed `<entityType>:<entityId>:<propertyKey>` so drop
 can decide whether to call `deleteSecret` (§5.5.2 C). External-ref identifier layouts are defined
@@ -441,7 +446,7 @@ URN:
 
 | URN type-specific identifier (after `provider_name`)                                                                                                                                                                                                           | Behavior                                                                  |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| **Write-through shaped for this entity** — for in-memory, the identifier is exactly `<entityType>:<entityId>:<propertyKey>` where `entityType` ∈ {`catalog`,`schema`,`fileset`}, `entityId` equals this entity's id, and `propertyKey` equals the property key | Best-effort `deleteSecret(urn)`, then drop / remove the property metadata |
+| **Write-through shaped for this entity** — for in-memory, the identifier is `<entityType>:<entityId>:<propertyKey>` or `<entityType>:<entityId>:<writeId>:<propertyKey>` (with a UUID `writeId`) where `entityType` ∈ {`catalog`,`schema`,`fileset`}, `entityId` equals this entity's id, and `propertyKey` equals the property key | Best-effort `deleteSecret(urn)`, then drop / remove the property metadata |
 | **Anything else** (including external-ref URNs)                                                                                                                                                                                                                | Drop / remove property metadata only — **do not** call `deleteSecret`     |
 
 Rationale: write-through secrets are **Gravitino-managed**; once the property (or entity) is gone,

@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -246,7 +247,8 @@ public final class SecretPropertyUtils {
   /**
    * Returns whether {@code value} is a write-through secret URN owned by this entity property.
    *
-   * <p>Write-through URNs use identifier segments {@code entityType:entityId:propertyKey}.
+   * <p>Write-through URNs use identifier segments {@code entityType:entityId:propertyKey}, or
+   * {@code entityType:entityId:writeId:propertyKey} when written with a write id.
    *
    * @param propertyKey the property key
    * @param value the property value
@@ -262,10 +264,33 @@ public final class SecretPropertyUtils {
     try {
       SecretUrn urn = SecretUrn.parse(value);
       List<String> segments = urn.identifierSegments();
-      return segments.size() == 3
+      return isWriteThroughShape(urn)
           && entityType.equals(segments.get(0))
           && String.valueOf(entityId).equals(segments.get(1))
-          && propertyKey.equals(segments.get(2));
+          && propertyKey.equals(urn.propertyKey());
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Returns whether {@code urn} has the shape of a write-through URN: three identifier segments
+   * ({@code entityType:entityId:propertyKey}), or four whose third segment is a UUID write id.
+   *
+   * @param urn the secret URN
+   * @return true when the URN has a write-through shape
+   */
+  public static boolean isWriteThroughShape(SecretUrn urn) {
+    List<String> segments = urn.identifierSegments();
+    if (segments.size() == 3) {
+      return true;
+    }
+    if (segments.size() != 4) {
+      return false;
+    }
+    try {
+      UUID.fromString(segments.get(2));
+      return true;
     } catch (IllegalArgumentException e) {
       return false;
     }

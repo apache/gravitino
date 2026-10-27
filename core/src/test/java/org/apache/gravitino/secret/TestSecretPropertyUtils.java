@@ -152,6 +152,27 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
+  void testWriteThroughShapeAcceptsWriteIdSegment() {
+    String writeId = "0b9c5f4e-6f3a-4a52-9d1e-2b7c1e8f3a10";
+    Assertions.assertTrue(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:memory:catalog:7:jdbc-password")));
+    Assertions.assertTrue(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse(
+                "urn:gravitino-secret:memory:catalog:7:" + writeId + ":jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:memory:path:kv:jdbc-password:jdbc-password")));
+
+    String urn = "urn:gravitino-secret:memory:catalog:7:" + writeId + ":jdbc-password";
+    Assertions.assertTrue(
+        SecretPropertyUtils.isWriteThroughForEntity("jdbc-password", urn, "catalog", 7L));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughForEntity("jdbc-password", urn, "catalog", 8L));
+  }
+
+  @Test
   void testBuildSecretsIncludesAdditionalSensitiveKey() {
     SensitivePropertyKeyMatcher.configure(List.of("passwrod"));
     try (SecretManager sm = memorySecretManager()) {

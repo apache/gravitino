@@ -22,7 +22,9 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_WRITE_ID;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -60,6 +62,21 @@ public class TestSecretUrn {
     Assertions.assertEquals(
         List.of("catalog", "1", "authentication.password"), urn.identifierSegments());
     Assertions.assertEquals("authentication.password", urn.propertyKey());
+  }
+
+  @Test
+  public void testBuildWriteThroughUrnWithWriteId() {
+    Map<String, String> attributes = new HashMap<>(attributes("catalog", "42", "jdbc-password"));
+    attributes.put(ATTR_WRITE_ID, "w1");
+    SecretUrn urn = SecretUrn.buildWriteThrough("memory", attributes);
+    Assertions.assertEquals(
+        "urn:gravitino-secret:memory:catalog:42:w1:jdbc-password", urn.toString());
+    Assertions.assertEquals("jdbc-password", urn.propertyKey());
+    Assertions.assertEquals(urn, SecretUrn.parse(urn.toString()));
+
+    attributes.put(ATTR_WRITE_ID, "bad/id");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> SecretUrn.buildWriteThrough("memory", attributes));
   }
 
   @Test

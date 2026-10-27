@@ -37,5 +37,11 @@ public final class SecretConstants {
   /** Write attribute: entity property key that holds the secret. */
   public static final String ATTR_PROPERTY_KEY = "propertyKey";
 
+  /**
+   * Write attribute: identifier of one write, which makes the write-through URN of each write
+   * unique. Optional: URNs written without it have no write id segment.
+   */
+  public static final String ATTR_WRITE_ID = "writeId";
+
   private SecretConstants() {}
 }

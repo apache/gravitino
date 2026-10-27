@@ -60,9 +60,6 @@ public final class SecretAlterChanges {
     List<CatalogChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
     List<SecretUrn> replacedUrns = new ArrayList<>();
-    // A null-tolerant snapshot of the properties before the changes mutate them; entity
-    // property maps are not guaranteed free of null values, so avoid Map.copyOf here.
-    Map<String, String> originalProperties = new HashMap<>(properties);
     try {
       for (CatalogChange change : changes) {
         if (change instanceof CatalogChange.SetSecretBinding) {
@@ -87,7 +84,13 @@ public final class SecretAlterChanges {
           CatalogChange.SetProperty c = (CatalogChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  properties, "catalog", entityId, c.getProperty(), c.getValue());
+                  properties,
+                  "catalog",
+                  entityId,
+                  c.getProperty(),
+                  c.getValue(),
+                  written,
+                  replacedUrns);
           out.add(CatalogChange.setProperty(c.getProperty(), value));
         } else if (change instanceof CatalogChange.RemoveProperty) {
           CatalogChange.RemoveProperty c = (CatalogChange.RemoveProperty) change;
@@ -99,45 +102,26 @@ public final class SecretAlterChanges {
         }
       }
       return Pair.of(
-          out.toArray(new CatalogChange[0]),
-          holderOf(written, replacedUrns, properties, originalProperties));
+          out.toArray(new CatalogChange[0]), holderOf(written, replacedUrns, properties));
     } catch (RuntimeException e) {
-      // Roll back only materials the persisted entity cannot reference. An
-      // in-batch re-bind may have rewritten a deterministic URN that the original
-      // properties still point at, so deleting it would dangle the URN.
-      secretManager.rollbackSecrets(rollbackSafe(written, originalProperties));
+      secretManager.rollbackSecrets(written);
       throw e;
     }
   }
 
   /**
-   * Builds the result holder, dropping collected URNs that the final properties still reference (a
-   * later change in the same batch may have re-bound the same key).
+   * Builds the result holder, dropping collected URNs that the final properties still reference.
    */
   private static SecretMaterialsHolder holderOf(
-      List<SecretMaterial> written,
-      List<SecretUrn> replacedUrns,
-      Map<String, String> properties,
-      Map<String, String> originalProperties) {
+      List<SecretMaterial> written, List<SecretUrn> replacedUrns, Map<String, String> properties) {
     SecretMaterialsHolder holder = new SecretMaterialsHolder();
-    holder.set(List.copyOf(rollbackSafe(written, originalProperties)));
+    holder.set(List.copyOf(written));
     holder.setReplacedUrns(
         replacedUrns.stream()
             .filter(urn -> !properties.containsValue(urn.toString()))
             .distinct()
             .collect(Collectors.toUnmodifiableList()));
     return holder;
-  }
-
-  /**
-   * Materials an aborted alter may delete: only URNs the original properties cannot reference. An
-   * in-batch re-bind can rewrite a deterministic URN the persisted entity still points at.
-   */
-  private static List<SecretMaterial> rollbackSafe(
-      List<SecretMaterial> written, Map<String, String> originalProperties) {
-    return written.stream()
-        .filter(m -> !originalProperties.containsValue(m.urn().toString()))
-        .collect(Collectors.toList());
   }
 
   /**
@@ -212,9 +196,6 @@ public final class SecretAlterChanges {
     List<SchemaChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
     List<SecretUrn> replacedUrns = new ArrayList<>();
-    // A null-tolerant snapshot of the properties before the changes mutate them; entity
-    // property maps are not guaranteed free of null values, so avoid Map.copyOf here.
-    Map<String, String> originalProperties = new HashMap<>(properties);
     try {
       for (SchemaChange change : changes) {
         if (change instanceof SchemaChange.SetSecretBinding) {
@@ -239,7 +220,13 @@ public final class SecretAlterChanges {
           SchemaChange.SetProperty c = (SchemaChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  properties, "schema", entityId, c.getProperty(), c.getValue());
+                  properties,
+                  "schema",
+                  entityId,
+                  c.getProperty(),
+                  c.getValue(),
+                  written,
+                  replacedUrns);
           out.add(SchemaChange.setProperty(c.getProperty(), value));
         } else if (change instanceof SchemaChange.RemoveProperty) {
           SchemaChange.RemoveProperty c = (SchemaChange.RemoveProperty) change;
@@ -250,14 +237,9 @@ public final class SecretAlterChanges {
           out.add(change);
         }
       }
-      return Pair.of(
-          out.toArray(new SchemaChange[0]),
-          holderOf(written, replacedUrns, properties, originalProperties));
+      return Pair.of(out.toArray(new SchemaChange[0]), holderOf(written, replacedUrns, properties));
     } catch (RuntimeException e) {
-      // Roll back only materials the persisted entity cannot reference. An
-      // in-batch re-bind may have rewritten a deterministic URN that the original
-      // properties still point at, so deleting it would dangle the URN.
-      secretManager.rollbackSecrets(rollbackSafe(written, originalProperties));
+      secretManager.rollbackSecrets(written);
       throw e;
     }
   }
@@ -282,9 +264,6 @@ public final class SecretAlterChanges {
     List<FilesetChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
     List<SecretUrn> replacedUrns = new ArrayList<>();
-    // A null-tolerant snapshot of the properties before the changes mutate them; entity
-    // property maps are not guaranteed free of null values, so avoid Map.copyOf here.
-    Map<String, String> originalProperties = new HashMap<>(properties);
     try {
       for (FilesetChange change : changes) {
         if (change instanceof FilesetChange.SetSecretBinding) {
@@ -309,7 +288,13 @@ public final class SecretAlterChanges {
           FilesetChange.SetProperty c = (FilesetChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  properties, "fileset", entityId, c.getProperty(), c.getValue());
+                  properties,
+                  "fileset",
+                  entityId,
+                  c.getProperty(),
+                  c.getValue(),
+                  written,
+                  replacedUrns);
           out.add(FilesetChange.setProperty(c.getProperty(), value));
         } else if (change instanceof FilesetChange.RemoveProperty) {
           FilesetChange.RemoveProperty c = (FilesetChange.RemoveProperty) change;
@@ -321,13 +306,9 @@ public final class SecretAlterChanges {
         }
       }
       return Pair.of(
-          out.toArray(new FilesetChange[0]),
-          holderOf(written, replacedUrns, properties, originalProperties));
+          out.toArray(new FilesetChange[0]), holderOf(written, replacedUrns, properties));
     } catch (RuntimeException e) {
-      // Roll back only materials the persisted entity cannot reference. An
-      // in-batch re-bind may have rewritten a deterministic URN that the original
-      // properties still point at, so deleting it would dangle the URN.
-      secretManager.rollbackSecrets(rollbackSafe(written, originalProperties));
+      secretManager.rollbackSecrets(written);
       throw e;
     }
   }
