@@ -19,9 +19,12 @@
 package org.apache.gravitino.authorization.ranger;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -32,8 +35,11 @@ import static org.mockito.Mockito.when;
 import com.google.common.base.Throwables;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.authorization.ranger.integration.test.RangerBaseE2EIT;
+import org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv;
 import org.apache.gravitino.authorization.ranger.integration.test.RangerPaimonE2EIT;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.kyuubi.plugin.spark.authz.ranger.SparkRangerAdminPlugin;
@@ -55,22 +61,32 @@ public class TestRangerPolicyRefresh {
   private SparkSession previousSession;
   private GravitinoMetalake previousMetalake;
   private String previousMetalakeName;
+  private Catalog previousCatalog;
+  private boolean registeredCloseable;
 
   @BeforeEach
   void saveSharedState() {
     previousSession = PolicyWaitProbe.session();
     previousMetalake = PolicyWaitProbe.metalake();
     previousMetalakeName = RangerBaseE2EIT.metalakeName;
+    previousCatalog = PolicyWaitProbe.catalog();
     RangerBaseE2EIT.metalakeName = "metalake_policy_refresh_test";
     PolicyWaitProbe.session(null);
     PolicyWaitProbe.metalake(mock(GravitinoMetalake.class));
   }
 
   @AfterEach
-  void restoreSharedState() {
-    PolicyWaitProbe.session(previousSession);
-    PolicyWaitProbe.metalake(previousMetalake);
-    RangerBaseE2EIT.metalakeName = previousMetalakeName;
+  void restoreSharedState() throws Exception {
+    try {
+      if (registeredCloseable) {
+        PolicyWaitProbe.closeResources();
+      }
+    } finally {
+      PolicyWaitProbe.session(previousSession);
+      PolicyWaitProbe.metalake(previousMetalake);
+      PolicyWaitProbe.catalog(previousCatalog);
+      RangerBaseE2EIT.metalakeName = previousMetalakeName;
+    }
   }
 
   @Test
@@ -209,6 +225,61 @@ public class TestRangerPolicyRefresh {
     }
   }
 
+  @Test
+  void testCleanupPreservesDefaultSchemaAndCascadesOtherSchemas() throws Exception {
+    PolicyWaitProbe probe = mock(PolicyWaitProbe.class, CALLS_REAL_METHODS);
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    probe.adminClient(client);
+    Catalog catalog = mock(Catalog.class, RETURNS_DEEP_STUBS);
+    PolicyWaitProbe.catalog(catalog);
+    when(catalog.asSchemas().listSchemas()).thenReturn(new String[] {"default", "leftover_schema"});
+    when(PolicyWaitProbe.metalake().listCatalogs()).thenReturn(new String[] {"leftover_catalog"});
+    SparkSession session = mock(SparkSession.class);
+    PolicyWaitProbe.session(session);
+    AutoCloseable resource = mock(AutoCloseable.class);
+    PolicyWaitProbe.registerResource(resource);
+    registeredCloseable = true;
+
+    try (MockedStatic<RangerITEnv> environment = mockStatic(RangerITEnv.class)) {
+      probe.cleanup();
+      verify(catalog.asSchemas()).dropSchema("leftover_schema", true);
+      verify(catalog.asSchemas(), never()).dropSchema(eq("default"), anyBoolean());
+      verify(PolicyWaitProbe.metalake()).dropCatalog("leftover_catalog", true);
+      verify(client).disableMetalake("metalake_policy_refresh_test");
+      verify(client).dropMetalake("metalake_policy_refresh_test");
+      verify(session).close();
+      verify(resource).close();
+      Assertions.assertNull(PolicyWaitProbe.session());
+      Assertions.assertNull(probe.adminClient());
+      environment.verify(RangerITEnv::cleanup);
+    }
+  }
+
+  @Test
+  void testMetadataCleanupFailureStillClosesSparkAndResources() throws Exception {
+    PolicyWaitProbe probe = mock(PolicyWaitProbe.class, CALLS_REAL_METHODS);
+    probe.adminClient(mock(GravitinoAdminClient.class));
+    Catalog catalog = mock(Catalog.class, RETURNS_DEEP_STUBS);
+    PolicyWaitProbe.catalog(catalog);
+    IllegalStateException failure = new IllegalStateException("metadata cleanup failed");
+    when(catalog.asSchemas().listSchemas()).thenThrow(failure);
+    SparkSession session = mock(SparkSession.class);
+    PolicyWaitProbe.session(session);
+    AutoCloseable resource = mock(AutoCloseable.class);
+    PolicyWaitProbe.registerResource(resource);
+    registeredCloseable = true;
+
+    try (MockedStatic<RangerITEnv> environment = mockStatic(RangerITEnv.class)) {
+      Assertions.assertSame(
+          failure, Assertions.assertThrows(IllegalStateException.class, probe::cleanup));
+      verify(session).close();
+      verify(resource).close();
+      Assertions.assertNull(PolicyWaitProbe.session());
+      Assertions.assertNull(probe.adminClient());
+      environment.verify(RangerITEnv::cleanup);
+    }
+  }
+
   private void configureSession(String extensions) {
     SparkSession session = mock(SparkSession.class);
     SparkContext context = mock(SparkContext.class);
@@ -247,6 +318,34 @@ public class TestRangerPolicyRefresh {
 
     static void metalake(GravitinoMetalake value) {
       metalake = value;
+    }
+
+    static Catalog catalog() {
+      return catalog;
+    }
+
+    static void catalog(Catalog value) {
+      catalog = value;
+    }
+
+    static void registerResource(AutoCloseable resource) {
+      closer.register(resource);
+    }
+
+    static void closeResources() throws Exception {
+      closer.close();
+    }
+
+    GravitinoAdminClient adminClient() {
+      return client;
+    }
+
+    void adminClient(GravitinoAdminClient value) {
+      client = value;
+    }
+
+    void cleanup() {
+      cleanIT();
     }
 
     static void waitForPolicies() {
