@@ -291,9 +291,12 @@ call.
 `filter` and `mask` are Gravitino restricted-syntax keywords, not standard Rego keywords. `filter`
 is valid only as the row-filter rule head, and `mask` is valid only as the column-mask rule head.
 
-Column names, group names, and string values appear only as JSON string literals. A name equal to a
-keyword needs no special keyword escape: `col("and")` references the column named `and`. Backticks,
-single quotes, SQL delimited identifiers, and backslash escaping outside a JSON string are invalid.
+Column names, group names, and string values appear only as JSON string literals. Raw U+0000 through
+U+001F characters and decoded NUL are invalid. Valid JSON escapes for control characters other than
+NUL, such as `\n`, are decoded and preserved. U+007F is also preserved in literal or escaped form. A
+name equal to a keyword needs no special keyword escape: `col("and")` references the column named
+`and`. Backticks, single quotes, SQL delimited identifiers, and backslash escaping outside a JSON
+string are invalid.
 
 For example, this expression is valid and unambiguous:
 
@@ -359,12 +362,23 @@ Save-time validation applies these limits before canonicalization:
 
 - source length: 16 KiB of UTF-8;
 - operation depth: 8;
-- AST nodes: 256;
-- decoded string literal: 4 KiB of UTF-8; and
-- array elements: 256.
+- source AST nodes: 256;
+- decoded string literal: 4 KiB of UTF-8;
+- numeric literal: 256 bytes;
+- elements per literal array: 256;
+- total array elements: 256 in the source; and
+- parenthesis nesting: 256 levels.
 
-The resolved predicate also has maximum operation depth 8. Canonicalization cannot make an
-oversized expression valid.
+Operation depth counts AST operation nodes. A consecutive associative `and` or `or` chain is one
+n-ary logical node, and parentheses do not add depth. These limits apply to user-provided source.
+They are not re-applied to the generated row-filter predicate.
+
+Conditional row filters use linear nested lowering. Each condition appears once in its selected arm
+and once, negated, in its remaining-branches arm. The source limits therefore bound generated work:
+lowering is linear in the number and size of source branches, and generated array occurrences are at
+most twice the source total. Under the 256-node source limit, 127 minimal branches lower to a
+predicate with depth 256 and 890 node occurrences. A generated predicate may exceed the source
+depth or node limits.
 
 ## Context and Schema Binding
 
@@ -397,8 +411,10 @@ is lowered to:
 
 ```text
 (condition1 and result1)
-or (not condition1 and condition2 and result2)
-or (not condition1 and not condition2 and fallback)
+or (not condition1 and (
+  (condition2 and result2)
+  or (not condition2 and fallback)
+))
 ```
 
 Request-context-only conditions are folded before the final predicate is built, but every branch
@@ -407,6 +423,7 @@ evaluates them in order and selects the first action whose condition is true, or
 action. The conditional assignment, `if`, and `else` nodes never appear in the Iceberg wire
 expression or projection. This preserves the first-matching-branch semantics of Rego's `else`
 chain while producing the one closed Boolean predicate or one column action required by Iceberg.
+The nested form grows linearly rather than repeating every earlier condition in every later branch.
 
 The first version supports these value predicates:
 

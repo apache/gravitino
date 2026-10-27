@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -421,37 +422,22 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     if (entityType != Entity.EntityType.FILESET) {
       return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }
+    return deleteWithCallback(
+        ident,
+        entityType,
+        () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
+        postDeleteAction);
+  }
 
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
-    try {
-      FilesetEntity deletedFileset;
-      try {
-        deletedFileset = FilesetMetaService.getInstance().deleteFilesetAndGet(ident);
-      } catch (NoSuchEntityException e) {
-        // Only the delete itself may report the fileset as missing. A NoSuchEntityException from
-        // any later step means the delete did happen and something else failed, which must not be
-        // reported to the caller as "there was nothing to delete".
-        return Optional.empty();
-      }
-      EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
-      E deletedEntity = clazz.cast(deletedFileset);
-      // Run external cleanup while the metadata delete can still be rolled back. The callback uses
-      // the same snapshot whose OCC token won above, so it cannot act on stale locations.
-      postDeleteAction.accept(deletedEntity);
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return Optional.of(deletedEntity);
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
+  @Override
+  public Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    return deleteWithCallback(
+        ident,
+        Entity.EntityType.SCHEMA,
+        () -> SchemaMetaService.getInstance().deleteSchemaAndGet(ident, false, cascadeFunctions),
+        postDeleteAction);
   }
 
   @Override
@@ -671,7 +657,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             "All entities must be in the same namespace for batchPut operation.");
 
         StatisticMetaService.getInstance()
-            .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+            .writeStatisticsWithVersion(
                 statisticEntities,
                 NameIdentifier.parse(statisticEntities.get(0).namespace().toString()),
                 Entity.EntityType.TABLE);
@@ -870,6 +856,42 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             update.sourceEntityType(),
             toNameIdentifiers(update.targetsToAdd()),
             toNameIdentifiers(update.targetsToRemove()));
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> Optional<E> deleteWithCallback(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Supplier<E> deleteAction,
+      Consumer<E> postDeleteAction) {
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      E deletedEntity;
+      try {
+        deletedEntity = deleteAction.get();
+      } catch (NoSuchEntityException e) {
+        // Only the delete itself may report the entity as missing. A NoSuchEntityException from
+        // any later step means the delete did happen and something else failed, which must not be
+        // reported to the caller as "there was nothing to delete".
+        return Optional.empty();
+      }
+      EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
+      // Run external cleanup while the metadata delete can still be rolled back. The callback uses
+      // the same snapshot whose OCC token won above, so it cannot act on stale locations.
+      postDeleteAction.accept(deletedEntity);
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return Optional.of(deletedEntity);
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
     }
   }
 

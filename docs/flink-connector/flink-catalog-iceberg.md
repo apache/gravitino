@@ -45,6 +45,7 @@ Flink clients use a different Iceberg version than the Gravitino server (1.11.0)
 | 1.19          | 2.12  | 1.10.2          | `iceberg-flink-runtime-1.19-1.10.2.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | 2.12  | 1.11.0          | `iceberg-flink-runtime-1.20-1.11.0.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 | 2.1           | n/a   | 1.11.0          | `iceberg-flink-runtime-2.1-1.11.0.jar`  | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+| 2.2           | n/a   | 1.12.0          | `iceberg-flink-runtime-2.2-1.12.0.jar`  | `gravitino-flink-connector-runtime-2.2-${gravitino-version}.jar`       |
 
 Replace `${gravitino-version}` with your Gravitino release version.
 
@@ -118,6 +119,15 @@ The Gravitino Flink connector transforms the following properties in a catalog t
 Gravitino catalog property names with the prefix `flink.bypass.` are passed to Flink iceberg connector. For example, using `flink.bypass.clients` to pass the `clients` to the Flink iceberg connector.
 
 ## Storage
+
+### Credential Vending
+
+Unless the catalog uses a `REST` backend with `data-access` set to `vended-credentials`, the Flink connector fetches catalog-level credentials from Gravitino once, when the catalog is opened, and never refreshes them. Only static credential providers, such as `s3-secret-key`, `oss-secret-key` and `azure-account-key`, are vended to Flink:
+
+- `s3-token`, `gcs-token`, `adls-token`, `oss-token` and `cos-token` vend no credential at catalog level. Flink logs a warning and Iceberg uses the credentials available on the Flink nodes, such as an instance profile.
+- `aws-irsa` is rejected when the catalog is loaded, because its credential expires and is never refreshed.
+
+For temporary credentials vended per table and refreshed automatically, use a `REST` backend with `data-access` set to `vended-credentials`.
 
 ### OSS
 

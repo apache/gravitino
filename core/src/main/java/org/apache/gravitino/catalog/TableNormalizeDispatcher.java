@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.resolvePhysicalTableName;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -62,7 +63,8 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.loadTable(normalizeCaseSensitive(ident));
+    return dispatcher.loadTable(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager));
   }
 
   @Override
@@ -95,24 +97,28 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     return dispatcher.alterTable(
         // The constraints of the name spec may be more strict than underlying catalog,
         // and for compatibility reasons, we only apply case-sensitive capabilities here.
-        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager),
+        applyCapabilities(capability, changes));
   }
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    return dispatcher.dropTable(normalizeNameIdentifier(ident));
+    return dispatcher.dropTable(
+        resolvePhysicalTableName(normalizeNameIdentifier(ident), catalogManager));
   }
 
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    return dispatcher.purgeTable(normalizeNameIdentifier(ident));
+    return dispatcher.purgeTable(
+        resolvePhysicalTableName(normalizeNameIdentifier(ident), catalogManager));
   }
 
   @Override
   public boolean tableExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.tableExists(normalizeCaseSensitive(ident));
+    return dispatcher.tableExists(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager));
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {

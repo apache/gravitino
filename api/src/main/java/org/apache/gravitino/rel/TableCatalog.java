@@ -288,10 +288,11 @@ public interface TableCatalog {
    * @param changes Table changes to apply to the table.
    * @return The updated table metadata.
    * @throws NoSuchTableException If the table does not exist.
+   * @throws TableAlreadyExistsException If the new name is already used by another table.
    * @throws IllegalArgumentException If the change is rejected by the implementation.
    */
   Table alterTable(NameIdentifier ident, TableChange... changes)
-      throws NoSuchTableException, IllegalArgumentException;
+      throws NoSuchTableException, TableAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Removes both the metadata and the directory associated with the table from the file system if

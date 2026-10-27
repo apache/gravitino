@@ -58,6 +58,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -305,12 +306,13 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
    * @param changes The array of MetalakeChange objects representing the changes to apply.
    * @return The altered Metalake instance after applying the changes.
    * @throws NoSuchMetalakeException If the Metalake with the given identifier does not exist.
+   * @throws MetalakeAlreadyExistsException If the new name is already used by another metalake.
    * @throws IllegalArgumentException If the provided changes are invalid.
    * @throws RuntimeException If altering the Metalake encounters storage issues.
    */
   @Override
   public BaseMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
-      throws NoSuchMetalakeException, IllegalArgumentException {
+      throws NoSuchMetalakeException, MetalakeAlreadyExistsException, IllegalArgumentException {
     Executable<BaseMetalake, RuntimeException> exceptionExecutable =
         () -> {
           try {
@@ -340,6 +342,15 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
           } catch (IllegalArgumentException iae) {
             LOG.warn("Altering Metalake {} failed due to invalid changes", ident, iae);
             throw iae;
+
+          } catch (EntityAlreadyExistsException e) {
+            String newName =
+                RenameUtils.getLastRenameName(
+                    ident.name(),
+                    changes,
+                    MetalakeChange.RenameMetalake.class,
+                    MetalakeChange.RenameMetalake::getNewName);
+            throw new MetalakeAlreadyExistsException(e, "Metalake %s already exists", newName);
 
           } catch (IOException ioe) {
             LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);

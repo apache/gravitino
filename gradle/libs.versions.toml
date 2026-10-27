@@ -17,12 +17,15 @@
 # under the License.
 #
 [versions]
+db-scheduler = "16.12.0"
 awssdk = "2.31.73"
 azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
 reactor-netty-core = "1.2.1"
+# JUnit Jupiter 5.x ships with JUnit Platform 1.x of the same minor; bump them together.
 junit = "5.8.1"
+junit-platform = "1.8.1"
 jackson = "2.15.2"
 snakeyaml = "2.0"
 gson = "2.11.0"
@@ -55,6 +58,8 @@ httpclient5 = "5.4.4"
 httpcore5 = "5.3.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
+# 7.3.x moves to Jackson 2.19, which isn't audited in dev/release/maven/dependencies.txt yet.
+fabric8-kubernetes = "7.2.0"
 commons-configuration2 = "2.10.1"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
@@ -68,6 +73,8 @@ commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 iceberg = '1.11.0'
+datastrato-iceberg = "1.13.0"
+experimental-iceberg-git-commit = "e6118db078e09d960600c3c302e0f220457cb388"
 # Last Iceberg release compatible with Spark 3.3.
 iceberg4spark33 = "1.8.1"
 iceberg4spark35 = "1.11.0"
@@ -79,6 +86,7 @@ spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.3"
 spark40 = "4.0.3"
+spark41 = "4.1.3"
 kyuubi4spark = "1.12.0"
 kyuubi4authz = "1.10.2"
 trino = '435'
@@ -116,6 +124,7 @@ jodd = "3.5.2"
 flink119 = "1.19.0"
 flink120 = "1.20.0"
 flink21 = "2.1.3"
+flink22 = "2.2.1"
 flinkjdbc119 = "3.3.0-1.19"
 flinkjdbc120 = "3.3.0-1.20"
 # flink-connector-jdbc was restructured starting with the 4.x line: the monolithic
@@ -123,20 +132,23 @@ flinkjdbc120 = "3.3.0-1.20"
 # database (flink-connector-jdbc-mysql, flink-connector-jdbc-postgres, ...), and this split line
 # is what publishes real Flink 2.x builds.
 flinkjdbc21 = "4.1.0-2.1"
+flinkjdbc22 = "4.1.0-2.2"
 # flink-connector-hive has not published a build targeting the Flink 2.x line yet either;
 # reuse the newest externalized release (built against 1.20) until an official 2.x build ships.
 flinkHive21 = "3.0.0-1.20"
-# flink-connector-jdbc-core (Flink 2.1) transitively pulls openlineage-sql-java:1.32.0, whose
+# flink-connector-jdbc-core (Flink 2.x) transitively pulls openlineage-sql-java:1.32.0, whose
 # bundled, unrelocated org.apache.commons.lang3.SystemProperties predates the getUserName(String)
 # overload and shadows the real commons-lang3 on the classpath. Force this newer release, which
 # ships an up-to-date bundled copy.
-openlineageSqlJava21 = "1.52.0"
+openlineageSqlJava = "1.52.0"
 iceberg4flink119 = "1.10.2"
 iceberg4flink120 = "1.11.0"
 iceberg4flink21 = "1.11.0"
+iceberg4flink22 = "1.12.0"
 paimon4flink119 = "1.2.0"
 paimon4flink120 = "1.2.0"
 paimon4flink21 = "1.4.1"
+paimon4flink22 = "1.4.1"
 # cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
 # Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
 cglib = "3.3.0"
@@ -182,6 +194,7 @@ aspectj = "1.9.24"
 ql-expression = "4.0.3"
 
 [libraries]
+db-scheduler = { group = "com.github.kagkarlsson", name = "db-scheduler", version.ref = "db-scheduler" }
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
 aws-dynamodb = { group = "software.amazon.awssdk", name = "dynamodb", version.ref = "awssdk" }
 aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }
@@ -209,6 +222,7 @@ lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" 
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit" }
+junit-platform-testkit = { group = "org.junit.platform", name = "junit-platform-testkit", version.ref = "junit-platform" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
 slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version.ref = "slf4j" }
@@ -271,6 +285,9 @@ micrometer-core = { group = "io.micrometer", name = "micrometer-core", version.r
 
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+fabric8-kubernetes-client = { group = "io.fabric8", name = "kubernetes-client", version.ref = "fabric8-kubernetes" }
+fabric8-kubernetes-httpclient-jdk = { group = "io.fabric8", name = "kubernetes-httpclient-jdk", version.ref = "fabric8-kubernetes" }
+fabric8-kubernetes-server-mock = { group = "io.fabric8", name = "kubernetes-server-mock", version.ref = "fabric8-kubernetes" }
 commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
@@ -376,8 +393,11 @@ flinkjdbc120 = {group='org.apache.flink',name='flink-connector-jdbc', version.re
 flinkjdbc21-core = {group='org.apache.flink',name='flink-connector-jdbc-core', version.ref='flinkjdbc21'}
 flinkjdbc21-mysql = {group='org.apache.flink',name='flink-connector-jdbc-mysql', version.ref='flinkjdbc21'}
 flinkjdbc21-postgres = {group='org.apache.flink',name='flink-connector-jdbc-postgres', version.ref='flinkjdbc21'}
+flinkjdbc22-core = {group='org.apache.flink',name='flink-connector-jdbc-core', version.ref='flinkjdbc22'}
+flinkjdbc22-mysql = {group='org.apache.flink',name='flink-connector-jdbc-mysql', version.ref='flinkjdbc22'}
+flinkjdbc22-postgres = {group='org.apache.flink',name='flink-connector-jdbc-postgres', version.ref='flinkjdbc22'}
 flinkHive21 = {group='org.apache.flink',name='flink-connector-hive_2.12', version.ref='flinkHive21'}
-openlineageSqlJava21 = {group='io.openlineage',name='openlineage-sql-java', version.ref='openlineageSqlJava21'}
+openlineageSqlJava = {group='io.openlineage',name='openlineage-sql-java', version.ref='openlineageSqlJava'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }

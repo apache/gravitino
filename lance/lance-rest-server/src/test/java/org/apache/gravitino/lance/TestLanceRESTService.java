@@ -22,59 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
-import java.util.Set;
 import org.apache.gravitino.lance.common.config.LanceConfig;
-import org.apache.gravitino.listener.EventBus;
-import org.apache.gravitino.server.web.HttpAuditFilter;
-import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.gravitino.server.web.JettyServerTestUtils;
-import org.apache.gravitino.server.web.RequestContextFilter;
-import org.eclipse.jetty.servlet.ServletHandler;
 import org.junit.jupiter.api.Test;
 
 public class TestLanceRESTService {
-
-  /**
-   * LanceRESTService.serviceInit() previously registered /metrics and /prometheus/metrics (added by
-   * JettyServer#initialize() itself, outside LANCE_SPEC) with no audit coverage at all, and nothing
-   * in the build caught it. Rather than parse source text, this exercises the extracted
-   * LanceRESTService#registerMetricsPathFilters against a plain JettyServer and inspects the real
-   * ServletHandler filter mappings it produces, so a broken JettyServer.METRICS_PATH_SPECS list or
-   * a filter that merely appears in a comment cannot pass. See GH-12760.
-   */
-  @Test
-  public void testMetricsPathsHaveAuditFilterCoverage() throws Exception {
-    JettyServer server = new JettyServer();
-    JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(new LanceConfig());
-    server.initialize(jettyServerConfig, "test-lance-rest", false);
-    EventBus eventBus = new EventBus(Collections.emptyList());
-
-    try {
-      LanceRESTService.registerMetricsPathFilters(server, eventBus);
-
-      ServletHandler servletHandler =
-          JettyServerTestUtils.getServletContextHandler(server).getServletHandler();
-      Set<String> auditedPathSpecs =
-          JettyServerTestUtils.filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
-      Set<String> requestContextPathSpecs =
-          JettyServerTestUtils.filterPathSpecsFor(servletHandler, RequestContextFilter.class);
-
-      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
-        assertTrue(
-            auditedPathSpecs.contains(pathSpec),
-            "'" + pathSpec + "' must be covered by HttpAuditFilter, see GH-12760");
-        assertTrue(
-            requestContextPathSpecs.contains(pathSpec),
-            "'"
-                + pathSpec
-                + "' must be covered by RequestContextFilter for query-parameter "
-                + "capture, see GH-12760");
-      }
-    } finally {
-      server.stop();
-    }
-  }
 
   /** The documented Lance REST key reaches the value the service passes to its error builder. */
   @Test
@@ -84,5 +36,17 @@ public class TestLanceRESTService {
         JettyServerConfig.fromConfig(
                 new LanceConfig(Collections.singletonMap("includeErrorStackTrace", "false")))
             .isIncludeErrorStackTrace());
+  }
+
+  @Test
+  public void testMetricsAreEnabledOnlyForConfiguredStandaloneMode() {
+    LanceConfig disabledConfig = new LanceConfig();
+    assertFalse(LanceRESTService.shouldEnableMetrics(false, disabledConfig));
+    assertFalse(LanceRESTService.shouldEnableMetrics(true, disabledConfig));
+
+    LanceConfig enabledConfig =
+        new LanceConfig(Collections.singletonMap(LanceConfig.METRICS_ENABLED.getKey(), "true"));
+    assertTrue(LanceRESTService.shouldEnableMetrics(false, enabledConfig));
+    assertFalse(LanceRESTService.shouldEnableMetrics(true, enabledConfig));
   }
 }

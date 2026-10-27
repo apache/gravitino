@@ -51,7 +51,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
 | `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned; takes precedence over `gravitino.bypass.maxWaitMillis`.                                                    | `30000`       | No       |
 
 :::caution
 Gravitino does not package the OceanBase JDBC driver due to licensing, so you
@@ -263,6 +263,13 @@ The OceanBase catalog does not support creating partitioned tables in the curren
 :::
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+
+#### Drop and Purge Table
+
+- Dropping a table runs `DROP TABLE` in OceanBase. Whether OceanBase keeps the dropped table in its
+  recycle bin depends on the OceanBase configuration.
+- Purging a table is not supported. A purge request fails with an unsupported-operation error, and
+  the table and its data stay unchanged. Use drop instead.
 
 #### Alter Table Operations
 
