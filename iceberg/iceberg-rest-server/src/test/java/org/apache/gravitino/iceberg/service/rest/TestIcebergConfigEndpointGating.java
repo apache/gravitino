@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.util.Collections;
 import java.util.Map;
 import javax.ws.rs.core.Application;
@@ -26,9 +30,12 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests that the /v1/config endpoint gates optional endpoints (like scan planning) based on the
@@ -62,6 +69,24 @@ public class TestIcebergConfigEndpointGating extends IcebergTestBase {
     Assertions.assertFalse(
         hasScanPlanEndpoint,
         "Config response must NOT advertise scan plan endpoint for catalogs that do not support it");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true,true", "true,false", "false,true", "false,false"})
+  void testScanEndpointsAreAdvertisedIndependently(boolean plan, boolean tasks) {
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    when(wrapper.supportsScanPlanOperations()).thenReturn(plan);
+    when(wrapper.supportsFetchScanTasks()).thenReturn(tasks);
+    when(wrapper.getCatalogConfigToClient()).thenReturn(Collections.emptyMap());
+    IcebergCatalogWrapperManager manager = mock(IcebergCatalogWrapperManager.class);
+    when(manager.getCatalogWrapper(anyString())).thenReturn(wrapper);
+    try (Response response = new IcebergConfigOperations(manager).getConfig("")) {
+      ConfigResponse config = (ConfigResponse) response.getEntity();
+      Assertions.assertEquals(
+          plan, config.endpoints().contains(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN));
+      Assertions.assertEquals(
+          tasks, config.endpoints().contains(Endpoint.V1_FETCH_TABLE_SCAN_PLAN_TASKS));
+    }
   }
 
   @Test
@@ -101,6 +126,11 @@ public class TestIcebergConfigEndpointGating extends IcebergTestBase {
 
     @Override
     public boolean supportsScanPlanOperations() {
+      return false;
+    }
+
+    @Override
+    public boolean supportsFetchScanTasks() {
       return false;
     }
   }
