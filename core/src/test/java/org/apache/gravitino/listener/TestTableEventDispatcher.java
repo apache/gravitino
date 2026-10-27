@@ -25,12 +25,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.CreateTableEvent;
+import org.apache.gravitino.listener.api.event.CreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -125,6 +128,60 @@ public class TestTableEventDispatcher {
     Assertions.assertEquals(CreateTableEvent.class, second.getClass());
     Assertions.assertTrue(
         second.customInfo().isEmpty(), "Extras must not survive into a later operation");
+  }
+
+  /**
+   * A failure-event listener must not be able to mask the original create-table failure: when the
+   * dispatcher throws, the {@link CreateTableFailureEvent} listener exception is swallowed by the
+   * {@link EventBus} so callers still see the original exception.
+   */
+  @Test
+  void testCreateTableFailureEventShouldNotMaskOriginalExceptionWhenListenerThrows() {
+    GravitinoRuntimeException originalException =
+        new GravitinoRuntimeException("Original create table failure");
+    GravitinoRuntimeException listenerException =
+        new GravitinoRuntimeException("Failure listener exception");
+
+    TableDispatcher tableExceptionDispatcher = mock(TableDispatcher.class);
+    when(tableExceptionDispatcher.createTable(
+            any(NameIdentifier.class),
+            any(Column[].class),
+            any(String.class),
+            any(Map.class),
+            any(Transform[].class),
+            any(Distribution.class),
+            any(SortOrder[].class),
+            any(Index[].class)))
+        .thenThrow(originalException);
+
+    EventBus eventBus =
+        new EventBus(
+            Arrays.asList(
+                new EventListenerPlugin() {
+                  @Override
+                  public void init(Map<String, String> properties) {}
+
+                  @Override
+                  public void start() {}
+
+                  @Override
+                  public void stop() {}
+
+                  @Override
+                  public void onPostEvent(Event event) {
+                    if (event instanceof CreateTableFailureEvent) {
+                      throw listenerException;
+                    }
+                  }
+                }));
+    TableEventDispatcher tableEventDispatcher =
+        new TableEventDispatcher(eventBus, tableExceptionDispatcher);
+
+    GravitinoRuntimeException thrownException =
+        Assertions.assertThrowsExactly(
+            GravitinoRuntimeException.class, () -> createTable(tableEventDispatcher));
+
+    Assertions.assertSame(originalException, thrownException);
   }
 
   private static TableEventDispatcher dispatcher(EventListenerPlugin listener, Table table) {
