@@ -68,6 +68,7 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.jdbc)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
 

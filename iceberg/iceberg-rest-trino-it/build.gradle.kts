@@ -68,6 +68,7 @@ dependencies {
   testRuntimeOnly(libs.awaitility)
   testRuntimeOnly(libs.commons.lang3)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.postgresql)
 
