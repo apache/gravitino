@@ -121,7 +121,12 @@ public interface PolicyUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {}
   }
 
-  /** The policy update request for updating a policy content. */
+  /**
+   * The policy update request for updating a policy content.
+   *
+   * <p>{@code newContent} fully replaces the previous content. Omitted typed fields use that
+   * content type's defaults; they are not merged with the previously stored values.
+   */
   @EqualsAndHashCode
   @Getter
   @ToString

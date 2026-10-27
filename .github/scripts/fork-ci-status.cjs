@@ -16,7 +16,7 @@
 const { TRUSTED_REQUIRED } = require('./publish-ci-status.cjs');
 const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
 const SUITES = ['build', 'backend', 'spark', 'flink', 'trino', 'iceberg_rest_trino', 'python',
-  'frontend', 'access_control', 'idp_basic', 'mcp', 'maintenance', 'web_ui', 'charts',
+  'frontend', 'access_control', 'idp_basic', 'mcp', 'maintenance', 'tms', 'web_ui', 'charts',
   'contrib_catalog', 'asf_allowlist'];
 // The fail-fast watcher in fork-ci.yml never fails the run (continue-on-error), but runs that
 // started before that change can still fail on the watcher's own API errors.

@@ -47,6 +47,13 @@ public class TestIcebergSparkConfigUtils {
   }
 
   @Test
+  public void testBuildTemplateSparkConfigsLeavesMasterUnsetByDefault() {
+    Map<String, String> configs = IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+
+    assertEquals("{{spark_master:-}}", configs.get("spark.master"));
+  }
+
+  @Test
   public void testParseFlatJsonMap() {
     Map<String, String> parsed =
         IcebergSparkConfigUtils.parseFlatJsonMap(
