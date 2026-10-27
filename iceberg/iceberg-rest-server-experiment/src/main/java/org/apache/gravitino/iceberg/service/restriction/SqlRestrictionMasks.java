@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.service.restriction;
 import java.math.BigDecimal;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.gravitino.iceberg.service.restriction.SqlRestrictionPredicates.Truth;
 import org.apache.gravitino.policy.sql.CaseBranch;
 import org.apache.gravitino.policy.sql.CaseExpression;
 import org.apache.gravitino.policy.sql.FunctionCall;
@@ -62,14 +61,14 @@ final class SqlRestrictionMasks {
     if (body instanceof CaseExpression) {
       CaseExpression choice = (CaseExpression) body;
       for (CaseBranch branch : choice.branches()) {
-        Truth condition =
+        SqlPredicateResult condition =
             choice.selector() == null
                 ? predicates.resolve(branch.condition())
                 : equality(choice.selector(), branch.condition());
-        if (!condition.constant()) {
+        if (!condition.isConstant()) {
           throw SqlRestrictionBinding.unsupported("row-dependent mask selection");
         }
-        if (condition.yes.op() == Expression.Operation.TRUE) {
+        if (condition.trueExpression().op() == Expression.Operation.TRUE) {
           return selected(branch.result());
         }
       }
@@ -100,7 +99,7 @@ final class SqlRestrictionMasks {
     return fixed;
   }
 
-  private Truth equality(SqlExpression selector, SqlExpression match) {
+  private SqlPredicateResult equality(SqlExpression selector, SqlExpression match) {
     return predicates.equal(selector, match);
   }
 

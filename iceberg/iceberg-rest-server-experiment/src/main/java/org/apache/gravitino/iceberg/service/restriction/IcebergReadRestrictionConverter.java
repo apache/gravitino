@@ -79,7 +79,8 @@ public final class IcebergReadRestrictionConverter {
     if (rowFilter.isPresent()) {
       SqlDefinition definition = rowFilter.get();
       SqlRestrictionBinding binding = new SqlRestrictionBinding(definition, schema, snapshot, null);
-      Expression converted = new SqlRestrictionPredicates(binding).resolve(definition.body()).yes;
+      Expression converted =
+          new SqlRestrictionPredicates(binding).resolve(definition.body()).trueExpression();
       converted = SqlRestrictionCanonicalizer.canonicalize(converted);
       if (converted.op() != Expression.Operation.TRUE) {
         filter = converted;
