@@ -72,9 +72,13 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -83,11 +87,174 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestSchemaMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_catalog_test";
   private final String catalogName = "catalog_for_catalog_test";
+
+  @TestTemplate
+  void testDeleteSchemaAndGetRollsBackWhenCleanupFails() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createAndInsertSchema(metalakeName, catalogName, "schema_cleanup_failure");
+    NameIdentifier ident = schema.nameIdentifier();
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(metalakeName, catalogName, schema.name()),
+            "function",
+            AUDIT_INFO);
+    backend.insert(function, false);
+    long lastChangeId =
+        SessionUtils.getWithoutCommit(
+            EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId);
+    NoSuchEntityException failure = new NoSuchEntityException("cleanup dependency is missing");
+
+    assertThrows(
+        NonEmptyEntityException.class,
+        () ->
+            backend.deleteSchemaAndGet(
+                ident,
+                false,
+                ignored -> Assertions.fail("A non-cascading drop must preserve functions")));
+
+    Assertions.assertSame(
+        failure,
+        assertThrows(
+            NoSuchEntityException.class,
+            () ->
+                backend.deleteSchemaAndGet(
+                    ident,
+                    true,
+                    deleted -> {
+                      Assertions.assertEquals(schema.id(), deleted.id());
+                      Assertions.assertEquals(schema.properties(), deleted.properties());
+                      throw failure;
+                    })));
+    assertTrue(backend.exists(ident, Entity.EntityType.SCHEMA));
+    Assertions.assertEquals(
+        function.comment(),
+        backend
+            .<FunctionEntity>get(function.nameIdentifier(), Entity.EntityType.FUNCTION)
+            .comment());
+    assertTrue(
+        SessionUtils.getWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper -> mapper.selectEntityChanges(lastChangeId, 100))
+            .isEmpty());
+    Assertions.assertEquals(
+        schema.properties(),
+        backend.<SchemaEntity>get(ident, Entity.EntityType.SCHEMA).properties());
+
+    SchemaEntity deleted =
+        backend
+            .deleteSchemaAndGet(
+                ident, true, snapshot -> Assertions.assertEquals(schema.id(), snapshot.id()))
+            .orElseThrow();
+    Assertions.assertEquals(schema.id(), deleted.id());
+    assertFalse(backend.exists(ident, Entity.EntityType.SCHEMA));
+    assertFalse(backend.exists(function.nameIdentifier(), Entity.EntityType.FUNCTION));
+    List<EntityChangeRecord> changes =
+        SessionUtils.getWithoutCommit(
+            EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(lastChangeId, 100));
+    Assertions.assertEquals(2, changes.size());
+    Assertions.assertEquals(
+        Set.of(Entity.EntityType.SCHEMA.name(), Entity.EntityType.FUNCTION.name()),
+        changes.stream().map(EntityChangeRecord::getEntityType).collect(Collectors.toSet()));
+    assertTrue(changes.stream().allMatch(change -> change.getOperateType() == OperateType.DROP));
+    assertFalse(
+        backend
+            .deleteSchemaAndGet(
+                ident,
+                true,
+                ignored -> Assertions.fail("Cleanup must not run for a missing schema"))
+            .isPresent());
+  }
+
+  @TestTemplate
+  void testDeleteSchemaAndGetRejectsRemainingFilesetsBeforeCleanup() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema = createAndInsertSchema(metalakeName, catalogName, "schema_with_child");
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalogName, schema.name()),
+            "fileset",
+            AUDIT_INFO);
+    backend.insert(fileset, false);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(metalakeName, catalogName, schema.name()),
+            "function",
+            AUDIT_INFO);
+    backend.insert(function, false);
+
+    assertThrows(
+        NonEmptyEntityException.class,
+        () ->
+            backend.deleteSchemaAndGet(
+                schema.nameIdentifier(),
+                true,
+                ignored -> Assertions.fail("Cleanup must not run for a non-empty schema")));
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertTrue(backend.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
+    assertTrue(backend.exists(function.nameIdentifier(), Entity.EntityType.FUNCTION));
+  }
+
+  @TestTemplate
+  void testDeleteSchemaAndGetPropagatesFunctionCleanupFailure() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createAndInsertSchema(metalakeName, catalogName, "function_cleanup_failure");
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(metalakeName, catalogName, schema.name()),
+            "function",
+            AUDIT_INFO);
+    backend.insert(function, false);
+    FunctionMetaService functionService = FunctionMetaService.getInstance();
+
+    for (RuntimeException failure :
+        List.of(
+            new NoSuchEntityException("function disappeared"),
+            new OptimisticLockException("function changed"))) {
+      FunctionMetaService failingService = Mockito.spy(functionService);
+      Mockito.doThrow(failure)
+          .when(failingService)
+          .deleteFunctionWithVersion(
+              Mockito.eq(function.nameIdentifier()), Mockito.any(FunctionPO.class));
+      try (MockedStatic<FunctionMetaService> mocked =
+          Mockito.mockStatic(FunctionMetaService.class)) {
+        mocked.when(FunctionMetaService::getInstance).thenReturn(failingService);
+        RuntimeException actual =
+            assertThrows(
+                RuntimeException.class,
+                () ->
+                    backend.deleteSchemaAndGet(
+                        schema.nameIdentifier(),
+                        true,
+                        ignored ->
+                            Assertions.fail("Cleanup must not run after a function failure")));
+        if (failure instanceof NoSuchEntityException) {
+          Assertions.assertEquals(
+              "Failed to delete functions under schema " + schema.nameIdentifier(),
+              actual.getMessage());
+          Assertions.assertSame(failure, actual.getCause());
+        } else {
+          Assertions.assertSame(failure, actual);
+        }
+      }
+      assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+      assertTrue(backend.exists(function.nameIdentifier(), Entity.EntityType.FUNCTION));
+    }
+  }
 
   @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {

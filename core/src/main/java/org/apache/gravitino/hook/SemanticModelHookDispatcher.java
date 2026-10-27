@@ -33,6 +33,8 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
@@ -86,17 +88,25 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
           IllegalSemanticModelException {
     SemanticModel semanticModel =
         dispatcher.createSemanticModel(ident, comment, definition, properties);
-
-    // Set the creator as the owner of the Semantic Model.
-    OwnerDispatcher ownerManager = ownerDispatcher.get();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SEMANTIC_MODEL),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
-    }
+    setCreatorAsOwner(ident);
     return semanticModel;
+  }
+
+  @Override
+  public SemanticModel importSemanticModel(
+      NameIdentifier ident,
+      @Nullable String comment,
+      SemanticModelDefinition definition,
+      Map<String, String> properties) {
+    SemanticModel semanticModel =
+        dispatcher.importSemanticModel(ident, comment, definition, properties);
+    setCreatorAsOwner(ident);
+    return semanticModel;
+  }
+
+  @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+    return dispatcher.exportOssieDocument(ident, format);
   }
 
   @Override
@@ -122,5 +132,16 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
       AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.SEMANTIC_MODEL);
     }
     return dropped;
+  }
+
+  private void setCreatorAsOwner(NameIdentifier ident) {
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
+    if (ownerManager != null) {
+      ownerManager.setOwner(
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SEMANTIC_MODEL),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
+    }
   }
 }

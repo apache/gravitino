@@ -205,6 +205,9 @@ public class Configs {
           .createWithDefault(60 * 60 * 1000L);
 
   public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
+  /** Default maximum number of entity change log records read in one polling cycle. */
+  public static final int DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE = 2000;
+
   public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 30 * 24 * 60 * 60L;
   public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 24 * 60 * 60L;
 
@@ -215,6 +218,46 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS);
+
+  /**
+   * Maximum records read per entity change log poll. A full batch triggers an immediate next poll;
+   * empty or partial batches wait for the configured poll interval.
+   */
+  public static final ConfigEntry<Integer> ENTITY_CHANGE_LOG_POLL_BATCH_SIZE =
+      new ConfigBuilder("gravitino.entityChangeLog.pollBatchSize")
+          .doc(
+              "The maximum number of entity change log records read per poll. A full batch is"
+                  + " followed by another poll right away instead of after the poll interval")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+
+  /** Default recent-history replay window in seconds. */
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS = 60L;
+
+  /** Default maximum locally remembered event IDs. */
+  public static final int DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES = 100000;
+
+  /** Window for replaying recent change records to catch out-of-order commits. */
+  public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS =
+      new ConfigBuilder("gravitino.entityChangeLog.replayWindowSecs")
+          .doc(
+              "Recent change log replay window in seconds; 0 disables replay. This bounds recorded created_at age, not commit age. "
+                  + "Replay sweeps start at most once per max(pollIntervalSecs, replayWindowSecs / 4)")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .longConf()
+          .checkValue(value -> value >= 0 && value <= 86400, "Must be between 0 and 86400 seconds")
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+
+  /** Maximum event IDs retained locally to suppress repeated replay invalidations. */
+  public static final ConfigEntry<Integer> ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES =
+      new ConfigBuilder("gravitino.entityChangeLog.replayMaxEntries")
+          .doc("Maximum locally remembered event IDs for recent change log replay deduplication")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_RETENTION_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.retentionSecs")
@@ -577,8 +620,9 @@ public class Configs {
   public static final ConfigEntry<String> JOB_EXECUTOR =
       new ConfigBuilder("gravitino.job.executor")
           .doc(
-              "The executor to run jobs, by default it is 'local', user can implement their own "
-                  + "executor and set it here.")
+              "The executor to run jobs: one of the built-in executors 'local' (the default) and "
+                  + "'k8s', or the name of a custom executor whose class is set by "
+                  + "gravitino.jobExecutor.<name>.class.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -619,12 +663,12 @@ public class Configs {
   public static final ConfigEntry<Integer> JOB_OUTPUT_MAX_BYTES =
       new ConfigBuilder("gravitino.job.outputMaxBytes")
           .doc(
-              "The maximum number of bytes read from the tail of a job's captured stdout/stderr "
-                  + "when retrieving its output. Bounds both the read cost and the response size "
-                  + "regardless of how the content is shaped (e.g. a single very long line). "
-                  + "This is resolved by JobManager and passed as an argument to "
-                  + "JobExecutor#getJobStdout and JobExecutor#getJobStderr, so all executors "
-                  + "honor the same cap.")
+              "The maximum number of bytes returned from the tail of a job's captured "
+                  + "stdout/stderr when retrieving its output. Bounds the response size regardless "
+                  + "of how the content is shaped (e.g. a single very long line). Whether it also "
+                  + "bounds the bytes read depends on the job executor. This is resolved by "
+                  + "JobManager and passed as an argument to JobExecutor#getJobStdout and "
+                  + "JobExecutor#getJobStderr, so all executors honor the same cap.")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)

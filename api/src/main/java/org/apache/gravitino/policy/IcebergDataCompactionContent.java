@@ -23,15 +23,17 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Built-in policy content for Iceberg compaction strategy. */
-public class IcebergDataCompactionContent implements PolicyContent {
+public class IcebergDataCompactionContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Strategy type value for iceberg data compaction. */
@@ -42,6 +44,20 @@ public class IcebergDataCompactionContent implements PolicyContent {
   public static final String JOB_TEMPLATE_NAME_VALUE = "builtin-iceberg-rewrite-data-files";
   /** Prefix for rewrite options propagated to job options. */
   public static final String JOB_OPTIONS_PREFIX = "job.options.";
+  /**
+   * Rule key for Iceberg {@code rewrite_data_files} top-level {@code strategy} argument.
+   *
+   * <p>This is separate from {@link #JOB_OPTIONS_PREFIX} because Iceberg treats {@code strategy} as
+   * a procedure parameter, not an entry in the {@code options} map.
+   */
+  public static final String REWRITE_STRATEGY_KEY = "rewriteStrategy";
+  /**
+   * Rule key for Iceberg {@code rewrite_data_files} top-level {@code sort_order} argument.
+   *
+   * <p>This is separate from {@link #JOB_OPTIONS_PREFIX} because Iceberg treats {@code sort_order}
+   * as a procedure parameter, not an entry in the {@code options} map.
+   */
+  public static final String SORT_ORDER_KEY = "sortOrder";
   /** Rule key for trigger expression. */
   public static final String TRIGGER_EXPR_KEY = "trigger-expr";
   /** Rule key for score expression. */
@@ -72,8 +88,49 @@ public class IcebergDataCompactionContent implements PolicyContent {
   public static final long DEFAULT_MAX_PARTITION_NUM = 50L;
   /** Default rewrite options for Iceberg rewrite data files. */
   public static final Map<String, String> DEFAULT_REWRITE_OPTIONS = ImmutableMap.of();
+  /** Iceberg rewrite strategy value for binpack. */
+  public static final String REWRITE_STRATEGY_BINPACK = "binpack";
+  /** Iceberg rewrite strategy value for sort. */
+  public static final String REWRITE_STRATEGY_SORT = "sort";
+  /** Default Iceberg rewrite strategy. */
+  public static final String DEFAULT_REWRITE_STRATEGY = REWRITE_STRATEGY_BINPACK;
+  /** Default Iceberg sort order (empty means unset). */
+  public static final String DEFAULT_SORT_ORDER = "";
 
+  private enum RewriteOptionValueKind {
+    POSITIVE_LONG,
+    POSITIVE_INT,
+    NON_NEGATIVE_INT,
+    BOOLEAN,
+    REWRITE_JOB_ORDER,
+    RATIO
+  }
+
+  private static final Set<String> SUPPORTED_REWRITE_STRATEGIES =
+      ImmutableSet.of(REWRITE_STRATEGY_BINPACK, REWRITE_STRATEGY_SORT);
   private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
+  private static final Set<String> REWRITE_JOB_ORDERS =
+      ImmutableSet.of("bytes-asc", "bytes-desc", "files-asc", "files-desc", "none");
+  // Names mirror Iceberg RewriteDataFiles / SizeBasedFileRewriter / SizeBasedDataRewriter.
+  private static final Map<String, RewriteOptionValueKind> SUPPORTED_REWRITE_OPTIONS =
+      ImmutableMap.<String, RewriteOptionValueKind>builder()
+          .put("target-file-size-bytes", RewriteOptionValueKind.POSITIVE_LONG)
+          .put("min-file-size-bytes", RewriteOptionValueKind.POSITIVE_LONG)
+          .put("max-file-size-bytes", RewriteOptionValueKind.POSITIVE_LONG)
+          .put("max-file-group-size-bytes", RewriteOptionValueKind.POSITIVE_LONG)
+          .put("min-input-files", RewriteOptionValueKind.POSITIVE_INT)
+          .put("max-concurrent-file-group-rewrites", RewriteOptionValueKind.POSITIVE_INT)
+          .put("partial-progress.max-commits", RewriteOptionValueKind.POSITIVE_INT)
+          .put("partial-progress.max-failed-commits", RewriteOptionValueKind.NON_NEGATIVE_INT)
+          .put("output-spec-id", RewriteOptionValueKind.NON_NEGATIVE_INT)
+          .put("delete-file-threshold", RewriteOptionValueKind.NON_NEGATIVE_INT)
+          .put("rewrite-all", RewriteOptionValueKind.BOOLEAN)
+          .put("partial-progress.enabled", RewriteOptionValueKind.BOOLEAN)
+          .put("use-starting-sequence-number", RewriteOptionValueKind.BOOLEAN)
+          .put("remove-dangling-deletes", RewriteOptionValueKind.BOOLEAN)
+          .put("rewrite-job-order", RewriteOptionValueKind.REWRITE_JOB_ORDER)
+          .put("delete-ratio-threshold", RewriteOptionValueKind.RATIO)
+          .build();
   private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
       ImmutableSet.of(
           MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
@@ -99,11 +156,13 @@ public class IcebergDataCompactionContent implements PolicyContent {
   private final Long dataFileMseWeight;
   private final Long deleteFileNumberWeight;
   private final Long maxPartitionNum;
+  private final String rewriteStrategy;
+  private final String sortOrder;
   private final Map<String, String> rewriteOptions;
 
   /** Default constructor for Jackson deserialization only. */
   private IcebergDataCompactionContent() {
-    this(null, null, null, null, null, null);
+    this(null, null, null, null, null, null, null, null, PolicyExecutionSpec.empty());
   }
 
   IcebergDataCompactionContent(
@@ -112,7 +171,32 @@ public class IcebergDataCompactionContent implements PolicyContent {
       Long dataFileMseWeight,
       Long deleteFileNumberWeight,
       Long maxPartitionNum,
+      String rewriteStrategy,
+      String sortOrder,
       Map<String, String> rewriteOptions) {
+    this(
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
+        rewriteOptions,
+        PolicyExecutionSpec.empty());
+  }
+
+  IcebergDataCompactionContent(
+      Long minDataFileMse,
+      Long minDeleteFileNumber,
+      Long dataFileMseWeight,
+      Long deleteFileNumberWeight,
+      Long maxPartitionNum,
+      String rewriteStrategy,
+      String sortOrder,
+      Map<String, String> rewriteOptions,
+      PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
     // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =
@@ -122,6 +206,13 @@ public class IcebergDataCompactionContent implements PolicyContent {
     this.deleteFileNumberWeight =
         deleteFileNumberWeight == null ? DEFAULT_DELETE_FILE_NUMBER_WEIGHT : deleteFileNumberWeight;
     this.maxPartitionNum = maxPartitionNum == null ? DEFAULT_MAX_PARTITION_NUM : maxPartitionNum;
+    this.rewriteStrategy =
+        rewriteStrategy == null
+            ? DEFAULT_REWRITE_STRATEGY
+            : rewriteStrategy.trim().toLowerCase(Locale.ROOT);
+    // Null → "" for binpack (Iceberg leaves sort_order unset). When rewriteStrategy is
+    // "sort", validate() requires a non-blank sortOrder — do not treat "" as valid for sort.
+    this.sortOrder = sortOrder == null ? DEFAULT_SORT_ORDER : sortOrder.trim();
     this.rewriteOptions =
         rewriteOptions == null
             ? DEFAULT_REWRITE_OPTIONS
@@ -174,6 +265,25 @@ public class IcebergDataCompactionContent implements PolicyContent {
   }
 
   /**
+   * Returns the Iceberg {@code rewrite_data_files} top-level {@code strategy} argument.
+   *
+   * @return rewrite strategy, one of {@value REWRITE_STRATEGY_BINPACK} or {@value
+   *     REWRITE_STRATEGY_SORT}
+   */
+  public String rewriteStrategy() {
+    return rewriteStrategy;
+  }
+
+  /**
+   * Returns the Iceberg {@code rewrite_data_files} top-level {@code sort_order} argument.
+   *
+   * @return sort order expression, or empty string when unset
+   */
+  public String sortOrder() {
+    return sortOrder;
+  }
+
+  /**
    * Returns rewrite options that are expanded to {@code job.options.*} rule entries.
    *
    * @return rewrite options
@@ -204,35 +314,40 @@ public class IcebergDataCompactionContent implements PolicyContent {
     rules.put(MAX_PARTITION_NUM_KEY, maxPartitionNum);
     rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
     rules.put(SCORE_EXPR_KEY, SCORE_EXPR);
+    rules.put(REWRITE_STRATEGY_KEY, rewriteStrategy);
+    rules.put(SORT_ORDER_KEY, sortOrder);
     rewriteOptions.forEach((key, value) -> rules.put(JOB_OPTIONS_PREFIX + key, value));
     return Collections.unmodifiableMap(rules);
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
-    PolicyContent.super.validate();
+    super.validate();
     // All fields are defaulted in the constructor, so only range checks are needed here.
     Preconditions.checkArgument(minDataFileMse >= 0, "minDataFileMse must be >= 0");
     Preconditions.checkArgument(minDeleteFileNumber >= 0, "minDeleteFileNumber must be >= 0");
     Preconditions.checkArgument(dataFileMseWeight >= 0, "dataFileMseWeight must be >= 0");
     Preconditions.checkArgument(deleteFileNumberWeight >= 0, "deleteFileNumberWeight must be >= 0");
     Preconditions.checkArgument(maxPartitionNum > 0, "maxPartitionNum must be > 0");
+    Preconditions.checkArgument(
+        SUPPORTED_REWRITE_STRATEGIES.contains(rewriteStrategy),
+        "rewriteStrategy must be one of %s, but got '%s'",
+        SUPPORTED_REWRITE_STRATEGIES,
+        rewriteStrategy);
+    if (REWRITE_STRATEGY_SORT.equals(rewriteStrategy)) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(sortOrder),
+          "sortOrder must be set when rewriteStrategy is '%s'",
+          REWRITE_STRATEGY_SORT);
+      // Full Iceberg parse needs Spark ExtendedParser + table Schema; that runs in the job.
+    } else {
+      Preconditions.checkArgument(
+          StringUtils.isBlank(sortOrder),
+          "sortOrder must be empty when rewriteStrategy is '%s'",
+          rewriteStrategy);
+    }
 
-    rewriteOptions.forEach(
-        (key, value) -> {
-          Preconditions.checkArgument(StringUtils.isNotBlank(key), "rewrite option key is blank");
-          Preconditions.checkArgument(
-              OPTION_KEY_PATTERN.matcher(key).matches(),
-              "rewrite option key '%s' contains illegal characters",
-              key);
-          Preconditions.checkArgument(
-              !key.startsWith(JOB_OPTIONS_PREFIX),
-              "rewrite option key '%s' must not start with '%s'",
-              key,
-              JOB_OPTIONS_PREFIX);
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(value), "rewrite option '%s' must have non-empty value", key);
-        });
+    rewriteOptions.forEach(IcebergDataCompactionContent::validateRewriteOption);
   }
 
   @Override
@@ -241,40 +356,146 @@ public class IcebergDataCompactionContent implements PolicyContent {
       return false;
     }
     IcebergDataCompactionContent that = (IcebergDataCompactionContent) o;
-    return Objects.equals(minDataFileMse, that.minDataFileMse)
+    return executionFieldsEqual(that)
+        && Objects.equals(minDataFileMse, that.minDataFileMse)
         && Objects.equals(minDeleteFileNumber, that.minDeleteFileNumber)
         && Objects.equals(dataFileMseWeight, that.dataFileMseWeight)
         && Objects.equals(deleteFileNumberWeight, that.deleteFileNumberWeight)
         && Objects.equals(maxPartitionNum, that.maxPartitionNum)
+        && Objects.equals(rewriteStrategy, that.rewriteStrategy)
+        && Objects.equals(sortOrder, that.sortOrder)
         && Objects.equals(rewriteOptions, that.rewriteOptions);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
+        executionFieldsHashCode(),
         minDataFileMse,
         minDeleteFileNumber,
         dataFileMseWeight,
         deleteFileNumberWeight,
         maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
         rewriteOptions);
   }
 
   @Override
   public String toString() {
-    return "IcebergDataCompactionContent{"
-        + "minDataFileMse="
-        + minDataFileMse
-        + ", minDeleteFileNumber="
-        + minDeleteFileNumber
-        + ", dataFileMseWeight="
-        + dataFileMseWeight
-        + ", deleteFileNumberWeight="
-        + deleteFileNumberWeight
-        + ", maxPartitionNum="
-        + maxPartitionNum
-        + ", rewriteOptions="
-        + rewriteOptions
-        + '}';
+    StringBuilder sb =
+        new StringBuilder("IcebergDataCompactionContent{")
+            .append("minDataFileMse=")
+            .append(minDataFileMse)
+            .append(", minDeleteFileNumber=")
+            .append(minDeleteFileNumber)
+            .append(", dataFileMseWeight=")
+            .append(dataFileMseWeight)
+            .append(", deleteFileNumberWeight=")
+            .append(deleteFileNumberWeight)
+            .append(", maxPartitionNum=")
+            .append(maxPartitionNum)
+            .append(", rewriteStrategy='")
+            .append(rewriteStrategy)
+            .append('\'')
+            .append(", sortOrder='")
+            .append(sortOrder)
+            .append('\'')
+            // Never render rewriteOptions values; same redaction as jobOptions / updaterOptions.
+            .append(", rewriteOptionsKeys=")
+            .append(rewriteOptions.keySet())
+            .append(", ");
+    appendExecutionFields(sb);
+    sb.append('}');
+    return sb.toString();
+  }
+
+  private static void validateRewriteOption(String key, String value) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(key), "rewrite option key is blank");
+    Preconditions.checkArgument(
+        OPTION_KEY_PATTERN.matcher(key).matches(),
+        "rewrite option key '%s' contains illegal characters",
+        key);
+    Preconditions.checkArgument(
+        !key.startsWith(JOB_OPTIONS_PREFIX),
+        "rewrite option key '%s' must not start with '%s'",
+        key,
+        JOB_OPTIONS_PREFIX);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value), "rewrite option '%s' must have non-empty value", key);
+    RewriteOptionValueKind kind = SUPPORTED_REWRITE_OPTIONS.get(key);
+    Preconditions.checkArgument(
+        kind != null,
+        "rewrite option '%s' is not supported by rewrite_data_files; supported options are %s",
+        key,
+        SUPPORTED_REWRITE_OPTIONS.keySet());
+    switch (kind) {
+      case POSITIVE_LONG:
+        parseRewriteOptionLong(
+            key,
+            value,
+            v -> Preconditions.checkArgument(v > 0, rewriteOptionMessage(key, "a positive long")));
+        break;
+      case POSITIVE_INT:
+        parseRewriteOptionInt(
+            key,
+            value,
+            v -> Preconditions.checkArgument(v > 0, rewriteOptionMessage(key, "a positive int")));
+        break;
+      case NON_NEGATIVE_INT:
+        parseRewriteOptionInt(
+            key,
+            value,
+            v ->
+                Preconditions.checkArgument(
+                    v >= 0, rewriteOptionMessage(key, "a non-negative int")));
+        break;
+      case BOOLEAN:
+        Preconditions.checkArgument(
+            "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value),
+            rewriteOptionMessage(key, "true or false"));
+        break;
+      case REWRITE_JOB_ORDER:
+        Preconditions.checkArgument(
+            REWRITE_JOB_ORDERS.contains(value.toLowerCase(Locale.ROOT)),
+            "rewrite option '%s' must be one of %s, but got '%s'",
+            key,
+            REWRITE_JOB_ORDERS,
+            value);
+        break;
+      case RATIO:
+        try {
+          double ratio = Double.parseDouble(value.trim());
+          Preconditions.checkArgument(
+              ratio >= 0.0D && ratio <= 1.0D,
+              rewriteOptionMessage(key, "a number between 0 and 1"));
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException(
+              rewriteOptionMessage(key, "a number between 0 and 1"), e);
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unhandled rewrite option kind: " + kind);
+    }
+  }
+
+  private static void parseRewriteOptionLong(String key, String value, Consumer<Long> check) {
+    try {
+      check.accept(Long.parseLong(value.trim()));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(rewriteOptionMessage(key, "a long"), e);
+    }
+  }
+
+  private static void parseRewriteOptionInt(String key, String value, Consumer<Integer> check) {
+    try {
+      check.accept(Integer.parseInt(value.trim()));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(rewriteOptionMessage(key, "an int"), e);
+    }
+  }
+
+  private static String rewriteOptionMessage(String key, String expected) {
+    return String.format("rewrite option '%s' must be %s", key, expected);
   }
 }

@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.CATA
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.SCHEMA_PROPERTIES_META;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.TABLE_PROPERTIES_META;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Map;
@@ -501,5 +502,15 @@ public class TestIcebergCatalog {
     Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
     Assertions.assertTrue(
         credentialProviders.contains(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testPathBasedCredentialProvidersAllowed() {
+    IcebergCatalog catalog = new IcebergCatalog();
+    Assertions.assertTrue(catalog.supportsPathBasedCredentials());
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,gcs-token")));
   }
 }

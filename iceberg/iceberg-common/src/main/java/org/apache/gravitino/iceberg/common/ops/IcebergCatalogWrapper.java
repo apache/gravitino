@@ -35,6 +35,7 @@ import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.TableMetadata;
@@ -45,6 +46,8 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
@@ -61,11 +64,15 @@ import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
+import org.apache.iceberg.rest.responses.ImmutableLoadViewResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
+import org.apache.iceberg.view.BaseView;
+import org.apache.iceberg.view.View;
+import org.apache.iceberg.view.ViewMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -319,6 +326,19 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return getCatalog().tableExists(tableIdentifier);
   }
 
+  /**
+   * Returns whether the identifier resolves to a metadata table rather than to a table with that
+   * name. For example, {@code db.t.files} resolves to the files table of {@code db.t} when the
+   * namespace {@code db.t} has no table {@code files}.
+   *
+   * @param tableIdentifier the table identifier
+   * @return true if loading the identifier returns a metadata table
+   * @throws NoSuchTableException if neither exists
+   */
+  public boolean resolvesToMetadataTable(TableIdentifier tableIdentifier) {
+    return getCatalog().loadTable(tableIdentifier) instanceof BaseMetadataTable;
+  }
+
   public ListTablesResponse listTable(Namespace namespace) {
     return CatalogHandlers.listTables(getCatalog(), namespace);
   }
@@ -360,8 +380,28 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return CatalogHandlers.updateView(getViewCatalog(), viewIdentifier, request);
   }
 
+  /**
+   * Loads a view response from one metadata snapshot.
+   *
+   * @param viewIdentifier the view to load
+   * @return the view metadata and its location
+   * @throws NoSuchViewException if the view does not exist or disappears during loading
+   */
   public LoadViewResponse loadView(TableIdentifier viewIdentifier) {
-    return CatalogHandlers.loadView(getViewCatalog(), viewIdentifier);
+    View view = getViewCatalog().loadView(viewIdentifier);
+    Preconditions.checkState(
+        view instanceof BaseView, "Cannot wrap catalog that does not produce BaseView");
+    ViewMetadata metadata = ((BaseView) view).operations().current();
+    if (metadata == null) {
+      throw new NoSuchViewException("View does not exist: %s", viewIdentifier);
+    }
+    // CatalogHandlers' private viewResponse helper assumes non-null metadata. A native rename
+    // can remove the view after loadView's existence check, so build the same response from the
+    // checked snapshot rather than loading it again through the handler.
+    return ImmutableLoadViewResponse.builder()
+        .metadata(metadata)
+        .metadataLocation(metadata.metadataFileLocation())
+        .build();
   }
 
   public void dropView(TableIdentifier viewIdentifier) {

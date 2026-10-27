@@ -20,14 +20,15 @@
 
 # Build every Apache Gravitino Flink connector runtime shadow jar present in
 # the source tree and prepare the layout consumed by the Docker image.
-# Flink only supports Scala 2.12.
+# Flink 1.x jars use the Scala 2.12 suffix; Flink 2.x jars have no Scala suffix.
 #
 # The set of Flink runtime modules is DISCOVERED from the Gradle project, so
 # this script does not hard-code which versions exist. Whatever the checked-out
-# branch supports (for example 1.19/1.20/2.1) is built automatically.
+# branch supports (for example 1.19/1.20/2.1/2.2) is built automatically.
 #
 # Output layout:
-#   packages/connectors/flink-<ver>/gravitino-flink-connector-runtime-<ver>_2.12-*.jar
+#   packages/connectors/flink-1.<minor>/gravitino-flink-connector-runtime-1.<minor>_2.12-*.jar
+#   packages/connectors/flink-2.<minor>/gravitino-flink-connector-runtime-2.<minor>-*.jar
 
 set -euo pipefail
 
@@ -52,7 +53,7 @@ versions="$(echo "${runtime_modules}" | sed 's/flink-runtime-//' | sort -u)"
 echo "Discovered Flink connector versions:"
 echo "${versions}" | sed 's/^/  - /'
 
-# Assemble each discovered runtime shadow jar (Scala 2.12 only).
+# Assemble each discovered runtime shadow jar.
 tasks=""
 for m in ${runtime_modules}; do
   tasks="${tasks} :flink-connector:${m}:shadowJar"

@@ -175,7 +175,7 @@ public interface Privilege {
     /** The privilege to create a semantic model. */
     CREATE_SEMANTIC_MODEL(0L, 1L << 39),
     /** The privilege to discover a semantic model and load its definition. */
-    SELECT_SEMANTIC_MODEL(0L, 1L << 40),
+    USE_SEMANTIC_MODEL(0L, 1L << 40),
     /** The privilege to rename a semantic model or alter its definition and metadata. */
     MODIFY_SEMANTIC_MODEL(0L, 1L << 41);
 

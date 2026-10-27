@@ -44,8 +44,34 @@ a job runs. See [Placeholders](#placeholders).
 }
 ```
 
-`executable` and `scripts` must be reachable by the Gravitino server, which accepts local paths and
-HTTP, HTTPS, FTP, and FTPS URLs.
+`executable` and `scripts` are fetched by the job executor. With the `local` job executor they must
+be reachable by the Gravitino server, which accepts local paths and HTTP, HTTPS, FTP, and FTPS URLs.
+
+Each of them is fetched into the job's working directory under the file name of its path, so it
+must point to a file, and two different resources of a template must not share a file name: a run
+is rejected otherwise, instead of one file silently overwriting the other. The same applies to the
+`executable`, `jars`, `files` and `archives` of a Spark template.
+
+`executable` can also be a command name with no path, such as `python` or `bash`. Such a command is
+not fetched, it is looked up where the job runs: the `local` job executor looks it up on the `PATH`
+of the Gravitino server process, and setting `PATH` in `environments` doesn't change that. The
+scripts are still fetched next to it, into the job's working directory, so a template can run a
+script with an installed interpreter:
+
+```json
+{
+  "name": "python_report",
+  "jobType": "shell",
+  "executable": "python",
+  "arguments": ["report.py", "{{date}}"],
+  "scripts": ["https://repo.example.com/jobs/report.py"]
+}
+```
+
+A file name without a path, such as `run.sh`, is a command name too. Earlier versions fetched it as
+a file relative to the working directory of the Gravitino server; to run a file, write its absolute
+path or URI instead. To avoid running a different program than the one that was fetched, a run is
+rejected when a script has the same file name as a command-name `executable`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -377,7 +403,7 @@ default configurations:
 | `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed                                                                                    | `604800000` (7 days)          | No       |
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor                                                                                            | `300000` (5 minutes)          | No       |
 | `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output                                                                                      | `1000`                        | No       |
-| `gravitino.job.outputMaxBytes`         | The maximum number of bytes read from the tail of a job's stdout/stderr output                                                                                       | `262144` (256KB)              | No       |
+| `gravitino.job.outputMaxBytes`         | The maximum number of bytes returned from the tail of a job's stdout/stderr output                                                                                   | `262144` (256KB)              | No       |
 
 #### Configurations for Local Job Executor
 
@@ -415,6 +441,10 @@ only tracks the jobs it runs itself:
   `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
   `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
   directory.
+- To clear such a job sooner, cancel it. If the job is still `CANCELLING` more than three times
+  `gravitino.job.statusPullIntervalInMs` after the cancel request, the server running it is
+  considered gone, and another server marks the job as `CANCELLED` when it pulls job statuses. Its
+  job template can then be deleted.
 
 :::caution
 The local job executor can't tell a job left behind by an exited server from a job that is still
@@ -430,8 +460,31 @@ server doesn't recognize the jobs it ran before the restart. This also applies t
 deployment. The processes of these jobs are usually gone with the previous server process, but the
 jobs are only marked as `FAILED` once they expire as described above, which can take up to about
 1.1 times `gravitino.job.stagingDirKeepTimeInMs` (about 7.7 days by default), as the cleanup runs
-every tenth of that time. Until then, they are still reported as queued, started or cancelling.
-Cancelling such a job only marks it as `CANCELLING`, which also restarts the expiration.
+every tenth of that time. Until then, they are still reported as queued, started or cancelling, and
+they keep their job templates from being deleted.
+
+To clear these jobs sooner, cancel them. A cancelled job is marked as `CANCELLED` within about four
+times `gravitino.job.statusPullIntervalInMs`, as described above. Lowering
+`gravitino.job.stagingDirKeepTimeInMs` also shortens the time, but finished jobs are then kept for
+a shorter time, and a job that runs longer than that without changing its status is marked as
+`FAILED`.
+:::
+
+:::caution
+Telling a gone server from a live one by how long a job stays `CANCELLING` requires all servers to
+use the same `gravitino.job.statusPullIntervalInMs` and to have their clocks in sync. A job is also
+marked as `CANCELLED` while its server is still running it if that server doesn't answer the
+cancellation in time, for example because:
+
+- it uses a longer `gravitino.job.statusPullIntervalInMs` than the other servers, or its clock is
+  off,
+- it fails to pull job statuses for that long, or
+- the job process takes longer than one pull interval to exit, e.g. as
+  `gravitino.jobExecutor.local.cancelForceKillDelayInMs` is longer than the pull interval.
+
+If the server hasn't asked the job process to stop yet, it never does once the job is `CANCELLED`,
+so the process keeps running until it finishes, and deleting its job template also deletes the
+staging directory the process uses.
 :::
 
 ## Future Work

@@ -1,7 +1,7 @@
 name: Daft Iceberg REST Contract Test Action
 
 on:
-  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
