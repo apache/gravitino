@@ -55,6 +55,7 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
+import org.apache.gravitino.iceberg.common.ops.IcebergAuxCatalogBridge;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
@@ -132,12 +133,22 @@ public class IcebergCatalogOperations
     resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
+    // Aux IRC already owns a wrapper for this catalog name; reuse it (jdbc/hive/rest) instead of
+    // constructing a second backend client or HTTP-looping to the local REST server.
+    Optional<IcebergCatalogWrapper> shared = IcebergAuxCatalogBridge.resolve(info.name());
+    boolean reusedFromAux = shared.isPresent();
+    IcebergCatalogWrapper rawWrapper =
+        shared.orElseGet(() -> new IcebergCatalogWrapper(icebergConfig));
+    if (reusedFromAux) {
+      LOG.info("Reusing aux Iceberg REST catalog wrapper for lakehouse catalog '{}'", info.name());
+    }
 
     try {
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
+      // Kerberos proxy is applied when IRC created the wrapper; do not wrap twice.
       this.icebergCatalogWrapper =
-          authenticationConfig.isKerberosAuth()
+          !reusedFromAux
+                  && authenticationConfig.isKerberosAuth()
                   && rawWrapper.getCatalog() instanceof SupportsKerberos
               ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
               : rawWrapper;

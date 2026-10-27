@@ -537,6 +537,8 @@ To use access control with the Iceberg REST service:
 Access control for the Iceberg REST Catalog (IRC) is only supported when running as an auxiliary service embedded in the Gravitino server. Standalone Iceberg REST server deployments do not support access control features.
 
 When running as an auxiliary service, the `gravitino.iceberg-rest.gravitino-uri` configuration is **not required**. The service will use internal interfaces to access Gravitino directly, providing better performance and avoiding the need for HTTP-based communication.
+
+In the same auxiliary deployment, lakehouse-iceberg catalogs whose names are known to the embedded IRC reuse the IRC `IcebergCatalogWrapper` instances in-process (jdbc / hive / rest backends) instead of building a second client or HTTP-looping to the local REST port. Downstream IRC→remote REST (for example IRC2) still uses HTTP.
 :::
 
 Refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
