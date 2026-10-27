@@ -36,6 +36,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.catalog.lakehouse.hudi.utils.HudiSparkTestUtils;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -455,6 +456,7 @@ public class HudiCatalogHMSIT extends BaseIT {
   }
 
   private static void createHudiTables() {
+    HudiSparkTestUtils.resetHudiHiveClient();
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
