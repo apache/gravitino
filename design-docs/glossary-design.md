@@ -25,7 +25,7 @@
 
 This design covers the open-source part of the Business Glossary PRD (requirements G1–G10) and
 builds on the Domain design (apache/gravitino#13867). Enterprise features (G11–G18: approval
-workflow, versions, CSV import/export, UI) plug in through the hooks described here.
+workflow, version history, CSV import/export, UI) plug in through the hooks described here.
 
 ## Goals
 
@@ -36,8 +36,8 @@ workflow, versions, CSV import/export, UI) plug in through the hooks described h
    `RELATED` (symmetric). The server rejects cycles.
 3. **Bindings** (G3, G4): a term binds to catalogs, schemas, tables, views, columns, filesets,
    topics, models and semantic-model metrics. A binding never grants access.
-4. **Domains** (G5): a term belongs to zero or more domains through an explicit relation, and
-   domain grants govern it.
+4. **Domains** (G5): a term belongs to zero or more domains, and domain grants govern it. Two
+   options are compared in Domains; an explicit relation is proposed.
 5. **Status** (G6): `DRAFT`, `APPROVED`, `DEPRECATED`, set through the API. Agents see `APPROVED`
    terms only.
 6. **Privileges** (G7): `VIEW_DEFINITION`, `CREATE_DEFINITION`, `MANAGE_DEFINITIONS` on the
@@ -125,14 +125,56 @@ TermBinding  { termId, objectId, objectType, metricName?, audit_info }
 
 ### Domains
 
-- A term with no domain is governed by metalake grants only.
+A term belongs to zero or more domains, and domain grants govern it (G5, G7); a term with no
+domain is governed by metalake grants only. There are two ways to record the membership. Option A
+is proposed.
+
+**Option A: explicit relation (proposed)**
+
+- `glossary_term_domain_rel (term_id, domain_id)`, changed only through the term API
+  (`addDomain`, `removeDomain`, `domains` on create).
 - Adding a domain needs the edit privilege on the term and `CREATE_DEFINITION` on that domain, so
-  nobody can move a term into a domain they cannot write.
-- **Terms of a domain** use the Domain design's scope: terms linked to the domain or to a
-  subdomain the caller can see, each reported as `Direct` or `Via subdomain`.
+  nobody can move a term into a domain they cannot write. In Enterprise the change goes through
+  `TermChangeHandler` like any other term change.
+- **Terms of a domain** (`GET /domains/{domain}/terms`) use the Domain design's scope: terms linked
+  to the domain or to a subdomain the caller can see, reported as `Direct` or `Via subdomain`.
 - Dropping a domain that still has terms fails with 409 `NonEmptyDomainException`, like a domain
-  with subdomains; unlinking them silently would change who manages the terms. This is one added
+  with subdomains, since unlinking them would change who manages the terms. This is one added
   check in `DomainManager#dropDomain`.
+
+**Option B: backing tags, as for assets in #13867**
+
+- `GLOSSARY_TERM` becomes taggable and is added to `DomainMember.SUPPORTED_TYPES`. A term is in
+  domain D when it carries D's backing (tag, value); terms show up in `GET /domains/{domain}/objects`
+  and in the domains of an object. No relation table.
+- Plain tag rules are not enough. For assets, read access plus `APPLY_TAG` on a backing tag adds an
+  asset to a domain, and that grants nothing. For a term it decides who manages the term: a user
+  with only `VIEW_DEFINITION` and `APPLY_TAG` could add a term to Finance and hand it to Finance's
+  managers. Option B therefore needs two special cases in the tag association path for
+  `GLOSSARY_TERM`:
+  1. besides `APPLY_TAG`, the edit privilege on the term and `CREATE_DEFINITION` on the domain
+     that the (tag, value) backs, found through the Domain design's reverse lookup;
+  2. in Enterprise, a backing-tag change on a term goes through `TermChangeHandler` for approval
+     (Q6), instead of applying at once.
+- Changing or deleting a domain's backing tag silently moves terms out of the domain, so who
+  manages them changes with no term change. A domain drop works as for assets.
+
+**Comparison**
+
+|                              | Option A: explicit relation                                        | Option B: backing tags                                                   |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Meaning                      | "Term T belongs to domain D" is stored as such                     | Derived from tags: (T carries tag X) and (X backs D)                     |
+| Who can change it            | Term privileges + `CREATE_DEFINITION` on D, in one place           | `APPLY_TAG`, plus the two term-specific checks above                     |
+| Approval (Enterprise)        | Same path as other term edits                                      | Needs a hook in the tag association API                                  |
+| Stable governance            | Changes only through the term API                                  | Also changes when a backing tag is replaced or deleted                   |
+| Authorization lookup         | One indexed read of the term's domains                             | Term tags → reverse lookup of the domains they back                      |
+| Consistency with assets      | A second membership mechanism; terms listed by a separate endpoint | One mechanism (G5 wording); terms appear in domain member listings       |
+| Changes to the Domain design | Drop check only                                                    | Taggable `GLOSSARY_TERM`, new member type, special cases in the tag code |
+
+Option A is proposed: for terms, domain membership is a governance fact rather than a
+classification, so it should be explicit and changed only by people who govern the term. Option B
+matches the G5 wording, but it needs term-specific rules inside the generic tag code, which #13867
+keeps free of special cases.
 
 ### Bindings
 
@@ -301,17 +343,14 @@ Together with the `domain` tools of #13867, an agent can go from a domain to its
 
 1. **A glossary container** (`metalake.glossary.term`). It adds a second grouping axis next to
    Domain, and product chose Domain as the only grouping.
-2. **Domain membership through backing tags**, as for assets in #13867. Domain membership decides
-   who manages a term, so anyone with `APPLY_TAG` on a backing tag could move a term into a domain
-   and change who controls it; #13867 rejects data grants on domains for the same reason.
+2. **Domain membership through backing tags** (Option B in Domains): compared there.
 3. **Terms as tags on assets.** `APPLY_TAG` does not match the DEFINITION privileges, tags have no
    definition, relations or status, and tags carry policies while bindings must not affect access.
 
 ## Open Questions
 
-1. **G5 wording**: G5 asks for "the same membership model as other domain members", which in
-   #13867 is backing tags. This design uses an explicit relation (Alternative 2). Product and the
-   Domain design need to agree.
+1. **Domain membership of terms**: Option A (explicit relation, proposed) or Option B (backing
+   tags, the G5 wording). Product and the Domain design need to agree; see Domains.
 2. **One privilege set for Define objects**: #13867 defines `MANAGE_DOMAIN` / `USE_DOMAIN`, while
    the 2.0 privilege model uses the DEFINITION privileges for every Define object.
 3. **`PUBLIC` role**: Gravitino has none today; G7 needs it from the 2.0 privilege model work.
