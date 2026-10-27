@@ -49,6 +49,7 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
+    validateSqlIdentifier(databaseName);
     StringBuilder sqlBuilder = new StringBuilder();
 
     // Append database name
@@ -68,6 +69,7 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
+    validateSqlIdentifier(databaseName);
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append(String.format("DROP DATABASE `%s`", databaseName));
     if (cascade) {
