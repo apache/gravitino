@@ -125,14 +125,42 @@ parts:
 1. **Policy** — what to maintain, when to trigger, and non-sensitive job settings.
 2. **Scheduling and commit** — how work is enqueued, claimed, and recorded.
 
+### 5.0 Terminology: policy identity vs scheduler task kind
+
+Do **not** overload “task type”. TMS uses two different identities:
+
+| Concept | Meaning | Identity today |
+| ------- | ------- | -------------- |
+| **Policy / activity type** | Which maintenance the policy describes (compaction, manifest-rewrite, snapshot-expiry, orphan-cleanup) | `Policy.BuiltInType` (e.g. `ICEBERG_COMPACTION`) |
+| **Scheduler task kind** | Which db-scheduler row / pool owns the work | `policy-expand`, `cron-job`, `commit-job` |
+
+Rules:
+
+- Prefer **`Policy.BuiltInType`** as the single policy/activity identity. Server defaults
+  (for example per-type `minIntervalMs`) and content registries key off it. Do **not**
+  introduce a parallel enum that maps 1:1 to `BuiltInType` (the former
+  `TableMaintenanceTaskType` pattern).
+- Keep **scheduler task kinds** separate. They are control-plane scheduling units, not
+  policy types. One policy may produce expand / cron / commit work without changing its
+  `BuiltInType`.
+- If a future runtime “activity” ever diverges from policy identity (non-1:1), introduce
+  that concept then with an explicit contract. Until then, do not invent a second
+  activity layer.
+
+In prose, prefer “maintenance type” / `BuiltInType` for policy activity, and “scheduler
+task kind” for expand / cron-job / commit-job.
+
 TMS has two trigger paths that stay separate:
 
 - **crontab** — expand a policy into one-shot Spark submits (one type per submit).
 - **onCommit** — after an IRC commit, enqueue one per-table commit-job; one pick runs a
   chained Spark Job for the allowed types.
 
-Both paths end with a short control-plane `runJob` on the Gravitino Job framework. Read
-policy first, then scheduling.
+Both paths **build an enqueue-time job snapshot** (tables, chain steps, merged `jobConf`) into
+db-scheduler `task_data` before insert. The cron / commit pool pick **consumes that snapshot** —
+soft-slot claim, light in-flight checks, then `runJob` — and does **not** re-collect policies or
+rebuild `jobConf`. Both paths end with a short control-plane `runJob` on the Gravitino Job
+framework. Read policy first, then scheduling.
 
 | Store                                                          | Role                                                         |
 | -------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -147,31 +175,37 @@ policy first, then scheduling.
 
 TMS reuses the existing metalake Policy APIs and does **not** add
 `/api/maintenance/table/policies`. Each policy covers **one** maintenance type. The same
-policy may enable both `onCommit` and `crontab`.
+policy may enable both commit and time triggers (`commitTrigger` and `timeTrigger`).
 
-#### 5.1.1 Evaluate triggers (`onCommit` + `crontab`)
+#### 5.1.1 Evaluate triggers (`commitTrigger` + `timeTrigger`)
 
-Triggers live in **`policy_version_info.content.schedule`**, next to `jobOptions`,
-`rewriteOptions`, and `minIntervalMs`. Operators edit that versioned content through Policy
-APIs. `policy_meta` only holds identity and attachment. The `scheduled_*_tasks` tables are runtime
+Triggers are **flat** peers on policy content (same JSON object as `jobOptions` /
+`updaterOptions` / `rewriteOptions` / `minIntervalMs`): `commitTrigger` (boolean) and
+`timeTrigger` (cron string). Operators edit that versioned content through Policy APIs.
+`policy_meta` only holds identity and attachment. The `scheduled_*_tasks` tables are runtime
 state for db-scheduler — not where operators set triggers.
 
 TMS has two trigger modes. They never feed each other's queues:
 
-| Trigger    | Path                                     | Which types                                     |
-| ---------- | ---------------------------------------- | ----------------------------------------------- |
-| `onCommit` | IRC → **commit-job** only (skips expand) | Compaction / manifest-rewrite / snapshot-expiry |
-| `crontab`  | **policy-expand** → cron-job             | All four types                                  |
+| Wire field       | Runtime path                              | Which types                                     |
+| ---------------- | ----------------------------------------- | ----------------------------------------------- |
+| `commitTrigger`  | IRC → **commit-job** only (skips expand)  | Compaction / manifest-rewrite / snapshot-expiry |
+| `timeTrigger`    | **policy-expand** → cron-job              | All four types                                  |
 
-**`onCommit`** runs after a successful Iceberg commit through IRC. That fits types that
+**`commitTrigger`** runs after a successful Iceberg commit through IRC. That fits types that
 rewrite or expire data and metadata from the commit stream. **`orphan-cleanup` does not:**
 it scans storage for unreferenced files on a schedule. Running it on every commit would be
-too heavy. Create/alter rejects `schedule.onCommit = true` for orphan-cleanup; that type is
-**crontab-only**.
+too heavy. Create/alter rejects `commitTrigger = true` for orphan-cleanup; that type is
+**timeTrigger-only** when automation is enabled.
 
-**`minIntervalMs`** sits in policy content **beside** `schedule` (not inside it). It is the
-cooldown for **that policy's type** after `MAX(finished_at)` on `table_maintenance_job` for
-`(table, policy)`. Server conf and code defaults are lower-priority fallbacks.
+**`minIntervalMs`** is the cooldown for **that policy's type** after `MAX(finished_at)` on
+`table_maintenance_job` for `(table, policy)`. Server conf and code defaults are
+lower-priority fallbacks.
+
+**`timeTrigger` cron:** the string is stored as-is on the policy API. Syntax and time-zone
+rules are owned by the TMS / db-scheduler registration path (not re-validated with a second
+parser in `api`). Examples below use a typical six-field Quartz-style form; align examples
+with the scheduler contract when registration validation is wired.
 
 Example content:
 
@@ -183,28 +217,27 @@ Example content:
     "uri": "http://host:9001/iceberg",
     "type": "rest"
   },
-  "schedule": { "onCommit": true, "crontab": "0 2 * * *" },
+  "commitTrigger": true,
+  "timeTrigger": "0 0 2 * * ?",
   "minIntervalMs": 3600000
 }
 ```
 
-| Field               | Runtime effect                                                    |
-| ------------------- | ----------------------------------------------------------------- |
-| `schedule.onCommit` | IRC upserts commit-job; commit pool submits one chained Job       |
-| `schedule.crontab`  | Sets / refreshes next `policy-expand` due time                    |
-| `minIntervalMs`     | Cooldown for this policy's type; highest when set                 |
-| `jobOptions`        | Non-sensitive Spark / IRC client props (`uri`, `type`, memory, …) |
-
-Automated maintenance should set at least one of `onCommit` or `crontab` (orphan-cleanup:
-**`crontab` only**).
+| Field            | Runtime effect                                                    |
+| ---------------- | ----------------------------------------------------------------- |
+| `commitTrigger`  | IRC upserts commit-job; commit pool submits one chained Job       |
+| `timeTrigger`    | Sets / refreshes next `policy-expand` due time                    |
+| `minIntervalMs`  | Cooldown for this policy's type; highest when set                 |
+| `jobOptions`     | Non-sensitive Spark / IRC client props (`uri`, `type`, memory, …) |
+| `updaterOptions` | Non-sensitive Gravitino updater props (`gravitino_uri`, `metalake`, …) |
 
 #### 5.1.2 Sensitive credentials
 
 Policy content is versioned, edited through Policy APIs, and readable with `VIEW_POLICY`.
 **Secrets must not live there.** Put credential-shaped keys in `jobOptions` /
-`rewriteOptions` and create/alter **rejects** them. Non-sensitive Spark / IRC client props
-(`uri`, `type`, memory, …) stay on the nearest policy; auth is cluster-static in
-`gravitino.conf` (values may be SecretManager references). Conf keys: §7.4.
+`rewriteOptions` / `updaterOptions` and create/alter **rejects** them. Non-sensitive Spark /
+IRC client props (`uri`, `type`, memory, …) stay on the nearest policy; auth is
+cluster-static in `gravitino.conf` (values may be SecretManager references). Conf keys: §7.4.
 
 TMS talks to **two** backends with **two** identities, so there are two prefixes:
 
@@ -220,7 +253,7 @@ each — it does not write secrets back into policy content:
 
 | Runtime bag         | Non-sensitive (examples)                                      | Auth overlay                            |
 | ------------------- | ------------------------------------------------------------- | --------------------------------------- |
-| **`updateOptions`** | `gravitino_uri`, `metalake`, updater impl names, …            | `gravitino.maintenance.gravitinoAuth.*` |
+| **`updaterOptions`** | `gravitino_uri`, `metalake`, updater impl names, …            | `gravitino.maintenance.gravitinoAuth.*` |
 | **`jobOptions`**    | nearest policy `jobOptions` (`uri`, `type`, Spark resources…) | `gravitino.maintenance.ircAuth.*`       |
 
 ### 5.2 Scheduling and commit
@@ -259,9 +292,9 @@ gates**, **`minIntervalMs`**, and Iceberg **before/after snapshot ids**. That is
 | Column               | Type                       | Notes                                                                                      |
 | -------------------- | -------------------------- | ------------------------------------------------------------------------------------------ |
 | `id`                 | `BIGINT UNSIGNED` PK       | Auto increment                                                                             |
-| `job_id`             | `BIGINT UNSIGNED NULL`     | Set at `runJob`; maps to `job_run_meta.job_run_id`; null if released before submit         |
+| `job_id`             | `BIGINT UNSIGNED NULL`     | Set at `runJob`; maps to `job_run_meta.job_run_id`; **non-unique** — one Spark job may bind multiple tables; null if released before submit |
 | `table_id`           | `BIGINT UNSIGNED NOT NULL` | `table_meta` PK                                                                            |
-| `policy_id`          | `BIGINT UNSIGNED NOT NULL` | Cron: that Job's policy. Commit chain: first type that ran; full chain in runtime template |
+| `policy_id`          | `BIGINT UNSIGNED NOT NULL` | Soft slot per policy. Cron: that Job's policy. Commit chain: one row per chain member (same `job_id`) |
 | `before_snapshot_id` | `BIGINT NULL`              | Set inside the Spark Job when S0 is sampled                                                |
 | `after_snapshot_id`  | `BIGINT NULL`              | Iceberg snapshot after job terminal; null while pending                                    |
 | `finished_at`        | `BIGINT UNSIGNED NULL`     | Epoch millis; **null = in-flight**                                                         |
@@ -276,7 +309,7 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_job` (
     `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after job; null while pending',
     `finished_at` BIGINT(20) UNSIGNED NULL COMMENT 'end time; null = in-flight',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_job_id` (`job_id`),
+    KEY `idx_job_id` (`job_id`),
     KEY `idx_tmj_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
     KEY `idx_tmj_before_sid` (`table_id`, `before_snapshot_id`),
     KEY `idx_tmj_after_sid` (`table_id`, `after_snapshot_id`)
@@ -325,23 +358,27 @@ flowchart TD
   B --> C[Keep expand row; set next crontab]
 ```
 
-Example with crontab `0 2 * * *`: create inserts expand due next 02:00; at 02:00 expand inserts
+Example with `timeTrigger` `0 0 2 * * ?`: create inserts expand due next 02:00; at 02:00 expand inserts
 many cron-jobs due now, then schedules itself for the next 02:00. Expand's due time is when
 **enqueue** happens — not when Spark runs.
 
 #### 5.2.2 `cron-job`
 
-Expand writes these one-shot rows. Most types use one table per job
-(`table:{table_id}:{policy_id}`). Batched **snapshot-expiry** may use
-`batch:{batch_id}:{policy_id}`.
+Expand writes these one-shot rows **with an enqueue-time job snapshot** in `task_data`
+(metalake, table targets, one chain step, merged `jobConf` including auth overlays).
+`minIntervalMs` is gated at expand / enqueue so cooled-down tables are not scheduled.
+Most types use one table per job (`table:{table_id}:{policy_id}`). Batched **snapshot-expiry**
+may use `batch:{batch_id}:{policy_id}` (one snapshot covering several same-catalog tables).
 
-When a cron-job is due (cron pool), keep the callback short — insert then submit; do not sample here:
+When a cron-job is due (cron pool), keep the callback short — consume the snapshot, claim, submit;
+do not sample or rebuild `jobConf` here. For a batch row, **any** in-flight table aborts the whole
+pick (no partial submits) before the one-shot row is removed:
 
 ```mermaid
 flowchart TD
-  A{Already in-flight?} -->|yes| Z[Delete cron-job; stop]
-  A -->|no| B[Insert table_maintenance_job]
-  B --> C[runJob]
+  A[Read enqueue-time snapshot from task_data] --> B{Any snapshot table in-flight?}
+  B -->|yes| Z[Delete cron-job; stop]
+  B -->|no| C[For each table: insert table_maintenance_job + runJob]
   C --> D[Delete cron-job; return]
 ```
 
@@ -365,21 +402,35 @@ A later wake-up sees the fresher state.
 
 After a successful IRC table update in the same JVM, an `EventListenerPlugin` upserts one
 commit-job for that table (`{table_id}`). Register it with `gravitino.eventListener.names` /
-`{name}.class`. The listener only enqueues — it does not submit Spark or build the type chain.
-Bursts of commits on the same table coalesce to one row.
+`{name}.class`. The listener does **not** submit Spark; enqueue (on the listener thread path)
+builds the onCommit chain and snapshot, then inserts the row.
+
+**Enqueue** (before the commit-job row exists):
+
+1. Collect nearest policies with `commitTrigger=true` in order compaction →
+   manifest-rewrite → snapshot-expiry (orphan cleanup is timeTrigger-only).
+2. Drop members still inside `minIntervalMs`.
+3. Fail closed if effective Gravitino / IRC auth bags disagree across the remaining chain.
+4. Build an enqueue-time job snapshot (table target, ordered chain steps, merged `jobConf`)
+   into `task_data`.
+5. `scheduleIfNotExists` due now. Bursts coalesce: an existing row keeps its original
+   `task_data` (no overwrite).
+
+If the chain is empty after gates, or snapshot build fails, **skip** — do not insert a row.
 
 When a commit-job is due (commit pool) — keep the callback short; Spark runs elsewhere:
 
 ```mermaid
 flowchart TD
-  A{Any type in chain in-flight?} -->|yes| Z[Delete commit-job; stop]
-  A -->|no| B["Collect onCommit types: compaction → manifest-rewrite → snapshot-expiry"]
-  B --> C[Insert table_maintenance_job]
-  C --> D[Merge jobOptions + auth; one runJob]
+  A[Read enqueue-time snapshot from task_data] --> B{Any snapshot type in-flight?}
+  B -->|yes| Z[Delete commit-job; stop]
+  B -->|no| C[Claim soft slots for every chain policy]
+  C --> D[runJob from snapshot jobConf / chain]
   D --> E[Delete commit-job]
 ```
 
-Insert then `runJob` — sampling is **not** on the control plane.
+Consume the snapshot then `runJob` — sampling is **not** on the control plane; pick does
+**not** re-collect policies or re-merge auth.
 
 Inside that **one** Spark Job, types run in order in the same process. Each type's full flow
 includes its own sample / recommend / work. If the snapshot drifts during a type, **end that type**
@@ -443,14 +494,14 @@ where needed, mutate tables, and run Jobs.
 | ----------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `gravitino.server.rest.extensionPackages` | Include TMS Feature package (e.g. `org.apache.gravitino.maintenance.web.rest.feature`)     |
 | `gravitino.auxService.names`              | Include `iceberg-rest` when using IRC (same JVM)                                           |
-| `gravitino.eventListener.names`           | Include a TMS commit-job listener name (e.g. `tms-commit-job`)                             |
+| `gravitino.eventListener.names`           | Include the post-commit maintenance listener name (example below)                          |
 | `gravitino.eventListener.{name}.class`    | FQCN of the TMS `EventListenerPlugin` that upserts commit-job on `IcebergUpdateTableEvent` |
 
 ```properties
 gravitino.server.rest.extensionPackages = org.apache.gravitino.maintenance.web.rest.feature
 gravitino.auxService.names = iceberg-rest
-gravitino.eventListener.names = tms-commit-job
-gravitino.eventListener.tms-commit-job.class = org.apache.gravitino.maintenance.listener.IcebergUpdateTableEventListener
+gravitino.eventListener.names = post-commit-maintenance-listener
+gravitino.eventListener.post-commit-maintenance-listener.class = org.apache.gravitino.maintenance.listener.PostCommitMaintenanceListener
 gravitino.maintenance.scheduler.expandThreads = 4
 gravitino.maintenance.scheduler.cronThreads = 8
 gravitino.maintenance.scheduler.commitThreads = 4
@@ -500,7 +551,7 @@ Cluster-static — **not** in policy content and **not** a DB table.
 
 | Prefix                                 | Role                                                         | Merged into `runJob` bag                        |
 | -------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
-| `gravitino.maintenance.gravitinoAuth.` | Expand / submit / RBAC client; also jobs that call Gravitino | `updateOptions` (+ non-sensitive updater props) |
+| `gravitino.maintenance.gravitinoAuth.` | Expand / submit / RBAC client; also jobs that call Gravitino | `updaterOptions` (+ non-sensitive updater props) |
 | `gravitino.maintenance.ircAuth.`       | Iceberg REST client auth for Spark Jobs → IRC                | `jobOptions` (+ policy non-sensitive props)     |
 
 Illustrative auth keys (same shape under each prefix; values may be SecretManager references where
@@ -549,8 +600,9 @@ Implementation checklist:
 - [ ] Insert `table_maintenance_job` then `runJob`; sample / recommend / drift handling run
       **inside** the Spark Job; then DELETE the scheduled row.
 - [ ] Validation reads metrics per type in the run; purge unreferenced history by TTL/N.
-- [ ] Commit path: one chained Job; `policy_id` = first type; full chain in runtime template;
-      orphan crontab-only; coalesce on `{table_id}`; Spark `jobOptions` merge uses max.
+- [ ] Commit path: one chained Job; soft slot per chain policy (same `job_id`); full chain in
+      `maintenance_types` / `policy_ids`; orphan crontab-only; coalesce on `{table_id}`; Spark
+      `jobOptions` merge uses max.
 - [ ] Client auth from `gravitino.conf` only; reject credential-shaped keys in policy
       `jobOptions`.
 - [ ] Authorization on ⇒ grants to the token identity; no auto user bootstrap.

@@ -113,6 +113,7 @@ jobs:
             -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test \
             -x :iceberg:iceberg-rest-trino-it:test \
             -x :plugins:idp-basic:test \
+            -x :plugins:maintenance:test \
             -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test \
             -x :clients:cli:test -x :maintenance:jobs:test -x :maintenance:optimizer:test \
             $EXCLUDE_CONTRIB_TESTS

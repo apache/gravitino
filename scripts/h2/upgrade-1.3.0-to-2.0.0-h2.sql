@@ -91,7 +91,11 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
     `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
     `semantic_model_comment` CLOB DEFAULT NULL COMMENT 'semantic model comment snapshot',
-    `semantic_model_definition` CLOB NOT NULL COMMENT 'structured definition snapshot (JSON)',
+    `datasets` CLOB NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
+    `relationships` CLOB DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
+    `metrics` CLOB DEFAULT NULL COMMENT 'metric definitions snapshot (JSON)',
+    `ai_context` CLOB DEFAULT NULL COMMENT 'model AI context snapshot (JSON)',
+    `custom_extensions` CLOB DEFAULT NULL COMMENT 'model custom extensions snapshot (JSON)',
     `properties` CLOB DEFAULT NULL COMMENT 'semantic model properties snapshot (JSON)',
     `audit_info` CLOB NOT NULL COMMENT 'semantic model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
@@ -164,7 +168,7 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
     PRIMARY KEY (`id`)
 ) COMMENT='table maintenance action metadata';
-CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_job_id` ON `table_maintenance_action`(`job_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_job_id` ON `table_maintenance_action`(`job_id`);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
 CREATE INDEX IF NOT EXISTS `idx_tma_before_sid` ON `table_maintenance_action`(`table_id`, `before_snapshot_id`);

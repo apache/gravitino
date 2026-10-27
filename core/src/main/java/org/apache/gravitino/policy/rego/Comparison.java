@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 
 /** A binary comparison operation. */
-final class Comparison implements CanonicalExpression {
+public final class Comparison implements CanonicalExpression {
   private final ComparisonOperator operator;
   private final CanonicalExpression left;
   private final CanonicalExpression right;
@@ -33,15 +33,30 @@ final class Comparison implements CanonicalExpression {
     this.right = right;
   }
 
-  ComparisonOperator operator() {
+  /**
+   * Returns the comparison operator.
+   *
+   * @return comparison operator
+   */
+  public ComparisonOperator operator() {
     return operator;
   }
 
-  CanonicalExpression left() {
+  /**
+   * Returns the left operand.
+   *
+   * @return left operand
+   */
+  public CanonicalExpression left() {
     return left;
   }
 
-  CanonicalExpression right() {
+  /**
+   * Returns the right operand.
+   *
+   * @return right operand
+   */
+  public CanonicalExpression right() {
     return right;
   }
 
