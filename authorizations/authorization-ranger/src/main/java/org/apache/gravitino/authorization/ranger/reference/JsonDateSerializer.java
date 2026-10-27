@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization.ranger.reference;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.TimeZone;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.map.JsonSerializer;
 import org.codehaus.jackson.map.SerializerProvider;
@@ -36,7 +37,9 @@ public class JsonDateSerializer extends JsonSerializer<Date> {
   @Override
   public void serialize(Date date, JsonGenerator gen, SerializerProvider provider)
       throws IOException {
-    String formattedDate = new SimpleDateFormat(DATE_FORMAT).format(date);
+    SimpleDateFormat simpleDateFormat = new SimpleDateFormat(DATE_FORMAT);
+    simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+    String formattedDate = simpleDateFormat.format(date);
     gen.writeString(formattedDate);
   }
 }
