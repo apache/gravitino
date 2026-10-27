@@ -108,8 +108,8 @@ public final class PolicyExpandPipeline {
   /**
    * Runs one expand pick for {@code policyId}.
    *
-   * <p>Runs under {@link MaintenanceAuthDoAs} so lakehouse {@code rest} backends can forward
-   * an Authorization header to Iceberg REST when the scheduler thread has no inbound user.
+   * <p>Runs under {@link MaintenanceAuthDoAs} so lakehouse {@code rest} backends can forward an
+   * Authorization header to Iceberg REST when the scheduler thread has no inbound user.
    *
    * @param policyId expand task instance id
    * @return next due time when the expand row should stay, or empty to delete the row
