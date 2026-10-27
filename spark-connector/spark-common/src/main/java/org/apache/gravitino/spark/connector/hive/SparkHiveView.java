@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
@@ -161,8 +162,9 @@ public class SparkHiveView extends HiveTable {
                       "View '{}' has no Spark SQL representation; falling back to Hive SQL. "
                           + "Results may differ if the SQL uses Hive-specific syntax.",
                       gravitinoView.name());
-                  // Hive stores the view text with its table names qualified as the expanded text.
-                  return catalogTable().viewText().getOrElse(() -> hiveSql);
+                  // For a view created by Hive, the expanded text has its table names qualified.
+                  String expandedText = catalogTable().viewText().getOrElse(() -> "");
+                  return StringUtils.isNotBlank(expandedText) ? expandedText : hiveSql;
                 });
     return new ViewScanBuilder(spark, viewSql, schema(), relationQualifier(spark));
   }
@@ -182,7 +184,7 @@ public class SparkHiveView extends HiveTable {
     if (recorded.isEmpty()) {
       viewNamespace.add(schemaName);
     } else {
-      if (!CatalogManager.SESSION_CATALOG_NAME().equals(recorded.get(0))) {
+      if (!CatalogManager.SESSION_CATALOG_NAME().equalsIgnoreCase(recorded.get(0))) {
         viewCatalog = recorded.get(0);
       }
       viewNamespace.addAll(recorded.subList(1, recorded.size()));

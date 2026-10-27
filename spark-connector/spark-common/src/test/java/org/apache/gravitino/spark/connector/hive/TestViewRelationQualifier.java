@@ -24,12 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.spark.sql.catalyst.analysis.RelationTimeTravel;
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation;
 import org.apache.spark.sql.catalyst.expressions.Expression;
 import org.apache.spark.sql.catalyst.expressions.SubqueryExpression;
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser;
 import org.apache.spark.sql.catalyst.parser.ParseException;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
+import org.apache.spark.sql.internal.SQLConf;
 import org.junit.jupiter.api.Test;
 import scala.collection.JavaConverters;
 
@@ -66,6 +68,33 @@ public class TestViewRelationQualifier {
         relations("WITH t AS (SELECT * FROM base) SELECT * FROM t"));
   }
 
+  @Test
+  void testQualifiesTimeTravelRelations() throws ParseException {
+    assertEquals(Arrays.asList("hive.db1.t"), relations("SELECT * FROM t VERSION AS OF 1"));
+  }
+
+  @Test
+  void testQualifiesNestedCtesUnderLegacyPolicy() throws ParseException {
+    SQLConf conf = SQLConf.get();
+    String key = SQLConf.LEGACY_CTE_PRECEDENCE_POLICY().key();
+    String previous = conf.getConfString(key, null);
+    conf.setConfString(key, "LEGACY");
+    try {
+      assertEquals(
+          Arrays.asList("hive.db1.t"),
+          relations("WITH a AS (WITH b AS (SELECT * FROM t) SELECT * FROM b) SELECT * FROM a"));
+      assertEquals(
+          Arrays.asList("hive.db1.a", "hive.db1.b"),
+          relations("SELECT * FROM a WHERE id IN (WITH c AS (SELECT id FROM b) SELECT id FROM c)"));
+    } finally {
+      if (previous == null) {
+        conf.unsetConf(key);
+      } else {
+        conf.setConfString(key, previous);
+      }
+    }
+  }
+
   private static List<String> relations(String sql) throws ParseException {
     List<String> names = new ArrayList<>();
     collect(QUALIFIER.qualify(new CatalystSqlParser().parsePlan(sql)), names);
@@ -73,6 +102,9 @@ public class TestViewRelationQualifier {
   }
 
   private static void collect(LogicalPlan plan, List<String> names) {
+    if (plan instanceof RelationTimeTravel) {
+      collect(((RelationTimeTravel) plan).relation(), names);
+    }
     if (plan instanceof UnresolvedRelation) {
       List<String> parts =
           JavaConverters.seqAsJavaList(((UnresolvedRelation) plan).multipartIdentifier());

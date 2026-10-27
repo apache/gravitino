@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 import org.apache.spark.sql.catalyst.analysis.CTESubstitution;
+import org.apache.spark.sql.catalyst.analysis.RelationTimeTravel;
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation;
 import org.apache.spark.sql.catalyst.expressions.Expression;
 import org.apache.spark.sql.catalyst.expressions.SubqueryExpression;
@@ -31,11 +32,15 @@ import scala.collection.JavaConverters;
 
 /**
  * Qualifies the table names in a parsed view query with the namespace the view resolves in, the way
- * Spark expands names inside a view: a one-part name gets the catalog and the namespace, and a name
- * whose first part is not a registered catalog gets the catalog.
+ * Spark expands table names inside a view: a one-part name gets the catalog and the namespace, and
+ * a name whose first part is not a registered catalog gets the catalog. Function names and names
+ * built with {@code IDENTIFIER(...)} are not qualified.
  */
 @SuppressWarnings("deprecation") // JavaConverters is deprecated on Scala 2.13 but required on 2.12
 final class ViewRelationQualifier {
+
+  // The analyzer applies CTESubstitution in a batch of at most 100 iterations by default.
+  private static final int MAX_CTE_SUBSTITUTIONS = 100;
 
   private final String catalog;
   private final List<String> namespace;
@@ -60,12 +65,31 @@ final class ViewRelationQualifier {
    * @return the plan with qualified table names
    */
   LogicalPlan qualify(LogicalPlan plan) {
-    return qualifyPlan(CTESubstitution.apply(plan));
+    return qualifyPlan(substituteCtes(plan));
+  }
+
+  // The legacy CTE precedence policy substitutes one level of nested WITH per run, so run it until
+  // nothing changes, as the analyzer does.
+  private static LogicalPlan substituteCtes(LogicalPlan plan) {
+    LogicalPlan current = plan;
+    for (int i = 0; i < MAX_CTE_SUBSTITUTIONS; i++) {
+      LogicalPlan next = CTESubstitution.apply(current);
+      if (next.fastEquals(current)) {
+        break;
+      }
+      current = next;
+    }
+    return current;
   }
 
   private LogicalPlan qualifyPlan(LogicalPlan plan) {
     if (plan instanceof UnresolvedRelation) {
       return qualifyRelation((UnresolvedRelation) plan);
+    }
+    if (plan instanceof RelationTimeTravel) {
+      RelationTimeTravel timeTravel = (RelationTimeTravel) plan;
+      return new RelationTimeTravel(
+          qualifyPlan(timeTravel.relation()), timeTravel.timestamp(), timeTravel.version());
     }
     return plan.mapChildren(this::qualifyPlan).mapExpressions(this::qualifyExpression);
   }
@@ -73,8 +97,9 @@ final class ViewRelationQualifier {
   private Expression qualifyExpression(Expression expression) {
     Expression qualified = expression;
     if (expression instanceof SubqueryExpression) {
+      // Spark analyzes a subquery on its own, which substitutes the CTEs it defines.
       SubqueryExpression subquery = (SubqueryExpression) expression;
-      qualified = subquery.withNewPlan(qualifyPlan(subquery.plan()));
+      qualified = subquery.withNewPlan(qualify(subquery.plan()));
     }
     return qualified.mapChildren(this::qualifyExpression);
   }
