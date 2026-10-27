@@ -37,6 +37,7 @@ import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceControlPlaneAuth;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
@@ -137,7 +138,9 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
   }
 
   private Optional<MaintenanceJobSpec> buildSpec(long tableId) {
-    Optional<CollectedCommitChain> collected = chainCollector.apply(tableId);
+    // Nearest-policy resolve may tableExists via REST → IRC; need gravitinoAuth principal.
+    Optional<CollectedCommitChain> collected =
+        MaintenanceControlPlaneAuth.call(gravitinoConfig, () -> chainCollector.apply(tableId));
     if (collected.isEmpty()) {
       return Optional.empty();
     }

@@ -137,4 +137,40 @@ class TestGravitinoAuthSettings {
     Assertions.assertEquals(
         "YourSecureGravitinoPassword", properties.get(OptimizerConfig.AUTH_PASSWORD));
   }
+
+  @Test
+  void authorizationHeaderForBasic() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(OptimizerConfig.AUTH_TYPE, "basic");
+    properties.put(OptimizerConfig.AUTH_USERNAME, "admin");
+    properties.put(OptimizerConfig.AUTH_PASSWORD, "secret");
+    GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
+
+    Assertions.assertEquals("admin", settings.principalName());
+    String header = settings.authorizationHeader().orElseThrow();
+    Assertions.assertTrue(header.startsWith("Basic "));
+    Assertions.assertEquals(
+        "admin:secret",
+        new String(
+            java.util.Base64.getDecoder().decode(header.substring("Basic ".length())),
+            java.nio.charset.StandardCharsets.UTF_8));
+  }
+
+  @Test
+  void authorizationHeaderEmptyForNone() {
+    GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig());
+    Assertions.assertTrue(settings.authorizationHeader().isEmpty());
+  }
+
+  @Test
+  void principalNameForOauthUsesClientId() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(OptimizerConfig.AUTH_TYPE, "oauth");
+    properties.put(OptimizerConfig.AUTH_OAUTH_SERVER_URI, "http://idp");
+    properties.put(OptimizerConfig.AUTH_OAUTH_PATH, "token");
+    properties.put(OptimizerConfig.AUTH_OAUTH_CREDENTIAL, "svc-client:secret");
+    properties.put(OptimizerConfig.AUTH_OAUTH_SCOPE, "catalog");
+    GravitinoAuthSettings settings = GravitinoAuthSettings.from(new OptimizerConfig(properties));
+    Assertions.assertEquals("svc-client", settings.principalName());
+  }
 }

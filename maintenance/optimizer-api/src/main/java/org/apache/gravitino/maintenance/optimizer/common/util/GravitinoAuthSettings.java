@@ -19,11 +19,16 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClientBase;
+import org.apache.gravitino.client.OAuth2TokenProvider;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
 /**
@@ -40,6 +45,9 @@ public final class GravitinoAuthSettings {
   public static final String TYPE_SIMPLE = "simple";
   public static final String TYPE_BASIC = "basic";
   public static final String TYPE_OAUTH = "oauth";
+
+  /** Password used when building a Basic Authorization header for {@link #TYPE_SIMPLE}. */
+  static final String SIMPLE_AUTH_DUMMY_PASSWORD = "dummy";
 
   private final String authType;
   private final String username;
@@ -158,6 +166,68 @@ public final class GravitinoAuthSettings {
   }
 
   /**
+   * Builds the raw {@code Authorization} header value for forwarding (for example {@code Bearer …}
+   * or {@code Basic …}). Empty when auth is unset or {@code none}.
+   *
+   * <p>Matches the value stored on {@code UserPrincipal} by Gravitino server authenticators so
+   * Iceberg REST {@code UserPrincipalForwardingAuthManager} can reuse it.
+   *
+   * @return authorization header value, or empty when no credentials apply
+   */
+  public Optional<String> authorizationHeader() {
+    switch (normalizedType()) {
+      case TYPE_SIMPLE:
+        return Optional.of(basicAuthorization(simpleUsername(), SIMPLE_AUTH_DUMMY_PASSWORD));
+      case TYPE_BASIC:
+        requireValue(username, "username is required for basic authentication");
+        requireValue(password, "password is required for basic authentication");
+        return Optional.of(basicAuthorization(username.trim(), password));
+      case TYPE_OAUTH:
+        return Optional.of(oauthAuthorizationHeader());
+      case TYPE_NONE:
+        return Optional.empty();
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported auth_type: "
+                + authType
+                + ". Supported values are: none, simple, basic, oauth");
+    }
+  }
+
+  /**
+   * Principal name to use with {@link #authorizationHeader()} for control-plane {@code doAs}.
+   *
+   * @return non-blank principal name
+   */
+  public String principalName() {
+    switch (normalizedType()) {
+      case TYPE_SIMPLE:
+        return simpleUsername();
+      case TYPE_BASIC:
+        requireValue(username, "username is required for basic authentication");
+        return username.trim();
+      case TYPE_OAUTH:
+        if (StringUtils.isNotBlank(username)) {
+          return username.trim();
+        }
+        requireValue(oauthCredential, "oauth credential is required for oauth authentication");
+        String credential = oauthCredential.trim();
+        int split = credential.indexOf(':');
+        if (split > 0) {
+          return credential.substring(0, split);
+        }
+        return "oauth-client";
+      case TYPE_NONE:
+        throw new IllegalStateException("principalName is not available when auth_type is none");
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported auth_type: "
+                + authType
+                + ". Supported values are: none, simple, basic, oauth");
+    }
+  }
+
+  /**
    * Returns the normalized auth type, or {@link #TYPE_NONE} when unset.
    *
    * @return auth type
@@ -235,6 +305,47 @@ public final class GravitinoAuthSettings {
         return;
       }
     }
+  }
+
+  private String oauthAuthorizationHeader() {
+    requireValue(oauthServerUri, "oauth server URI is required for oauth authentication");
+    requireValue(oauthPath, "oauth path is required for oauth authentication");
+    requireValue(oauthCredential, "oauth credential is required for oauth authentication");
+    requireValue(oauthScope, "oauth scope is required for oauth authentication");
+    try (OAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(oauthServerUri)
+            .withPath(oauthPath)
+            .withCredential(oauthCredential)
+            .withScope(oauthScope)
+            .build()) {
+      byte[] tokenData = provider.getTokenData();
+      if (tokenData == null || tokenData.length == 0) {
+        throw new IllegalStateException("OAuth token provider returned an empty token");
+      }
+      return new String(tokenData, StandardCharsets.UTF_8);
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to request OAuth token: " + e.getMessage(), e);
+    }
+  }
+
+  private String simpleUsername() {
+    if (StringUtils.isNotBlank(username)) {
+      return username.trim();
+    }
+    String envUser = System.getenv("GRAVITINO_USER");
+    if (StringUtils.isNotBlank(envUser)) {
+      return envUser.trim();
+    }
+    return System.getProperty("user.name");
+  }
+
+  private static String basicAuthorization(String user, String pass) {
+    String encoded =
+        Base64.getEncoder().encodeToString((user + ":" + pass).getBytes(StandardCharsets.UTF_8));
+    return AuthConstants.AUTHORIZATION_BASIC_HEADER + encoded;
   }
 
   private static void requireValue(String value, String message) {
