@@ -5,13 +5,31 @@ name: Iceberg REST Trino Integration Test
 # The module uses a Java 24 toolchain (Trino 478) and runs in deploy mode against
 # the built distribution, so it needs its own job rather than the catch-all backend IT.
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: fork-ci-iceberg-rest-trino-${{ inputs.head-sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -19,11 +37,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
       - name: Disable Git automatic maintenance
         run: git config --local maintenance.auto false
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
           filters: |
             source_changes:
               - .github/**
@@ -52,5 +82,10 @@ jobs:
         java-version: [ 17 ]
     uses: ./.github/workflows/iceberg-rest-trino-integration-test-action.yml
     with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}

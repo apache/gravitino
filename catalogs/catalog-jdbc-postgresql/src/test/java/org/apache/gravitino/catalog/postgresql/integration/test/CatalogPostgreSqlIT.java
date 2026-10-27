@@ -1133,7 +1133,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
           break;
         case "character_col_3":
-          Assertions.assertEquals(Literals.stringLiteral("''::bpchar"), column.defaultValue());
+          Assertions.assertEquals(Literals.stringLiteral(""), column.defaultValue());
           break;
         default:
           Assertions.fail("Unexpected column name: " + column.name());

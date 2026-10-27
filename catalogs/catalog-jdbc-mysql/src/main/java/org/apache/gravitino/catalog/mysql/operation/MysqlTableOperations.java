@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValue
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -397,7 +396,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
         TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
             (TableChange.UpdateColumnDefaultValue) change;
         alterSql.add(
-            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
+            updateColumnDefaultValueFieldDefinition(
+                updateColumnDefaultValue, lazyLoadTable, changes));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -423,7 +423,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnNullabilityDefinition(
-                (TableChange.UpdateColumnNullability) change, lazyLoadTable));
+                (TableChange.UpdateColumnNullability) change, lazyLoadTable, changes));
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
@@ -442,7 +442,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -531,19 +531,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private String updateColumnNullabilityDefinition(
-      TableChange.UpdateColumnNullability change, JdbcTable table) {
-    validateUpdateColumnNullable(change, table);
+      TableChange.UpdateColumnNullability change, JdbcTable table, TableChange... changes) {
+    JdbcColumn column = validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    JdbcColumn updateColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(change.nullable())
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withAutoIncrement(column.autoIncrement())
-            .build();
+    JdbcColumn updateColumn = withPendingDefaultValueAndNullability(column, changes);
     return MODIFY_COLUMN
         + BACK_QUOTE
         + col
@@ -729,12 +720,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append(AFTER).append(afterPosition.getColumn());
+      columnDefinition.append(AFTER).append(quote(afterPosition.getColumn()));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append(AFTER).append(quote(s)));
     }
     return columnDefinition.toString();
   }
@@ -762,22 +753,16 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private String updateColumnDefaultValueFieldDefinition(
-      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue,
+      JdbcTable jdbcTable,
+      TableChange... changes) {
     if (updateColumnDefaultValue.fieldName().length > 1) {
       throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnDefaultValue.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quote(col));
-    JdbcColumn newColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withType(column.dataType())
-            .withNullable(column.nullable())
-            .withComment(column.comment())
-            .withAutoIncrement(column.autoIncrement())
-            .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
-            .build();
+    JdbcColumn newColumn = withPendingDefaultValueAndNullability(column, changes);
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
@@ -794,7 +779,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
