@@ -276,7 +276,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
   }
 
   private Seq<SparkPlan> superFallback(LogicalPlan plan) {
-    // Strategy.apply returns scala.collection.Seq; the parent strategy builds immutable Seqs.
+    // On Scala 2.12 Strategy.apply returns scala.collection.Seq; the parent builds immutable Lists.
     return (Seq<SparkPlan>) (Object) super.apply(plan);
   }
 

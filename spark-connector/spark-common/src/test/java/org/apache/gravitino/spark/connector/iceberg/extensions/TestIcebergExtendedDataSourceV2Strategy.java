@@ -32,7 +32,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Tests {@link IcebergExtendedDataSourceV2Strategy} on catalogs that Gravitino does not manage. */
+/**
+ * Tests {@link IcebergExtendedDataSourceV2Strategy} on an Iceberg catalog that Gravitino does not
+ * manage.
+ */
 public class TestIcebergExtendedDataSourceV2Strategy {
 
   @TempDir static Path warehouse;
