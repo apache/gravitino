@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.authorization;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -110,16 +111,34 @@ public class TestRequiredPrivilegesSparkResolution {
   }
 
   @Test
-  void testAbortedAnalysisLeavesNoStaleDenialForLaterQueries() {
-    // A mid-resolution abort (here: the catalog's loadTable throwing on the second table after
-    // the first was denied) must not leave a denial behind that fails a later unrelated query.
-    // On the unfixed thread-local design this leaked and the later count() threw.
+  void testDescribeDeniedTableReportsForbidden() {
+    ForbiddenException failure =
+        assertThrows(ForbiddenException.class, () -> spark.sql("DESCRIBE TABLE denied.db.t1"));
+
+    assertTrue(failure.getMessage().contains("denied.db.t1: SELECT_TABLE"), failure.getMessage());
+  }
+
+  @Test
+  void testDeniedGetTableDoesNotFailLaterQueries() throws Exception {
+    // Spark 3.5 loads the table after analysis, so no post-hoc rule sees the denied placeholder.
+    // Spark 4 resolves the table during analysis and reports the denial there.
+    try {
+      spark.catalog().getTable("denied.db.t1");
+    } catch (ForbiddenException e) {
+      assertTrue(e.getMessage().contains("denied.db.t1: SELECT_TABLE"), e.getMessage());
+    }
+
+    assertEquals(1L, spark.range(1).count());
+  }
+
+  @Test
+  void testAbortedAnalysisDoesNotFailLaterQueries() {
+    // The broken catalog throws while the join is resolved, after denied.db.t1 was loaded.
     assertThrows(
         RuntimeException.class,
         () -> spark.sql("SELECT 1 FROM denied.db.t1 JOIN broken.db.t2 ON 1 = 1"));
 
-    // Later unrelated queries on the same session/thread must succeed.
-    org.junit.jupiter.api.Assertions.assertEquals(1L, spark.range(1).count());
+    assertEquals(1L, spark.range(1).count());
   }
 
   /** A catalog that denies every table, used to exercise the authorization resolution path. */

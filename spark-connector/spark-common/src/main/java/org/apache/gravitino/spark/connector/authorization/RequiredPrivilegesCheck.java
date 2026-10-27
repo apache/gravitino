@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.spark.sql.catalyst.analysis.NamedRelation;
+import org.apache.spark.sql.catalyst.analysis.ResolvedTable;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
 import org.apache.spark.sql.catalyst.plans.logical.V2WriteCommand;
 import org.apache.spark.sql.catalyst.rules.Rule;
@@ -47,9 +48,7 @@ public class RequiredPrivilegesCheck extends Rule<LogicalPlan> {
 
   @Override
   public LogicalPlan apply(LogicalPlan plan) {
-    // Post-hoc rules run once over the root plan; the whole subtree is walked so every denial in
-    // the query is aggregated into a single error. Reporting per node instead (the rule is also
-    // applied node-by-node) would throw on the first denied leaf and lose the aggregation.
+    // Walk the whole plan so that one error lists every denied table of the query.
     Optional<ForbiddenException> failure = AuthorizationTable.aggregateFailure(collectDenied(plan));
     if (failure.isPresent()) {
       throw failure.get();
@@ -66,6 +65,9 @@ public class RequiredPrivilegesCheck extends Rule<LogicalPlan> {
   private static void collectDenied(LogicalPlan plan, List<AuthorizationTable> denied) {
     if (plan instanceof DataSourceV2Relation) {
       addIfDenied(((DataSourceV2Relation) plan).table(), denied);
+    } else if (plan instanceof ResolvedTable) {
+      // Commands such as DESCRIBE TABLE and SHOW CREATE TABLE resolve their table to this node.
+      addIfDenied(((ResolvedTable) plan).table(), denied);
     } else if (plan instanceof StreamingRelationV2) {
       // Streaming sources resolve to this leaf node instead of DataSourceV2Relation.
       addIfDenied(((StreamingRelationV2) plan).table(), denied);
