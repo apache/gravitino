@@ -47,8 +47,9 @@ workflow, versions, CSV import/export, UI) plug in through the hooks described h
 
 ## Non-Goals
 
-1. **Approval workflow, versions, CSV import/export, KB articles, UI** (G11–G13, G15, G16):
-   Enterprise 2.0. OSS edits apply at once; the hook is `TermChangeHandler` (see Status).
+1. **Approval workflow, version history API, CSV import/export, KB articles, UI** (G11–G13, G15,
+   G16): Enterprise 2.0. OSS edits apply at once and record versions, but OSS exposes no version
+   API; the hook is `TermChangeHandler` (see Versions).
 2. **Ranked or fuzzy lookup, SKOS, connectors** (G14, G17, G18): Enterprise 2.1.
 3. **Access through terms**: a term or binding never grants or denies data access and carries no
    policies.
@@ -76,19 +77,21 @@ workflow, versions, CSV import/export, UI) plug in through the hooks described h
 
 ```
 GlossaryTerm { id, name, definition, synonyms[], status: DRAFT | APPROVED | DEPRECATED,
-               sourceRef?, properties, audit_info }
+               sourceRef?, properties, currentVersion, audit_info }
+TermVersion  { termId, version, state: PENDING | CURRENT | SUPERSEDED, snapshot, audit_info }
 TermRelation { fromTermId, toTermId, type: BROADER | RELATED, audit_info }
 TermDomain   { termId, domainId, audit_info }
 TermBinding  { termId, objectId, objectType, metricName?, audit_info }
 ```
 
-| Table                      | Unique key                                                                     | Other index                              |
-| -------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------- |
-| `glossary_term_meta`       | `(metalake_id, name_key, deleted_at)`, `(metalake_id, source_ref, deleted_at)` |                                          |
-| `glossary_term_synonym`    | `(term_id, synonym_key, deleted_at)`                                           | `(metalake_id, synonym_key, deleted_at)` |
-| `glossary_term_rel`        | `(from_term_id, to_term_id, rel_type, deleted_at)`                             | `(to_term_id, rel_type)`                 |
-| `glossary_term_domain_rel` | `(term_id, domain_id, deleted_at)`                                             | `(domain_id)`                            |
-| `glossary_term_binding`    | `(term_id, object_type, object_id, metric_name, deleted_at)`                   | `(object_type, object_id)`               |
+| Table                        | Unique key                                                                     | Other index                              |
+| ---------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------- |
+| `glossary_term_meta`         | `(metalake_id, name_key, deleted_at)`, `(metalake_id, source_ref, deleted_at)` |                                          |
+| `glossary_term_synonym`      | `(term_id, synonym_key, deleted_at)`                                           | `(metalake_id, synonym_key, deleted_at)` |
+| `glossary_term_rel`          | `(from_term_id, to_term_id, rel_type, deleted_at)`                             | `(to_term_id, rel_type)`                 |
+| `glossary_term_domain_rel`   | `(term_id, domain_id, deleted_at)`                                             | `(domain_id)`                            |
+| `glossary_term_binding`      | `(term_id, object_type, object_id, metric_name, deleted_at)`                   | `(object_type, object_id)`               |
+| `glossary_term_version_info` | `(term_id, version, deleted_at)`                                               | `(term_id, state)`                       |
 
 - Tables go into the H2, MySQL and PostgreSQL schemas and the `upgrade-1.3.0-to-2.0.0` scripts.
 - `name_key` and `synonym_key` are the trimmed, lower-cased values, so uniqueness and lookup are
@@ -153,10 +156,30 @@ TermBinding  { termId, objectId, objectType, metricName?, audit_info }
 
 - In OSS, a `MANAGE_DEFINITIONS` holder on any of the term's domains or on the metalake sets the
   status directly with `PATCH`. There are no submissions, so no self-approval rule.
-- Edits apply at once in any status and are audited. OSS keeps only the current term.
-- **Enterprise hook**: `GlossaryManager` sends every change through a `TermChangeHandler`. The OSS
-  implementation applies it; Enterprise replaces it to store proposals, add `IN_REVIEW`, block
-  self-approval and keep versions (G12, G13).
+- Edits apply at once in any status and are audited, and each content change records a version
+  (see Versions).
+
+### Versions
+
+The storage supports versions in OSS, so Enterprise needs no schema of its own and no later data
+migration; this follows the existing `current_version` + `table_column_version_info` pattern.
+
+- **What is versioned**: a change to the name, definition, synonyms, properties, relations,
+  domains or bindings. Owner and status changes are not; they are audited only.
+- **Snapshot**: each version row stores the whole term as JSON (fields, synonyms, broader and
+  related term IDs, domain IDs, bindings). The live tables hold only the current state, so a
+  snapshot is the only way to store a change that is not applied yet.
+- **OSS write path**: in the same transaction as the change, under the term's exclusive lock,
+  increment `current_version`, insert a `CURRENT` row and mark the previous one `SUPERSEDED`. Cost:
+  one extra insert and one update per edit; a snapshot grows with the term's bindings.
+- **OSS read path**: none. Product keeps the version history API in Enterprise (G12); exposing
+  `GET /glossary/terms/{term}/versions` later needs no storage change.
+- **Enterprise hook**: `GlossaryManager` sends every content change through a `TermChangeHandler`.
+  The OSS implementation applies it at once as above. Enterprise replaces it to write a `PENDING`
+  row instead, without touching the live tables; on approval it applies the snapshot to the live
+  tables and promotes the row to `CURRENT`. It also adds `IN_REVIEW`, blocks self-approval and
+  serves the history (G12, G13).
+- Dropping a term soft-deletes its version rows.
 
 ### Locking
 
@@ -298,8 +321,8 @@ Together with the `domain` tools of #13867, an agent can go from a domain to its
 ### Phase 1: Terms, storage and authorization
 
 - [ ] `GlossaryTerm` API and `MetadataObject.Type.GLOSSARY_TERM` in `api/`; DEFINITION privileges on metalake and domain
-- [ ] Storage: the five glossary tables and `glossary_hierarchy_lock` (H2, MySQL, PostgreSQL, upgrade scripts)
-- [ ] `GlossaryManager`: CRUD, name and synonym rules, relations with the cycle check, domain links, status, `TermChangeHandler`, locking
+- [ ] Storage: the six glossary tables and `glossary_hierarchy_lock` (H2, MySQL, PostgreSQL, upgrade scripts)
+- [ ] `GlossaryManager`: CRUD, name and synonym rules, relations with the cycle check, domain links, status, version rows, `TermChangeHandler`, locking
 - [ ] Authorization: `TermScopeResolver`, the `GLOSSARY_TERM` case in `JcasbinAuthorizer`, draft visibility, owner-only edits for `CREATE_DEFINITION`
 - [ ] REST endpoints for terms, status and hierarchy; `GlossaryEventDispatcher`; the domain drop check
 
