@@ -113,11 +113,7 @@ public class DomainPO {
    * @return The domain persistent object.
    */
   public static DomainPO initializeDomainPO(DomainEntity domainEntity, Long metalakeId) {
-    return toBuilder(domainEntity)
-        .withMetalakeId(metalakeId)
-        .withCurrentVersion(INIT_VERSION)
-        .withLastVersion(INIT_VERSION)
-        .build();
+    return toDomainPO(domainEntity, domainEntity.id(), metalakeId, INIT_VERSION);
   }
 
   /**
@@ -129,12 +125,8 @@ public class DomainPO {
    */
   public static DomainPO updateDomainPO(DomainPO oldDomainPO, DomainEntity newDomainEntity) {
     Long nextVersion = oldDomainPO.currentVersion() + 1;
-    return toBuilder(newDomainEntity)
-        .withDomainId(oldDomainPO.domainId())
-        .withMetalakeId(oldDomainPO.metalakeId())
-        .withCurrentVersion(nextVersion)
-        .withLastVersion(nextVersion)
-        .build();
+    return toDomainPO(
+        newDomainEntity, oldDomainPO.domainId(), oldDomainPO.metalakeId(), nextVersion);
   }
 
   /**
@@ -177,10 +169,14 @@ public class DomainPO {
     return domainPOs.stream().map(po -> fromDomainPO(po, namespace)).collect(Collectors.toList());
   }
 
-  private static DomainPOBuilder toBuilder(DomainEntity domainEntity) {
+  // Returns the built PO rather than the lombok builder: javadoc runs before lombok, so a
+  // signature that names the generated builder class fails the javadoc task.
+  private static DomainPO toDomainPO(
+      DomainEntity domainEntity, Long domainId, Long metalakeId, Long version) {
     try {
       return builder()
-          .withDomainId(domainEntity.id())
+          .withDomainId(domainId)
+          .withMetalakeId(metalakeId)
           .withDomainName(domainEntity.name())
           .withComment(domainEntity.comment())
           .withStatus(domainEntity.status().name())
@@ -188,7 +184,10 @@ public class DomainPO {
           .withBackingTagValue(domainEntity.backingTagValue())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(domainEntity.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(domainEntity.auditInfo()))
-          .withDeletedAt(DEFAULT_DELETED_AT);
+          .withCurrentVersion(version)
+          .withLastVersion(version)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize domain entity", e);
     }
