@@ -86,10 +86,11 @@ public class GravitinoConnector implements Connector {
   public GravitinoConnector(CatalogConnectorContext catalogConnectorContext) {
     this.catalogIdentifier = catalogConnectorContext.getCatalog().geNameIdentifier();
     this.catalogConnectorContext = catalogConnectorContext;
-    this.connectorMetadata =
-        new CatalogConnectorMetadata(catalogConnectorContext.getMetalake(), this.catalogIdentifier);
-
     GravitinoConfig config = catalogConnectorContext.getConfig();
+    this.connectorMetadata =
+        new CatalogConnectorMetadata(
+            catalogConnectorContext.getMetalake(), this.catalogIdentifier, config);
+
     this.forwardUser = config.isForwardUser();
     this.perUserSessionCache = forwardUser ? buildSessionCache(config) : null;
   }
@@ -280,31 +281,35 @@ public class GravitinoConnector implements Connector {
       return perUserSessionCache.get(
               credKey,
               () -> {
-                GravitinoAdminClient userClient = buildAuthClient(session);
+                GravitinoAdminClient userClient;
+                try {
+                  userClient = buildAuthClient(session);
+                } catch (IllegalArgumentException | UnsupportedOperationException e) {
+                  // buildAuthClient raises these for an invalid or unsupported credential.
+                  throw new TrinoException(
+                      PERMISSION_DENIED,
+                      "Failed to authenticate user '"
+                          + session.getUser()
+                          + "' with Gravitino: "
+                          + e.getMessage(),
+                      e);
+                }
                 GravitinoMetalake userMetalake =
                     userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
                 return new UserSession(
-                    userClient, new CatalogConnectorMetadata(userMetalake, catalogIdentifier));
+                    userClient,
+                    new CatalogConnectorMetadata(
+                        userMetalake, catalogIdentifier, catalogConnectorContext.getConfig()));
               })
           .metadata;
     } catch (ExecutionException | UncheckedExecutionException e) {
       Throwable cause = e.getCause() == null ? e : e.getCause();
       LOG.warn(
           cause, "Failed to create per-user Gravitino client for user '%s'", session.getUser());
-      if (cause instanceof TrinoException) {
-        // Already carries a specific Trino error code (e.g. from buildForSession); re-wrapping
-        // would swallow it.
-        throw (TrinoException) cause;
-      }
-      if (cause instanceof IllegalArgumentException
-          || cause instanceof UnsupportedOperationException) {
-        throw new TrinoException(
-            PERMISSION_DENIED,
-            "Failed to authenticate user '"
-                + session.getUser()
-                + "' with Gravitino: "
-                + cause.getMessage(),
-            cause);
+      if (cause instanceof Exception) {
+        throw GravitinoErrorCode.toTrinoException(
+            (Exception) cause,
+            "Failed to create per-user Gravitino client for user '" + session.getUser() + "'");
       }
       throw new TrinoException(
           GENERIC_INTERNAL_ERROR,

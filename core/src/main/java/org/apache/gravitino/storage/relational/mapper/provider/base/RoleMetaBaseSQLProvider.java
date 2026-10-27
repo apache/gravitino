@@ -43,14 +43,24 @@ public class RoleMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  /** Returns SQL that selects and locks an active role by ID. */
-  public String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+  /** Returns SQL that selects an active role by ID. */
+  protected String selectRoleMetaById(Long roleId) {
     return "SELECT role_id as roleId, role_name as roleName, metalake_id as metalakeId,"
         + " properties, audit_info as auditInfo, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + ROLE_TABLE_NAME
-        + " WHERE role_id = #{roleId} AND deleted_at = 0 FOR UPDATE";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
+
+  /** Returns SQL that selects and locks an active role by ID. */
+  public String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+    return selectRoleMetaById(roleId) + " FOR UPDATE";
+  }
+
+  /** Returns SQL that selects an active role by ID and locks it for shared access. */
+  public String selectRoleMetaByIdForShare(@Param("roleId") Long roleId) {
+    return selectRoleMetaById(roleId) + " LOCK IN SHARE MODE";
   }
 
   public String selectRoleIdByMetalakeIdAndName(
@@ -222,7 +232,46 @@ public class RoleMetaBaseSQLProvider {
     }
     return "<script>SELECT role_id as roleId, role_name as roleName, updated_at as updatedAt FROM "
         + ROLE_TABLE_NAME
-        + " WHERE role_id IN <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>#{id}</foreach>"
-        + " AND deleted_at = 0</script>";
+        + " WHERE role_id IN <foreach item='id' collection='roleIds' open='(' separator=','"
+        + " close=')'>#{id}</foreach> AND deleted_at = 0</script>";
+  }
+  /**
+   * Returns a single-statement role and privilege snapshot by name.
+   *
+   * @param metalakeId the metalake ID
+   * @param roleName the role name
+   * @return the aggregate select SQL
+   */
+  public String selectRoleWithPrivilegesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
+    return withPrivileges(selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+  }
+
+  /**
+   * Returns matching roles together with all their privileges.
+   *
+   * @param metadataObjectId the metadata object ID
+   * @param metadataObjectType the metadata object type
+   * @return the aggregate select SQL
+   */
+  public String listRolesWithPrivilegesByMetadataObjectIdAndType(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return withPrivileges(listRolesByMetadataObjectIdAndType(metadataObjectId, metadataObjectType));
+  }
+
+  private String withPrivileges(String roleSql) {
+    // Role overwrites replace their privilege rows. Resolve both from one statement snapshot,
+    // including empty roles, rather than combining a root read with a later privilege read.
+    return "SELECT r.*, p.id AS priv_relationId, p.role_id AS priv_roleId, p.metadata_object_id AS"
+        + " priv_metadataObjectId, p.type AS priv_type, p.privilege_names AS"
+        + " priv_privilegeNames, p.privilege_conditions AS priv_privilegeConditions,"
+        + " p.current_version AS priv_currentVersion, p.last_version AS priv_lastVersion,"
+        + " p.deleted_at AS priv_deletedAt FROM ("
+        + roleSql
+        + ") r LEFT JOIN "
+        + SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME
+        + " p"
+        + " ON r.roleId = p.role_id AND p.deleted_at = 0";
   }
 }

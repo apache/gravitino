@@ -48,11 +48,22 @@ public class RoleMetaSQLProviderFactory {
 
   static class RoleMetaMySQLProvider extends RoleMetaBaseSQLProvider {}
 
-  static class RoleMetaH2Provider extends RoleMetaBaseSQLProvider {}
+  static class RoleMetaH2Provider extends RoleMetaBaseSQLProvider {
+    @Override
+    public String selectRoleMetaByIdForShare(Long roleId) {
+      // H2 has no shared row-lock syntax, matching the other parent-fencing providers.
+      return selectRoleMetaByIdForUpdate(roleId);
+    }
+  }
 
   public static String selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
     return getProvider().selectRoleMetaByMetalakeIdAndName(metalakeId, roleName);
+  }
+
+  /** Returns SQL that selects an active role by ID and locks it for shared access. */
+  public static String selectRoleMetaByIdForShare(@Param("roleId") Long roleId) {
+    return getProvider().selectRoleMetaByIdForShare(roleId);
   }
 
   /** Returns SQL that selects and locks an active role by ID. */
@@ -115,5 +126,30 @@ public class RoleMetaSQLProviderFactory {
 
   public static String batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds) {
     return getProvider().batchGetRoleUpdatedAt(roleIds);
+  }
+  /**
+   * Returns SQL for a role and privilege snapshot by name.
+   *
+   * @param metalakeId the metalake ID
+   * @param roleName the role name
+   * @return the aggregate select SQL
+   */
+  public static String selectRoleWithPrivilegesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
+    return getProvider().selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName);
+  }
+
+  /**
+   * Returns SQL for matching roles and all their privileges.
+   *
+   * @param metadataObjectId the metadata object ID
+   * @param metadataObjectType the metadata object type
+   * @return the aggregate select SQL
+   */
+  public static String listRolesWithPrivilegesByMetadataObjectIdAndType(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .listRolesWithPrivilegesByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 }

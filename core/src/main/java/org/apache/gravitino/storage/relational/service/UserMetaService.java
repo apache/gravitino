@@ -65,10 +65,17 @@ public class UserMetaService {
   private UserMetaService() {}
 
   private UserPO getUserPOByMetalakeIdAndName(Long metalakeId, String userName) {
+    return getUserPOByMetalakeIdAndName(metalakeId, userName, false);
+  }
+
+  private UserPO getUserPOByMetalakeIdAndName(Long metalakeId, String userName, boolean withRoles) {
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeIdAndName(metalakeId, userName));
+            mapper ->
+                withRoles
+                    ? mapper.selectUserWithRolesByMetalakeIdAndName(metalakeId, userName)
+                    : mapper.selectUserMetaByMetalakeIdAndName(metalakeId, userName));
 
     if (userPO == null) {
       throw new NoSuchEntityException(
@@ -105,8 +112,8 @@ public class UserMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = userPO.requireRolePOs();
 
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
@@ -153,7 +160,10 @@ public class UserMetaService {
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
       SessionUtils.doMultipleWithCommit(
-          () -> lockMetalakeForUserCreate(metalakePO),
+          () ->
+              MetalakeMetaService.getInstance()
+                  .lockMetalakeForChildWrite(
+                      metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
                   UserMetaMapper.class,
@@ -164,6 +174,9 @@ public class UserMetaService {
                       mapper.insertUserMeta(userPO);
                     }
                   }),
+          () ->
+              RoleMetaService.getInstance()
+                  .lockRolesForMembership(metalakePO.getMetalakeId(), roleIds),
           () -> {
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class,
@@ -233,8 +246,8 @@ public class UserMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
+    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = oldUserPO.requireRolePOs();
     UserEntity oldUserEntity = POConverters.fromUserPO(oldUserPO, rolePOs, identifier.namespace());
 
     UserEntity newEntity = (UserEntity) updater.apply((E) oldUserEntity);
@@ -261,6 +274,17 @@ public class UserMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            if (!insertRoleIds.isEmpty() || !deleteRoleIds.isEmpty()) {
+              // The cascade writes memberships before principals; this update does the reverse.
+              // Fence grants and revokes before the principal CAS to avoid both orphan grants and
+              // a revoke/cascade deadlock. Metadata-only updates write no membership rows, so they
+              // need no parent lock (which would serialize unrelated updates on H2).
+              MetalakeMetaService.getInstance()
+                  .lockMetalakeForChildWrite(
+                      identifier.namespace().level(0), oldUserPO.getMetalakeId());
+            }
+          },
+          () -> {
             int updated =
                 SessionUtils.getWithoutCommit(
                     UserMetaMapper.class,
@@ -271,6 +295,9 @@ public class UserMetaService {
               throw userWriteFailure(identifier, oldUserPO, UserLookup.NAME);
             }
           },
+          () ->
+              RoleMetaService.getInstance()
+                  .lockRolesForMembership(oldUserPO.getMetalakeId(), insertRoleIds),
           () -> {
             if (insertRoleIds.isEmpty()) {
               return;
@@ -396,37 +423,6 @@ public class UserMetaService {
                         po, AuthorizationUtils.ofUserNamespace(metalakeName)))
             .collect(Collectors.toList());
     return new PagedResult<>(totalCount, users);
-  }
-
-  /**
-   * Holds the parent metalake row for the rest of the transaction, so the user cannot be created
-   * under a metalake that is going away.
-   *
-   * <p>The lock is shared, not exclusive: many users can be created under the same metalake at the
-   * same time. Dropping a metalake takes an exclusive lock on this row, so a drop and a create
-   * cannot overlap. Whoever gets the row first wins, and the loser either sees the metalake gone or
-   * inserts under a metalake that is still there.
-   *
-   * <p>The name is compared again because the ID alone cannot tell a rename apart: the caller
-   * looked the metalake up by name, so a renamed row means the name in the request no longer
-   * exists.
-   *
-   * <p>The metalake's version is deliberately not compared, matching {@code CatalogMetaService}.
-   * Holding the row is what makes the create safe. An unrelated metalake edit that commits in
-   * between bumps the version without making this create wrong, so comparing it would reject the
-   * create for no reason.
-   */
-  private void lockMetalakeForUserCreate(MetalakePO observedMetalakePO) {
-    OccWriteSupport.lockParentForChildWrite(
-        observedMetalakePO.getMetalakeName(),
-        Entity.EntityType.METALAKE,
-        () ->
-            SessionUtils.getWithoutCommit(
-                MetalakeMetaMapper.class,
-                mapper ->
-                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
-        null,
-        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
   }
 
   private RuntimeException userWriteFailure(

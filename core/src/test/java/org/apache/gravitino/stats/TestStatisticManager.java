@@ -19,12 +19,19 @@
 
 package org.apache.gravitino.stats;
 
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -56,9 +63,12 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -109,10 +119,17 @@ public class TestStatisticManager {
         .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -396,6 +413,81 @@ public class TestStatisticManager {
       StatisticValue<?> value = expectStats.get(statistic.name());
       Assertions.assertEquals(
           value, statistic.value().get(), "Statistic value type mismatch: " + statistic.name());
+    }
+  }
+
+  @Test
+  public void testTableStatisticsDoNotWaitForTableTreeLock() throws Exception {
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    MetadataObject tableObject =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    stats.put("lock_free", StatisticValues.longValue(1L));
+
+    // Table-level statistic writes are fenced on the table row and version-checked by the entity
+    // store, so they must not contend with an in-flight table operation that holds the table tree
+    // lock.
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter, () -> statisticManager.updateStatistics(METALAKE, tableObject, stats));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter, () -> statisticManager.listStatistics(METALAKE, tableObject));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWriter,
+          () ->
+              statisticManager.dropStatistics(
+                  METALAKE, tableObject, Lists.newArrayList("lock_free")));
+    }
+  }
+
+  @Test
+  public void testPartitionStatisticsStillWaitForTableTreeLock() throws Exception {
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    MetadataObject tableObject =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    stats.put("locked", StatisticValues.longValue(1L));
+    List<PartitionStatisticsUpdate> updates =
+        Lists.newArrayList(PartitionStatisticsModification.update("p_lock", stats));
+
+    // A pluggable partition statistic storage need not update atomically, so this path keeps the
+    // tree lock until the storages do.
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () -> statisticManager.updatePartitionStatistics(METALAKE, tableObject, updates));
+    }
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () ->
+              statisticManager.listPartitionStatistics(
+                  METALAKE,
+                  tableObject,
+                  PartitionRange.between(
+                      "p_lock",
+                      PartitionRange.BoundType.CLOSED,
+                      "p_lock",
+                      PartitionRange.BoundType.CLOSED)));
+    }
+    try (TreeLockTestSupport.HeldLock tableWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE), LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(
+          tableWriter,
+          () ->
+              statisticManager.dropPartitionStatistics(
+                  METALAKE,
+                  tableObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          "p_lock", Lists.newArrayList("locked")))));
     }
   }
 

@@ -48,7 +48,8 @@ public class ExtendedGroupPO extends GroupPO {
       return false;
     }
     ExtendedGroupPO that = (ExtendedGroupPO) o;
-    return Objects.equals(getRoleIds(), that.getRoleIds())
+    return super.equals(o)
+        && Objects.equals(getRoleIds(), that.getRoleIds())
         && Objects.equals(getRoleNames(), that.getRoleNames());
   }
 

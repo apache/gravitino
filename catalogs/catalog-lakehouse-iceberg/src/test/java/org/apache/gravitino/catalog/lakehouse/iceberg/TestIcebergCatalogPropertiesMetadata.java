@@ -46,10 +46,10 @@ public class TestIcebergCatalogPropertiesMetadata {
   }
 
   @Test
-  void testCloudAccessKeyIdsAreVisibleAndSecretsAreHidden() {
-    Assertions.assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+  void testCloudAccessKeyIdsAndSecretsAreHidden() {
+    Assertions.assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     Assertions.assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
-    Assertions.assertFalse(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    Assertions.assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
     Assertions.assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
   }
 

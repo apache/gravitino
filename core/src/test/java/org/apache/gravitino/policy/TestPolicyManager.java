@@ -19,12 +19,19 @@
 
 package org.apache.gravitino.policy;
 
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -47,6 +54,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -57,16 +65,20 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -74,6 +86,7 @@ import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -93,6 +106,8 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -239,13 +254,22 @@ public class TestPolicyManager {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(
+            String.format(
+                "jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL;LOCK_TIMEOUT=30000", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -324,6 +348,32 @@ public class TestPolicyManager {
     Assertions.assertEquals(
         "Policy with name non_existent_policy under metalake metalake_for_policy_test does not exist",
         e.getMessage());
+  }
+
+  @Test
+  void testRenamePolicyToExistingName() {
+    PolicyContent content =
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
+    PolicyEntity source = createCustomPolicy(METALAKE, "source", content);
+    PolicyEntity target = createCustomPolicy(METALAKE, "target", content);
+    for (PolicyChange[] changes :
+        new PolicyChange[][] {
+          {PolicyChange.rename("target")},
+          {PolicyChange.rename("intermediate"), PolicyChange.rename("target")}
+        }) {
+      PolicyAlreadyExistsException exception =
+          Assertions.assertThrows(
+              PolicyAlreadyExistsException.class,
+              () -> policyManager.alterPolicy(METALAKE, "source", changes));
+      Assertions.assertEquals(
+          "Policy with name target under metalake " + METALAKE + " already exists",
+          exception.getMessage());
+      Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
+      Assertions.assertEquals(source.id(), policyManager.getPolicy(METALAKE, "source").id());
+      Assertions.assertEquals(target.id(), policyManager.getPolicy(METALAKE, "target").id());
+      Assertions.assertThrows(
+          NoSuchPolicyException.class, () -> policyManager.getPolicy(METALAKE, "intermediate"));
+    }
   }
 
   @Test
@@ -456,6 +506,169 @@ public class TestPolicyManager {
     Assertions.assertFalse(
         removeEx.getMessage().contains("%s"),
         "format args were not substituted: " + removeEx.getMessage());
+  }
+
+  @Test
+  public void testCreateUpdateAndGetRowFilterPolicy() {
+    String policyName = "row_filter_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent originalContent = PolicyContents.rowFilter("filter := col(\"region\") == \"US\"");
+
+    PolicyEntity created =
+        policyManager.createPolicy(
+            METALAKE, policyName, Policy.BuiltInType.ROW_FILTER, null, true, originalContent);
+
+    Assertions.assertEquals(originalContent, created.content());
+    Assertions.assertEquals(
+        ImmutableSet.of(MetadataObject.Type.TABLE), created.content().supportedObjectTypes());
+    Assertions.assertEquals(
+        originalContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    PolicyContent updatedContent = PolicyContents.rowFilter("filter := col(\"region\") == \"EU\"");
+    PolicyEntity updated =
+        policyManager.alterPolicy(
+            METALAKE, policyName, PolicyChange.updateContent("system_row_filter", updatedContent));
+
+    Assertions.assertEquals(updatedContent, updated.content());
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.createPolicy(
+                METALAKE,
+                "invalid_" + policyName,
+                Policy.BuiltInType.ROW_FILTER,
+                null,
+                true,
+                PolicyContents.rowFilter("filter := col(\"region\")")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.alterPolicy(
+                METALAKE,
+                policyName,
+                PolicyChange.updateContent(
+                    "system_row_filter",
+                    PolicyContents.rowFilter("mask := action(\"replace-with-null\")"))));
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
+  }
+
+  @Test
+  public void testRenameAndCommentUpdateDoNotRevalidateStoredRowFilter() throws IOException {
+    String policyName = "legacy_row_filter_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent legacyContent = PolicyContents.rowFilter("filter := col(\"region\")");
+    PolicyEntity legacyPolicy =
+        PolicyEntity.builder()
+            .withId(new RandomIdGenerator().nextId())
+            .withName(policyName)
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+            .withPolicyType(Policy.BuiltInType.ROW_FILTER)
+            .withEnabled(true)
+            .withContent(legacyContent)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(legacyPolicy, false /* overwritten */);
+
+    String newName = "renamed_" + policyName;
+    PolicyEntity renamed =
+        Assertions.assertDoesNotThrow(
+            () -> policyManager.alterPolicy(METALAKE, policyName, PolicyChange.rename(newName)));
+    PolicyEntity commented =
+        Assertions.assertDoesNotThrow(
+            () ->
+                policyManager.alterPolicy(
+                    METALAKE, newName, PolicyChange.updateComment("legacy policy")));
+
+    Assertions.assertEquals(newName, commented.name());
+    Assertions.assertEquals("legacy policy", commented.comment());
+    Assertions.assertEquals(legacyContent, renamed.content());
+    Assertions.assertEquals(legacyContent, commented.content());
+  }
+
+  @Test
+  public void testRenameDoesNotRevalidateLegacyCompactionRewriteOptions() throws IOException {
+    String policyName = "legacy_compaction_" + UUID.randomUUID().toString().replace("-", "");
+    // Constructed without content validate(); would fail rewriteOptions allowlist on create.
+    PolicyContent legacyContent =
+        PolicyContents.icebergDataCompaction(1000L, 1L, ImmutableMap.of("no-such-option", "x"));
+    PolicyEntity legacyPolicy =
+        PolicyEntity.builder()
+            .withId(new RandomIdGenerator().nextId())
+            .withName(policyName)
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(legacyContent)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .buildSkippingContentValidation();
+    entityStore.put(legacyPolicy, false /* overwritten */);
+
+    String newName = "renamed_" + policyName;
+    PolicyEntity renamed =
+        Assertions.assertDoesNotThrow(
+            () -> policyManager.alterPolicy(METALAKE, policyName, PolicyChange.rename(newName)));
+    Assertions.assertEquals(newName, renamed.name());
+    Assertions.assertEquals(legacyContent, renamed.content());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.alterPolicy(
+                METALAKE,
+                newName,
+                PolicyChange.updateContent(
+                    "system_iceberg_compaction",
+                    PolicyContents.icebergDataCompaction(
+                        1000L, 1L, ImmutableMap.of("no-such-option", "y")))));
+  }
+
+  @Test
+  public void testCreateUpdateAndGetColumnMaskPolicy() {
+    String policyName = "column_mask_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent originalContent = PolicyContents.columnMask("mask := action(\"show-last-4\")");
+
+    PolicyEntity created =
+        policyManager.createPolicy(
+            METALAKE, policyName, Policy.BuiltInType.COLUMN_MASK, null, true, originalContent);
+
+    Assertions.assertEquals(originalContent, created.content());
+    Assertions.assertEquals(
+        originalContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    PolicyContent updatedContent =
+        PolicyContents.columnMask("mask := action(\"replace-with-null\")");
+    PolicyEntity updated =
+        policyManager.alterPolicy(
+            METALAKE, policyName, PolicyChange.updateContent("system_column_mask", updatedContent));
+
+    Assertions.assertEquals(updatedContent, updated.content());
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.createPolicy(
+                METALAKE,
+                "invalid_" + policyName,
+                Policy.BuiltInType.COLUMN_MASK,
+                null,
+                true,
+                PolicyContents.columnMask("mask := action(\"unknown\")")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.alterPolicy(
+                METALAKE,
+                policyName,
+                PolicyChange.updateContent(
+                    "system_column_mask", PolicyContents.columnMask("filter := true"))));
+    Assertions.assertEquals(
+        updatedContent, policyManager.getPolicy(METALAKE, policyName).content());
   }
 
   @Test
@@ -600,6 +813,78 @@ public class TestPolicyManager {
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject));
     Assertions.assertEquals(
         0, policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject).length);
+  }
+
+  @Test
+  public void testPolicyOperationsDoNotWaitForMetalakeTreeLock() throws Exception {
+    String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent content =
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
+
+    // A metalake WRITE lock covers every policy below it. Policy operations are fenced by the
+    // entity store, so none of them may wait for it.
+    try (TreeLockTestSupport.HeldLock metalakeWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(METALAKE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> createCustomPolicy(METALAKE, policyName, content));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.getPolicy(METALAKE, policyName));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.listPolicyInfos(METALAKE));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.disablePolicy(METALAKE, policyName));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () ->
+              policyManager.alterPolicy(
+                  METALAKE, policyName, PolicyChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.listTagAssociationsForPolicy(METALAKE, policyName));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> policyManager.deletePolicy(METALAKE, policyName));
+    }
+  }
+
+  @Test
+  public void testChangePolicyEnabledStateReportsPolicyDroppedBeforeUpdate() throws IOException {
+    String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
+    createCustomPolicy(
+        METALAKE,
+        policyName,
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null));
+    EntityStore racingStore = Mockito.spy(entityStore);
+    NoSuchEntityException dropped =
+        new NoSuchEntityException("policy %s was dropped concurrently", policyName);
+    // The policy is still enabled when its state is checked, then dropped before the update.
+    Mockito.doThrow(dropped)
+        .when(racingStore)
+        .update(
+            Mockito.eq(NameIdentifierUtil.ofPolicy(METALAKE, policyName)),
+            Mockito.eq(PolicyEntity.class),
+            Mockito.eq(Entity.EntityType.POLICY),
+            Mockito.any());
+    PolicyManager racingManager = new PolicyManager(new RandomIdGenerator(), racingStore);
+
+    NoSuchPolicyException e =
+        Assertions.assertThrows(
+            NoSuchPolicyException.class, () -> racingManager.disablePolicy(METALAKE, policyName));
+    Assertions.assertSame(dropped, e.getCause());
+  }
+
+  @Test
+  public void testConcurrentCreatePolicyHasOneWinner() throws Exception {
+    String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent content =
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
+
+    List<Object> outcomes =
+        RaceTestUtils.runTogether(8, () -> createCustomPolicy(METALAKE, policyName, content));
+
+    Assertions.assertEquals(1, outcomes.stream().filter(o -> o instanceof PolicyEntity).count());
+    outcomes.stream()
+        .filter(o -> !(o instanceof PolicyEntity))
+        .forEach(o -> Assertions.assertInstanceOf(PolicyAlreadyExistsException.class, o));
+    Assertions.assertEquals(policyName, policyManager.getPolicy(METALAKE, policyName).name());
   }
 
   private PolicyEntity createCustomPolicy(

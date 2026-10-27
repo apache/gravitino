@@ -19,12 +19,59 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergJobUtils {
+
+  @Test
+  public void testStrictArgumentsNormalizeTemplateValues() {
+    Map<String, String> parsed =
+        IcebergJobUtils.parseArguments(
+            new String[] {"--required", " value ", "--optional", " {{optional}} "},
+            new HashSet<>(Arrays.asList("required", "optional")),
+            Collections.singleton("required"));
+    assertEquals("value", parsed.get("required"));
+    assertNull(parsed.get("optional"));
+  }
+
+  @Test
+  public void testStrictArgumentsRejectMalformedInput() {
+    Set<String> supported = Collections.singleton("key");
+    String[][] invalid = {
+      {"--unknown", "value"},
+      {"key", "value"},
+      {null, "value"},
+      {"--key"},
+      {"--key", null},
+      {"--key", "--key"},
+      {"--key", "", "--key", "value"},
+      {"--key", "{{key}}"},
+      {"--key", " "},
+      {}
+    };
+    for (String[] args : invalid) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> IcebergJobUtils.parseArguments(args, supported, supported));
+    }
+  }
+
+  @Test
+  public void testLegacyArgumentsStillAcceptBareFlags() {
+    assertEquals("true", IcebergJobUtils.parseArguments(new String[] {"--flag"}).get("flag"));
+  }
 
   @Test
   public void testRequireIcebergSparkRuntimeSucceedsWhenPresent() {
@@ -53,5 +100,46 @@ public class TestIcebergJobUtils {
             IllegalArgumentException.class,
             () -> IcebergJobUtils.parseCustomSparkConfigs("{not_json}"));
     assertTrue(ex.getMessage().contains("--spark-conf"));
+  }
+
+  @Test
+  public void testFilterCustomSparkConfigsDropsSubmittedMasterAndDeployMode() {
+    Map<String, String> configs =
+        ImmutableMap.of(
+            "spark.master", "local[*]",
+            "spark.submit.deployMode", "client",
+            "spark.jars", "/opt/iceberg-spark-runtime.jar",
+            "spark.sql.shuffle.partitions", "200");
+    SparkConf submitted =
+        new SparkConf(false)
+            .set("spark.master", "k8s://https://kubernetes.default.svc")
+            .set("spark.submit.deployMode", "cluster");
+
+    assertEquals(
+        ImmutableMap.of(
+            "spark.jars", "/opt/iceberg-spark-runtime.jar", "spark.sql.shuffle.partitions", "200"),
+        IcebergJobUtils.filterCustomSparkConfigs(configs, submitted));
+  }
+
+  @Test
+  public void testFilterCustomSparkConfigsKeepsMasterNotSubmitted() {
+    // A job run without spark-submit, e.g. in a test, has no master unless it sets one.
+    Map<String, String> configs = ImmutableMap.of("spark.master", "local[1]");
+    assertEquals(configs, IcebergJobUtils.filterCustomSparkConfigs(configs, new SparkConf(false)));
+  }
+
+  @Test
+  public void testFilterCustomSparkConfigsDropsKubernetesAndBlankConfigs() {
+    Map<String, String> configs =
+        ImmutableMap.of(
+            "spark.kubernetes.executor.secretKeyRef.TOKEN", "secret:token",
+            "spark.kubernetes.container.image", "other:1.0",
+            "spark.sql.shuffle.partitions", "",
+            // Blank like StringUtils.isBlank, as the k8s job executor checks it: an em space.
+            "spark.driver.memory", "\u2003",
+            "spark.executor.memory", "2g");
+    assertEquals(
+        ImmutableMap.of("spark.executor.memory", "2g"),
+        IcebergJobUtils.filterCustomSparkConfigs(configs, new SparkConf(false)));
   }
 }

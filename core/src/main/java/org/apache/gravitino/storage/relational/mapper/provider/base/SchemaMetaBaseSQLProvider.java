@@ -26,6 +26,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
@@ -211,6 +212,9 @@ public class SchemaMetaBaseSQLProvider {
         + " UNION ALL SELECT 1 FROM "
         + TopicMetaMapper.TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
         + " LIMIT 1";
   }
 
@@ -371,14 +375,21 @@ public class SchemaMetaBaseSQLProvider {
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
-  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  /**
+   * Returns SQL that soft-deletes schemas using identifier-and-version pairs. The leading IN list
+   * lets the database find the rows by primary key instead of scanning the table for the OR chain.
+   */
   public String softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs) {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE deleted_at = 0 AND "
+        + " WHERE deleted_at = 0 AND schema_id IN "
+        + "<foreach collection='schemaMetas' item='item' separator=',' open='(' close=')'>"
+        + "#{item.schemaId}"
+        + "</foreach>"
+        + " AND "
         + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
         + "</foreach>"

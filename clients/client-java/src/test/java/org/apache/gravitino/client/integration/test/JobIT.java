@@ -19,6 +19,7 @@
 package org.apache.gravitino.client.integration.test;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -380,6 +381,8 @@ public class JobIT extends BaseIT {
             .withClassName("org.apache.gravitino.test.SparkJob")
             .build();
     Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+    File jobRunsDir = new File(testStagingDir, "job-runs");
+    Set<String> jobStagingDirsBefore = listFileNames(jobRunsDir);
 
     // The run request is rejected with the reason instead of being queued and failing later.
     IllegalArgumentException e =
@@ -396,9 +399,11 @@ public class JobIT extends BaseIT {
 
     // No job is created, and the staging directory of the rejected job is removed.
     Assertions.assertTrue(metalake.listJobs(template.name()).isEmpty());
-    String[] jobStagingDirs =
-        new File(testStagingDir, METALAKE_NAME + File.separator + template.name()).list();
-    Assertions.assertTrue(jobStagingDirs == null || jobStagingDirs.length == 0);
+    // Directories of earlier jobs may expire meanwhile, but no new one may be left behind.
+    Set<String> jobStagingDirsAfter = listFileNames(jobRunsDir);
+    Assertions.assertTrue(
+        jobStagingDirsBefore.containsAll(jobStagingDirsAfter),
+        "Staging directories left behind: " + jobStagingDirsAfter);
 
     // Shell jobs are not affected by the missing Spark installation.
     JobTemplate shellTemplate = builder.withName("test_run_shell_without_spark_submit").build();
@@ -628,6 +633,15 @@ public class JobIT extends BaseIT {
         .during(STATUS_PULL_INTERVAL_IN_MS * 2, TimeUnit.MILLISECONDS)
         .atMost(STATUS_PULL_INTERVAL_IN_MS * 2 + 1000, TimeUnit.MILLISECONDS)
         .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.CANCELLING);
+
+    // The other server never answers the cancellation, as it doesn't exist. After three pull
+    // intervals this server considers it gone and marks the job as CANCELLED, so the job template
+    // can be deleted.
+    Awaitility.await()
+        .atMost(STATUS_PULL_INTERVAL_IN_MS * 5, TimeUnit.MILLISECONDS)
+        .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.CANCELLED);
+    Assertions.assertNotNull(metalake.getJob(job.name()).finishedAt());
+    Assertions.assertTrue(metalake.deleteJobTemplate(template.name()));
   }
 
   @Test
@@ -669,6 +683,11 @@ public class JobIT extends BaseIT {
             .build();
     GravitinoEnv.getInstance().entityStore().put(job, false /* overwrite */);
     return job;
+  }
+
+  private static Set<String> listFileNames(File dir) {
+    String[] names = dir.list();
+    return names == null ? Collections.emptySet() : ImmutableSet.copyOf(names);
   }
 
   private String generateTestEntryScript() {

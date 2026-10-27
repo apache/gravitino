@@ -30,6 +30,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -39,13 +41,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.connector.job.JobContext;
+import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
-import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateResolver;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
@@ -76,6 +81,8 @@ public class TestLocalJobExecutor {
   private static final String OUTPUT_INDEX_DIR_NAME = ".job-output-index";
 
   private static JobExecutor jobExecutor;
+
+  private static final AtomicLong JOB_IDS = new AtomicLong();
 
   private static JobTemplateEntity jobTemplateEntity;
 
@@ -149,10 +156,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Assertions.assertNotNull(jobId);
 
     Awaitility.await()
@@ -169,17 +175,67 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testJobRunsInStagingDirOfJobContext() throws IOException {
+    // The template's executable and script live in the test resources, not in the job directory.
+    JobTemplate template = newRuntimeJobTemplate();
+    File sourceDir = new File(template.executable()).getParentFile();
+    File jobDir = new File(workingDir, "context-dir");
+    Assertions.assertTrue(jobDir.mkdirs());
+
+    String jobId = submit(jobExecutor, template, jobDir);
+    Awaitility.await()
+        .atMost(3, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    // The executor localizes the resources into the job directory and runs the job there.
+    Assertions.assertTrue(new File(jobDir, "test-job.sh").exists());
+    Assertions.assertTrue(new File(jobDir, "common.sh").exists());
+    Assertions.assertTrue(new File(jobDir, "output.log").exists());
+    Assertions.assertFalse(new File(sourceDir, "output.log").exists());
+    Assertions.assertTrue(
+        String.join("\n", jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES))
+            .contains("value1"));
+  }
+
+  @Test
+  public void testRunCommandNameExecutable() throws IOException {
+    // The executable is a command on the PATH, and the script it runs is shipped as a script.
+    File sourceDir = new File(workingDir, "command-src");
+    Assertions.assertTrue(sourceDir.mkdirs());
+    File script = new File(sourceDir, "hello.sh");
+    Files.writeString(script.toPath(), "echo \"hello from $1\"\n");
+    File jobDir = new File(workingDir, "command-job");
+    Assertions.assertTrue(jobDir.mkdirs());
+    JobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("command-job")
+            .withExecutable("bash")
+            .withArguments(Lists.newArrayList("hello.sh", "bash"))
+            .withScripts(Lists.newArrayList(script.getAbsolutePath()))
+            .build();
+
+    String jobId = submit(jobExecutor, template, jobDir);
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
+
+    Assertions.assertEquals(
+        Collections.singletonList("hello from bash"),
+        jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES));
+    // Only the script is localized, there is no file named after the command.
+    Assertions.assertFalse(new File(jobDir, "bash").exists());
+  }
+
+  @Test
   public void testJobOwnership() throws IOException {
     LocalJobExecutor executor = (LocalJobExecutor) jobExecutor;
     Assertions.assertTrue(executor.isJobStateNodeLocal());
     Assertions.assertTrue(executor.executorId().matches("[0-9a-f]{8}"));
 
     JobTemplate template =
-        JobManager.createRuntimeJobTemplate(
-            jobTemplateEntity,
-            ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"),
-            workingDir);
-    String jobId = executor.submitJob(template);
+        new JobTemplateResolver(jobTemplateEntity)
+            .resolve(ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"));
+    String jobId = submit(executor, template, workingDir);
     Assertions.assertTrue(
         jobId.matches("local-job-" + executor.executorId() + "-[0-9a-f-]{36}"), jobId);
     Assertions.assertTrue(executor.ownsJob(jobId));
@@ -209,9 +265,9 @@ public class TestLocalJobExecutor {
     try {
       executor.initialize(
           withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "2")));
-      String jobId1 = executor.submitJob(newSleepJobTemplate("sleep-1"));
-      String jobId2 = executor.submitJob(newSleepJobTemplate("sleep-2"));
-      String jobId3 = executor.submitJob(newSleepJobTemplate("sleep-3"));
+      String jobId1 = submitSleepJob(executor, "sleep-1");
+      String jobId2 = submitSleepJob(executor, "sleep-2");
+      String jobId3 = submitSleepJob(executor, "sleep-3");
 
       // Up to maxRunningJobs jobs run at the same time, the others wait in the queue.
       Awaitility.await()
@@ -238,10 +294,9 @@ public class TestLocalJobExecutor {
             "arg2", "fail",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Assertions.assertNotNull(jobId);
 
     Awaitility.await()
@@ -266,27 +321,33 @@ public class TestLocalJobExecutor {
             ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, sparkHome.getAbsolutePath())));
 
     try {
+      File sparkJar = new File(workingDir, "spark-demo.jar");
+      Assertions.assertTrue(sparkJar.createNewFile());
+      File jobDir = new File(workingDir, "spark-job");
+      Assertions.assertTrue(jobDir.mkdirs());
       SparkJobTemplate template =
           SparkJobTemplate.builder()
               .withName("spark-job")
-              .withExecutable(new File(workingDir, "spark-demo.jar").getAbsolutePath())
+              .withExecutable(sparkJar.getAbsolutePath())
               .withClassName("com.example.MainClass")
               .build();
 
       // spark-submit does not exist, the job is rejected at submission instead of being queued.
       int indexCountBeforeRejection = outputIndexFileCount();
       IllegalArgumentException e =
-          Assertions.assertThrows(IllegalArgumentException.class, () -> exec.submitJob(template));
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> submit(exec, template, jobDir));
       Assertions.assertTrue(e.getMessage().contains("spark-submit is not found or not executable"));
-      // A rejected submission leaves no output index behind.
+      // A rejected submission leaves no output index behind, and fetches nothing.
       Assertions.assertEquals(indexCountBeforeRejection, outputIndexFileCount());
+      Assertions.assertArrayEquals(new String[0], jobDir.list());
 
       // Once spark-submit is available, the same job is accepted.
       File sparkSubmit = new File(sparkHome, "bin/spark-submit");
       FileUtils.writeStringToFile(sparkSubmit, "#!/bin/sh\nexit 0\n", "UTF-8");
       Assertions.assertTrue(sparkSubmit.setExecutable(true));
 
-      String jobId = exec.submitJob(template);
+      String jobId = submit(exec, template, jobDir);
       Assertions.assertNotNull(jobId);
       Awaitility.await()
           .atMost(1, TimeUnit.MINUTES)
@@ -304,10 +365,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -353,10 +413,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -390,12 +449,10 @@ public class TestLocalJobExecutor {
 
       // Submit two jobs to a single-threaded executor - the second one stays QUEUED until the
       // first (which sleeps for a few seconds) finishes.
-      JobTemplate templateA =
-          JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDirA);
-      JobTemplate templateB =
-          JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDirB);
-      exec.submitJob(templateA);
-      String jobIdB = exec.submitJob(templateB);
+      JobTemplate templateA = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
+      JobTemplate templateB = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
+      submit(exec, templateA, workingDirA);
+      String jobIdB = submit(exec, templateB, workingDirB);
 
       Assertions.assertEquals(JobHandle.Status.QUEUED, exec.getJobStatus(jobIdB));
       Assertions.assertEquals(
@@ -421,10 +478,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -451,10 +507,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -482,10 +537,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -514,10 +568,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -547,10 +600,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -571,10 +623,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -598,10 +649,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -628,10 +678,9 @@ public class TestLocalJobExecutor {
             "arg2", "success",
             "var", "value3");
 
-    JobTemplate template =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, jobConf, workingDir);
+    JobTemplate template = new JobTemplateResolver(jobTemplateEntity).resolve(jobConf);
 
-    String jobId = jobExecutor.submitJob(template);
+    String jobId = submit(jobExecutor, template, workingDir);
     Assertions.assertNotNull(jobId);
     // sleep a while to ensure the job is running.
     Thread.sleep(1000);
@@ -650,6 +699,94 @@ public class TestLocalJobExecutor {
   }
 
   @Test
+  public void testCancelJobEscalatesToForcibleKill() throws Exception {
+    // A process that ignores SIGTERM must still terminate (and free its worker
+    // thread) after the cancel grace period.
+    LocalJobExecutor executor = new LocalJobExecutor();
+    executor.initialize(
+        withStagingDir(
+            ImmutableMap.of(LocalJobExecutorConfigs.CANCEL_FORCE_KILL_DELAY_MS, "1000")));
+    try {
+      JobTemplateEntity.TemplateContent trapContent =
+          JobTemplateEntity.TemplateContent.builder()
+              .withExecutable("/bin/sh")
+              .withArguments(Lists.newArrayList("-c", "trap '' TERM; echo ready; exec sleep 300"))
+              .withEnvironments(ImmutableMap.of())
+              .withJobType(JobTemplate.JobType.SHELL)
+              .withScripts(Lists.newArrayList())
+              .withCustomFields(ImmutableMap.of())
+              .build();
+      JobTemplateEntity trapTemplate =
+          JobTemplateEntity.builder()
+              .withId(2L)
+              .withName("trap-term-job-template")
+              .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+              .withComment("test")
+              .withTemplateContent(trapContent)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      JobTemplate template = new JobTemplateResolver(trapTemplate).resolve(ImmutableMap.of());
+
+      String jobId = submit(executor, template, workingDir);
+      awaitReadyMarker();
+      Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
+
+      executor.cancelJob(jobId);
+
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .until(() -> executor.getJobStatus(jobId) == JobHandle.Status.CANCELLED);
+    } finally {
+      executor.close();
+    }
+  }
+
+  @Test
+  public void testCancelledJobExitingZeroReportsCancelled() throws Exception {
+    // A cancelled job whose TERM handler exits 0 must report CANCELLED, not SUCCEEDED: the user
+    // asked for it to stop, so a clean exit taken in response to the cancel is still a
+    // cancellation.
+    LocalJobExecutor executor = new LocalJobExecutor();
+    executor.initialize(withStagingDir(Collections.emptyMap()));
+    try {
+      JobTemplateEntity.TemplateContent content =
+          JobTemplateEntity.TemplateContent.builder()
+              .withExecutable("/bin/sh")
+              .withArguments(
+                  Lists.newArrayList(
+                      "-c", "trap 'exit 0' TERM; echo ready; while :; do sleep 1; done"))
+              .withEnvironments(ImmutableMap.of())
+              .withJobType(JobTemplate.JobType.SHELL)
+              .withScripts(Lists.newArrayList())
+              .withCustomFields(ImmutableMap.of())
+              .build();
+      JobTemplateEntity templateEntity =
+          JobTemplateEntity.builder()
+              .withId(3L)
+              .withName("term-exit-zero-template")
+              .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+              .withComment("test")
+              .withTemplateContent(content)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      JobTemplate template = new JobTemplateResolver(templateEntity).resolve(ImmutableMap.of());
+
+      String jobId = submit(executor, template, workingDir);
+      awaitReadyMarker();
+      Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(jobId));
+
+      executor.cancelJob(jobId);
+
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .until(() -> executor.getJobStatus(jobId) == JobHandle.Status.CANCELLED);
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, executor.getJobStatus(jobId));
+    } finally {
+      executor.close();
+    }
+  }
+
+  @Test
   public void testCancelSucceededJob() {
     // Cancelling a job that is already succeeded.
     Map<String, String> successJobConf =
@@ -659,8 +796,8 @@ public class TestLocalJobExecutor {
             "var", "value3");
 
     JobTemplate successTemplate =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, successJobConf, workingDir);
-    String successJobId = jobExecutor.submitJob(successTemplate);
+        new JobTemplateResolver(jobTemplateEntity).resolve(successJobConf);
+    String successJobId = submit(jobExecutor, successTemplate, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(successJobId) == JobHandle.Status.SUCCEEDED);
@@ -678,9 +815,8 @@ public class TestLocalJobExecutor {
             "arg2", "fail",
             "var", "value3");
 
-    JobTemplate failTemplate =
-        JobManager.createRuntimeJobTemplate(jobTemplateEntity, failJobConf, workingDir);
-    String failJobId = jobExecutor.submitJob(failTemplate);
+    JobTemplate failTemplate = new JobTemplateResolver(jobTemplateEntity).resolve(failJobConf);
+    String failJobId = submit(jobExecutor, failTemplate, workingDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(failJobId) == JobHandle.Status.FAILED);
@@ -785,22 +921,23 @@ public class TestLocalJobExecutor {
 
   @Test
   public void testSubmitJobWritesOutputIndexRelativeToStagingDir() throws IOException {
-    // Laid out like the {metalake}/{template}/job-{id} staging directory of JobManager.
-    File jobDir = new File(workingDir, "metalake/template/job-1");
+    // Laid out like the job-runs/job-{id} staging directory of JobManager.
+    File jobDir = new File(workingDir, "job-runs/job-1");
     Assertions.assertTrue(jobDir.mkdirs());
     String jobId = runSucceededJob(jobDir);
 
     JsonNode index = JsonUtils.anyFieldMapper().readTree(outputIndexFile(jobId));
     Assertions.assertEquals(1, index.get("version").intValue());
     Assertions.assertEquals(
-        workingDir.getName() + "/metalake/template/job-1", index.get("workingDir").textValue());
+        workingDir.getName() + "/job-runs/job-1", index.get("workingDir").textValue());
   }
 
   @Test
   public void testOutputIndexKeepsSpecialCharactersInWorkingDir() throws IOException {
-    // Job template names are not restricted, so the staging directory may contain any character a
-    // file name can. They must survive the JSON encoding and the '/'-joining unchanged. Some of
-    // these characters are only valid in POSIX file names, like the shell job itself.
+    // The working directory may contain any character a file name can, e.g. a staging directory of
+    // an earlier version, which was named after the job template. It must survive the JSON encoding
+    // and the '/'-joining unchanged. Some of these characters are only valid in POSIX file names,
+    // like the shell job itself.
     String specialName =
         "a b \"quoted\" back\\slash 中文 \t tab \n newline %20 #!$&'()*+,;=@[]{}~`^|<>?";
     File jobDir =
@@ -851,7 +988,7 @@ public class TestLocalJobExecutor {
       // The status of a finished job is dropped from memory almost right away.
       exec.initialize(
           withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "10")));
-      String jobId = exec.submitJob(newRuntimeJobTemplate(workingDir));
+      String jobId = submit(exec, newRuntimeJobTemplate(), workingDir);
       // A queued or running job's status never expires, so a missing status means it finished.
       Awaitility.await().atMost(3, TimeUnit.MINUTES).until(() -> !hasJobStatus(exec, jobId));
 
@@ -1144,6 +1281,19 @@ public class TestLocalJobExecutor {
     Assertions.assertEquals(6, jobExecutor.getJobStdout(jobId, 100, DEFAULT_TEST_MAX_BYTES).size());
   }
 
+  // The job script prints "ready" only after installing its TERM trap, so a cancel sent once this
+  // returns cannot reach the shell before the trap is in place.
+  private static void awaitReadyMarker() {
+    File output = new File(workingDir, "output.log");
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .until(
+            () ->
+                output.exists()
+                    && FileUtils.readFileToString(output, StandardCharsets.UTF_8)
+                        .contains("ready"));
+  }
+
   private static Map<String, String> withStagingDir(Map<String, String> configs) {
     return ImmutableMap.<String, String>builder()
         .putAll(configs)
@@ -1151,15 +1301,18 @@ public class TestLocalJobExecutor {
         .build();
   }
 
-  private static JobTemplate newRuntimeJobTemplate(File jobDir) {
-    return JobManager.createRuntimeJobTemplate(
-        jobTemplateEntity,
-        ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"),
-        jobDir);
+  private static JobTemplate newRuntimeJobTemplate() {
+    return new JobTemplateResolver(jobTemplateEntity)
+        .resolve(ImmutableMap.of("arg1", "value1", "arg2", "success", "var", "value3"));
+  }
+
+  private static String submit(JobExecutor executor, JobTemplate jobTemplate, File jobDir) {
+    return executor.submitJob(
+        new JobContext(JOB_IDS.incrementAndGet(), "test", jobDir), jobTemplate);
   }
 
   private static String runSucceededJob(File jobDir) {
-    String jobId = jobExecutor.submitJob(newRuntimeJobTemplate(jobDir));
+    String jobId = submit(jobExecutor, newRuntimeJobTemplate(), jobDir);
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
@@ -1233,22 +1386,125 @@ public class TestLocalJobExecutor {
     }
   }
 
-  private JobTemplate newSleepJobTemplate(String name) throws IOException {
-    // The job runs in the directory of its executable, so give each job its own directory.
-    File jobDir = new File(workingDir, name);
-    Assertions.assertTrue(jobDir.mkdirs());
-    File script = new File(jobDir, "sleep.sh");
+  @Test
+  public void testJobExecutionInfoOfFinishedJobs() throws IOException {
+    Instant submittedAt = Instant.now();
+    String succeededJobId = submitScriptJob(jobExecutor, "succeed", "sleep 1\nexit 0");
+    String failedJobId = submitScriptJob(jobExecutor, "fail", "sleep 1\nexit 1");
+
+    Awaitility.await()
+        .atMost(1, TimeUnit.MINUTES)
+        .until(
+            () ->
+                jobExecutor.getJobStatus(succeededJobId) == JobHandle.Status.SUCCEEDED
+                    && jobExecutor.getJobStatus(failedJobId) == JobHandle.Status.FAILED);
+
+    // The jobs are never polled while they run, but their snapshots still carry when they
+    // actually started and finished.
+    for (String jobId : Lists.newArrayList(succeededJobId, failedJobId)) {
+      JobExecutionInfo info = jobExecutor.getJobExecutionInfo(jobId);
+      Assertions.assertNotNull(info.startedAt(), jobId);
+      Assertions.assertNotNull(info.finishedAt(), jobId);
+      Assertions.assertFalse(info.startedAt().isBefore(submittedAt), jobId);
+      Assertions.assertTrue(
+          Duration.between(info.startedAt(), info.finishedAt()).toMillis() >= 900, info.toString());
+    }
+  }
+
+  @Test
+  public void testJobExecutionInfoOfCancelledJobs() throws IOException {
+    LocalJobExecutor executor = new LocalJobExecutor();
+    try {
+      executor.initialize(
+          withStagingDir(ImmutableMap.of(LocalJobExecutorConfigs.MAX_RUNNING_JOBS, "1")));
+      String runningJobId = submitSleepJob(executor, "sleep");
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> executor.getJobStatus(runningJobId) == JobHandle.Status.STARTED);
+      // The other job waits in the queue, as only one job can run at a time.
+      String queuedJobId = submitScriptJob(executor, "queued", "exit 0");
+
+      JobExecutionInfo started = executor.getJobExecutionInfo(runningJobId);
+      Assertions.assertNotNull(started.startedAt());
+      Assertions.assertNull(started.finishedAt());
+      Assertions.assertEquals(
+          JobExecutionInfo.of(JobHandle.Status.QUEUED), executor.getJobExecutionInfo(queuedJobId));
+
+      // A job cancelled from the queue never started.
+      executor.cancelJob(queuedJobId);
+      JobExecutionInfo cancelledQueued = executor.getJobExecutionInfo(queuedJobId);
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelledQueued.status());
+      Assertions.assertNull(cancelledQueued.startedAt());
+      Assertions.assertNotNull(cancelledQueued.finishedAt());
+
+      // A running job keeps its started time while it is being cancelled and after that.
+      executor.cancelJob(runningJobId);
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> executor.getJobStatus(runningJobId) == JobHandle.Status.CANCELLED);
+      JobExecutionInfo cancelled = executor.getJobExecutionInfo(runningJobId);
+      Assertions.assertEquals(started.startedAt(), cancelled.startedAt());
+      Assertions.assertNotNull(cancelled.finishedAt());
+      Assertions.assertFalse(cancelled.finishedAt().isBefore(cancelled.startedAt()));
+    } finally {
+      executor.close();
+    }
+  }
+
+  @Test
+  public void testCleanupOnlyRemovesFinishedJobs() throws IOException {
+    LocalJobExecutor executor = new LocalJobExecutor();
+    try {
+      executor.initialize(
+          withStagingDir(
+              ImmutableMap.of(
+                  LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS,
+                  "10",
+                  LocalJobExecutorConfigs.MAX_RUNNING_JOBS,
+                  "2")));
+      String runningJobId = submitSleepJob(executor, "sleep");
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> executor.getJobStatus(runningJobId) == JobHandle.Status.STARTED);
+      String finishedJobId = submitScriptJob(executor, "finish", "exit 0");
+
+      // The finished job is removed once it has been kept for the keep time, while the running job
+      // is kept however long it runs.
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> !hasJobStatus(executor, finishedJobId));
+      Assertions.assertEquals(JobHandle.Status.STARTED, executor.getJobStatus(runningJobId));
+    } finally {
+      executor.close();
+    }
+  }
+
+  private String submitSleepJob(JobExecutor executor, String name) throws IOException {
     // Exec the sleep, so that killing the job process also stops the sleep.
-    Files.writeString(script.toPath(), "#!/bin/bash\nexec sleep 600\n");
+    return submitScriptJob(executor, name, "exec sleep 600");
+  }
+
+  private String submitScriptJob(JobExecutor executor, String name, String commands)
+      throws IOException {
+    // The script lives outside of the job's directory, where the executor localizes it.
+    File sourceDir = new File(workingDir, name + "-src");
+    Assertions.assertTrue(sourceDir.mkdirs());
+    File script = new File(sourceDir, "job.sh");
+    Files.writeString(script.toPath(), "#!/bin/bash\n" + commands + "\n");
     Assertions.assertTrue(script.setExecutable(true));
 
-    return ShellJobTemplate.builder()
-        .withName(name)
-        .withExecutable(script.getAbsolutePath())
-        .withArguments(Collections.emptyList())
-        .withEnvironments(Collections.emptyMap())
-        .withCustomFields(Collections.emptyMap())
-        .withScripts(Collections.emptyList())
-        .build();
+    // Each job runs in its own directory.
+    File jobDir = new File(workingDir, name);
+    Assertions.assertTrue(jobDir.mkdirs());
+    JobTemplate jobTemplate =
+        ShellJobTemplate.builder()
+            .withName(name)
+            .withExecutable(script.getAbsolutePath())
+            .withArguments(Collections.emptyList())
+            .withEnvironments(Collections.emptyMap())
+            .withCustomFields(Collections.emptyMap())
+            .withScripts(Collections.emptyList())
+            .build();
+    return submit(executor, jobTemplate, jobDir);
   }
 }

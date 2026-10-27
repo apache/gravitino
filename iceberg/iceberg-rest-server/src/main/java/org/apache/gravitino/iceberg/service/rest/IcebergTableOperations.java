@@ -63,6 +63,7 @@ import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -77,6 +78,10 @@ import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.metrics.CommitReport;
+import org.apache.iceberg.metrics.MetricsReport;
+import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
@@ -107,16 +112,19 @@ public class IcebergTableOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergTableOperationDispatcher tableOperationDispatcher;
+  private IcebergReadRestrictionLoader readRestrictionLoader;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergTableOperations(
       IcebergMetricsManager icebergMetricsManager,
-      IcebergTableOperationDispatcher tableOperationDispatcher) {
+      IcebergTableOperationDispatcher tableOperationDispatcher,
+      IcebergReadRestrictionLoader readRestrictionLoader) {
     this.icebergMetricsManager = icebergMetricsManager;
     this.tableOperationDispatcher = tableOperationDispatcher;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
+    this.readRestrictionLoader = readRestrictionLoader;
   }
 
   @GET
@@ -330,7 +338,7 @@ public class IcebergTableOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
 
             // Fast path: if client sent If-None-Match, try to resolve ETag without full table load
-            if (StringUtils.isNotBlank(ifNoneMatch)) {
+            if (!readRestrictionLoader.enabled() && StringUtils.isNotBlank(ifNoneMatch)) {
               Optional<String> metadataLocation =
                   tableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
               if (metadataLocation.isPresent()) {
@@ -343,13 +351,21 @@ public class IcebergTableOperations {
 
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
+            if (IcebergRESTUtils.SnapshotMode.REFS.getValue().equals(snapshots)) {
+              loadTableResponse =
+                  readRestrictionLoader.preserveSnapshotFilteredFields(
+                      loadTableResponse, filterSnapshotsByRefs(loadTableResponse));
+            }
+            IcebergReadRestrictionLoader.Result restrictionResult =
+                readRestrictionLoader.load(context, tableIdentifier, loadTableResponse);
+            loadTableResponse = restrictionResult.response();
             Optional<EntityTag> etag =
-                generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), snapshots);
+                generateETag(
+                    loadTableResponse.tableMetadata().metadataFileLocation(),
+                    snapshots,
+                    restrictionResult.etagSeed());
             if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
               return Response.notModified(etag.get()).build();
-            }
-            if (IcebergRESTUtils.SnapshotMode.REFS.getValue().equals(snapshots)) {
-              loadTableResponse = filterSnapshotsByRefs(loadTableResponse);
             }
             return buildResponseWithETag(loadTableResponse, etag);
           });
@@ -405,10 +421,14 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "report-table-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "report-table-metrics", absolute = true)
+  @AuthorizationExpression(
+      expression = LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response reportTableMetrics(
-      @PathParam("prefix") String prefix,
-      @Encoded() @PathParam("namespace") String namespace,
-      @Encoded() @PathParam("table") String table,
+      @AuthorizationMetadata(type = EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
+          String namespace,
+      @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table,
       ReportMetricsRequest request) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -423,8 +443,30 @@ public class IcebergTableOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean accepted =
-                icebergMetricsManager.recordMetric(catalogName, icebergNS, request.report());
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
+            if (!tableOperationDispatcher.tableExists(context, tableIdentifier)) {
+              throw new NoSuchTableException("Table %s not found", tableIdentifier);
+            }
+            MetricsReport report = request.report();
+            String reportedTableName;
+            if (report instanceof CommitReport) {
+              reportedTableName = ((CommitReport) report).tableName();
+            } else if (report instanceof ScanReport) {
+              reportedTableName = ((ScanReport) report).tableName();
+            } else {
+              throw new IllegalArgumentException("Unsupported metrics report type");
+            }
+            String qualifiedTableName = tableIdentifier.toString();
+            if (reportedTableName == null
+                || (!tableName.equals(reportedTableName)
+                    && !qualifiedTableName.equals(reportedTableName)
+                    && !reportedTableName.endsWith("." + qualifiedTableName))) {
+              throw new IllegalArgumentException(
+                  "Metrics report table name does not match the requested table");
+            }
+            boolean accepted = icebergMetricsManager.recordMetric(catalogName, icebergNS, report);
             if (accepted) {
               return IcebergRESTUtils.noContent();
             } else {
@@ -641,6 +683,7 @@ public class IcebergTableOperations {
         TableMetadata.buildFrom(metadata)
             .withMetadataLocation(metadata.metadataFileLocation())
             .suppressHistoricalSnapshots()
+            .discardChanges()
             .build();
     LoadTableResponse.Builder builder =
         LoadTableResponse.builder()
@@ -679,6 +722,12 @@ public class IcebergTableOperations {
   @VisibleForTesting
   static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
     return IcebergRESTUtils.generateETag(metadataLocation, snapshots);
+  }
+
+  @VisibleForTesting
+  static Optional<EntityTag> generateETag(
+      String metadataLocation, String snapshots, Optional<String> representationSeed) {
+    return IcebergRESTUtils.generateETag(metadataLocation, snapshots, representationSeed);
   }
 
   /**

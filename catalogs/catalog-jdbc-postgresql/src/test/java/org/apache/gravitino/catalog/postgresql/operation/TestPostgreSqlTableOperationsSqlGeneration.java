@@ -24,6 +24,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
+import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -32,6 +33,8 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestPostgreSqlTableOperationsSqlGeneration {
 
@@ -76,6 +79,39 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
               })
           .build();
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDeleteIndexesDropsOnlyConstraints(boolean ifExists) {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.deleteIndex("primary_key", ifExists),
+            TableChange.deleteIndex("unique_key", ifExists));
+
+    String optional = ifExists ? "IF EXISTS " : "";
+    Assertions.assertEquals(
+        "ALTER TABLE \"test_table\" DROP CONSTRAINT "
+            + optional
+            + "\"primary_key\";\n"
+            + "ALTER TABLE \"test_table\" DROP CONSTRAINT "
+            + optional
+            + "\"unique_key\";",
+        sql);
+  }
+
+  @Test
+  void testDeleteIndexWithoutIfExistsUsesStrictConstraintDrop() {
+    TableUpdateRequest request =
+        new TableUpdateRequest.DeleteTableIndexRequest("primary_key", null);
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+
+    Assertions.assertEquals(
+        "ALTER TABLE \"test_table\" DROP CONSTRAINT \"primary_key\";",
+        ops.alterTableSql("test_table", request.tableChange()));
   }
 
   @Test
@@ -138,6 +174,19 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
         "COMMENT ON COLUMN \"test_table\".\"col1\" "
             + "IS E'owner\\\\''s comment; DROP TABLE marker; --';",
         alterSql);
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+
+    Assertions.assertEquals(
+        "COMMENT ON COLUMN \"test_table\".\"col1\" IS E'';",
+        ops.alterTableSql(
+            "test_table", TableChange.updateColumnComment(new String[] {"col1"}, null)));
+    Assertions.assertEquals(
+        "COMMENT ON TABLE \"test_table\" IS E'';",
+        ops.alterTableSql("test_table", TableChange.updateComment(null)));
   }
 
   @Test

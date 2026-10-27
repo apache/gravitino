@@ -89,6 +89,8 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
@@ -102,9 +104,17 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.AccessControlContent;
+import org.apache.gravitino.policy.ColumnMaskContent;
+import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
+import org.apache.gravitino.policy.RowFilterContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -130,6 +140,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValueConstraint;
@@ -315,6 +326,22 @@ public class DTOConverters {
         .withDefaultSchema(view.defaultSchema())
         .withProperties(view.properties())
         .withAudit(toDTO(view.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a {@link SemanticModel} implementation to a {@link SemanticModelDTO}.
+   *
+   * @param semanticModel The Semantic Model implementation.
+   * @return The Semantic Model DTO.
+   */
+  public static SemanticModelDTO toDTO(SemanticModel semanticModel) {
+    return SemanticModelDTO.builder()
+        .withName(semanticModel.name())
+        .withComment(semanticModel.comment())
+        .withDefinition(SemanticModelDefinitionDTO.fromDefinition(semanticModel.definition()))
+        .withProperties(semanticModel.properties())
+        .withAudit(toDTO(semanticModel.auditInfo()))
         .build();
   }
 
@@ -647,6 +674,12 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
+    PolicyExecutionSpec executionSpec = null;
+    if (policyContent instanceof ExecutablePolicyContent) {
+      PolicyExecutionSpec spec = ((ExecutablePolicyContent) policyContent).executionSpec();
+      executionSpec = spec.hasAny() ? spec : null;
+    }
+
     if (policyContent instanceof PolicyContents.CustomContent) {
       PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
       return PolicyContentDTO.CustomContentDTO.builder()
@@ -656,6 +689,35 @@ public class DTOConverters {
           .build();
     }
 
+    if (policyContent instanceof IcebergOrphanFileRemovalContent) {
+      IcebergOrphanFileRemovalContent content = (IcebergOrphanFileRemovalContent) policyContent;
+      return PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withLocation(content.location())
+          .withDryRun(content.dryRun())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+    if (policyContent instanceof IcebergRewriteManifestsContent) {
+      IcebergRewriteManifestsContent content = (IcebergRewriteManifestsContent) policyContent;
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
+          .withManifestCountCritical(content.manifestCountCritical())
+          .withManifestCountWarning(content.manifestCountWarning())
+          .withAvgManifestSizeThresholdBytes(content.avgManifestSizeThresholdBytes())
+          .withSpecId(content.specId())
+          .withUseCaching(content.useCaching())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+    if (policyContent instanceof IcebergSnapshotExpirationContent) {
+      IcebergSnapshotExpirationContent content = (IcebergSnapshotExpirationContent) policyContent;
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withRetainLast(content.retainLast())
+          .withStreamResults(content.streamResults())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
           (IcebergDataCompactionContent) policyContent;
@@ -665,7 +727,32 @@ public class DTOConverters {
           .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+          .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
+          .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+
+    if (policyContent instanceof RowFilterContent) {
+      RowFilterContent content = (RowFilterContent) policyContent;
+      return PolicyContentDTO.RowFilterContentDTO.builder()
+          .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof ColumnMaskContent) {
+      ColumnMaskContent content = (ColumnMaskContent) policyContent;
+      return PolicyContentDTO.ColumnMaskContentDTO.builder()
+          .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof AccessControlContent) {
+      AccessControlContent accessControlContent = (AccessControlContent) policyContent;
+      return PolicyContentDTO.AccessControlContentDTO.builder()
+          .withPrivileges(accessControlContent.privileges())
+          .withApplicableRoles(accessControlContent.applicableRoles())
           .build();
     }
 
@@ -1513,16 +1600,39 @@ public class DTOConverters {
           customContentDTO.properties());
     }
 
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) {
+      return ((PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
+      return ((PolicyContentDTO.IcebergRewriteManifestsContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
+      return ((PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
-      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
-          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
-      return PolicyContents.icebergDataCompaction(
-          icebergCompactionContentDTO.minDataFileMse(),
-          icebergCompactionContentDTO.minDeleteFileNumber(),
-          icebergCompactionContentDTO.dataFileMseWeight(),
-          icebergCompactionContentDTO.deleteFileNumberWeight(),
-          icebergCompactionContentDTO.maxPartitionNum(),
-          icebergCompactionContentDTO.rewriteOptions());
+      return ((PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO).toDomainContent();
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.RowFilterContentDTO) {
+      PolicyContentDTO.RowFilterContentDTO contentDTO =
+          (PolicyContentDTO.RowFilterContentDTO) policyContentDTO;
+      return PolicyContents.rowFilter(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.ColumnMaskContentDTO) {
+      PolicyContentDTO.ColumnMaskContentDTO contentDTO =
+          (PolicyContentDTO.ColumnMaskContentDTO) policyContentDTO;
+      return PolicyContents.columnMask(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.AccessControlContentDTO) {
+      PolicyContentDTO.AccessControlContentDTO accessControlContentDTO =
+          (PolicyContentDTO.AccessControlContentDTO) policyContentDTO;
+      return PolicyContents.accessControl(
+          accessControlContentDTO.privileges(), accessControlContentDTO.applicableRoles());
     }
 
     throw new IllegalArgumentException(

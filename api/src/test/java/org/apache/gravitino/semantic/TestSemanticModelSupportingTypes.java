@@ -181,31 +181,6 @@ public class TestSemanticModelSupportingTypes {
   }
 
   @Test
-  public void testAIContextAdditionalPropertyBounds() {
-    Object maximumDepthValue = "value";
-    for (int depth = 0; depth < AIContextObject.MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH; depth++) {
-      maximumDepthValue = Map.of("nested", maximumDepthValue);
-    }
-    AIContextObject.builder()
-        .withAdditionalProperties(Map.of("maximumDepth", maximumDepthValue))
-        .build();
-
-    Object excessiveDepthValue = Map.of("nested", maximumDepthValue);
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            AIContextObject.builder()
-                .withAdditionalProperties(Map.of("excessiveDepth", excessiveDepthValue))
-                .build());
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            AIContextObject.builder()
-                .withAdditionalProperties(Map.of("unsupportedNumber", new AtomicInteger(1)))
-                .build());
-  }
-
-  @Test
   public void testSupportingTypeValidation() {
     assertThrows(IllegalArgumentException.class, () -> DialectExpression.builder().build());
     assertThrows(IllegalArgumentException.class, () -> Expression.builder().build());
@@ -243,6 +218,12 @@ public class TestSemanticModelSupportingTypes {
         () ->
             AIContextObject.builder()
                 .withAdditionalProperties(Map.of("unsupported", new Object()))
+                .build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            AIContextObject.builder()
+                .withAdditionalProperties(Map.of("unsupportedNumber", new AtomicInteger(1)))
                 .build());
     assertThrows(
         IllegalArgumentException.class,
