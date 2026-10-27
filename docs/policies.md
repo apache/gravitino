@@ -104,6 +104,35 @@ mask := action("show-last-4") if is_group_member("support")
 else := action("replace-with-null")
 ```
 
+When the experimental Iceberg REST read-restriction loader resolves several row-filter policies
+for one table, a filter that resolves to `true` adds no restriction and is ignored. Identical
+effective filters are deduplicated. Distinct restrictive filters conflict and cause the load-table
+request to fail; the loader does not combine them.
+
+If the selected column-mask action is not applicable to a column type, the experimental loader
+fails the load-table request rather than omitting the mask and exposing the original values.
+Unselected actions do not need to be applicable to that column. For example, `replace-with-null`
+cannot apply to a required column when that action is selected.
+
+Experimental Iceberg REST read restrictions require authorization to be enabled with
+`gravitino.authorization.enable=true` and a policy dispatcher to be available. When a policy dispatcher
+is available but authorization is disabled, the Iceberg REST service fails to start with an error
+identifying the required configuration, even when no policy applies. In auxiliary mode, this also
+aborts startup of the Gravitino server.
+
+`is_group_member` uses group membership supplied by the authenticated principal; enabling
+authorization does not populate these groups. An empty group list is valid and means that the user
+is not a member of any group. Authenticators that do not supply groups, including `simple`, therefore
+select the non-member branch of group-based policies, which may be unrestricted if the policy allows
+it. The referenced group must still exist in Gravitino; an unknown group or an unresolved identity
+causes the load-table request to fail.
+
+When the experimental Iceberg REST read-restriction loader is enabled, load-table does not support
+names containing `.` in the metalake, catalog, schema, table, or top-level column path. The
+metadata-object API reserves `.` as a qualified-name separator, so a tag cannot be assigned
+directly to such an object. The loader returns HTTP 400 for these names even when no policy is
+assigned. A standalone service without a policy dispatcher does not perform policy resolution.
+
 Conditional branches are evaluated from left to right. The first true condition selects its result,
 and every conditional rule must end with an unconditional `else`. Row-filter conditions and results
 must be Boolean. Column-mask conditions may use only request context; they cannot reference columns.

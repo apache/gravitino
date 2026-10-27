@@ -121,6 +121,9 @@ public class JobManager implements JobOperationDispatcher {
   // stop.
   private static final int CANCELLATION_TIMEOUT_IN_PULL_INTERVALS = 3;
 
+  // How many of the jobs whose status pull failed are named in the log of a poll.
+  private static final int MAX_LOGGED_FAILED_JOBS = 5;
+
   private final EntityStore entityStore;
 
   private final File stagingDir;
@@ -488,7 +491,7 @@ public class JobManager implements JobOperationDispatcher {
         maxBytes == null || maxBytes > 0, "maxBytes must be positive if specified");
 
     // A caller-specified maxLines/maxBytes can only narrow the globally configured cap, never
-    // widen it - the global configuration remains a hard upper bound on read cost/response size.
+    // widen it - the global configuration remains a hard upper bound on the response size.
     int effectiveMaxLines = clampToGlobalMax(maxLines, jobOutputMaxLines);
     int effectiveMaxBytes = clampToGlobalMax(maxBytes, jobOutputMaxBytes);
 
@@ -1046,30 +1049,47 @@ public class JobManager implements JobOperationDispatcher {
                         || job.status() == JobHandle.Status.CANCELLING)
             .toList();
 
+    // A job whose status can't be pulled or updated is kept unchanged, and retried in the next
+    // poll. While the job executor fails, for example while its backend is unreachable, every job
+    // fails the same way on every poll, so the failures are logged once per poll.
     long now = System.currentTimeMillis();
-    activeJobs.forEach(
-        job -> {
-          // A failure on one job must never stop the status pull of the others.
-          try {
-            // Only the job executor instance owning the job can query its status. The jobs
-            // owned by other servers are skipped, except a node local job whose cancellation its
-            // owner has not answered in time: the owner has likely exited, e.g. the server
-            // restarted, so nobody else would ever settle it. The other jobs left behind by a
-            // server that has exited are settled by cleanUpStagingDirs() once they expire.
-            if (jobExecutor.ownsJob(job.jobExecutionId())) {
-              pullAndUpdateOwnedJobStatus(metalake, job);
-            } else if (jobExecutor.isJobStateNodeLocal() && isCancellationUnanswered(job, now)) {
-              settleUnansweredCancellation(metalake, job, now);
-            }
-          } catch (Throwable t) {
-            LOG.error(
-                "Failed to update the status of job {} with execution id {} under metalake {}",
-                job.name(),
-                job.jobExecutionId(),
-                metalake,
-                t);
-          }
-        });
+    List<String> failedJobs = new ArrayList<>();
+    Throwable firstFailure = null;
+    for (JobEntity job : activeJobs) {
+      // A failure on one job must never stop the status pull of the others.
+      try {
+        // Only the job executor instance owning the job can query its status. The jobs owned by
+        // other servers are skipped, except a node local job whose cancellation its owner has not
+        // answered in time: the owner has likely exited, e.g. the server restarted, so nobody else
+        // would ever settle it. The other jobs left behind by a server that has exited are settled
+        // by cleanUpStagingDirs() once they expire.
+        if (jobExecutor.ownsJob(job.jobExecutionId())) {
+          pullAndUpdateOwnedJobStatus(metalake, job);
+        } else if (jobExecutor.isJobStateNodeLocal() && isCancellationUnanswered(job, now)) {
+          settleUnansweredCancellation(metalake, job, now);
+        }
+      } catch (Throwable t) {
+        LOG.debug(
+            "Failed to pull or update the status of job {} with execution id {} under metalake {}",
+            job.name(),
+            job.jobExecutionId(),
+            metalake,
+            t);
+        failedJobs.add(job.name());
+        firstFailure = firstFailure == null ? t : firstFailure;
+      }
+    }
+
+    if (firstFailure != null) {
+      LOG.warn(
+          "Failed to pull or update the status of {} of {} active jobs under metalake {}, for"
+              + " example {}, retrying in the next poll. The first failure:",
+          failedJobs.size(),
+          activeJobs.size(),
+          metalake,
+          failedJobs.subList(0, Math.min(failedJobs.size(), MAX_LOGGED_FAILED_JOBS)),
+          firstFailure);
+    }
   }
 
   private void pullAndUpdateOwnedJobStatus(String metalake, JobEntity job) {
@@ -1104,14 +1124,6 @@ public class JobManager implements JobOperationDispatcher {
           job.jobExecutionId(),
           metalake,
           observed.status());
-    } catch (Exception e) {
-      // Keep the job unchanged, and retry it in the next poll.
-      LOG.error(
-          "Failed to pull or cancel job {} by execution id {}",
-          job.name(),
-          job.jobExecutionId(),
-          e);
-      return;
     }
 
     // Besides the status, the job executor may report the timestamps of the job later than its

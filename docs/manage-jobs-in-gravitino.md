@@ -403,7 +403,7 @@ default configurations:
 | `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed                                                                                    | `604800000` (7 days)          | No       |
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor                                                                                            | `300000` (5 minutes)          | No       |
 | `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output                                                                                      | `1000`                        | No       |
-| `gravitino.job.outputMaxBytes`         | The maximum number of bytes read from the tail of a job's stdout/stderr output                                                                                       | `262144` (256KB)              | No       |
+| `gravitino.job.outputMaxBytes`         | The maximum number of bytes returned from the tail of a job's stdout/stderr output                                                                                   | `262144` (256KB)              | No       |
 
 #### Configurations for Local Job Executor
 

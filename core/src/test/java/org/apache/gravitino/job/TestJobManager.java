@@ -41,12 +41,14 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -93,6 +95,12 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -103,6 +111,19 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestJobManager {
+
+  private static class LogCollector extends AbstractAppender {
+    private final List<LogEvent> events = new CopyOnWriteArrayList<>();
+
+    private LogCollector() {
+      super("jobManagerLogCollector", null, PatternLayout.createDefaultLayout(), true, null);
+    }
+
+    @Override
+    public void append(LogEvent event) {
+      events.add(event.toImmutable());
+    }
+  }
 
   private JobManager jobManager;
 
@@ -1967,6 +1988,54 @@ public class TestJobManager {
   }
 
   @Test
+  public void testPullJobStatusLogsFailuresOncePerPoll() throws IOException {
+    List<JobEntity> jobs = new ArrayList<>();
+    for (int i = 0; i < 7; i++) {
+      jobs.add(newJobEntity("execution-" + i, JobHandle.Status.STARTED, Instant.now(), null));
+    }
+    mockListActiveJobs(jobs.toArray(new JobEntity[0]));
+    // The backend of the job executor is unreachable, the job executor fails every job but one.
+    RuntimeException unreachable = new RuntimeException("API server unreachable");
+    when(jobExecutor.getJobExecutionInfo(any())).thenThrow(unreachable);
+    doReturn(JobExecutionInfo.of(JobHandle.Status.STARTED))
+        .when(jobExecutor)
+        .getJobExecutionInfo(jobs.get(6).jobExecutionId());
+    stubEntityStoreUpdateToApply(jobs.get(6));
+
+    List<LogEvent> events = captureLogs(() -> jobManager.pullAndUpdateJobStatus());
+
+    // Each job is logged at DEBUG, and the poll at WARN once, with the first failure.
+    Assertions.assertEquals(
+        6,
+        events.stream()
+            .filter(
+                event ->
+                    Level.DEBUG.equals(event.getLevel())
+                        && event.getThrown() == unreachable
+                        && event
+                            .getMessage()
+                            .getFormattedMessage()
+                            .startsWith("Failed to pull or update the status of job "))
+            .count());
+    List<LogEvent> warnings =
+        events.stream().filter(event -> event.getLevel().isMoreSpecificThan(Level.WARN)).toList();
+    Assertions.assertEquals(1, warnings.size());
+    LogEvent warning = warnings.get(0);
+    Assertions.assertEquals(Level.WARN, warning.getLevel());
+    Assertions.assertSame(unreachable, warning.getThrown());
+    String message = warning.getMessage().getFormattedMessage();
+    Assertions.assertTrue(
+        message.contains("6 of 7 active jobs under metalake " + metalake), message);
+    Assertions.assertTrue(
+        message.contains(
+            jobs.subList(0, 5).stream()
+                .map(JobEntity::name)
+                .collect(Collectors.toList())
+                .toString()),
+        message);
+  }
+
+  @Test
   public void testPullJobStatusKeepsCancellingWhenOwnerFailsToCancel() throws IOException {
     JobEntity job =
         newJobEntity("local-job-mine-1", JobHandle.Status.CANCELLING, Instant.now(), null);
@@ -3374,6 +3443,28 @@ public class TestJobManager {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  private static List<LogEvent> captureLogs(Runnable action) {
+    LoggerContext context =
+        (LoggerContext) LogManager.getContext(JobManager.class.getClassLoader(), false);
+    var logger = context.getLogger(JobManager.class.getName());
+    LogCollector collector = new LogCollector();
+    collector.start();
+    // Attach to this logger without replacing its configuration or its existing appenders.
+    synchronized (logger) {
+      Level previous = logger.getLevel();
+      logger.addAppender(collector);
+      logger.setLevel(Level.DEBUG);
+      try {
+        action.run();
+      } finally {
+        logger.removeAppender(collector);
+        logger.setLevel(previous);
+        collector.stop();
+      }
+    }
+    return List.copyOf(collector.events);
   }
 
   private void mockListActiveJobs(JobEntity... jobs) {
