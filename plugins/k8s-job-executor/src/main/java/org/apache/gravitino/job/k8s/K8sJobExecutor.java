@@ -218,6 +218,46 @@ public class K8sJobExecutor implements JobExecutor {
   }
 
   @Override
+  public Optional<String> findSubmittedJob(JobContext context, JobTemplate jobTemplate) {
+    if (!(jobTemplate instanceof SparkJobTemplate)) {
+      return Optional.empty();
+    }
+
+    // The SparkApplication of a job is named after the job id, in the namespace that the job
+    // template selects, so it's found the same way submitJob() names it.
+    GenericKubernetesResource app;
+    try {
+      app =
+          SparkApplicationUtils.buildSparkApplication(
+              context, (SparkJobTemplate) jobTemplate, configs);
+    } catch (IllegalArgumentException e) {
+      // submitJob() rejects such a job before creating anything.
+      return Optional.empty();
+    }
+    K8sJobExecutionId jobExecutionId =
+        K8sJobExecutionId.of(
+            configs.cluster(),
+            K8sJobExecutionId.Kind.SPARK_APPLICATION,
+            app.getMetadata().getNamespace(),
+            app.getMetadata().getName());
+    checkApiServerReachable();
+    try {
+      return getSparkApplication(jobExecutionId)
+          .filter(
+              existing ->
+                  existing.getMetadata().getDeletionTimestamp() == null
+                      && K8sJobResourceUtils.isOfJob(existing, context.jobId()))
+          .map(existing -> jobExecutionId.toString());
+    } catch (KubernetesClientException e) {
+      if (isUnreachable(e)) {
+        unreachableAtMs = clock.millis();
+        unreachableFailure = e;
+      }
+      throw e;
+    }
+  }
+
+  @Override
   public JobExecutionInfo getJobExecutionInfo(String jobId) throws NoSuchJobException {
     K8sJobExecutionId id = parseJobExecutionId(jobId);
     checkApiServerReachable();

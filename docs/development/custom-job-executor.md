@@ -56,6 +56,19 @@ these times whenever the job runner provides them: Gravitino pulls job states on
 status change, and a job that starts and finishes between two pulls gets no start time. Once a job
 has started, keep reporting its start time in every later state, including the finished one.
 
+### Recover Unrecorded Submissions
+
+Gravitino registers a job before it calls `submitJob`, and records the returned execution id
+afterwards. If the execution id is not recorded within three `gravitino.job.statusPullIntervalInMs`,
+for example because the Gravitino server submitting the job exited right after the submission,
+another server calls `findSubmittedJob(JobContext, JobTemplate)` with the same context and runtime
+job template. A returned execution id is recorded, and the job is tracked from then on. Otherwise
+the job is marked as `FAILED`.
+
+The default implementation finds nothing. Implement it if your job runner can look up a job by the
+Gravitino job id, for example when the execution is named after `JobContext#jobId()`, so that such
+a job is tracked rather than left running unknown to Gravitino. The `k8s` job executor does this.
+
 ### Register the Job Executor
 
 After you implement your own job executor, you need to register it in the Gravitino server by

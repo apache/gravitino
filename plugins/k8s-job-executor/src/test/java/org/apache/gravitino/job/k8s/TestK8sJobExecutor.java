@@ -54,6 +54,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -197,6 +198,46 @@ public class TestK8sJobExecutor {
     JobExecutionInfo succeeded = executor.getJobExecutionInfo(jobExecutionId);
     Assertions.assertEquals(driverStartedAt, succeeded.startedAt());
     Assertions.assertEquals(driverFinishedAt, succeeded.finishedAt());
+  }
+
+  @Test
+  public void testFindSubmittedJob() {
+    // Nothing is submitted for the job yet.
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), sparkTemplate()));
+
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    Assertions.assertEquals(
+        Optional.of(jobExecutionId), executor.findSubmittedJob(context(1L), sparkTemplate()));
+    // The SparkApplication of one job is never found for another one.
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(2L), sparkTemplate()));
+
+    // A SparkApplication with the name of the job that belongs to another job is not its execution.
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    app.getMetadata().getLabels().put(K8sJobResourceUtils.LABEL_JOB_ID, "3");
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(app)
+        .update();
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), sparkTemplate()));
+
+    // A job the k8s job executor doesn't support is never submitted.
+    ShellJobTemplate shellTemplate =
+        ShellJobTemplate.builder().withName("shell-job").withExecutable("/bin/echo").build();
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), shellTemplate));
+  }
+
+  @Test
+  public void testFindSubmittedJobAfterCancellation() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    executor.cancelJob(jobExecutionId);
+
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), sparkTemplate()));
   }
 
   @Test

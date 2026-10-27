@@ -29,7 +29,9 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -40,6 +42,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.InUseException;
@@ -63,6 +66,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 /**
  * Tests the job system in a multi-node deployment: two Gravitino servers, each with its own {@link
@@ -85,7 +89,12 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   // A cancellation of a local job is answered by its owner within a few pull intervals.
   private static final long JOB_STATUS_PULL_INTERVAL_IN_MS = TimeUnit.MINUTES.toMillis(1);
 
+  // A submission not recorded within three pull intervals is reconciled with the job executor.
+  private static final long SUBMISSION_TIMEOUT_IN_MS = 3 * JOB_STATUS_PULL_INTERVAL_IN_MS;
+
   private File testDir;
+
+  private Config config;
 
   private LocalJobExecutor executorA;
 
@@ -102,7 +111,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     testDir = Files.createTempDirectory("gravitino-test-job-multi-node").toFile();
 
     // Both nodes share the same staging directory, like a deployment on shared storage.
-    Config config = newConfig(new File(testDir, "staging"));
+    config = newConfig(new File(testDir, "staging"));
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     // Both nodes share the same metadata store, backed by the relational backend under test.
@@ -174,6 +183,161 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Assertions.assertTrue(
         finished.startedAt() >= job.auditInfo().createTime().toEpochMilli(), finished.toString());
     Assertions.assertTrue(finished.finishedAt() - finished.startedAt() >= 900, finished.toString());
+  }
+
+  @TestTemplate
+  public void testSubmissionLeftByExitedNodeIsSettledByAnotherNode() throws Exception {
+    // The server exits right after the job executor accepts the job, before it records the
+    // submission. The job was registered before the submission, so it's not lost.
+    AtomicReference<String> submitted = new AtomicReference<>();
+    JobExecutor crashingExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              submitted.set((String) invocation.callRealMethod());
+              throw new SimulatedServerExit();
+            })
+        .when(crashingExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager crashingNode = newJobManager(config, entityStore, crashingExecutor);
+    try {
+      Assertions.assertThrows(
+          SimulatedServerExit.class,
+          () -> crashingNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600")));
+      JobEntity pending = onlyJob();
+      Assertions.assertEquals(JobHandle.Status.QUEUED, pending.status());
+      Assertions.assertEquals(
+          JobManager.pendingSubmissionExecutionId(pending.id()), pending.jobExecutionId());
+
+      // Within the submission timeout, the job is left to the server submitting it.
+      nodeB.pullAndUpdateJobStatus();
+      Assertions.assertEquals(pending, getJob(pending.name()));
+
+      // Beyond it, the job is reconciled with the job executor, which has no execution of it on
+      // node B, so it's marked as FAILED.
+      moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+      nodeB.pullAndUpdateJobStatus();
+      JobEntity settled = getJob(pending.name());
+      Assertions.assertEquals(JobHandle.Status.FAILED, settled.status());
+      Assertions.assertTrue(settled.finishedAt() > 0);
+      Assertions.assertNotNull(submitted.get());
+    } finally {
+      // Closing the node kills the job process it launched.
+      crashingNode.close();
+    }
+  }
+
+  @TestTemplate
+  public void testSubmissionLeftByExitedNodeIsRecordedWhenExecutorHasIt() throws Exception {
+    AtomicReference<String> submitted = new AtomicReference<>();
+    JobExecutor crashingExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              submitted.set((String) invocation.callRealMethod());
+              throw new SimulatedServerExit();
+            })
+        .when(crashingExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager crashingNode = newJobManager(config, entityStore, crashingExecutor);
+    // A job executor that can look up a job by its Gravitino job id finds the execution.
+    JobExecutor lookupExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(invocation -> Optional.ofNullable(submitted.get()))
+        .when(lookupExecutor)
+        .findSubmittedJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager lookupNode = newJobManager(config, entityStore, lookupExecutor);
+    try {
+      Assertions.assertThrows(
+          SimulatedServerExit.class,
+          () -> crashingNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "0")));
+      JobEntity pending = onlyJob();
+      moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+
+      lookupNode.pullAndUpdateJobStatus();
+      JobEntity recorded = getJob(pending.name());
+      Assertions.assertEquals(submitted.get(), recorded.jobExecutionId());
+      Assertions.assertEquals(JobHandle.Status.QUEUED, recorded.status());
+
+      // From then on the job is tracked by the node owning the execution like any other job.
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(
+              () -> crashingExecutor.getJobStatus(submitted.get()) == JobHandle.Status.SUCCEEDED);
+      crashingNode.pullAndUpdateJobStatus();
+      Assertions.assertEquals(JobHandle.Status.SUCCEEDED, getJob(pending.name()).status());
+    } finally {
+      crashingNode.close();
+      lookupNode.close();
+    }
+  }
+
+  @TestTemplate
+  public void testSubmissionSettledByAnotherNodeIsCancelled() throws Exception {
+    // The submission takes longer than the submission timeout, so node B settles the job while it
+    // is being submitted. Node A then cancels the execution it can no longer record.
+    AtomicReference<String> submitted = new AtomicReference<>();
+    JobExecutor slowExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              JobContext context = invocation.getArgument(0);
+              String jobName = JobHandle.JOB_ID_PREFIX + context.jobId();
+              moveJobTimestampsBack(jobName, SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+              nodeB.pullAndUpdateJobStatus();
+              Assertions.assertEquals(JobHandle.Status.FAILED, getJob(jobName).status());
+              submitted.set((String) invocation.callRealMethod());
+              return submitted.get();
+            })
+        .when(slowExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager slowNode = newJobManager(config, entityStore, slowExecutor);
+    try {
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> slowNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600")));
+      Assertions.assertTrue(failure.getMessage().contains(submitted.get()), failure.getMessage());
+
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> slowExecutor.getJobStatus(submitted.get()) == JobHandle.Status.CANCELLED);
+      JobEntity settled = onlyJob();
+      Assertions.assertEquals(JobHandle.Status.FAILED, settled.status());
+      // The settled job keeps no execution id it never recorded.
+      Assertions.assertEquals(
+          JobManager.pendingSubmissionExecutionId(settled.id()), settled.jobExecutionId());
+    } finally {
+      slowNode.close();
+    }
+  }
+
+  @TestTemplate
+  public void testJobCancelledFromAnotherNodeDuringSubmissionIsCancelled() throws Exception {
+    AtomicReference<String> submitted = new AtomicReference<>();
+    JobExecutor slowExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              JobContext context = invocation.getArgument(0);
+              String jobName = JobHandle.JOB_ID_PREFIX + context.jobId();
+              // Node B has no execution to cancel yet, so it only marks the job as CANCELLING.
+              Assertions.assertEquals(
+                  JobHandle.Status.CANCELLING, nodeB.cancelJob(METALAKE, jobName).status());
+              submitted.set((String) invocation.callRealMethod());
+              return submitted.get();
+            })
+        .when(slowExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager slowNode = newJobManager(config, entityStore, slowExecutor);
+    try {
+      JobEntity job = slowNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600"));
+      Assertions.assertEquals(JobHandle.Status.CANCELLING, job.status());
+      Assertions.assertEquals(submitted.get(), job.jobExecutionId());
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> slowExecutor.getJobStatus(submitted.get()) == JobHandle.Status.CANCELLED);
+
+      slowNode.pullAndUpdateJobStatus();
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, getJob(job.name()).status());
+    } finally {
+      slowNode.close();
+    }
   }
 
   @TestTemplate
@@ -497,6 +661,16 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
                 .withRuntimeJobTemplate(job.runtimeJobTemplate())
                 .build());
   }
+
+  private JobEntity onlyJob() {
+    List<JobEntity> jobs = nodeB.listJobs(METALAKE, Optional.empty());
+    Assertions.assertEquals(1, jobs.size(), jobs.toString());
+    return jobs.get(0);
+  }
+
+  // Thrown by a job executor to simulate that the server exits in the middle of a submission. It
+  // is an Error, so that the server doesn't handle it as a failed submission.
+  private static class SimulatedServerExit extends Error {}
 
   private boolean jobExists(String jobName) {
     try {

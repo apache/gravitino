@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
@@ -87,6 +88,31 @@ public interface JobExecutor extends Closeable {
   default String submitJob(JobTemplate jobTemplate) {
     throw new UnsupportedOperationException(
         getClass().getName() + " doesn't support submitJob(JobTemplate)");
+  }
+
+  /**
+   * Find the execution of a job that was submitted to this job executor, but whose execution id
+   * Gravitino didn't record, for example because the Gravitino server submitting it exited right
+   * after the submission.
+   *
+   * <p>Gravitino registers a job before submitting it, and records the execution id that {@link
+   * #submitJob(JobContext, JobTemplate)} returns afterwards. If the execution id isn't recorded in
+   * time, Gravitino calls this method with the same context and runtime job template as the
+   * submission, and tracks the returned execution like any other one. If no execution is found, the
+   * job is marked as {@link JobHandle.Status#FAILED}.
+   *
+   * <p>The default implementation returns an empty result, which fits a job executor that can't
+   * look up a job by its Gravitino job id. A job executor that can, for example one that names the
+   * execution after {@link JobContext#jobId()}, should implement it, so that such a job is tracked
+   * rather than left running unknown to Gravitino.
+   *
+   * @param context The context the job was submitted with.
+   * @param jobTemplate The runtime job template the job was submitted with, whose resources are
+   *     URIs.
+   * @return The unique identifier of the execution of the job, or empty if there is none.
+   */
+  default Optional<String> findSubmittedJob(JobContext context, JobTemplate jobTemplate) {
+    return Optional.empty();
   }
 
   /**
