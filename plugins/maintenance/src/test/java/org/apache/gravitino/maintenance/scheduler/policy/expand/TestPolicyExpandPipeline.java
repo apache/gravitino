@@ -160,6 +160,29 @@ class TestPolicyExpandPipeline {
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS));
   }
 
+  @Test
+  void testSnapshotExpiryExpandEnqueuesWithBatchCapacity() {
+    PolicyEntity policy = expirePolicy(true, CRON);
+    ExpandOccupancyGate gate = allowAll();
+    PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
+    List<ExpandTableCandidate> candidates =
+        List.of(
+            new ExpandTableCandidate(10L, MetadataObject.Type.SCHEMA),
+            new ExpandTableCandidate(11L, MetadataObject.Type.SCHEMA));
+    when(tables.listTableIds(
+            eq(policy),
+            eq(5),
+            eq(gate),
+            eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
+        .thenReturn(candidates);
+    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    when(cronJobs.enqueueDueNow(eq(policy), eq(candidates), eq(5))).thenReturn(1);
+
+    PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 5);
+    Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
+    verify(cronJobs).enqueueDueNow(policy, candidates, 5);
+  }
+
   private static PolicyExpandPipeline pipeline(
       Function<Long, Optional<PolicyEntity>> policyLoader,
       PolicyTableEnumerator tables,
@@ -213,6 +236,19 @@ class TestPolicyExpandPipeline {
                 minIntervalMs,
                 null,
                 null))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
+  private static PolicyEntity expirePolicy(boolean enabled, String timeTrigger) {
+    return PolicyEntity.builder()
+        .withId(42L)
+        .withName("expire")
+        .withNamespace(NamespaceUtil.ofPolicy("metalake"))
+        .withPolicyType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
+        .withEnabled(enabled)
+        .withContent(PolicyContents.icebergSnapshotExpiration(timeTrigger, null, null, null, null))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();

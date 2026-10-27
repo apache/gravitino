@@ -28,10 +28,12 @@ import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
@@ -55,7 +57,12 @@ import org.slf4j.LoggerFactory;
  * <p>Follows the usual client pattern: {@link SchedulerClient#scheduleIfNotExists} for new instance
  * ids, {@link SchedulerClient#getScheduledExecutionsForTask} to inspect open rows, and {@link
  * SchedulerClient#reschedule(TaskInstanceId, Instant, Object)} to replace {@code task_data} when
- * filling an incomplete snapshot-expiry batch (same due time, new table list + shared jobConf).
+ * filling an incomplete snapshot-expiry batch.
+ *
+ * <p>Snapshot-expiry coalesce happens at expand enqueue (not cron pick): unpicked same-catalog
+ * {@code expire_snapshots} {@code table:} / {@code batch:} rows may merge while under capacity. A
+ * peer is absorbed only when it is not already at capacity and the combined size would not exceed
+ * capacity (all-or-nothing). Policy id need not match. Picked rows are never cancelled or merged.
  *
  * <p>The entity store disables JDBC autocommit; connections are wrapped via {@link
  * AutocommitDataSources} so each client call commits. {@code task_data} is JSON via {@link
@@ -64,6 +71,8 @@ import org.slf4j.LoggerFactory;
 public final class RelationalCronJobScheduler implements CronJobScheduler {
 
   private static final Logger LOG = LoggerFactory.getLogger(RelationalCronJobScheduler.class);
+
+  private static final String EXPIRE_SNAPSHOTS = "expire_snapshots";
 
   private final DataSource dataSource;
   private final MaintenanceJobSpecFactory specFactory;
@@ -84,7 +93,8 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
    * @param gravitinoConfig server config
    * @param tableRefResolver resolves entity ids to catalog + schema.table
    */
-  RelationalCronJobScheduler(
+  @VisibleForTesting
+  public RelationalCronJobScheduler(
       DataSource dataSource,
       Config gravitinoConfig,
       Function<List<Long>, List<ResolvedTableRef>> tableRefResolver) {
@@ -145,18 +155,61 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
       int batchCapacity,
       Instant due) {
     List<Long> batchable = new ArrayList<>();
-    int scheduled = 0;
+    List<Long> tableLevel = new ArrayList<>();
     for (ExpandTableCandidate candidate : slice) {
+      if (isQueuedForPolicy(client, candidate.tableId(), policy.id())) {
+        continue;
+      }
       if (candidate.batchableForSnapshotExpiry()) {
-        if (!isQueuedForPolicy(client, candidate.tableId(), policy.id())) {
-          batchable.add(candidate.tableId());
-        }
-      } else if (scheduleTable(client, policy, candidate.tableId(), due)) {
-        scheduled++;
+        batchable.add(candidate.tableId());
+      } else {
+        tableLevel.add(candidate.tableId());
       }
     }
-    scheduled += packIntoBatches(client, policy, batchable, batchCapacity, due);
+    int scheduled = packIntoBatches(client, policy, batchable, batchCapacity, due);
+    for (Long tableId : tableLevel) {
+      scheduled += enqueueTableSnapshotExpiry(client, policy, tableId, batchCapacity, due);
+    }
+    absorbPeersIntoOpenBatches(client, batchCapacity);
     return scheduled;
+  }
+
+  /**
+   * Enqueues one table-level snapshot-expiry winner: prefer filling an incomplete same-catalog
+   * {@code batch:}, else coalesce with other unpicked expire peers into a new {@code batch:}, else
+   * schedule a lone {@code table:} row.
+   */
+  private int enqueueTableSnapshotExpiry(
+      SchedulerClient client, PolicyEntity policy, long tableId, int batchCapacity, Instant due) {
+    if (isQueuedForPolicy(client, tableId, policy.id())) {
+      return 0;
+    }
+    Optional<String> catalog = catalogNameOf(tableId);
+    if (catalog.isEmpty()) {
+      return 0;
+    }
+    Optional<OpenExpireJob> incomplete =
+        findIncompleteExpireBatch(client, batchCapacity, catalog.get());
+    if (incomplete.isPresent()
+        && mergeTablesIntoJob(client, incomplete.get(), List.of(tableId), batchCapacity)) {
+      return 0;
+    }
+
+    List<OpenExpireJob> peers =
+        selectAbsorbablePeers(
+            client, catalog.get(), batchCapacity - 1, batchCapacity, Set.of(), Set.of(tableId));
+    if (!peers.isEmpty()) {
+      List<Long> chunk = new ArrayList<>();
+      chunk.add(tableId);
+      for (OpenExpireJob peer : peers) {
+        chunk.addAll(peer.spec.tableIds());
+      }
+      if (chunk.size() <= batchCapacity && scheduleBatch(client, policy, chunk, due)) {
+        cancelJobs(client, peers);
+        return 1;
+      }
+    }
+    return scheduleTable(client, policy, tableId, due) ? 1 : 0;
   }
 
   private int packIntoBatches(
@@ -168,7 +221,6 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     if (tableIds.isEmpty()) {
       return 0;
     }
-    // Same-catalog batches only: mixed catalogs would reuse wrong spark.sql.catalog.* props.
     Map<String, List<Long>> byCatalog = groupByCatalog(tableIds);
     int newRows = 0;
     for (Map.Entry<String, List<Long>> entry : byCatalog.entrySet()) {
@@ -196,6 +248,15 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     return byCatalog;
   }
 
+  private Optional<String> catalogNameOf(long tableId) {
+    List<ResolvedTableRef> resolved = tableRefResolver.apply(List.of(tableId));
+    if (resolved.isEmpty()) {
+      LOG.warn("Skipping unresolved table {} from snapshot-expiry table enqueue", tableId);
+      return Optional.empty();
+    }
+    return Optional.of(resolved.get(0).catalogName());
+  }
+
   private int packSameCatalog(
       SchedulerClient client,
       PolicyEntity policy,
@@ -206,27 +267,53 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     List<Long> remaining = new ArrayList<>(tableIds);
     int newRows = 0;
     while (!remaining.isEmpty()) {
-      Optional<OpenBatch> incomplete =
-          findIncompleteBatch(client, policy.id(), batchCapacity, catalogName);
+      Optional<OpenExpireJob> incomplete =
+          findIncompleteExpireBatch(client, batchCapacity, catalogName);
       if (incomplete.isPresent()) {
-        OpenBatch open = incomplete.get();
+        OpenExpireJob open = incomplete.get();
         int room = batchCapacity - open.spec.tableIds().size();
-        List<Long> chunk = new ArrayList<>(remaining.subList(0, Math.min(room, remaining.size())));
-        if (mergeIntoBatch(client, open, chunk)) {
-          remaining.subList(0, chunk.size()).clear();
+        int fromRemaining = Math.min(room, remaining.size());
+        List<Long> chunk = new ArrayList<>(remaining.subList(0, fromRemaining));
+        Set<Long> excludeTables = new HashSet<>(open.spec.tableIds());
+        excludeTables.addAll(chunk);
+        List<OpenExpireJob> peers =
+            selectAbsorbablePeers(
+                client,
+                catalogName,
+                room - chunk.size(),
+                batchCapacity,
+                Set.of(open.instanceId.getId()),
+                excludeTables);
+        for (OpenExpireJob peer : peers) {
+          chunk.addAll(peer.spec.tableIds());
+        }
+        if (mergeTablesIntoJob(client, open, chunk, batchCapacity)) {
+          remaining.subList(0, fromRemaining).clear();
+          cancelJobs(client, peers);
           continue;
         }
       }
       int end = Math.min(batchCapacity, remaining.size());
       List<Long> chunk = new ArrayList<>(remaining.subList(0, end));
-      if (scheduleBatch(client, policy, chunk, due)) {
+      List<OpenExpireJob> peers =
+          selectAbsorbablePeers(
+              client,
+              catalogName,
+              batchCapacity - chunk.size(),
+              batchCapacity,
+              Set.of(),
+              new HashSet<>(chunk));
+      for (OpenExpireJob peer : peers) {
+        chunk.addAll(peer.spec.tableIds());
+      }
+      if (chunk.size() <= batchCapacity && scheduleBatch(client, policy, chunk, due)) {
         newRows++;
         remaining.subList(0, end).clear();
+        cancelJobs(client, peers);
         continue;
       }
-      // Fail-closed: do not drop a whole multi-table chunk on build failure — peel one id.
       Long first = remaining.remove(0);
-      if (chunk.size() > 1 && scheduleBatch(client, policy, List.of(first), due)) {
+      if (end > 1 && scheduleBatch(client, policy, List.of(first), due)) {
         newRows++;
       } else {
         LOG.warn(
@@ -236,6 +323,184 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
       }
     }
     return newRows;
+  }
+
+  /** Fills incomplete expire {@code batch:} rows with whole unpicked same-catalog peers. */
+  private void absorbPeersIntoOpenBatches(SchedulerClient client, int batchCapacity) {
+    Set<String> saturated = new HashSet<>();
+    for (; ; ) {
+      Optional<OpenExpireJob> incomplete =
+          listOpenExpireJobs(client).stream()
+              .filter(j -> j.isBatch && !j.picked && j.spec.tableIds().size() < batchCapacity)
+              .filter(j -> j.catalog != null)
+              .filter(j -> !saturated.contains(j.instanceId.getId()))
+              .min(Comparator.comparingLong(j -> j.batchId));
+      if (incomplete.isEmpty()) {
+        return;
+      }
+      OpenExpireJob open = incomplete.get();
+      int room = batchCapacity - open.spec.tableIds().size();
+      List<OpenExpireJob> peers =
+          selectAbsorbablePeers(
+              client,
+              open.catalog,
+              room,
+              batchCapacity,
+              Set.of(open.instanceId.getId()),
+              new HashSet<>(open.spec.tableIds()));
+      if (peers.isEmpty()) {
+        saturated.add(open.instanceId.getId());
+        continue;
+      }
+      List<Long> extra = new ArrayList<>();
+      for (OpenExpireJob peer : peers) {
+        extra.addAll(peer.spec.tableIds());
+      }
+      if (!mergeTablesIntoJob(client, open, extra, batchCapacity)) {
+        return;
+      }
+      cancelJobs(client, peers);
+    }
+  }
+
+  /**
+   * Selects whole unpicked expire peers that fit in {@code room} without exceeding capacity. Skips
+   * peers already at capacity. All-or-nothing per peer.
+   */
+  private static List<OpenExpireJob> selectAbsorbablePeers(
+      SchedulerClient client,
+      String catalogName,
+      int room,
+      int batchCapacity,
+      Set<String> excludeInstanceIds,
+      Set<Long> excludeTableIds) {
+    if (room <= 0) {
+      return List.of();
+    }
+    List<OpenExpireJob> candidates =
+        listOpenExpireJobs(client).stream()
+            .filter(j -> !j.picked)
+            .filter(j -> catalogName.equals(j.catalog))
+            .filter(j -> !excludeInstanceIds.contains(j.instanceId.getId()))
+            .filter(j -> j.spec.tableIds().size() < batchCapacity)
+            .filter(j -> j.spec.tableIds().stream().noneMatch(excludeTableIds::contains))
+            .sorted(
+                Comparator.comparingInt((OpenExpireJob j) -> j.spec.tableIds().size())
+                    .thenComparing(j -> j.instanceId.getId()))
+            .toList();
+    List<OpenExpireJob> taken = new ArrayList<>();
+    int left = room;
+    Set<Long> claimedTables = new HashSet<>(excludeTableIds);
+    for (OpenExpireJob peer : candidates) {
+      int size = peer.spec.tableIds().size();
+      if (size > left) {
+        continue;
+      }
+      if (peer.spec.tableIds().stream().anyMatch(claimedTables::contains)) {
+        continue;
+      }
+      taken.add(peer);
+      claimedTables.addAll(peer.spec.tableIds());
+      left -= size;
+      if (left == 0) {
+        break;
+      }
+    }
+    return taken;
+  }
+
+  private boolean mergeTablesIntoJob(
+      SchedulerClient client, OpenExpireJob open, List<Long> extraTableIds, int batchCapacity) {
+    if (extraTableIds.isEmpty()) {
+      return true;
+    }
+    Map<Long, TableTarget> byId = new LinkedHashMap<>();
+    for (TableTarget target : open.spec.getTables()) {
+      byId.put(target.getTableId(), target);
+    }
+    if (byId.size() + extraTableIds.stream().filter(id -> !byId.containsKey(id)).count()
+        > batchCapacity) {
+      return false;
+    }
+    String openCatalog = open.catalog;
+    if (openCatalog == null || openCatalog.isEmpty()) {
+      LOG.warn(
+          "Could not merge tables into cron-job {}: open job missing catalog name",
+          open.instanceId.getId());
+      return false;
+    }
+    List<ResolvedTableRef> resolved = tableRefResolver.apply(extraTableIds);
+    if (resolved.size() != extraTableIds.size()) {
+      LOG.warn(
+          "Could not merge tables into cron-job {}: resolved {} of {} ids {}",
+          open.instanceId.getId(),
+          resolved.size(),
+          extraTableIds.size(),
+          extraTableIds);
+      return false;
+    }
+    String metalake = open.spec.metalake();
+    if (metalake == null) {
+      LOG.warn(
+          "Could not merge tables into cron-job {}: missing metalake on open spec",
+          open.instanceId.getId());
+      return false;
+    }
+    boolean added = false;
+    for (ResolvedTableRef ref : resolved) {
+      if (!openCatalog.equals(ref.catalogName())) {
+        LOG.warn(
+            "Could not merge table {} into cron-job {}: catalog {} != open job catalog {}",
+            ref.tableId(),
+            open.instanceId.getId(),
+            ref.catalogName(),
+            openCatalog);
+        return false;
+      }
+      if (!byId.containsKey(ref.tableId())) {
+        byId.put(ref.tableId(), MaintenanceJobSpecFactory.toTarget(metalake, ref));
+        added = true;
+      }
+    }
+    if (!added) {
+      return true;
+    }
+    if (byId.size() > batchCapacity) {
+      return false;
+    }
+    MaintenanceJobSpec merged =
+        new MaintenanceJobSpec(
+            new ArrayList<>(byId.values()), open.spec.getOperations(), open.spec.getJobConf());
+    try {
+      return client.reschedule(open.instanceId, open.executionTime, merged);
+    } catch (RuntimeException e) {
+      LOG.debug(
+          "Could not merge tables into cron-job {}: {}", open.instanceId.getId(), e.toString());
+      return false;
+    }
+  }
+
+  private static void cancelJobs(SchedulerClient client, List<OpenExpireJob> jobs) {
+    for (OpenExpireJob job : jobs) {
+      Optional<ScheduledExecution<Object>> execution = client.getScheduledExecution(job.instanceId);
+      if (execution.isEmpty()) {
+        continue;
+      }
+      if (execution.get().isPicked()) {
+        LOG.warn(
+            "Skip cancel of picked cron-job {} after snapshot-expiry merge",
+            job.instanceId.getId());
+        continue;
+      }
+      try {
+        client.cancel(job.instanceId);
+      } catch (RuntimeException e) {
+        LOG.warn(
+            "Failed to cancel absorbed cron-job {} after snapshot-expiry merge: {}",
+            job.instanceId.getId(),
+            e.toString());
+      }
+    }
   }
 
   private boolean scheduleTable(
@@ -261,68 +526,6 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
         new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec.get()), due);
   }
 
-  private boolean mergeIntoBatch(SchedulerClient client, OpenBatch open, List<Long> extraTableIds) {
-    Map<Long, TableTarget> byId = new LinkedHashMap<>();
-    for (TableTarget target : open.spec.getTables()) {
-      byId.put(target.getTableId(), target);
-    }
-    String openCatalog = open.spec.getTables().get(0).catalogName();
-    if (openCatalog == null || openCatalog.isEmpty()) {
-      LOG.warn(
-          "Could not merge tables into cron-job {}: open batch missing catalog name",
-          open.instanceId.getId());
-      return false;
-    }
-    List<ResolvedTableRef> resolved = tableRefResolver.apply(extraTableIds);
-    // Require every requested id so packIntoBatches does not drop unresolved tables from
-    // remaining after a partial merge.
-    if (resolved.size() != extraTableIds.size()) {
-      LOG.warn(
-          "Could not merge tables into cron-job {}: resolved {} of {} ids {}",
-          open.instanceId.getId(),
-          resolved.size(),
-          extraTableIds.size(),
-          extraTableIds);
-      return false;
-    }
-    String metalake = open.spec.metalake();
-    if (metalake == null) {
-      LOG.warn(
-          "Could not merge tables into cron-job {}: missing metalake on open spec",
-          open.instanceId.getId());
-      return false;
-    }
-    boolean added = false;
-    for (ResolvedTableRef ref : resolved) {
-      if (!openCatalog.equals(ref.catalogName())) {
-        LOG.warn(
-            "Could not merge table {} into cron-job {}: catalog {} != open batch catalog {}",
-            ref.tableId(),
-            open.instanceId.getId(),
-            ref.catalogName(),
-            openCatalog);
-        return false;
-      }
-      if (!byId.containsKey(ref.tableId())) {
-        byId.put(ref.tableId(), MaintenanceJobSpecFactory.toTarget(metalake, ref));
-        added = true;
-      }
-    }
-    if (!added) {
-      return true;
-    }
-    MaintenanceJobSpec merged =
-        new MaintenanceJobSpec(
-            new ArrayList<>(byId.values()), open.spec.getOperations(), open.spec.getJobConf());
-    try {
-      return client.reschedule(open.instanceId, open.executionTime, merged);
-    } catch (RuntimeException e) {
-      LOG.debug(
-          "Could not merge tables into cron-job {}: {}", open.instanceId.getId(), e.toString());
-      return false;
-    }
-  }
-
   private Optional<MaintenanceJobSpec> buildSpec(PolicyEntity policy, List<Long> tableIds) {
     List<ResolvedTableRef> resolved = tableRefResolver.apply(tableIds);
     if (resolved.size() != tableIds.size()) {
@@ -345,16 +548,88 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     }
   }
 
-  private static Optional<OpenBatch> findIncompleteBatch(
-      SchedulerClient client, long policyId, int batchCapacity, String catalogName) {
-    return listOpenBatches(client, policyId).stream()
-        .filter(b -> !b.picked && b.spec.tableIds().size() < batchCapacity)
-        .filter(b -> catalogName.equals(b.spec.getTables().get(0).catalogName()))
-        .min(Comparator.comparingLong(b -> b.batchId));
+  private static Optional<OpenExpireJob> findIncompleteExpireBatch(
+      SchedulerClient client, int batchCapacity, String catalogName) {
+    return listOpenExpireJobs(client).stream()
+        .filter(j -> j.isBatch && !j.picked && j.spec.tableIds().size() < batchCapacity)
+        .filter(j -> catalogName.equals(j.catalog))
+        .min(Comparator.comparingLong(j -> j.batchId));
   }
 
-  private static List<OpenBatch> listOpenBatches(SchedulerClient client, long policyId) {
-    List<OpenBatch> open = new ArrayList<>();
+  private static List<OpenExpireJob> listOpenExpireJobs(SchedulerClient client) {
+    List<OpenExpireJob> open = new ArrayList<>();
+    for (ScheduledExecution<MaintenanceJobSpec> execution :
+        client.getScheduledExecutionsForTask(
+            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)) {
+      MaintenanceJobSpec data = execution.getData();
+      if (data == null || !data.isValid() || !isExpireSnapshots(data)) {
+        continue;
+      }
+      String instanceId = execution.getTaskInstance().getId();
+      String catalog = data.getTables().isEmpty() ? null : data.getTables().get(0).catalogName();
+      Optional<CronJobIds.BatchPolicyIds> batch = CronJobIds.parseBatch(instanceId);
+      if (batch.isPresent()) {
+        open.add(
+            new OpenExpireJob(
+                TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, instanceId),
+                true,
+                batch.get().batchId(),
+                batch.get().policyId(),
+                execution.getExecutionTime(),
+                data,
+                catalog,
+                execution.isPicked()));
+        continue;
+      }
+      Optional<CronJobIds.TablePolicyIds> table = CronJobIds.parseTable(instanceId);
+      if (table.isPresent()) {
+        open.add(
+            new OpenExpireJob(
+                TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, instanceId),
+                false,
+                -1L,
+                table.get().policyId(),
+                execution.getExecutionTime(),
+                data,
+                catalog,
+                execution.isPicked()));
+      }
+    }
+    return open;
+  }
+
+  private static boolean isExpireSnapshots(MaintenanceJobSpec spec) {
+    return spec.getOperations().stream()
+        .anyMatch(op -> EXPIRE_SNAPSHOTS.equals(op.getMaintenanceType()));
+  }
+
+  static long nextBatchId(SchedulerClient client, long policyId) {
+    long max = -1L;
+    for (OpenExpireJob job : listOpenExpireJobs(client)) {
+      if (job.isBatch && job.policyId == policyId) {
+        max = Math.max(max, job.batchId);
+      }
+    }
+    return max + 1L;
+  }
+
+  /**
+   * True when a table already has a queued cron-job for this policy, or any queued snapshot-expiry
+   * cron-job (any policy) that already covers the table.
+   */
+  static boolean isQueuedForPolicy(SchedulerClient client, long tableId, long policyId) {
+    if (client
+        .getScheduledExecution(
+            TaskInstanceId.of(
+                TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(tableId, policyId)))
+        .isPresent()) {
+      return true;
+    }
+    for (OpenExpireJob job : listOpenExpireJobs(client)) {
+      if (job.spec.tableIds().contains(tableId)) {
+        return true;
+      }
+    }
     for (ScheduledExecution<MaintenanceJobSpec> execution :
         client.getScheduledExecutionsForTask(
             TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)) {
@@ -364,63 +639,42 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
         continue;
       }
       MaintenanceJobSpec data = execution.getData();
-      if (data == null || !data.isValid()) {
-        continue;
-      }
-      open.add(
-          new OpenBatch(
-              TaskInstanceId.of(
-                  TableMaintenanceSchedulerPools.CRON_JOB, execution.getTaskInstance().getId()),
-              parsed.get().batchId(),
-              execution.getExecutionTime(),
-              data,
-              execution.isPicked()));
-    }
-    return open;
-  }
-
-  static long nextBatchId(SchedulerClient client, long policyId) {
-    long max = -1L;
-    for (OpenBatch batch : listOpenBatches(client, policyId)) {
-      max = Math.max(max, batch.batchId);
-    }
-    return max + 1L;
-  }
-
-  /** True when a table already has a queued {@code table:} or {@code batch:} cron-job. */
-  static boolean isQueuedForPolicy(SchedulerClient client, long tableId, long policyId) {
-    if (client
-        .getScheduledExecution(
-            TaskInstanceId.of(
-                TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(tableId, policyId)))
-        .isPresent()) {
-      return true;
-    }
-    for (OpenBatch batch : listOpenBatches(client, policyId)) {
-      if (batch.spec.tableIds().contains(tableId)) {
+      if (data != null
+          && data.isValid()
+          && !isExpireSnapshots(data)
+          && data.tableIds().contains(tableId)) {
         return true;
       }
     }
     return false;
   }
 
-  private static final class OpenBatch {
+  private static final class OpenExpireJob {
     private final TaskInstanceId instanceId;
+    private final boolean isBatch;
     private final long batchId;
+    private final long policyId;
     private final Instant executionTime;
     private final MaintenanceJobSpec spec;
+    private final String catalog;
     private final boolean picked;
 
-    private OpenBatch(
+    private OpenExpireJob(
         TaskInstanceId instanceId,
+        boolean isBatch,
         long batchId,
+        long policyId,
         Instant executionTime,
         MaintenanceJobSpec spec,
+        String catalog,
         boolean picked) {
       this.instanceId = instanceId;
+      this.isBatch = isBatch;
       this.batchId = batchId;
+      this.policyId = policyId;
       this.executionTime = executionTime;
       this.spec = spec;
+      this.catalog = catalog;
       this.picked = picked;
     }
   }
