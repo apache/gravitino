@@ -29,6 +29,7 @@ import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
@@ -298,6 +299,26 @@ public interface EntityStore extends Closeable {
     } catch (NoSuchEntityException e) {
       return Optional.empty();
     }
+  }
+
+  /**
+   * Deletes a schema and optionally its functions, then runs an action before committing.
+   *
+   * <p>Any remaining children, including filesets, prevent deletion. Function cleanup and the
+   * schema deletion must roll back together if the action or the remaining-child check fails.
+   *
+   * @param ident the schema identifier
+   * @param cascadeFunctions whether to delete functions in the same metadata transaction
+   * @param postDeleteAction the action to run against the deleted snapshot before commit
+   * @return the deleted schema, or empty when it did not exist
+   * @throws IOException if the delete operation fails
+   * @throws UnsupportedOperationException if the store cannot honor this transaction boundary
+   */
+  default Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "This store cannot delete a schema with a pre-commit action");
   }
 
   /**

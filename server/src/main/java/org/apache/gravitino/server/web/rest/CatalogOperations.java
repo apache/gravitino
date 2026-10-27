@@ -313,7 +313,7 @@ public class CatalogOperations {
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully {} catalog: {}.{}",
-                request.isInUse() ? "enable" : "disable",
+                op == OperationType.ENABLE ? "enable" : "disable",
                 metalake,
                 catalogName);
             return response;
@@ -322,7 +322,7 @@ public class CatalogOperations {
     } catch (Exception e) {
       LOG.info(
           "Failed to {} catalog: {}.{}",
-          request.isInUse() ? "enable" : "disable",
+          op == OperationType.ENABLE ? "enable" : "disable",
           metalake,
           catalogName);
       return ExceptionHandlers.handleCatalogException(op, catalogName, metalake, e);

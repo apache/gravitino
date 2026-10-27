@@ -98,6 +98,10 @@ public class IcebergConstants {
   public static final String OWNER = "owner";
   public static final String LOCATION = "location";
   public static final String CURRENT_SNAPSHOT_ID = "current-snapshot-id";
+
+  /** Read-only partition spec ID projected from Iceberg table metadata. */
+  public static final String DEFAULT_SPEC_ID = "default-spec-id";
+
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
   public static final String SORT_ORDER = "sort-order";
   public static final String IDENTIFIER_FIELDS = "identifier-fields";

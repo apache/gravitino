@@ -171,6 +171,12 @@ public class TestPolicyEntity {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> readRestrictionPolicy(Policy.BuiltInType.COLUMN_MASK, rowFilter));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            readRestrictionPolicy(
+                Policy.BuiltInType.ROW_FILTER,
+                PolicyContents.rowFilter("previously-stored-expression")));
   }
 
   private static PolicyEntity readRestrictionPolicy(

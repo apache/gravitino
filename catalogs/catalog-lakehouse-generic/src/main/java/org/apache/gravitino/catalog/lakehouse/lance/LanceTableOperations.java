@@ -68,10 +68,12 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
+import org.lance.WriteDatasetBuilder;
 import org.lance.WriteParams;
 import org.lance.index.DistanceType;
 import org.lance.index.IndexOptions;
@@ -229,10 +231,15 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
     }
 
+    // Validate registration before OVERWRITE can remove existing metadata or managed data.
+    if (register) {
+      validateExistingDatasetLocation(ident, location, properties);
+    }
+
     // Handle OVERWRITE mode - drop existing table if present
     if (mode == CreationMode.OVERWRITE) {
       if (register) {
-        dropTable(ident);
+        dropExternalTableForRegistration(ident);
       } else {
         purgeTable(ident);
       }
@@ -288,10 +295,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // dataset) for a table that is about to be deleted anyway.
       Table table = super.loadTable(ident);
       validateLanceTable(ident, table);
-      boolean external =
-          Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
-              .map(Boolean::parseBoolean)
-              .orElse(false);
+      boolean external = LancePropertiesUtils.isExternalTable(table.properties());
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -316,6 +320,10 @@ public class LanceTableOperations extends ManagedTableOperations {
       return false;
     } catch (IllegalArgumentException e) {
       throw e;
+    } catch (OptimisticLockException e) {
+      // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
+      // not changed, so the dataset is kept and the operation can be retried.
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }
@@ -327,10 +335,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // Use super.loadTable to skip schema-refresh overhead when dropping.
       Table table = super.loadTable(ident);
       validateLanceTable(ident, table);
-      boolean external =
-          Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
-              .map(Boolean::parseBoolean)
-              .orElse(false);
+      boolean external = LancePropertiesUtils.isExternalTable(table.properties());
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -352,6 +357,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchTableException e) {
       return false;
     } catch (IllegalArgumentException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
+      // not changed, so the dataset is kept and the operation can be retried.
       throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to drop Lance dataset for table " + ident, e);
@@ -399,12 +408,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     if (register) {
-      // Registering a table adopts an existing dataset at the caller-supplied location. Validate
-      // that the location really resolves to a valid Lance dataset before we record it in
-      // Gravitino; otherwise an unrelated directory could be registered and later removed by
-      // drop/purge (see issue #13696). This must happen before any storage I/O or metadata write.
-      validateExistingDatasetLocation(ident, location, properties);
-
+      properties = LancePropertiesUtils.normalizeTableProperties(properties);
       // Currently, register operation does not read the schema from the underlying Lance dataset.
       // So we can't get the version of the dataset here.
       return super.createTable(
@@ -425,13 +429,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     Map<String, String> storageProps =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
-    try (Dataset ignored =
-        Dataset.write()
-            .schema(convertColumnsToArrowSchema(columns))
-            .uri(location)
-            .mode(WriteParams.WriteMode.CREATE)
-            .storageOptions(storageProps)
-            .execute()) {
+    try (Dataset ignored = createDataset(location, columns, storageProps)) {
       // Only create the table metadata in Gravitino after the Lance dataset is successfully
       // created.
       long datasetVersion = ignored.version();
@@ -451,10 +449,19 @@ public class LanceTableOperations extends ManagedTableOperations {
           indexes);
     } catch (NoSuchSchemaException e) {
       throw e;
-    } catch (TableAlreadyExistsException e) {
-      // If the table metadata already exists, but the underlying lance table was just created
-      // successfully, we need to clean up the created lance table to avoid orphaned datasets.
-      Dataset.drop(location, storageProps);
+    } catch (TableAlreadyExistsException | OptimisticLockException e) {
+      // Metadata registration failed after creating the dataset. Attempt to remove it so a retry
+      // can create it again; if cleanup fails, retain the registration error and cleanup failure.
+      try {
+        Dataset.drop(location, storageProps);
+      } catch (Exception dropFailure) {
+        // JNI can throw checked exceptions even though Dataset.drop declares none.
+        LOG.warn(
+            "Failed to drop the Lance dataset at {} after metadata registration failed",
+            location,
+            dropFailure);
+        e.addSuppressed(dropFailure);
+      }
       throw e;
     } catch (IllegalArgumentException e) {
       if (e.getMessage().contains("Dataset already exists")) {
@@ -465,6 +472,23 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to create Lance dataset at location " + location, e);
     }
+  }
+
+  /**
+   * Creates an empty Lance dataset for the columns. The Lance file format version is chosen from
+   * the blob columns, because blob v2 and legacy blob each require a different version.
+   */
+  Dataset createDataset(String location, Column[] columns, Map<String, String> storageOptions) {
+    Schema schema = convertColumnsToArrowSchema(columns);
+    WriteDatasetBuilder builder =
+        Dataset.write()
+            .schema(schema)
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .storageOptions(storageOptions);
+    LanceDataTypeConverter.requiredFileFormatVersion(schema.getFields())
+        .ifPresent(builder::dataStorageVersion);
+    return builder.execute();
   }
 
   private Schema convertColumnsToArrowSchema(Column[] columns) {
@@ -620,8 +644,9 @@ public class LanceTableOperations extends ManagedTableOperations {
    *
    * <p>Two concurrent loads can both read the old metadata. The first update wins; the second gets
    * {@link OptimisticLockException}. Repair is safe to run more than once, so the loser waits
-   * briefly, reads the winner's latest row, and tries again. Ordinary IO failures are not safe to
-   * retry here and are returned immediately.
+   * briefly, reads the winner's latest row, and tries again. Lock wait timeouts are returned
+   * immediately: each attempt has already consumed the backend's lock wait budget. Ordinary IO
+   * failures are not safe to retry here and are returned immediately.
    */
   private TableEntity updateTableWithCasRetry(
       NameIdentifier ident, Function<TableEntity, TableEntity> updater) throws IOException {
@@ -630,6 +655,9 @@ public class LanceTableOperations extends ManagedTableOperations {
       try {
         return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
       } catch (OptimisticLockException e) {
+        if (ExceptionUtils.isLockWaitTimeout(e)) {
+          throw e;
+        }
         lastConflict = e;
         LOG.debug(
             "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",
@@ -860,6 +888,7 @@ public class LanceTableOperations extends ManagedTableOperations {
           Field field =
               LanceDataTypeConverter.CONVERTER.toArrowField(
                   columnName, addColumn.getDataType(), true);
+          LanceDataTypeConverter.checkFileFormatVersion(field, dataset.getLanceFileFormatVersion());
           dataset.addColumns(List.of(field));
         } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
           dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
@@ -903,38 +932,6 @@ public class LanceTableOperations extends ManagedTableOperations {
     return openDataset(location, Map.of());
   }
 
-  /**
-   * Validates that a caller-supplied location resolves to an existing, valid Lance dataset before
-   * any storage I/O adopts it. Registering a table stores the location verbatim; when a later
-   * drop/purge runs it deletes the dataset at that location. Without this check a plain directory
-   * could be registered and then removed as if it were a Lance dataset (issue #13696).
-   *
-   * @param ident the table being registered, used only for the error message
-   * @param location the caller-supplied dataset location
-   * @param properties the table properties, used to resolve storage options
-   * @throws IllegalArgumentException if the location is blank or does not resolve to a valid Lance
-   *     dataset
-   */
-  void validateExistingDatasetLocation(
-      NameIdentifier ident, String location, Map<String, String> properties) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(location),
-        "Table location must be specified when registering Lance table %s",
-        ident);
-    Map<String, String> storageOptions =
-        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
-    try (Dataset ignored = openDataset(location, storageOptions)) {
-      // Opening a non-Lance location throws; reaching here confirms a valid dataset.
-      LOG.debug("Validated Lance dataset at location {} for table {}", location, ident);
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Location %s for Lance table %s does not resolve to a valid Lance dataset",
-              location, ident),
-          e);
-    }
-  }
-
   Dataset openDataset(String location, Map<String, String> storageOptions) {
     // Do not pass an explicit allocator: OpenDatasetBuilder then sets selfManagedAllocator=true
     // so Dataset.close() will release the off-heap memory. Passing new RootAllocator() sets
@@ -959,6 +956,51 @@ public class LanceTableOperations extends ManagedTableOperations {
             .build();
       default:
         throw new IllegalArgumentException("Unsupported index type: " + indexType);
+    }
+  }
+
+  private void dropExternalTableForRegistration(NameIdentifier ident) {
+    try {
+      Table existing = super.loadTable(ident);
+      validateLanceTable(ident, existing);
+      Preconditions.checkArgument(
+          LancePropertiesUtils.isExternalTable(existing.properties()),
+          "Cannot overwrite managed Lance table %s with a registration; "
+              + "explicitly drop or purge the managed table before registering a replacement",
+          ident);
+      // Registration replaces external metadata only. Calling dropTable could delete a managed
+      // dataset, including the same dataset that the incoming registration just validated.
+      super.dropTable(ident);
+    } catch (NoSuchTableException e) {
+      // No existing registration needs replacing.
+    }
+  }
+
+  /**
+   * Validates that a caller-supplied location resolves to an existing, valid Lance dataset before
+   * metadata changes adopt it. An explicit purge can later delete the registered location, so a
+   * plain directory must not be adopted as if it were a Lance dataset (issue #13696).
+   *
+   * <p>This checks dataset existence, not operator-defined storage scope or purge authorization.
+   *
+   * @param ident the table being registered, used only for the error message
+   * @param location the caller-supplied dataset location
+   * @param properties the table properties, used to resolve storage options
+   * @throws IllegalArgumentException if the location does not resolve to a valid Lance dataset
+   */
+  private void validateExistingDatasetLocation(
+      NameIdentifier ident, String location, Map<String, String> properties) {
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
+    try (Dataset ignored = openDataset(location, storageOptions)) {
+      // Opening a non-Lance location throws; reaching here confirms a valid dataset.
+      LOG.debug("Validated Lance dataset at location {} for table {}", location, ident);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Location %s for Lance table %s does not resolve to a valid Lance dataset",
+              location, ident),
+          e);
     }
   }
 }

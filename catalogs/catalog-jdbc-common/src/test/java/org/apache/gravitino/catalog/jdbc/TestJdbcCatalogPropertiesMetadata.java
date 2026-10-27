@@ -20,7 +20,10 @@ package org.apache.gravitino.catalog.jdbc;
 
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -36,12 +39,14 @@ import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.TestDataSourceValidation.UnsupportedValidationDriver;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestJdbcCatalogPropertiesMetadata {
 
@@ -52,6 +57,125 @@ public class TestJdbcCatalogPropertiesMetadata {
     Assertions.assertFalse(propertiesMetadata.isHiddenProperty(JdbcConfig.POOL_MIN_SIZE.getKey()));
     Assertions.assertFalse(propertiesMetadata.isHiddenProperty(JdbcConfig.POOL_MAX_SIZE.getKey()));
     Assertions.assertFalse(propertiesMetadata.isHiddenProperty(JdbcConfig.POOL_MAX_IDLE.getKey()));
+  }
+
+  @Test
+  public void testShouldValidateOnCreateHonorsVerifyOnCreate() {
+    // Default (property absent): verify on create.
+    Assertions.assertTrue(buildCatalog(ImmutableMap.of()).shouldValidateOnCreate());
+    // Explicit true: verify.
+    Assertions.assertTrue(
+        buildCatalog(ImmutableMap.of(JdbcConfig.VERIFY_ON_CREATE.getKey(), "true"))
+            .shouldValidateOnCreate());
+    // Explicit false: skip.
+    Assertions.assertFalse(
+        buildCatalog(ImmutableMap.of(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false"))
+            .shouldValidateOnCreate());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "none,none,none,30000",
+    "1250,none,none,1250",
+    "none,2300,none,2300",
+    "1250,2300,none,1250",
+    "none,none,3400,3400",
+    "1250,none,3400,1250"
+  })
+  void testPoolMaxWaitReachesCatalogDataSource(
+      String canonical, String bypass, String dbcpBypass, long expected) throws Exception {
+    Map<String, String> properties = poolWaitProperties();
+    if (!"none".equals(canonical)) {
+      properties.put(JdbcConfig.POOL_MAX_WAIT_MS.getKey(), canonical);
+    }
+    if (!"none".equals(bypass)) {
+      properties.put("gravitino.bypass." + JdbcConfig.POOL_MAX_WAIT_MS.getKey(), bypass);
+    }
+    if (!"none".equals(dbcpBypass)) {
+      // The DBCP-native key documented as the bypass example in the JDBC catalog docs.
+      properties.put("gravitino.bypass.maxWaitMillis", dbcpBypass);
+    }
+    JdbcCatalogPropertiesMetadata metadata = new JdbcCatalogPropertiesMetadata();
+    Assertions.assertTrue(metadata.containsProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    Assertions.assertFalse(metadata.isHiddenProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    Assertions.assertFalse(metadata.isImmutableProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    try (JdbcCatalogOperations operations = poolWaitOperations()) {
+      operations.initialize(properties, poolWaitCatalogInfo(properties), new TestJdbcCatalog());
+      BasicDataSource pool = (BasicDataSource) FieldUtils.readField(operations, "dataSource", true);
+      Assertions.assertEquals(expected, pool.getMaxWaitDuration().toMillis());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "-1", "not-a-number"})
+  void testInvalidPoolMaxWaitIsRejected(String value) {
+    Map<String, String> properties = poolWaitProperties();
+    properties.put(JdbcConfig.POOL_MAX_WAIT_MS.getKey(), value);
+    try (JdbcCatalogOperations operations = poolWaitOperations()) {
+      Assertions.assertThrows(
+          GravitinoRuntimeException.class,
+          () ->
+              operations.initialize(
+                  properties, poolWaitCatalogInfo(properties), new TestJdbcCatalog()));
+    }
+  }
+
+  private static Map<String, String> poolWaitProperties() {
+    return new HashMap<>(
+        Map.of(
+            JdbcConfig.JDBC_URL.getKey(),
+            "jdbc:sqlite::memory:",
+            JdbcConfig.JDBC_DRIVER.getKey(),
+            "org.sqlite.JDBC",
+            JdbcConfig.USERNAME.getKey(),
+            "user",
+            JdbcConfig.PASSWORD.getKey(),
+            "password"));
+  }
+
+  private static CatalogInfo poolWaitCatalogInfo(Map<String, String> properties) {
+    return new CatalogInfo(
+        1L,
+        "jdbc_catalog",
+        Catalog.Type.RELATIONAL,
+        "jdbc-test",
+        "test",
+        properties,
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build(),
+        Namespace.of("metalake"));
+  }
+
+  private static JdbcCatalogOperations poolWaitOperations() {
+    return new JdbcCatalogOperations(
+        new SqliteExceptionConverter(),
+        new SqliteTypeConverter(),
+        new SqliteDatabaseOperations(":memory:"),
+        new SqliteTableOperations(),
+        new SqliteColumnDefaultValueConverter());
+  }
+
+  private static JdbcCatalog buildCatalog(Map<String, String> extraProperties) {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:")
+            .put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC")
+            .put(JdbcConfig.USERNAME.getKey(), "user")
+            .put(JdbcConfig.PASSWORD.getKey(), "password")
+            .putAll(extraProperties)
+            .build();
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("jdbc_catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("jdbc-test")
+            .withComment("test")
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    return new TestJdbcCatalog().withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
   }
 
   @Test
@@ -94,6 +218,31 @@ public class TestJdbcCatalogPropertiesMetadata {
         new JdbcCatalogPropertiesMetadata()
             .transformProperties(loadedProperties)
             .get(JdbcConfig.POOL_MAX_IDLE.getKey()));
+  }
+
+  @Test
+  public void testConnectTimeoutSurvivesTransformProperties() {
+    // transformProperties only retains keys in the JDBC allowlist; the connect-timeout key must be
+    // on it, otherwise an operator-configured value is silently dropped and the catalog always uses
+    // the 30000 ms default (the production-path bug behind the create-time verification feature).
+    Map<String, String> createProperties =
+        ImmutableMap.<String, String>builder()
+            .put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:")
+            .put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC")
+            .put(JdbcConfig.USERNAME.getKey(), "user")
+            .put(JdbcConfig.PASSWORD.getKey(), "password")
+            .put(JdbcConfig.CONNECT_TIMEOUT_MS.getKey(), "7500")
+            .build();
+
+    Map<String, String> transformed =
+        new JdbcCatalogPropertiesMetadata().transformProperties(createProperties);
+
+    Assertions.assertEquals("7500", transformed.get(JdbcConfig.CONNECT_TIMEOUT_MS.getKey()));
+    Assertions.assertEquals(
+        7500L, new JdbcConfig(transformed).getConnectTimeoutMs(), "value must reach JdbcConfig");
+    Assertions.assertFalse(
+        new JdbcCatalogPropertiesMetadata()
+            .isHiddenProperty(JdbcConfig.CONNECT_TIMEOUT_MS.getKey()));
   }
 
   /** Verifies the actual catalog configuration path for drivers without isValid support. */

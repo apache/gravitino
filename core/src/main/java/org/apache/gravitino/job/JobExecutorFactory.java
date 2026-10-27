@@ -32,17 +32,36 @@ import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JobExecutorFactory {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JobExecutorFactory.class);
+
+  /** The name of the built-in k8s job executor. */
+  public static final String K8S_JOB_EXECUTOR_NAME = "k8s";
+
+  /**
+   * The class name of the built-in k8s job executor. The job executor is a plugin that depends on
+   * core, so core can only refer to its class by name. The plugin uses these constants and checks
+   * that the name is the one of its class.
+   */
+  public static final String K8S_JOB_EXECUTOR_CLASS_NAME =
+      "org.apache.gravitino.job.k8s.K8sJobExecutor";
 
   private static final String JOB_EXECUTOR_CONF_PREFIX = "gravitino.jobExecutor.";
 
   private static final String JOB_EXECUTOR_CLASS_SUFFIX = ".class";
 
+  private static final String K8S_JOB_EXECUTOR_JAR = "gravitino-k8s-job-executor-<version>.jar";
+
   private static final Map<String, String> BUILTIN_EXECUTORS =
       ImmutableMap.of(
           LocalJobExecutorConfigs.LOCAL_JOB_EXECUTOR_NAME,
-          LocalJobExecutor.class.getCanonicalName());
+          LocalJobExecutor.class.getCanonicalName(),
+          K8S_JOB_EXECUTOR_NAME,
+          K8S_JOB_EXECUTOR_CLASS_NAME);
 
   private JobExecutorFactory() {
     // Private constructor to prevent instantiation
@@ -51,11 +70,21 @@ public class JobExecutorFactory {
   public static JobExecutor create(Config config) {
     String jobExecutorName = config.get(Configs.JOB_EXECUTOR);
     String clzName;
+    String jobExecutorClassKey =
+        JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + JOB_EXECUTOR_CLASS_SUFFIX;
     if (BUILTIN_EXECUTORS.containsKey(jobExecutorName)) {
       clzName = BUILTIN_EXECUTORS.get(jobExecutorName);
+      String configuredClzName = StringUtils.trimToNull(config.getRawString(jobExecutorClassKey));
+      if (configuredClzName != null && !configuredClzName.equals(clzName)) {
+        LOG.warn(
+            "Job executor {} is built in, so {} = {} is ignored and {} is used. Give a custom job"
+                + " executor another name.",
+            jobExecutorName,
+            jobExecutorClassKey,
+            configuredClzName,
+            clzName);
+      }
     } else {
-      String jobExecutorClassKey =
-          JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + JOB_EXECUTOR_CLASS_SUFFIX;
       clzName = config.getRawString(jobExecutorClassKey);
     }
 
@@ -67,8 +96,8 @@ public class JobExecutorFactory {
     Map<String, String> configs =
         Maps.newHashMap(
             config.getConfigsWithPrefix(JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + "."));
+    Class<?> jobExecutorClass = loadJobExecutorClass(jobExecutorName, clzName);
     try {
-      Class<?> jobExecutorClass = Class.forName(clzName);
       checkJobExecutorClass(jobExecutorClass);
       JobExecutor jobExecutor =
           (JobExecutor) jobExecutorClass.getDeclaredConstructor().newInstance();
@@ -138,6 +167,29 @@ public class JobExecutorFactory {
             + "JobExecutor#submitJob(JobTemplate), which LocalJobExecutor never calls. Override "
             + "submitJob(JobContext, JobTemplate) instead.",
         jobExecutorClass.getName());
+  }
+
+  private static Class<?> loadJobExecutorClass(String jobExecutorName, String clzName) {
+    try {
+      return Class.forName(clzName);
+    } catch (ClassNotFoundException | LinkageError e) {
+      // A LinkageError is thrown when the class is there, but a class it depends on isn't.
+      String hint =
+          K8S_JOB_EXECUTOR_CLASS_NAME.equals(clzName)
+              ? String.format(
+                  "It is shipped in %s, make sure the jar is in the libs directory of the"
+                      + " Gravitino server",
+                  K8S_JOB_EXECUTOR_JAR)
+              : String.format(
+                  "Check %s%s%s, and make sure the jar of the job executor is on the classpath"
+                      + " of the Gravitino server",
+                  JOB_EXECUTOR_CONF_PREFIX, jobExecutorName, JOB_EXECUTOR_CLASS_SUFFIX);
+      throw new RuntimeException(
+          String.format(
+              "Failed to create job executor %s: its class %s can't be loaded. %s",
+              jobExecutorName, clzName, hint),
+          e);
+    }
   }
 
   private static boolean implementsMethod(

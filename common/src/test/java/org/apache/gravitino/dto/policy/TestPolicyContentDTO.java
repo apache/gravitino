@@ -18,10 +18,13 @@
  */
 package org.apache.gravitino.dto.policy;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.policy.AccessControlContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -41,5 +44,60 @@ public class TestPolicyContentDTO {
     // UnsupportedOperationException, even though the domain CustomContent returns its
     // customRules from rules().
     Assertions.assertEquals(customRules, content.rules());
+  }
+
+  @Test
+  public void testAccessControlContentDtoRules() {
+    PolicyContentDTO.AccessControlContentDTO content =
+        PolicyContentDTO.AccessControlContentDTO.builder()
+            .withPrivileges(ImmutableList.of(Privilege.Name.SELECT_TABLE))
+            .withApplicableRoles(ImmutableList.of("analyst"))
+            .build();
+
+    Assertions.assertEquals(
+        ImmutableList.of(Privilege.Name.SELECT_TABLE.name()),
+        content.rules().get(AccessControlContent.PRIVILEGES_KEY));
+    Assertions.assertEquals(
+        ImmutableList.of("analyst"),
+        content.rules().get(AccessControlContent.APPLICABLE_ROLES_KEY));
+    Assertions.assertTrue(content.properties().isEmpty());
+    Assertions.assertFalse(content.supportedObjectTypes().contains(MetadataObject.Type.METALAKE));
+    Assertions.assertDoesNotThrow(content::validate);
+  }
+
+  @Test
+  public void testAccessControlContentDtoAbsentFields() {
+    PolicyContentDTO.AccessControlContentDTO content =
+        PolicyContentDTO.AccessControlContentDTO.builder().build();
+
+    Assertions.assertTrue(content.privileges().isEmpty());
+    Assertions.assertTrue(content.applicableRoles().isEmpty());
+  }
+
+  @Test
+  public void testAccessControlContentDtoDelegatesValidation() {
+    // A DTO that skips validate() would let a privilege outside the allowlist reach the server, so
+    // the delegation to the domain content is the contract under test here, not the rule itself.
+    PolicyContentDTO.AccessControlContentDTO unpermittedPrivilege =
+        PolicyContentDTO.AccessControlContentDTO.builder()
+            .withPrivileges(ImmutableList.of(Privilege.Name.CREATE_TABLE))
+            .withApplicableRoles(ImmutableList.of("analyst"))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        unpermittedPrivilege::validate,
+        "expected a privilege outside PERMITTED_PRIVILEGES to be rejected");
+
+    PolicyContentDTO.AccessControlContentDTO noRoles =
+        PolicyContentDTO.AccessControlContentDTO.builder()
+            .withPrivileges(ImmutableList.of(Privilege.Name.SELECT_TABLE))
+            .build();
+    Assertions.assertThrows(IllegalArgumentException.class, noRoles::validate);
+
+    PolicyContentDTO.AccessControlContentDTO noPrivileges =
+        PolicyContentDTO.AccessControlContentDTO.builder()
+            .withApplicableRoles(ImmutableList.of("analyst"))
+            .build();
+    Assertions.assertThrows(IllegalArgumentException.class, noPrivileges::validate);
   }
 }

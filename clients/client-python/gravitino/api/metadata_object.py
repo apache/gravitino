@@ -87,6 +87,9 @@ class MetadataObject(ABC):
         JOB_TEMPLATE = "job_template"
         """A job template represents a reusable template for creating jobs in Gravitino."""
 
+        SEMANTIC_MODEL = "semantic_model"
+        """A Semantic Model defines business semantics over catalog data."""
+
         FUNCTION = "function"
         """A function represents a user-defined function registered in Gravitino."""
 

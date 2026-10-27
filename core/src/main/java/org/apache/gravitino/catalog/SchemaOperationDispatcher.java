@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -580,6 +581,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               droppedFromStore = store.delete(ident, SCHEMA, true);
             } catch (NoSuchEntityException e) {
               LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -667,6 +670,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     try {
       store.put(schemaEntity, true);
     } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);

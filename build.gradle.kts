@@ -514,9 +514,14 @@ allprojects {
 
       val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
       param.environment("dockerTest", dockerTest.toString())
+      // Must stay inside doFirst: tasks such as :core's database lanes set this flag in their own
+      // configuration action, which may run after this configureEach action registers.
+      val includeDockerTaggedTests =
+        param.extensions.extraProperties.properties["includeDockerTaggedTests"] as? Boolean
+          ?: dockerTest
       val dorisMultiVersion = project.hasProperty("dorisMultiVersionTest")
       param.useJUnitPlatform {
-        if (!dockerTest) {
+        if (!includeDockerTaggedTests) {
           excludeTags("gravitino-docker-test")
         }
         if (!dorisMultiVersion) {
@@ -620,6 +625,7 @@ subprojects {
     ":catalogs:hadoop-auth",
     ":catalogs:hadoop-common",
     ":maintenance:jobs",
+    ":maintenance:maintenance-common",
     ":maintenance:optimizer-api",
     ":maintenance:updaters",
     ":clients",
@@ -1019,7 +1025,17 @@ subprojects {
       val extraArgs = project.property("extraJvmArgs") as List<String>
       jvmArgs = listOf("-Xmx4G") + extraArgs
       useJUnitPlatform()
-      finalizedBy(tasks.getByName("jacocoTestReport"))
+      val isCoreSuiteTask =
+        project.path == ":core" &&
+          name in setOf(
+          "coreUnitTest",
+          "coreH2Test",
+          "coreMySQLTest",
+          "corePostgreSQLTest"
+        )
+      if (!isCoreSuiteTask) {
+        finalizedBy(tasks.getByName("jacocoTestReport"))
+      }
     }
   }
 
@@ -1168,9 +1184,12 @@ tasks {
         "copyJobsLib",
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+        ":iceberg:iceberg-rest-server-experiment:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
-        ":plugins:idp-basic:copyLibAndConfigs"
+        ":plugins:idp-basic:copyLibAndConfigs",
+        ":plugins:maintenance:copyLibAndConfigs",
+        ":plugins:k8s-job-executor:copyLibAndConfigs"
       )
     if (!skipWeb) {
       dependencies.add(":web:web:build")

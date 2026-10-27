@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.system.storedprocedure;
 
+import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
@@ -135,22 +137,13 @@ public class TestDropCatalogStoredProcedure {
 
     DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, METALAKE);
 
-    // The internally-thrown "not exists" TrinoException is caught by the outer catch(Exception)
-    // and re-wrapped as GRAVITINO_UNSUPPORTED_OPERATION, with the original exception preserved
-    // as the cause. This matches the historical behavior observed in the issue's stack trace.
-    // The contract we verify is: the user-visible message still tells them the catalog does not
-    // exist, and the root cause carries the GRAVITINO_CATALOG_NOT_EXISTS error code.
     TrinoException error =
         assertThrows(TrinoException.class, () -> procedure.dropCatalog(CATALOG, false, null));
     assertTrue(
         error.getMessage().contains("not exists"),
         () -> "Expected message to contain 'not exists' but was: " + error.getMessage());
-    Throwable cause = error.getCause();
-    assertTrue(
-        cause instanceof TrinoException, () -> "Expected TrinoException cause, was: " + cause);
     assertEquals(
-        GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS.toErrorCode(),
-        ((TrinoException) cause).getErrorCode());
+        GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS.toErrorCode(), error.getErrorCode());
   }
 
   @Test
@@ -172,5 +165,21 @@ public class TestDropCatalogStoredProcedure {
     verify(metalake, times(1)).dropCatalog(CATALOG, true);
     // Local-cache reload should NOT be triggered when the local connector was already absent.
     verify(manager, never()).catalogConnectorExist(anyString());
+  }
+
+  @Test
+  public void testDropCatalogDeniedIsPermissionDenied() {
+    String message = "User joel is not authorized to perform operation dropCatalog";
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+    when(manager.getMetalake(METALAKE)).thenReturn(metalake);
+    when(metalake.dropCatalog(CATALOG, true)).thenThrow(new ForbiddenException(message));
+
+    DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, METALAKE);
+
+    TrinoException error =
+        assertThrows(TrinoException.class, () -> procedure.dropCatalog(CATALOG, false, null));
+    assertEquals(PERMISSION_DENIED.toErrorCode(), error.getErrorCode());
+    assertEquals(message, error.getMessage());
   }
 }

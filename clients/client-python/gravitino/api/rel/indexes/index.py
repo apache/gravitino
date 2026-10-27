@@ -32,6 +32,8 @@ class Index(ABC):
         """The enum IndexType defines the type of the index.
 
         Catalogs may support generic key types and connector-specific index types.
+        `DATA_SKIPPING_ANNOY` and `DATA_SKIPPING_USEARCH` are exposed for reading legacy
+        ClickHouse index metadata only.
         """
 
         PRIMARY_KEY = "PRIMARY_KEY"
@@ -49,6 +51,21 @@ class Index(ABC):
         integrity by preventing duplicate entries in specific columns, and they can be applied to
         columns that are not designated as the primary key. The uniqueness constraint imposed by
         UNIQUE KEY helps in avoiding redundancy and ensuring data accuracy in the database."""
+
+        BITMAP = "BITMAP"
+        """Bitmap index, which uses bit arrays to represent the presence of values in a column."""
+
+        INVERTED = "INVERTED"
+        """Inverted index, which maps terms to their locations to speed up full-text searches."""
+
+        VECTOR = "VECTOR"
+        """Vector index, which speeds up similarity searches in high-dimensional vector spaces."""
+
+        DATA_SKIPPING_ANNOY = "DATA_SKIPPING_ANNOY"
+        """Legacy ClickHouse Annoy index metadata. This type is metadata-only."""
+
+        DATA_SKIPPING_USEARCH = "DATA_SKIPPING_USEARCH"
+        """Legacy ClickHouse USearch index metadata. This type is metadata-only."""
 
         DATA_SKIPPING_VECTOR_SIMILARITY = "DATA_SKIPPING_VECTOR_SIMILARITY"
         """ClickHouse vector similarity data skipping index."""

@@ -47,7 +47,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String DEFAULT_UPDATE_MODE = "all";
   private static final String OPTION_UPDATER_OPTIONS = "updater-options";
   private static final String OPTION_SPARK_CONF = "spark-conf";
-  private static final String DEFAULT_SPARK_MASTER = "local[*]";
   private static final String DEFAULT_SPARK_EXECUTOR_INSTANCES = "1";
   private static final String DEFAULT_SPARK_EXECUTOR_CORES = "1";
   private static final String DEFAULT_SPARK_EXECUTOR_MEMORY = "1g";
@@ -98,6 +97,17 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
     validateUpdaterOptions(updateMode, updaterOptions);
     validateSparkConfigs(tableTargets, sparkConfigs);
+    // The job ignores the master of spark_conf, as spark-submit decides it, so say where it goes.
+    if (StringUtils.isNotBlank(sparkConfigs.get(SPARK_MASTER_KEY))) {
+      context
+          .output()
+          .printf(
+              "WARN: %s=%s in the Spark configurations is ignored by the job. Set %sspark_master"
+                  + " instead.%n",
+              SPARK_MASTER_KEY,
+              sparkConfigs.get(SPARK_MASTER_KEY),
+              OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX);
+    }
 
     if (context.dryRun()) {
       for (TableTarget tableTarget : tableTargets) {
@@ -333,12 +343,10 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     Map<String, String> placeholders = new LinkedHashMap<>();
     String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
 
-    placeholders.put(
-        "spark_master",
-        firstNonBlank(
-            submitterConfigs.get("spark_master"),
-            sparkConfigs.get(SPARK_MASTER_KEY),
-            DEFAULT_SPARK_MASTER));
+    // An empty master leaves it to the job executor: spark-submit defaults to local[*], and the
+    // k8s job executor lets the operator decide it. spark.master in spark_conf isn't used, as the
+    // job ignores it there too.
+    placeholders.put("spark_master", firstNonBlank(submitterConfigs.get("spark_master")));
     placeholders.put(
         "spark_executor_instances",
         firstNonBlank(
