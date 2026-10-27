@@ -214,11 +214,11 @@ public class EffectiveTagResolver {
     if (metadataObjects.isEmpty()) {
       return new LinkedHashMap<>();
     }
+    MetadataObjectUtil.checkMetadataObjects(metalake, metadataObjects);
     Map<MetadataObject, List<MetadataObject>> resolutionOrders = new LinkedHashMap<>();
     Map<Entity.EntityType, Set<MetadataObject>> objectsByType =
         new EnumMap<>(Entity.EntityType.class);
     for (MetadataObject requested : metadataObjects) {
-      MetadataObjectUtil.checkMetadataObject(metalake, requested);
       List<MetadataObject> order = new ArrayList<>();
       order.add(requested);
       order.addAll(MetadataObjectUtil.getParentMetadataObjects(requested));

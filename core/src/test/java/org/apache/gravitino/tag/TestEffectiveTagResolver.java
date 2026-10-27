@@ -19,6 +19,8 @@
 package org.apache.gravitino.tag;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -71,6 +73,9 @@ public class TestEffectiveTagResolver {
     metadataObjectUtil = mockStatic(MetadataObjectUtil.class, CALLS_REAL_METHODS);
     metadataObjectUtil
         .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, TABLE))
+        .thenAnswer(invocation -> null);
+    metadataObjectUtil
+        .when(() -> MetadataObjectUtil.checkMetadataObjects(eq(METALAKE), anyList()))
         .thenAnswer(invocation -> null);
   }
 
@@ -165,12 +170,6 @@ public class TestEffectiveTagResolver {
     MetadataObject second =
         MetadataObjects.of(
             Arrays.asList("catalog", "schema", "table", "second"), MetadataObject.Type.COLUMN);
-    metadataObjectUtil
-        .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, first))
-        .thenAnswer(invocation -> null);
-    metadataObjectUtil
-        .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, second))
-        .thenAnswer(invocation -> null);
     TagEntity inherited = tag(1L, "domain", TagAssignment.ofValues("finance"));
     TagEntity direct = tag(1L, "domain", TagAssignment.ofValues("engineering"));
     when(relationOperations.batchListEntitiesByRelation(any(), any(), any()))
@@ -197,6 +196,9 @@ public class TestEffectiveTagResolver {
             });
 
     Map<MetadataObject, TagEntity[]> result = resolver.resolve(METALAKE, List.of(first, second));
+
+    metadataObjectUtil.verify(
+        () -> MetadataObjectUtil.checkMetadataObjects(METALAKE, List.of(first, second)));
 
     Assertions.assertArrayEquals(
         new String[] {"engineering"}, result.get(first)[0].assignment().orElseThrow().values());
