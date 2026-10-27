@@ -23,10 +23,12 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -37,6 +39,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
@@ -44,6 +47,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -83,6 +87,37 @@ public class TableMetaService {
           tableName);
     }
     return tablePO.getTableId();
+  }
+
+  /**
+   * Returns the metalake name that owns an active table id.
+   *
+   * <p>Used when callers have a table entity id but not a metalake name (for example TMS occupancy
+   * reclaim looking up a bound job without depending on the current policy still existing).
+   *
+   * @param tableId table entity id
+   * @return the metalake name, or {@code null} when the table or metalake is not active
+   */
+  @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getMetalakeNameByTableId")
+  public String getMetalakeNameByTableId(long tableId) {
+    List<TablePO> tables =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.listTablePOsByTableIds(Collections.singletonList(tableId)));
+    if (tables == null || tables.isEmpty()) {
+      return null;
+    }
+    Long metalakeId = tables.get(0).getMetalakeId();
+    if (metalakeId == null) {
+      return null;
+    }
+    MetalakePO metalake =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaById(metalakeId));
+    return metalake == null ? null : metalake.getMetalakeName();
   }
 
   @Monitored(

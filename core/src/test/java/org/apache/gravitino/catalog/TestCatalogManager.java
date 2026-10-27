@@ -40,6 +40,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -52,6 +54,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -73,6 +76,7 @@ import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -93,6 +97,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretProviderRegistry;
@@ -109,6 +114,13 @@ import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -118,6 +130,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
@@ -387,6 +400,68 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
+    reset();
+  }
+
+  @Test
+  void testPathBasedCredentialProviderValidation() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "token_provider");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+            .put("mock", "mock")
+            .build();
+    Map<String, String> tokenProps =
+        ImmutableMap.<String, String>builder()
+            .putAll(props)
+            .put(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-secret-key,gcs-token")
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", tokenProps));
+    Assertions.assertTrue(exception.getMessage().contains("gcs-token"));
+    Assertions.assertTrue(exception.getMessage().contains(provider));
+    Assertions.assertFalse(catalogManager.catalogExists(ident));
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.alterCatalog(
+                    ident,
+                    CatalogChange.setProperty(
+                        CredentialConstants.CREDENTIAL_PROVIDERS, "adls-token")));
+    Assertions.assertTrue(exception.getMessage().contains("adls-token"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.testConnection(
+                    ident,
+                    CatalogChange.setProperty(
+                        CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token")));
+    Assertions.assertTrue(exception.getMessage().contains("s3-token"));
+
+    catalogManager.alterCatalog(
+        ident,
+        CatalogChange.setProperty(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-secret-key"));
+    Assertions.assertEquals(
+        "s3-secret-key",
+        catalogManager
+            .loadCatalog(ident)
+            .properties()
+            .get(CredentialConstants.CREDENTIAL_PROVIDERS));
     reset();
   }
 
@@ -1648,9 +1723,11 @@ public class TestCatalogManager {
     Mockito.verify(catalogWrapper, Mockito.never()).doWithSchemaOps(any());
   }
 
-  @Test
-  public void testForceDropManagedCatalogPropagatesSchemaConflict() throws Exception {
-    NameIdentifier ident = NameIdentifier.of("metalake", "test_force_drop_occ");
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testForceDropManagedCatalogPreservesMetadataOnSchemaFailure(boolean conflict)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test_force_drop_failure_" + conflict);
     Map<String, String> props =
         ImmutableMap.of(
             "provider",
@@ -1667,7 +1744,7 @@ public class TestCatalogManager {
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("schema_occ")
-            .withNamespace(Namespace.of("metalake", "test_force_drop_occ"))
+            .withNamespace(Namespace.of("metalake", ident.name()))
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -1682,14 +1759,28 @@ public class TestCatalogManager {
     // A managed-storage catalog drops each schema through its schema operations.
     Mockito.doReturn(CapabilityResult.SUPPORTED).when(capability).managedStorage(any());
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
-    OptimisticLockException conflict = new OptimisticLockException("lock wait timeout");
-    Mockito.doThrow(conflict).when(catalogWrapper).doWithSchemaOps(any());
+    RuntimeException failure =
+        conflict
+            ? new OptimisticLockException("lock wait timeout")
+            : new RuntimeException("Failed to delete fileset storage", new IOException("denied"));
+    Mockito.doThrow(failure).when(catalogWrapper).doWithSchemaOps(any());
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
 
-    Assertions.assertSame(
-        conflict,
+    RuntimeException thrown =
         Assertions.assertThrows(
-            OptimisticLockException.class, () -> catalogManager.dropCatalog(ident, true)));
+            RuntimeException.class, () -> catalogManager.dropCatalog(ident, true));
+    if (conflict) {
+      Assertions.assertSame(failure, thrown);
+    } else {
+      String schemaError =
+          "Failed to drop schema " + NameIdentifier.of("metalake", ident.name(), "schema_occ");
+      Assertions.assertTrue(thrown.getMessage().contains(schemaError));
+      Assertions.assertTrue(ExceptionUtils.getThrowableList(thrown).contains(failure));
+    }
+    Assertions.assertTrue(entityStore.exists(ident, EntityType.CATALOG));
+    Assertions.assertTrue(
+        entityStore.exists(
+            NameIdentifier.of("metalake", ident.name(), "schema_occ"), EntityType.SCHEMA));
   }
 
   @Test
@@ -2079,6 +2170,113 @@ public class TestCatalogManager {
       Assertions.assertTrue(manager.dropCatalog(ident, true));
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testCredentialProvidersCannotBeSecret() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_credential_providers");
+      SecretReference reference = new SecretReference("reference", Map.of("path", "providers"));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(
+                      CredentialConstants.CREDENTIAL_PROVIDERS,
+                      new SecretBinding("memory", "gcs-token")),
+                  Map.of()));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(),
+                  Map.of(CredentialConstants.CREDENTIAL_PROVIDERS, reference)));
+      Assertions.assertFalse(manager.catalogExists(ident));
+
+      manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", catalogProps());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.alterCatalog(
+                  ident,
+                  CatalogChange.setSecretBinding(
+                      CredentialConstants.CREDENTIAL_PROVIDERS,
+                      new SecretBinding("memory", "gcs-token"))));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.alterCatalog(
+                  ident,
+                  CatalogChange.setSecretReference(
+                      CredentialConstants.CREDENTIAL_PROVIDERS, reference)));
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+    }
+  }
+
+  @Test
+  void testLoadWarnsForSecretCredentialProviders() throws Exception {
+    LoggerContext context =
+        (LoggerContext) LogManager.getContext(CatalogManager.class.getClassLoader(), false);
+    Configuration logConfig = context.getConfiguration();
+    List<LogEvent> events = new ArrayList<>();
+    AbstractAppender appender =
+        new AbstractAppender("credentialProvidersCapture", null, null, true, null) {
+          @Override
+          public void append(LogEvent event) {
+            events.add(event.toImmutable());
+          }
+        };
+    appender.start();
+    LoggerConfig logger = new LoggerConfig(CatalogManager.class.getName(), Level.WARN, false);
+    logger.addAppender(appender, Level.WARN, null);
+    logConfig.addLogger(CatalogManager.class.getName(), logger);
+    context.updateLoggers();
+
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      // A catalog persisted before credential providers were rejected as secrets.
+      NameIdentifier ident = NameIdentifier.of("metalake", "legacy_secret_providers");
+      long id = new RandomIdGenerator().nextId();
+      SecretUrn urn = writeThroughUrn("catalog", id, CredentialConstants.CREDENTIAL_PROVIDERS);
+      secrets.writeSecrets(List.of(new SecretMaterial(urn, "gcs-token")));
+      Map<String, String> props = new HashMap<>(catalogProps());
+      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, urn.toString());
+      entityStore.put(
+          CatalogEntity.builder()
+              .withId(id)
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider(provider)
+              .withComment("comment")
+              .withProperties(props)
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build());
+
+      Assertions.assertDoesNotThrow(() -> manager.loadCatalog(ident));
+      Assertions.assertTrue(
+          events.stream()
+              .anyMatch(e -> e.getMessage().getFormattedMessage().contains("gcs-token")));
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+    } finally {
+      logConfig.removeLogger(CatalogManager.class.getName());
+      context.updateLoggers();
+      appender.stop();
     }
   }
 
