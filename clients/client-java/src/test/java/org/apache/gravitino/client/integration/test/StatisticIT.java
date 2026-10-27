@@ -30,8 +30,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -63,7 +64,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@HiveFixture
 public class StatisticIT extends BaseIT {
+
+  @FixtureContainer private HiveContainer hive;
 
   private static final Logger LOG = LoggerFactory.getLogger(StatisticIT.class);
   public static final String metalakeName =
@@ -79,7 +83,6 @@ public class StatisticIT extends BaseIT {
   public static final String HIVE_COL_NAME3 = "hive_col_name3";
   private String HIVE_METASTORE_URIS;
   private final String provider = "hive";
-  private final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private GravitinoMetalake metalake;
   private Catalog catalog;
   private Table table;
@@ -284,13 +287,9 @@ public class StatisticIT extends BaseIT {
   }
 
   protected void startNecessaryContainer() {
-    containerSuite.startHiveContainer();
-
     HIVE_METASTORE_URIS =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
   }
 
   private void createMetalake() {
@@ -382,7 +381,7 @@ public class StatisticIT extends BaseIT {
         "location",
         String.format(
             "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
+            hive.getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
     return properties;

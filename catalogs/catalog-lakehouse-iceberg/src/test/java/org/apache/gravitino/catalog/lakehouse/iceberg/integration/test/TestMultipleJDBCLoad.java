@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPrope
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER;
 
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -35,33 +34,29 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@MySQLFixture(database = TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD)
+@PostgreSQLFixture(database = TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD)
 public class TestMultipleJDBCLoad extends BaseIT {
   private static final TestDatabaseName TEST_DB_NAME =
       TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD;
 
-  private static MySQLContainer mySQLContainer;
-  private static PostgreSQLContainer postgreSQLContainer;
-
-  @BeforeAll
-  public void startup() throws IOException {
-    containerSuite.startMySQLContainer(TEST_DB_NAME);
-    mySQLContainer = containerSuite.getMySQLContainer();
-    containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
-    postgreSQLContainer = containerSuite.getPostgreSQLContainer();
-  }
+  @FixtureContainer private static MySQLContainer mySQLContainer;
+  @FixtureContainer private static PostgreSQLContainer postgreSQLContainer;
 
   @Test
   public void testJdbcCatalogCreationWithUrlCredentials() throws Exception {

@@ -220,6 +220,10 @@ dependencies {
 
   // Keep optional Hadoop S3A dependencies available only to tests.
   s3aTestRuntime(libs.hadoop3.aws)
+  // The LocalStack fixture creates buckets with the S3 SDK v2; the synchronous client needs no Netty.
+  testRuntimeOnly(libs.aws.s3) {
+    exclude("software.amazon.awssdk", "netty-nio-client")
+  }
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

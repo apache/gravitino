@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.iceberg.IcebergBuild;
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.function.Executable;
  * nested namespaces, and table privilege enforcement against the experimental Iceberg artifacts.
  */
 @Tag("gravitino-docker-test")
+@PostgreSQLFixture(database = TestDatabaseName.PG_ICEBERG_EXPERIMENTAL_AUTHZ_IT)
 public class IcebergExperimentalAuthorizationIT extends IcebergTableAuthorizationIT {
 
   private static final String EXPERIMENTAL_SERVER_DIRECTORY = "iceberg-rest-server-experiment";
@@ -75,11 +77,6 @@ public class IcebergExperimentalAuthorizationIT extends IcebergTableAuthorizatio
           startupLog.contains(EXPERIMENTAL_SERVER_DIRECTORY),
           "The deployed Iceberg REST service must load its configured experimental classpath");
     }
-  }
-
-  @Override
-  protected TestDatabaseName getTestDatabaseName() {
-    return TestDatabaseName.PG_ICEBERG_EXPERIMENTAL_AUTHZ_IT;
   }
 
   /**

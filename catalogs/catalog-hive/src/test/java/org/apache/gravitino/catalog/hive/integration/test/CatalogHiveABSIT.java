@@ -18,13 +18,15 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.HiveStorage;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,6 +41,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
     value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not prepared.")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture(version = HiveVersion.HIVE3, storage = HiveStorage.ABS)
 public class CatalogHiveABSIT extends CatalogHive2IT {
 
   private static final String ABS_BUCKET_NAME = System.getenv("ABS_CONTAINER_NAME");
@@ -47,22 +50,9 @@ public class CatalogHiveABSIT extends CatalogHive2IT {
 
   @Override
   protected void startNecessaryContainer() {
-    Map<String, String> hiveContainerEnv =
-        ImmutableMap.of(
-            "ABS_ACCOUNT_NAME",
-            ABS_USER_ACCOUNT_NAME,
-            "ABS_ACCOUNT_KEY",
-            ABS_USER_ACCOUNT_KEY,
-            HiveContainer.HIVE_RUNTIME_VERSION,
-            HiveContainer.HIVE3);
-
-    containerSuite.startHiveContainerWithS3(hiveContainerEnv);
-
     hiveMetastoreUris =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
   }
 
   @Override

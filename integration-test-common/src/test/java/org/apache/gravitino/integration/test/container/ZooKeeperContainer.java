@@ -24,12 +24,13 @@ import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 
 public class ZooKeeperContainer extends BaseContainer {
   private static final Logger LOG = LoggerFactory.getLogger(ZooKeeperContainer.class);
 
-  public static final String DEFAULT_IMAGE = "zookeeper:3.8.0";
+  public static final String DEFAULT_IMAGE = TestImages.ZOOKEEPER;
   public static final String HOST_NAME = "gravitino-ci-zookeeper";
   public static final int ZK_PORT = 2181;
 
@@ -46,6 +47,12 @@ public class ZooKeeperContainer extends BaseContainer {
       Map<String, String> envVars,
       Optional<Network> network) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+  }
+
+  // ZooKeeper syncs its transaction log on every write unless told not to.
+  @Override
+  protected void applyDisposableData(GenericContainer<?> container) {
+    container.withEnv("ZOO_CFG_EXTRA", "forceSync=no");
   }
 
   @Override

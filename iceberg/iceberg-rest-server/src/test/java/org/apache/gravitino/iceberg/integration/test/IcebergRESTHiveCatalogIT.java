@@ -24,8 +24,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Table;
@@ -41,8 +42,9 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@HiveFixture
 public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer protected HiveContainer hive;
 
   @Override
   protected boolean supportsNestedNamespaces() {
@@ -54,9 +56,7 @@ public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
   }
 
   @Override
-  void initEnv() {
-    containerSuite.startHiveContainer();
-  }
+  void initEnv() {}
 
   @Override
   Map<String, String> getCatalogConfig() {
@@ -68,17 +68,14 @@ public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_URI.getKey(),
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT));
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT));
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
         GravitinoITUtils.genRandomName(
             String.format(
                 "hdfs://%s:%d/user/hive/warehouse-hive",
-                containerSuite.getHiveContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT)));
+                hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT)));
     return configMap;
   }
 

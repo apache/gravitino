@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.hive.client;
 
-import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -39,9 +38,9 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.CloseContainerExtension;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -62,12 +61,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 // This class is used for testing against Hive 2.x Metastore instances using Docker containers.
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
+@ExtendWith(PrintFuncNameExtension.class)
+@HiveFixture
 public class TestHive2HMS {
 
-  protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
-
-  protected HiveContainer hiveContainer;
+  @FixtureContainer protected HiveContainer hive;
   protected String testPrefix = "hive2";
   protected String metastoreUri;
   protected String hdfsBasePath;
@@ -76,24 +74,19 @@ public class TestHive2HMS {
 
   @BeforeAll
   public void startHiveContainer() {
-    containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2));
-    hiveContainer = containerSuite.getHiveContainer();
     metastoreUri =
         String.format(
-            "thrift://%s:%d",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     hdfsBasePath =
         String.format(
             "hdfs://%s:%d/tmp/gravitino_test",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     hiveClient = new HiveClientFactory(createHiveProperties(), testPrefix).createHiveClient();
   }
 
   @AfterAll
   public void stopHiveContainer() throws Exception {
-    containerSuite.close();
     if (hiveClient != null) {
       hiveClient.close();
       hiveClient = null;

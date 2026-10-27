@@ -15,9 +15,17 @@
 # limitations under the License.
 
 # This script is originally from the official Kafka docker image container `/etc/kafka/docker/run`
-# and has been modified to be used to modify the Kafka configuration `advertised.listeners` to use the container's IP address
+# and has been modified to advertise the PLAINTEXT listener on the container's IP address, which
+# tests use as the bootstrap address. The Testcontainers Kafka module exports the other advertised
+# listeners before it calls this script; they are kept.
 IP=$(hostname -i)
-export KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://$IP:$DEFAULT_BROKER_PORT"
+if [ -n "$KAFKA_ADVERTISED_LISTENERS" ]; then
+  KAFKA_ADVERTISED_LISTENERS=$(echo "$KAFKA_ADVERTISED_LISTENERS" | \
+    sed -E "s#PLAINTEXT://[^,]*#PLAINTEXT://$IP:$DEFAULT_BROKER_PORT#")
+  export KAFKA_ADVERTISED_LISTENERS
+else
+  export KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://$IP:$DEFAULT_BROKER_PORT"
+fi
 echo "KAFKA_ADVERTISED_LISTENERS is set to $KAFKA_ADVERTISED_LISTENERS"
 
 

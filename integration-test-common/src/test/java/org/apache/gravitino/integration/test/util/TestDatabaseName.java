@@ -63,6 +63,9 @@ public enum TestDatabaseName {
   /** Represents the MySQL database used for testing catalog credential integration. */
   MYSQL_CATALOG_CREDENTIAL_IT,
 
+  /** Represents the MySQL database Ranger admin keeps its policies in. */
+  MYSQL_RANGER,
+
   /**
    * Represents the first MySQL-backed database used by
    * lakehouse.iceberg.integration.test.IcebergClassLoaderPoolIT to verify ClassLoader isolation and
@@ -159,4 +162,28 @@ public enum TestDatabaseName {
 
   /** Represents the MySQL database for the Flink Iceberg JDBC-backend catalog integration test. */
   FLINK_ICEBERG_JDBC_CATALOG_IT,
+
+  /** Represents the default MySQL database of catalog.mysql.TestMysqlDataSource's pool. */
+  MYSQL_TEST_MYSQL_DATA_SOURCE,
+
+  /** Represents the PostgreSQL database for catalog.postgresql.TestPostgreSqlDataSource. */
+  PG_TEST_PG_DATA_SOURCE,
+
+  /**
+   * Represents the PostgreSQL database catalog.postgresql.operation.TestPostgreSql connects to
+   * first; each test class then creates its own database.
+   */
+  PG_TEST_PG_OPERATIONS,
+
+  /** Represents the MySQL database for the optimizer's JDBC metrics repository tests. */
+  MYSQL_OPTIMIZER_JDBC_METRICS_IT,
+
+  /** Represents the PostgreSQL database for the optimizer's JDBC metrics repository tests. */
+  PG_OPTIMIZER_JDBC_METRICS_IT,
+
+  /** Represents the MySQL metrics database for TestIcebergUpdateStatsJobWithSpark's local job. */
+  MYSQL_ICEBERG_UPDATE_STATS_JOB,
+
+  /** Represents the MySQL metrics database for TestIcebergUpdateStatsJobWithSpark's server jobs. */
+  MYSQL_ICEBERG_UPDATE_STATS_JOB_VIA_SERVER,
 }

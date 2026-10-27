@@ -18,10 +18,10 @@
  */
 package org.apache.gravitino.flink.connector.store;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,14 +51,14 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class TestGravitinoCatalogStore {
   private GravitinoCatalogManager gravitinoCatalogMockManager;
   private GravitinoCatalogStore gravitinoCatalogStore;
 
-  @Before
+  @BeforeEach
   public void setupCatalogStore() {
     gravitinoCatalogMockManager = mock(GravitinoCatalogManager.class);
     gravitinoCatalogStore = new GravitinoCatalogStore(gravitinoCatalogMockManager);
@@ -97,8 +97,8 @@ public class TestGravitinoCatalogStore {
       fail("Expected CatalogException to be thrown");
     } catch (CatalogException e) {
       assertTrue(
-          "Expected failure message to contain 'Failed to remove the catalog:'",
-          e.getMessage().contains("Failed to remove the catalog:"));
+          e.getMessage().contains("Failed to remove the catalog:"),
+          "Expected failure message to contain 'Failed to remove the catalog:'");
     }
     verify(gravitinoCatalogMockManager).dropCatalog(catalogName);
   }
@@ -113,9 +113,9 @@ public class TestGravitinoCatalogStore {
       fail("Expected CatalogException to be thrown");
     } catch (CatalogException e) {
       assertTrue(
-          "Expected failure message to contain 'Failed to remove the catalog:'",
-          e.getMessage().contains("Failed to remove the catalog:"));
-      assertTrue("Expected cause to be RuntimeException", e.getCause() instanceof RuntimeException);
+          e.getMessage().contains("Failed to remove the catalog:"),
+          "Expected failure message to contain 'Failed to remove the catalog:'");
+      assertTrue(e.getCause() instanceof RuntimeException, "Expected cause to be RuntimeException");
     }
     verify(gravitinoCatalogMockManager).dropCatalog(catalogName);
   }
