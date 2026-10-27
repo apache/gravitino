@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.semantic.CustomExtension.GRAVITINO_PROPERTIES_VENDOR;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -103,6 +104,50 @@ public class TestSemanticModelValidator {
     assertInvalid(
         definition(shortSource),
         "datasets[0].source: must contain exactly catalog.schema.name, but was 'sales.orders'");
+  }
+
+  @Test
+  public void testRejectsReservedRootExtensionRegardlessOfData() {
+    for (String data : new String[] {"{}", "{\"owner\":\"analytics\"}", "not JSON"}) {
+      CustomExtension reserved =
+          CustomExtension.builder()
+              .withVendorName(GRAVITINO_PROPERTIES_VENDOR)
+              .withData(data)
+              .build();
+      SemanticModelDefinition definition =
+          SemanticModelDefinition.builder()
+              .withDatasets(new Dataset[] {dataset("orders")})
+              .withCustomExtensions(new CustomExtension[] {reserved})
+              .build();
+
+      assertInvalid(
+          definition,
+          "customExtensions[0].vendorName: 'GRAVITINO_PROPERTIES' is reserved for Gravitino properties");
+    }
+  }
+
+  @Test
+  public void testPreservesOrdinaryRootAndNestedPropertiesVendorExtensions() {
+    CustomExtension nested =
+        CustomExtension.builder()
+            .withVendorName(GRAVITINO_PROPERTIES_VENDOR)
+            .withData("not JSON")
+            .build();
+    Dataset orders =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .withCustomExtensions(new CustomExtension[] {nested})
+            .build();
+    CustomExtension ordinary =
+        CustomExtension.builder().withVendorName("GRAVITINO").withData("not JSON").build();
+    SemanticModelDefinition definition =
+        SemanticModelDefinition.builder()
+            .withDatasets(new Dataset[] {orders})
+            .withCustomExtensions(new CustomExtension[] {ordinary})
+            .build();
+
+    assertDoesNotThrow(() -> SemanticModelValidator.validateDefinition(definition));
   }
 
   @Test

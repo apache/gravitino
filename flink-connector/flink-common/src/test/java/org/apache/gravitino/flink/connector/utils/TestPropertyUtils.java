@@ -19,6 +19,9 @@
 package org.apache.gravitino.flink.connector.utils;
 
 import java.util.Map;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -49,14 +52,14 @@ public class TestPropertyUtils {
   }
 
   @Test
-  void testPropertiesWithSecretsSwallowsRestException() {
+  void testPropertiesWithSecretsPropagatesRestException() {
     SupportsSecrets broken =
         () -> {
           throw new RESTException("connection failed");
         };
-    Map<String, String> merged =
-        PropertyUtils.propertiesWithSecrets(Map.of("k", "v"), () -> broken);
-    Assertions.assertEquals("v", merged.get("k"));
+    Assertions.assertThrows(
+        RESTException.class,
+        () -> PropertyUtils.propertiesWithSecrets(Map.of("k", "v"), () -> broken));
   }
 
   @Test
@@ -75,5 +78,23 @@ public class TestPropertyUtils {
     Map<String, String> merged =
         PropertyUtils.propertiesWithSecrets(null, () -> () -> Map.of("secret", "x"));
     Assertions.assertEquals("x", merged.get("secret"));
+  }
+
+  @Test
+  void testPropertiesWithSecretsAndCredentialsSkipsExpiringCredentials() {
+    Credential staticCred = new S3SecretKeyCredential("AKIATEST", "static-secret");
+    Credential tokenCred =
+        new S3TokenCredential("SESSION", "session-secret", "tok", 1_700_000_000_000L);
+    Map<String, String> merged =
+        PropertyUtils.propertiesWithSecretsAndCredentials(
+            Map.of("s3-endpoint", "http://s3.example.com"),
+            () -> () -> Map.of(),
+            () -> () -> new Credential[] {tokenCred, staticCred});
+    Assertions.assertEquals(
+        "AKIATEST", merged.get(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "static-secret", merged.get(S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY));
+    Assertions.assertFalse(merged.containsKey(S3TokenCredential.GRAVITINO_S3_TOKEN));
+    Assertions.assertEquals("http://s3.example.com", merged.get("s3-endpoint"));
   }
 }

@@ -22,6 +22,8 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
+
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
 )
@@ -61,6 +63,7 @@ from mcp_server.client.plain.plain_rest_client_topic_operation import (
 from mcp_server.client.plain.plain_rest_client_view_operation import (
     PlainRESTClientViewOperation,
 )
+from mcp_server.client.plain.utils import encode_path_segment
 
 
 def _make_mock_client(response_json: dict):
@@ -97,6 +100,61 @@ _ENCODED_QUERY_INJECTION = "name%3Fadmin%3Dtrue%23"
 _ENCODED_SLASH = "cat%2Fschema"
 
 METALAKE = "my_metalake"
+
+
+class TestEncodePathSegment(unittest.TestCase):
+    def test_rejects_empty_and_dot_segments(self):
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    encode_path_segment(name)
+
+    def test_preserves_encoding_and_string_conversion(self):
+        for value, expected in (
+            (_PATH_TRAVERSAL, _ENCODED_PATH_TRAVERSAL),
+            (_QUERY_INJECTION, _ENCODED_QUERY_INJECTION),
+            (_SLASH, _ENCODED_SLASH),
+            ("sales.v2", "sales.v2"),
+            ("%2e%2e", "%252e%252e"),
+            (1, "1"),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(encode_path_segment(value), expected)
+
+
+class TestPathNameValidation(unittest.IsolatedAsyncioTestCase):
+    """Invalid names must fail before httpx can normalize the request path."""
+
+    async def asyncSetUp(self):
+        self.requests = []
+
+        def respond(request):
+            self.requests.append(request)
+            return httpx.Response(
+                200, json={"code": 0, "dropped": True, "identifiers": []}
+            )
+
+        self.client = httpx.AsyncClient(
+            base_url="http://localhost:8090",
+            transport=httpx.MockTransport(respond),
+        )
+        self.addAsyncCleanup(self.client.aclose)
+
+    async def test_drop_table_rejects_invalid_names_before_request(self):
+        op = PlainRESTClientTableOperation(METALAKE, self.client)
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    await op.drop_table("catalog", "schema", name, False)
+                self.assertEqual(self.requests, [])
+
+    async def test_load_model_rejects_invalid_names_before_request(self):
+        op = PlainRESTClientModelOperation(METALAKE, self.client)
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    await op.load_model("catalog", "schema", name)
+                self.assertEqual(self.requests, [])
 
 
 class TestMetalakeOperation(unittest.TestCase):
@@ -495,6 +553,64 @@ class TestPolicyOperationUrlEncoding(unittest.TestCase):
         url = _called_url(client.get)
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
+
+    def test_list_policies_for_tag_encodes_tag_name(self):
+        client = _make_mock_client({"associations": [{"policy": {}}]})
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(op.list_policies_for_tag(_PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertEqual('[{"policy": {}}]', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn("details=true", url)
+        self.assertNotIn("../../", url)
+
+    def test_associate_policy_with_tag_encodes_names_and_sends_selector(self):
+        client = _make_mock_client(
+            {
+                "code": 0,
+                "policy": _QUERY_INJECTION,
+                "tag": _PATH_TRAVERSAL,
+                "selector": {"type": "ALL_VALUES"},
+            }
+        )
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(
+            op.associate_policy_with_tag(
+                _PATH_TRAVERSAL,
+                _QUERY_INJECTION,
+                {"type": "ALL_VALUES"},
+            )
+        )
+        url = _called_url(client.post)
+        self.assertIn('"selector": {"type": "ALL_VALUES"}', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertEqual(
+            {"selector": {"type": "ALL_VALUES"}},
+            client.post.call_args.kwargs["json"],
+        )
+
+    def test_disassociate_policy_from_tag_handles_no_content_response(self):
+        client = _make_mock_client({})
+        client.delete.return_value.status_code = 204
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(
+            op.disassociate_policy_from_tag(_PATH_TRAVERSAL, _QUERY_INJECTION)
+        )
+        url = _called_url(client.delete)
+        self.assertIn('"removed": true', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+
+    def test_list_tags_for_policy_encodes_policy_name(self):
+        client = _make_mock_client({"associations": [{"tag": {}}]})
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(op.list_tags_for_policy(_QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertEqual('[{"tag": {}}]', result)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertIn("details=true", url)
+        self.assertNotIn("?admin=true", url)
 
 
 class TestStatisticOperationUrlEncoding(unittest.TestCase):

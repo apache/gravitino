@@ -43,6 +43,7 @@ import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -57,6 +58,7 @@ import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
@@ -87,6 +89,9 @@ public class MetadataObjectService {
               .put(MetadataObject.Type.FUNCTION, MetadataObjectService::getFunctionObjectsFullName)
               .put(MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName)
               .put(MetadataObject.Type.VIEW, MetadataObjectService::getViewObjectsFullName)
+              .put(
+                  MetadataObject.Type.SEMANTIC_MODEL,
+                  MetadataObjectService::getSemanticModelObjectsFullName)
               .put(MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName)
               .put(MetadataObject.Type.TAG, MetadataObjectService::getTagObjectsFullName)
               .put(MetadataObject.Type.POLICY, MetadataObjectService::getPolicyObjectsFullName)
@@ -661,5 +666,32 @@ public class MetadataObjectService {
         });
 
     return schemaIdAndNameMap;
+  }
+
+  private static Map<Long, String> getSemanticModelObjectsFullName(List<Long> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return Maps.newHashMap();
+    }
+    List<SemanticModelPO> models =
+        SessionUtils.getWithoutCommit(
+            SemanticModelMetaMapper.class, mapper -> mapper.listSemanticModelPOsByIds(ids));
+    if (models == null || models.isEmpty()) {
+      return Maps.newHashMap();
+    }
+    Map<Long, String> schemas =
+        getSchemaObjectsFullName(
+            models.stream()
+                .map(SemanticModelPO::getSchemaId)
+                .distinct()
+                .collect(Collectors.toList()));
+    Map<Long, String> names = Maps.newHashMap();
+    models.forEach(
+        model -> {
+          String schema = schemas.get(model.getSchemaId());
+          names.put(
+              model.getSemanticModelId(),
+              schema == null ? null : DOT_JOINER.join(schema, model.getSemanticModelName()));
+        });
+    return names;
   }
 }

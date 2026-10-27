@@ -96,6 +96,26 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     assertEquals(0, IcebergRemoveOrphanFilesJob.execute(spark, args));
   }
 
+  /** Verifies blank locations default to the table root without CLI argument parsing. */
+  @Test
+  public void testBlankLocationDefaultsToTableRoot() throws Exception {
+    spark.sql("CREATE TABLE test_catalog.db.blank_location (id INT) USING iceberg");
+    Path root = tempDir.resolve("db/blank_location");
+    Path old = Files.write(root.resolve("old-orphan"), new byte[] {1});
+    Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(5, ChronoUnit.DAYS)));
+    Map<String, String> options = args("blank_location");
+    options.put("dry-run", "true");
+    for (String location : new String[] {"", " ", "\t", "\u2003"}) {
+      options.put("location", location);
+      assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+      assertTrue(Files.exists(old));
+    }
+    options.put("location", "");
+    options.put("dry-run", "false");
+    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+    assertFalse(Files.exists(old));
+  }
+
   /** Verifies custom location and outside rejection. */
   @Test
   public void testCustomLocationAndOutsideRejection() throws Exception {
@@ -121,6 +141,29 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     args.put("location", link.toString());
     assertThrows(
         IllegalArgumentException.class, () -> IcebergRemoveOrphanFilesJob.execute(spark, args));
+  }
+
+  /** Verifies UTC cutoffs from the policy adapter retain their meaning in other session zones. */
+  @Test
+  public void testUtcCutoffWithNonUtcSession() throws Exception {
+    spark.sql("CREATE TABLE test_catalog.db.utc_cutoff (id INT) USING iceberg");
+    Path root = tempDir.resolve("db/utc_cutoff");
+    Instant cutoff = Instant.now().minus(4, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
+    Path older = Files.write(root.resolve("older"), new byte[] {1});
+    Path newer = Files.write(root.resolve("newer"), new byte[] {1});
+    Files.setLastModifiedTime(older, FileTime.from(cutoff.minusSeconds(60)));
+    Files.setLastModifiedTime(newer, FileTime.from(cutoff.plusSeconds(60)));
+    Map<String, String> options = args("utc_cutoff");
+    options.put("older-than", cutoff.toString().replace("T", " "));
+    String timezone = spark.conf().get("spark.sql.session.timeZone");
+    spark.conf().set("spark.sql.session.timeZone", "America/Los_Angeles");
+    try {
+      assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+      assertFalse(Files.exists(older));
+      assertTrue(Files.exists(newer));
+    } finally {
+      spark.conf().set("spark.sql.session.timeZone", timezone);
+    }
   }
 
   /** Verifies invalid inputs fail before deletion. */

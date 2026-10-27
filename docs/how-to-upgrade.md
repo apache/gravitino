@@ -160,6 +160,11 @@ These scripts should run to completion without any errors. If you
 do encounter errors you need to analyze the cause and attempt to
 trace it back to one of the preceding steps.
 
+For the MySQL, PostgreSQL, and H2 1.3.0-to-2.0.0 upgrade scripts, you can rerun the
+script after fixing the cause of a partial failure; earlier upgrade scripts are unchanged.
+Unexpected schema differences, such as a missing MySQL index during a rename, require
+manual schema repair before retrying.
+
 ### Step 6: Verify the Upgrade
 
 The final step of the upgrade process is validating your freshly

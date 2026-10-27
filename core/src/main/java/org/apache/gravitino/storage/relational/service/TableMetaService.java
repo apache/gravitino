@@ -23,10 +23,12 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -37,6 +39,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
@@ -44,16 +47,20 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
 
+  private static final Logger LOG = LoggerFactory.getLogger(TableMetaService.class);
   private static final TableMetaService INSTANCE = new TableMetaService();
   private BasePOStorageOps<TablePO, TableMetaMapper> ops;
 
@@ -80,6 +87,37 @@ public class TableMetaService {
           tableName);
     }
     return tablePO.getTableId();
+  }
+
+  /**
+   * Returns the metalake name that owns an active table id.
+   *
+   * <p>Used when callers have a table entity id but not a metalake name (for example TMS occupancy
+   * reclaim looking up a bound job without depending on the current policy still existing).
+   *
+   * @param tableId table entity id
+   * @return the metalake name, or {@code null} when the table or metalake is not active
+   */
+  @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getMetalakeNameByTableId")
+  public String getMetalakeNameByTableId(long tableId) {
+    List<TablePO> tables =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.listTablePOsByTableIds(Collections.singletonList(tableId)));
+    if (tables == null || tables.isEmpty()) {
+      return null;
+    }
+    Long metalakeId = tables.get(0).getMetalakeId();
+    if (metalakeId == null) {
+      return null;
+    }
+    MetalakePO metalake =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaById(metalakeId));
+    return metalake == null ? null : metalake.getMetalakeName();
   }
 
   @Monitored(
@@ -123,13 +161,18 @@ public class TableMetaService {
               po.getSchemaId(),
               po.getCatalogId(),
               po.getMetalakeId(),
+              () -> {
+                if (overwrite) {
+                  deleteStaleTableWithSameName(tableEntity.nameIdentifier(), po);
+                }
+              },
               () ->
                   SessionUtils.doWithoutCommit(
                       TableMetaMapper.class,
                       mapper -> {
                         ops.insertPO(mapper, po, overwrite);
                         if (overwrite) {
-                          // MySQL may preserve the existing table ID during an upsert. Read the
+                          // The upsert may update the existing row with the same table ID. Read the
                           // stored identity and database-generated version while the row is locked.
                           TablePO storedPO =
                               mapper.selectTableMetaBySchemaIdAndName(
@@ -410,9 +453,36 @@ public class TableMetaService {
     builder.withSchemaId(namespacedEntityId.entityId());
   }
 
+  /**
+   * Deletes the table stored under the same name as {@code po} when it has a different ID.
+   *
+   * <p>Such a row is a stale registration, for example a table dropped outside Gravitino and then
+   * created again. Upserting over it would keep the stale ID on MySQL and H2, so the new table
+   * would inherit the old table's tags, owner, privileges and statistics, and would fail on the
+   * name's unique key on PostgreSQL. The caller must hold the schema write lock and run this in the
+   * same transaction as the insert.
+   */
+  private void deleteStaleTableWithSameName(NameIdentifier identifier, TablePO po) {
+    TablePO storedPO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.selectTableMetaBySchemaIdAndName(po.getSchemaId(), po.getTableName()));
+    if (storedPO == null || storedPO.getTableId().equals(po.getTableId())) {
+      return;
+    }
+
+    LOG.warn(
+        "Replacing stale registration of table {} with ID {} by the table with ID {}",
+        identifier,
+        storedPO.getTableId(),
+        po.getTableId());
+    deleteTableWithVersion(identifier, storedPO);
+    deleteTableDependents(storedPO);
+  }
+
   private TablePO tablePOWithPersistedIdentityAndVersions(TablePO incomingPO, TablePO persistedPO) {
-    // The upsert derives the version inside the database and may preserve an existing table ID, so
-    // its dependent rows must carry the identity and versions the database ended up with.
+    // The upsert derives the version inside the database, so its dependent rows must carry the
+    // versions the database ended up with.
     return TablePO.builder(incomingPO)
         .withTableId(persistedPO.getTableId())
         .withCurrentVersion(persistedPO.getCurrentVersion())

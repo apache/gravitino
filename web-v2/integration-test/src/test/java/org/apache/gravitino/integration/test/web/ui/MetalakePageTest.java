@@ -121,9 +121,9 @@ public class MetalakePageTest extends BaseWebIT {
   @Order(6)
   public void testCreateInvalidMetalake() throws InterruptedException {
     String name = "1!@#$";
-    metalakePage.createMetalakeBtn.click();
+    clickAndWait(metalakePage.createMetalakeBtn);
     metalakePage.setMetalakeNameField(name);
-    metalakePage.submitHandleMetalakeBtn.click();
+    clickAndWait(metalakePage.submitHandleMetalakeBtn);
     Assertions.assertTrue(metalakePage.checkIsErrorName());
   }
 

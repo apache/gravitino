@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.gravitino.maintenance.jobs.TemplateArguments;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.hadoop.HadoopTables;
@@ -110,11 +111,7 @@ public class TestIcebergRemoveOrphanFilesJobMain {
   }
 
   private String[] templateArguments(Map<String, String> jobConf) {
-    return new IcebergRemoveOrphanFilesJob()
-        .jobTemplate().arguments().stream()
-            .map(
-                arg -> arg.startsWith("{{") ? jobConf.get(arg.substring(2, arg.length() - 2)) : arg)
-            .toArray(String[]::new);
+    return TemplateArguments.resolve(new IcebergRemoveOrphanFilesJob().jobTemplate(), jobConf);
   }
 
   private String runFailure(boolean omitIcebergRuntime, String[] args) throws Exception {

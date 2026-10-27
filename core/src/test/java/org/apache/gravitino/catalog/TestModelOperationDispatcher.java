@@ -36,6 +36,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
@@ -1316,42 +1317,71 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testRegisterModelWaitsForRegisterModelOfSameName() throws Exception {
+  public void testModelOperationsDoNotWaitForCatalogTreeLock() throws Exception {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_2");
     createSchemaForLockTest(schemaIdent);
-    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_model_lock_2", "model1");
+    NameIdentifier modelIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_2", "m1");
 
-    TreeLockTestSupport.HeldLock sameNameCreate =
-        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE);
-    TreeLockTestSupport.assertWaitsFor(sameNameCreate, () -> registerModelForLockTest(ident));
-  }
+    // A catalog WRITE lock covers every schema, model and version below it. Model operations are
+    // fenced by the entity store, so none of them may wait for it.
+    try (TreeLockTestSupport.HeldLock catalogWriter =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, catalog), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> registerModelForLockTest(modelIdent));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.listModels(
+                  Namespace.of(metalake, catalog, "schema_model_lock_2")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModel(modelIdent));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.alterModel(
+                  modelIdent, ModelChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.linkModelVersion(
+                  modelIdent, ImmutableMap.of("n1", "u1"), new String[] {"a1"}, null, null));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModelVersion(modelIdent, "a1"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModelVersion(modelIdent, 0));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.listModelVersions(modelIdent));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.listModelVersionInfos(modelIdent));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n1"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.getModelVersionUri(modelIdent, "a1", "n1"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.alterModelVersion(
+                  modelIdent, 0, ModelVersionChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.alterModelVersion(
+                  modelIdent, "a1", ModelVersionChange.updateComment("changed by alias")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter,
+          () ->
+              modelOperationDispatcher.linkModelVersion(
+                  modelIdent, ImmutableMap.of("n2", "u2"), new String[] {"a2"}, null, null));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.deleteModelVersion(modelIdent, "a2"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.deleteModelVersion(modelIdent, 0));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          catalogWriter, () -> modelOperationDispatcher.deleteModel(modelIdent));
+    }
 
-  @Test
-  public void testRegisterModelWaitsForSchemaWriteLock() throws Exception {
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_3");
-    createSchemaForLockTest(schemaIdent);
-
-    TreeLockTestSupport.HeldLock schemaWriter =
-        TreeLockTestSupport.HeldLock.acquire(schemaIdent, LockType.WRITE);
-    TreeLockTestSupport.assertWaitsFor(
-        schemaWriter,
-        () ->
-            registerModelForLockTest(
-                NameIdentifier.of(metalake, catalog, "schema_model_lock_3", "model1")));
-  }
-
-  @Test
-  public void testRegisterModelWaitsForCatalogWriteLock() throws Exception {
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_model_lock_4");
-    createSchemaForLockTest(schemaIdent);
-
-    TreeLockTestSupport.HeldLock catalogWriter =
-        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(metalake, catalog), LockType.WRITE);
-    TreeLockTestSupport.assertWaitsFor(
-        catalogWriter,
-        () ->
-            registerModelForLockTest(
-                NameIdentifier.of(metalake, catalog, "schema_model_lock_4", "model1")));
+    Assertions.assertFalse(modelOperationDispatcher.modelExists(modelIdent));
   }
 
   private static void createSchemaForLockTest(NameIdentifier schemaIdent) {

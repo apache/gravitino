@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -35,6 +36,9 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestDorisUtils {
   @Test
@@ -68,6 +72,41 @@ public class TestDorisUtils {
 
     result = DorisUtils.generatePropertiesSql(properties);
     assertEquals(expectedStr, result);
+  }
+
+  /** Verifies large escaped properties are parsed without recursive regex stack growth. */
+  @Test
+  public void testLongEscapedPropertiesRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key".repeat(10000), "value\" = \"part\\".repeat(2000));
+    assertEquals(
+        properties,
+        DorisUtils.extractPropertiesFromSql(DorisUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies escaped quotes cannot be mistaken for the property key/value separator. */
+  @Test
+  public void testPropertiesWithQuotedSeparatorsRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("k", "a\" = \"b");
+    properties.put("key\" = \"part", "value\" = \"part\\");
+    properties.put(" spaced key ", " spaced value ");
+    properties.put("empty", "");
+    properties.put("\\\"", "\\\" = \"\\");
+
+    assertEquals(
+        properties,
+        DorisUtils.extractPropertiesFromSql(DorisUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies backslash-escaped quotes around an equals sign remain in the property value. */
+  @Test
+  public void testPropertiesWithBackslashEscapedSeparators() {
+    String sql = "PROPERTIES (\n\"k\" = \"a\\\" = \\\"b\",\n\"end\" = \"tail\\\\\"\n)";
+    Map<String, String> expected = new HashMap<>();
+    expected.put("k", "a\" = \"b");
+    expected.put("end", "tail\\");
+    assertEquals(expected, DorisUtils.extractPropertiesFromSql(sql));
   }
 
   @Test
@@ -267,5 +306,50 @@ public class TestDorisUtils {
     Distribution distributionAutoLeading =
         DorisUtils.extractDistributionInfoFromSql(createTableSqlWithAutoLeadingWhitespace);
     assertEquals(-1, distributionAutoLeading.number());
+  }
+
+  @ParameterizedTest
+  @MethodSource("partitionLiteralValues")
+  void testPartitionLiteralEscaping(String value, String escaped) {
+    Literal<String> literal = Literals.stringLiteral(value);
+    assertEquals(
+        "PARTITION `p` VALUES LESS THAN (\"" + escaped + "\")",
+        DorisUtils.generatePartitionSqlFragment(
+            Partitions.range("p", literal, Literals.NULL, Collections.emptyMap())));
+    assertEquals(
+        "PARTITION `p` VALUES [(\"" + escaped + "\"), (MAXVALUE))",
+        DorisUtils.generatePartitionSqlFragment(
+            Partitions.range("p", Literals.NULL, literal, Collections.emptyMap())));
+    assertEquals(
+        "PARTITION `p` VALUES [(\"" + escaped + "\"), (\"" + escaped + "\"))",
+        DorisUtils.generatePartitionSqlFragment(
+            Partitions.range("p", literal, literal, Collections.emptyMap())));
+
+    assertEquals(
+        "PARTITION `p` VALUES IN (\"" + escaped + "\",\"plain\")",
+        DorisUtils.generatePartitionSqlFragment(
+            Partitions.list(
+                "p",
+                new Literal<?>[][] {{literal}, {Literals.stringLiteral("plain")}},
+                Collections.emptyMap())));
+    assertEquals(
+        "PARTITION `p` VALUES IN ((\"" + escaped + "\",\"plain\"),(\"plain\",\"" + escaped + "\"))",
+        DorisUtils.generatePartitionSqlFragment(
+            Partitions.list(
+                "p",
+                new Literal<?>[][] {
+                  {literal, Literals.stringLiteral("plain")},
+                  {Literals.stringLiteral("plain"), literal}
+                },
+                Collections.emptyMap())));
+  }
+
+  private static Stream<Arguments> partitionLiteralValues() {
+    return Stream.of(
+        Arguments.of("say \"hi\"", "say \"\"hi\"\""),
+        Arguments.of("C:\\temp\\", "C:\\\\temp\\\\"),
+        Arguments.of("5\" pipe' ; --", "5\"\" pipe' ; --"),
+        Arguments.of("slash\\\"quote", "slash\\\\\"\"quote"),
+        Arguments.of("line\nnext\tvalue", "line\nnext\tvalue"));
   }
 }
