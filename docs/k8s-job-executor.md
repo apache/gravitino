@@ -52,9 +52,10 @@ The Spark configurations of a job come from these places, each overriding the on
 3. The `configs` of the job template.
 4. For a built-in Iceberg job, its `spark_conf` parameter, see [Built-In Jobs](#built-in-jobs).
 
-A blank value in the `configs` of a job template or in `spark_conf` leaves the configuration unset,
-so it doesn't override a server-level default. This is what an optional placeholder without a value
-becomes. Any other value replaces the default; a list such as `spark.jars` isn't merged with it.
+A blank value in the `configs` of a job template or in `spark_conf` overrides nothing: the
+configuration keeps the value that an earlier place sets, for example a server-level default. An
+optional placeholder without a value becomes such a blank value. Any other value replaces the
+earlier one; a list such as `spark.jars` isn't merged with it.
 
 The job executor then adjusts the result:
 
@@ -188,7 +189,7 @@ cluster-wide permission.
 |------------------------------------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `sparkapplications` (`spark.apache.org`) | `create` | Submit a job                                                                                                                                                                                                                              |
 | `sparkapplications` (`spark.apache.org`) | `get`    | Query, submit, and cancel a job, and read its output                                                                                                                                                                                      |
-| `sparkapplications` (`spark.apache.org`) | `list`   | Query all the jobs of a namespace with one call. Optional: without it, the job executor gets the jobs one by one and logs a warning                                                                                                       |
+| `sparkapplications` (`spark.apache.org`) | `list`   | Query all the jobs of a namespace with one listing, made 500 at a time. Optional: without it, the job executor gets the jobs one by one and logs a warning                                                                                |
 | `sparkapplications` (`spark.apache.org`) | `update` | Mark a job as cancelled by Gravitino                                                                                                                                                                                                      |
 | `sparkapplications` (`spark.apache.org`) | `delete` | Cancel a job, and delete the `SparkApplication` of a job that got no status or whose submission failed                                                                                                                                    |
 | `pods`                                   | `list`   | Find the driver pod, for the output and the times of a job, and to check that the driver of a failed job has terminated. Without it, a failed job stays unfinished until its `SparkApplication` is deleted after `spark.ttlAfterStopInMs` |
@@ -363,9 +364,10 @@ If the API server can't be reached, each request is tried `1 + requestRetries` t
 up to `connectionTimeoutInMs`, or `requestTimeoutInMs` for an API server that accepts the request
 but doesn't answer. With the defaults, a cancellation fails after about 15 seconds if the API server
 can't be reached, or 30 seconds if it doesn't answer. A submission can take twice as long, as the
-job executor then also tries to delete the `SparkApplication` in case it was created. After a status
-query fails this way, the status queries of the other jobs fail right away for 10 seconds, and
-Gravitino tries them again on its next status pull.
+job executor then also tries to delete the `SparkApplication` in case it was created. It does the
+same after a server error from the API server. If that deletion fails, the server log names the
+`SparkApplication` to delete by hand. After a status query fails this way, the status queries of the
+other jobs fail right away for 10 seconds, and Gravitino tries them again on its next status pull.
 
 ### Enable the Job Executor
 
@@ -398,7 +400,7 @@ server from starting.
 | `gravitino.jobExecutor.k8s.requestTimeoutInMs`               | How long in milliseconds to wait for the response of a request to the API server                                                                                              | `10000` (10 seconds)                             | No       |
 | `gravitino.jobExecutor.k8s.requestRetries`                   | How many times a request to the API server is tried again when the server can't be reached, doesn't answer in time, or answers with a server error                            | `2`                                              | No       |
 | `gravitino.jobExecutor.k8s.statusCacheTtlInMs`               | How long in milliseconds the `SparkApplication` resources listed in a namespace are cached for status queries. Zero or less disables the cache                                | `5000` (5 seconds)                               | No       |
-| `gravitino.jobExecutor.k8s.noStatusTimeoutInMs`              | How long in milliseconds a job waits for the operator to report the first state of its `SparkApplication` before it fails                                                     | `600000` (10 minutes)                            | No       |
+| `gravitino.jobExecutor.k8s.noStatusTimeoutInMs`              | How long in milliseconds a job waits for the operator to write the first status of its `SparkApplication`, after which the `SparkApplication` is deleted and the job fails    | `600000` (10 minutes)                            | No       |
 | `gravitino.jobExecutor.k8s.spark.image`                      | The image of the Spark driver and executors, unless the job template or a server-level default sets `spark.kubernetes.container.image`                                        | (none)                                           | Yes      |
 | `gravitino.jobExecutor.k8s.spark.sparkVersion`               | The Spark version of the image                                                                                                                                                | (none)                                           | Yes      |
 | `gravitino.jobExecutor.k8s.spark.serviceAccount`             | The service account of the Spark driver, unless the job template or a server-level default sets `spark.kubernetes.authenticate.driver.serviceAccountName`                     | `spark`                                          | No       |

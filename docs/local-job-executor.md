@@ -27,8 +27,13 @@ For job templates and the job API, see [Manage Jobs](./manage-jobs-in-gravitino.
 
 The local job executor fetches the resources of a job, that is its executable, scripts, jars, files,
 and archives, into the staging directory of the job, and runs the job there as a process on the
-Gravitino server host. An `executable` that is a command name, such as `python`, isn't fetched. The resources must be reachable by the Gravitino server, which accepts local
-paths and HTTP, HTTPS, FTP, and FTPS URLs.
+Gravitino server host. An `executable` that is a command name, such as `python`, isn't fetched. The
+resources must be reachable by the Gravitino server, which accepts local paths and HTTP, HTTPS, FTP,
+and FTPS URLs.
+
+The driver of a built-in Iceberg job applies its `spark_conf` parameter only after it starts, so
+`spark.jars` there doesn't add a jar to the job, such as the Iceberg Spark runtime. Install the jar
+into `SPARK_HOME/jars` instead.
 
 The executor always uses `gravitino.job.stagingDir` as its staging directory, the same one the job
 system stages jobs in. A `gravitino.jobExecutor.local.stagingDir` setting is ignored.

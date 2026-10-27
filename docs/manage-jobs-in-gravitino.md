@@ -44,8 +44,8 @@ a job runs. See [Placeholders](#placeholders).
 }
 ```
 
-`executable` and `scripts` are fetched by the job executor. With the `local` job executor they must
-be reachable by the Gravitino server, which accepts local paths and HTTP, HTTPS, FTP, and FTPS URLs.
+`executable` and `scripts` are fetched by the local job executor, so they must be reachable by the
+Gravitino server, which accepts local paths and HTTP, HTTPS, FTP, and FTPS URLs.
 
 With the local job executor, each of them is fetched into the job's working directory under the
 file name of its path, so it must point to a file, and two different resources of a template must
@@ -102,7 +102,7 @@ A Spark template submits an application. What it needs depends on the job execut
   [Local Job Executor](./local-job-executor.md#requirements).
 - The Kubernetes job executor needs every resource of the template to be a URI that the cluster can
   reach, such as `local://` for a file in the Spark image, `https://`, or `s3a://`, see
-  [Kubernetes Job Executor](./k8s-job-executor.md#job-execution).
+  [Kubernetes Job Executor](./k8s-job-executor.md#job-resources).
 
 ```json
 {
