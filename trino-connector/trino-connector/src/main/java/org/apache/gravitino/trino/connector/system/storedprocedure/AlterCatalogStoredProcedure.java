@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -173,10 +172,8 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
           GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
           "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
     } catch (Exception e) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-          "alter catalog failed. " + (StringUtils.isEmpty(e.getMessage()) ? "" : e.getMessage()),
-          e);
+      throw GravitinoErrorCode.toTrinoException(
+          e, "Alter catalog " + NameIdentifier.of(metalake, catalogName) + " failed");
     }
   }
 }

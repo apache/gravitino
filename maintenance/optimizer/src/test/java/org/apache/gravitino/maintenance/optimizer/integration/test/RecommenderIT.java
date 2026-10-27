@@ -20,7 +20,14 @@
 package org.apache.gravitino.maintenance.optimizer.integration.test;
 
 import com.google.common.collect.ImmutableMap;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -37,8 +44,12 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.recommender.Recommender;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoOrphanFileRemovalJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StrategyUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -67,6 +78,11 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
             + CompactionStrategyHandler.NAME
             + ".className",
         CompactionStrategyHandler.class.getName(),
+        OptimizerConfig.OPTIMIZER_PREFIX
+            + "strategyHandler."
+            + OrphanFileRemovalStrategyHandler.NAME
+            + ".className",
+        OrphanFileRemovalStrategyHandler.class.getName(),
         OptimizerConfig.JOB_SUBMITTER_CONFIG.getKey(),
         RecordingJobSubmitterForIT.NAME,
         RecordingJobSubmitterForIT.SESSION_ID_KEY,
@@ -83,6 +99,141 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
   void closeResources() throws Exception {
     if (statisticsUpdater != null) {
       statisticsUpdater.close();
+    }
+  }
+
+  @Test
+  void testOrphanCleanupRejectsLocationWhitespace() throws Exception {
+    String name = "location_cleanup";
+    String type = "system_iceberg_orphan_file_removal";
+    String validLocation = "s3://bucket/table/data";
+    metalakeClient.createPolicy(
+        name,
+        type,
+        "valid location",
+        true,
+        PolicyContents.icebergOrphanFileRemoval(3, validLocation, true));
+    for (String location :
+        new String[] {
+          "  " + validLocation,
+          validLocation + "  ",
+          "\u2003" + validLocation,
+          validLocation + "\u2003"
+        }) {
+      HttpResponse<String> create =
+          policyRequest(
+              "POST",
+              "",
+              "{\"name\":\"invalid_location_cleanup\",\"policyType\":\""
+                  + type
+                  + "\",\"enabled\":true,\"content\":{\"location\":\""
+                  + location
+                  + "\"}}");
+      Assertions.assertEquals(400, create.statusCode(), create.body());
+      Assertions.assertTrue(create.body().contains("location"));
+      HttpResponse<String> update =
+          policyRequest(
+              "PUT",
+              "/" + name,
+              "{\"updates\":[{\"@type\":\"updateContent\",\"policyType\":\""
+                  + type
+                  + "\",\"newContent\":{\"location\":\""
+                  + location
+                  + "\"}}]}");
+      Assertions.assertEquals(400, update.statusCode(), update.body());
+      Assertions.assertTrue(update.body().contains("location"));
+      Assertions.assertEquals(
+          validLocation,
+          metalakeClient.getPolicy(name).content().rules().get("job.options.location"));
+    }
+  }
+
+  @Test
+  void testOrphanCleanupRejectsOverflowingRetention() throws Exception {
+    HttpResponse<String> response =
+        policyRequest(
+            "POST",
+            "",
+            "{\"name\":\"overflowing_cleanup\",\"policyType\":\"system_iceberg_orphan_file_removal\","
+                + "\"enabled\":true,\"content\":{\"olderThanDays\":"
+                + Long.MAX_VALUE
+                + "}}");
+    Assertions.assertEquals(400, response.statusCode(), response.body());
+    Assertions.assertTrue(response.body().contains("olderThanDays"));
+  }
+
+  @Test
+  void testOrphanCleanupRejectsInvalidUpdateAndPreservesPolicy() throws Exception {
+    String name = "bounded_cleanup";
+    String type = "system_iceberg_orphan_file_removal";
+    long maximum = IcebergOrphanFileRemovalContent.MAX_OLDER_THAN_DAYS;
+    metalakeClient.createPolicy(
+        name,
+        type,
+        "maximum retention",
+        true,
+        PolicyContents.icebergOrphanFileRemoval(maximum, null, true));
+    HttpResponse<String> response =
+        policyRequest(
+            "PUT",
+            "/" + name,
+            "{\"updates\":[{\"@type\":\"updateContent\",\"policyType\":\""
+                + type
+                + "\",\"newContent\":{\"olderThanDays\":"
+                + (maximum + 1)
+                + "}}]}");
+    Assertions.assertEquals(400, response.statusCode(), response.body());
+    Assertions.assertTrue(response.body().contains("olderThanDays"));
+    Assertions.assertEquals(
+        String.valueOf(maximum),
+        metalakeClient
+            .getPolicy(name)
+            .content()
+            .rules()
+            .get(
+                IcebergOrphanFileRemovalContent.JOB_OPTIONS_PREFIX
+                    + IcebergOrphanFileRemovalContent.OLDER_THAN_DAYS_KEY)
+            .toString());
+  }
+
+  @Test
+  void testOrphanCleanupPolicyThroughRestAndTags() throws Exception {
+    String tableName = "orphan_cleanup_partitioned";
+    String policyName = "orphan_cleanup_policy";
+    createPartitionTable(tableName);
+    metalakeClient.createPolicy(
+        policyName,
+        "system_iceberg_orphan_file_removal",
+        "cleanup",
+        true,
+        PolicyContents.icebergOrphanFileRemoval(3, null, true));
+    createTagForPolicy(policyName);
+    associatePolicyTagToTable(policyName, tableName);
+    try (Recommender recommender = new Recommender(optimizerEnv)) {
+      List<JobExecutionContext> jobs =
+          recommendForOneStrategy(recommender, List.of(getTableIdentifier(tableName)), policyName);
+      Assertions.assertEquals(1, jobs.size());
+      Assertions.assertEquals("builtin-iceberg-remove-orphan-files", jobs.get(0).jobTemplateName());
+      Map<String, String> config =
+          new GravitinoOrphanFileRemovalJobAdapter().jobConfig(jobs.get(0));
+      Assertions.assertEquals(TEST_SCHEMA + "." + tableName, config.get("table_identifier"));
+      Assertions.assertEquals("true", config.get("dry_run"));
+      Assertions.assertEquals("", config.get("location"));
+    }
+    metalakeClient.disablePolicy(policyName);
+    RecordingJobSubmitterForIT.reset(SESSION_ID);
+    try (Recommender recommender = new Recommender(optimizerEnv)) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  recommender.submitForStrategyName(
+                      List.of(getTableIdentifier(tableName)), policyName));
+      Assertions.assertTrue(
+          exception.getMessage().contains("No identifiers matched strategy name"));
+      Assertions.assertTrue(RecordingJobSubmitterForIT.submittedContexts(SESSION_ID).isEmpty());
+    } finally {
+      RecordingJobSubmitterForIT.clear(SESSION_ID);
     }
   }
 
@@ -269,6 +420,24 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
               .map(p -> p.partitionName() + "=" + p.partitionValue())
               .toList());
     }
+  }
+
+  private HttpResponse<String> policyRequest(String method, String suffix, String body)
+      throws Exception {
+    String credentials =
+        Base64.getEncoder()
+            .encodeToString(
+                (System.getProperty("user.name") + ":").getBytes(StandardCharsets.UTF_8));
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(serverUri + "/api/metalakes/" + METALAKE_NAME + "/policies" + suffix))
+            .timeout(Duration.ofSeconds(30))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/vnd.gravitino.v1+json")
+            .header("Authorization", "Basic " + credentials)
+            .method(method, HttpRequest.BodyPublishers.ofString(body))
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private List<JobExecutionContext> recommendForOneStrategy(

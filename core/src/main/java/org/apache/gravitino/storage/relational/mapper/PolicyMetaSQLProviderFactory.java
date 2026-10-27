@@ -74,8 +74,8 @@ public class PolicyMetaSQLProviderFactory {
 
   /** Delegates a version-checked policy soft delete. */
   public static String softDeletePolicyByIdAndVersion(
-      @Param("policyId") Long policyId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().softDeletePolicyByIdAndVersion(policyId, currentVersion);
+      @Param("policyId") Long policyId, @Param("occVersion") Long occVersion) {
+    return getProvider().softDeletePolicyByIdAndVersion(policyId, occVersion);
   }
 
   public static String deletePolicyMetasByLegacyTimeline(
@@ -96,6 +96,10 @@ public class PolicyMetaSQLProviderFactory {
   public static String selectPolicyMetaByMetalakeIdAndNameForUpdate(
       @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
     return getProvider().selectPolicyMetaByMetalakeIdAndNameForUpdate(metalakeId, policyName);
+  }
+
+  public static String selectPolicyMetaByPolicyId(@Param("policyId") Long policyId) {
+    return getProvider().selectPolicyMetaByPolicyId(policyId);
   }
 
   public static String selectPolicyByPolicyId(@Param("policyId") Long policyId) {

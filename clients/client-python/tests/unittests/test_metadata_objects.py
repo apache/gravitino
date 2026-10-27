@@ -117,14 +117,15 @@ class TestMetadataObjects(unittest.TestCase):
 
         with self.assertRaisesRegex(
             IllegalArgumentException,
-            "If the length of names is 3, it must be FILESET, TABLE, TOPIC, MODEL, VIEW or FUNCTION",
+            "If the length of names is 3, it must be FILESET, TABLE, TOPIC, MODEL, VIEW, FUNCTION or SEMANTIC_MODEL",
         ):
             MetadataObjects.of(
                 ["catalog1", "schema1", "table1"], MetadataObject.Type.COLUMN
             )
 
         with self.assertRaisesRegex(
-            IllegalArgumentException, "If the length of names is 4, it must be COLUMN"
+            IllegalArgumentException,
+            "If the length of names is 4, it must be the COLUMN type",
         ):
             MetadataObjects.of(
                 ["catalog1", "schema1", "table1", "column1"], MetadataObject.Type.TABLE

@@ -89,10 +89,27 @@ if [ "${copied}" -eq 0 ]; then
   exit 1
 fi
 
-# Stage the canonical Apache-2.0 LICENSE and NOTICE from the repository root so
-# the image ships the real texts (not drifting copies committed in-tree).
-cp "${gravitino_home}/LICENSE" "${conn_dir}/licenses/LICENSE"
-cp "${gravitino_home}/NOTICE" "${conn_dir}/licenses/NOTICE"
+# /licenses must describe what the shipped plugin jars bundle, not the source
+# tree. Each band already carries that pair, built from LICENSE.trino and
+# NOTICE.trino, with the texts it cites in its own licenses/ directory. Bands
+# bundle different components, so each gets its own directory.
+bands="$(find "${conn_dir}/packages/connectors" -maxdepth 1 -mindepth 1 -type d | sort)"
+[ -n "${bands}" ] || { echo "ERROR: no staged connector band to take licenses from" >&2; exit 1; }
+
+# Drop earlier staging; leftovers would ship licences for bands not in the image.
+mkdir -p "${conn_dir}/licenses"
+find "${conn_dir}/licenses" -mindepth 1 -maxdepth 1 ! -name '.gitignore' -exec rm -rf {} +
+
+while IFS= read -r band; do
+  dest="${conn_dir}/licenses/$(basename "${band}")"
+  [ -s "${band}/LICENSE" ] && [ -s "${band}/NOTICE" ] || {
+    echo "ERROR: ${band} has no LICENSE or NOTICE" >&2
+    exit 1
+  }
+  mkdir -p "${dest}"
+  cp "${band}/LICENSE" "${dest}/LICENSE"
+  cp "${band}/NOTICE" "${dest}/NOTICE"
+done <<< "${bands}"
 
 echo ""
 echo "=== Trino connectors prepared (${copied} version range(s)) ==="

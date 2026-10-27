@@ -155,6 +155,11 @@ public class PolicyTagRelService {
       RelationEdgeTarget[] targetsToRemove)
       throws IOException {
     String metalake = tagIdentifier.namespace().level(0);
+    NameIdentifier metalakeIdentifier = NameIdentifier.of(metalake);
+    LiveEndpointService.lockLiveEndpoint(
+        metalakeIdentifier,
+        Entity.EntityType.METALAKE,
+        EntityIdService.getEntityIds(metalakeIdentifier, Entity.EntityType.METALAKE));
     TagPO tagPO = lockTag(tagIdentifier);
     long tagId = tagPO.getTagId();
     Map<String, Long> policyIds = resolvePolicyIds(metalake, targetsToAdd, targetsToRemove);

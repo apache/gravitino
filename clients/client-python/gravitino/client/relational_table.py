@@ -34,6 +34,7 @@ from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.generic_column import GenericColumn
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
@@ -262,8 +263,14 @@ class RelationalTable(
     def list_tags(self) -> list[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._object_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> list[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._object_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         return self._object_tag_operations.get_tag(name)

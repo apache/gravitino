@@ -24,6 +24,11 @@ requires-python = ">=3.10"
 dependencies = [
     # Pin FastMCP so breaking API changes are handled explicitly during dependency upgrades.
     "fastmcp==3.4.5",
+    # Function argument validation via Field(validation_alias=AliasChoices(...)) — used to
+    # keep accepting legacy tool argument names — is only honored from Pydantic 2.12.0
+    # (fix: https://github.com/pydantic/pydantic/pull/12340). Without this floor the lock
+    # resolves an older Pydantic and the legacy-alias tests fail.
+    "pydantic>=2.12.0,<3",
     # httpx.Auth plugin for hop-2 client_credentials fetch/cache.
     "httpx-auth>=0.22,<0.24",
     # TODO(#10754): pydocket (a transitive dep of fastmcp>=2.14.0)
@@ -31,6 +36,14 @@ dependencies = [
     # fakeredis.aioredis, which pydocket still uses. Pin fakeredis to <2.35.0 until the
     # tracked pydocket/fakeredis compatibility issue is resolved.
     "fakeredis<2.38.0",
+]
+
+# Development-only dependencies. These are NOT shipped in the MCP server image:
+# the Dockerfile runs `uv sync --no-dev` and start-mcp-server.sh runs `uv run --no-dev`,
+# so pylint (GPL-2.0-or-later) and its transitive dep astroid (LGPL) stay out of the
+# distributed runtime environment. Developers still get them via `uv sync` locally.
+[dependency-groups]
+dev = [
     "parameterized>=0.9.0",
     "pytest>=8.4.1",
     "pylint>=2.20.0",

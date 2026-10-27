@@ -19,11 +19,7 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -32,25 +28,21 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.dto.responses.CredentialResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 
 public class TestMetadataObjectCredentialOperations extends JerseyTest {
 
@@ -104,40 +96,26 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetCredentialsReturnsEmptyWithoutUseSecret() throws Exception {
-    MetadataObject metadataObject =
-        MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
-    S3SecretKeyCredential credential = new S3SecretKeyCredential("access-id", "secret-key");
+  public void testInvalidCredentialLocationResponse() {
+    String path = "wasbs://container@account.blob.core.windows.net/warehouse/table";
     when(credentialOperationDispatcher.getCredentials(any(), any()))
-        .thenReturn(Arrays.asList(credential));
+        .thenThrow(
+            new IllegalArgumentException(
+                "adls-token requires an abfs or abfss location; unsupported location: " + path));
 
-    MetadataObjectCredentialOperations operations =
-        new MetadataObjectCredentialOperations(credentialOperationDispatcher);
-    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    Response response =
+        target(basePath(metalake))
+            .path("fileset")
+            .path("catalog.schema.fileset")
+            .path("credentials")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
 
-    try (MockedStatic<MetadataAuthzHelper> metadataAuthzHelper =
-        mockStatic(MetadataAuthzHelper.class)) {
-      metadataAuthzHelper
-          .when(
-              () ->
-                  MetadataAuthzHelper.checkAccess(
-                      any(),
-                      any(Entity.EntityType.class),
-                      eq(
-                          AuthorizationExpressionConstants
-                              .FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)))
-          .thenReturn(false);
-
-      Response response =
-          operations.getCredentials(
-              metalake, metadataObject.type().name(), metadataObject.fullName());
-
-      Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-      CredentialResponse credentialResponse = (CredentialResponse) response.getEntity();
-      Assertions.assertEquals(0, credentialResponse.getCode());
-      Assertions.assertEquals(0, credentialResponse.getCredentials().length);
-      verify(credentialOperationDispatcher, never()).getCredentials(any(), any());
-    }
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertTrue(error.getMessage().contains("abfs or abfss"));
+    Assertions.assertTrue(error.getMessage().contains(path));
   }
 
   private void testGetCredentialsForObject(MetadataObject metadataObject) {

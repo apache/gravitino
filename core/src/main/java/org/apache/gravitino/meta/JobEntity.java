@@ -68,8 +68,8 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
           "runtime_job_template",
           String.class,
           "The resolved job template that was actually submitted for execution, serialized as "
-              + "JSON, with placeholders replaced and referenced files downloaded. Null for jobs "
-              + "run before this field was introduced.");
+              + "JSON, with placeholders replaced and the resources kept as the URIs from the "
+              + "template. Null for jobs run before this field was introduced.");
 
   private Long id;
   private String jobExecutionId;
@@ -167,7 +167,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
   /**
    * Returns the resolved job template that was actually submitted for execution, serialized as JSON
-   * (placeholders replaced, referenced files downloaded).
+   * (placeholders replaced, resources kept as the URIs from the template).
    *
    * @return the serialized runtime job template, or {@code null} for jobs run before this field was
    *     introduced

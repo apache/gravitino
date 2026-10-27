@@ -156,6 +156,7 @@ Changes are applied as a list in one request. Storage locations cannot be change
 |--------------------|--------------------------------------------------------------|-----------------------------------------------|
 | Rename             | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
 | Update the comment | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
+| Update the type    | `{"@type":"updateType","newType":"external"}`                | `FilesetChange.updateType(Fileset.Type.EXTERNAL)` |
 | Set a property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
 | Remove a property  | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
 
@@ -178,6 +179,58 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 Fileset fileset = filesets.alterFileset(
     NameIdentifier.of("raw", "raw_events"),
     FilesetChange.setProperty("retention", "90d"));
+```
+
+</TabItem>
+</Tabs>
+
+#### Change the Fileset Type
+
+An existing fileset can be changed between `MANAGED` and `EXTERNAL`. This changes metadata only:
+its identifier, name, storage locations, properties, and existing files are preserved. Setting the
+current type is allowed.
+
+Change a `MANAGED` fileset to `EXTERNAL` before dropping it to retain its files. Changing an
+`EXTERNAL` fileset to `MANAGED` explicitly accepts management of the existing data, including
+deleting that data when the fileset is dropped. The same type semantics apply when dropping a
+schema with cascade. Conversion does not move, create, or delete files, and does not protect data
+from deletion through another managed fileset with an overlapping location.
+
+With `disable-filesystem-ops=true`, dropping a fileset removes only its metadata, even after
+conversion to `MANAGED`.
+
+Type conversion follows the existing [fileset alter authorization](security/access-control.md#data-objects).
+A caller with `WRITE_FILESET` and the required catalog and schema use privileges can convert in
+either direction, including changing whether a subsequent drop deletes the data. This does not
+grant permission to drop the fileset; drop retains its existing ownership requirements.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+  "updates": [{"@type": "updateType", "newType": "external"}]
+}' http://localhost:8090/api/metalakes/example/catalogs/landing/schemas/raw/filesets/raw_events
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Fileset fileset = filesets.alterFileset(
+    NameIdentifier.of("raw", "raw_events"),
+    FilesetChange.updateType(Fileset.Type.EXTERNAL));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+fileset = filesets.alter_fileset(
+    NameIdentifier.of("raw", "raw_events"),
+    FilesetChange.update_type(Fileset.Type.EXTERNAL),
+)
 ```
 
 </TabItem>
