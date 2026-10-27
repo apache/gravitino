@@ -131,6 +131,20 @@ public class TestDorisTypeConverter {
   }
 
   @Test
+  public void testFromGravitinoExternalTypeValidation() {
+    // testExternalTypeRoundTrip already covers the legitimate values; these must be rejected.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of("int, DROP COLUMN secret")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of("json; DROP TABLE foo")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of("int -- comment")));
+  }
+
+  @Test
   public void testMalformedTypeStringFallback() {
     // Malformed parameterized types (e.g. "varchar(abc)") should fallback to ExternalType
     // instead of throwing NumberFormatException. columnSize=null triggers fallback parsing
