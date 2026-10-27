@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
@@ -81,6 +82,9 @@ public class OrphanedMetadataObjectRelationService {
           .put(
               MetadataObject.Type.FUNCTION,
               new EntityTable(FunctionMetaMapper.TABLE_NAME, "function_id"))
+          .put(
+              MetadataObject.Type.DOMAIN,
+              new EntityTable(DomainMetaMapper.DOMAIN_TABLE_NAME, "domain_id"))
           .build();
 
   private OrphanedMetadataObjectRelationService() {}

@@ -1,0 +1,439 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.storage.relational.service;
+
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.po.DomainPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+
+/** The service that stores domains in the {@code domain_meta} table. */
+public class DomainMetaService {
+
+  private static final DomainMetaService INSTANCE = new DomainMetaService();
+
+  private DomainMetaService() {}
+
+  /**
+   * Returns the singleton service instance.
+   *
+   * @return The domain meta service.
+   */
+  public static DomainMetaService getInstance() {
+    return INSTANCE;
+  }
+
+  /**
+   * Lists the domains of a metalake.
+   *
+   * @param ns The domain namespace of the metalake.
+   * @return The domains of the metalake.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listDomainsByNamespace")
+  public List<DomainEntity> listDomainsByNamespace(Namespace ns) {
+    String metalakeName = ns.level(0);
+    List<DomainPO> domainPOs =
+        SessionUtils.getWithoutCommit(
+            DomainMetaMapper.class, mapper -> mapper.listDomainPOsByMetalake(metalakeName));
+    return DomainPO.fromDomainPOs(domainPOs, ns);
+  }
+
+  /**
+   * Gets a domain by its identifier.
+   *
+   * @param ident The domain identifier.
+   * @return The domain.
+   * @throws NoSuchEntityException If the domain does not exist.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getDomainByIdentifier")
+  public DomainEntity getDomainByIdentifier(NameIdentifier ident) {
+    String metalakeName = ident.namespace().level(0);
+    DomainPO domainPO = getDomainPOByMetalakeAndName(metalakeName, ident.name());
+    return DomainPO.fromDomainPO(domainPO, ident.namespace());
+  }
+
+  /**
+   * Gets the domains with the given identifiers. Identifiers of domains that do not exist are
+   * skipped.
+   *
+   * @param identifiers The domain identifiers, all in the same metalake.
+   * @return The domains that exist.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetDomainByIdentifier")
+  public List<DomainEntity> batchGetDomainByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    String metalakeName = firstIdent.namespace().level(0);
+    List<String> domainNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    List<DomainPO> domainPOs =
+        SessionUtils.getWithoutCommit(
+            DomainMetaMapper.class,
+            mapper -> mapper.listDomainPOsByMetalakeAndDomainNames(metalakeName, domainNames));
+    return DomainPO.fromDomainPOs(domainPOs, firstIdent.namespace());
+  }
+
+  /**
+   * Inserts a domain.
+   *
+   * @param domainEntity The domain to insert.
+   * @param overwritten Whether to replace an active domain with the same name or ID.
+   * @throws IOException If the domain cannot be stored.
+   * @throws EntityAlreadyExistsException If a domain with the same name exists and {@code
+   *     overwritten} is false.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertDomain")
+  public void insertDomain(DomainEntity domainEntity, boolean overwritten) throws IOException {
+    Namespace ns = domainEntity.namespace();
+    String metalakeName = ns.level(0);
+
+    try {
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeName);
+      }
+
+      DomainPO domainPO = DomainPO.initializeDomainPO(domainEntity, metalakePO.getMetalakeId());
+
+      SessionUtils.doMultipleWithCommit(
+          () -> lockMetalakeForDomainCreate(metalakePO),
+          () -> insertDomainWithoutCommit(domainEntity, domainPO, overwritten));
+    } catch (RuntimeException e) {
+      try {
+        ExceptionUtils.checkSQLException(
+            e, Entity.EntityType.DOMAIN, domainEntity.nameIdentifier().toString());
+      } catch (EntityAlreadyExistsException duplicate) {
+        if (overwritten) {
+          // A missing-row locking read does not fence a concurrent insert at READ_COMMITTED.
+          // Propagate the conflict so the whole transaction is rolled back before retrying.
+          throw ExceptionUtils.concurrentModification(
+              Entity.EntityType.DOMAIN, domainEntity.nameIdentifier());
+        }
+        throw duplicate;
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Updates a domain. The update is a compare-and-set on the version of the domain that the updater
+   * was given, so a domain that changed in between is not overwritten.
+   *
+   * <p>The returned domain is read back in the same transaction, so its backing tag name comes from
+   * the tag it is now bound to rather than from the updater's entity.
+   *
+   * @param identifier The domain identifier.
+   * @param updater The function that returns the updated domain.
+   * @param <E> The entity type.
+   * @return The updated domain, as stored.
+   * @throws IOException If the domain cannot be stored.
+   * @throws NoSuchEntityException If the domain does not exist.
+   * @throws EntityAlreadyExistsException If the domain is renamed to a name that is in use.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateDomain")
+  public <E extends Entity & HasIdentifier> DomainEntity updateDomain(
+      NameIdentifier identifier, Function<E, E> updater) throws IOException {
+    String metalakeName = identifier.namespace().level(0);
+
+    try {
+      DomainPO domainPO = getDomainPOByMetalakeAndName(metalakeName, identifier.name());
+      DomainEntity oldDomainEntity = DomainPO.fromDomainPO(domainPO, identifier.namespace());
+      DomainEntity updatedDomainEntity = (DomainEntity) updater.apply((E) oldDomainEntity);
+      Preconditions.checkArgument(
+          Objects.equals(oldDomainEntity.id(), updatedDomainEntity.id()),
+          "The updated domain entity id: %s must have the same id as the old entity id %s",
+          updatedDomainEntity.id(),
+          oldDomainEntity.id());
+
+      DomainPO newDomainPO = DomainPO.updateDomainPO(domainPO, updatedDomainEntity);
+      DomainPO[] storedDomainPO = new DomainPO[1];
+      SessionUtils.doWithCommit(
+          DomainMetaMapper.class,
+          mapper -> {
+            updateDomainWithVersion(identifier, mapper, domainPO, newDomainPO);
+            storedDomainPO[0] = mapper.selectDomainMetaById(domainPO.domainId());
+          });
+
+      return DomainPO.fromDomainPO(storedDomainPO[0], identifier.namespace());
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.DOMAIN, identifier.toString());
+      throw e;
+    }
+  }
+
+  /**
+   * Deletes a domain, together with its owner and the privileges granted on it. The backing tag and
+   * its assignments are kept.
+   *
+   * @param identifier The domain identifier.
+   * @return True if the domain is deleted, false if it does not exist.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteDomain")
+  public boolean deleteDomain(NameIdentifier identifier) {
+    DomainPO domainPO;
+    try {
+      domainPO = getDomainPOByMetalakeAndName(identifier.namespace().level(0), identifier.name());
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+    return deleteDomain(identifier, domainPO);
+  }
+
+  /**
+   * Hard-deletes the domains soft-deleted before the given time.
+   *
+   * @param legacyTimeline The time before which soft-deleted domains are removed.
+   * @param limit The maximum number of domains to remove.
+   * @return The number of removed domains.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteDomainMetasByLegacyTimeline")
+  public int deleteDomainMetasByLegacyTimeline(long legacyTimeline, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        DomainMetaMapper.class,
+        mapper -> mapper.deleteDomainMetasByLegacyTimeline(legacyTimeline, limit));
+  }
+
+  /**
+   * Gets the ID of a domain.
+   *
+   * @param metalakeId The metalake ID.
+   * @param domainName The domain name.
+   * @return The domain ID.
+   * @throws NoSuchEntityException If the domain does not exist.
+   */
+  public Long getDomainIdByMetalakeIdAndName(Long metalakeId, String domainName) {
+    DomainPO domainPO =
+        SessionUtils.getWithoutCommit(
+            DomainMetaMapper.class,
+            mapper -> mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, domainName));
+
+    if (domainPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.DOMAIN.name().toLowerCase(),
+          domainName);
+    }
+    return domainPO.domainId();
+  }
+
+  /**
+   * Deletes the domain the caller observed. The delete is a compare-and-set on the observed
+   * version, so a domain that changed since it was read is rejected instead of being removed, and
+   * the dependent rows are cleaned up in the same transaction as the domain row itself. If another
+   * transaction deletes or renames the observed domain first, this method returns {@code false}.
+   *
+   * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
+   * use {@link #deleteDomain(NameIdentifier)}, which reads it first.
+   */
+  @VisibleForTesting
+  boolean deleteDomain(NameIdentifier identifier, DomainPO domainPO) {
+    long domainId = domainPO.domainId();
+
+    // The version-checked delete of the domain row must stay first: it decides whether this
+    // delete wins, and a losing delete throws there and rolls the transaction back before any
+    // dependent row is touched. The cleanups that follow are blanket soft deletes for this domain
+    // ID, so their row counts carry no information and are not checked.
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> deleteDomainWithVersion(identifier, domainPO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                          domainId, MetadataObject.Type.DOMAIN.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper ->
+                      mapper.softDeleteObjectRelsByMetadataObject(
+                          domainId, MetadataObject.Type.DOMAIN.name())));
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Holds the parent metalake row for the rest of the transaction, so a domain cannot be created
+   * under a metalake that is going away. The lock is shared, so domains can be created under the
+   * same metalake at the same time, while dropping the metalake takes an exclusive lock on the row.
+   */
+  private void lockMetalakeForDomainCreate(MetalakePO observedMetalakePO) {
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+  }
+
+  /**
+   * Writes a new domain or replaces the active domain selected by name or stable ID. The overwrite
+   * path uses locking reads instead of a database-specific upsert, which keeps the stored domain ID
+   * and version stable across all databases.
+   */
+  private void insertDomainWithoutCommit(
+      DomainEntity domainEntity, DomainPO initializedDomainPO, boolean overwritten) {
+    if (!overwritten) {
+      insertNewDomainWithoutCommit(initializedDomainPO);
+      return;
+    }
+
+    DomainPO existingDomainPO = findAndLockDomainForOverwrite(initializedDomainPO);
+    if (existingDomainPO == null) {
+      if (SessionUtils.getWithoutCommit(
+              DomainMetaMapper.class,
+              mapper -> mapper.countDeletedDomainMetasById(initializedDomainPO.domainId()))
+          > 0) {
+        throw new EntityAlreadyExistsException(
+            "The domain ID %s is reserved by a deleted domain; use a new ID",
+            initializedDomainPO.domainId());
+      }
+      insertNewDomainWithoutCommit(initializedDomainPO);
+      return;
+    }
+
+    DomainPO replacementDomainPO = DomainPO.updateDomainPO(existingDomainPO, domainEntity);
+    NameIdentifier observedIdentifier =
+        NameIdentifier.of(domainEntity.namespace(), existingDomainPO.domainName());
+    SessionUtils.doWithoutCommit(
+        DomainMetaMapper.class,
+        mapper ->
+            updateDomainWithVersion(
+                observedIdentifier, mapper, existingDomainPO, replacementDomainPO));
+  }
+
+  private void insertNewDomainWithoutCommit(DomainPO domainPO) {
+    SessionUtils.doWithoutCommit(
+        DomainMetaMapper.class, mapper -> mapper.insertDomainMeta(domainPO));
+  }
+
+  private DomainPO findAndLockDomainForOverwrite(DomainPO initializedDomainPO) {
+    return OccWriteSupport.findAndLockForOverwrite(
+        () ->
+            SessionUtils.getWithoutCommit(
+                DomainMetaMapper.class,
+                mapper ->
+                    mapper.selectDomainMetaByMetalakeIdAndNameForUpdate(
+                        initializedDomainPO.metalakeId(), initializedDomainPO.domainName())),
+        () ->
+            SessionUtils.getWithoutCommit(
+                DomainMetaMapper.class,
+                mapper -> mapper.selectDomainMetaByIdForUpdate(initializedDomainPO.domainId())),
+        current -> Objects.equals(current.metalakeId(), initializedDomainPO.metalakeId()));
+  }
+
+  private void updateDomainWithVersion(
+      NameIdentifier identifier,
+      DomainMetaMapper mapper,
+      DomainPO oldDomainPO,
+      DomainPO newDomainPO) {
+    OccWriteSupport.updateWithVersion(
+        () -> mapper.updateDomainMeta(newDomainPO, oldDomainPO),
+        () -> domainWriteFailure(identifier, oldDomainPO));
+  }
+
+  private void deleteDomainWithVersion(NameIdentifier identifier, DomainPO observedDomainPO) {
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                DomainMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteDomainMetaByIdAndVersion(
+                        observedDomainPO.domainId(), observedDomainPO.currentVersion())),
+        () -> domainWriteFailure(identifier, observedDomainPO));
+  }
+
+  private RuntimeException domainWriteFailure(
+      NameIdentifier identifier, DomainPO observedDomainPO) {
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.DOMAIN,
+        () ->
+            SessionUtils.getWithoutCommit(
+                DomainMetaMapper.class,
+                mapper -> mapper.selectDomainMetaByIdForUpdate(observedDomainPO.domainId())),
+        null,
+        current ->
+            Objects.equals(current.domainName(), observedDomainPO.domainName())
+                && Objects.equals(current.metalakeId(), observedDomainPO.metalakeId()));
+  }
+
+  private DomainPO getDomainPOByMetalakeAndName(String metalakeName, String domainName) {
+    DomainPO domainPO =
+        SessionUtils.getWithoutCommit(
+            DomainMetaMapper.class,
+            mapper -> mapper.selectDomainMetaByMetalakeAndName(metalakeName, domainName));
+
+    if (domainPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.DOMAIN.name().toLowerCase(),
+          domainName);
+    }
+    return domainPO;
+  }
+}

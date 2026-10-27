@@ -66,6 +66,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
+          .put(MetadataObject.Type.DOMAIN, Entity.EntityType.DOMAIN)
           .build();
 
   private MetadataObjectUtil() {}
@@ -137,6 +138,8 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case DOMAIN:
+        return NameIdentifierUtil.ofDomain(metalakeName, metadataObject.name());
       case VIEW:
       case SEMANTIC_MODEL:
       case CATALOG:

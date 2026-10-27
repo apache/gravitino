@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -164,6 +165,27 @@ public class TestNameIdentifierUtil {
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTag("metalake1", "tag1"), Entity.EntityType.TAG);
     assertEquals(expectedTagObject, tagObject);
+
+    // test domain, whose name may contain "/"
+    NameIdentifier domain = NameIdentifierUtil.ofDomain("metalake1", "Finance/Trading");
+    assertEquals(NamespaceUtil.ofDomain("metalake1"), domain.namespace());
+    assertEquals(
+        MetadataObjects.parse("Finance/Trading", MetadataObject.Type.DOMAIN),
+        NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
+    assertEquals(
+        domain,
+        NameIdentifierUtil.buildNameIdentifier(
+            Entity.EntityType.DOMAIN,
+            "Finance/Trading",
+            ImmutableMap.of(Entity.EntityType.METALAKE, "metalake1")));
+    assertEquals(
+        NameIdentifier.of("metalake1"),
+        NameIdentifierUtil.parentNameIdentifier(domain, Entity.EntityType.DOMAIN));
+    assertThrows(
+        IllegalNamespaceException.class,
+        () ->
+            NameIdentifierUtil.toMetadataObject(
+                NameIdentifier.of("metalake1", "Finance"), Entity.EntityType.DOMAIN));
 
     // test model version is not convertible to MetadataObject
     NameIdentifier modelVersion =

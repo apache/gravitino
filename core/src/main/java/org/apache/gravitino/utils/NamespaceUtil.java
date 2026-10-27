@@ -233,6 +233,16 @@ public class NamespaceUtil {
   }
 
   /**
+   * Create a namespace for domain.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for domain
+   */
+  public static Namespace ofDomain(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.DOMAIN_SCHEMA_NAME);
+  }
+
+  /**
    * Create a namespace for job.
    *
    * @param metalake The metalake name
@@ -421,6 +431,19 @@ public class NamespaceUtil {
     check(
         namespace != null && namespace.length() == 3,
         "Job template namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check if the given domain namespace is legal, throw an {@link IllegalNamespaceException} if
+   * it's illegal.
+   *
+   * @param namespace The domain namespace
+   */
+  public static void checkDomain(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "Domain namespace must be non-null and have 3 levels, the input namespace is %s",
         namespace);
   }
 

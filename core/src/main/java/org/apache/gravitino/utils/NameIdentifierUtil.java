@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.utils;
 
+import static org.apache.gravitino.Entity.EntityType.DOMAIN;
 import static org.apache.gravitino.Entity.EntityType.GROUP;
 import static org.apache.gravitino.Entity.EntityType.JOB;
 import static org.apache.gravitino.Entity.EntityType.JOB_TEMPLATE;
@@ -57,7 +58,7 @@ public class NameIdentifierUtil {
   private NameIdentifierUtil() {}
 
   private static final Set<Entity.EntityType> SUPPORT_VIRTUAL_NAMESPACE_TYPES =
-      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
+      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE, DOMAIN);
 
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
@@ -350,6 +351,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the domain {@link NameIdentifier} with the given metalake and domain name.
+   *
+   * @param metalake The metalake name
+   * @param domainName The domain name
+   * @return The created domain {@link NameIdentifier}
+   */
+  public static NameIdentifier ofDomain(String metalake, String domainName) {
+    return NameIdentifier.of(NamespaceUtil.ofDomain(metalake), domainName);
+  }
+
+  /**
    * Create the job {@link NameIdentifier} with the given metalake and job name.
    *
    * @param metalake The metalake name
@@ -619,6 +631,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a domain identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The domain {@link NameIdentifier} to check.
+   */
+  public static void checkDomain(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Domain identifier must not be null");
+    NamespaceUtil.checkDomain(ident.namespace());
+  }
+
+  /**
    * Check whether the metadata object name can be represented in a qualified metadata object name.
    *
    * @param ident The metadata object identifier to check
@@ -728,6 +751,10 @@ public class NameIdentifierUtil {
       case JOB_TEMPLATE:
         checkJobTemplate(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB_TEMPLATE);
+
+      case DOMAIN:
+        checkDomain(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.DOMAIN);
 
       default:
         throw new IllegalArgumentException(
@@ -967,6 +994,7 @@ public class NameIdentifierUtil {
       case POLICY:
       case JOB:
       case JOB_TEMPLATE:
+      case DOMAIN:
         return Entity.EntityType.METALAKE;
 
       case METALAKE:
@@ -1013,6 +1041,8 @@ public class NameIdentifierUtil {
         return NamespaceUtil.ofJob(metalake);
       case JOB_TEMPLATE:
         return NamespaceUtil.ofJobTemplate(metalake);
+      case DOMAIN:
+        return NamespaceUtil.ofDomain(metalake);
       default:
         throw new IllegalArgumentException("Unsupported virtual namespace type: " + type);
     }
