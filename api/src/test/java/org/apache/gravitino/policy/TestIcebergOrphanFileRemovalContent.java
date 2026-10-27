@@ -94,4 +94,22 @@ class TestIcebergOrphanFileRemovalContent {
       Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
     }
   }
+
+  @Test
+  void rejectsUnsafeLocationSyntax() {
+    for (String location :
+        new String[] {
+          "s3://bucket/table/../other",
+          "s3://bucket/table/%2e%2e/other",
+          "s3://bucket/table\\data",
+          "s3://bucket/table/data?query",
+          "s3://bucket/table/data#frag"
+        }) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> PolicyContents.icebergOrphanFileRemoval(3, location, true).validate());
+      Assertions.assertTrue(error.getMessage().contains("location"));
+    }
+  }
 }
