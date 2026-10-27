@@ -47,6 +47,7 @@ import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchPlanningResultResponse;
 import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -241,6 +242,22 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .planTableScan(tableIdentifier, scanRequest, context.requestCredentialVending(), privilege);
+  }
+
+  @Override
+  public FetchPlanningResultResponse fetchPlanningResult(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId) {
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .fetchPlanningResult(tableIdentifier, planId);
+  }
+
+  @Override
+  public void cancelPlanning(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId) {
+    icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .cancelPlanning(tableIdentifier, planId);
   }
 
   @Override
