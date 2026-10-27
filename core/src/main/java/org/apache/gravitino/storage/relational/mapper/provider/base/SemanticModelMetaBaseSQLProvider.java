@@ -40,7 +40,8 @@ public class SemanticModelMetaBaseSQLProvider {
           + " smvi.schema_id as version_schema_id,"
           + " smvi.semantic_model_id as version_semantic_model_id, smvi.version,"
           + " smvi.semantic_model_name as version_semantic_model_name,"
-          + " smvi.semantic_model_comment, smvi.semantic_model_definition, smvi.properties,"
+          + " smvi.semantic_model_comment, smvi.datasets, smvi.relationships, smvi.metrics,"
+          + " smvi.ai_context, smvi.custom_extensions, smvi.properties,"
           + " smvi.audit_info as version_audit_info,"
           + " smvi.deleted_at as version_deleted_at";
 
@@ -238,7 +239,11 @@ public class SemanticModelMetaBaseSQLProvider {
             smvi.version,
             smvi.semantic_model_name as version_semantic_model_name,
             smvi.semantic_model_comment,
-            smvi.semantic_model_definition,
+            smvi.datasets,
+            smvi.relationships,
+            smvi.metrics,
+            smvi.ai_context,
+            smvi.custom_extensions,
             smvi.properties,
             smvi.audit_info as version_audit_info,
             smvi.deleted_at as version_deleted_at
