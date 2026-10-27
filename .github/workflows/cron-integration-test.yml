@@ -6,7 +6,7 @@ name: Cron Integration Test
 #
 # Phase-1 suites (gvfs-fuse, web-ui, frontend, contrib-catalog are excluded):
 #   backend, spark, flink, maintenance, python, trino, access-control,
-#   iceberg-rest-trino, mcp, idp, trino-multi-version, lance, multi-instance
+#   iceberg-rest-trino, mcp, idp, tms, trino-multi-version, lance, multi-instance
 
 run-name: OSS IT (${{ inputs.suites || 'all' }}) caller=${{ inputs.caller_run_id || 'manual' }}
 
@@ -52,7 +52,8 @@ concurrency:
 jobs:
   select-suites:
     name: Select suites
-    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino'
+    # Other copies of the repository set ENABLE_SCHEDULED_TESTS to run it on schedule.
+    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino' || vars.ENABLE_SCHEDULED_TESTS == 'true'
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.parse.outputs.backend }}
@@ -65,6 +66,7 @@ jobs:
       iceberg-rest-trino: ${{ steps.parse.outputs.iceberg-rest-trino }}
       mcp: ${{ steps.parse.outputs.mcp }}
       idp: ${{ steps.parse.outputs.idp }}
+      tms: ${{ steps.parse.outputs.tms }}
       trino-multi-version: ${{ steps.parse.outputs.trino-multi-version }}
       lance: ${{ steps.parse.outputs.lance }}
       multi-instance: ${{ steps.parse.outputs.multi-instance }}
@@ -91,6 +93,7 @@ jobs:
               "iceberg-rest-trino",
               "mcp",
               "idp",
+              "tms",
               "trino-multi-version",
               "lance",
               "multi-instance",
@@ -145,6 +148,7 @@ jobs:
     with:
       architecture: linux/amd64
       java-version: ${{ needs.select-suites.outputs.java-version }}
+      shard: all
 
   maintenance:
     name: maintenance
@@ -181,6 +185,7 @@ jobs:
     with:
       architecture: linux/amd64
       java-version: ${{ needs.select-suites.outputs.java-version }}
+      shard: all
 
   iceberg-rest-trino:
     name: iceberg-rest-trino
@@ -204,6 +209,14 @@ jobs:
     needs: select-suites
     if: needs.select-suites.outputs.idp == 'true'
     uses: ./.github/workflows/idp-basic-test-action.yml
+    with:
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
+  tms:
+    name: tms
+    needs: select-suites
+    if: needs.select-suites.outputs.tms == 'true'
+    uses: ./.github/workflows/tms-test-action.yml
     with:
       java-version: ${{ needs.select-suites.outputs.java-version }}
 
@@ -239,10 +252,12 @@ jobs:
       - iceberg-rest-trino
       - mcp
       - idp
+      - tms
       - trino-multi-version
       - lance
       - multi-instance
-    if: always()
+    # Scheduled runs are skipped outside the upstream repository; do not report them as failures.
+    if: always() && (github.event_name != 'schedule' || github.repository == 'apache/gravitino' || vars.ENABLE_SCHEDULED_TESTS == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Write summary
@@ -257,6 +272,7 @@ jobs:
           ICEBERG_REST_TRINO: ${{ needs.iceberg-rest-trino.result }}
           MCP: ${{ needs.mcp.result }}
           IDP: ${{ needs.idp.result }}
+          TMS: ${{ needs.tms.result }}
           TRINO_MULTI_VERSION: ${{ needs.trino-multi-version.result }}
           LANCE: ${{ needs.lance.result }}
           MULTI_INSTANCE: ${{ needs.multi-instance.result }}
@@ -283,6 +299,7 @@ jobs:
           | iceberg-rest-trino | ${ICEBERG_REST_TRINO} |
           | mcp | ${MCP} |
           | idp | ${IDP} |
+          | tms | ${TMS} |
           | trino-multi-version | ${TRINO_MULTI_VERSION} |
           | lance | ${LANCE} |
           | multi-instance | ${MULTI_INSTANCE} |
@@ -293,7 +310,7 @@ jobs:
             failed=1
           fi
           for result in "$BACKEND" "$SPARK" "$FLINK" "$MAINTENANCE" "$PYTHON" "$TRINO" \
-            "$ACCESS_CONTROL" "$ICEBERG_REST_TRINO" "$MCP" "$IDP" \
+            "$ACCESS_CONTROL" "$ICEBERG_REST_TRINO" "$MCP" "$IDP" "$TMS" \
             "$TRINO_MULTI_VERSION" "$LANCE" "$MULTI_INSTANCE"
           do
             if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then

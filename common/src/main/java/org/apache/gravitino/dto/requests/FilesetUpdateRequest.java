@@ -31,6 +31,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.secret.SecretBinding;
@@ -44,6 +45,9 @@ import org.apache.gravitino.secret.SecretReference;
   @JsonSubTypes.Type(
       value = FilesetUpdateRequest.UpdateFilesetCommentRequest.class,
       name = "updateComment"),
+  @JsonSubTypes.Type(
+      value = FilesetUpdateRequest.UpdateFilesetTypeRequest.class,
+      name = "updateType"),
   @JsonSubTypes.Type(
       value = FilesetUpdateRequest.RemoveFilesetCommentRequest.class,
       name = "removeComment"),
@@ -124,6 +128,35 @@ public interface FilesetUpdateRequest extends RESTRequest {
     /** Validates the fields of the request. Always pass. */
     @Override
     public void validate() throws IllegalArgumentException {}
+  }
+
+  /** The fileset update request for changing the type of a fileset. */
+  @EqualsAndHashCode
+  @NoArgsConstructor(force = true)
+  @AllArgsConstructor
+  @ToString
+  class UpdateFilesetTypeRequest implements FilesetUpdateRequest {
+
+    @Getter
+    @JsonProperty("newType")
+    private final Fileset.Type newType;
+
+    /** {@inheritDoc} */
+    @Override
+    public FilesetChange filesetChange() {
+      return FilesetChange.updateType(newType);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException if the new type is null.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          newType != null, "\"newType\" field is required and cannot be null");
+    }
   }
 
   /** The fileset update request for setting the properties of a fileset. */

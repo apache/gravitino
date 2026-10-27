@@ -4,6 +4,31 @@ name: Flink Integration Test Action
 on:
   workflow_call:
     inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
+      shard:
+        required: false
+        description: 'Test shard defined in dev/ci/test-shards.sh; all preserves the complete suite'
+        type: string
+        default: 'all'
       architecture:
         required: true
         description: 'Architecture of the platform'
@@ -15,13 +40,22 @@ on:
 
 jobs:
   start-runner:
-    name: JDK${{ inputs.java-version }}
+    name: JDK${{ inputs.java-version }}-${{ inputs.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.shard == 'all' && 120 || 90 }}
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: actions/setup-java@v4
         with:
@@ -46,22 +80,15 @@ jobs:
 
       - name: Flink Integration Test
         id: integrationTest
-        # run embedded mode and deploy mode integration tests for every supported Flink minor
-        run: |
-          for v in 1.19 1.20 2.1 2.2; do
-            ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false -PskipWeb=true \
-              :flink-connector:flink-$v:test \
-              --tests "org.apache.gravitino.flink.connector.integration.test.**"
-            ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false -PskipWeb=true \
-              :flink-connector:flink-$v:test \
-              --tests "org.apache.gravitino.flink.connector.integration.test.**"
-          done
+        env:
+          TEST_SHARD: ${{ inputs.shard }}
+        run: dev/ci/run-integration-shard.sh flink "${TEST_SHARD}"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: flink-connector-integrate-test-reports-${{ inputs.java-version }}
+          name: flink-connector-integrate-test-reports-${{ inputs.java-version }}-${{ inputs.shard }}
           path: |
             build/reports
             flink-connector/v1.19/flink/build/*.log

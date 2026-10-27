@@ -25,10 +25,12 @@
 #
 # Suites:
 #   build       Unit tests run by .github/workflows/build.yml.
+#   flink       Flink version/mode pairs, one pair per line.
+#   access-control  Authorization mode/backend pairs, one pair per line.
 #   backend-it  Integration tests run by .github/workflows/backend-integration-test.yml.
 #               The `all` selector preserves the unsharded cron/manual suite.
 #
-# Every suite ends with a catch-all `others` shard that excludes the projects of all named
+# The task-based build/backend-it suites end with a catch-all `others` shard that excludes the projects of all named
 # shards, so a new module is always tested by `others` until it is moved to a named shard.
 # To rebalance, move a project between the lists below; the workflows need no change.
 
@@ -38,6 +40,7 @@ set -euo pipefail
 # Core tests run in the dedicated core-test workflow lanes, outside these build shards.
 # Projects with `gravitino-docker-test` tests. Gradle runs them one by one under the shared test
 # environment lock, so they are kept away from the parallel unit tests in `others`.
+# shellcheck disable=SC2034 # Referenced indirectly by print_test_tasks.
 BUILD_DOCKER=(
   :authorizations:authorization-chain
   :authorizations:authorization-ranger
@@ -64,14 +67,16 @@ BUILD_DOCKER=(
 )
 
 # ---- backend-it suite --------------------------------------------------------------------------
-# client-java, catalog-fileset and filesystem-hadoop3 stay in `others`: together with the remaining
-# modules they still finish before the slowest shard, and one less shard saves a job per backend.
+# client-java, catalog-fileset and filesystem-hadoop3 stay in `others`. Recent task timings
+# split roughly 28/28/35 minutes before setup; rebalance these lists as the suites grow.
+# shellcheck disable=SC2034 # Referenced indirectly by print_test_tasks.
 BACKEND_IT_HIVE=(
   :catalogs:catalog-hive
   :catalogs:catalog-glue
   :catalogs:catalog-lakehouse-hudi
 )
 
+# shellcheck disable=SC2034 # Referenced indirectly by print_test_tasks.
 BACKEND_IT_LAKEHOUSE=(
   :iceberg:iceberg-rest-server
   :catalogs:catalog-lakehouse-iceberg
@@ -89,6 +94,8 @@ shards_of() {
   case "$1" in
     build) echo "docker others" ;;
     backend-it) echo "hive lakehouse others" ;;
+    flink) echo "embedded deploy" ;;
+    access-control) echo "h2 mysql postgresql" ;;
     *) echo "Unknown suite: $1" >&2; usage ;;
   esac
 }
@@ -140,6 +147,35 @@ if [ "${shard}" = "--list" ]; then
     sep=","
   done
   printf ']\n'
+  exit 0
+fi
+
+# Keep both modes for every supported connector version; tests compare this list with settings.
+if [ "${suite}" = "flink" ]; then
+  case "${shard}" in
+    embedded|deploy) modes=("${shard}") ;;
+    all) modes=(embedded deploy) ;;
+    *) echo "Unknown shard '${shard}' for suite '${suite}'" >&2; usage ;;
+  esac
+  for version in 1.19 1.20 2.1 2.2; do
+    for mode in "${modes[@]}"; do
+      printf '%s %s\n' "${mode}" "${version}"
+    done
+  done
+  exit 0
+fi
+
+if [ "${suite}" = "access-control" ]; then
+  case "${shard}" in
+    h2|mysql|postgresql) backends=("${shard}") ;;
+    all) backends=(h2 mysql postgresql) ;;
+    *) echo "Unknown shard '${shard}' for suite '${suite}'" >&2; usage ;;
+  esac
+  for backend in "${backends[@]}"; do
+    mode=deploy
+    [ "${backend}" != "h2" ] || mode=embedded
+    printf '%s %s\n' "${mode}" "${backend}"
+  done
   exit 0
 fi
 

@@ -2,13 +2,31 @@ name: Backend Integration Test
 
 # Controls when the workflow will run
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: fork-ci-backend-${{ inputs.head-sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -17,12 +35,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
       - name: Disable Git automatic maintenance
         run: git config --local maintenance.auto false
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
         id: filter
         with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
           filters: |
             source_changes:
               - .github/**
@@ -54,8 +83,8 @@ jobs:
         id: shards
         run: echo "backend_it_shards=$(dev/ci/test-shards.sh backend-it --list)" >> "${GITHUB_OUTPUT}"
     outputs:
-      source_changes: ${{ steps.filter.outputs.source_changes }}
       backend_it_shards: ${{ steps.shards.outputs.backend_it_shards }}
+      source_changes: ${{ steps.filter.outputs.source_changes }}
 
   BackendIT:
     needs: changes
@@ -63,11 +92,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        architecture: [ linux/amd64 ]
+        architecture: [linux/amd64]
         java-version: [ 17 ]
         backend: [ h2, mysql, postgresql ]
         test-mode: [ embedded, deploy ]
-        # Shards are defined in dev/ci/test-shards.sh.
         shard: ${{ fromJSON(needs.changes.outputs.backend_it_shards) }}
         exclude:
           - test-mode: 'embedded'
@@ -78,6 +106,11 @@ jobs:
             backend: 'h2'
     uses: ./.github/workflows/backend-integration-test-action.yml
     with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
       backend: ${{ matrix.backend }}

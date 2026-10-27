@@ -4,6 +4,30 @@ name: Backend Integration Test Action
 on:
   workflow_call:
     inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
+      shard:
+        required: true
+        description: 'Test shard defined in dev/ci/test-shards.sh; all preserves the complete suite'
+        type: string
       architecture:
         required: true
         description: 'Architecture of the platform'
@@ -20,20 +44,25 @@ on:
         required: true
         description: 'run on embedded or deploy mode'
         type: string
-      shard:
-        required: true
-        description: 'Test shard defined in dev/ci/test-shards.sh'
-        type: string
 
 jobs:
   start-runner:
     name: JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}-${{ inputs.shard }}
     runs-on: ubuntu-22.04
-    timeout-minutes: ${{ inputs.shard == 'all' && 120 || 90 }}
+    timeout-minutes: ${{ inputs.shard == 'all' && 180 || 90 }}
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: actions/setup-java@v4
         with:
@@ -68,7 +97,7 @@ jobs:
           [ -s "$deb" ] || { echo "Could not download $deb from any mirror" >&2; exit 1; }
           sudo dpkg -i "$deb"
 
-      - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}-${{ inputs.shard }})
+      - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
         id: integrationTest
         run: |
           EXCLUDE_CONTRIB_TESTS=""
@@ -77,7 +106,10 @@ jobs:
           done
 
           shard_args_text="$(dev/ci/test-shards.sh backend-it "${{ inputs.shard }}")"
-          mapfile -t shard_args <<< "${shard_args_text}"
+          shard_args=()
+          while IFS= read -r argument; do
+            shard_args+=("${argument}")
+          done <<< "${shard_args_text}"
 
           ./gradlew "${shard_args[@]}" -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
             -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test \
@@ -91,6 +123,7 @@ jobs:
             -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test \
             -x :iceberg:iceberg-rest-trino-it:test \
             -x :plugins:idp-basic:test \
+            -x :plugins:maintenance:test \
             -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test \
             -x :clients:cli:test -x :maintenance:jobs:test -x :maintenance:optimizer:test \
             $EXCLUDE_CONTRIB_TESTS

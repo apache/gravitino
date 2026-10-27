@@ -11,6 +11,23 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 ## Upgrading from Gravitino 1.3 to 2.0
 
+### Audit client address behind a reverse proxy
+
+- Gravitino 1.3 used the first `X-Forwarded-For` entry as the audit client address whenever
+  the header was present. The server now ignores `X-Forwarded-For` unless the request comes from
+  a proxy listed in `trustedProxies`.
+- If the Gravitino server, the Iceberg REST service, or the Lance REST service runs behind a load
+  balancer, ingress controller, or other reverse proxy, set
+  `gravitino.server.webserver.trustedProxies`, `gravitino.iceberg-rest.trustedProxies`, or
+  `gravitino.lance-rest.trustedProxies` to the proxy addresses. Without it, the audit log records
+  the proxy address instead of the client address.
+- IPv6 client addresses in audit events are now recorded in compressed form without brackets,
+  for example `::1` instead of `[0:0:0:0:0:0:0:1]`. Update log queries or parsers that match the
+  old form.
+- List only the proxies. Trusting a range that untrusted clients can also connect from, such as a
+  whole Kubernetes pod CIDR, lets those clients choose the recorded address again. See
+  [HTTP Server](./gravitino-server-config.md#http-server).
+
 ### Policies are selected through tags
 
 - Direct policy associations with metadata objects are no longer read or written. The upgrade
