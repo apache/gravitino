@@ -31,11 +31,11 @@ public interface SemanticModelMetricMapper {
   /** The metric identity table name. */
   String TABLE_NAME = "semantic_model_metric_meta";
 
-  /** Inserts a new metric identity. */
+  /** Inserts new metric identities in one statement. */
   @InsertProvider(
       type = SemanticModelMetricSQLProviderFactory.class,
-      method = "insertSemanticModelMetric")
-  void insertSemanticModelMetric(@Param("metric") SemanticModelMetricPO metricPO);
+      method = "insertSemanticModelMetrics")
+  void insertSemanticModelMetrics(@Param("metrics") List<SemanticModelMetricPO> metricPOs);
 
   /** Locks and reads the live identities of a Semantic Model. */
   @SelectProvider(

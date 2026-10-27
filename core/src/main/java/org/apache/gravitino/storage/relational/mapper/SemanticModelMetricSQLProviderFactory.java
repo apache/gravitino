@@ -46,9 +46,10 @@ public class SemanticModelMetricSQLProviderFactory {
     return PROVIDERS.get(JDBCBackendType.fromString(databaseId));
   }
 
-  /** Inserts a new metric identity. */
-  public static String insertSemanticModelMetric(@Param("metric") SemanticModelMetricPO metricPO) {
-    return getProvider().insertSemanticModelMetric(metricPO);
+  /** Returns SQL for inserting new metric identities in one statement. */
+  public static String insertSemanticModelMetrics(
+      @Param("metrics") List<SemanticModelMetricPO> metricPOs) {
+    return getProvider().insertSemanticModelMetrics(metricPOs);
   }
 
   /** Locks and reads the live identities of a Semantic Model. */

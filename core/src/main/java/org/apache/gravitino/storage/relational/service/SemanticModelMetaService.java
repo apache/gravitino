@@ -24,7 +24,9 @@ import static org.apache.gravitino.storage.relational.po.SemanticModelPO.fromSem
 import static org.apache.gravitino.storage.relational.po.SemanticModelPO.initializeSemanticModelPO;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -66,6 +68,7 @@ import org.slf4j.LoggerFactory;
 public class SemanticModelMetaService {
 
   private static final Logger LOG = LoggerFactory.getLogger(SemanticModelMetaService.class);
+  private static final int METRIC_INSERT_BATCH_SIZE = 1000;
   private static final SemanticModelMetaService INSTANCE = new SemanticModelMetaService();
 
   private final BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> ops;
@@ -262,8 +265,10 @@ public class SemanticModelMetaService {
           },
           () -> {
             if (!Objects.equals(
-                oldSemanticModelPO.getSemanticModelVersionInfoPO().metrics(),
-                newSemanticModelPO.getSemanticModelVersionInfoPO().metrics())) {
+                    oldSemanticModelPO.getSemanticModelVersionInfoPO().metrics(),
+                    newSemanticModelPO.getSemanticModelVersionInfoPO().metrics())
+                && !metricNames(oldSemanticModelEntity.definition())
+                    .equals(metricNames(newEntity.definition()))) {
               reconcileMetricIdentities(newSemanticModelPO, newEntity.definition());
             }
           },
@@ -418,14 +423,7 @@ public class SemanticModelMetaService {
 
   private static void reconcileMetricIdentities(
       SemanticModelPO model, SemanticModelDefinition definition) {
-    Set<String> names = new LinkedHashSet<>();
-    Metric[] metrics = definition.metrics();
-    if (metrics != null) {
-      for (Metric metric : metrics) {
-        Preconditions.checkArgument(
-            names.add(metric.name()), "Duplicate metric name: %s", metric.name());
-      }
-    }
+    Set<String> names = metricNames(definition);
 
     // The caller has already inserted or version-checked the model in this transaction. A locking
     // read also observes the latest identities on backends using repeatable-read isolation.
@@ -438,23 +436,31 @@ public class SemanticModelMetaService {
                   .stream()
                   .collect(
                       Collectors.toMap(SemanticModelMetricPO::metricName, Function.identity()));
+          List<String> addedNames = new ArrayList<>();
           for (String name : names) {
-            if (live.remove(name) != null) {
-              continue;
+            if (live.remove(name) == null) {
+              addedNames.add(name);
             }
+          }
+          if (!addedNames.isEmpty()) {
             IdGenerator generator = GravitinoEnv.getInstance().idGenerator();
             Preconditions.checkState(
                 generator != null, "Metric identity ID generator is not initialized");
-            mapper.insertSemanticModelMetric(
-                SemanticModelMetricPO.builder()
-                    .withMetricId(generator.nextId())
-                    .withMetalakeId(model.getMetalakeId())
-                    .withCatalogId(model.getCatalogId())
-                    .withSchemaId(model.getSchemaId())
-                    .withSemanticModelId(model.getSemanticModelId())
-                    .withMetricName(name)
-                    .withDeletedAt(0L)
-                    .build());
+            List<SemanticModelMetricPO> addedMetrics = new ArrayList<>(addedNames.size());
+            for (String name : addedNames) {
+              addedMetrics.add(
+                  SemanticModelMetricPO.builder()
+                      .withMetricId(generator.nextId())
+                      .withMetalakeId(model.getMetalakeId())
+                      .withCatalogId(model.getCatalogId())
+                      .withSchemaId(model.getSchemaId())
+                      .withSemanticModelId(model.getSemanticModelId())
+                      .withMetricName(name)
+                      .withDeletedAt(0L)
+                      .build());
+            }
+            Lists.partition(addedMetrics, METRIC_INSERT_BATCH_SIZE)
+                .forEach(mapper::insertSemanticModelMetrics);
           }
           if (!live.isEmpty()) {
             mapper.softDeleteSemanticModelMetricsByIds(
@@ -464,6 +470,18 @@ public class SemanticModelMetaService {
                     .collect(Collectors.toList()));
           }
         });
+  }
+
+  private static Set<String> metricNames(SemanticModelDefinition definition) {
+    Set<String> names = new LinkedHashSet<>();
+    Metric[] metrics = definition.metrics();
+    if (metrics != null) {
+      for (Metric metric : metrics) {
+        Preconditions.checkArgument(
+            names.add(metric.name()), "Duplicate metric name: %s", metric.name());
+      }
+    }
+    return names;
   }
 
   private SemanticModelPO updateSemanticModelPO(

@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 
 import java.io.IOException;
 import java.sql.PreparedStatement;
@@ -42,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
@@ -102,7 +104,15 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
                         .build())
             .toArray(Metric[]::new);
     SemanticModelEntity renamed = copy(original, original.id(), "renamed", reordered);
-    backend.update(original.nameIdentifier(), original.type(), old -> renamed);
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class, CALLS_REAL_METHODS)) {
+      backend.update(original.nameIdentifier(), original.type(), old -> renamed);
+      sessions.verify(
+          () -> SessionUtils.doWithoutCommit(eq(SemanticModelMetricMapper.class), any()), never());
+    }
+    assertEquals(renamed, backend.get(renamed.nameIdentifier(), renamed.type()));
+    assertEquals(
+        2, service().getSemanticModelPOByIdentifier(renamed.nameIdentifier()).getCurrentVersion());
+    assertEquals(2, count("semantic_model_version_info", original.id()));
     assertEquals(initial, liveIds(original.id()));
     assertEquals(4, count("semantic_model_metric_meta", original.id()));
 
@@ -117,6 +127,72 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
     assertNotEquals(initial.get("revenue"), current.get("revenue"));
     assertEquals(5, count("semantic_model_metric_meta", original.id()));
     assertSnapshotNames(reintroduced);
+  }
+
+  @TestTemplate
+  void testUnchangedMetricsSkipIdentityReconciliation() throws Exception {
+    Namespace namespace = parents();
+    SemanticModelEntity original = model(namespace, "sales", "revenue");
+    backend.insert(original, false);
+    Map<String, Long> initial = liveIds(original.id());
+    SemanticModelEntity replacement =
+        copy(original, original.id(), original.name(), original.definition().metrics());
+
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class, CALLS_REAL_METHODS)) {
+      backend.update(original.nameIdentifier(), original.type(), old -> replacement);
+      sessions.verify(
+          () -> SessionUtils.doWithoutCommit(eq(SemanticModelMetricMapper.class), any()), never());
+    }
+
+    assertEquals(replacement, backend.get(replacement.nameIdentifier(), replacement.type()));
+    assertEquals(
+        2,
+        service().getSemanticModelPOByIdentifier(replacement.nameIdentifier()).getCurrentVersion());
+    assertEquals(2, count("semantic_model_version_info", original.id()));
+    assertEquals(initial, liveIds(original.id()));
+    assertEquals(1, count("semantic_model_metric_meta", original.id()));
+  }
+
+  @TestTemplate
+  void testCreateWithMetricsAcrossInsertBatches() throws Exception {
+    String[] names = IntStream.range(0, 1001).mapToObj(i -> "metric_" + i).toArray(String[]::new);
+    SemanticModelEntity original = model(parents(), "sales", names);
+    backend.insert(original, false);
+
+    Map<String, Long> identities = liveIds(original.id());
+    assertEquals(Set.copyOf(Arrays.asList(names)), identities.keySet());
+    assertEquals(names.length, Set.copyOf(identities.values()).size());
+    assertEquals(names.length, count("semantic_model_metric_meta", original.id()));
+    assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
+  }
+
+  @TestTemplate
+  void testReconciliationWithoutNewNamesDoesNotRequireIdGenerator() throws Exception {
+    Namespace namespace = parents();
+    SemanticModelEntity original = model(namespace, "sales", "kept", "removed");
+    backend.insert(original, false);
+    long keptId = liveIds(original.id()).get("kept");
+    SemanticModelEntity reduced = copy(original, original.id(), original.name(), metrics("kept"));
+    SemanticModelEntity imported = model(namespace, original.name(), "kept");
+    SemanticModelEntity empty = copy(reduced, reduced.id(), reduced.name(), null);
+
+    IdGenerator originalGenerator = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", null, true);
+    try {
+      backend.update(original.nameIdentifier(), original.type(), old -> reduced);
+      assertEquals(Map.of("kept", keptId), liveIds(original.id()));
+      backend.insert(imported, true);
+      assertEquals(Map.of("kept", keptId), liveIds(original.id()));
+      backend.update(original.nameIdentifier(), original.type(), old -> empty);
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", originalGenerator, true);
+    }
+
+    assertTrue(liveIds(original.id()).isEmpty());
+    assertEquals(2, count("semantic_model_metric_meta", original.id()));
+    assertEquals(empty, backend.get(original.nameIdentifier(), original.type()));
+    assertEquals(
+        4, service().getSemanticModelPOByIdentifier(original.nameIdentifier()).getCurrentVersion());
   }
 
   @TestTemplate
@@ -210,14 +286,16 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
     SemanticModelEntity original = model(namespace, "sales", "original");
     backend.insert(original, false);
     Map<String, Long> before = liveIds(original.id());
-    SemanticModelEntity invalid =
-        copy(original, original.id(), original.name(), metrics("same", "same"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> backend.update(original.nameIdentifier(), original.type(), old -> invalid));
-    assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
-    assertEquals(before, liveIds(original.id()));
-    assertEquals(1, count("semantic_model_version_info", original.id()));
+    for (String duplicateName : new String[] {"same", "original"}) {
+      SemanticModelEntity invalid =
+          copy(original, original.id(), original.name(), metrics(duplicateName, duplicateName));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> backend.update(original.nameIdentifier(), original.type(), old -> invalid));
+      assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
+      assertEquals(before, liveIds(original.id()));
+      assertEquals(1, count("semantic_model_version_info", original.id()));
+    }
   }
 
   @TestTemplate
@@ -249,31 +327,37 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testIdentityInsertFailureRollsBackPartialReconciliation() throws Exception {
+  void testIdentityInsertFailureRollsBackAllBatches() throws Exception {
     Namespace namespace = parents();
     SemanticModelEntity original = model(namespace, "sales", "existing");
     backend.insert(original, false);
     Map<String, Long> before = liveIds(original.id());
-    SemanticModelEntity replacement =
-        copy(original, original.id(), original.name(), metrics("first", "second"));
     IdGenerator originalGenerator = GravitinoEnv.getInstance().idGenerator();
-    AtomicInteger allocated = new AtomicInteger();
-    IdGenerator duplicateGenerator =
-        () ->
-            allocated.incrementAndGet() == 1 ? originalGenerator.nextId() : before.get("existing");
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", duplicateGenerator, true);
-    try {
-      assertThrows(
-          EntityAlreadyExistsException.class,
-          () -> backend.update(original.nameIdentifier(), original.type(), old -> replacement));
-    } finally {
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", originalGenerator, true);
+    for (int metricCount : new int[] {2, 1001}) {
+      String[] names =
+          IntStream.range(0, metricCount).mapToObj(i -> "metric_" + i).toArray(String[]::new);
+      SemanticModelEntity replacement =
+          copy(original, original.id(), original.name(), metrics(names));
+      AtomicInteger allocated = new AtomicInteger();
+      IdGenerator duplicateGenerator =
+          () ->
+              allocated.incrementAndGet() < metricCount
+                  ? originalGenerator.nextId()
+                  : before.get("existing");
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", duplicateGenerator, true);
+      try {
+        assertThrows(
+            EntityAlreadyExistsException.class,
+            () -> backend.update(original.nameIdentifier(), original.type(), old -> replacement));
+      } finally {
+        FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", originalGenerator, true);
+      }
+      assertEquals(metricCount, allocated.get());
+      assertEquals(before, liveIds(original.id()));
+      assertEquals(1, count("semantic_model_metric_meta", original.id()));
+      assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
+      assertEquals(1, count("semantic_model_version_info", original.id()));
     }
-    assertEquals(2, allocated.get());
-    assertEquals(before, liveIds(original.id()));
-    assertEquals(1, count("semantic_model_metric_meta", original.id()));
-    assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
-    assertEquals(1, count("semantic_model_version_info", original.id()));
   }
 
   @TestTemplate

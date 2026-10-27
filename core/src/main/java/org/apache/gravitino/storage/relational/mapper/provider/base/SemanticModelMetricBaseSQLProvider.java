@@ -27,13 +27,17 @@ import org.apache.ibatis.annotations.Param;
 /** Provides MySQL-compatible SQL for Semantic Model metric identities. */
 public class SemanticModelMetricBaseSQLProvider {
 
-  /** Returns SQL for inserting a new identity. */
-  public String insertSemanticModelMetric(@Param("metric") SemanticModelMetricPO metricPO) {
-    return "INSERT INTO "
+  /** Returns SQL for inserting new identities in one statement. */
+  public String insertSemanticModelMetrics(
+      @Param("metrics") List<SemanticModelMetricPO> metricPOs) {
+    return "<script>INSERT INTO "
         + TABLE_NAME
         + " (metric_id, metalake_id, catalog_id, schema_id, semantic_model_id, metric_name, deleted_at)"
-        + " VALUES (#{metric.metricId}, #{metric.metalakeId}, #{metric.catalogId},"
-        + " #{metric.schemaId}, #{metric.semanticModelId}, #{metric.metricName}, #{metric.deletedAt})";
+        + " VALUES "
+        + "<foreach collection='metrics' item='metric' separator=','>"
+        + "(#{metric.metricId}, #{metric.metalakeId}, #{metric.catalogId},"
+        + " #{metric.schemaId}, #{metric.semanticModelId}, #{metric.metricName}, #{metric.deletedAt})"
+        + "</foreach></script>";
   }
 
   /** Returns a locking read of live identities after the containing model's concurrency check. */
