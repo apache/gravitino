@@ -30,18 +30,24 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
-import org.awaitility.Awaitility;
-import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.WaitStrategy;
+import org.testcontainers.utility.DockerImageName;
 
+/**
+ * ClickHouse on the official {@code org.testcontainers.clickhouse.ClickHouseContainer} module. The
+ * module's readiness check, HTTP {@code /} answering {@code Ok.}, comes once the server serves
+ * queries. A single server and each node of the ZooKeeper-backed cluster use this class.
+ */
 public class ClickHouseContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(ClickHouseContainer.class);
 
-  public static final String DEFAULT_IMAGE = "clickhouse:24.8.14";
+  public static final String DEFAULT_IMAGE = TestImages.CLICKHOUSE;
   public static final String HOST_NAME = "gravitino-ci-clickhouse";
   public static final int CLICKHOUSE_PORT = 8123;
   public static final int CLICKHOUSE_NATIVE_PORT = 9000;
@@ -63,7 +69,7 @@ public class ClickHouseContainer extends BaseContainer {
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
-    super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+    super(module(image), hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
   @Override
@@ -72,36 +78,11 @@ public class ClickHouseContainer extends BaseContainer {
     withLogConsumer(new PrintingContainerLog(format("%-14s| ", "clickHouseContainer")));
   }
 
+  // The module's HTTP check passes once the server answers queries, as the SELECT 1 probe did.
   @Override
-  public void start() {
-    super.start();
-    Preconditions.check("clickHouse container startup failed!", checkContainerStatus(5));
-  }
-
-  @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    Awaitility.await()
-        .atMost(java.time.Duration.ofMinutes(2))
-        .pollInterval(Duration.ofSeconds(5))
-        .until(
-            () -> {
-              try (Connection connection =
-                      DriverManager.getConnection(getJdbcUrl(), USER_NAME, getPassword());
-                  Statement statement = connection.createStatement()) {
-                // Simple health check query; ClickHouse should respond if it is ready.
-                statement.execute("SELECT 1");
-                LOG.info("clickHouse container is healthy");
-                return true;
-              } catch (SQLException e) {
-                LOG.warn(
-                    "Failed to connect to clickHouse container during Awaitility health check: {}",
-                    e.getMessage(),
-                    e);
-                return false;
-              }
-            });
-
-    return true;
+  @Nullable
+  protected WaitStrategy waitStrategy() {
+    return null;
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
@@ -167,6 +148,33 @@ public class ClickHouseContainer extends BaseContainer {
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to create database on clickHouse cluster: " + e.getMessage(), e);
+    }
+  }
+
+  private static org.testcontainers.clickhouse.ClickHouseContainer module(String image) {
+    // The image may be the Docker library's "clickhouse", a mirror or a custom tag; the module only
+    // needs a ClickHouse server.
+    return new Module(
+            DockerImageName.parse(image).asCompatibleSubstituteFor("clickhouse/clickhouse-server"))
+        .withUsername(USER_NAME)
+        .withPassword(PASSWORD)
+        // The module's readiness check ignores BaseContainer's startup timeout, so it gets the
+        // seven minutes the port and query checks had before.
+        .withStartupTimeout(Duration.ofMinutes(7));
+  }
+
+  /** The module without its {@code CLICKHOUSE_DB} variable. */
+  private static final class Module extends org.testcontainers.clickhouse.ClickHouseContainer {
+    private Module(DockerImageName image) {
+      super(image);
+    }
+
+    // With CLICKHOUSE_DB set, the image boots a throwaway server to create that database before
+    // the real one; "default" exists anyway.
+    @Override
+    protected void configure() {
+      super.configure();
+      getEnvMap().remove("CLICKHOUSE_DB");
     }
   }
 

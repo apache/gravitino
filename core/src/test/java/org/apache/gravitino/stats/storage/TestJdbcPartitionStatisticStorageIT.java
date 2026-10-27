@@ -46,10 +46,11 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
-import org.apache.gravitino.integration.test.container.PGImageName;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.stats.PartitionRange;
@@ -589,19 +590,15 @@ public class TestJdbcPartitionStatisticStorageIT {
   @Nested
   @CoreBackend.MySQL
   @Tag("gravitino-docker-test")
+  @MySQLFixture(database = TestDatabaseName.MYSQL_MYSQL_ABSTRACT_IT)
   static class MySQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
-    private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
     private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.MYSQL_MYSQL_ABSTRACT_IT;
-    private MySQLContainer mySQLContainer;
+    @FixtureContainer private MySQLContainer mySQLContainer;
 
     @Override
     protected void setupStorage() throws Exception {
-      LOG.info("Starting MySQL container for partition statistics integration tests");
-
-      // Start MySQL container
-      containerSuite.startMySQLContainer(TEST_DB_NAME);
-      mySQLContainer = containerSuite.getMySQLContainer();
+      LOG.info("Setting up MySQL partition statistics storage for integration tests");
 
       // Create database schema
       createMySQLSchema();
@@ -660,19 +657,15 @@ public class TestJdbcPartitionStatisticStorageIT {
   @Nested
   @CoreBackend.PostgreSQL
   @Tag("gravitino-docker-test")
+  @PostgreSQLFixture(database = TestDatabaseName.PG_TEST_PARTITION_STATS)
   static class PostgreSQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
-    private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
     private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_TEST_PARTITION_STATS;
-    private PostgreSQLContainer postgreSQLContainer;
+    @FixtureContainer private PostgreSQLContainer postgreSQLContainer;
 
     @Override
     protected void setupStorage() throws Exception {
-      LOG.info("Starting PostgreSQL container for partition statistics integration tests");
-
-      // Start PostgreSQL container
-      containerSuite.startPostgreSQLContainer(TEST_DB_NAME, PGImageName.VERSION_13);
-      postgreSQLContainer = containerSuite.getPostgreSQLContainer(PGImageName.VERSION_13);
+      LOG.info("Setting up PostgreSQL partition statistics storage for integration tests");
 
       // Create database schema
       createPostgreSQLSchema();

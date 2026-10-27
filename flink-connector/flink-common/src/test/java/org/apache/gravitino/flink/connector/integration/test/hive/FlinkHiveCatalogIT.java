@@ -68,7 +68,9 @@ import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOpti
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -88,6 +90,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@MySQLFixture(database = TestDatabaseName.FLINK_HIVE_CATALOG_IT)
 public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
   private static final String FLINK_USER_NAME = "gravitino";
@@ -100,7 +103,7 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
   private String mysqlUsername;
   private String mysqlPassword;
   private String mysqlDriver;
-  private ContainerSuite containerSuite;
+  @FixtureContainer private MySQLContainer mysql;
 
   @Override
   protected boolean supportsPrimaryKey() {
@@ -131,23 +134,10 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   @Override
   protected void initCatalogEnv() throws Exception {
-    containerSuite = ContainerSuite.getInstance();
-    containerSuite.startMySQLContainer(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
-    mysqlUrl =
-        containerSuite.getMySQLContainer().getJdbcUrl(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
-    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
-    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
-    mysqlDriver =
-        containerSuite
-            .getMySQLContainer()
-            .getDriverClassName(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
-  }
-
-  @Override
-  protected void stopCatalogEnv() throws Exception {
-    if (containerSuite != null) {
-      containerSuite.close();
-    }
+    mysqlUrl = mysql.getJdbcUrl(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
+    mysqlUsername = mysql.getUsername();
+    mysqlPassword = mysql.getPassword();
+    mysqlDriver = mysql.getDriverClassName(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
   }
 
   protected void initDefaultHiveCatalog() {
