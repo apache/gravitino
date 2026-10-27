@@ -21,6 +21,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { requiredSuites, FAIL_FAST, SUITES, requiredName, evaluate, createService } = require('../fork-ci-status.cjs');
 const { resolve } = require('../resolve-fork-ci.cjs');
+const { statusState, TRUSTED_REQUIRED } = require('../publish-ci-status.cjs');
 const { yamlEntries, prepare } = require('../allowlist-pr.cjs');
 const A = 'a'.repeat(40), B = 'b'.repeat(40), C = 'c'.repeat(40);
 const pr = () => ({ number: 7, state: 'open', head: { sha: A, repo: { owner: { login: 'fork' }, name: 'repo', full_name: 'fork/repo' } },
@@ -123,7 +124,11 @@ test('changed definitions cannot self-attest through a watcher-only failure', as
     for (const run of response.data.workflow_runs) run.conclusion = 'failure';
     return response;
   };
-  assert.equal((await createService(github).mirror(pr())).result.conclusion, 'action_required');
+  const { result } = await createService(github).mirror(pr());
+  // Not success, and shown as pending trusted verification rather than as an error.
+  assert.equal(result.conclusion, 'action_required');
+  assert.equal(result.title, TRUSTED_REQUIRED);
+  assert.equal(statusState(result), 'pending');
 });
 test('changed workflow definitions cannot self-attest a successful fork run', async () => {
   const service = createService(serviceMock({ changed: true }));

@@ -19,7 +19,9 @@ const path = require('node:path');
 const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
 
 // Only the block-list syntax used by Required CI is accepted. Unsupported workflow
-// changes must fail closed rather than silently dropping required callers.
+// changes must fail closed rather than silently dropping required callers. SUITES below
+// parses the default branch's fork-ci.yml when this module loads, so an unsupported
+// format there stops the publisher for every PR; the script tests parse it first.
 function requiredSuites(source) {
   const lines = source.split(/\r?\n/);
   const starts = lines.flatMap((line, i) => /^  required_ci:/.test(line) ? [i] : []);
