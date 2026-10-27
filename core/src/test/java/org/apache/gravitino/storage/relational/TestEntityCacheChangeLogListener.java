@@ -38,6 +38,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.TestUtil;
@@ -63,12 +64,15 @@ public class TestEntityCacheChangeLogListener {
     cache.put(catalog);
     cache.put(schema);
 
-    EntityCacheChangeLogListener listener = new EntityCacheChangeLogListener(cache);
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    EntityCacheChangeLogListener listener = new EntityCacheChangeLogListener(cache, metrics);
     listener.onEntityChange(
         List.of(record(EntityType.SCHEMA, schema.nameIdentifier().toString(), OperateType.DROP)));
 
     Assertions.assertFalse(cache.contains(schema.nameIdentifier(), EntityType.SCHEMA));
     Assertions.assertTrue(cache.contains(catalog.nameIdentifier(), EntityType.CATALOG));
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().counter("records-applied-total").getCount());
   }
 
   @Test
@@ -192,7 +196,8 @@ public class TestEntityCacheChangeLogListener {
     NameIdentifier failing = NameIdentifier.of("m1", "boom");
     doThrow(new RuntimeException("boom")).when(cache).invalidate(failing, EntityType.CATALOG);
 
-    EntityCacheChangeLogListener listener = new EntityCacheChangeLogListener(cache);
+    EntityChangeLogMetricsSource metrics = new EntityChangeLogMetricsSource();
+    EntityCacheChangeLogListener listener = new EntityCacheChangeLogListener(cache, metrics);
     listener.onEntityChange(
         List.of(
             record(EntityType.CATALOG, "m1.boom", OperateType.DROP),
@@ -202,6 +207,12 @@ public class TestEntityCacheChangeLogListener {
     // replayed and no entry can survive stale.
     verify(cache).clear();
     verify(cache, never()).invalidate(NameIdentifier.of("m1", "ok"), EntityType.CATALOG);
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().counter("invalidation-failures-total").getCount());
+    Assertions.assertEquals(
+        1, metrics.getMetricRegistry().counter("fallback-clears-total").getCount());
+    Assertions.assertEquals(
+        0, metrics.getMetricRegistry().counter("records-applied-total").getCount());
   }
 
   @Test

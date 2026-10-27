@@ -49,8 +49,11 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
@@ -60,6 +63,7 @@ import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecuto
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.ExceptionHandlers;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.FunctionOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
@@ -70,6 +74,7 @@ import org.apache.gravitino.server.web.rest.MetadataObjectSecretOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
+import org.apache.gravitino.server.web.rest.OperationType;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PartitionOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
@@ -77,12 +82,14 @@ import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
+import org.apache.gravitino.server.web.rest.SemanticModelOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -108,6 +115,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             ViewOperations.class.getName(),
             ModelOperations.class.getName(),
             FunctionOperations.class.getName(),
+            SemanticModelOperations.class.getName(),
             TopicOperations.class.getName(),
             FilesetOperations.class.getName(),
             BulkOperations.class.getName(),
@@ -162,7 +170,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
 
-      try {
+      try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
         AuthorizationExecutor executor = null;
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
@@ -181,13 +189,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             authorizationMetalake = Optional.of(metalakeIdent.name());
             Optional<Response> validationFailure =
                 validateCurrentUserAndActiveRoles(
-                    metalakeIdent,
-                    authorizationRequestContext,
-                    expressionAnnotation,
-                    metadataContext,
-                    method,
-                    expression,
-                    false);
+                    metalakeIdent, authorizationRequestContext, method, expression);
             if (validationFailure.isPresent()) {
               return validationFailure.get();
             }
@@ -233,11 +235,8 @@ public class GravitinoInterceptionService implements InterceptionService {
                   validateCurrentUserAndActiveRoles(
                       NameIdentifier.of(dynamicMetalake.get()),
                       authorizationRequestContext,
-                      expressionAnnotation,
-                      metadataContext,
                       method,
-                      expression,
-                      true);
+                      expression);
               if (validationFailure.isPresent()) {
                 return validationFailure.get();
               }
@@ -248,6 +247,27 @@ public class GravitinoInterceptionService implements InterceptionService {
             boolean authorizeResult;
             try {
               authorizeResult = executor.execute(authorizationRequestContext);
+            } catch (NoSuchTableException exception) {
+              NameIdentifier tableIdent = metadataContext.get(Entity.EntityType.TABLE);
+              if (tableIdent == null) {
+                throw exception;
+              }
+              return ExceptionHandlers.handleTableException(
+                  OperationType.LOAD,
+                  tableIdent.name(),
+                  NameIdentifierUtil.getSchemaIdentifier(tableIdent).name(),
+                  exception);
+            } catch (NoSuchViewException exception) {
+              NameIdentifier viewIdent = metadataContext.get(Entity.EntityType.VIEW);
+              if (viewIdent == null) {
+                throw exception;
+              }
+              // An authorized absence probe must terminate before the resource can load a view.
+              return ExceptionHandlers.handleViewException(
+                  OperationType.LOAD,
+                  viewIdent.name(),
+                  NameIdentifierUtil.getSchemaIdentifier(viewIdent).name(),
+                  exception);
             } catch (BadRequestException exception) {
               LOG.warn("Invalid authorization request", exception);
               return Utils.illegalArguments(exception.getMessage(), exception);
@@ -270,6 +290,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                   expressionAnnotation, metadataContext, method, evaluatedExpression);
             }
           }
+          scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
         }
         return methodInvocation.proceed();
       } catch (IllegalMetadataObjectException ex) {
@@ -296,36 +317,28 @@ public class GravitinoInterceptionService implements InterceptionService {
     private Optional<Response> validateCurrentUserAndActiveRoles(
         NameIdentifier metalakeIdent,
         AuthorizationRequestContext authorizationRequestContext,
-        AuthorizationExpression expressionAnnotation,
-        Map<Entity.EntityType, NameIdentifier> metadataContext,
         Method method,
-        String expression,
-        boolean dynamicMetalake) {
+        String expression) {
       String currentUser = PrincipalUtils.getCurrentUserName();
       try {
         AuthorizationUtils.checkCurrentUser(
             metalakeIdent.name(), currentUser, authorizationRequestContext);
       } catch (NoSuchMetalakeException e) {
+        // A custom authorizer may report a missing metalake directly; JCasbin reports it as
+        // non-membership instead.
         LOG.warn("Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
-        if (dynamicMetalake) {
-          return Optional.of(
-              Utils.illegalArguments(
-                  String.format(
-                      "job.namespace must identify an existing metalake: %s", metalakeIdent.name()),
-                  e));
-        }
-        // Not a real authz denial — metalake is absent, not forbidden. Skip event dispatch;
-        // HttpAuditFilter will emit a generic HttpRequestFailureEvent for this 403.
-        return Optional.of(
-            buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression));
+        // A missing metalake is not an authorization denial, so skip the denial event. Return the
+        // same client-visible response as a failed membership check to avoid exposing existence.
+        return Optional.of(metalakeMembershipFailure(currentUser, metalakeIdent.name()));
       } catch (ForbiddenException ex) {
         LOG.warn(
             "User validation failed - User: {}, Metalake: {}, Reason: {}",
             currentUser,
             metalakeIdent.name(),
-            ex.getMessage());
+            ex.getMessage(),
+            ex);
         dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
-        return Optional.of(Utils.forbidden(ex.getMessage(), ex));
+        return Optional.of(metalakeMembershipFailure(currentUser, metalakeIdent.name()));
       } catch (Exception ex) {
         LOG.error(
             "Unexpected error during user validation - User: {}, Metalake: {}",
@@ -358,6 +371,11 @@ public class GravitinoInterceptionService implements InterceptionService {
         }
       }
       return Optional.empty();
+    }
+
+    private Response metalakeMembershipFailure(String user, String metalake) {
+      return Utils.forbidden(
+          AuthorizationUtils.metalakeMembershipFailureMessage(metalake, user), null);
     }
 
     private Response buildNoAuthResponse(

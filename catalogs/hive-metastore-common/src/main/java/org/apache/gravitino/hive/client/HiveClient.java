@@ -122,4 +122,11 @@ public interface HiveClient extends AutoCloseable {
   void close();
 
   UserGroupInformation getUser();
+
+  /**
+   * Returns the Hive version of the metastore backend this client is connected to.
+   *
+   * @return The resolved Hive version.
+   */
+  HiveClientClassLoader.HiveVersion hiveVersion();
 }

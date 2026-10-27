@@ -21,6 +21,8 @@ package org.apache.gravitino.rel.indexes;
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.rel.indexes.Index.IndexType;
 
@@ -155,8 +157,19 @@ public class Indexes {
         IndexType indexType, String name, String[][] fieldNames, Map<String, String> properties) {
       this.indexType = indexType;
       this.name = name;
-      this.fieldNames = fieldNames;
-      this.properties = properties == null ? ImmutableMap.of() : properties;
+      // Deep-copy the caller's arrays and snapshot the map so later external mutations of the
+      // caller's inputs cannot change the built index. Null rows and null map entries are
+      // preserved rather than rejected, matching the pre-fix behavior and TableChange.AddIndex.
+      this.fieldNames =
+          fieldNames == null
+              ? null
+              : Arrays.stream(fieldNames)
+                  .map(row -> row == null ? null : row.clone())
+                  .toArray(String[][]::new);
+      this.properties =
+          properties == null
+              ? ImmutableMap.of()
+              : Collections.unmodifiableMap(new HashMap<>(properties));
     }
 
     /**
@@ -176,11 +189,15 @@ public class Indexes {
     }
 
     /**
-     * @return The field names under the table contained in the index
+     * @return A defensive copy of the field names under the table contained in the index
      */
     @Override
     public String[][] fieldNames() {
-      return fieldNames;
+      return fieldNames == null
+          ? null
+          : Arrays.stream(fieldNames)
+              .map(row -> row == null ? null : row.clone())
+              .toArray(String[][]::new);
     }
 
     /**

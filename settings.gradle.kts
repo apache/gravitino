@@ -63,6 +63,7 @@ include(
 // in-tree for reference; see clients/filesystem-fuse/README.md for details.
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("iceberg:iceberg-rest-server-experiment")
 include("iceberg:iceberg-rest-trino-it")
 include("lance:lance-common")
 include("lance:lance-rest-server")
@@ -82,20 +83,17 @@ if (!skipTrinoConnector) {
 } else {
   println("Skipping trino-connector modules since skipTrinoConnector is set to true")
 }
+// flink-common's sources are also compiled directly into each flink-connector:flink-*
+// module's own sourceSet (not consumed as a jar dependency), so it is not gated by scalaVersion.
+include("flink-connector:flink-common")
 if (scalaVersion == "2.12") {
-  // flink only support scala 2.12
-  include("flink-connector:flink-common")
+  // flink 1.x only supports scala 2.12
   include(
-    "flink-connector:flink-1.18",
-    "flink-connector:flink-runtime-1.18",
     "flink-connector:flink-1.19",
     "flink-connector:flink-runtime-1.19",
     "flink-connector:flink-1.20",
     "flink-connector:flink-runtime-1.20"
   )
-  project(":flink-connector:flink-1.18").projectDir = file("flink-connector/v1.18/flink")
-  project(":flink-connector:flink-runtime-1.18").projectDir =
-    file("flink-connector/v1.18/flink-runtime")
   project(":flink-connector:flink-1.19").projectDir = file("flink-connector/v1.19/flink")
   project(":flink-connector:flink-runtime-1.19").projectDir =
     file("flink-connector/v1.19/flink-runtime")
@@ -103,6 +101,16 @@ if (scalaVersion == "2.12") {
   project(":flink-connector:flink-runtime-1.20").projectDir =
     file("flink-connector/v1.20/flink-runtime")
 }
+// These connectors use Flink Java APIs, so they do not need scalaVersion gating.
+// Flink internals still use Scala.
+include("flink-connector:flink-2.1", "flink-connector:flink-runtime-2.1")
+project(":flink-connector:flink-2.1").projectDir = file("flink-connector/v2.1/flink")
+project(":flink-connector:flink-runtime-2.1").projectDir =
+  file("flink-connector/v2.1/flink-runtime")
+include("flink-connector:flink-2.2", "flink-connector:flink-runtime-2.2")
+project(":flink-connector:flink-2.2").projectDir = file("flink-connector/v2.2/flink")
+project(":flink-connector:flink-runtime-2.2").projectDir =
+  file("flink-connector/v2.2/flink-runtime")
 include("spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
@@ -125,7 +133,10 @@ include(":catalogs:hadoop-auth")
 include(":lineage")
 include(":mcp-server")
 include(":plugins:idp-basic")
+include(":plugins:k8s-job-executor")
+include(":plugins:maintenance")
 include(
+  ":maintenance:maintenance-common",
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
   ":maintenance:optimizer",

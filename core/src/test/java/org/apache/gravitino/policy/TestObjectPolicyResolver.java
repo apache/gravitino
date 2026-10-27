@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -37,6 +38,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.EffectiveTagResolver;
+import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -49,6 +51,8 @@ public class TestObjectPolicyResolver {
   private static final String METALAKE = "metalake";
   private static final MetadataObject OBJECT =
       MetadataObjects.of(Arrays.asList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+  private static final MetadataObject CATALOG =
+      MetadataObjects.of(Collections.singletonList("catalog"), MetadataObject.Type.CATALOG);
 
   private EntityStore entityStore;
   private SupportsRelationOperations relationOperations;
@@ -66,12 +70,16 @@ public class TestObjectPolicyResolver {
 
   @Test
   public void testResolveByPresenceAndValueSelector() throws Exception {
-    TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
-    TagEntity classified = tag(2L, "classified", TagAssignment.noValue());
+    TagEntity domain =
+        tag(1L, "domain", TagAssignment.ofValues("finance")).copyWithInherited(false);
+    TagEntity classified = tag(2L, "classified", TagAssignment.noValue()).copyWithInherited(true);
     PolicyEntity selected = policy(10L, "selected", true);
     PolicyEntity disabled = policy(11L, "disabled", false);
-    when(effectiveTagResolver.resolve(METALAKE, OBJECT))
-        .thenReturn(new TagEntity[] {domain, classified});
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(
+            new ResolvedTag[] {
+              new ResolvedTag(domain, OBJECT), new ResolvedTag(classified, CATALOG)
+            });
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Arrays.asList(
@@ -87,13 +95,19 @@ public class TestObjectPolicyResolver {
     PolicyEntity[] policies = resolver.resolve(METALAKE, OBJECT);
 
     Assertions.assertArrayEquals(new PolicyEntity[] {selected}, policies);
+    Assertions.assertFalse(policies[0].inherited().orElseThrow());
+
+    ObjectPolicyResolver.Match[] matches = resolver.resolveMatches(METALAKE, OBJECT);
+    Assertions.assertEquals(1, matches.length);
+    Assertions.assertEquals(List.of(OBJECT, CATALOG), matches[0].sources());
   }
 
   @Test
   public void testResolveMissingSelectorAsAllValues() throws Exception {
-    TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
+    TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance")).copyWithInherited(true);
     PolicyEntity policy = policy(10L, "policy", true);
-    when(effectiveTagResolver.resolve(METALAKE, OBJECT)).thenReturn(new TagEntity[] {domain});
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(new ResolvedTag[] {new ResolvedTag(domain, CATALOG)});
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Collections.singletonList(NameIdentifierUtil.ofTag(METALAKE, "domain")),
@@ -107,14 +121,19 @@ public class TestObjectPolicyResolver {
                     policy,
                     null)));
 
-    Assertions.assertArrayEquals(new PolicyEntity[] {policy}, resolver.resolve(METALAKE, OBJECT));
+    PolicyEntity[] policies = resolver.resolve(METALAKE, OBJECT);
+    Assertions.assertArrayEquals(new PolicyEntity[] {policy}, policies);
+    Assertions.assertTrue(policies[0].inherited().orElseThrow());
+    Assertions.assertEquals(
+        List.of(CATALOG), resolver.resolveMatches(METALAKE, OBJECT)[0].sources());
   }
 
   @Test
   public void testDropNonMatchingSelector() throws Exception {
     TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("engineering"));
     PolicyEntity policy = policy(10L, "policy", true);
-    when(effectiveTagResolver.resolve(METALAKE, OBJECT)).thenReturn(new TagEntity[] {domain});
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(new ResolvedTag[] {new ResolvedTag(domain, OBJECT)});
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Collections.singletonList(NameIdentifierUtil.ofTag(METALAKE, "domain")),
@@ -123,15 +142,19 @@ public class TestObjectPolicyResolver {
             Collections.singletonList(relation(domain, policy, TagValueSelector.of("finance"))));
 
     Assertions.assertEquals(0, resolver.resolve(METALAKE, OBJECT).length);
+    Assertions.assertEquals(0, resolver.resolveMatches(METALAKE, OBJECT).length);
   }
 
   @Test
-  public void testRejectMixedSelectorResults() throws Exception {
+  public void testSelectPolicyWhenAnySelectorMatches() throws Exception {
     TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
     TagEntity classified = tag(2L, "classified", TagAssignment.ofValues("public"));
     PolicyEntity policy = policy(10L, "policy", true);
-    when(effectiveTagResolver.resolve(METALAKE, OBJECT))
-        .thenReturn(new TagEntity[] {domain, classified});
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(
+            new ResolvedTag[] {
+              new ResolvedTag(domain, OBJECT), new ResolvedTag(classified, OBJECT)
+            });
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Arrays.asList(
@@ -143,10 +166,27 @@ public class TestObjectPolicyResolver {
                 relation(domain, policy, TagValueSelector.of("finance")),
                 relation(classified, policy, TagValueSelector.of("pii"))));
 
-    IllegalStateException exception =
-        Assertions.assertThrows(
-            IllegalStateException.class, () -> resolver.resolve(METALAKE, OBJECT));
-    Assertions.assertTrue(exception.getMessage().contains("conflicting selector results"));
+    Assertions.assertArrayEquals(new PolicyEntity[] {policy}, resolver.resolve(METALAKE, OBJECT));
+  }
+
+  @Test
+  public void testChildTagValueOverrideDropsAncestorTagValuePolicy() throws Exception {
+    // Effective tags after override: table data_domain=risk (catalog finance is shadowed).
+    TagEntity domain =
+        tag(1L, "data_domain", TagAssignment.ofValues("risk")).copyWithInherited(false);
+    PolicyEntity financePolicy = policy(30L, "finance-policy", true);
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(new ResolvedTag[] {new ResolvedTag(domain, OBJECT)});
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Collections.singletonList(NameIdentifierUtil.ofTag(METALAKE, "data_domain")),
+            Entity.EntityType.TAG))
+        .thenReturn(
+            Collections.singletonList(
+                relation(domain, financePolicy, TagValueSelector.of("finance"))));
+
+    Assertions.assertEquals(0, resolver.resolve(METALAKE, OBJECT).length);
+    Assertions.assertEquals(0, resolver.resolveMatches(METALAKE, OBJECT).length);
   }
 
   private static RelationalEntity<PolicyEntity> relation(

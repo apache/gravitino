@@ -20,9 +20,11 @@
 package org.apache.gravitino.iceberg.service.rest;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,13 +34,19 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
@@ -46,6 +54,8 @@ import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
@@ -66,11 +76,18 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+import org.apache.iceberg.GenericBlobMetadata;
+import org.apache.iceberg.GenericStatisticsFile;
+import org.apache.iceberg.ImmutableGenericPartitionStatisticsFile;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.SnapshotParser;
 import org.apache.iceberg.SnapshotRef;
+import org.apache.iceberg.StatisticsFile;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.Namespace;
@@ -81,10 +98,12 @@ import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
@@ -241,6 +260,76 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testFetchScanTasksUnknownPlanTask(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "fetch_tasks_table", true);
+
+    dummyEventListener.clearEvent();
+
+    // Scan planning hands out no plan tasks yet, so every plan task presented here is one this
+    // server never issued, reported as 404 per the Iceberg REST spec.
+    Response response =
+        doFetchScanTasks(
+            namespace, "fetch_tasks_table", new FetchScanTasksRequest("not-a-plan-task"));
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+
+    // Assert on the error payload, not just the status: an unregistered route would also yield
+    // 404, which would let this test pass without the endpoint existing.
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("NoSuchPlanTaskException", error.type());
+    Assertions.assertTrue(
+        error.message().contains("not-a-plan-task"),
+        "Error message should name the rejected plan task, but was: " + error.message());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergFetchScanTasksPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergFetchScanTasksFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testFetchScanTasksTableNotFound(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    dummyEventListener.clearEvent();
+
+    // A missing table is reported as a missing table, not masked as an unknown plan task.
+    Response response =
+        doFetchScanTasks(namespace, "missing_table", new FetchScanTasksRequest("any-plan-task"));
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("NoSuchTableException", error.type());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergFetchScanTasksPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergFetchScanTasksFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testScanPlanningEndpointsRejectMissingRequestBody(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "empty_body_table", true);
+
+    // Jersey hands the resource method a null entity when the body is absent. Both scan planning
+    // endpoints must report that as a 400 rather than letting a downstream NPE become a 500.
+    for (String endpoint : new String[] {"plan", "tasks"}) {
+      Response response =
+          getTableClientBuilder(namespace, Optional.of("empty_body_table/" + endpoint))
+              .post(Entity.entity("", MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(
+          Status.BAD_REQUEST.getStatusCode(),
+          response.getStatus(),
+          "Empty body on /" + endpoint + " should be a 400, not a 500");
+    }
+    // No events are asserted here: the request is rejected at the REST boundary before it reaches
+    // the dispatcher chain, so no operation event is dispatched.
   }
 
   @ParameterizedTest
@@ -429,6 +518,55 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
+
+    ReportMetricsRequest qualifiedRequest =
+        ReportMetricsRequest.of(
+            ImmutableCommitReport.builder()
+                .tableName("client_catalog." + namespace + ".metrics_foo1")
+                .snapshotId(-1)
+                .sequenceNumber(-1)
+                .operation("append")
+                .commitMetrics(commitMetrics)
+                .build());
+    Response qualifiedResponse =
+        getReportMetricsClientBuilder("metrics_foo1", namespace)
+            .post(Entity.entity(qualifiedRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), qualifiedResponse.getStatus());
+
+    Response missingTableResponse =
+        getReportMetricsClientBuilder("missing_metrics_table", namespace)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), missingTableResponse.getStatus());
+
+    ReportMetricsRequest mismatchedRequest =
+        ReportMetricsRequest.of(
+            ImmutableCommitReport.builder()
+                .tableName("another_table")
+                .snapshotId(-1)
+                .sequenceNumber(-1)
+                .operation("append")
+                .commitMetrics(commitMetrics)
+                .build());
+    Response mismatchedTableResponse =
+        getReportMetricsClientBuilder("metrics_foo1", namespace)
+            .post(Entity.entity(mismatchedRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Status.BAD_REQUEST.getStatusCode(), mismatchedTableResponse.getStatus());
+
+    ReportMetricsRequest mismatchedNamespaceRequest =
+        ReportMetricsRequest.of(
+            ImmutableCommitReport.builder()
+                .tableName("client_catalog.other_namespace.metrics_foo1")
+                .snapshotId(-1)
+                .sequenceNumber(-1)
+                .operation("append")
+                .commitMetrics(commitMetrics)
+                .build());
+    Response mismatchedNamespaceResponse =
+        getReportMetricsClientBuilder("metrics_foo1", namespace)
+            .post(Entity.entity(mismatchedNamespaceRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Status.BAD_REQUEST.getStatusCode(), mismatchedNamespaceResponse.getStatus());
   }
 
   @ParameterizedTest
@@ -567,6 +705,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
+  private Response doFetchScanTasks(Namespace ns, String tableName, FetchScanTasksRequest request) {
+    Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/tasks"));
+    return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
   private Response doUpdateTable(Namespace ns, String name, TableMetadata base) {
     TableMetadata newMetadata = base.updateSchema(newTableSchema);
     List<MetadataUpdate> metadataUpdates = newMetadata.changes();
@@ -580,6 +723,14 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Response response = doLoadTable(ns, tableName);
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     return loadTableResponse.tableMetadata();
+  }
+
+  private Response doUpdateTable(
+      Namespace ns, String name, TableMetadata base, List<MetadataUpdate> metadataUpdates) {
+    List<UpdateRequirement> requirements = UpdateRequirements.forUpdateTable(base, metadataUpdates);
+    UpdateTableRequest updateTableRequest = new UpdateTableRequest(requirements, metadataUpdates);
+    return getTableClientBuilder(ns, Optional.of(name))
+        .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
   private void verifyUpdateTableFail(Namespace ns, String name, int status, TableMetadata base) {
@@ -1052,6 +1203,77 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         allEtag, allEtag2, "ETag should be consistent for the same snapshots value");
   }
 
+  @Test
+  void testLoadTableETagIncludesReadRestrictionSeed() {
+    Optional<EntityTag> unrestricted =
+        IcebergTableOperations.generateETag("s3://bucket/metadata.json", "all", Optional.empty());
+    Optional<EntityTag> firstRestriction =
+        IcebergTableOperations.generateETag(
+            "s3://bucket/metadata.json", "all", Optional.of("{\"row-filter\":\"first\"}"));
+    Optional<EntityTag> secondRestriction =
+        IcebergTableOperations.generateETag(
+            "s3://bucket/metadata.json", "all", Optional.of("{\"row-filter\":\"second\"}"));
+
+    Assertions.assertTrue(unrestricted.isPresent());
+    Assertions.assertTrue(firstRestriction.isPresent());
+    Assertions.assertTrue(secondRestriction.isPresent());
+    Assertions.assertEquals(
+        IcebergTableOperations.generateETag("s3://bucket/metadata.json", "all"), unrestricted);
+    Assertions.assertNotEquals(unrestricted, firstRestriction);
+    Assertions.assertNotEquals(firstRestriction, secondRestriction);
+  }
+
+  @Test
+  void testLoadTableConditionalRequestResolvesRestrictionsBeforeETag() throws Exception {
+    IcebergTableOperationDispatcher dispatcher =
+        Mockito.mock(IcebergTableOperationDispatcher.class);
+    IcebergReadRestrictionLoader loader = Mockito.mock(IcebergReadRestrictionLoader.class);
+    Mockito.when(loader.enabled()).thenReturn(true);
+    Namespace namespace = IcebergRestTestUtil.TEST_NAMESPACE_NAME;
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "conditional_restrictions");
+    TableMetadata metadata = getTableMeta(namespace, "conditional_restrictions");
+    LoadTableResponse tableResponse =
+        LoadTableResponse.builder().withTableMetadata(metadata).build();
+    Mockito.when(dispatcher.loadTable(Mockito.any(), Mockito.any())).thenReturn(tableResponse);
+    Mockito.when(loader.load(Mockito.any(), Mockito.any(), Mockito.eq(tableResponse)))
+        .thenReturn(
+            IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("first")),
+            IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("second")),
+            IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("second")))
+        .thenThrow(new IllegalStateException("policy resolution failed"))
+        .thenThrow(new IllegalNameIdentifierException("Dotted names are unsupported"));
+
+    IcebergTableOperations operations =
+        new IcebergTableOperations(Mockito.mock(IcebergMetricsManager.class), dispatcher, loader);
+    HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+    Mockito.when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+    Mockito.when(request.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
+    FieldUtils.writeField(operations, "httpRequest", request, true);
+
+    Response first = operations.loadTable("", "schema", "table", "all", null, null);
+    Assertions.assertEquals(Status.OK.getStatusCode(), first.getStatus());
+    String firstETag = first.getHeaderString("ETag");
+    Assertions.assertNotNull(firstETag);
+
+    Response changed = operations.loadTable("", "schema", "table", "all", null, firstETag);
+    Assertions.assertEquals(Status.OK.getStatusCode(), changed.getStatus());
+    String changedETag = changed.getHeaderString("ETag");
+    Assertions.assertNotEquals(firstETag, changedETag);
+
+    Response unchanged = operations.loadTable("", "schema", "table", "all", null, changedETag);
+    Assertions.assertEquals(Status.NOT_MODIFIED.getStatusCode(), unchanged.getStatus());
+
+    Response failed = operations.loadTable("", "schema", "table", "all", null, changedETag);
+    Assertions.assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), failed.getStatus());
+
+    Response unsupported = operations.loadTable("", "schema", "table", "all", null, changedETag);
+    Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), unsupported.getStatus());
+    Mockito.verify(dispatcher, Mockito.never())
+        .getTableMetadataLocation(Mockito.any(), Mockito.any());
+    Mockito.verify(dispatcher, Mockito.times(5)).loadTable(Mockito.any(), Mockito.any());
+  }
+
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testLoadTableSnapshotsRefsFiltering(Namespace namespace) {
@@ -1091,6 +1313,25 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         refs.keySet(),
         refsTableResponse.tableMetadata().refs().keySet(),
         "Refs should be preserved in filtered response");
+
+    // Filtering must not alter anything other than the snapshot list
+    Assertions.assertNotNull(allTableResponse.metadataLocation());
+    Assertions.assertEquals(
+        allTableResponse.metadataLocation(),
+        refsTableResponse.metadataLocation(),
+        "snapshots=refs must keep metadata-location in the response");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().lastUpdatedMillis(),
+        refsTableResponse.tableMetadata().lastUpdatedMillis(),
+        "snapshots=refs must not change last-updated-ms");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().previousFiles(),
+        refsTableResponse.tableMetadata().previousFiles(),
+        "snapshots=refs must not add a metadata-log entry");
+    Assertions.assertEquals(
+        allTableResponse.tableMetadata().snapshotLog(),
+        refsTableResponse.tableMetadata().snapshotLog(),
+        "snapshots=refs must keep the full snapshot-log for lazy loading");
   }
 
   @ParameterizedTest
@@ -1133,10 +1374,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   void testFilterSnapshotsByRefsKeepsCredentials() {
     TableMetadata metadata =
         TableMetadata.newTableMetadata(
-            tableSchema,
-            org.apache.iceberg.PartitionSpec.unpartitioned(),
-            "s3://bucket/db/tbl",
-            ImmutableMap.of());
+            tableSchema, PartitionSpec.unpartitioned(), "s3://bucket/db/tbl", ImmutableMap.of());
     org.apache.iceberg.rest.credentials.Credential credential =
         IcebergRESTUtils.toRESTCredential(
             "s3://bucket/db/tbl/",
@@ -1158,6 +1396,199 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(
         "token", filtered.credentials().get(0).config().get("s3.session-token"));
     Assertions.assertEquals("org.apache.iceberg.aws.s3.S3FileIO", filtered.config().get("io-impl"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableSnapshotsRefsWithStatisticsOnHistoricalSnapshot(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    String tableName = "snapshots_refs_stats_foo1";
+    verifyCreateTableSucc(namespace, tableName, true);
+
+    LoadTableResponse before =
+        doLoadTableWithSnapshots(namespace, tableName, "all").readEntity(LoadTableResponse.class);
+    TableMetadata base = before.tableMetadata();
+    Set<Long> referencedSnapshotIds =
+        base.refs().values().stream().map(SnapshotRef::snapshotId).collect(Collectors.toSet());
+    long historicalSnapshotId =
+        base.snapshots().stream()
+            .map(Snapshot::snapshotId)
+            .filter(id -> !referencedSnapshotIds.contains(id))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("expected an unreferenced snapshot"));
+    long currentSnapshotId = base.currentSnapshot().snapshotId();
+
+    // Attach statistics and partition statistics to the historical snapshot, and statistics to the
+    // current one so we can check that only the suppressed snapshot's files are dropped.
+    Response updateResponse =
+        doUpdateTable(
+            namespace,
+            tableName,
+            base,
+            ImmutableList.of(
+                new MetadataUpdate.SetStatistics(statisticsFile(historicalSnapshotId)),
+                new MetadataUpdate.SetPartitionStatistics(
+                    ImmutableGenericPartitionStatisticsFile.builder()
+                        .snapshotId(historicalSnapshotId)
+                        .path("s3://bucket/db/tbl/metadata/partition-stats-historical.parquet")
+                        .fileSizeInBytes(10L)
+                        .build()),
+                new MetadataUpdate.SetStatistics(statisticsFile(currentSnapshotId))));
+    Assertions.assertEquals(Status.OK.getStatusCode(), updateResponse.getStatus());
+
+    Response allResponse = doLoadTableWithSnapshots(namespace, tableName, "all");
+    Assertions.assertEquals(Status.OK.getStatusCode(), allResponse.getStatus());
+    TableMetadata all = allResponse.readEntity(LoadTableResponse.class).tableMetadata();
+    Assertions.assertEquals(2, all.statisticsFiles().size());
+    Assertions.assertEquals(1, all.partitionStatisticsFiles().size());
+
+    Response refsResponse = doLoadTableWithSnapshots(namespace, tableName, "refs");
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        refsResponse.getStatus(),
+        "snapshots=refs must not fail when a suppressed snapshot has statistics");
+    TableMetadata refs = refsResponse.readEntity(LoadTableResponse.class).tableMetadata();
+
+    Assertions.assertEquals(
+        referencedSnapshotIds,
+        refs.snapshots().stream().map(Snapshot::snapshotId).collect(Collectors.toSet()));
+    Assertions.assertEquals(
+        ImmutableSet.of(currentSnapshotId),
+        refs.statisticsFiles().stream().map(StatisticsFile::snapshotId).collect(Collectors.toSet()),
+        "statistics of suppressed snapshots are dropped, statistics of kept snapshots remain");
+    Assertions.assertTrue(
+        refs.partitionStatisticsFiles().isEmpty(),
+        "partition statistics of the suppressed snapshot must be dropped");
+    Assertions.assertEquals(all.metadataFileLocation(), refs.metadataFileLocation());
+    Assertions.assertEquals(all.lastUpdatedMillis(), refs.lastUpdatedMillis());
+  }
+
+  @Test
+  void testFilterSnapshotsByRefsPreservesMetadataLocationAndHistory() {
+    TableMetadata base =
+        TableMetadata.newTableMetadata(
+            tableSchema, PartitionSpec.unpartitioned(), "s3://bucket/db/tbl", ImmutableMap.of());
+    Snapshot first = snapshot(1L, null, 1000L);
+    Snapshot second = snapshot(2L, 1L, 2000L);
+    TableMetadata withHistory =
+        TableMetadata.buildFrom(
+                TableMetadata.buildFrom(base).setBranchSnapshot(first, "main").build())
+            .setBranchSnapshot(second, "main")
+            .build();
+    String metadataLocation = "s3://bucket/db/tbl/metadata/00002-abc.metadata.json";
+    // Round-trip through the parser so the metadata looks like one loaded from a metadata file:
+    // no pending changes and a known metadata location, exactly what loadTable hands over.
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(metadataLocation, TableMetadataParser.toJson(withHistory));
+    Assertions.assertEquals(2, metadata.snapshots().size());
+    LoadTableResponse original = LoadTableResponse.builder().withTableMetadata(metadata).build();
+
+    LoadTableResponse filtered = IcebergTableOperations.filterSnapshotsByRefs(original);
+
+    Assertions.assertEquals(
+        ImmutableSet.of(2L),
+        filtered.tableMetadata().snapshots().stream()
+            .map(Snapshot::snapshotId)
+            .collect(Collectors.toSet()),
+        "only the ref-referenced snapshot should remain");
+    Assertions.assertEquals(
+        metadataLocation, filtered.metadataLocation(), "metadata-location must be preserved");
+    Assertions.assertEquals(
+        metadata.lastUpdatedMillis(),
+        filtered.tableMetadata().lastUpdatedMillis(),
+        "last-updated-ms must not be bumped by filtering");
+    Assertions.assertEquals(
+        metadata.previousFiles(),
+        filtered.tableMetadata().previousFiles(),
+        "filtering must not append a metadata-log entry");
+    Assertions.assertEquals(
+        metadata.snapshotLog(),
+        filtered.tableMetadata().snapshotLog(),
+        "snapshot-log must be kept intact for lazy snapshot loading");
+  }
+
+  @Test
+  void testFilterSnapshotsByRefsDiscardsStatisticsRemovalChanges() {
+    TableMetadata base =
+        TableMetadata.newTableMetadata(
+            tableSchema, PartitionSpec.unpartitioned(), "s3://bucket/db/tbl", ImmutableMap.of());
+    Snapshot first = snapshot(1L, null, 1000L);
+    Snapshot second = snapshot(2L, 1L, 2000L);
+    TableMetadata withHistory =
+        TableMetadata.buildFrom(
+                TableMetadata.buildFrom(base).setBranchSnapshot(first, "main").build())
+            .setBranchSnapshot(second, "main")
+            // statistics on the historical snapshot are what suppressHistoricalSnapshots() removes
+            .setStatistics(statisticsFile(1L))
+            .setPartitionStatistics(
+                ImmutableGenericPartitionStatisticsFile.builder()
+                    .snapshotId(1L)
+                    .path("s3://bucket/db/tbl/metadata/partition-stats-1.parquet")
+                    .fileSizeInBytes(10L)
+                    .build())
+            .setStatistics(statisticsFile(2L))
+            .build();
+    String metadataLocation = "s3://bucket/db/tbl/metadata/00003-abc.metadata.json";
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(metadataLocation, TableMetadataParser.toJson(withHistory));
+    Assertions.assertEquals(2, metadata.statisticsFiles().size());
+    Assertions.assertEquals(1, metadata.partitionStatisticsFiles().size());
+    LoadTableResponse original = LoadTableResponse.builder().withTableMetadata(metadata).build();
+
+    // Before the fix this threw IllegalArgumentException:
+    // "Cannot set metadata location with changes to table metadata: 2 changes"
+    LoadTableResponse filtered =
+        Assertions.assertDoesNotThrow(() -> IcebergTableOperations.filterSnapshotsByRefs(original));
+
+    Assertions.assertEquals(
+        ImmutableSet.of(2L),
+        filtered.tableMetadata().snapshots().stream()
+            .map(Snapshot::snapshotId)
+            .collect(Collectors.toSet()));
+    Assertions.assertEquals(
+        ImmutableSet.of(2L),
+        filtered.tableMetadata().statisticsFiles().stream()
+            .map(StatisticsFile::snapshotId)
+            .collect(Collectors.toSet()),
+        "only the suppressed snapshot's statistics are dropped");
+    Assertions.assertTrue(filtered.tableMetadata().partitionStatisticsFiles().isEmpty());
+    Assertions.assertTrue(
+        filtered.tableMetadata().changes().isEmpty(),
+        "a load response must not carry pending metadata updates");
+    Assertions.assertEquals(metadataLocation, filtered.metadataLocation());
+    Assertions.assertEquals(
+        metadata.lastUpdatedMillis(), filtered.tableMetadata().lastUpdatedMillis());
+    Assertions.assertEquals(metadata.previousFiles(), filtered.tableMetadata().previousFiles());
+    Assertions.assertEquals(metadata.snapshotLog(), filtered.tableMetadata().snapshotLog());
+  }
+
+  private static StatisticsFile statisticsFile(long snapshotId) {
+    return new GenericStatisticsFile(
+        snapshotId,
+        String.format("s3://bucket/db/tbl/metadata/stats-%d.puffin", snapshotId),
+        100L,
+        42L,
+        ImmutableList.of(
+            new GenericBlobMetadata(
+                "apache-datasketches-theta-v1",
+                snapshotId,
+                1L,
+                ImmutableList.of(1),
+                ImmutableMap.of())));
+  }
+
+  private static Snapshot snapshot(long snapshotId, Long parentId, long timestampMs) {
+    String json =
+        String.format(
+            "{\"snapshot-id\":%d,%s\"timestamp-ms\":%d,\"sequence-number\":%d,"
+                + "\"summary\":{\"operation\":\"append\"},"
+                + "\"manifest-list\":\"s3://bucket/db/tbl/metadata/snap-%d.avro\",\"schema-id\":0}",
+            snapshotId,
+            parentId == null ? "" : String.format("\"parent-snapshot-id\":%d,", parentId),
+            timestampMs,
+            snapshotId,
+            snapshotId);
+    return SnapshotParser.fromJson(json);
   }
 
   @ParameterizedTest

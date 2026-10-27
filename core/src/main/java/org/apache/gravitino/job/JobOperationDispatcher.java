@@ -81,11 +81,14 @@ public interface JobOperationDispatcher extends Closeable {
    * @param changes the changes to apply to the job template
    * @return the updated job template entity after applying the changes
    * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   * @throws JobTemplateAlreadyExistsException if the job template is renamed to a name that already
+   *     exists
    * @throws IllegalArgumentException if any of the changes cannot be applied to the job template.
    */
   JobTemplateEntity alterJobTemplate(
       String metalake, String jobTemplateName, JobTemplateChange... changes)
-      throws NoSuchJobTemplateException, IllegalArgumentException;
+      throws NoSuchJobTemplateException, JobTemplateAlreadyExistsException,
+          IllegalArgumentException;
 
   /**
    * List all the jobs. If the jobTemplateName is provided, it will list the jobs associated with
@@ -100,14 +103,51 @@ public interface JobOperationDispatcher extends Closeable {
       throws NoSuchJobTemplateException;
 
   /**
-   * Retrieves a job by its ID in the specified metalake.
+   * Retrieves a job by its ID in the specified metalake, optionally including its captured
+   * stdout/stderr output (see {@link JobEntity#stdout()}/{@link JobEntity#stderr()}), using the
+   * globally configured {@code gravitino.job.outputMaxLines}/{@code outputMaxBytes} caps.
+   *
+   * <p>Output is fetched live from the {@code JobExecutor} on every call, not persisted, so {@code
+   * includeOutput} should only be set to {@code true} when the caller actually needs the output -
+   * it is never included in {@link #listJobs(String, Optional)}, and callers that don't need output
+   * should pass {@code false} here.
    *
    * @param metalake the name of the metalake
    * @param jobId the ID of the job to retrieve
+   * @param includeOutput whether to also fetch and attach the job's stdout/stderr output
    * @return the job entity associated with the specified ID
    * @throws NoSuchJobException if no job with the specified ID exists
    */
-  JobEntity getJob(String metalake, String jobId) throws NoSuchJobException;
+  default JobEntity getJob(String metalake, String jobId, boolean includeOutput)
+      throws NoSuchJobException {
+    return getJob(metalake, jobId, includeOutput, null, null);
+  }
+
+  /**
+   * Retrieves a job by its ID in the specified metalake, optionally including its captured
+   * stdout/stderr output, with caller-specified caps on how much of it to return.
+   *
+   * <p>{@code maxLines}/{@code maxBytes} let a caller ask for less output than the globally
+   * configured {@code gravitino.job.outputMaxLines}/{@code outputMaxBytes} caps, but never more - a
+   * value larger than the global cap is clamped down to it, so the global configuration always
+   * remains a hard upper bound. Passing {@code null} for either uses the global default. Both are
+   * ignored when {@code includeOutput} is {@code false}.
+   *
+   * @param metalake the name of the metalake
+   * @param jobId the ID of the job to retrieve
+   * @param includeOutput whether to also fetch and attach the job's stdout/stderr output
+   * @param maxLines the maximum number of (most recent) output lines to return, or {@code null} to
+   *     use the global default
+   * @param maxBytes the maximum number of (most recent) output bytes to read, or {@code null} to
+   *     use the global default
+   * @return the job entity associated with the specified ID
+   * @throws NoSuchJobException if no job with the specified ID exists
+   * @throws IllegalArgumentException if {@code maxLines} or {@code maxBytes} is specified and not
+   *     positive
+   */
+  JobEntity getJob(
+      String metalake, String jobId, boolean includeOutput, Integer maxLines, Integer maxBytes)
+      throws NoSuchJobException;
 
   /**
    * Runs a job based on the specified job template and configuration in the specified metalake.

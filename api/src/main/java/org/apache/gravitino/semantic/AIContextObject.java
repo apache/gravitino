@@ -37,8 +37,6 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public final class AIContextObject {
 
-  static final int MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH = 100;
-
   @Nullable private final String instructions;
   @Nullable private final String[] synonyms;
   @Nullable private final String[] examples;
@@ -206,9 +204,8 @@ public final class AIContextObject {
      * <p>Values may be null, strings, booleans, JSON-compatible numbers, maps with string keys,
      * lists, or Java arrays. Integral numbers are normalized to {@link BigInteger}, and decimal
      * numbers are normalized to {@link BigDecimal} so their value semantics remain stable across
-     * JSON round trips. Nested maps, lists, and arrays may be at most {@value
-     * #MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH} levels deep. Property names must not duplicate {@code
-     * instructions}, {@code synonyms}, or {@code examples}.
+     * JSON round trips. Property names must not duplicate {@code instructions}, {@code synonyms},
+     * or {@code examples}.
      *
      * @param additionalProperties The additional properties.
      * @return This builder.
@@ -224,7 +221,7 @@ public final class AIContextObject {
      * @return The immutable structured AI context.
      * @throws IllegalArgumentException If a string array contains null, the additional properties
      *     are null, a property duplicates a standard field, or a property value is not
-     *     JSON-compatible or exceeds the supported nesting depth.
+     *     JSON-compatible or contains a cyclic reference.
      */
     public AIContextObject build() {
       SemanticModelDefinition.validateNoNullElements("synonyms", synonyms);
@@ -245,16 +242,13 @@ public final class AIContextObject {
           !isStandardProperty(name),
           "additional property must not duplicate standard property: %s",
           name);
-      result.put(name, immutableJsonValue(entry.getValue(), name, visiting, 0));
+      result.put(name, immutableJsonValue(entry.getValue(), name, visiting));
     }
     return Collections.unmodifiableMap(result);
   }
 
   private static Object immutableJsonValue(
-      @Nullable Object value,
-      String path,
-      IdentityHashMap<Object, Boolean> visiting,
-      int containerDepth) {
+      @Nullable Object value, String path, IdentityHashMap<Object, Boolean> visiting) {
     if (value == null || value instanceof String || value instanceof Boolean) {
       return value;
     }
@@ -262,13 +256,13 @@ public final class AIContextObject {
       return canonicalizeJsonNumber((Number) value, path);
     }
     if (value instanceof Map) {
-      return immutableJsonMap((Map<?, ?>) value, path, visiting, containerDepth + 1);
+      return immutableJsonMap((Map<?, ?>) value, path, visiting);
     }
     if (value instanceof List) {
-      return immutableJsonList((List<?>) value, path, visiting, containerDepth + 1);
+      return immutableJsonList((List<?>) value, path, visiting);
     }
     if (value.getClass().isArray()) {
-      return immutableJsonArray(value, path, visiting, containerDepth + 1);
+      return immutableJsonArray(value, path, visiting);
     }
     throw new IllegalArgumentException(
         String.format(
@@ -277,8 +271,8 @@ public final class AIContextObject {
   }
 
   private static Map<String, Object> immutableJsonMap(
-      Map<?, ?> value, String path, IdentityHashMap<Object, Boolean> visiting, int containerDepth) {
-    enterContainer(value, path, visiting, containerDepth);
+      Map<?, ?> value, String path, IdentityHashMap<Object, Boolean> visiting) {
+    enterContainer(value, path, visiting);
     try {
       Map<String, Object> result = new LinkedHashMap<>();
       for (Map.Entry<?, ?> entry : value.entrySet()) {
@@ -287,8 +281,7 @@ public final class AIContextObject {
             "Additional property %s contains a map key that is not a string",
             path);
         String key = (String) entry.getKey();
-        result.put(
-            key, immutableJsonValue(entry.getValue(), path + "." + key, visiting, containerDepth));
+        result.put(key, immutableJsonValue(entry.getValue(), path + "." + key, visiting));
       }
       return Collections.unmodifiableMap(result);
     } finally {
@@ -297,14 +290,12 @@ public final class AIContextObject {
   }
 
   private static List<Object> immutableJsonList(
-      List<?> value, String path, IdentityHashMap<Object, Boolean> visiting, int containerDepth) {
-    enterContainer(value, path, visiting, containerDepth);
+      List<?> value, String path, IdentityHashMap<Object, Boolean> visiting) {
+    enterContainer(value, path, visiting);
     try {
       List<Object> result = new ArrayList<>(value.size());
       for (int index = 0; index < value.size(); index++) {
-        result.add(
-            immutableJsonValue(
-                value.get(index), path + "[" + index + "]", visiting, containerDepth));
+        result.add(immutableJsonValue(value.get(index), path + "[" + index + "]", visiting));
       }
       return Collections.unmodifiableList(result);
     } finally {
@@ -313,15 +304,13 @@ public final class AIContextObject {
   }
 
   private static List<Object> immutableJsonArray(
-      Object value, String path, IdentityHashMap<Object, Boolean> visiting, int containerDepth) {
-    enterContainer(value, path, visiting, containerDepth);
+      Object value, String path, IdentityHashMap<Object, Boolean> visiting) {
+    enterContainer(value, path, visiting);
     try {
       int length = Array.getLength(value);
       List<Object> result = new ArrayList<>(length);
       for (int index = 0; index < length; index++) {
-        result.add(
-            immutableJsonValue(
-                Array.get(value, index), path + "[" + index + "]", visiting, containerDepth));
+        result.add(immutableJsonValue(Array.get(value, index), path + "[" + index + "]", visiting));
       }
       return Collections.unmodifiableList(result);
     } finally {
@@ -370,12 +359,7 @@ public final class AIContextObject {
   }
 
   private static void enterContainer(
-      Object value, String path, IdentityHashMap<Object, Boolean> visiting, int containerDepth) {
-    Preconditions.checkArgument(
-        containerDepth <= MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH,
-        "Additional property %s exceeds maximum nesting depth of %s",
-        path,
-        MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH);
+      Object value, String path, IdentityHashMap<Object, Boolean> visiting) {
     Preconditions.checkArgument(
         !visiting.containsKey(value), "Additional property %s contains a cyclic value", path);
     visiting.put(value, Boolean.TRUE);

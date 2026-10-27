@@ -36,6 +36,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(libs.awaitility)
+  testImplementation(libs.aws.s3)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
@@ -79,6 +80,13 @@ val testJar by tasks.registering(Jar::class) {
 
 configurations {
   create("testArtifacts")
+}
+
+dependencies {
+  // ContainerSuite builds its MySQL and PostgreSQL containers on these Testcontainers modules, so
+  // every module that uses the test artifacts needs them at test runtime.
+  "testArtifacts"(libs.testcontainers.mysql)
+  "testArtifacts"(libs.testcontainers.postgresql)
 }
 
 artifacts {

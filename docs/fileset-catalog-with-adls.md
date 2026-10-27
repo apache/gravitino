@@ -32,6 +32,10 @@ The catalog automatically loads the Azure Data Lake Storage filesystem provider 
 classpath. The deprecated `filesystem-providers` and `default-filesystem-provider` catalog
 properties do not need to be set.
 
+The bundle uses JSSE for TLS and does not include the optional WildFly OpenSSL provider.
+If you explicitly set Hadoop's `fs.azure.ssl.channel.mode` to `OpenSSL`, install a compatible
+provider separately on the catalog or client classpath. The default mode does not require it.
+
 ## Azure Data Lake Storage Properties
 
 These properties are needed in addition to the shared
@@ -415,7 +419,7 @@ ${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/adls_catalo
 ### GVFS Python client
 
 ```bash
-pip install apache-gravitino==${GRAVITINO_VERSION}
+pip install "apache-gravitino[azure]==${GRAVITINO_VERSION}"
 ```
 
 On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Azure Data Lake Storage

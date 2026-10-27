@@ -102,6 +102,38 @@ public class TestEffectiveTagResolver {
         new TagEntity[] {directDomain, schemaClassification, catalogOwner}, effectiveTags);
     Assertions.assertArrayEquals(
         new String[] {"finance"}, effectiveTags[0].assignment().orElseThrow().values());
+    Assertions.assertFalse(effectiveTags[0].inherited().orElseThrow());
+    Assertions.assertTrue(effectiveTags[1].inherited().orElseThrow());
+    Assertions.assertTrue(effectiveTags[2].inherited().orElseThrow());
+  }
+
+  @Test
+  void testResolveWithSourcesPreservesContributingObject() throws Exception {
+    TagEntity directDomain = tag(1L, "domain", TagAssignment.ofValues("risk"));
+    TagEntity catalogDomain = tag(2L, "domain", TagAssignment.ofValues("finance"));
+    when(relationOperations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            MetadataObjectUtil.toEntityIdent(METALAKE, TABLE),
+            Entity.EntityType.TABLE))
+        .thenReturn(Collections.singletonList(directDomain));
+    when(relationOperations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            MetadataObjectUtil.toEntityIdent(METALAKE, SCHEMA),
+            Entity.EntityType.SCHEMA))
+        .thenReturn(Collections.emptyList());
+    when(relationOperations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            MetadataObjectUtil.toEntityIdent(METALAKE, CATALOG),
+            Entity.EntityType.CATALOG))
+        .thenReturn(Collections.singletonList(catalogDomain));
+
+    EffectiveTagResolver.ResolvedTag[] effectiveTags = resolver.resolveWithSources(METALAKE, TABLE);
+
+    Assertions.assertEquals(1, effectiveTags.length);
+    Assertions.assertEquals(TABLE, effectiveTags[0].source());
+    Assertions.assertArrayEquals(
+        new String[] {"risk"}, effectiveTags[0].tag().assignment().orElseThrow().values());
+    Assertions.assertFalse(effectiveTags[0].tag().inherited().orElseThrow());
   }
 
   @Test

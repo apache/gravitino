@@ -4,6 +4,26 @@ name: Backend Integration Test Action
 on:
   workflow_call:
     inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
       architecture:
         required: true
         description: 'Architecture of the platform'
@@ -25,11 +45,20 @@ jobs:
   start-runner:
     name: JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: actions/setup-java@v4
         with:
@@ -55,8 +84,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
+          # libssl1.1 is not in the runner's apt sources, so the .deb is fetched directly.
+          deb=libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          for host in archive.ubuntu.com nz2.archive.ubuntu.com security.ubuntu.com; do
+            wget --tries=3 --timeout=30 -O "$deb" "https://$host/ubuntu/pool/main/o/openssl/$deb" && break
+            rm -f "$deb"
+          done
+          [ -s "$deb" ] || { echo "Could not download $deb from any mirror" >&2; exit 1; }
+          sudo dpkg -i "$deb"
 
       - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
         id: integrationTest
@@ -66,17 +101,19 @@ jobs:
             EXCLUDE_CONTRIB_TESTS="$EXCLUDE_CONTRIB_TESTS -x :catalogs-contrib:$module:test"
           done
 
-          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
+          ./gradlew test :iceberg:iceberg-rest-server:experimentalTest -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
             -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test \
             -x :flink-connector:flink-common:test \
-            -x :flink-connector:flink-1.18:test -x :flink-connector:flink-runtime-1.18:test \
             -x :flink-connector:flink-1.19:test -x :flink-connector:flink-runtime-1.19:test \
             -x :flink-connector:flink-1.20:test -x :flink-connector:flink-runtime-1.20:test \
+            -x :flink-connector:flink-2.1:test -x :flink-connector:flink-runtime-2.1:test \
+            -x :flink-connector:flink-2.2:test -x :flink-connector:flink-runtime-2.2:test \
             -x :spark-connector:spark-3.5:test -x :spark-connector:spark-4.0:test \
             -x :spark-connector:spark-runtime-3.5:test -x :spark-connector:spark-runtime-4.0:test \
             -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test \
             -x :iceberg:iceberg-rest-trino-it:test \
             -x :plugins:idp-basic:test \
+            -x :plugins:maintenance:test \
             -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test \
             -x :clients:cli:test -x :maintenance:jobs:test -x :maintenance:optimizer:test \
             $EXCLUDE_CONTRIB_TESTS

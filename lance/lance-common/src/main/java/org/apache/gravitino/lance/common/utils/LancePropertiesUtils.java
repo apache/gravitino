@@ -20,10 +20,14 @@
 package org.apache.gravitino.lance.common.utils;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
+import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.gravitino.rel.Table;
 
 /** Utility methods for Lance storage properties. */
 public final class LancePropertiesUtils {
@@ -33,10 +37,51 @@ public final class LancePropertiesUtils {
   }
 
   /**
+   * Returns whether the supplied table format identifies a Lance table.
+   *
+   * @param tableFormat the table format, which may be null
+   * @return true when the format is Lance, ignoring case
+   */
+  public static boolean isLanceTableFormat(String tableFormat) {
+    return LANCE_TABLE_FORMAT.equalsIgnoreCase(tableFormat);
+  }
+
+  /**
+   * Returns whether the table's data is externally owned.
+   *
+   * <p>Registered Lance tables are external even when an older registration omitted or incorrectly
+   * stored the external flag. Other formats retain their explicit external flag semantics.
+   *
+   * @param tableProperties the stored table properties
+   * @return true for an explicitly external table or a registered Lance table
+   */
+  public static boolean isExternalTable(Map<String, String> tableProperties) {
+    return Boolean.parseBoolean(tableProperties.get(Table.PROPERTY_EXTERNAL))
+        || isRegisteredLanceTable(tableProperties);
+  }
+
+  /**
+   * Makes registered Lance table properties explicitly external without changing the input map.
+   *
+   * @param tableProperties the table properties
+   * @return a copy with external=true for a registered Lance table, or the input when unchanged
+   */
+  public static Map<String, String> normalizeTableProperties(Map<String, String> tableProperties) {
+    if (!isRegisteredLanceTable(tableProperties)
+        || "true".equals(tableProperties.get(Table.PROPERTY_EXTERNAL))) {
+      return tableProperties;
+    }
+    Map<String, String> normalized = new LinkedHashMap<>(tableProperties);
+    normalized.put(Table.PROPERTY_EXTERNAL, "true");
+    return normalized;
+  }
+
+  /**
    * Extracts Lance storage options from a property map.
    *
    * @param tableProperties the source properties
    * @return the Lance storage options without the `lance.storage.` prefix
+   * @throws IllegalArgumentException if a property key is exactly `lance.storage.`
    */
   public static Map<String, String> getLanceStorageOptions(Map<String, String> tableProperties) {
     if (tableProperties == null || tableProperties.isEmpty()) {
@@ -47,7 +92,14 @@ public final class LancePropertiesUtils {
         .filter(entry -> entry.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
         .collect(
             Collectors.toMap(
-                entry -> entry.getKey().substring(LANCE_STORAGE_OPTIONS_PREFIX.length()),
+                entry -> {
+                  String propertyKey = entry.getKey();
+                  Preconditions.checkArgument(
+                      !LANCE_STORAGE_OPTIONS_PREFIX.equals(propertyKey),
+                      "Lance storage option key cannot be empty: %s",
+                      propertyKey);
+                  return propertyKey.substring(LANCE_STORAGE_OPTIONS_PREFIX.length());
+                },
                 Map.Entry::getValue,
                 (left, right) -> right,
                 LinkedHashMap::new));
@@ -85,5 +137,10 @@ public final class LancePropertiesUtils {
             .collect(
                 Collectors.toMap(
                     entry -> LANCE_STORAGE_OPTIONS_PREFIX + entry.getKey(), Map.Entry::getValue));
+  }
+
+  private static boolean isRegisteredLanceTable(Map<String, String> tableProperties) {
+    return isLanceTableFormat(tableProperties.get(Table.PROPERTY_TABLE_FORMAT))
+        && Boolean.parseBoolean(tableProperties.get(LANCE_TABLE_REGISTER));
   }
 }

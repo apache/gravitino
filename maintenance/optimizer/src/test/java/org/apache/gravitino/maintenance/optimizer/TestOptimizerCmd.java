@@ -24,6 +24,10 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.List;
+import java.util.regex.Pattern;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.MetricsEvaluatorForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
@@ -38,6 +42,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestOptimizerCmd {
+
+  // A spark_master entry with an empty value in the printed job configuration.
+  private static final Pattern EMPTY_SPARK_MASTER = Pattern.compile("\\bspark_master=\\s*[,}]");
 
   @Test
   void testGlobalHelpIncludesImplementedCommands() {
@@ -157,6 +164,23 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testSubmitStrategyJobsNormalizesIdentifierWithDefaultCatalog() throws Exception {
+    Path confPath = addDefaultCatalog(createOptimizerConfForSubmitStrategy(), "test");
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-strategy-jobs",
+            "--identifiers",
+            "db.table",
+            "--strategy-name",
+            StrategyProviderForCmdTest.STRATEGY_NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
+  }
+
+  @Test
   void testSubmitStrategyJobsDryRunDoesNotSubmit() throws Exception {
     Path confPath = createOptimizerConfForSubmitStrategy();
     String[] output =
@@ -249,6 +273,38 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testListTableMetricsNormalizesIdentifierWithDefaultCatalog() throws Exception {
+    Path confPath = addDefaultCatalog(createOptimizerConfForMetricsProvider(), "test");
+    String[] output =
+        runCommand(
+            "--type",
+            "list-table-metrics",
+            "--identifiers",
+            "db.table",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
+  }
+
+  @Test
+  void testListTableMetricsRejectsTwoLevelIdentifierWithoutDefaultCatalog() throws Exception {
+    Path confPath = createOptimizerConfForMetricsProvider();
+    String[] output =
+        runCommand(
+            "--type",
+            "list-table-metrics",
+            "--identifiers",
+            "db.table",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(
+        output[1].contains(
+            "configure gravitino.optimizer.gravitinoDefaultCatalog when using schema.table"),
+        "stderr=" + output[1] + ", stdout=" + output[0]);
+  }
+
+  @Test
   void testListTableMetricsWithPartitionPathImplemented() throws Exception {
     Path confPath = createOptimizerConfForMetricsProvider();
     String[] output =
@@ -289,6 +345,22 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testListJobMetricsDoesNotApplyDefaultCatalog() throws Exception {
+    Path confPath = addDefaultCatalog(createOptimizerConfForMetricsProvider(), "catalog");
+    String[] output =
+        runCommand(
+            "--type",
+            "list-job-metrics",
+            "--identifiers",
+            "db.job1",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("identifier=db.job1"));
+    Assertions.assertFalse(output[0].contains("identifier=catalog.db.job1"));
+  }
+
+  @Test
   void testMonitorMetricsImplemented() throws Exception {
     Path confPath = createOptimizerConfForMonitor();
     String[] output =
@@ -308,6 +380,25 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[0].contains("EvaluationResult{scopeType=JOB"));
     Assertions.assertTrue(output[0].contains("identifier=test.db.job1"));
     Assertions.assertTrue(output[0].contains("identifier=test.db.job2"));
+  }
+
+  @Test
+  void testMonitorMetricsNormalizesIdentifierWithDefaultCatalog() throws Exception {
+    Path confPath = addDefaultCatalog(createOptimizerConfForMonitor(), "test");
+    String[] output =
+        runCommand(
+            "--type",
+            "monitor-metrics",
+            "--identifiers",
+            "db.table",
+            "--action-time",
+            "100",
+            "--range-seconds",
+            "10",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
   }
 
   @Test
@@ -338,6 +429,29 @@ class TestOptimizerCmd {
     Assertions.assertTrue(
         totalPartitionUpdates >= 1,
         "Expected partition updates from updateAll, but got " + totalPartitionUpdates);
+  }
+
+  @Test
+  void testUpdateStatisticsNormalizesIdentifierWithDefaultCatalog() throws Exception {
+    StatisticsUpdaterForTest.reset();
+    Path confPath = addDefaultCatalog(createOptimizerConfForUpdater(), "catalog");
+    String[] output =
+        runCommand(
+            "--type",
+            "update-statistics",
+            "--identifiers",
+            "schema.table",
+            "--calculator-name",
+            StatisticsCalculatorForTest.NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    List<NameIdentifier> updatedIdentifiers =
+        StatisticsUpdaterForTest.instances().stream()
+            .flatMap(updater -> updater.tableIdentifiers().stream())
+            .toList();
+    Assertions.assertEquals(
+        List.of(NameIdentifier.of("catalog", "schema", "table")), updatedIdentifiers);
   }
 
   @Test
@@ -387,7 +501,8 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[0].contains("jobTemplate=builtin-iceberg-update-stats"));
     Assertions.assertTrue(output[0].contains("update_mode=stats"));
     Assertions.assertTrue(output[0].contains("table_identifier=ab.t1"));
-    Assertions.assertTrue(output[0].contains("spark_master=local[*]"));
+    // Without a configured master, the job executor decides it.
+    Assertions.assertTrue(EMPTY_SPARK_MASTER.matcher(output[0]).find(), output[0]);
     Assertions.assertTrue(output[0].contains("catalog_type=rest"));
     Assertions.assertTrue(output[0].contains("catalog_uri=http://localhost:9001/iceberg"));
     Assertions.assertTrue(output[0].contains("warehouse_location=/tmp/warehouse"));
@@ -444,13 +559,21 @@ class TestOptimizerCmd {
                 + "\"spark.sql.catalog.rest.type\":\"rest\","
                 + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
                 + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
-                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}",
+                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\","
+                + "\"spark.master\":\"local[2]\"}",
             "--dry-run",
             "--conf-path",
             confPath.toString());
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("custom-metrics-updater"));
     Assertions.assertTrue(output[0].contains("spark.sql.catalog.rest"));
+    // The master of spark_conf isn't passed as the spark_master parameter, and the user is told.
+    Assertions.assertTrue(EMPTY_SPARK_MASTER.matcher(output[0]).find(), output[0]);
+    Assertions.assertTrue(
+        output[0].contains(
+            "WARN: spark.master=local[2] in the Spark configurations is ignored by the job."
+                + " Set gravitino.optimizer.jobSubmitterConfig.spark_master instead."),
+        output[0]);
   }
 
   @Test
@@ -640,6 +763,15 @@ class TestOptimizerCmd {
             + System.lineSeparator();
     Files.writeString(confPath, content, StandardCharsets.UTF_8);
     confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path addDefaultCatalog(Path confPath, String catalogName) throws Exception {
+    Files.writeString(
+        confPath,
+        "gravitino.optimizer.gravitinoDefaultCatalog = " + catalogName + System.lineSeparator(),
+        StandardCharsets.UTF_8,
+        StandardOpenOption.APPEND);
     return confPath;
   }
 

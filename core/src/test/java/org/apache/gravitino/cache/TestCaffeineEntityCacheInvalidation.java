@@ -21,7 +21,6 @@ package org.apache.gravitino.cache;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.time.Duration;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -40,7 +39,6 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.TestUtil;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -349,44 +347,27 @@ public class TestCaffeineEntityCacheInvalidation {
   }
 
   @Test
-  void testExpiredRemovalCallbackAfterReinsertKeepsIndexEntry() throws Exception {
-    // Deterministic regression for the removal-listener race: the asynchronous callback of an
-    // expired/evicted entry must not delete the index entry of a reinserted entry with the same
-    // key, otherwise later parent-level invalidation can no longer discover the child.
-    Config config = new Config(false) {};
-    // 50 ms TTL so the first entry expires quickly while the test stays deterministic.
-    config.set(Configs.CACHE_EXPIRATION_TIME, 50L);
-    cache = new CaffeineEntityCache(config);
-
+  void testExpiredRemovalCallbackAfterReinsertKeepsIndexEntry() {
     CatalogEntity catalog =
         TestUtil.getTestCatalogEntity(1L, "catalog1", Namespace.of("metalake"), "hive", "cmt");
     SchemaEntity schema =
         TestUtil.getTestSchemaEntity(2L, "schema1", Namespace.of("metalake", "catalog1"), "cmt");
     TableEntity table =
         TestUtil.getTestTableEntity(3L, "table1", Namespace.of("metalake", "catalog1", "schema1"));
+    EntityCacheKey tableKey = EntityCacheKey.of(table.nameIdentifier(), Entity.EntityType.TABLE);
     cache.put(catalog);
     cache.put(schema);
     cache.put(table);
 
-    // Wait past the TTL so the table entry expires. Caffeine's removal listener runs
-    // asynchronously on the cache's executor (CLEANUP_EXECUTOR), reinsert the entity first and
-    // give the delayed callback a chance to run. Use Awaitility for a deterministic wait.
-    Awaitility.await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () ->
-                Assertions.assertNull(
-                    cache
-                        .getCacheData()
-                        .getIfPresent(
-                            EntityCacheKey.of(table.nameIdentifier(), Entity.EntityType.TABLE))));
-
-    // Reinsert the table: cacheData now holds a fresh entry and cacheIndex holds its key again.
+    // Remove only the data entry, then reinsert it before replaying the old expiry callback.
+    // Explicit Caffeine removal skips index cleanup, so no asynchronous timing is required.
+    cache.getCacheData().invalidate(tableKey);
+    Assertions.assertNull(cache.getCacheData().policy().getIfPresentQuietly(tableKey));
     cache.put(table);
+    cache.removeIndexEntryIfAbsent(tableKey);
     Assertions.assertTrue(cache.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
 
-    // If the delayed removal callback unconditionally removed the index entry, parent
-    // invalidation would fail to drop this reinserted child.
+    // The delayed callback must preserve the new entry's index so parent invalidation finds it.
     cache.invalidate(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
     Assertions.assertFalse(cache.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     Assertions.assertFalse(cache.contains(schema.nameIdentifier(), Entity.EntityType.SCHEMA));

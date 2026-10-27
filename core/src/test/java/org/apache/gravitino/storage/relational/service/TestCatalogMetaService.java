@@ -29,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -61,8 +62,10 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -72,6 +75,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 public class TestCatalogMetaService extends TestJDBCBackend {
 
@@ -573,6 +577,102 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     assertEquals(0, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
   }
 
+  @TestTemplate
+  public void testDeleteCatalogCascadeRemovesTableVersions() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_with_table_versions",
+            auditInfo);
+    backend.insert(catalog, false);
+
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalog.name()),
+            "schema_with_table_versions",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    Namespace objectNamespace = Namespace.of(metalakeName, catalog.name(), schema.name());
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column_with_version")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_with_version")
+            .withNamespace(objectNamespace)
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    // The insert wrote an active version row for the table.
+    assertTrue(countActiveTableVersionRows(table.id()) > 0);
+
+    assertTrue(CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true));
+
+    // The catalog cascade must soft-delete the version rows too; otherwise they keep
+    // deleted_at = 0 forever and never become eligible for legacy-timeline cleanup.
+    assertEquals(0, countActiveTableVersionRows(table.id()));
+  }
+
+  @TestTemplate
+  public void testCascadeDeleteCatalogWithMoreSchemasThanOneChunk() throws IOException {
+    String catalogName = "catalog_many_schemas";
+    CatalogEntity catalog = createAndInsertCatalog(metalakeName, catalogName);
+    int schemaCount = OccWriteSupport.CHILD_DELETE_BATCH_SIZE + 1;
+    for (int i = 0; i < schemaCount; i++) {
+      createAndInsertSchema(metalakeName, catalogName, "schema_" + i);
+    }
+
+    // Make the snapshot of the last schema stale, so only the second chunk misses a row. The
+    // first chunk is already deleted by then and must roll back with the failed cascade.
+    CatalogMetaService service = Mockito.spy(CatalogMetaService.getInstance());
+    Mockito.doAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              List<SchemaPO> schemaPOs = (List<SchemaPO>) invocation.callRealMethod();
+              List<SchemaPO> staleSchemaPOs = new ArrayList<>(schemaPOs);
+              SchemaPO last = staleSchemaPOs.get(staleSchemaPOs.size() - 1);
+              staleSchemaPOs.set(
+                  staleSchemaPOs.size() - 1,
+                  SchemaPO.builder()
+                      .withSchemaId(last.getSchemaId())
+                      .withSchemaName(last.getSchemaName())
+                      .withMetalakeId(last.getMetalakeId())
+                      .withCatalogId(last.getCatalogId())
+                      .withSchemaComment(last.getSchemaComment())
+                      .withProperties(last.getProperties())
+                      .withAuditInfo(last.getAuditInfo())
+                      .withCurrentVersion(last.getCurrentVersion() + 1)
+                      .withLastVersion(last.getLastVersion() + 1)
+                      .withDeletedAt(last.getDeletedAt())
+                      .build());
+              return staleSchemaPOs;
+            })
+        .when(service)
+        .listSchemaPOsForCascade(catalog.id());
+
+    assertThrows(
+        OptimisticLockException.class, () -> service.deleteCatalog(catalog.nameIdentifier(), true));
+    assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertEquals(schemaCount, countActiveSchemas(catalog.id()));
+
+    assertTrue(CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true));
+    assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertEquals(0, countActiveSchemas(catalog.id()));
+  }
+
   private List<Throwable> insertCatalogsConcurrently(CatalogEntity first, CatalogEntity second)
       throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -652,6 +752,31 @@ public class TestCatalogMetaService extends TestJDBCBackend {
         return rs.getInt(1);
       }
       throw new RuntimeException("No result for countActiveTagRelForMetadataObject");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  private int countActiveSchemas(Long catalogId) {
+    return SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId))
+        .size();
+  }
+
+  private int countActiveTableVersionRows(Long tableId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM table_version_info WHERE table_id = %d AND deleted_at = 0",
+                    tableId))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      return 0;
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
     }

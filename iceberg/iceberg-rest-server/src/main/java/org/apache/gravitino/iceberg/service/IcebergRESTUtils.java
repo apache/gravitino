@@ -49,6 +49,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -91,6 +92,11 @@ public class IcebergRESTUtils {
           "client.refresh-credentials-endpoint",
           "gcs.oauth2.refresh-credentials-endpoint",
           "adls.refresh-credentials-endpoint");
+
+  // Set once at service startup. Only Iceberg REST reads this flag, and its classes are packaged
+  // outside the main server's classpath, so each service loads its own copy.
+  private static volatile boolean includeErrorStackTrace =
+      JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue();
 
   /** Snapshot modes for the Iceberg loadTable endpoint. */
   public enum SnapshotMode {
@@ -339,8 +345,8 @@ public class IcebergRESTUtils {
 
   /**
    * Builds an OK response with the ETag header derived from the table metadata location. Uses the
-   * default snapshots value to ensure ETags from create/update/register are consistent with the
-   * default loadTable endpoint.
+   * default snapshots value, matching an unrestricted default load-table response. A load-table
+   * response with read restrictions has a distinct ETag based on those restrictions.
    *
    * @param loadTableResponse the table response to include in the body
    * @return a Response with ETag header set
@@ -390,6 +396,20 @@ public class IcebergRESTUtils {
    * @return the generated ETag
    */
   public static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
+    return generateETag(metadataLocation, snapshots, Optional.empty());
+  }
+
+  /**
+   * Generates an ETag for a load-table representation, including state that may change without an
+   * Iceberg metadata commit.
+   *
+   * @param metadataLocation the metadata file location
+   * @param snapshots the snapshots query parameter value
+   * @param representationSeed optional canonical seed for response state outside table metadata
+   * @return the generated ETag
+   */
+  public static Optional<EntityTag> generateETag(
+      String metadataLocation, String snapshots, Optional<String> representationSeed) {
     if (StringUtils.isBlank(metadataLocation)) {
       return Optional.empty();
     }
@@ -397,6 +417,10 @@ public class IcebergRESTUtils {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       digest.update(metadataLocation.getBytes(StandardCharsets.UTF_8));
       digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
+      if (representationSeed.isPresent()) {
+        digest.update((byte) 0);
+        digest.update(representationSeed.get().getBytes(StandardCharsets.UTF_8));
+      }
       byte[] hash = digest.digest();
       StringBuilder hexString = new StringBuilder();
       for (byte b : hash) {
@@ -425,14 +449,26 @@ public class IcebergRESTUtils {
     return Response.status(Status.NOT_FOUND).build();
   }
 
+  /**
+   * Sets whether error responses built by {@link #errorResponse(Throwable, int)} include the
+   * exception's stack trace. Called once when the service starts.
+   *
+   * @param include whether to include stack traces
+   */
+  public static void setIncludeErrorStackTrace(boolean include) {
+    includeErrorStackTrace = include;
+  }
+
   public static Response errorResponse(Throwable ex, int httpStatus) {
-    ErrorResponse errorResponse =
+    ErrorResponse.Builder builder =
         ErrorResponse.builder()
             .responseCode(httpStatus)
             .withType(ex.getClass().getSimpleName())
-            .withMessage(ex.getMessage())
-            .withStackTrace(ex)
-            .build();
+            .withMessage(ex.getMessage());
+    if (includeErrorStackTrace) {
+      builder.withStackTrace(ex);
+    }
+    ErrorResponse errorResponse = builder.build();
     return Response.status(httpStatus)
         .entity(errorResponse)
         .type(MediaType.APPLICATION_JSON)

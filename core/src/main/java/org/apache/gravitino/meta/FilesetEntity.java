@@ -29,6 +29,7 @@ import java.util.Objects;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -42,7 +43,10 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
   public static final Field NAME =
       Field.required("name", String.class, "The name of the fileset entity.");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment or description of the fileset entity.");
+      Field.optional(
+          "comment",
+          "The comment or description of the fileset entity.",
+          EntityFieldLimits.MAX_COMMENT_LENGTH);
   public static final Field TYPE =
       Field.required("type", Fileset.Type.class, "The type of the fileset entity.");
   public static final Field STORAGE_LOCATIONS =

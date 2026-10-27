@@ -92,7 +92,7 @@ public interface Entity extends Serializable {
    * @throws IllegalArgumentException If the validation fails.
    */
   default void validate() throws IllegalArgumentException {
-    fields().forEach(Field::validate);
+    fields().forEach((field, value) -> field.validate(value, type()));
   }
 
   /**

@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -157,6 +158,24 @@ public class TestGravitinoServer {
   }
 
   @Test
+  public void testMetricsEndpointsAreAvailableOnMainServer() throws Exception {
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    int port =
+        JettyServerConfig.fromConfig(spyServerConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
+    HttpClient client = HttpClient.newHttpClient();
+    for (String path : JettyServer.METRICS_PATH_SPECS) {
+      HttpResponse<String> response =
+          client.send(
+              HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path)).GET().build(),
+              HttpResponse.BodyHandlers.ofString());
+      assertEquals(200, response.statusCode(), "Metrics endpoint " + path);
+    }
+  }
+
+  @Test
   public void testStartWithoutInitialise() throws Exception {
     assertThrows(RuntimeException.class, () -> gravitinoServer.start());
   }
@@ -233,6 +252,42 @@ public class TestGravitinoServer {
                     .build(),
                 HttpResponse.BodyHandlers.ofString());
     assertEquals(404, response.statusCode());
+  }
+
+  @Test
+  public void testJerseyErrorOmitsStackWhenDisabled() throws Exception {
+    Map<String, String> configs = new HashMap<>();
+    configs.put(
+        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(5000, 6000)));
+    configs.put(
+        GravitinoServer.WEBSERVER_CONF_PREFIX
+            + JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getKey(),
+        "false");
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.loadFromMap(configs, key -> true);
+    serverConfig = spyServerConfig(serverConfig);
+    gravitinoServer = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    int port =
+        JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
+    HttpResponse<String> response =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/metalakes"))
+                    .header("Accept", "application/vnd.gravitino.v1+json")
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{"))
+                    .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+    assertEquals(400, response.statusCode(), response.body());
+    JsonNode responseJson = ObjectMapperProvider.objectMapper(false).readTree(response.body());
+    assertTrue(responseJson.hasNonNull("message"));
+    assertFalse(responseJson.has("stack"));
   }
 
   @Test

@@ -54,6 +54,7 @@ dependencies {
   testImplementation(libs.nimbus.jose.jwt)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.hadoop3.client)
+  testImplementation(libs.jackson.dataformat.yaml)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.minikdc)

@@ -47,5 +47,10 @@ public class TestConnectorUtil {
     extensions = new String[] {"a", "a", "b", "c"};
     result = ConnectorUtil.removeDuplicateSparkExtensions(extensions, null);
     Assertions.assertEquals(result, "a,b,c");
+
+    extensions = new String[] {"a", " b ", ""};
+    addedExtensions = " a, b, ,c ";
+    result = ConnectorUtil.removeDuplicateSparkExtensions(extensions, addedExtensions.split(COMMA));
+    Assertions.assertEquals(result, "a,b,c");
   }
 }

@@ -82,15 +82,7 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
     // metadata.json file at the given location), so build a mock LoadTableResponse here.
     // Honor cloud URIs (e.g. s3://) in metadataLocation so credential vending tests can
     // verify the vended path; default to /mock otherwise for existing tests.
-    String location =
-        request.metadataLocation().contains("://") ? request.metadataLocation() : "/mock";
-    Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
-    TableMetadata baseMetadata =
-        TableMetadata.newTableMetadata(
-            mockSchema, PartitionSpec.unpartitioned(), location, ImmutableMap.of());
-    String json = TableMetadataParser.toJson(baseMetadata);
-    TableMetadata tableMetadata =
-        TableMetadataParser.fromJson(location + "/metadata/v1.metadata.json", json);
+    TableMetadata tableMetadata = mockTableMetadata(request.metadataLocation());
     LoadTableResponse loadTableResponse =
         LoadTableResponse.builder()
             .withTableMetadata(tableMetadata)
@@ -111,6 +103,11 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
           CredentialPrivilege.WRITE);
     }
     return loadTableResponse;
+  }
+
+  @Override
+  public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
+    return mockTableMetadata(metadataLocation);
   }
 
   @Override
@@ -155,6 +152,16 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
     }
     return Boolean.parseBoolean(
         request.properties().getOrDefault(GENERATE_PLAN_TASKS_DATA_PROP, Boolean.FALSE.toString()));
+  }
+
+  private static TableMetadata mockTableMetadata(String metadataLocation) {
+    String location = metadataLocation.contains("://") ? metadataLocation : "/mock";
+    Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
+    TableMetadata baseMetadata =
+        TableMetadata.newTableMetadata(
+            mockSchema, PartitionSpec.unpartitioned(), location, ImmutableMap.of());
+    String json = TableMetadataParser.toJson(baseMetadata);
+    return TableMetadataParser.fromJson(location + "/metadata/v1.metadata.json", json);
   }
 
   private void appendSampleData(Namespace namespace, String tableName) {

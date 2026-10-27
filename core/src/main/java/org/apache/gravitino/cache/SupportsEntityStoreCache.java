@@ -70,9 +70,9 @@ public interface SupportsEntityStoreCache {
    *
    * <p>Only self-contained entities are approved. User/group/role are deliberately excluded because
    * they contain relation-derived data whose source can change through another entity. Model/model
-   * version and function are also excluded because they carry load-bearing pointers that must not
-   * be served stale. Other unapproved and newly introduced entity types go straight to the store
-   * until their invalidation behavior has been validated.
+   * version, Semantic Model, and function are also excluded because they carry load-bearing content
+   * that must not be served stale. Other unapproved and newly introduced entity types go straight
+   * to the store until their invalidation behavior has been validated.
    *
    * <p>Implementations must also invoke {@link #invalidateOnKeyChange(Entity)} for every entity,
    * including non-cacheable ones, since a non-cacheable entity may still invalidate a cacheable
@@ -88,6 +88,12 @@ public interface SupportsEntityStoreCache {
    *
    * <p>For example, inserting a {@code ModelVersion} may require invalidating the corresponding
    * {@code Model} entry in the cache to maintain consistency.
+   *
+   * <p>Callers may run {@link #put(Entity)}, and therefore this method, while holding the inserted
+   * entity's own cache lock (see {@link EntityCache#withCacheLock(EntityCacheKey,
+   * EntityCache.ThrowingRunnable)}); the relational entity store publishes reads and inserts that
+   * way. Implementations must therefore not acquire another entity's cache lock here, since nesting
+   * two entity locks can deadlock.
    *
    * @param entity The entity being inserted
    * @param <E> The type of the entity

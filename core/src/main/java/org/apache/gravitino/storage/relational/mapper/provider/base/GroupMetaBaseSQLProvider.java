@@ -141,13 +141,23 @@ public class GroupMetaBaseSQLProvider {
 
   /** Returns SQL that selects and locks an active group by ID. */
   public String selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId) {
+    return selectGroupMetaById(groupId) + " FOR UPDATE";
+  }
+
+  /** Returns SQL that selects an active group by ID and locks it for shared access. */
+  public String selectGroupMetaByIdForShare(@Param("groupId") Long groupId) {
+    return selectGroupMetaById(groupId) + " LOCK IN SHARE MODE";
+  }
+
+  /** Returns SQL that selects an active group by ID. */
+  protected String selectGroupMetaById(Long groupId) {
     return "SELECT group_id as groupId, group_name as groupName,"
         + " metalake_id as metalakeId, audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
         + " deleted_at as deletedAt"
         + " FROM "
         + GROUP_TABLE_NAME
-        + " WHERE group_id = #{groupId} AND deleted_at = 0 FOR UPDATE";
+        + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
   public String listExtendedGroupPOsByMetalakeIdAndNames(

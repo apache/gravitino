@@ -141,10 +141,20 @@ it recognizes.
 ### Running More Than One Server
 
 Servers behind a load balancer share the entity store but keep local caches. Each server polls the
-entity change log and invalidates entries that another server has modified. The defaults are safe:
-a three second poll, and a server that cannot keep its caches current exits rather than serving
-metadata it knows to be stale. Point the load balancer's health check at `GET /health/ready` so a
-server that has lost its database stops receiving traffic.
+entity change log and invalidates entries that another server has modified. The default poll
+interval is three seconds. The poller delivers each incremental batch to registered listeners
+and advances its cursor. Bounded recent-history replay is enabled by default and can repeat event
+IDs for listeners opting into replay, including the built-in cache listeners. A listener that
+cannot invalidate a key must clear its local cache. The poller logs query and listener failures
+and continues polling. Monitor the
+[entity change log metrics](metrics.md#entity-change-log-metrics), especially record lag, time
+since the last successful poll, listener failures, and fallback clears. Point the load balancer's
+health check at `GET /health/ready` so a server that has lost its database stops receiving traffic.
+
+Jobs run by the default `local` job executor keep their output in `gravitino.job.stagingDir`. Put
+that directory on storage shared by all servers, for example an NFS mount, so that a request for a
+job's output can be served by any server. Otherwise only the server that ran the job can return
+it, and the others return empty output. See [Manage Jobs](manage-jobs-in-gravitino.md).
 
 ## Server Configuration
 
@@ -170,13 +180,37 @@ empty string or list; `(none)` means it has no default at all.
 | `gravitino.server.webserver.requestHeaderSize`       | Maximum size in bytes of an HTTP request header.                                                                                                                                             | `131072`                                |
 | `gravitino.server.webserver.responseHeaderSize`      | Maximum size in bytes of an HTTP response header.                                                                                                                                            | `131072`                                |
 | `gravitino.server.webserver.customFilters`           | Comma-separated list of servlet filter class names to apply to the API.                                                                                                                      | (empty)                                 |
+| `gravitino.server.webserver.trustedProxies`          | Comma-separated list of IP addresses or CIDR blocks (IPv4 or IPv6) of reverse proxies whose `X-Forwarded-For` header is trusted when recording the client address. Host names are not allowed.             | (empty)                                 |
 | `gravitino.server.rest.extensionPackages`            | Comma-separated list of packages to scan for additional REST resources.                                                                                                                      | (empty)                                 |
 | `gravitino.server.visibleConfigs`                    | Comma-separated list of extra properties to expose on the unauthenticated `GET /configs` endpoint, on top of the fixed set it always returns. Additive, so each entry widens what is public. | (empty)                                 |
 | `gravitino.server.bulk.maxItems`                     | Maximum number of items allowed in a single bulk request.                                                                                                                                    | `100`                                   |
+| `gravitino.server.webserver.includeErrorStackTrace`  | Whether HTTP error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details. It remains `true` by default only to avoid breaking legacy clients that expect the `stack` field. See [OWASP REST Security: Error handling](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#error-handling) and [CWE-209](https://cwe.mitre.org/data/definitions/209.html). | `true`                                  |
 
 Filters named in `customFilters` must be standard `javax.servlet` filters. Pass parameters to a
 filter with properties of the form
 `gravitino.server.webserver.{filter_class_name}.param.{param_name} = {value}`.
+
+`trustedProxies` controls the client address recorded in audit events. A caller can set
+`X-Forwarded-For` to any value, so the server honors it only when the TCP peer is a trusted proxy.
+In that case the server reads every `X-Forwarded-For` header from right to left, skips trusted
+proxies, and records the first address that is not one. Entries to the left of that address were
+supplied by the client and are ignored. Empty list elements are skipped. If an entry is not an IP address, the server
+stops and records the last trusted hop. When `trustedProxies` is empty, the default, `X-Forwarded-For` is
+ignored and the TCP peer address is recorded. Recorded addresses are in canonical form, with IPv6
+compressed and without brackets, for example `::1`. An entry that is not an IP address or CIDR
+block fails server startup. IPv6 link-local addresses (`fe80::/10`) cannot be trusted proxies: the
+same link-local address can name different hosts on different network links, so an entry inside
+`fe80::/10` also fails startup, and a link-local peer is never trusted even when a wider entry such
+as `::/0` covers it. Use a global or unique local address (for example `fd00::/8`) for the proxy.
+
+If Gravitino runs behind a load balancer, ingress controller, or other reverse proxy, list their
+addresses here. Otherwise the audit log records the proxy address for every request. List only
+the proxies themselves: trusting a range that untrusted clients can connect from, such as a whole
+Kubernetes pod CIDR, lets those clients choose the recorded address again.
+
+```properties
+gravitino.server.webserver.trustedProxies = 10.0.0.10, 10.0.1.0/24, fd00:10::/64
+```
 
 `GET /configs` backs the Web UI, so it answers without authentication and always returns
 `gravitino.authenticators`, `gravitino.authorization.enable`, and `gravitino.schema.separator`.
@@ -270,20 +304,21 @@ PostgreSQL, and the setup procedure for both is in
 
 The driver, user, and password properties are required whenever the URL is not `jdbc:h2`.
 
-| Configuration Item                                 | Description                                                                                                                                                                                                          | Default Value                 |
-|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.entity.store`                           | Entity storage implementation. `relational` is the only supported value.                                                                                                                                             | `relational`                  |
-| `gravitino.entity.store.relational`                | Relational storage implementation. `JDBCBackend` is the only supported value, and it covers H2, MySQL, and PostgreSQL.                                                                                               | `JDBCBackend`                 |
-| `gravitino.entity.store.relational.jdbcUrl`        | Database URL the backend connects to.                                                                                                                                                                                | `jdbc:h2`                     |
-| `gravitino.entity.store.relational.jdbcDriver`     | Driver class name. Place the driver jar in `${GRAVITINO_HOME}/libs/`.                                                                                                                                                | `org.h2.Driver`               |
-| `gravitino.entity.store.relational.jdbcUser`       | Database username.                                                                                                                                                                                                   | `gravitino`                   |
-| `gravitino.entity.store.relational.jdbcPassword`   | Database password.                                                                                                                                                                                                   | `gravitino`                   |
-| `gravitino.entity.store.relational.storagePath`    | Where embedded H2 keeps its files. A relative value resolves against `${GRAVITINO_HOME}`. The default sits inside the deployment directory, so an upgrade that replaces that directory discards the data. Change it. | `${GRAVITINO_HOME}/data/jdbc` |
-| `gravitino.entity.store.relational.maxConnections` | Maximum size of the JDBC connection pool.                                                                                                                                                                            | `100`                         |
-| `gravitino.entity.store.relational.maxWaitMillis`  | Maximum wait in milliseconds for a connection from the pool.                                                                                                                                                         | `1000`                        |
-| `gravitino.entity.store.maxTransactionSkewTimeMs`  | Maximum transaction skew in milliseconds.                                                                                                                                                                            | `2000`                        |
-| `gravitino.entity.store.deleteAfterTimeMs`         | How long in milliseconds deleted and superseded rows are kept. Accepts 10 minutes to 30 days.                                                                                                                        | `604800000` (7 days)          |
-| `gravitino.entity.store.versionRetentionCount`     | Number of entity versions kept, including the current one. Accepts 1 to 10.                                                                                                                                          | `1`                           |
+| Configuration Item                                     | Description                                                                                                                                                                                                          | Default Value                 |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| `gravitino.entity.store`                               | Entity storage implementation. `relational` is the only supported value.                                                                                                                                             | `relational`                  |
+| `gravitino.entity.store.relational`                    | Relational storage implementation. `JDBCBackend` is the only supported value, and it covers H2, MySQL, and PostgreSQL.                                                                                               | `JDBCBackend`                 |
+| `gravitino.entity.store.relational.jdbcUrl`            | Database URL the backend connects to.                                                                                                                                                                                | `jdbc:h2`                     |
+| `gravitino.entity.store.relational.jdbcDriver`         | Driver class name. Place the driver jar in `${GRAVITINO_HOME}/libs/`.                                                                                                                                                | `org.h2.Driver`               |
+| `gravitino.entity.store.relational.jdbcUser`           | Database username.                                                                                                                                                                                                   | `gravitino`                   |
+| `gravitino.entity.store.relational.jdbcPassword`       | Database password.                                                                                                                                                                                                   | `gravitino`                   |
+| `gravitino.entity.store.relational.storagePath`        | Where embedded H2 keeps its files. A relative value resolves against `${GRAVITINO_HOME}`. The default sits inside the deployment directory, so an upgrade that replaces that directory discards the data. Change it. | `${GRAVITINO_HOME}/data/jdbc` |
+| `gravitino.entity.store.relational.maxConnections`     | Maximum size of the JDBC connection pool.                                                                                                                                                                            | `100`                         |
+| `gravitino.entity.store.relational.maxIdleConnections` | Maximum idle connections retained per server; capped by `maxConnections`. Budget for it on every server, plus any JDBC catalog pools that use the same database instance.                                            | `10`                          |
+| `gravitino.entity.store.relational.maxWaitMillis`      | Maximum wait in milliseconds for a connection from the pool.                                                                                                                                                         | `1000`                        |
+| `gravitino.entity.store.maxTransactionSkewTimeMs`      | Maximum transaction skew in milliseconds.                                                                                                                                                                            | `2000`                        |
+| `gravitino.entity.store.deleteAfterTimeMs`             | How long in milliseconds deleted and superseded rows are kept. Accepts 10 minutes to 30 days.                                                                                                                        | `604800000` (7 days)          |
+| `gravitino.entity.store.versionRetentionCount`         | Number of entity versions kept, including the current one. Accepts 1 to 10.                                                                                                                                          | `1`                           |
 
 #### Caching
 
@@ -301,7 +336,10 @@ by default, and the properties below tune what it holds and how it evicts.
 | `gravitino.cache.lockSegments`   | Number of lock segments used to reduce contention.                                  | `16`               |
 
 Two eviction limits apply at once. Time to live always applies: an entry older than
-`expireTimeInMs` expires and is cleaned up asynchronously. Alongside it, the cache bounds its size
+`expireTimeInMs` expires and is cleaned up asynchronously. The clock starts when the entry is
+written and is not reset by reads, so in a multi-node deployment `expireTimeInMs` is also the upper
+bound on how long a node can serve a stale entry if a cross-node invalidation is ever missed (see
+[Change Log Propagation](#change-log-propagation)). Alongside it, the cache bounds its size
 either by count or by weight. With `enableWeigher` disabled, Caffeine's W-TinyLFU policy evicts the
 least-used entries once `maxEntries` is reached. With `enableWeigher` enabled, each entity type
 carries a weight, larger for entities higher in the hierarchy, and eviction targets a total weight
@@ -314,16 +352,91 @@ Caches are local to each server, so a metalake modified on one server would othe
 its neighbors. Every server writes its changes to an entity change log table and polls that table
 to invalidate what other servers have touched. A separate cleaner trims old rows.
 
-| Configuration Item                              | Description                                                                                                                                         | Default Value       |
-|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
-| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls. Must be positive.                                                                                                | `3`                 |
-| `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`. | `2592000` (30 days) |
-| `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                         | `86400` (1 day)     |
+Each poll reads at most `pollBatchSize` incremental records and, when a replay sweep is in
+progress or due, one additional recent-history page of at most `pollBatchSize` records. If either query returns a
+full page, the next poll starts immediately instead of waiting `pollIntervalSecs`, so a backlog is drained as fast as the
+server can read and apply batches rather than at a fixed `pollBatchSize / pollIntervalSecs`
+records per second. Once both queries return fewer records than the batch size, or the cycle
+fails, the server waits `pollIntervalSecs` again. A change written on one server therefore normally becomes visible
+on the others within about `pollIntervalSecs`, plus the time needed to drain any backlog ahead of
+it. Continuous draining deliberately has no minimum delay between batches; a sustained backlog
+can therefore keep the data query running at the rate the database and listeners support. The
+observability-only database-tail query is sampled at most once per `pollIntervalSecs` during a
+full incremental-batch drain; partial and empty incremental queries still sample the tail,
+including each cycle of a replay-only drain. Each poll holds its whole batch
+in memory, so raise `pollBatchSize` in moderate steps.
+
+| Configuration Item                              | Description                                                                                                                                                                                   | Default Value       |
+|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
+| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls once a server has caught up. Must be positive.                                                                                                              | `3`                 |
+| `gravitino.entityChangeLog.pollBatchSize`       | Maximum number of change log records read per poll. A full batch is followed by another poll right away. Must be positive.                                                                    | `2000`              |
+| `gravitino.entityChangeLog.replayWindowSecs`    | Recent-history recorded-age window in seconds, using database time. Replay sweeps start at most once per `max(pollIntervalSecs, replayWindowSecs / 4)`. `0` disables replay; maximum `86400`. | `60`                |
+| `gravitino.entityChangeLog.replayMaxEntries`    | Maximum event IDs remembered locally for deduplication. Must be positive. Capacity eviction permits duplicate invalidations.                                                                  | `100000`            |
+| `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`.                                           | `2592000` (30 days) |
+| `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                                                                   | `86400` (1 day)     |
+
+The built-in entity, catalog, and authorization listeners opt into replay. Third-party
+`EntityChangeLogListener` implementations keep incremental-only delivery by default. Override
+`supportsReplay()` to return `true` only when callbacks tolerate duplicate event IDs.
+
+All valid catalog events invalidate their cache entry, including locally originated events.
+Name-based local mutation markers are not used because polling can race marker registration and
+replay can repeat rows. This may add a local catalog reload; existing operation leases defer
+connection-pool/classloader cleanup until in-flight operations finish. Point reads and insert
+publications also check the entity-cache invalidation epoch so an ancestor invalidation cannot
+leave an old value cached after a concurrent load. An overlapping read can still return its
+original snapshot; this does not introduce linearizable reads.
+
+Auto-increment ID allocation order is not commit order. A transaction can commit a lower ID after
+another row has advanced the incremental cursor. Recent-history replay scans at or behind that
+cursor, ordered by `(created_at, id)` with a fixed ID ceiling per sweep. Each query uses the database
+clock, and the existing `created_at` index supports the time filter; repeated IDs are suppressed
+by a process-local bounded set.
+Full replay pages continue immediately, but every cycle delivers its incremental batch first.
+A new sweep starts at most once per `max(pollIntervalSecs, replayWindowSecs / 4)`, 15 seconds by
+default; the first sweep after startup runs at once. A row that becomes visible behind an already
+scanned replay page, or between sweeps, is considered on the next sweep. Late-commit recovery can
+therefore take up to one extra sweep interval, and a row is guaranteed to be replayed only if it
+becomes visible before its recorded age exceeds the window minus one sweep interval (45 seconds by
+default).
+
+The window measures age of the stored **`created_at`**, not time since commit. PostgreSQL's
+existing writer uses `CURRENT_TIMESTAMP`, which is the transaction start timestamp; a long
+transaction can therefore consume replay headroom even before inserting its log row. Transactions
+that commit outside it, records deleted by retention cleanup, and an overloaded replay sweep can still lose
+invalidations. Keep retention longer than the replay window and allow enough headroom for polling
+and backlog. This is bounded compensation, not a lossless delivery protocol. Replay does not change
+cache TTLs. Each sweep rereads every row in the window; deduplication avoids repeated listener work,
+not the SQL reads. With the sweep interval at a quarter of the window, each row is read by about
+four sweeps per server, so replay reads grow with write rate and server count but not with the
+poll interval. More recent rows than
+`replayMaxEntries` can cause repeated invalidations, including catalog reloads; increase capacity or reduce the window based on measured traffic and memory.
+
+At startup, INFO logs report the window and dedup capacity. A WARN containing
+`Entity change log replay found` reports previously unseen rows behind the cursor, with cursor,
+startup cursor, window, approximate oldest recorded age, and up to 20 event summaries
+(`id:type:operation:name`). DEBUG logs include every replayed row's timestamp and age, and page/sweep
+progress. This is evidence of a **possible** late commit: dedup eviction can also produce unseen
+IDs. The first sweep after startup replays recent history into an empty dedup set, so it logs
+`Entity change log startup replay delivered` at INFO instead. Ages compare JVM and database clocks and are not commit latency.
+`replay failed` logs include page cursors and the exception; incremental delivery is preserved,
+and replay retries are limited to one attempt per polling interval during a failure.
+`replay dedup capacity reached` reports accumulated eviction and possible repeated invalidations,
+at most once per polling interval. The `entity-change-log` metrics `replay-records-total`,
+`replay-failures-total`, and `dedup-evictions-total` count the same events for monitoring. An event never observed because it committed outside the window
+cannot be diagnosed from replay logs alone.
+The `record-lag` gauge compares maximum ID and cursor, so a value of zero does not rule out a
+late lower-ID commit; inspect the replay diagnostics as well.
 
 #### Tree Lock
 
-Gravitino serializes conflicting metadata operations with an in-memory tree lock. It is the only
-lock implementation available, and it is per-server.
+Gravitino serializes some conflicting metadata operations with an in-memory tree lock. It is the
+only lock implementation available, and it is per-server. Partition, tag, policy, owner, model and
+table-level statistic operations do not take it. Partition operations delegate consistency to the
+catalog implementation; the other operations rely on the entity store's transaction and concurrency
+controls. Conflicting writes may return HTTP 409, while an idempotent delete may return `false` if
+another delete or rename wins. Partition statistics still take the tree lock, because a partition
+statistic storage need not update atomically.
 
 | Configuration Item                   | Description                                          | Default Value |
 |--------------------------------------|------------------------------------------------------|---------------|
@@ -346,6 +459,23 @@ vended credentials; the mechanism it opts out of is described in
 | `gravitino.catalog.classloader.isolated`            | Whether to load each catalog's libraries and configuration in an isolated classloader rather than the application classloader.                                                                                                                                                                         | `true`        |
 | `gravitino.catalog.classloader.sharing.enabled`     | Whether catalogs whose isolation-relevant properties match may share one classloader. Sharing reduces Metaspace usage; disabling it gives every catalog its own.                                                                                                                                       | `true`        |
 | `gravitino.catalog.credential.backfillToProperties` | Whether to return hidden catalog credentials such as `jdbc-password` in the catalog properties response, for connectors that cannot consume vended credentials. Anyone who can read catalog properties can then read those credentials. Turn it off once your connectors are upgraded.                 | `false`       |
+
+### Sensitive property key matching
+
+Gravitino masks credential-like property keys on list/get responses and can recover undeclared
+inline values via `getSecrets`. By default, a key matches when its name contains `secret`,
+`password`, `token`, `credential`, `access`, or `account` (case-insensitive).
+
+`gravitino.secret.sensitiveKeyKeywords` **replaces** that default list. Use it to drop a default
+keyword that masks unrelated properties (for example omit `access` and `account`), to add a typo
+or extra word (for example `passwrod` or `private`), or set it to empty to disable name-based
+matching. The value is a comma-separated list. Each entry is a case-insensitive literal substring
+of the property key, not a regular expression. Keep entries specific; overly broad values such as
+`key` can mask unrelated properties.
+
+| Configuration Item                      | Description                                                                                                                                                                                      | Default Value                                     |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| `gravitino.secret.sensitiveKeyKeywords` | Comma-separated keywords for credential-like property keys. Replaces the default list. Each entry is a literal substring, not a regular expression. An empty value disables name-based matching. | `secret,password,token,credential,access,account` |
 
 ### Securing the Server
 
@@ -433,16 +563,26 @@ frequently — this can measurably increase audit log volume; size log rotation 
 `FileAuditWriter` is the default writer, and it manages no files itself. Rotation, compression, and
 retention are delegated to Log4j2 through a logger named `gravitino.audit`, configured by the
 `audit_file` appender group in `conf/log4j2.properties`. Out of the box it writes
-`gravitino_audit.log` under the log directory, rotates daily and at 256 MB, gzips what it rotates,
-and deletes anything older than 30 days. Change the path or the retention there:
+`gravitino_audit.log` under the log directory and rotates it daily and at 256 MB into numbered gzip
+archives. It deletes archives older than 30 days and, oldest first, archives beyond 10 GB in total.
+Change the retention or the path there:
 
 ```properties
 # conf/log4j2.properties
+property.auditLogMaxTotalSize = 30GB
+appender.audit_file.strategy.delete.ifFileName.ifAny.ifLastModified.age = 90d
+
 appender.audit_file.fileName    = /var/log/gravitino/my_audit.log
 appender.audit_file.filePattern = /var/log/gravitino/my_audit_%d{yyyyMMdd}.%i.log.gz
-
-appender.audit_file.strategy.delete.ifAll.ifLastModified.age = 90d
+# Deletion must look in the new directory and match the new archive names.
+appender.audit_file.strategy.delete.basePath = /var/log/gravitino
+appender.audit_file.strategy.delete.ifFileName.glob = my_audit_*.log.gz
 ```
+
+Earlier releases set the audit retention with
+`appender.audit_file.strategy.delete.ifAll.ifLastModified.age`. That key no longer exists. Log4j2
+rejects a configuration file that still sets it, and the server then writes no log files. See
+[Log rotation and retention](./how-to-install.md#log-rotation-and-retention) for all logs.
 
 Earlier releases configured the writer directly through `gravitino.audit.writer.file.*`. Those
 properties now do nothing, and `FileAuditWriter` logs a warning at startup if it finds any of them.
@@ -510,12 +650,26 @@ server, are documented with those services. See
 
 #### Jobs
 
-| Configuration Item                     | Description                                                                                                | Default Value                 |
-|----------------------------------------|------------------------------------------------------------------------------------------------------------|-------------------------------|
-| `gravitino.job.executor`               | Executor that runs jobs. Implement your own and name it here to replace the built-in one.                  | `local`                       |
-| `gravitino.job.stagingDir`             | Directory holding staging files for running jobs.                                                          | `/tmp/gravitino/jobs/staging` |
-| `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing. | `604800000` (7 days)          |
-| `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                  | `300000` (5 minutes)          |
+| Configuration Item                     | Description                                                                                                                                                    | Default Value                 |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| `gravitino.job.executor`               | Executor that runs jobs: the built-in `local` or `k8s`, or the name of a custom executor whose class is set by `gravitino.jobExecutor.<name>.class`.            | `local`                       |
+| `gravitino.job.stagingDir`             | Directory holding staging files for running jobs. With multiple servers, put it on storage shared by all servers so that any server can return a job's output. | `/tmp/gravitino/jobs/staging` |
+| `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing.                                                     | `604800000` (7 days)          |
+| `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                                                                      | `300000` (5 minutes)          |
+| `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                                                                                   | `1000`                        |
+| `gravitino.job.outputMaxBytes`         | Maximum number of bytes read from the tail of a job's stdout/stderr when fetching its output.                                                                  | `262144` (256KB)              |
+
+#### Table maintenance cooldowns
+
+When a table-maintenance policy omits `minIntervalMs`, the server uses these per-type keys, then
+the code defaults below. Policy content always wins when set.
+
+| Configuration Item                                     | Description                                     | Default Value   |
+|--------------------------------------------------------|-------------------------------------------------|-----------------|
+| `gravitino.maintenance.compaction.minIntervalMs`       | Cooldown between finished compaction runs       | `3600000` (1h)  |
+| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | Cooldown between finished manifest-rewrite runs | `3600000` (1h)  |
+| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | Cooldown between finished snapshot-expiry runs  | `3600000` (1h)  |
+| `gravitino.maintenance.orphan-cleanup.minIntervalMs`   | Cooldown between finished orphan-cleanup runs   | `86400000` (1d) |
 
 ### Key Management
 
@@ -645,6 +799,7 @@ means the property is left alone.
 | `GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE`         | `gravitino.server.webserver.requestHeaderSize`       | `131072`                                             |
 | `GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE`        | `gravitino.server.webserver.responseHeaderSize`      | `131072`                                             |
 | `GRAVITINO_SERVER_BULK_MAX_ITEMS`                        | `gravitino.server.bulk.maxItems`                     | `100`                                                |
+| `GRAVITINO_SERVER_WEBSERVER_INCLUDE_ERROR_STACK_TRACE`    | `gravitino.server.webserver.includeErrorStackTrace`  | `true`                                               |
 | `GRAVITINO_ENTITY_STORE`                                 | `gravitino.entity.store`                             | `relational`                                         |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL`                      | `gravitino.entity.store.relational`                  | `JDBCBackend`                                        |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`             | `gravitino.entity.store.relational.jdbcUrl`          | `jdbc:h2`                                            |
