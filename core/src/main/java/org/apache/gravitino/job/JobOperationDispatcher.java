@@ -81,11 +81,14 @@ public interface JobOperationDispatcher extends Closeable {
    * @param changes the changes to apply to the job template
    * @return the updated job template entity after applying the changes
    * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   * @throws JobTemplateAlreadyExistsException if the job template is renamed to a name that already
+   *     exists
    * @throws IllegalArgumentException if any of the changes cannot be applied to the job template.
    */
   JobTemplateEntity alterJobTemplate(
       String metalake, String jobTemplateName, JobTemplateChange... changes)
-      throws NoSuchJobTemplateException, IllegalArgumentException;
+      throws NoSuchJobTemplateException, JobTemplateAlreadyExistsException,
+          IllegalArgumentException;
 
   /**
    * List all the jobs. If the jobTemplateName is provided, it will list the jobs associated with

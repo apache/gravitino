@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRemoveOrphanFilesJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteDataFilesJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob;
@@ -53,7 +54,8 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
           new IcebergUpdateStatsAndMetricsJob(),
           new IcebergUpdateManifestStatsJob(),
           new IcebergExpireSnapshotsJob(),
-          new IcebergRemoveOrphanFilesJob());
+          new IcebergRemoveOrphanFilesJob(),
+          new IcebergMaintenanceJob());
 
   @Override
   public List<? extends JobTemplate> jobTemplates() {

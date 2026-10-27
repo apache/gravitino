@@ -177,6 +177,24 @@ class TestIndexSerdes(unittest.TestCase):
         self.assertEqual(Index.IndexType.DATA_SKIPPING_USEARCH, round_tripped[1].type())
         self.assertEqual(usearch_properties, round_tripped[1].properties())
 
+    def test_index_serdes_bitmap_inverted_vector(self):
+        for index_type in (
+            Index.IndexType.BITMAP,
+            Index.IndexType.INVERTED,
+            Index.IndexType.VECTOR,
+        ):
+            index = IndexSerdes.deserialize(
+                {
+                    "indexType": index_type.value,
+                    "name": "idx",
+                    "fieldNames": [["col"]],
+                }
+            )
+            self.assertEqual(index_type, index.type())
+            self.assertEqual(
+                index_type.value, IndexSerdes.serialize(index)["indexType"]
+            )
+
     def test_vector_similarity_index_properties_round_trip(self):
         json_string = """
         {

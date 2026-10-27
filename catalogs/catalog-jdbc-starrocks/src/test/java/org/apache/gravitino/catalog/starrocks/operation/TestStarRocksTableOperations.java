@@ -22,6 +22,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Maps;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -40,6 +45,7 @@ import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTablePartitionOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -63,6 +69,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestStarRocksTableOperations extends TestStarRocks {
@@ -243,6 +251,115 @@ public class TestStarRocksTableOperations extends TestStarRocks {
     } finally {
       TABLE_OPERATIONS.drop(databaseName, tableName);
     }
+  }
+
+  @Test
+  public void testClearTableCommentWithNull() {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_clear_comment_table");
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
+
+    try {
+      TABLE_OPERATIONS.create(
+          databaseName,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          createProperties(),
+          null,
+          Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(databaseName, tableName, TableChange.updateComment(null));
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(
+              () -> {
+                String comment = TABLE_OPERATIONS.load(databaseName, tableName).comment();
+                Assertions.assertTrue(StringUtils.isEmpty(comment), comment);
+              });
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
+  }
+
+  @Test
+  public void testAlterTableUpdateColumnTypeKeepsDefaultValue() {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_type_default_test_table");
+    JdbcColumn col_1 = JdbcColumn.builder().withName("col_1").withType(INT).build();
+    // The wide col_2 keeps col_3 out of the default key columns, so col_3 is a value column.
+    JdbcColumn col_2 = JdbcColumn.builder().withName("col_2").withType(VARCHAR_255).build();
+    JdbcColumn col_3 =
+        JdbcColumn.builder()
+            .withName("col_3")
+            .withType(Types.VarCharType.of(16))
+            .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
+            .build();
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        new JdbcColumn[] {col_1, col_2, col_3},
+        "test_comment",
+        createProperties(),
+        null,
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+        new Index[0]);
+
+    TABLE_OPERATIONS.alterTable(
+        databaseName,
+        tableName,
+        TableChange.updateColumnType(new String[] {col_3.name()}, Types.VarCharType.of(32)));
+
+    // StarRocks applies schema changes asynchronously.
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updated = TABLE_OPERATIONS.load(databaseName, tableName).columns()[2];
+              Assertions.assertEquals(Types.VarCharType.of(32), updated.dataType());
+              Assertions.assertEquals(
+                  Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
+            });
+  }
+
+  @Test
+  public void testUpdateColumnPositionAfterReservedWordColumn() {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_position_test_table");
+    // The wide col_2 keeps status and key out of the default key columns.
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("col_1").withType(INT).build(),
+          JdbcColumn.builder().withName("col_2").withType(VARCHAR_255).build(),
+          JdbcColumn.builder().withName("status").withType(VARCHAR_255).build(),
+          JdbcColumn.builder().withName("key").withType(VARCHAR_255).build()
+        };
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns,
+        "test_comment",
+        createProperties(),
+        null,
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+        new Index[0]);
+
+    // A null position moves the column after the last column `key`, a reserved word.
+    TABLE_OPERATIONS.alterTable(
+        databaseName, tableName, TableChange.updateColumnPosition(new String[] {"status"}, null));
+
+    // StarRocks applies schema changes asynchronously.
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                Assertions.assertArrayEquals(
+                    new String[] {"col_1", "col_2", "key", "status"},
+                    Arrays.stream(TABLE_OPERATIONS.load(databaseName, tableName).columns())
+                        .map(Column::name)
+                        .toArray(String[]::new)));
   }
 
   @Test
@@ -679,5 +796,79 @@ public class TestStarRocksTableOperations extends TestStarRocks {
         () ->
             TABLE_OPERATIONS.alterTable(
                 databaseName, tableName, TableChange.setProperty("unsupported.property", "VIEW")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "O'Brien",
+        "quote\\' and \\new\\path; \"double\"",
+        "owner's a\"\"b \"value\"\\path",
+        "ends with \\"
+      })
+  void testStringDefaultValueRoundTrips(String defaultValue) throws SQLException {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_default_round_trip");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build(),
+      JdbcColumn.builder()
+          .withName("col1")
+          .withType(VARCHAR_255)
+          .withNullable(true)
+          .withDefaultValue(Literals.varcharLiteral(255, defaultValue))
+          .build()
+    };
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns,
+        null,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("id")),
+        Indexes.EMPTY_INDEXES);
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(databaseName, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[1].defaultValue());
+      try (Connection connection = DATA_SOURCE.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.executeUpdate(
+            String.format("INSERT INTO `%s`.`%s` (id) VALUES (1)", databaseName, tableName));
+        try (ResultSet result =
+            statement.executeQuery(
+                String.format("SELECT col1 FROM `%s`.`%s`", databaseName, tableName))) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(defaultValue, result.getString(1));
+        }
+      }
+
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"PRIMARY", "UNIQUE", "DUPLICATE"})
+  void testLoadTableReportsOnlySecondaryIndexes(String keyType) throws SQLException {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_index");
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "CREATE TABLE `%s`.`%s` (`id` INT NOT NULL, `region` VARCHAR(32) NOT NULL, "
+                  + "INDEX `idx_region` (`region`) USING BITMAP) "
+                  + "%s KEY(`id`, `region`) DISTRIBUTED BY HASH(`id`) BUCKETS 1 "
+                  + "PROPERTIES (\"replication_num\" = \"1\")",
+              databaseName, tableName, keyType));
+    }
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(databaseName, tableName);
+      Assertions.assertEquals(1, table.index().length);
+      Assertions.assertEquals(Index.IndexType.BITMAP, table.index()[0].type());
+      Assertions.assertEquals("idx_region", table.index()[0].name());
+      Assertions.assertArrayEquals(new String[][] {{"region"}}, table.index()[0].fieldNames());
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
   }
 }

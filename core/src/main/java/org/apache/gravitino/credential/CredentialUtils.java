@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,19 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class CredentialUtils {
+
+  /**
+   * Credential types that only vend credentials for a path-based credential context. They return
+   * nothing for a catalog-level context, so they only work on catalogs that provide path contexts.
+   */
+  public static final Set<String> PATH_BASED_CREDENTIAL_TYPES =
+      ImmutableSet.of(
+          S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
+          AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE,
+          OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE,
+          GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
+          ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE,
+          COSTokenCredential.COS_TOKEN_CREDENTIAL_TYPE);
 
   public static Map<String, CredentialProvider> loadCredentialProviders(
       Map<String, String> catalogProperties) {

@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.gravitino.integration.test.container.DatabaseContainer.Durability;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -391,10 +392,7 @@ public class ContainerSuite implements Closeable {
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
                   .withHostName("gravitino-ci-mysql")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("MYSQL_ROOT_PASSWORD", "root")
-                          .build())
+                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
                   .withNetwork(network);
 
@@ -420,10 +418,7 @@ public class ContainerSuite implements Closeable {
               MySQLContainer.builder()
                   .withImage("mysql:5.7")
                   .withHostName("gravitino-ci-mysql-v5")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("MYSQL_ROOT_PASSWORD", "root")
-                          .build())
+                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
                   .withNetwork(network);
 
@@ -449,11 +444,7 @@ public class ContainerSuite implements Closeable {
               PostgreSQLContainer.builder()
                   .withImage(pgImageName.toString())
                   .withHostName(PostgreSQLContainer.HOST_NAME)
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("POSTGRES_USER", PostgreSQLContainer.USER_NAME)
-                          .put("POSTGRES_PASSWORD", PostgreSQLContainer.PASSWORD)
-                          .build())
+                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
                   .withNetwork(network);
 
