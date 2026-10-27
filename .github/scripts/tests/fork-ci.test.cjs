@@ -1300,3 +1300,12 @@ test('workflow lookup and parse failures leave the published status untouched an
     assert.ok(failures.length > before);
   }
 }));
+
+test('publisher shares the immutable workflow read between migration detection and suite validation', async () => withPublisher(async ({ ctx, core }) => {
+  const { github, statuses } = publisherMock();
+  const getContent = github.rest.repos.getContent; const reads = [];
+  github.rest.repos.getContent = async args => { reads.push(args.ref); return getContent(args); };
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses[0].state, 'success');
+  assert.deepEqual(reads, [B]);
+}));

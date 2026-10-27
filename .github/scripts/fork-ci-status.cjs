@@ -102,14 +102,14 @@ function evaluate(pr, run, jobs, baseSha = pr.base.sha, suites = SUITES) {
   return evaluateExecution(pr, run, jobs, baseSha) || evaluateSuites(jobs, suites);
 }
 
-function createService(github) {
+function createService(github, { readWorkflow = sha => github.rest.repos.getContent({ ...UPSTREAM,
+  path: '.github/workflows/fork-ci.yml', ref: sha }).then(response => response.data) } = {}) {
   const definitions = new Map();
   const trees = new Map();
   const suitesBySha = new Map();
   async function suitesAt(sha) {
     if (!suitesBySha.has(sha)) suitesBySha.set(sha, (async () => {
-      const { data } = await github.rest.repos.getContent({ ...UPSTREAM,
-        path: '.github/workflows/fork-ci.yml', ref: sha });
+      const data = await readWorkflow(sha);
       if (data.encoding !== 'base64' || typeof data.content !== 'string') {
         throw new Error(`Cannot read trusted Fork CI workflow contents at ${sha}; retry the status refresh`);
       }
