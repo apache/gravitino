@@ -55,7 +55,10 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   function readWorkflow(sha) {
     if (!workflowContents.has(sha)) workflowContents.set(sha,
       github.rest.repos.getContent({ ...context.repo, path: '.github/workflows/fork-ci.yml', ref: sha })
-        .then(response => response.data));
+        .then(response => response.data).catch(error => {
+          workflowContents.delete(sha); // Retry transient lookup failures on the next pass.
+          throw error;
+        }));
     return workflowContents.get(sha);
   }
   let service = createService(github, { readWorkflow });

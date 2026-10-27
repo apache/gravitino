@@ -1309,3 +1309,32 @@ test('publisher shares the immutable workflow read between migration detection a
   assert.equal(statuses[0].state, 'success');
   assert.deepEqual(reads, [B]);
 }));
+
+test('a transient trusted workflow lookup failure recovers on the next polling pass', async () => withPublisher(async ({ ctx, core, failures }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const { github, statuses } = publisherMock();
+  github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: 15000, limit: 15000 } } } });
+  const list = github.rest.actions.listWorkflowRuns;
+  github.rest.actions.listWorkflowRuns = async args => args.event === 'workflow_dispatch'
+    ? { data: { workflow_runs: [{ ...run(), id: 2, head_sha: C, head_branch: 'main',
+      display_title: 'Trusted Fork CI #7', created_at: '2026-01-02T00:00:00Z' }] } } : list(args);
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => {
+    if (args.run_id === 2) {
+      const result = jobs(pr()); result[0].name = requiredName(pr(), C); return result;
+    }
+    return paginate(endpoint, args);
+  };
+  let trustedReads = 0;
+  const getContent = github.rest.repos.getContent;
+  github.rest.repos.getContent = async args => {
+    if (args.ref === C && ++trustedReads === 1) throw Object.assign(new Error('Temporary API failure'), { status: 503 });
+    return getContent(args);
+  };
+  let time = Date.parse('2026-01-03T00:00:00Z');
+  await update({ github, context: ctx, core, clock: () => time, sleep: async ms => { time += ms; } });
+  assert.equal(trustedReads, 2);
+  assert.equal(statuses.length, 1); assert.equal(statuses[0].state, 'success');
+  assert.deepEqual(failures, []);
+}));
