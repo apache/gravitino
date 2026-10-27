@@ -23,8 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.partitions.IdentityPartition;
+import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataTypes;
@@ -52,6 +56,21 @@ public class TestHiveGravitinoOperationOperator {
 
     // HMS stores a null partition value as the default partition marker.
     assertEquals("dt=20240101/region=__HIVE_DEFAULT_PARTITION__", name.getValue());
+  }
+
+  @Test
+  void testAddNullPartitionValueUsesHiveDefaultMarker() throws Exception {
+    SupportsPartitions partitions = mock(SupportsPartitions.class);
+    ArgumentCaptor<Partition> partition = ArgumentCaptor.forClass(Partition.class);
+    when(partitions.addPartition(partition.capture())).thenReturn(null);
+
+    InternalRow ident = new GenericInternalRow(new Object[] {20240101, null});
+    operator(partitions).createPartition(ident, Collections.emptyMap(), SCHEMA);
+
+    // The partition that the drop above looks up must be the one that ADD PARTITION creates.
+    Literal<?>[] values = ((IdentityPartition) partition.getValue()).values();
+    assertEquals(20240101, values[0].value());
+    assertEquals("__HIVE_DEFAULT_PARTITION__", values[1].value());
   }
 
   @Test
