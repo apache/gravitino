@@ -51,6 +51,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   // on the default branch can write those caches using its runner runtime token.
   // Workflow contents are immutable at a commit SHA. Share them across migration detection,
   // suite validation and polling passes without caching mutable run or trust decisions.
+  // context.repo is apache/gravitino in production; a sandbox reads its own definitions.
   const workflowContents = new Map();
   function readWorkflow(sha) {
     if (!workflowContents.has(sha)) workflowContents.set(sha,

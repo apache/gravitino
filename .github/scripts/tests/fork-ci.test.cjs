@@ -447,6 +447,32 @@ test('scheduled publication ignores poisoned cache state and recomputes definiti
   assert.ok(!workflow.includes('actions/cache/'));
 }));
 
+test('a full rerun on a newer base is judged by its newest Required CI job', async () => {
+  // Attempt 1 failed against base B; the rerun repeated eligibility against base C and passed.
+  const p = pr();
+  const github = serviceMock();
+  github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: {
+    workflow_runs: event !== 'workflow_dispatch' ? [{ ...run(), run_attempt: 2 }] : []
+  } });
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? [
+    { name: requiredName(p), id: 1, run_attempt: 1, conclusion: 'failure' },
+    { name: requiredName(p, C), id: 2, run_attempt: 2, conclusion: 'success' },
+    ...SUITES.map((suite, i) => ({ name: `${suite} / changes`, id: 10 + i, run_attempt: 2, conclusion: 'success' }))];
+  workflowSource(github, SUITES, C);
+  const mirror = await createService(github).mirror(p);
+  assert.equal(mirror.base, C);
+  assert.equal(mirror.result.conclusion, 'success');
+});
+test('a trusted run without a required suite asks for another trusted dispatch', async () => {
+  const trustedJobs = jobs(pr()).filter(job => !job.name.startsWith('tms / ')); trustedJobs[0].name = requiredName(pr(), C);
+  const github = serviceMock({ trusted: true, trustedSha: C, trustedJobs });
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  workflowSource(github, SUITES, C);
+  const { result } = await createService(github).mirror(pr());
+  assert.equal(result.conclusion, 'action_required');
+  assert.match(result.note, /trusted run has no tms jobs\. Dispatch trusted Fork CI again/);
+});
 test('partial reruns retain successful callers but use each job newest result', async () => {
   const p = pr();
   const github = serviceMock();

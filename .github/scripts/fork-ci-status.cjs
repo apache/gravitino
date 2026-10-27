@@ -89,12 +89,13 @@ function evaluateExecution(pr, run, jobs, baseSha) {
   }
 }
 
-function evaluateSuites(jobs, suites) {
+function evaluateSuites(jobs, suites, trusted = false) {
   for (const suite of suites) {
     const children = jobs.filter(job => job.name.startsWith(`${suite} / `));
     if (!children.length) {
-      return requiredAction(`The run has no ${suite} jobs. If the base branch added this suite, ` +
-        'merge the latest base branch and push.');
+      // A trusted run executes the upstream workflow that defines its suites, so only a fork can lack one.
+      return requiredAction(trusted ? `The trusted run has no ${suite} jobs. Dispatch trusted Fork CI again.`
+        : `The run has no ${suite} jobs. If the base branch added this suite, merge the latest base branch and push.`);
     }
     if (!children.some(job => job.conclusion === 'success') ||
         children.some(job => !['success', 'skipped'].includes(job.conclusion))) {
@@ -176,7 +177,10 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     // branch moves on; strict branch protection, not this check, requires an up-to-date branch.
     const prefix = `Required CI / ${pr.base.ref} / `;
     const suffix = ` / ${pr.head.sha}`;
-    const job = jobs.find(job => job.name.startsWith(prefix) && job.name.endsWith(suffix));
+    // A rerun of the whole run repeats eligibility, which can name a newer base commit. jobsFor keeps
+    // both names, so take the newest attempt: it selects the tested callers and Required CI result.
+    const job = jobs.filter(job => job.name.startsWith(prefix) && job.name.endsWith(suffix))
+      .sort((a, b) => (b.run_attempt || 1) - (a.run_attempt || 1) || b.id - a.id)[0];
     const sha = job?.name.slice(prefix.length, -suffix.length);
     return acceptedBase(pr, sha);
   }
@@ -241,7 +245,7 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
       // base branch after that commit does not fail the run, but one the tested code already had
       // must have run, even when the head's own workflow predates it.
       result = !selected.trusted && !sameDefinitions ? requiredAction(TRUSTED_REQUIRED)
-        : evaluateSuites(jobs, await suitesAt(base));
+        : evaluateSuites(jobs, await suitesAt(base), selected.trusted);
     }
     if (selected.trusted && result.conclusion === 'success' && await acceptedBase(pr, base) !== base) {
       result = requiredAction('Trusted CI tested a commit outside the current base branch. Dispatch trusted Fork CI again from the current default branch.');
