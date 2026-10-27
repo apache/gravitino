@@ -19,6 +19,11 @@
 
 An agent skill that enforces consistent structure and content quality for Apache Gravitino design documents.
 
+This skill owns **section structure**. Markdown formatting is
+[design-docs/markdown-formatting.md](../../../design-docs/markdown-formatting.md).
+Run `./gradlew markdownlint` before opening a design-doc PR. The human and agent
+entry point is [design-docs/README.md](../../../design-docs/README.md).
+
 ## What it does
 
 When writing or reviewing a design doc, the skill ensures the document covers all required sections in the correct order:
@@ -38,10 +43,14 @@ For each section, the skill checks content quality — not just presence. For ex
 
 ## Installation
 
-Copy `SKILL.md` into your agent's skill/instruction directory according to the agent's documentation. For example, with Claude Code:
+Copy the skill directory into your agent's skill folder. For Claude Code:
 
 ```bash
+# Global — available in all projects
 cp -r agent-skills/gravitino-design-doc ~/.claude/skills/
+
+# Project-local — available only inside this repo
+cp -r agent-skills/gravitino-design-doc .claude/skills/
 ```
 
 ## Usage

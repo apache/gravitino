@@ -1779,4 +1779,6 @@ fun checkOrbStackStatus() {
   }
 }
 
+apply(from = "gradle/markdownlint.gradle.kts")
+
 printDockerCheckInfo()
