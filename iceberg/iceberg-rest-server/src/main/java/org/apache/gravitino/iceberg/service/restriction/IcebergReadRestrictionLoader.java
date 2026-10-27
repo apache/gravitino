@@ -25,6 +25,7 @@ import java.util.ServiceLoader;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.slf4j.LoggerFactory;
 
 /** Optional extension that adds resolved read restrictions to an Iceberg load-table response. */
 public interface IcebergReadRestrictionLoader {
@@ -80,6 +81,14 @@ public interface IcebergReadRestrictionLoader {
     if (providers.hasNext()) {
       throw new IllegalStateException(
           "Multiple Iceberg read-restriction loaders found on the runtime classpath");
+    }
+    if (!loader.enabled()) {
+      LoggerFactory.getLogger(IcebergReadRestrictionLoader.class)
+          .warn(
+              "Iceberg read-restriction loader {} is installed but disabled; read restrictions will"
+                  + " not be applied. Check the loader's deployment prerequisites, including policy"
+                  + " dispatcher availability.",
+              loader.getClass().getName());
     }
     return loader;
   }

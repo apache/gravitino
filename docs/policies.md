@@ -116,7 +116,8 @@ cannot apply to a required column when that action is selected.
 Experimental Iceberg REST read restrictions require authorization to be enabled with
 `gravitino.authorization.enable=true` and a policy dispatcher to be available. When a policy dispatcher
 is available but authorization is disabled, the Iceberg REST service fails to start with an error
-identifying the required configuration, even when no policy applies.
+identifying the required configuration, even when no policy applies. In auxiliary mode, this also
+aborts startup of the Gravitino server.
 
 `is_group_member` uses group membership supplied by the authenticated principal; enabling
 authorization does not populate these groups. An empty group list is valid and means that the user

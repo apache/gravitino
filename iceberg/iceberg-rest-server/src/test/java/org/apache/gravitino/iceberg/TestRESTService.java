@@ -23,11 +23,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.ServiceLoader;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
@@ -36,8 +43,51 @@ import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLo
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestRESTService {
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testDiscoveryWarnsOnlyWhenInstalledProviderIsDisabled() {
+    IcebergReadRestrictionLoader loader = mock(IcebergReadRestrictionLoader.class);
+    ServiceLoader<IcebergReadRestrictionLoader> providers = mock(ServiceLoader.class);
+    when(providers.iterator()).thenAnswer(ignored -> Collections.singletonList(loader).iterator());
+    Logger logger = mock(Logger.class);
+    try (MockedStatic<ServiceLoader> discovery =
+            mockStatic(ServiceLoader.class, CALLS_REAL_METHODS);
+        MockedStatic<LoggerFactory> logging = mockStatic(LoggerFactory.class, CALLS_REAL_METHODS)) {
+      discovery
+          .when(() -> ServiceLoader.load(IcebergReadRestrictionLoader.class))
+          .thenReturn(providers);
+      logging
+          .when(() -> LoggerFactory.getLogger(IcebergReadRestrictionLoader.class))
+          .thenReturn(logger);
+
+      assertSame(loader, RESTService.loadReadRestrictionLoader(false));
+      verify(logger).warn(contains("installed but disabled"), eq(loader.getClass().getName()));
+
+      clearInvocations(logger);
+      when(loader.enabled()).thenReturn(true);
+      assertSame(loader, RESTService.loadReadRestrictionLoader(true));
+      verifyNoInteractions(logger);
+    }
+  }
+
+  @Test
+  void testNoProviderDoesNotRequireAuthorizationOrWarn() {
+    Logger logger = mock(Logger.class);
+    try (MockedStatic<LoggerFactory> logging =
+        mockStatic(LoggerFactory.class, CALLS_REAL_METHODS)) {
+      logging
+          .when(() -> LoggerFactory.getLogger(IcebergReadRestrictionLoader.class))
+          .thenReturn(logger);
+
+      assertFalse(RESTService.loadReadRestrictionLoader(false).enabled());
+      verifyNoInteractions(logger);
+    }
+  }
 
   @Test
   void testReadRestrictionStartupRequiresAuthorization() {
