@@ -55,9 +55,9 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
-import org.apache.gravitino.iceberg.common.ops.IcebergAuxCatalogBridge;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperFetcher;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -133,15 +133,11 @@ public class IcebergCatalogOperations
     resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    // Aux IRC already owns a wrapper for this catalog name; reuse it (jdbc/hive/rest) instead of
-    // constructing a second backend client or HTTP-looping to the local REST server.
-    Optional<IcebergCatalogWrapper> shared = IcebergAuxCatalogBridge.resolve(info.name());
-    boolean reusedFromAux = shared.isPresent();
-    IcebergCatalogWrapper rawWrapper =
-        shared.orElseGet(() -> new IcebergCatalogWrapper(icebergConfig));
-    if (reusedFromAux) {
-      LOG.info("Reusing aux Iceberg REST catalog wrapper for lakehouse catalog '{}'", info.name());
-    }
+    // Same split as DynamicIcebergConfigProvider (Internal vs Http), reverse direction:
+    // aux → InternalCatalogWrapperFetcher (reuse IRC manager); else LocalCatalogWrapperFetcher.
+    IcebergCatalogWrapperFetcher fetcher = IcebergCatalogWrapperFetcher.create();
+    boolean reusedFromAux = fetcher.isInternal();
+    IcebergCatalogWrapper rawWrapper = fetcher.load(info.name(), icebergConfig);
 
     try {
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);

@@ -18,57 +18,60 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
-import java.util.Optional;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIcebergAuxCatalogBridge {
+public class TestIcebergCatalogWrapperFetcher {
 
   @AfterEach
   void tearDown() {
-    IcebergAuxCatalogBridge.clear();
+    IcebergCatalogWrapperFetcher.unbindAuxLookup();
   }
 
   @Test
-  void resolveEmptyWhenUnregistered() {
-    Assertions.assertFalse(IcebergAuxCatalogBridge.isRegistered());
-    Assertions.assertTrue(IcebergAuxCatalogBridge.resolve("c1").isEmpty());
+  void createUsesLocalWhenUnbound() {
+    IcebergCatalogWrapperFetcher fetcher = IcebergCatalogWrapperFetcher.create();
+    Assertions.assertFalse(fetcher.isInternal());
+    IcebergCatalogWrapper loaded = fetcher.load("c1", new IcebergConfig());
+    Assertions.assertNotNull(loaded);
   }
 
   @Test
-  void resolveReturnsRegisteredWrapper() {
-    IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(new IcebergConfig());
-    IcebergAuxCatalogBridge.register(
+  void createUsesInternalWhenBound() {
+    IcebergCatalogWrapper shared = new IcebergCatalogWrapper(new IcebergConfig());
+    IcebergCatalogWrapperFetcher.bindAuxLookup(
         name -> {
           if ("c1".equals(name)) {
-            return wrapper;
+            return shared;
           }
           throw new NoSuchCatalogException("missing %s", name);
         });
 
-    Assertions.assertTrue(IcebergAuxCatalogBridge.isRegistered());
-    Optional<IcebergCatalogWrapper> resolved = IcebergAuxCatalogBridge.resolve("c1");
-    Assertions.assertTrue(resolved.isPresent());
-    Assertions.assertSame(wrapper, resolved.get());
+    IcebergCatalogWrapperFetcher fetcher = IcebergCatalogWrapperFetcher.create();
+    Assertions.assertTrue(fetcher.isInternal());
+    Assertions.assertSame(shared, fetcher.load("c1", new IcebergConfig()));
   }
 
   @Test
-  void resolveEmptyOnNoSuchCatalog() {
-    IcebergAuxCatalogBridge.register(
+  void internalFallsBackToLocalOnMissingCatalog() {
+    IcebergCatalogWrapperFetcher.bindAuxLookup(
         name -> {
           throw new NoSuchCatalogException("missing %s", name);
         });
-    Assertions.assertTrue(IcebergAuxCatalogBridge.resolve("unknown").isEmpty());
+    IcebergCatalogWrapperFetcher fetcher = IcebergCatalogWrapperFetcher.create();
+    Assertions.assertTrue(fetcher.isInternal());
+    IcebergCatalogWrapper loaded = fetcher.load("unknown", new IcebergConfig());
+    Assertions.assertNotNull(loaded);
   }
 
   @Test
-  void clearUnregisters() {
-    IcebergAuxCatalogBridge.register(name -> new IcebergCatalogWrapper(new IcebergConfig()));
-    IcebergAuxCatalogBridge.clear();
-    Assertions.assertFalse(IcebergAuxCatalogBridge.isRegistered());
-    Assertions.assertTrue(IcebergAuxCatalogBridge.resolve("c1").isEmpty());
+  void unbindReturnsToLocal() {
+    IcebergCatalogWrapperFetcher.bindAuxLookup(
+        name -> new IcebergCatalogWrapper(new IcebergConfig()));
+    IcebergCatalogWrapperFetcher.unbindAuxLookup();
+    Assertions.assertFalse(IcebergCatalogWrapperFetcher.create().isInternal());
   }
 }

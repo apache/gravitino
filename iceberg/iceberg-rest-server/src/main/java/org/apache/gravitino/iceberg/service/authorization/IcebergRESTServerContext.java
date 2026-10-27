@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperFetcher;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
@@ -64,12 +65,25 @@ public class IcebergRESTServerContext {
             configProvider.getMetalakeName(),
             configProvider.getDefaultCatalogName(),
             catalogWrapperManager);
+    // Symmetric to DynamicIcebergConfigProvider choosing InternalCatalogFetcher when aux:
+    // lakehouse may resolve wrappers via IcebergCatalogWrapperFetcher.Internal*.
+    if (Boolean.TRUE.equals(auxMode) && catalogWrapperManager != null) {
+      IcebergCatalogWrapperFetcher.bindAuxLookup(catalogWrapperManager::getCatalogWrapper);
+    } else {
+      IcebergCatalogWrapperFetcher.unbindAuxLookup();
+    }
     return InstanceHolder.INSTANCE;
   }
 
   public static IcebergRESTServerContext getInstance() {
     Preconditions.checkState(InstanceHolder.INSTANCE != null, "Not initialized");
     return InstanceHolder.INSTANCE;
+  }
+
+  /** Clears the singleton and aux lakehouse lookup (IRC service stop). */
+  public static void clear() {
+    IcebergCatalogWrapperFetcher.unbindAuxLookup();
+    InstanceHolder.INSTANCE = null;
   }
 
   public boolean isAuthorizationEnabled() {

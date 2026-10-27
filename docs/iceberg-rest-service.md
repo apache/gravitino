@@ -538,7 +538,7 @@ Access control for the Iceberg REST Catalog (IRC) is only supported when running
 
 When running as an auxiliary service, the `gravitino.iceberg-rest.gravitino-uri` configuration is **not required**. The service will use internal interfaces to access Gravitino directly, providing better performance and avoiding the need for HTTP-based communication.
 
-In the same auxiliary deployment, lakehouse-iceberg catalogs whose names are known to the embedded IRC reuse the IRC `IcebergCatalogWrapper` instances in-process (jdbc / hive / rest backends) instead of building a second client or HTTP-looping to the local REST port. Downstream IRC→remote REST (for example IRC2) still uses HTTP.
+In the same auxiliary deployment, lakehouse-iceberg catalog load mirrors `DynamicIcebergConfigProvider`'s Internal vs Http split in reverse: an `InternalCatalogWrapperFetcher` reuses the embedded IRC `IcebergCatalogWrapperManager` by catalog name (jdbc / hive / rest), otherwise a `LocalCatalogWrapperFetcher` self-loads. Downstream IRC→remote REST (for example IRC2) still uses HTTP.
 :::
 
 Refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
