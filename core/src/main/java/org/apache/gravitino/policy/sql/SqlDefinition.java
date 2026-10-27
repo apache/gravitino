@@ -81,7 +81,10 @@ public final class SqlDefinition {
   public boolean isQuotedParameter(String name) {
     return quotedParameters.contains(name);
   }
+
   /**
+   * Returns whether this definition targets a column mask.
+   *
    * @return whether this definition was validated as a column mask
    */
   public boolean isColumnMask() {

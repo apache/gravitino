@@ -22,35 +22,35 @@ import java.util.Locale;
 
 /** Allowlisted context, predicate, date-part and mask functions. */
 public enum SqlFunction {
-  /** Current user. */
+  /** Returns the trusted effective user's name. */
   CURRENT_USER,
-  /** Is group member. */
+  /** Tests the effective user's flat membership in a named group. */
   IS_GROUP_MEMBER,
-  /** Is nan. */
+  /** Tests whether a FLOAT or DOUBLE value is NaN. */
   IS_NAN,
-  /** Year. */
+  /** Extracts the calendar year from a DATE or TIMESTAMP. */
   YEAR,
-  /** Month. */
+  /** Extracts the month of the year from a DATE or TIMESTAMP. */
   MONTH,
-  /** Day. */
+  /** Extracts the day of the month from a DATE or TIMESTAMP. */
   DAY,
-  /** Mask alphanum. */
+  /** Replaces string characters with the profile's digit and character masks. */
   MASK_ALPHANUM,
-  /** Show first 4. */
+  /** Preserves the first four string code points and masks the remainder. */
   SHOW_FIRST_4,
-  /** Show last 4. */
+  /** Preserves the last four string code points and masks the remainder. */
   SHOW_LAST_4,
-  /** Mask to fixed value. */
+  /** Replaces the input with the fixed mask value for its logical type. */
   MASK_TO_FIXED_VALUE,
-  /** Replace with null. */
+  /** Replaces the input with a NULL of the same logical type. */
   REPLACE_WITH_NULL,
-  /** Truncate to year. */
+  /** Truncates a DATE or TIMESTAMP to the start of its year. */
   TRUNCATE_TO_YEAR,
-  /** Truncate to month. */
+  /** Truncates a DATE or TIMESTAMP to the start of its month. */
   TRUNCATE_TO_MONTH,
-  /** Sha256 global. */
+  /** Applies the type-preserving SHA-256 mask. */
   SHA256_GLOBAL,
-  /** Sha256 query local. */
+  /** Applies the type-preserving SHA-256 mask with a salt shared within one query. */
   SHA256_QUERY_LOCAL;
 
   static SqlFunction fromName(String name) {

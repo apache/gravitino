@@ -38,6 +38,8 @@ public final class IcebergReadRestrictionConverter {
   /** Trusted request-scoped identity and group lookups used while binding SQL expressions. */
   public interface BindingContext {
     /**
+     * Returns the authenticated effective user's name.
+     *
      * @return the non-empty authenticated effective user name
      */
     String sessionUser();

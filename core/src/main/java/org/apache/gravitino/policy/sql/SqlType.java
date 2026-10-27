@@ -68,6 +68,7 @@ public final class SqlType {
   public String name() {
     return name;
   }
+
   /**
    * Returns decimal or temporal precision.
    *
@@ -76,6 +77,7 @@ public final class SqlType {
   public int precision() {
     return precision;
   }
+
   /**
    * Returns decimal scale.
    *
@@ -84,6 +86,7 @@ public final class SqlType {
   public int scale() {
     return scale;
   }
+
   /**
    * Returns whether the timestamp carries a timezone.
    *
@@ -92,6 +95,7 @@ public final class SqlType {
   public boolean withTimeZone() {
     return withTimeZone;
   }
+
   /**
    * Returns whether this is a numeric type.
    *

@@ -70,52 +70,17 @@ END
 ```
 
 The server validates complete definitions on policy creation and content updates. Ordinary policy
-metadata reads, renames, and comment updates do not reparse source. The SQL parser rejects the previous
-`filter :=` and `mask :=` syntax.
-The experimental Iceberg REST loader binds applicable SQL definitions to the request identity and
-table schema, validates target nullability, and converts supported expressions to closed Iceberg
-read restrictions.
+metadata reads, renames, and comment updates do not reparse source. The experimental Iceberg REST
+loader binds applicable SQL definitions to the request identity and table schema, validates target
+nullability, and converts supported expressions to closed Iceberg read restrictions.
 
-A row filter declares zero or more parameters and `RETURNS BOOLEAN`. Parameters bind to table
-columns by name and must match their logical types. A mask declares exactly one parameter and
-returns that exact type. Its parameter name is local: `(xxx STRING) RETURNS STRING -> show_last_4(xxx)`
-can apply to a column named `phone_number`. No physical column alias or implicit `value` is injected.
-Masks can return the input, a literal, NULL, a scalar function result, or CASE branches.
-
-When the experimental Iceberg REST read-restriction loader resolves several row-filter policies
-for one table, a filter that resolves to `true` adds no restriction and is ignored. Identical
-effective filters are deduplicated. Distinct restrictive filters conflict and cause the load-table
-request to fail; the loader does not combine them.
-
-All mask branches must match the declared result type. A possibly null result, including a missing
-ELSE or an explicit NULL branch, is invalid for a required target. If the selected SQL result cannot
-be represented by a compatible Iceberg mask, the experimental loader fails the table load.
-Unselected CASE results and later conditions are not evaluated after a matching branch.
-
-Experimental Iceberg REST read restrictions require authorization to be enabled with
-`gravitino.authorization.enable=true` and a policy dispatcher to be available. When a policy dispatcher
-is available but authorization is disabled, the Iceberg REST service fails to start with an error
-identifying the required configuration, even when no policy applies. In auxiliary mode, this also
-aborts startup of the Gravitino server.
-
-`is_group_member` uses group membership supplied by the authenticated principal; enabling
-authorization does not populate these groups. An empty group list is valid and means that the user
-is not a member of any group. Authenticators that do not supply groups, including `simple`, therefore
-select the non-member branch of group-based policies, which may be unrestricted if the policy allows
-it. The referenced group must still exist in Gravitino; an unknown group or an unresolved identity
-causes the load-table request to fail.
-
-When the experimental Iceberg REST read-restriction loader is enabled, load-table does not support
-names containing `.` in the metalake, catalog, schema, table, or top-level column path. The
-metadata-object API reserves `.` as a qualified-name separator, so a tag cannot be assigned
-directly to such an object. The loader returns HTTP 400 for these names even when no policy is
-assigned. A standalone service without a policy dispatcher does not perform policy resolution.
+#### Types and Operators
 
 Supported declaration types are `BOOLEAN`, signed `INTEGER` and `LONG`, `FLOAT`, `DOUBLE`,
 `DECIMAL(p,s)`, `STRING`, `BINARY`, `DATE`, `TIME(6)` and `TIMESTAMP(6)` with or without time zone.
 Decimal precision is 1–38 and scale is 0–precision. Omitted temporal precision means 6.
-Numeric literals are exact until type validation; overflow, rounding, and implicit cross-family
-conversions are rejected. Temporal literals use `DATE '2026-01-01'`, `TIME '12:30:00'`,
+Numeric literals retain exact decimal text until conversion. Overflow, rounding, and implicit
+cross-family conversions are rejected. Temporal literals use `DATE '2026-01-01'`, `TIME '12:30:00'`,
 `TIMESTAMP '2026-01-01 12:30:00'`, or
 `TIMESTAMP WITH TIME ZONE '2026-01-01 12:30:00+00:00'`.
 
@@ -131,27 +96,7 @@ The expression body supports:
 - Searched `CASE WHEN condition THEN result ... ELSE result END` and simple
   `CASE selector WHEN match THEN result ... ELSE result END`. ELSE is optional.
 
-CASE preserves branch order and every branch is type checked, even if unreachable. SQL nulls
-are retained in the parsed tree: only TRUE keeps a row, NOT NULL remains unknown, and ordinary
-comparisons with NULL are unknown. A missing ELSE returns NULL. Schema binding must reject a
-nullable mask result for a required column. Binary values support null tests and compatible mask
-functions, but not value predicates.
-
-Context functions are `CURRENT_USER()` and `is_group_member('group')`. Group names must be
-non-empty string literals. Context values come from the trusted effective subject and remain stable
-for a conversion. User attributes are not supported.
-`is_nan(value)` accepts FLOAT or DOUBLE; `year(value)`, `month(value)`, and `day(value)` accept DATE
-or supported TIMESTAMP values and return INTEGER.
-
-The type-preserving mask functions each take one scalar argument:
-
-| Function                                       | Input type                                    |
-| ---------------------------------------------- | --------------------------------------------- |
-| `mask_alphanum`, `show_first_4`, `show_last_4` | STRING                                        |
-| `mask_to_fixed_value`                          | STRING, numeric, BOOLEAN, DATE or TIMESTAMP   |
-| `replace_with_null`                            | Any typed scalar                              |
-| `truncate_to_year`, `truncate_to_month`        | DATE or TIMESTAMP                             |
-| `sha256_global`, `sha256_query_local`          | STRING, signed INTEGER, signed LONG or BINARY |
+#### Identifiers and Literals
 
 Keywords and built-in function names are case-insensitive. Unquoted identifiers use ASCII
 letters or underscore followed by letters, digits or underscores, and normalize to uppercase.
@@ -160,6 +105,8 @@ unique after normalization. String literals use single quotes, with doubled sing
 escaping. Backslashes are literal and Unicode is preserved; isolated surrogates and NUL are rejected.
 Comments, statements, semicolons, casts, arithmetic, qualified names, nested fields, subqueries,
 unknown functions, exponents, leading `+`, leading zeroes and trailing decimal points are rejected.
+
+#### Resource Limits
 
 Limits apply before normalization and serve different purposes:
 
@@ -224,9 +171,9 @@ boundary: `1and TRUE` is invalid. The `AND` in `BETWEEN` separates its two scala
 
 #### Result Types and Binding Contract
 
-Each declared row-filter input must resolve to exactly one table column under the identifier
-matching rules; each declared type must match exactly. Missing, ambiguous or mismatched inputs
-are errors. A context-only filter can declare no inputs:
+A row filter declares zero or more parameters and returns BOOLEAN. Each input must resolve to
+exactly one table column under the identifier matching rules; each declared type must match exactly.
+Missing, ambiguous or mismatched inputs are errors. A context-only filter can declare no inputs:
 
 ```sql
 () RETURNS BOOLEAN -> is_group_member('auditors')
@@ -273,34 +220,38 @@ A filter retains rows only when its result is TRUE. These are SQL three-valued r
 
 For example, both `region <> 'US'` and `NOT (region = 'US')` exclude null regions. Use
 `region IS NULL OR region <> 'US'` to include them. A constant FALSE filter returns no rows.
-A mask that can return NULL, including an omitted ELSE, requires a nullable target. The binding
-and enforcement layer must reject a nullable result for a required column.
+All mask result arms must match the declared type. A mask that can return NULL, including an
+unselected NULL arm or an omitted ELSE, requires a nullable target. Schema binding rejects such a
+mask for a required column. Target conversion and context lookups evaluate only selected CASE
+results and stop evaluating later conditions after a match.
 
 #### Function Contract
 
-`CURRENT_USER()` returns the non-null STRING name of the trusted effective subject.
+`CURRENT_USER()` returns the non-null STRING name of the trusted effective subject. Context
+values remain stable for a conversion.
 `is_group_member('group')` returns BOOLEAN for exact flat membership in the current metalake.
 An unknown group, unavailable subject or failed lookup is an error; an existing group without
-the subject returns FALSE. Nested group expansion is unsupported.
+the subject returns FALSE. Group names must be non-empty string literals. Nested group expansion
+is unsupported.
 
-Context values remain stable for a conversion. User-attribute functions and implicit
-string-to-number conversions are unsupported.
+User attributes and implicit string-to-number conversions are unsupported.
 
-Date parts `year`, `month`, and `day` return INTEGER and preserve null input. Timestamp-with-timezone
-values use UTC; timestamps without timezone use their recorded calendar fields. Dates use the
-proleptic Gregorian calendar. `month(order_date) = 3` means March in any year.
+The predicate `is_nan(value)` accepts FLOAT or DOUBLE and preserves null input. Date parts
+`year`, `month`, and `day` accept DATE or TIMESTAMP, return INTEGER and preserve null input.
+Timestamp-with-timezone values use UTC; timestamps without timezone use their recorded calendar
+fields. Dates use the proleptic Gregorian calendar. `month(order_date) = 3` means March in any year.
 
 Mask function behavior is as follows; each call takes one compatible scalar argument and preserves
 its input logical type:
 
-| Function                                 | Behavior                                                                                                                                |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `mask_alphanum`                          | ASCII digits become `n`; `(),.@-` are preserved; other Unicode code points become `x`                                                   |
-| `show_first_4` / `show_last_4`           | Preserve the first/last four code points and mask the remainder as above; strings of four or fewer code points are unchanged            |
-| `mask_to_fixed_value`                    | Return `XXXXXXXX` for STRING, zero for numeric values, FALSE for BOOLEAN, or the epoch date/timestamp, including for null input         |
-| `replace_with_null`                      | Return a typed null                                                                                                                     |
-| `truncate_to_year` / `truncate_to_month` | Truncate to the start of the year/month, using UTC for timestamps with time zone                                                        |
-| `sha256_global` / `sha256_query_local`   | Type-preserving SHA-256; the query-local variant prepends a cryptographically random salt of at least 16 bytes, shared within one query |
+| Function                                 | Input type                                    | Behavior                                                                                                                                |
+| ---------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `mask_alphanum`                          | STRING                                        | ASCII digits become `n`; `(),.@-` are preserved; other Unicode code points become `x`                                                   |
+| `show_first_4` / `show_last_4`           | STRING                                        | Preserve the first/last four code points and mask the remainder as above; strings of four or fewer code points are unchanged            |
+| `mask_to_fixed_value`                    | STRING, numeric, BOOLEAN, DATE or TIMESTAMP   | Return `XXXXXXXX` for STRING, zero for numeric values, FALSE for BOOLEAN, or the epoch date/timestamp, including for null input         |
+| `replace_with_null`                      | Any typed scalar                              | Return a typed null                                                                                                                     |
+| `truncate_to_year` / `truncate_to_month` | DATE or TIMESTAMP                             | Truncate to the start of the year/month, using UTC for timestamps with time zone                                                        |
+| `sha256_global` / `sha256_query_local`   | STRING, signed INTEGER, signed LONG or BINARY | Type-preserving SHA-256; the query-local variant prepends a cryptographically random salt of at least 16 bytes, shared within one query |
 
 All masks except `mask_to_fixed_value` preserve null input. Hash input encoding is UTF-8 for
 strings, little-endian two's-complement for signed integers, and raw bytes for BINARY. STRING
@@ -323,6 +274,30 @@ response.
 
 #### Experimental Iceberg Conversion
 
+Experimental Iceberg REST read restrictions require authorization to be enabled with
+`gravitino.authorization.enable=true` and a policy dispatcher to be available. When a policy dispatcher
+is available but authorization is disabled, the Iceberg REST service fails to start with an error
+identifying the required configuration, even when no policy applies. In auxiliary mode, this also
+aborts startup of the Gravitino server.
+
+`is_group_member` uses group membership supplied by the authenticated principal; enabling
+authorization does not populate these groups. An empty group list is valid and means that the user
+is not a member of any group. Authenticators that do not supply groups, including `simple`, therefore
+select the non-member branch of group-based policies, which may be unrestricted if the policy allows
+it. The referenced group must still exist in Gravitino; an unknown group or an unresolved identity
+causes the load-table request to fail.
+
+When the experimental Iceberg REST read-restriction loader is enabled, load-table does not support
+names containing `.` in the metalake, catalog, schema, table, or top-level column path. The
+metadata-object API reserves `.` as a qualified-name separator, so a tag cannot be assigned
+directly to such an object. The loader returns HTTP 400 for these names even when no policy is
+assigned. A standalone service without a policy dispatcher does not perform policy resolution.
+
+When the experimental Iceberg REST read-restriction loader resolves several row-filter policies
+for one table, a filter that resolves to `true` adds no restriction and is ignored. Identical
+effective filters are deduplicated. Distinct restrictive filters conflict and cause the load-table
+request to fail; the loader does not combine them.
+
 The current converter supports the following enforcement subset of the shared SQL grammar:
 
 | SQL form                                                                 | Iceberg conversion                                                      |
@@ -341,9 +316,10 @@ The current converter supports the following enforcement subset of the shared SQ
 
 General column-to-column comparisons, month/day extraction from row values, row-dependent mask
 selection, composed mask calls and arbitrary literal mask values are not representable by the
-current closed target and are rejected. A SQL mask parameter binds to the selected column by field
-ID, independently of its local name. Quoted row-filter declarations match exact physical names;
-unquoted declarations match case-folded names and reject ambiguous matches.
+current closed target and are rejected. An incompatible selected mask fails the table load. A SQL
+mask parameter binds to the selected column by field ID, independently of its local name. Quoted
+row-filter declarations match exact physical names; unquoted declarations match case-folded names
+and reject ambiguous matches.
 
 Source limits still apply. Conversion additionally bounds generated Iceberg expressions to 16384
 nodes and depth 256, and bounds compilation work. This protects conditional lowering and
@@ -356,10 +332,10 @@ checks and response ETags.
 Each association connects one policy to one tag and stores a selector. The selector determines
 whether that association contributes the policy to an object's lookup result.
 
-| Selector       | When it matches                                                            |
-| -------------- | -------------------------------------------------------------------------- |
-| `ALL_VALUES`   | The effective tag is present, including an assignment without a value.     |
-| `TAG_VALUE`    | One of the effective tag assignment values equals the specified value.     |
+| Selector     | When it matches                                                        |
+| ------------ | ---------------------------------------------------------------------- |
+| `ALL_VALUES` | The effective tag is present, including an assignment without a value. |
+| `TAG_VALUE`  | One of the effective tag assignment values equals the specified value. |
 
 A policy may be associated with multiple tags. Association listings show those direct relations
 and their selectors, even if no object currently matches them. An object policy lookup returns each

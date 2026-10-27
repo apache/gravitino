@@ -21,7 +21,7 @@ package org.apache.gravitino.policy.sql;
 import java.nio.charset.StandardCharsets;
 import org.apache.gravitino.policy.ReadRestrictionContent;
 
-/** Validates typed definitions in the {@code restricted-sql-v1} source dialect. */
+/** Parses and validates typed definitions in the {@code restricted-sql-v1} source dialect. */
 public final class RestrictedSqlExpressionParserFacade {
   private RestrictedSqlExpressionParserFacade() {}
 
@@ -55,6 +55,7 @@ public final class RestrictedSqlExpressionParserFacade {
   public static SqlDefinition parseRowFilter(String source) {
     return parse(source, false);
   }
+
   /**
    * Parses and validates a complete SQL column-mask definition.
    *
