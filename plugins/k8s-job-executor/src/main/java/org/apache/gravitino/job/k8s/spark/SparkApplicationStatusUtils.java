@@ -108,6 +108,9 @@ public final class SparkApplicationStatusUtils {
   private static final Set<String> STOPPED_STATES =
       ImmutableSet.of("ResourceReleased", "TerminatedWithoutReleaseResources");
 
+  // The terminal phases of a pod. fabric8 has no public constants for the pod phases.
+  private static final Set<String> POD_TERMINATED_PHASES = ImmutableSet.of("Succeeded", "Failed");
+
   private SparkApplicationStatusUtils() {}
 
   /**
@@ -262,7 +265,7 @@ public final class SparkApplicationStatusUtils {
    */
   public static boolean isDriverRunning(GenericKubernetesResource app, Pod driver) {
     String phase = driver.getStatus() == null ? null : driver.getStatus().getPhase();
-    if ("Succeeded".equals(phase) || "Failed".equals(phase)) {
+    if (POD_TERMINATED_PHASES.contains(phase)) {
       return false;
     }
     ContainerState state = driverContainerState(driver, getDriverContainerName(app));
