@@ -46,6 +46,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.kyuubi.plugin.spark.authz.AccessControlException;
+import org.apache.kyuubi.plugin.spark.authz.ranger.SparkRangerAdminPlugin;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -68,6 +69,8 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   protected static SparkSession sparkSession = null;
   protected static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  private static final String RANGER_SPARK_EXTENSION =
+      "org.apache.kyuubi.plugin.spark.authz.ranger.RangerSparkExtension";
 
   protected static final String SQL_SHOW_DATABASES =
       String.format("SHOW DATABASES like '%s'", schemaName);
@@ -145,27 +148,34 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   protected void cleanIT() {
-    if (client != null) {
-      Arrays.stream(catalog.asSchemas().listSchemas())
-          .filter(schema -> !schema.equals("default"))
-          .forEach((schema -> catalog.asSchemas().dropSchema(schema, false)));
-
-      // The `dropCatalog` call will invoke the catalog metadata object to remove privileges
-      Arrays.stream(metalake.listCatalogs())
-          .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
-      client.disableMetalake(metalakeName);
-      client.dropMetalake(metalakeName);
-    }
-    if (sparkSession != null) {
-      sparkSession.close();
-    }
     try {
-      closer.close();
-    } catch (Exception e) {
-      LOG.error("Failed to close CloseableGroup", e);
+      if (client != null) {
+        // Drop the schemas with their tables, since a failed test can leave a table behind
+        Arrays.stream(catalog.asSchemas().listSchemas())
+            .filter(schema -> !schema.equals("default"))
+            .forEach((schema -> catalog.asSchemas().dropSchema(schema, true)));
+
+        // The `dropCatalog` call will invoke the catalog metadata object to remove privileges
+        Arrays.stream(metalake.listCatalogs())
+            .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
+        client.disableMetalake(metalakeName);
+        client.dropMetalake(metalakeName);
+      }
+    } finally {
+      // Close the Spark session even if the cleanup fails, otherwise the next test class gets it
+      // back from `SparkSession.builder().getOrCreate()` with this class's catalogs and extensions
+      if (sparkSession != null) {
+        sparkSession.close();
+        sparkSession = null;
+      }
+      try {
+        closer.close();
+      } catch (Exception e) {
+        LOG.error("Failed to close CloseableGroup", e);
+      }
+      client = null;
+      RangerITEnv.cleanup();
     }
-    client = null;
-    RangerITEnv.cleanup();
   }
 
   protected void createMetalake() {
@@ -180,10 +190,14 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   protected static void waitForUpdatingPolicies() {
-    // After Ranger authorization, Must wait a period of time for the Ranger Spark plugin to update
-    // the policy Sleep time must be greater than the policy update interval
-    // (ranger.plugin.spark.policy.pollIntervalMs) in the
-    // `resources/ranger-spark-security.xml.template`
+    // The Ranger Spark plugin polls Ranger admin every `ranger.plugin.spark.policy.pollIntervalMs`
+    // (see `resources/ranger-spark-security.xml.template`), but on a busy machine a poll can come
+    // later than the sleep below. Download the policies and roles now instead.
+    if (usesRangerSparkPlugin() && SparkRangerAdminPlugin.getPolicyVersion() >= 0) {
+      SparkRangerAdminPlugin.refreshPoliciesAndTags();
+    }
+
+    // Other Ranger plugins, such as the HDFS one in the Hive container, can only be waited for
     try {
       Thread.sleep(1000L);
     } catch (InterruptedException e) {
@@ -1288,5 +1302,16 @@ public abstract class RangerBaseE2EIT extends BaseIT {
       Assertions.assertThrows(
           AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
     }
+  }
+
+  private static boolean usesRangerSparkPlugin() {
+    // Check the configuration rather than the plugin itself: touching the plugin creates it, and it
+    // reads its configuration from the classpath only once, when it is created
+    return sparkSession != null
+        && sparkSession
+            .sparkContext()
+            .getConf()
+            .get("spark.sql.extensions", "")
+            .contains(RANGER_SPARK_EXTENSION);
   }
 }
