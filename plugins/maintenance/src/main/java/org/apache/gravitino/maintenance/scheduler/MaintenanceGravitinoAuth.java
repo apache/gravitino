@@ -31,8 +31,8 @@ import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
- * Runs TMS control-plane work (policy-expand / commit-chain resolve) under a {@link UserPrincipal}
- * built from {@code gravitino.maintenance.gravitinoAuth.*}.
+ * Runs policy-expand / commit-chain resolve under a {@link UserPrincipal} built from {@code
+ * gravitino.maintenance.gravitinoAuth.*}.
  *
  * <p>db-scheduler threads have no inbound HTTP {@code Authorization}. Lakehouse catalogs with
  * {@code catalog-backend=rest} forward the current principal's token to Iceberg REST via {@code
@@ -40,9 +40,9 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * NotAuthorized}. When gravitinoAuth is unset or {@code none}, the action runs unchanged so jdbc /
  * hive backends and unauthenticated IT setups keep working.
  */
-public final class MaintenanceControlPlaneAuth {
+public final class MaintenanceGravitinoAuth {
 
-  private MaintenanceControlPlaneAuth() {}
+  private MaintenanceGravitinoAuth() {}
 
   /**
    * Executes {@code action} under a gravitinoAuth principal when configured.

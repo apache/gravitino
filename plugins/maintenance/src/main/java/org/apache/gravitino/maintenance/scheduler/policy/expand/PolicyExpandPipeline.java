@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceControlPlaneAuth;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceGravitinoAuth;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobScheduler;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -108,14 +108,14 @@ public final class PolicyExpandPipeline {
   /**
    * Runs one expand pick for {@code policyId}.
    *
-   * <p>Runs under {@link MaintenanceControlPlaneAuth} so lakehouse {@code rest} backends can
-   * forward an Authorization header to Iceberg REST when the scheduler thread has no inbound user.
+   * <p>Runs under {@link MaintenanceGravitinoAuth} so lakehouse {@code rest} backends can forward
+   * an Authorization header to Iceberg REST when the scheduler thread has no inbound user.
    *
    * @param policyId expand task instance id
    * @return next due time when the expand row should stay, or empty to delete the row
    */
   public Optional<Instant> expand(long policyId) {
-    return MaintenanceControlPlaneAuth.call(config, () -> expandUnderPrincipal(policyId));
+    return MaintenanceGravitinoAuth.call(config, () -> expandUnderPrincipal(policyId));
   }
 
   private Optional<Instant> expandUnderPrincipal(long policyId) {

@@ -28,16 +28,16 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestMaintenanceControlPlaneAuth {
+class TestMaintenanceGravitinoAuth {
 
   @Test
   void resolvePrincipalEmptyWhenAuthUnset() {
-    Assertions.assertTrue(MaintenanceControlPlaneAuth.resolvePrincipal(new Config() {}).isEmpty());
+    Assertions.assertTrue(MaintenanceGravitinoAuth.resolvePrincipal(new Config() {}).isEmpty());
   }
 
   @Test
   void callRunsWithoutDoAsWhenAuthUnset() throws Exception {
-    String result = MaintenanceControlPlaneAuth.call(new Config() {}, () -> "ok");
+    String result = MaintenanceGravitinoAuth.call(new Config() {}, () -> "ok");
     Assertions.assertEquals("ok", result);
   }
 
@@ -50,7 +50,7 @@ class TestMaintenanceControlPlaneAuth {
                 "gravitino.maintenance.gravitinoAuth.username", "tms-sa",
                 "gravitino.maintenance.gravitinoAuth.password", "secret"));
 
-    Optional<UserPrincipal> resolved = MaintenanceControlPlaneAuth.resolvePrincipal(config);
+    Optional<UserPrincipal> resolved = MaintenanceGravitinoAuth.resolvePrincipal(config);
     Assertions.assertTrue(resolved.isPresent());
     Assertions.assertEquals("tms-sa", resolved.get().getName());
     Assertions.assertTrue(resolved.get().getAccessToken().orElseThrow().startsWith("Basic "));
@@ -58,7 +58,7 @@ class TestMaintenanceControlPlaneAuth {
     AtomicReference<String> seenUser = new AtomicReference<>();
     AtomicReference<String> seenAuth = new AtomicReference<>();
     String result =
-        MaintenanceControlPlaneAuth.call(
+        MaintenanceGravitinoAuth.call(
             config,
             () -> {
               UserPrincipal current = (UserPrincipal) PrincipalUtils.getCurrentPrincipal();
