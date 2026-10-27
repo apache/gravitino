@@ -585,7 +585,11 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
     `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
     `semantic_model_comment` TEXT DEFAULT NULL COMMENT 'semantic model comment snapshot',
-    `semantic_model_definition` MEDIUMTEXT NOT NULL COMMENT 'structured definition snapshot (JSON)',
+    `datasets` MEDIUMTEXT NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
+    `relationships` MEDIUMTEXT DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
+    `metrics` MEDIUMTEXT DEFAULT NULL COMMENT 'metric definitions snapshot (JSON)',
+    `ai_context` MEDIUMTEXT DEFAULT NULL COMMENT 'model AI context snapshot (JSON)',
+    `custom_extensions` MEDIUMTEXT DEFAULT NULL COMMENT 'model custom extensions snapshot (JSON)',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'semantic model properties snapshot (JSON)',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
@@ -598,11 +602,16 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
   COMMENT 'semantic model version information';
 ```
 
-`semantic_model_definition` contains AI context, datasets, relationships, metrics, and custom
-extensions as structured JSON managed by typed converters. Keeping the definition as one snapshot
-preserves collection order and allows create and alter to validate and persist the complete model
-atomically. Child members are not stored in separate tables because they do not have independent
-identity, lifecycle, or authorization.
+Each version row stores the complete definition in five JSON columns: `datasets`, `relationships`,
+`metrics`, `ai_context`, and `custom_extensions`. Typed converters preserve the existing field
+representations and collection order, including string-or-object AI context. Absent optional fields
+use SQL `NULL`, while explicit empty collections use JSON `[]`. Create and alter still validate and
+persist all definition fields atomically in one snapshot. Child members are not stored in separate
+tables because they do not have independent identity, lifecycle, or authorization.
+
+These Semantic Model tables are introduced in 2.0.0. Before that release, storage changes update the
+2.0.0 schema and 1.3.0-to-2.0.0 upgrade scripts in place for all supported databases. Released versions
+have no Semantic Model data to migrate.
 
 #### Version and Lifecycle Behavior
 
