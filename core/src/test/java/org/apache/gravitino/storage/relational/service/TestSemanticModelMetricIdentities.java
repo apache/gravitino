@@ -120,6 +120,36 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testWhitespaceOnlyNamesOnCreateReplaceAndOverwrite() throws Exception {
+    Namespace namespace = parents();
+    SemanticModelEntity original = model(namespace, "sales", " ");
+    backend.insert(original, false);
+    Map<String, Long> initial = liveIds(original.id());
+    assertEquals(Set.of(" "), initial.keySet());
+    assertSnapshotNames(backend.get(original.nameIdentifier(), original.type()));
+
+    SemanticModelEntity replacement =
+        copy(original, original.id(), original.name(), metrics(" ", "\t"));
+    backend.update(original.nameIdentifier(), original.type(), old -> replacement);
+    Map<String, Long> replaced = liveIds(original.id());
+    assertEquals(Set.of(" ", "\t"), replaced.keySet());
+    assertEquals(initial.get(" "), replaced.get(" "));
+    assertSnapshotNames(backend.get(original.nameIdentifier(), original.type()));
+
+    SemanticModelEntity imported = model(namespace, original.name(), " ", "\t", "\n");
+    backend.insert(imported, true);
+    Map<String, Long> overwritten = liveIds(original.id());
+    assertEquals(Set.of(" ", "\t", "\n"), overwritten.keySet());
+    assertEquals(replaced.get(" "), overwritten.get(" "));
+    assertEquals(replaced.get("\t"), overwritten.get("\t"));
+    assertEquals(3, Set.copyOf(overwritten.values()).size());
+    assertEquals(0, count("semantic_model_metric_meta", imported.id()));
+    SemanticModelEntity loaded = backend.get(original.nameIdentifier(), original.type());
+    assertEquals(original.id(), loaded.id());
+    assertSnapshotNames(loaded);
+  }
+
+  @TestTemplate
   void testAbsentEmptyAndModelScopedNames() throws Exception {
     Namespace namespace = parents();
     SemanticModelEntity absent = model(namespace, "absent", (String[]) null);

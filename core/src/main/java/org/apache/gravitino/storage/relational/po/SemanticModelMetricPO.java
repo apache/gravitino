@@ -56,7 +56,7 @@ public class SemanticModelMetricPO {
     Preconditions.checkArgument(catalogId != null, "Catalog id is required");
     Preconditions.checkArgument(schemaId != null, "Schema id is required");
     Preconditions.checkArgument(semanticModelId != null, "Semantic Model id is required");
-    Preconditions.checkArgument(StringUtils.isNotBlank(metricName), "Metric name cannot be empty");
+    Preconditions.checkArgument(StringUtils.isNotEmpty(metricName), "Metric name cannot be empty");
     Preconditions.checkArgument(deletedAt != null, "Deleted at is required");
     this.metricId = metricId;
     this.metalakeId = metalakeId;
