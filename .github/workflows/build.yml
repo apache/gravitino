@@ -239,6 +239,7 @@ jobs:
         run: |
           if [ "${{ needs.changes.outputs.maintenance_module_only_changes }}" = "true" ]; then
             ./gradlew \
+              :maintenance:maintenance-common:build \
               :maintenance:optimizer-api:build \
               :maintenance:updaters:build \
               :maintenance:optimizer:build \

@@ -53,6 +53,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecu
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -93,6 +94,8 @@ public class RESTService implements GravitinoAuxiliaryService {
   private boolean auxMode;
 
   private void initServer(IcebergConfig icebergConfig) {
+    boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
+    IcebergReadRestrictionLoader readRestrictionLoader = loadReadRestrictionLoader(enableAuth);
     JettyServerConfig serverConfig =
         JettyServerConfig.fromServiceConfig(icebergConfig, IcebergConfig.ICEBERG_CONFIG_PREFIX);
     IcebergRESTUtils.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
@@ -130,7 +133,6 @@ public class RESTService implements GravitinoAuxiliaryService {
     boolean skipAuthorizationForRestBackend =
         icebergConfig.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ);
 
-    Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
@@ -208,6 +210,7 @@ public class RESTService implements GravitinoAuxiliaryService {
             cleanupManager.ifPresent(
                 manager -> bind(manager).to(IcebergCleanupManager.class).ranked(1));
             bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
+            bind(readRestrictionLoader).to(IcebergReadRestrictionLoader.class).ranked(1);
             bind(icebergViewDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
             bind(icebergNamespaceDispatcher)
                 .to(IcebergNamespaceOperationDispatcher.class)
@@ -246,6 +249,15 @@ public class RESTService implements GravitinoAuxiliaryService {
     } else {
       server.addCustomFilters(ICEBERG_SPEC);
     }
+  }
+
+  static IcebergReadRestrictionLoader loadReadRestrictionLoader(boolean enableAuthorization) {
+    IcebergReadRestrictionLoader loader = IcebergReadRestrictionLoader.load();
+    if (loader.enabled() && !enableAuthorization) {
+      throw new IllegalStateException(
+          "Iceberg read restrictions require authorization; set gravitino.authorization.enable=true");
+    }
+    return loader;
   }
 
   static boolean shouldEnableMetrics(boolean auxiliaryMode, IcebergConfig icebergConfig) {

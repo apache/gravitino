@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 
 /** A Boolean negation operation. */
-final class Not implements CanonicalExpression {
+public final class Not implements CanonicalExpression {
   private final CanonicalExpression operand;
 
   Not(CanonicalExpression operand) {
@@ -33,7 +33,12 @@ final class Not implements CanonicalExpression {
     return operand instanceof Not ? ((Not) operand).operand() : new Not(operand);
   }
 
-  CanonicalExpression operand() {
+  /**
+   * Returns the negated operand.
+   *
+   * @return negated operand
+   */
+  public CanonicalExpression operand() {
     return operand;
   }
 

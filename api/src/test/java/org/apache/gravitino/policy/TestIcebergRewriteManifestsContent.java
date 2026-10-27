@@ -45,10 +45,12 @@ class TestIcebergRewriteManifestsContent {
   void testValidationAndOptions() {
     for (IcebergRewriteManifestsContent content :
         new IcebergRewriteManifestsContent[] {
-          PolicyContents.icebergRewriteManifests(99L, 100L, null, null, null),
-          PolicyContents.icebergRewriteManifests(null, 0L, null, null, null),
-          PolicyContents.icebergRewriteManifests(null, null, 0L, null, null),
-          PolicyContents.icebergRewriteManifests(null, null, null, -1, null)
+          PolicyContents.icebergRewriteManifests(
+              99L, 100L, (Long) null, (Integer) null, (Boolean) null),
+          PolicyContents.icebergRewriteManifests(
+              null, 0L, (Long) null, (Integer) null, (Boolean) null),
+          PolicyContents.icebergRewriteManifests(null, null, 0L, (Integer) null, (Boolean) null),
+          PolicyContents.icebergRewriteManifests(null, null, (Long) null, -1, (Boolean) null)
         }) {
       Assertions.assertThrows(IllegalArgumentException.class, content::validate);
     }
@@ -59,7 +61,8 @@ class TestIcebergRewriteManifestsContent {
     Assertions.assertEquals(false, content.rules().get("use_caching"));
     Assertions.assertNotEquals(content, PolicyContents.icebergRewriteManifests());
     IcebergRewriteManifestsContent largestSpec =
-        PolicyContents.icebergRewriteManifests(null, null, null, Integer.MAX_VALUE, null);
+        PolicyContents.icebergRewriteManifests(
+            null, null, (Long) null, Integer.MAX_VALUE, (Boolean) null);
     largestSpec.validate();
     Assertions.assertEquals(Integer.MAX_VALUE, largestSpec.specId());
   }
