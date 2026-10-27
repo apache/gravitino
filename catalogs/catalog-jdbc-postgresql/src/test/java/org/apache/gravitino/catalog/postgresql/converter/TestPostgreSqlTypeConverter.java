@@ -105,6 +105,14 @@ public class TestPostgreSqlTypeConverter {
   }
 
   @Test
+  public void testCharArrayPreservesLength() {
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.FixedCharType.of(5)), "_bpchar", 5, 0, 0);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.FixedCharType.of(1)), "_bpchar", 1, 0, 0);
+  }
+
+  @Test
   public void testConstrainedNumericOutsideDecimalLimits() {
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(39,0)"), NUMERIC, 39, 0, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(1000,0)"), NUMERIC, 1000, 0, 0);
