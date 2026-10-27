@@ -125,7 +125,7 @@ public class JwksTokenValidatorIT extends BaseIT {
             rsaKey, SUBJECT, SERVICE_AUDIENCE, Instant.now().minusSeconds(3600));
     withToken(
         expiredToken,
-        badClient -> Assertions.assertThrows(RuntimeException.class, badClient::serverVersion));
+        badClient -> Assertions.assertThrows(RuntimeException.class, badClient::listMetalakes));
   }
 
   @Test
@@ -135,7 +135,7 @@ public class JwksTokenValidatorIT extends BaseIT {
             rsaKey, SUBJECT, "wrong-audience", Instant.now().plusSeconds(1_000_000));
     withToken(
         wrongAudToken,
-        badClient -> Assertions.assertThrows(RuntimeException.class, badClient::serverVersion));
+        badClient -> Assertions.assertThrows(RuntimeException.class, badClient::listMetalakes));
   }
 
   @Test
@@ -146,7 +146,7 @@ public class JwksTokenValidatorIT extends BaseIT {
             differentKey, SUBJECT, SERVICE_AUDIENCE, Instant.now().plusSeconds(1_000_000));
     withToken(
         wrongKeyToken,
-        badClient -> Assertions.assertThrows(RuntimeException.class, badClient::serverVersion));
+        badClient -> Assertions.assertThrows(RuntimeException.class, badClient::listMetalakes));
   }
 
   @Test
