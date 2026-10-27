@@ -122,6 +122,7 @@ tests:
                     operator: In
                     values:
                       - amd64
+      priorityClassName: high-priority
     asserts:
       - equal:
           path: spec.replicas
@@ -170,6 +171,15 @@ tests:
       - equal:
           path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
           value: kubernetes.io/arch
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: high-priority
+
+  - it: omits priorityClassName when not set
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.priorityClassName
 
   - it: renders security contexts, resources, and custom probes
     template: deployment.yaml
