@@ -26,11 +26,14 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.io.TempDir;
 
 @Tag("gravitino-docker-test")
+@MySQLFixture(database = MYSQL_CATALOG_MYSQL_IT)
 public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
 
   private static final String DEFAULT_PAIMON_CATALOG = "test_flink_paimon_jdbc_catalog";
@@ -44,6 +47,8 @@ public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
   private static final String PAIMON_JDBC_BACKEND_DATABASE = "paimon_jdbc_backend_it";
 
   @TempDir private static Path warehouseDir;
+
+  @FixtureContainer private MySQLContainer mysql;
 
   private String mysqlUsername;
 
@@ -70,14 +75,12 @@ public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
 
   @Override
   protected void initCatalogEnv() throws Exception {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    // Only used to ensure the MySQL container itself is up; this test uses its own database
+    // The fixture's database only gets the MySQL server started; this test uses its own database
     // (see PAIMON_JDBC_BACKEND_DATABASE) rather than the shared MYSQL_CATALOG_MYSQL_IT one.
-    containerSuite.startMySQLContainer(MYSQL_CATALOG_MYSQL_IT);
-    String mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
-    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
-    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
-    mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
+    String mysqlUrl = mysql.getJdbcUrl();
+    mysqlUsername = mysql.getUsername();
+    mysqlPassword = mysql.getPassword();
+    mysqlDriver = mysql.getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
 
     Class.forName(mysqlDriver);
     try (Connection connection =

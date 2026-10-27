@@ -37,10 +37,11 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RESTException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.container.TrinoITContainers;
+import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.TrinoCluster;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.logging.log4j.util.Strings;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +66,7 @@ public class TrinoQueryITBase {
   public static String postgresqlUri = String.format("jdbc:postgresql://%s", testHost);
 
   protected static GravitinoAdminClient gravitinoClient;
-  protected static TrinoITContainers trinoITContainers;
+  protected static TrinoCluster trinoCluster;
   protected static TrinoQueryRunner trinoQueryRunner;
   protected static Map<String, String> serviceUrls = new HashMap<>();
 
@@ -111,32 +112,29 @@ public class TrinoQueryITBase {
       gravitinoClient = baseIT.getGravitinoClient();
       gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
 
-      trinoITContainers = ContainerSuite.getTrinoITContainers();
-
-      /**
-       * When connecting to a Hive metastore version 3.x, the Hive connector supports reading from
-       * and writing to insert-only and ACID tables, with full support for partitioning and
-       * bucketing
-       */
-      String hiveRuntimeVersion = "hive3";
-
-      /**
-       * Only Trino connector test will create Hive ACID table when deploy Hive with
-       * `/integration-test-common/docker-script/init/hive/init.sh`
-       */
-      Boolean isTrinoConnectorTest = true;
-
-      trinoITContainers.launch(
-          baseIT.getGravitinoServerPort(),
-          hiveRuntimeVersion,
-          isTrinoConnectorTest,
-          trinoWorkerNum,
-          trinoVersion,
-          trinoConnectorDir,
-          testContainers);
+      // Hive3 creates the ACID tables the connector test sets read; Hive 3 metastores let the
+      // Hive connector read and write insert-only and ACID tables.
+      TrinoCluster.Builder cluster =
+          TrinoCluster.builder()
+              .withGravitinoServerPort(baseIT.getGravitinoServerPort())
+              .withMetalake(metalakeName)
+              .withHiveRuntimeVersion(HiveContainer.HIVE3)
+              .withConnectorTest(true)
+              .withServices(services(testContainers));
+      if (trinoWorkerNum != null) {
+        cluster.withWorkers(trinoWorkerNum);
+      }
+      if (trinoVersion != null) {
+        cluster.withTrinoVersion(trinoVersion);
+      }
+      if (trinoConnectorDir != null) {
+        cluster.withConnectorDir(trinoConnectorDir);
+      }
+      trinoCluster = cluster.build();
+      trinoCluster.start();
 
       serviceUrls.clear();
-      serviceUrls.putAll(trinoITContainers.getServiceUrls());
+      serviceUrls.putAll(trinoCluster.serviceUrls());
       trinoUri = serviceUrls.getOrDefault("trino_uri", trinoUri);
       hiveMetastoreUri = serviceUrls.getOrDefault("hive_uri", hiveMetastoreUri);
       hdfsUri = serviceUrls.getOrDefault("hdfs_uri", hdfsUri);
@@ -151,6 +149,18 @@ public class TrinoQueryITBase {
     } else {
       gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     }
+  }
+
+  // The test sets name their services as the compose scripts did: "mysql" for MySQL only, and
+  // nothing or "default" for every service.
+  private static TrinoCluster.Services services(String testContainers) {
+    if (Strings.isBlank(testContainers) || "default".equals(testContainers)) {
+      return TrinoCluster.Services.ALL;
+    }
+    if ("mysql".equals(testContainers)) {
+      return TrinoCluster.Services.MYSQL;
+    }
+    throw new IllegalArgumentException("Unsupported test containers: " + testContainers);
   }
 
   public void setup() throws Exception {
@@ -172,7 +182,10 @@ public class TrinoQueryITBase {
 
     try {
       if (autoStart) {
-        if (trinoITContainers != null) trinoITContainers.shutdown();
+        if (trinoCluster != null) {
+          trinoCluster.close();
+          trinoCluster = null;
+        }
         if (baseIT != null) baseIT.stopIntegrationTest();
       }
     } catch (Exception e) {
