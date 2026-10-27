@@ -189,9 +189,11 @@ public interface JobExecutor extends Closeable {
    * @param jobId The unique identifier of the job.
    * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
    *     from the {@code gravitino.job.outputMaxLines} configuration.
-   * @param maxBytes The maximum number of (most recent) bytes to read from the underlying output,
-   *     resolved by the caller from the {@code gravitino.job.outputMaxBytes} configuration. Bounds
-   *     both the read cost and the response size regardless of how the content is shaped.
+   * @param maxBytes The maximum number of (most recent) bytes to return, resolved by the caller
+   *     from the {@code gravitino.job.outputMaxBytes} configuration. Bounds the response size
+   *     regardless of how the content is shaped. An implementation should also bound the bytes it
+   *     reads from the underlying output when it can, but may not, for example when the output can
+   *     only be read by lines.
    * @return the stdout lines of the job, or an empty list if not available.
    */
   default List<String> getJobStdout(String jobId, int maxLines, int maxBytes) {
@@ -212,9 +214,11 @@ public interface JobExecutor extends Closeable {
    * @param jobId The unique identifier of the job.
    * @param maxLines The maximum number of (most recent) lines to return, resolved by the caller
    *     from the {@code gravitino.job.outputMaxLines} configuration.
-   * @param maxBytes The maximum number of (most recent) bytes to read from the underlying output,
-   *     resolved by the caller from the {@code gravitino.job.outputMaxBytes} configuration. Bounds
-   *     both the read cost and the response size regardless of how the content is shaped.
+   * @param maxBytes The maximum number of (most recent) bytes to return, resolved by the caller
+   *     from the {@code gravitino.job.outputMaxBytes} configuration. Bounds the response size
+   *     regardless of how the content is shaped. An implementation should also bound the bytes it
+   *     reads from the underlying output when it can, but may not, for example when the output can
+   *     only be read by lines.
    * @return the stderr lines of the job, or an empty list if not available.
    */
   default List<String> getJobStderr(String jobId, int maxLines, int maxBytes) {
