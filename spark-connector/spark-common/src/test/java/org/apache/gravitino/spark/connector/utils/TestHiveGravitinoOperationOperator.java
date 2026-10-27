@@ -38,49 +38,41 @@ public class TestHiveGravitinoOperationOperator {
 
   private static final StructType SCHEMA =
       new StructType()
-          .add("dt", DataTypes.StringType, true)
+          .add("dt", DataTypes.IntegerType, true)
           .add("region", DataTypes.StringType, true);
-
-  private static final SupportsPartitions PARTS = mock(SupportsPartitions.class);
 
   @Test
   void testNullPartitionValueUsesHiveDefaultMarker() {
-    Table table = mock(Table.class);
-    when(table.supportPartitions()).thenReturn(PARTS);
+    SupportsPartitions partitions = mock(SupportsPartitions.class);
     ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
-    when(PARTS.dropPartition(name.capture())).thenReturn(true);
+    when(partitions.dropPartition(name.capture())).thenReturn(true);
 
-    HiveGravitinoOperationOperator operator = new HiveGravitinoOperationOperator(table);
-    InternalRow ident = row("20240101", null);
-    operator.dropPartition(ident, SCHEMA);
+    InternalRow ident = new GenericInternalRow(new Object[] {20240101, null});
+    operator(partitions).dropPartition(ident, SCHEMA);
 
-    // HMS stores null partition values as the default-partition marker; the read side maps the
-    // marker back to null, so the built name must carry the marker (not the literal "null").
+    // HMS stores a null partition value as the default partition marker.
     assertEquals("dt=20240101/region=__HIVE_DEFAULT_PARTITION__", name.getValue());
   }
 
   @Test
-  void testSubsetAndReorderedNamesResolveByFieldName() {
-    Table table = mock(Table.class);
-    when(table.supportPartitions()).thenReturn(PARTS);
-    ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
-    when(PARTS.partitionExists(name.capture())).thenReturn(true);
+  void testPartialSpecResolvesColumnsByName() {
+    SupportsPartitions partitions = mock(SupportsPartitions.class);
+    when(partitions.listPartitionNames())
+        .thenReturn(new String[] {"dt=1/region=us", "dt=2/region=eu"});
 
-    HiveGravitinoOperationOperator operator = new HiveGravitinoOperationOperator(table);
-    // names=["region"] with ident holding a region value: the field must be resolved by NAME,
-    // not by the positional dt field (whose IntegerType getter would corrupt the string value).
-    // With a names subset, ident holds values for exactly those columns.
+    // SHOW PARTITIONS ... PARTITION (region = 'us') passes only the region column and its value.
     InternalRow ident = new GenericInternalRow(new Object[] {UTF8String.fromString("us")});
-    operator.partitionExists(new String[] {"region"}, ident, SCHEMA);
+    InternalRow[] result =
+        operator(partitions).listPartitionIdentifiers(new String[] {"region"}, ident, SCHEMA);
 
-    assertEquals("region=us", name.getValue());
+    assertEquals(1, result.length);
+    assertEquals(1, result[0].getInt(0));
+    assertEquals("us", result[0].getUTF8String(1).toString());
   }
 
-  private static InternalRow row(String dt, String region) {
-    return new GenericInternalRow(
-        new Object[] {
-          dt == null ? null : UTF8String.fromString(dt),
-          region == null ? null : UTF8String.fromString(region)
-        });
+  private static HiveGravitinoOperationOperator operator(SupportsPartitions partitions) {
+    Table table = mock(Table.class);
+    when(table.supportPartitions()).thenReturn(partitions);
+    return new HiveGravitinoOperationOperator(table);
   }
 }
