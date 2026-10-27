@@ -86,6 +86,37 @@ public interface PolicyMetaMapper {
   PolicyPO selectPolicyMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName);
 
+  /**
+   * Loads one active policy, its current version, and the owning metalake name.
+   *
+   * @param policyId policy id
+   * @return the policy row, or null when the policy or its metalake is not active
+   */
+  @Results(
+      id = "policyWithMetalakeNameResultMap",
+      value = {
+        @Result(property = "policyId", column = "policy_id"),
+        @Result(property = "policyName", column = "policy_name"),
+        @Result(property = "policyType", column = "policy_type"),
+        @Result(property = "metalakeId", column = "metalake_id"),
+        @Result(property = "metalakeName", column = "metalake_name"),
+        @Result(property = "auditInfo", column = "audit_info"),
+        @Result(property = "currentVersion", column = "current_version"),
+        @Result(property = "lastVersion", column = "last_version"),
+        @Result(property = "occVersion", column = "occ_version"),
+        @Result(property = "deletedAt", column = "deleted_at"),
+        @Result(property = "policyVersionPO.id", column = "id"),
+        @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
+        @Result(property = "policyVersionPO.policyId", column = "version_policy_id"),
+        @Result(property = "policyVersionPO.version", column = "version"),
+        @Result(property = "policyVersionPO.policyComment", column = "policy_comment"),
+        @Result(property = "policyVersionPO.enabled", column = "enabled"),
+        @Result(property = "policyVersionPO.content", column = "content"),
+        @Result(property = "policyVersionPO.deletedAt", column = "version_deleted_at")
+      })
+  @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "selectPolicyMetaByPolicyId")
+  PolicyPO selectPolicyMetaByPolicyId(@Param("policyId") Long policyId);
+
   @UpdateProvider(type = PolicyMetaSQLProviderFactory.class, method = "updatePolicyMeta")
   Integer updatePolicyMeta(
       @Param("newPolicyMeta") PolicyPO newPolicyMeta,

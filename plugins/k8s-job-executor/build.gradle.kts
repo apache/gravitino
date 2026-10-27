@@ -48,6 +48,9 @@ dependencies {
     exclude(group = "io.fabric8", module = "kubernetes-httpclient-vertx")
   }
   implementation(libs.fabric8.kubernetes.httpclient.jdk)
+  // Parses the spark_conf of built-in jobs. Resolved to the version fabric8 needs, and relocated
+  // with it.
+  implementation(libs.jackson.databind)
 
   testImplementation(project(":api"))
   testImplementation(project(":common"))
