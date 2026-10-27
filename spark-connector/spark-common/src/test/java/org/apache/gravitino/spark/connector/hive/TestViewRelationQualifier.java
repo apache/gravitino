@@ -71,6 +71,9 @@ public class TestViewRelationQualifier {
   @Test
   void testQualifiesTimeTravelRelations() throws ParseException {
     assertEquals(Arrays.asList("hive.db1.t"), relations("SELECT * FROM t VERSION AS OF 1"));
+    assertEquals(
+        Arrays.asList("hive.db1.t", "hive.db1.u"),
+        relations("SELECT * FROM t TIMESTAMP AS OF (SELECT max(ts) FROM u)"));
   }
 
   @Test

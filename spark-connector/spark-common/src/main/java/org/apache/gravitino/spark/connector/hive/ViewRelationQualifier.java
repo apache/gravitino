@@ -87,9 +87,11 @@ final class ViewRelationQualifier {
       return qualifyRelation((UnresolvedRelation) plan);
     }
     if (plan instanceof RelationTimeTravel) {
+      // The relation is a field, not a child, of this leaf node.
       RelationTimeTravel timeTravel = (RelationTimeTravel) plan;
       return new RelationTimeTravel(
-          qualifyPlan(timeTravel.relation()), timeTravel.timestamp(), timeTravel.version());
+              qualifyPlan(timeTravel.relation()), timeTravel.timestamp(), timeTravel.version())
+          .mapExpressions(this::qualifyExpression);
     }
     return plan.mapChildren(this::qualifyPlan).mapExpressions(this::qualifyExpression);
   }
