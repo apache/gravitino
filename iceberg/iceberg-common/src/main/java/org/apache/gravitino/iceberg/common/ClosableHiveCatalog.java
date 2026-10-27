@@ -20,15 +20,12 @@
 package org.apache.gravitino.iceberg.common;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.PrivilegedExceptionAction;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
-import lombok.Getter;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
@@ -54,16 +51,10 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClosableHiveCatalog.class);
 
-  @Getter private final List<Closeable> resources = Lists.newArrayList();
-
   private KerberosClient kerberosClient;
 
   public ClosableHiveCatalog() {
     super();
-  }
-
-  public void addResource(Closeable resource) {
-    resources.add(resource);
   }
 
   /**
@@ -99,18 +90,6 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
     // First, close the internal HiveCatalog client pool to prevent resource leaks
     closeInternalClientPool();
-
-    // Then close any additional resources added via addResource()
-    resources.forEach(
-        resource -> {
-          try {
-            if (resource != null) {
-              resource.close();
-            }
-          } catch (Exception e) {
-            LOGGER.warn("Failed to close resource: {}", resource, e);
-          }
-        });
   }
 
   @Override
@@ -167,16 +146,6 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
     // Then try to close the old pool to release resources
     if (oldPool != null) {
-      // Try standard close method if available
-      if (oldPool instanceof AutoCloseable) {
-        try {
-          ((AutoCloseable) oldPool).close();
-          LOGGER.info("Successfully closed old Hive client pool");
-        } catch (Exception e) {
-          LOGGER.warn("Failed to close old Hive client pool", e);
-        }
-      }
-
       // Additionally, try to shutdown the internal scheduler thread pool in Iceberg's
       // CachedClientPool to prevent memory leak. This is necessary because Iceberg's
       // CachedClientPool does not implement Closeable and does not properly clean up
@@ -224,8 +193,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   /**
    * Close the internal HiveCatalog client pool using reflection. This is necessary because
-   * HiveCatalog doesn't provide a public API to close its client pool. We need to avoid closing
-   * IcebergHiveCachedClientPool twice (once here and once in resources list).
+   * HiveCatalog doesn't provide a public API to close its client pool.
    */
   private void closeInternalClientPool() {
     try {
@@ -233,13 +201,10 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
       clientsField.setAccessible(true);
       Object clientPool = clientsField.get(this);
 
-      if (clientPool != null && clientPool instanceof AutoCloseable) {
-        // Only close if it's NOT IcebergHiveCachedClientPool
-        if (!(clientPool instanceof IcebergHiveCachedClientPool)) {
-          ((AutoCloseable) clientPool).close();
-          LOGGER.info(
-              "Closed HiveCatalog internal client pool: {}", clientPool.getClass().getSimpleName());
-        }
+      if (clientPool instanceof AutoCloseable) {
+        ((AutoCloseable) clientPool).close();
+        LOGGER.info(
+            "Closed HiveCatalog internal client pool: {}", clientPool.getClass().getSimpleName());
       }
     } catch (NoSuchFieldException e) {
       LOGGER.warn("Could not find 'clients' field in HiveCatalog, skipping cleanup", e);
