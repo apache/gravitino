@@ -573,6 +573,37 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testRotationKeepsReplacedSecretWhenSchemaEntityUpdateFails() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_rotation");
+      d.createSchema(
+          ident,
+          "comment",
+          ImmutableMap.of("k1", "v1"),
+          Map.of("k2", new SecretBinding("memory", "old")),
+          Map.of());
+      SecretUrn urn =
+          SecretUrn.parse(
+              entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+
+      // The catalog applies the rotation, but the schema entity update fails and is only logged,
+      // so the entity still references the old secret.
+      doThrow(new IOException()).when(entityStore).update(any(), any(), any(), any());
+      d.alterSchema(ident, SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "new")));
+      reset(entityStore);
+
+      Assertions.assertEquals(
+          urn.toString(),
+          entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+      Assertions.assertEquals("old", secrets.readSecret(urn));
+      Assertions.assertTrue(d.dropSchema(ident, false));
+    }
+  }
+
+  @Test
   public void testCreateAndAlterSchemaRejectMaskedPlaceholder() {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_masked");
     Map<String, String> createProps =

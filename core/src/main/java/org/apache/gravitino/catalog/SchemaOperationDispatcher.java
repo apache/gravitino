@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -311,14 +312,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         ident,
         LockType.WRITE,
         () -> {
-          Pair<Schema, SchemaChange[]> alterResult =
+          Triple<Schema, SchemaChange[], SecretMaterialsHolder> alterResult =
               alterSchemaUnderLock(ident, catalogIdent, changes);
           Schema alteredSchema = alterResult.getLeft();
-          SchemaChange[] effectiveChanges = alterResult.getRight();
+          SchemaChange[] effectiveChanges = alterResult.getMiddle();
+          // Secrets the alter replaced; deleted once no stored entity references them.
+          SecretMaterialsHolder replacedSecrets = alterResult.getRight();
 
           // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
+            replacedSecrets.deleteReplaced(secretManager);
             return EntityCombinedSchema.of(alteredSchema)
                 .withHiddenProperties(
                     getMaskAndOmitKeys(
@@ -333,6 +337,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           if (stringId == null) {
             se = getEntity(ident, SCHEMA, SchemaEntity.class);
             if (se == null) {
+              replacedSecrets.deleteReplaced(secretManager);
               return EntityCombinedSchema.of(alteredSchema)
                   .withHiddenProperties(
                       getMaskAndOmitKeys(
@@ -376,6 +381,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .build()),
                   "UPDATE",
                   schemaId);
+          // A failed update is logged and leaves the entity on the replaced secrets, so keep them.
+          if (updatedSchemaEntity != null) {
+            replacedSecrets.deleteReplaced(secretManager);
+          }
 
           return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
               .withHiddenProperties(
@@ -386,7 +395,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         });
   }
 
-  private Pair<Schema, SchemaChange[]> alterSchemaUnderLock(
+  private Triple<Schema, SchemaChange[], SecretMaterialsHolder> alterSchemaUnderLock(
       NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
       throws NoSuchSchemaException {
     if (isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
@@ -403,7 +412,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         NoSuchSchemaException.class);
   }
 
-  private Pair<Schema, SchemaChange[]> alterManagedSchemaUnderLock(
+  private Triple<Schema, SchemaChange[], SecretMaterialsHolder> alterManagedSchemaUnderLock(
       NameIdentifier ident, SchemaChange... changes) throws NoSuchSchemaException {
     validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
 
@@ -438,7 +447,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               .withProperties(updatedEntity.properties())
               .withAuditInfo(updatedEntity.auditInfo())
               .build();
-      return Pair.of(alteredSchema, effectiveChangesHolder[0]);
+      return Triple.of(alteredSchema, effectiveChangesHolder[0], new SecretMaterialsHolder());
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", ident);
     } catch (IOException e) {
@@ -450,7 +459,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     }
   }
 
-  private Pair<Schema, SchemaChange[]> alterExternalSchemaUnderLock(
+  private Triple<Schema, SchemaChange[], SecretMaterialsHolder> alterExternalSchemaUnderLock(
       NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
       throws NoSuchSchemaException {
     Schema currentSchema = null;
@@ -504,8 +513,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               c -> c.doWithSchemaOps(s -> s.alterSchema(ident, effectiveChanges)),
               NoSuchSchemaException.class);
       alterCommitted = true;
-      writtenSecretMaterials.deleteReplaced(secretManager);
-      return Pair.of(alteredSchema, effectiveChanges);
+      // The caller deletes the replaced secrets after it updates the schema entity.
+      return Triple.of(alteredSchema, effectiveChanges, writtenSecretMaterials);
     } finally {
       if (!alterCommitted) {
         secretManager.rollbackSecrets(writtenSecretMaterials.get());

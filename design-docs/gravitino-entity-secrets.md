@@ -233,13 +233,13 @@ urn:gravitino-secret:memory:fileset:30019:s3-secret-access-key
 ```
 
 The property key from `SecretWriteContext` is the last segment (not an opaque ordinal).
-Create writes the three-segment form. An alter (`setSecretBinding`, or `setProperty` on a
-write-through secret) writes the new value under a new URN with a random `<writeId>` and deletes the
-replaced URN only after the alter commits. A failed alter therefore keeps the old value, and the
-deletion of a replaced URN cannot remove material that a concurrent alter on another server wrote
-for the same property.
+Create writes the three-segment form. An alter that sets a write-through secret owned by the
+entity (`setSecretBinding`, or `setProperty` on such a secret) writes the value under a new URN with
+a random UUID `<writeId>`. The replaced URN is deleted after the stored entity stops referencing
+it, so a failed alter keeps the old value, and a later alter of the same property never writes to
+the URN being deleted.
 
-Write-through URNs (including in-memory) embed `<entityType>:<entityId>:<propertyKey>` so drop
+Write-through URNs (including in-memory) embed `<entityType>:<entityId>[:<writeId>]:<propertyKey>` so drop
 can decide whether to call `deleteSecret` (§5.5.2 C). External-ref identifier layouts are defined
 by each provider implementation, but the built URN **must still end with the property key** so the
 recognition rule applies. This design only specifies the in-memory write-through form.

@@ -371,9 +371,8 @@ public class SecretManager implements Closeable {
    * write-through URN is appended to {@code replacedUrns} for the caller to delete after the alter
    * commits.
    *
-   * <p>Each call writes to a new URN that carries a random write id, so the material the entity
-   * currently references is never overwritten. A failed alter keeps the old value, and deleting a
-   * replaced URN cannot remove material written by a later alter.
+   * <p>The value is written to a new URN with a random write id instead of the URN the entity
+   * references, so a failed alter leaves the old value in place.
    *
    * @param properties mutable properties map updated as changes are applied
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
