@@ -584,7 +584,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                       + entry.getKey()
                       + ". Register it as an "
                       + Fileset.Type.EXTERNAL
-                      + " fileset, or set "
+                      + " fileset with this location set explicitly, or set "
                       + PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED
                       + "=true to manage it anyway");
             }
