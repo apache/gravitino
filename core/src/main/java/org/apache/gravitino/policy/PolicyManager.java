@@ -45,6 +45,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,7 +149,8 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   @Override
-  public PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes) {
+  public PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes)
+      throws NoSuchPolicyException, PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
     try {
@@ -161,10 +163,14 @@ public class PolicyManager implements PolicyDispatcher {
       throw new NoSuchPolicyException(
           "Policy with name %s under metalake %s does not exist", policyName, metalake);
     } catch (EntityAlreadyExistsException e) {
-      throw new RuntimeException(
-          String.format(
-              "Trying to alter policy %s under metalake %s, but the new name already exists",
-              policyName, metalake));
+      String newName =
+          RenameUtils.getLastRenameName(
+              policyName,
+              changes,
+              PolicyChange.RenamePolicy.class,
+              PolicyChange.RenamePolicy::getNewName);
+      throw new PolicyAlreadyExistsException(
+          e, "Policy with name %s under metalake %s already exists", newName, metalake);
     } catch (IOException ioe) {
       LOG.error("Failed to alter policy {} under metalake {}", policyName, metalake, ioe);
       throw new RuntimeException(ioe);
@@ -257,7 +263,8 @@ public class PolicyManager implements PolicyDispatcher {
           policyEntity -> {
             PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
             builder.withEnabled(expectedEnabledState);
-            return builder.build();
+            // Enable/disable must not re-validate legacy stored content.
+            return builder.buildSkippingContentValidation();
           });
     } catch (NoSuchEntityException e) {
       // The policy was dropped between the state check above and this update.
@@ -308,6 +315,7 @@ public class PolicyManager implements PolicyDispatcher {
     String newName = policyEntity.name();
     String newComment = policyEntity.comment();
     PolicyContent newContent = policyEntity.content();
+    boolean contentUpdated = false;
 
     for (PolicyChange change : changes) {
       if (change instanceof PolicyChange.RenamePolicy) {
@@ -337,20 +345,24 @@ public class PolicyManager implements PolicyDispatcher {
         }
 
         newContent = updateContent.getContent();
+        contentUpdated = true;
         validateReadRestrictionContent(policyType, newContent);
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
     }
 
-    newContent.validate();
+    // Rename/comment must not re-validate legacy stored content that would fail new checks.
+    if (contentUpdated) {
+      newContent.validate();
+    }
 
     PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
     builder.withName(newName);
     builder.withComment(newComment);
     builder.withContent(newContent);
 
-    return builder.build();
+    return contentUpdated ? builder.build() : builder.buildSkippingContentValidation();
   }
 
   private static void validateReadRestrictionContent(

@@ -369,8 +369,8 @@ public class SemanticModelMetaService {
             identifier.namespace().level(1),
             identifier.namespace().level(2),
             observedSemanticModelPO.getSemanticModelName());
-    // TODO: Soft-delete Semantic Model owner, tag, and securable-object relations in this
-    // transaction and in the metalake/catalog/schema cascade delete paths.
+    // Orphaned owner, tag, and securable-object relations are cleaned up by
+    // OrphanedMetadataObjectRelationService during garbage collection.
     SessionUtils.doMultipleWithCommit(
         () ->
             OccWriteSupport.deleteWithVersion(
@@ -443,7 +443,11 @@ public class SemanticModelMetaService {
         .withVersion(nextVersion)
         .withSemanticModelName(source.semanticModelName())
         .withSemanticModelComment(source.semanticModelComment())
-        .withSemanticModelDefinition(source.semanticModelDefinition())
+        .withDatasets(source.datasets())
+        .withRelationships(source.relationships())
+        .withMetrics(source.metrics())
+        .withAiContext(source.aiContext())
+        .withCustomExtensions(source.customExtensions())
         .withProperties(source.properties())
         .withAuditInfo(source.auditInfo())
         .withDeletedAt(source.deletedAt())

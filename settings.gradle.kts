@@ -63,6 +63,7 @@ include(
 // in-tree for reference; see clients/filesystem-fuse/README.md for details.
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("iceberg:iceberg-rest-server-experiment")
 include("iceberg:iceberg-rest-trino-it")
 include("lance:lance-common")
 include("lance:lance-rest-server")
@@ -133,8 +134,9 @@ include(":lineage")
 include(":mcp-server")
 include(":plugins:idp-basic")
 include(":plugins:k8s-job-executor")
-include(":plugins:tms")
+include(":plugins:maintenance")
 include(
+  ":maintenance:maintenance-common",
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
   ":maintenance:optimizer",

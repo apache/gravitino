@@ -20,10 +20,14 @@
 package org.apache.gravitino.policy;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -61,6 +65,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -261,6 +266,10 @@ public class TestPolicyManager {
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -339,6 +348,32 @@ public class TestPolicyManager {
     Assertions.assertEquals(
         "Policy with name non_existent_policy under metalake metalake_for_policy_test does not exist",
         e.getMessage());
+  }
+
+  @Test
+  void testRenamePolicyToExistingName() {
+    PolicyContent content =
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
+    PolicyEntity source = createCustomPolicy(METALAKE, "source", content);
+    PolicyEntity target = createCustomPolicy(METALAKE, "target", content);
+    for (PolicyChange[] changes :
+        new PolicyChange[][] {
+          {PolicyChange.rename("target")},
+          {PolicyChange.rename("intermediate"), PolicyChange.rename("target")}
+        }) {
+      PolicyAlreadyExistsException exception =
+          Assertions.assertThrows(
+              PolicyAlreadyExistsException.class,
+              () -> policyManager.alterPolicy(METALAKE, "source", changes));
+      Assertions.assertEquals(
+          "Policy with name target under metalake " + METALAKE + " already exists",
+          exception.getMessage());
+      Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
+      Assertions.assertEquals(source.id(), policyManager.getPolicy(METALAKE, "source").id());
+      Assertions.assertEquals(target.id(), policyManager.getPolicy(METALAKE, "target").id());
+      Assertions.assertThrows(
+          NoSuchPolicyException.class, () -> policyManager.getPolicy(METALAKE, "intermediate"));
+    }
   }
 
   @Test
@@ -551,6 +586,44 @@ public class TestPolicyManager {
     Assertions.assertEquals("legacy policy", commented.comment());
     Assertions.assertEquals(legacyContent, renamed.content());
     Assertions.assertEquals(legacyContent, commented.content());
+  }
+
+  @Test
+  public void testRenameDoesNotRevalidateLegacyCompactionRewriteOptions() throws IOException {
+    String policyName = "legacy_compaction_" + UUID.randomUUID().toString().replace("-", "");
+    // Constructed without content validate(); would fail rewriteOptions allowlist on create.
+    PolicyContent legacyContent =
+        PolicyContents.icebergDataCompaction(1000L, 1L, ImmutableMap.of("no-such-option", "x"));
+    PolicyEntity legacyPolicy =
+        PolicyEntity.builder()
+            .withId(new RandomIdGenerator().nextId())
+            .withName(policyName)
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(legacyContent)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .buildSkippingContentValidation();
+    entityStore.put(legacyPolicy, false /* overwritten */);
+
+    String newName = "renamed_" + policyName;
+    PolicyEntity renamed =
+        Assertions.assertDoesNotThrow(
+            () -> policyManager.alterPolicy(METALAKE, policyName, PolicyChange.rename(newName)));
+    Assertions.assertEquals(newName, renamed.name());
+    Assertions.assertEquals(legacyContent, renamed.content());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.alterPolicy(
+                METALAKE,
+                newName,
+                PolicyChange.updateContent(
+                    "system_iceberg_compaction",
+                    PolicyContents.icebergDataCompaction(
+                        1000L, 1L, ImmutableMap.of("no-such-option", "y")))));
   }
 
   @Test

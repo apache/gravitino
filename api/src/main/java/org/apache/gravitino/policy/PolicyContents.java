@@ -19,11 +19,13 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
 public class PolicyContents {
@@ -134,6 +136,55 @@ public class PolicyContents {
       String rewriteStrategy,
       String sortOrder,
       Map<String, String> rewriteOptions) {
+    return icebergDataCompaction(
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        rewriteStrategy,
+        sortOrder,
+        rewriteOptions,
+        null,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Creates an iceberg compaction policy content with rewrite strategy, sort order, and execution
+   * peers.
+   *
+   * @param minDataFileMse minimum threshold for custom-data-file-mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
+   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
+   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
+   * @param maxPartitionNum maximum partition number selected for compaction
+   * @param rewriteStrategy Iceberg rewrite_data_files top-level strategy
+   * @param sortOrder Iceberg rewrite_data_files top-level sort_order
+   * @param rewriteOptions rewrite options forwarded as job.options.*
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return iceberg compaction policy content
+   */
+  public static PolicyContent icebergDataCompaction(
+      long minDataFileMse,
+      long minDeleteFileNumber,
+      long dataFileMseWeight,
+      long deleteFileNumberWeight,
+      long maxPartitionNum,
+      String rewriteStrategy,
+      String sortOrder,
+      Map<String, String> rewriteOptions,
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
     return new IcebergDataCompactionContent(
         minDataFileMse,
         minDeleteFileNumber,
@@ -142,7 +193,9 @@ public class PolicyContents {
         maxPartitionNum,
         rewriteStrategy,
         sortOrder,
-        rewriteOptions);
+        rewriteOptions,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
@@ -165,25 +218,214 @@ public class PolicyContents {
    */
   public static PolicyContent icebergOrphanFileRemoval(
       long olderThanDays, @Nullable String location, boolean dryRun) {
-    return new IcebergOrphanFileRemovalContent(olderThanDays, location, dryRun);
+    return icebergOrphanFileRemoval(olderThanDays, location, dryRun, null, null, null, null, null);
   }
 
   /**
-   * Creates placeholder Iceberg rewrite-manifests policy content.
+   * Creates orphan cleanup policy content with execution peers.
    *
+   * @param olderThanDays minimum file age in days, from 1 to 36500 inclusive
+   * @param location optional scan location within the table
+   * @param dryRun whether to list candidates without deleting them
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag (must not be {@code true})
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return orphan cleanup policy content
+   */
+  public static PolicyContent icebergOrphanFileRemoval(
+      long olderThanDays,
+      @Nullable String location,
+      boolean dryRun,
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return new IcebergOrphanFileRemovalContent(
+        olderThanDays,
+        location,
+        dryRun,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
+  }
+
+  /**
+   * Creates a manifest rewrite policy with default thresholds targeting Iceberg's current default
+   * partition spec.
+   *
+   * @return manifest rewrite policy
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests() {
+    return new IcebergRewriteManifestsContent(
+        null, null, null, null, null, PolicyExecutionSpec.empty());
+  }
+
+  /**
+   * Creates a manifest rewrite policy. Null thresholds use the built-in defaults.
+   *
+   * @param manifestCountCritical count that triggers regardless of size
+   * @param manifestCountWarning minimum count for the size trigger
+   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param specId requested existing spec, or null to resolve Iceberg's current default at
+   *     evaluation
+   * @param useCaching caching option, or null for the Iceberg default
+   * @return manifest rewrite policy
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable Long manifestCountCritical,
+      @Nullable Long manifestCountWarning,
+      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching) {
+    return icebergRewriteManifests(
+        manifestCountCritical,
+        manifestCountWarning,
+        avgManifestSizeThresholdBytes,
+        specId,
+        useCaching,
+        null,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Creates Iceberg rewrite-manifests policy content with default thresholds and the given
+   * execution peers.
+   *
+   * <p>Prefer this over a peers-only five-arg overload so it does not clash with the thresholds
+   * factory {@code (Long, Long, Long, Integer, Boolean)}.
+   *
+   * @param executionSpec execution peers, or null for empty peers
    * @return rewrite-manifests policy content
    */
-  public static PolicyContent icebergRewriteManifests() {
-    return new IcebergRewriteManifestsContent();
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable PolicyExecutionSpec executionSpec) {
+    return new IcebergRewriteManifestsContent(
+        null,
+        null,
+        null,
+        null,
+        null,
+        executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec);
   }
 
   /**
-   * Creates placeholder Iceberg snapshot-expiration policy content.
+   * Creates a manifest rewrite policy with thresholds and execution peers. Null thresholds use the
+   * built-in defaults.
+   *
+   * @param manifestCountCritical count that triggers regardless of size
+   * @param manifestCountWarning minimum count for the size trigger
+   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param specId requested existing spec, or null to resolve Iceberg's current default at
+   *     evaluation
+   * @param useCaching caching option, or null for the Iceberg default
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return manifest rewrite policy
+   */
+  public static IcebergRewriteManifestsContent icebergRewriteManifests(
+      @Nullable Long manifestCountCritical,
+      @Nullable Long manifestCountWarning,
+      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching,
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return new IcebergRewriteManifestsContent(
+        manifestCountCritical,
+        manifestCountWarning,
+        avgManifestSizeThresholdBytes,
+        specId,
+        useCaching,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content with built-in defaults.
    *
    * @return snapshot-expiration policy content
    */
   public static PolicyContent icebergSnapshotExpiration() {
-    return new IcebergSnapshotExpirationContent();
+    return icebergSnapshotExpiration(null, null, null);
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content. Null arguments use built-in defaults.
+   *
+   * @param olderThanDays minimum snapshot age in days, or null for the default
+   * @param retainLast minimum recent snapshots to keep, or null for the default
+   * @param streamResults whether to stream intermediate delete results, or null for the default
+   * @return snapshot-expiration policy content
+   */
+  public static IcebergSnapshotExpirationContent icebergSnapshotExpiration(
+      @Nullable Long olderThanDays, @Nullable Long retainLast, @Nullable Boolean streamResults) {
+    return icebergSnapshotExpiration(
+        olderThanDays, retainLast, streamResults, null, null, null, null, null);
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content with default thresholds and execution peers.
+   *
+   * <p>Prefer this over mixing peers into the thresholds overload so {@code (Long, Long, Boolean)}
+   * stays unambiguous.
+   *
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return snapshot-expiration policy content
+   */
+  public static PolicyContent icebergSnapshotExpiration(
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return icebergSnapshotExpiration(
+        null, null, null, timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions);
+  }
+
+  /**
+   * Creates Iceberg snapshot-expiration policy content with thresholds and execution peers. Null
+   * thresholds use built-in defaults.
+   *
+   * @param olderThanDays minimum snapshot age in days, or null for the default
+   * @param retainLast minimum recent snapshots to keep, or null for the default
+   * @param streamResults whether to stream intermediate delete results, or null for the default
+   * @param timeTrigger optional cron expression
+   * @param commitTrigger optional commit-trigger flag
+   * @param minIntervalMs optional cooldown ms
+   * @param jobOptions optional job options
+   * @param updaterOptions optional updater options
+   * @return snapshot-expiration policy content
+   */
+  public static IcebergSnapshotExpirationContent icebergSnapshotExpiration(
+      @Nullable Long olderThanDays,
+      @Nullable Long retainLast,
+      @Nullable Boolean streamResults,
+      @Nullable String timeTrigger,
+      @Nullable Boolean commitTrigger,
+      @Nullable Long minIntervalMs,
+      @Nullable Map<String, String> jobOptions,
+      @Nullable Map<String, String> updaterOptions) {
+    return new IcebergSnapshotExpirationContent(
+        olderThanDays,
+        retainLast,
+        streamResults,
+        PolicyExecutionSpec.of(
+            timeTrigger, commitTrigger, minIntervalMs, jobOptions, updaterOptions));
   }
 
   /**
@@ -216,6 +458,19 @@ public class PolicyContents {
    */
   public static ColumnMaskContent columnMask(String expression) {
     return new ColumnMaskContent(expression);
+  }
+
+  /**
+   * Creates an access control policy content.
+   *
+   * @param privileges the privileges the rule confers on the tagged object, each of which must be
+   *     in {@link AccessControlContent#PERMITTED_PRIVILEGES}
+   * @param applicableRoles the roles that satisfy the rule's condition
+   * @return access control policy content
+   */
+  public static PolicyContent accessControl(
+      List<Privilege.Name> privileges, List<String> applicableRoles) {
+    return new AccessControlContent(privileges, applicableRoles);
   }
 
   private PolicyContents() {}

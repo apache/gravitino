@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -39,6 +40,114 @@ public class TestSparkApplicationUtils {
   private final K8sJobExecutorConfigs configs = newConfigs(ImmutableMap.of());
 
   @Test
+  public void testRejectClientDeployMode() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("s3a://bucket/app.jar")
+            .withClassName("org.example.App")
+            .withConfigs(ImmutableMap.of("spark.submit.deployMode", " Client "))
+            .build();
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+    Assertions.assertTrue(e.getMessage().contains("Client"), e.getMessage());
+
+    // Nor set by the executor configurations.
+    K8sJobExecutorConfigs clientMode =
+        newConfigs(ImmutableMap.of("spark.conf.spark.submit.deployMode", "client"));
+    SparkJobTemplate noMode =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("s3a://bucket/app.jar")
+            .withClassName("org.example.App")
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, noMode, clientMode));
+  }
+
+  @Test
+  public void testRejectNonKubernetesMaster() {
+    for (String master : new String[] {"local[*]", " local ", "yarn", "spark://host:7077"}) {
+      SparkJobTemplate template =
+          newTemplate("s3a://bucket/app.jar", ImmutableMap.of("spark.master", master));
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+      Assertions.assertTrue(e.getMessage().contains(master.trim()), e.getMessage());
+      // The spark_master parameter only exists in the built-in job templates.
+      Assertions.assertFalse(e.getMessage().contains("spark_master"), e.getMessage());
+    }
+
+    SparkJobTemplate builtin =
+        newTemplateBuilder()
+            .withName("builtin-sparkpi")
+            .withConfigs(ImmutableMap.of("spark.master", "local[*]"))
+            .build();
+    IllegalArgumentException builtinError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, builtin, configs));
+    Assertions.assertTrue(
+        builtinError.getMessage().contains("spark_master"), builtinError.getMessage());
+
+    // Nor set by the executor configurations.
+    K8sJobExecutorConfigs localMaster =
+        newConfigs(ImmutableMap.of("spark.conf.spark.master", "local[2]"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            SparkApplicationUtils.buildSparkApplication(
+                CONTEXT, newTemplate("s3a://bucket/app.jar", ImmutableMap.of()), localMaster));
+  }
+
+  @Test
+  public void testIgnoreBlankMaster() {
+    // A blank master, as the built-in templates set by default, is left to the operator.
+    Map<String, Object> spec =
+        getSpec(
+            newTemplate(
+                "s3a://bucket/app.jar",
+                ImmutableMap.of("spark.master", " ", "spark.submit.deployMode", "")),
+            configs);
+    @SuppressWarnings("unchecked")
+    Map<String, String> sparkConf = (Map<String, String>) spec.get("sparkConf");
+    Assertions.assertFalse(sparkConf.containsKey("spark.master"));
+    Assertions.assertFalse(sparkConf.containsKey("spark.submit.deployMode"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testBlankConfigsKeepExecutorDefaults() {
+    K8sJobExecutorConfigs withDefaults =
+        newConfigs(
+            ImmutableMap.of(
+                "spark.conf.spark.jars", "https://repo/iceberg-spark-runtime.jar",
+                "spark.conf.spark.jars.packages", "org.example:lib:1.0"));
+    SparkJobTemplate template =
+        newTemplate(
+            "s3a://bucket/app.jar",
+            ImmutableMap.of(
+                "spark.jars", "", "spark.jars.packages", " ", "spark.executor.memory", ""));
+
+    Map<String, String> sparkConf =
+        (Map<String, String>) getSpec(template, withDefaults).get("sparkConf");
+    Assertions.assertEquals("https://repo/iceberg-spark-runtime.jar", sparkConf.get("spark.jars"));
+    Assertions.assertEquals("org.example:lib:1.0", sparkConf.get("spark.jars.packages"));
+    Assertions.assertFalse(sparkConf.containsKey("spark.executor.memory"));
+
+    // A value set by the job overrides the executor default.
+    SparkJobTemplate withJars =
+        newTemplate(
+            "s3a://bucket/app.jar", ImmutableMap.of("spark.jars", "https://repo/other.jar"));
+    sparkConf = (Map<String, String>) getSpec(withJars, withDefaults).get("sparkConf");
+    Assertions.assertEquals("https://repo/other.jar", sparkConf.get("spark.jars"));
+  }
+
+  @Test
   @SuppressWarnings("unchecked")
   public void testBuildSparkApplication() {
     SparkJobTemplate template =
@@ -52,8 +161,8 @@ public class TestSparkApplicationUtils {
             .withArchives(ImmutableList.of("hdfs://nn/env.tgz#env"))
             .withConfigs(
                 ImmutableMap.of(
-                    "spark.master", "local[*]",
-                    "spark.submit.deployMode", "client",
+                    "spark.master", "k8s://https://kubernetes.default.svc",
+                    "spark.submit.deployMode", "cluster",
                     "spark.executor.instances", "2",
                     "spark.jars", "https://repo/other.jar"))
             .build();
@@ -430,20 +539,328 @@ public class TestSparkApplicationUtils {
   }
 
   @Test
-  public void testRejectEnvironments() {
+  public void testBuiltinJobRunsBuiltinJobsJar() {
+    // The executable of a built-in job template is the jobs jar on the Gravitino server.
+    for (String uri :
+        new String[] {
+          "/gravitino/auxlib/gravitino-jobs-2.0.0.jar", "file:///gravitino/auxlib/jobs.jar"
+        }) {
+      SparkJobTemplate template =
+          newTemplateBuilder().withName("builtin-sparkpi").withExecutable(uri).build();
+      Assertions.assertEquals(
+          "local:///opt/gravitino/jobs/gravitino-jobs.jar", getSpec(template, configs).get("jars"));
+      Assertions.assertEquals(
+          "s3a://bucket/gravitino-jobs.jar",
+          getSpec(
+                  template,
+                  newConfigs(
+                      ImmutableMap.of(
+                          K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR,
+                          "s3a://bucket/gravitino-jobs.jar")))
+              .get("jars"));
+    }
+  }
+
+  @Test
+  public void testBuiltinJobKeepsClusterReachableExecutable() {
     SparkJobTemplate template =
-        SparkJobTemplate.builder()
-            .withName("user-job")
-            .withExecutable("https://repo/app.jar")
-            .withClassName("org.example.App")
-            .withEnvironments(ImmutableMap.of("TOKEN", "secret"))
+        newTemplateBuilder()
+            .withName("builtin-sparkpi")
+            .withExecutable("https://repo/gravitino-jobs.jar")
+            .build();
+    Assertions.assertEquals(
+        "https://repo/gravitino-jobs.jar", getSpec(template, configs).get("jars"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSparkConfOfBuiltinJob() {
+    String json =
+        "{\"spark.jars\":\"https://repo/iceberg-spark-runtime.jar\","
+            + "\"spark.jars.packages\":\"org.example:lib:1.0\","
+            + "\"spark.executor.memory\":\"4g\","
+            + "\"spark.sql.shuffle.partitions\":200,"
+            + "\"spark.master\":\"local[*]\","
+            + "\"spark.submit.deployMode\":\"client\"}";
+    List<String> arguments = ImmutableList.of("--catalog", "demo", "--spark-conf", json);
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-rewrite-data-files")
+            .withArguments(arguments)
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.master", "",
+                    "spark.executor.memory", "1g",
+                    "spark.driver.memory", "1g"))
+            .build();
+
+    Map<String, Object> spec = getSpec(template, configs);
+    Map<String, String> sparkConf = (Map<String, String>) spec.get("sparkConf");
+    Assertions.assertEquals("https://repo/iceberg-spark-runtime.jar", sparkConf.get("spark.jars"));
+    Assertions.assertEquals("org.example:lib:1.0", sparkConf.get("spark.jars.packages"));
+    // spark_conf overrides the configurations of the template.
+    Assertions.assertEquals("4g", sparkConf.get("spark.executor.memory"));
+    Assertions.assertEquals("1g", sparkConf.get("spark.driver.memory"));
+    Assertions.assertEquals("200", sparkConf.get("spark.sql.shuffle.partitions"));
+    // The master and the deploy mode of spark_conf are ignored rather than rejected.
+    Assertions.assertFalse(sparkConf.containsKey("spark.master"));
+    Assertions.assertFalse(sparkConf.containsKey("spark.submit.deployMode"));
+    // The driver still gets spark_conf.
+    Assertions.assertEquals(arguments, spec.get("driverArgs"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSparkConfOfBuiltinJobKeepsExecutorDefaults() {
+    K8sJobExecutorConfigs withDefaults =
+        newConfigs(
+            ImmutableMap.of(
+                K8sJobExecutorConfigs.NAMESPACE,
+                "jobs",
+                "spark.conf.spark.jars",
+                "https://repo/iceberg-spark-runtime.jar"));
+    for (String json : new String[] {"", " ", "{}", "{\"spark.jars\":\" \"}"}) {
+      SparkJobTemplate template =
+          newTemplateBuilder()
+              .withName("builtin-iceberg-expire-snapshots")
+              .withArguments(ImmutableList.of("--spark-conf", json))
+              .build();
+      Map<String, String> sparkConf =
+          (Map<String, String>) getSpec(template, withDefaults).get("sparkConf");
+      Assertions.assertEquals(
+          "https://repo/iceberg-spark-runtime.jar", sparkConf.get("spark.jars"), json);
+      Assertions.assertEquals("jobs", sparkConf.get("spark.kubernetes.namespace"), json);
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSparkConfOfBuiltinJobReplacesExecutorDefaults() {
+    K8sJobExecutorConfigs withDefaults =
+        newConfigs(
+            ImmutableMap.of(
+                K8sJobExecutorConfigs.NAMESPACE,
+                "jobs",
+                "spark.conf.spark.jars",
+                "https://repo/iceberg-spark-runtime.jar"));
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-update-stats")
+            .withArguments(
+                ImmutableList.of(
+                    "--spark-conf", "{\"spark.jars\":\"https://repo/postgresql.jar\"}"))
+            .build();
+
+    // Like any Spark configuration of the job, spark.jars replaces the executor default.
+    Map<String, String> sparkConf =
+        (Map<String, String>) getSpec(template, withDefaults).get("sparkConf");
+    Assertions.assertEquals("https://repo/postgresql.jar", sparkConf.get("spark.jars"));
+  }
+
+  @Test
+  public void testRejectInvalidEnvironmentNameInSparkConfOfBuiltinJob() {
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-update-stats")
+            .withArguments(
+                ImmutableList.of("--spark-conf", "{\"spark.executorEnv.BAD NAME\":\"v\"}"))
             .build();
     IllegalArgumentException e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
-    Assertions.assertTrue(e.getMessage().contains("TOKEN"));
-    Assertions.assertFalse(e.getMessage().contains("secret"));
+    Assertions.assertTrue(e.getMessage().contains("BAD NAME"), e.getMessage());
+
+    // Nor in the configs of a template.
+    SparkJobTemplate inConfigs =
+        newTemplate("s3a://bucket/app.jar", ImmutableMap.of("spark.executorEnv.BAD NAME", "v"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, inConfigs, configs));
+
+    SparkJobTemplate valid =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-update-stats")
+            .withArguments(ImmutableList.of("--spark-conf", "{\"spark.executorEnv.MY_VAR\":\"v\"}"))
+            .build();
+    @SuppressWarnings("unchecked")
+    Map<String, String> sparkConf = (Map<String, String>) getSpec(valid, configs).get("sparkConf");
+    Assertions.assertEquals("v", sparkConf.get("spark.executorEnv.MY_VAR"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSparkConfOfBuiltinJobIgnoresKubernetesConfigs() {
+    String json =
+        "{\"spark.kubernetes.namespace\":\"kube-system\","
+            + "\"spark.kubernetes.authenticate.driver.serviceAccountName\":\"admin\","
+            + "\"spark.kubernetes.container.image\":\"evil:1.0\","
+            + "\"spark.kubernetes.driver.secretKeyRef.TOKEN\":\"secret:token\","
+            + "\"spark.executor.memory\":\"2g\"}";
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-expire-snapshots")
+            .withArguments(ImmutableList.of("--spark-conf", json))
+            .build();
+
+    GenericKubernetesResource app =
+        SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs);
+
+    Assertions.assertEquals("default", app.getMetadata().getNamespace());
+    Map<String, String> sparkConf =
+        (Map<String, String>)
+            ((Map<String, Object>) app.getAdditionalProperties().get("spec")).get("sparkConf");
+    Assertions.assertEquals("default", sparkConf.get("spark.kubernetes.namespace"));
+    Assertions.assertEquals(
+        "spark", sparkConf.get("spark.kubernetes.authenticate.driver.serviceAccountName"));
+    Assertions.assertEquals(
+        "gravitino-spark:3.5.9", sparkConf.get("spark.kubernetes.container.image"));
+    Assertions.assertFalse(sparkConf.containsKey("spark.kubernetes.driver.secretKeyRef.TOKEN"));
+    Assertions.assertEquals("2g", sparkConf.get("spark.executor.memory"));
+  }
+
+  @Test
+  public void testRejectInvalidSparkConfOfBuiltinJob() {
+    for (String json :
+        new String[] {
+          "{bad}",
+          "null",
+          "\"a\"",
+          "[\"a\"]",
+          "{\"spark.jars\":[\"a.jar\"]}",
+          "{\"k\":{\"x\":\"y\"}}"
+        }) {
+      SparkJobTemplate template =
+          newTemplateBuilder()
+              .withName("builtin-iceberg-expire-snapshots")
+              .withArguments(ImmutableList.of("--spark-conf", json))
+              .build();
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs),
+              json);
+      Assertions.assertTrue(e.getMessage().contains("spark_conf"), e.getMessage());
+    }
+
+    // A jar on the Gravitino server can't be read by the pods.
+    SparkJobTemplate serverJar =
+        newTemplateBuilder()
+            .withName("builtin-iceberg-expire-snapshots")
+            .withArguments(
+                ImmutableList.of("--spark-conf", "{\"spark.jars\":\"/opt/iceberg.jar\"}"))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, serverJar, configs));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSparkConfArgumentOfOtherJobsIsNotParsed() {
+    SparkJobTemplate template =
+        newTemplateBuilder()
+            .withName("user-job")
+            .withArguments(
+                ImmutableList.of("--spark-conf", "{\"spark.jars\":\"https://repo/a.jar\"}"))
+            .build();
+    Map<String, String> sparkConf =
+        (Map<String, String>) getSpec(template, configs).get("sparkConf");
+    Assertions.assertFalse(sparkConf.containsKey("spark.jars"));
+  }
+
+  @Test
+  public void testBuiltinJobsJarOnlyReplacesExecutableOfBuiltinJobs() {
+    // Not a built-in job: "builtin-" must be the prefix of the name.
+    SparkJobTemplate userJob =
+        newTemplateBuilder().withName("my-builtin-job").withExecutable("/opt/app.jar").build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, userJob, configs));
+
+    // The other resources of a built-in job are still checked.
+    SparkJobTemplate builtinJob =
+        newTemplateBuilder()
+            .withName("builtin-sparkpi")
+            .withExecutable("/gravitino/auxlib/gravitino-jobs-2.0.0.jar")
+            .withJars(ImmutableList.of("/gravitino/auxlib/other.jar"))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, builtinJob, configs));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testEnvironments() {
+    K8sJobExecutorConfigs withDefaults =
+        newConfigs(
+            ImmutableMap.of(
+                "spark.conf.spark.kubernetes.driverEnv.REGION",
+                "default-region",
+                "spark.conf.spark.executorEnv.STAGE",
+                "default-stage"));
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("https://repo/app.jar")
+            .withClassName("org.example.App")
+            .withEnvironments(ImmutableMap.of("REGION", "us-west", "app.mode-1", "", "TZ", "UTC"))
+            .withConfigs(ImmutableMap.of("spark.executorEnv.TZ", "Asia/Shanghai"))
+            .build();
+
+    Map<String, String> sparkConf =
+        (Map<String, String>) getSpec(template, withDefaults).get("sparkConf");
+
+    // Set for the driver and the executors, in place of the defaults of the job executor.
+    Assertions.assertEquals("us-west", sparkConf.get("spark.kubernetes.driverEnv.REGION"));
+    Assertions.assertEquals("us-west", sparkConf.get("spark.executorEnv.REGION"));
+    Assertions.assertEquals("", sparkConf.get("spark.kubernetes.driverEnv.app.mode-1"));
+    Assertions.assertEquals("", sparkConf.get("spark.executorEnv.app.mode-1"));
+    // The Spark configurations of the job template take precedence.
+    Assertions.assertEquals("UTC", sparkConf.get("spark.kubernetes.driverEnv.TZ"));
+    Assertions.assertEquals("Asia/Shanghai", sparkConf.get("spark.executorEnv.TZ"));
+    // A default that the job template doesn't set is kept.
+    Assertions.assertEquals("default-stage", sparkConf.get("spark.executorEnv.STAGE"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testAcceptEnvironmentNames() {
+    for (String valid : new String[] {"-X", ".X", "_X", "a.b-c_1", ".a.."}) {
+      SparkJobTemplate template =
+          SparkJobTemplate.builder()
+              .withName("user-job")
+              .withExecutable("https://repo/app.jar")
+              .withClassName("org.example.App")
+              .withEnvironments(ImmutableMap.of(valid, "v"))
+              .build();
+      Map<String, String> sparkConf =
+          (Map<String, String>) getSpec(template, configs).get("sparkConf");
+      Assertions.assertEquals("v", sparkConf.get("spark.kubernetes.driverEnv." + valid), valid);
+      Assertions.assertEquals("v", sparkConf.get("spark.executorEnv." + valid), valid);
+    }
+  }
+
+  @Test
+  public void testRejectInvalidEnvironmentName() {
+    for (String invalid : new String[] {"", "MY VAR", "A=B", "1ST", "PATH/X", ".", "..", "..CFG"}) {
+      SparkJobTemplate template =
+          SparkJobTemplate.builder()
+              .withName("user-job")
+              .withExecutable("https://repo/app.jar")
+              .withClassName("org.example.App")
+              .withEnvironments(ImmutableMap.of(invalid, "secret-value"))
+              .build();
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs));
+      Assertions.assertTrue(e.getMessage().contains("user-job"), e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("'" + invalid + "'"), e.getMessage());
+      // The value of an environment variable never goes into an error message.
+      Assertions.assertFalse(e.getMessage().contains("secret-value"), e.getMessage());
+    }
   }
 
   public static K8sJobExecutorConfigs newConfigs(Map<String, String> extra) {
@@ -451,6 +868,15 @@ public class TestSparkApplicationUtils {
     map.put("spark.conf.spark.driver.memory", "2g");
     map.putAll(extra);
     return new K8sJobExecutorConfigs(map);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> getSpec(
+      SparkJobTemplate template, K8sJobExecutorConfigs configs) {
+    return (Map<String, Object>)
+        SparkApplicationUtils.buildSparkApplication(CONTEXT, template, configs)
+            .getAdditionalProperties()
+            .get("spec");
   }
 
   private static SparkJobTemplate.Builder newTemplateBuilder() {

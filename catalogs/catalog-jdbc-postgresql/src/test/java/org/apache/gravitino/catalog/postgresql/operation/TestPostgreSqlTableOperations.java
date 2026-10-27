@@ -22,10 +22,12 @@ import com.google.common.collect.Maps;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -37,6 +39,7 @@ import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefault
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -49,6 +52,8 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestPostgreSqlTableOperations extends TestPostgreSql {
@@ -236,6 +241,26 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     assertionsTableInfo(
         newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
+    // a nullable column with a NULL default can be changed back to not null, and the NULL
+    // default is dropped
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME,
+        newName,
+        TableChange.updateColumnDefaultValue(new String[] {"col_2"}, Literals.NULL));
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME, newName, TableChange.updateColumnNullability(new String[] {"col_2"}, false));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
+    alterColumns.set(
+        1,
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.DoubleType.get())
+            .withNullable(false)
+            .withComment("set test key")
+            .build());
+    assertionsTableInfo(
+        newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
+
     // delete column
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -265,6 +290,81 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                 TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
     Assertions.assertFalse(TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
+  }
+
+  @Test
+  public void testUpdateColumnDefaultValueAndNullabilityTogether() {
+    String tableName = RandomNameUtils.genRandomName("default_not_null_table_");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("col_1")
+          .withType(Types.IntegerType.get())
+          .withNullable(true)
+          .withComment("set default first")
+          .build(),
+      JdbcColumn.builder()
+          .withName("col_2")
+          .withType(Types.IntegerType.get())
+          .withNullable(true)
+          .withComment("set not null first")
+          .build()
+    };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        columns,
+        "test_comment",
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME,
+        tableName,
+        TableChange.updateColumnDefaultValue(new String[] {"col_1"}, Literals.integerLiteral(5)),
+        TableChange.updateColumnNullability(new String[] {"col_1"}, false),
+        TableChange.updateColumnNullability(new String[] {"col_2"}, false),
+        TableChange.updateColumnDefaultValue(new String[] {"col_2"}, Literals.integerLiteral(7)));
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    Map<String, Column> loadedColumns =
+        Arrays.stream(load.columns()).collect(Collectors.toMap(Column::name, c -> c));
+    Assertions.assertFalse(loadedColumns.get("col_1").nullable());
+    Assertions.assertEquals(Literals.integerLiteral(5), loadedColumns.get("col_1").defaultValue());
+    Assertions.assertFalse(loadedColumns.get("col_2").nullable());
+    Assertions.assertEquals(Literals.integerLiteral(7), loadedColumns.get("col_2").defaultValue());
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    String tableName = RandomNameUtils.genRandomName("clear_comment_");
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("col comment").build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          new HashMap<>(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnComment(new String[] {"col_1"}, null),
+          TableChange.updateComment(null));
+
+      JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertTrue(StringUtils.isEmpty(load.comment()), load.comment());
+      Assertions.assertTrue(
+          StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
   }
 
   @Test
@@ -723,15 +823,11 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     // Test delete index definition.
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("test_pk", false);
     result = PostgreSqlTableOperations.deleteIndexDefinition(tableName, deleteIndex);
-    Assertions.assertEquals(
-        "ALTER TABLE \"t1\" DROP CONSTRAINT \"test_pk\";\n" + "DROP INDEX \"test_pk\";", result);
+    Assertions.assertEquals("ALTER TABLE \"t1\" DROP CONSTRAINT \"test_pk\";", result);
 
     deleteIndex = new TableChange.DeleteIndex("test_2_pk", true);
     result = PostgreSqlTableOperations.deleteIndexDefinition(tableName, deleteIndex);
-    Assertions.assertEquals(
-        "ALTER TABLE \"t1\" DROP CONSTRAINT \"test_2_pk\";\n"
-            + "DROP INDEX IF EXISTS \"test_2_pk\";",
-        result);
+    Assertions.assertEquals("ALTER TABLE \"t1\" DROP CONSTRAINT IF EXISTS \"test_2_pk\";", result);
   }
 
   @Test
@@ -783,5 +879,59 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     Assertions.assertNull(
         TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
         "Non-datetime type should return 0 precision");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"O'Brien", "quote\\' and \\new\\path; \"double\"", "ends with \\"})
+  void testStringDefaultValueRoundTrips(String defaultValue) {
+    String tableName = RandomNameUtils.genRandomName("pg_default_round_trip");
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withDefaultValue(Literals.varcharLiteral(255, defaultValue))
+            .build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        new JdbcColumn[] {column},
+        null,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[0].defaultValue());
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.addColumn(
+              new String[] {"col2"},
+              VARCHAR,
+              null,
+              TableChange.ColumnPosition.defaultPos(),
+              true,
+              false,
+              Literals.varcharLiteral(255, defaultValue)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, defaultValue), table.columns()[1].defaultValue());
+
+      String updated = defaultValue + " updated";
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          tableName,
+          TableChange.updateColumnDefaultValue(
+              new String[] {"col1"}, Literals.varcharLiteral(255, updated)));
+      table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+      Assertions.assertEquals(
+          Literals.varcharLiteral(255, updated), table.columns()[0].defaultValue());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+    }
   }
 }
