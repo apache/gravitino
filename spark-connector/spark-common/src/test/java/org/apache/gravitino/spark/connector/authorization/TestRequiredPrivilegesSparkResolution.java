@@ -119,6 +119,16 @@ public class TestRequiredPrivilegesSparkResolution {
   }
 
   @Test
+  void testSubqueryOnDeniedTableReportsForbidden() {
+    ForbiddenException failure =
+        assertThrows(
+            ForbiddenException.class,
+            () -> spark.sql("SELECT 1 WHERE EXISTS (SELECT 1 FROM denied.db.t1)"));
+
+    assertTrue(failure.getMessage().contains("denied.db.t1: SELECT_TABLE"), failure.getMessage());
+  }
+
+  @Test
   void testDeniedGetTableDoesNotFailLaterQueries() throws Exception {
     // Spark 3.5 loads the table after analysis, so no post-hoc rule sees the denied placeholder.
     // Spark 4 resolves the table during analysis and reports the denial there.
