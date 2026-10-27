@@ -30,6 +30,8 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
 import org.apache.spark.sql.catalyst.plans.logical.OneRowRelation;
 import org.apache.spark.sql.catalyst.plans.logical.Union;
+import org.apache.spark.sql.connector.catalog.SupportsRead;
+import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -77,6 +79,25 @@ public class TestRequiredPrivilegesCheck {
             + "[catalog.schema.table_a: MODIFY_TABLE, SELECT_TABLE; "
             + "catalog.schema.table_b: MODIFY_TABLE]",
         exception.getMessage());
+  }
+
+  @Test
+  void testDeniedTableFailsClosedWhenAccessed() {
+    ForbiddenException cause = new ForbiddenException("denied");
+    Table table =
+        AuthorizationTable.deny(
+            "table_a",
+            "catalog.schema.table_a",
+            ImmutableSet.of(Privilege.Name.SELECT_TABLE),
+            cause);
+
+    assertSame(
+        cause,
+        assertThrows(ForbiddenException.class, () -> ((SupportsRead) table).newScanBuilder(null)));
+    assertSame(
+        cause,
+        assertThrows(
+            ForbiddenException.class, () -> ((SupportsWrite) table).newWriteBuilder(null)));
   }
 
   @Test

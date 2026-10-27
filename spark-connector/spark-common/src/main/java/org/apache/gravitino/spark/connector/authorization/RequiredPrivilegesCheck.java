@@ -31,24 +31,21 @@ import org.apache.spark.sql.catalyst.rules.Rule;
 import org.apache.spark.sql.catalyst.streaming.StreamingRelationV2;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation;
+import scala.collection.Iterator;
 
 /**
  * A post-hoc resolution rule that reports the tables a query lacks Gravitino privileges for.
  *
- * <p>It runs after Spark's {@code ResolveRelations} has resolved every relation in the query, so
- * every denied table has been replaced by an {@link AuthorizationTable} placeholder in the plan,
- * but before {@code checkAnalysis} would fail the query for an unrelated reason (such as a column
- * that cannot be resolved against a denied table's placeholder schema). This lets a single error
- * list every inaccessible table and its required privileges instead of failing on the first one.
- *
- * <p>Because the denials are read from the plan itself, no state survives a query whose analysis
- * aborts before this rule runs.
+ * <p>It runs after Spark's {@code ResolveRelations}, which leaves an {@link AuthorizationTable}
+ * placeholder in the plan for each denied table, and before {@code checkAnalysis} would fail the
+ * query for an unrelated reason (such as a column that cannot be resolved against a placeholder's
+ * empty schema). It lists the denied tables of the plan and their required privileges in one error.
+ * A subquery is analyzed separately, so its denied tables are reported on their own.
  */
 public class RequiredPrivilegesCheck extends Rule<LogicalPlan> {
 
   @Override
   public LogicalPlan apply(LogicalPlan plan) {
-    // Walk the whole plan so that one error lists every denied table of the query.
     Optional<ForbiddenException> failure = AuthorizationTable.aggregateFailure(collectDenied(plan));
     if (failure.isPresent()) {
       throw failure.get();
@@ -78,7 +75,7 @@ public class RequiredPrivilegesCheck extends Rule<LogicalPlan> {
         addIfDenied(((DataSourceV2Relation) writeTarget).table(), denied);
       }
     }
-    scala.collection.Iterator<LogicalPlan> children = plan.children().iterator();
+    Iterator<LogicalPlan> children = plan.children().iterator();
     while (children.hasNext()) {
       collectDenied(children.next(), denied);
     }

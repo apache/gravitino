@@ -46,14 +46,12 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  *
  * <p>The connector does not load the real Spark table for a denied table, because that load would
  * bypass the very authorization the caller is missing. Instead {@link #deny} returns this
- * placeholder - carrying the table identifier, the required privileges, and the original failure -
- * so Spark's {@code ResolveRelations} can finish resolving every relation in the query. {@link
- * RequiredPrivilegesCheck} then walks the analyzed plan, finds every placeholder, and reports all
- * denied tables together, before analysis fails on anything else.
+ * placeholder, which carries the table identifier, the required privileges and the original
+ * failure, so Spark's {@code ResolveRelations} can finish resolving the relations of the query.
+ * {@link RequiredPrivilegesCheck} then finds the placeholders in the analyzed plan and reports them
+ * in one error.
  *
- * <p>Because the failure is carried in the plan itself rather than in side state, an analysis that
- * aborts before the post-hoc rule runs (for example, a catalog load that throws on a second table)
- * leaves nothing behind that can fail a later unrelated query on the same thread.
+ * <p>Nothing is recorded outside the plan, so a denial cannot fail a later query.
  *
  * <p>The metadata methods ({@link #name}, {@link #schema}, ...) return harmless placeholders so the
  * relation can be built during resolution, while the data-access methods ({@link #newScanBuilder},

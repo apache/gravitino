@@ -620,12 +620,17 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       // Do not load the underlying Spark table here: that load bypasses Gravitino authorization,
       // which the caller is precisely missing.
       //
-      // Unlike the read path, a write command targets a single table, so there is nothing to
-      // aggregate across relations. Returning an empty-schema placeholder here would let Spark's
-      // ResolveOutputRelation reject the write with a column-arity error before
-      // RequiredPrivilegesCheck runs, surfacing the wrong failure. Fail with the original
-      // authorization error instead.
-      throw e;
+      // Returning an empty-schema placeholder here would let Spark's ResolveOutputRelation reject
+      // the write with a column-arity error before RequiredPrivilegesCheck runs, surfacing the
+      // wrong failure. Fail now; the error lists only the write target.
+      AuthorizationTable denied =
+          (AuthorizationTable)
+              AuthorizationTable.deny(
+                  ident.name(),
+                  String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+                  Sets.newHashSet(Privilege.Name.MODIFY_TABLE),
+                  e);
+      throw AuthorizationTable.aggregateFailure(Collections.singletonList(denied)).orElse(e);
     }
     org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
     // Will create a catalog specific table

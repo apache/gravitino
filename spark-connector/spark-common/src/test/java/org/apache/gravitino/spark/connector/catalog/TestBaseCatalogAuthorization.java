@@ -114,7 +114,7 @@ public class TestBaseCatalogAuthorization {
   }
 
   @Test
-  void testDeniedWriteFailsWithOriginalError() throws Exception {
+  void testDeniedWriteReportsTheWriteTarget() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
     NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
     ForbiddenException original = new ForbiddenException("denied write");
@@ -125,8 +125,10 @@ public class TestBaseCatalogAuthorization {
     ForbiddenException thrown =
         assertThrows(ForbiddenException.class, () -> catalog.loadForWriting(identifier));
 
-    // The write path targets a single table: fail immediately with the original error.
-    assertEquals("denied write", thrown.getMessage());
+    assertEquals(
+        "Missing required privileges for Spark tables: [null.schema.table_a: MODIFY_TABLE]",
+        thrown.getMessage());
+    assertSame(original, thrown.getCause());
   }
 
   @Test
