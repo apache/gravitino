@@ -225,6 +225,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     return defaultDynamicCatalogName.orElse(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
   }
 
+  @Override
+  public boolean catalogConfigsFromMetalake() {
+    return true;
+  }
+
   /**
    * Creates a GravitinoClient based on the provided configuration properties. This static factory
    * method centralizes client creation logic for consistency and maintainability.

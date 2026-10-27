@@ -169,8 +169,9 @@ public class IcebergCatalogOperations
   }
 
   /**
-   * Returns the Iceberg catalog wrapper. In aux mode this is IRC {@link CatalogWrapperManager}
-   * get-or-create (shared cache, refresh on eviction). Otherwise the lakehouse-owned wrapper.
+   * Returns the Iceberg catalog wrapper. When aux IRC uses dynamic-config-provider, this is IRC
+   * {@link CatalogWrapperManager} get-or-create (shared cache, refresh on eviction). Otherwise the
+   * lakehouse-owned wrapper.
    */
   @VisibleForTesting
   IcebergCatalogWrapper catalogWrapper() {
@@ -190,10 +191,16 @@ public class IcebergCatalogOperations
     return new IcebergCatalogWrapperHelper(catalogWrapper().getCatalog());
   }
 
+  /**
+   * Reuse IRC wrappers only when aux IRC catalogs are metalake-backed (dynamic-config-provider).
+   * Static IRC configs do not necessarily include every lakehouse catalog name.
+   */
   private static boolean shouldUseIrcCatalogWrapper() {
     try {
       IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
-      return serverContext.isAuxMode() && serverContext.catalogWrapperManager() != null;
+      return serverContext.isAuxMode()
+          && serverContext.catalogConfigsFromMetalake()
+          && serverContext.catalogWrapperManager() != null;
     } catch (IllegalStateException e) {
       return false;
     }

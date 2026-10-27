@@ -46,6 +46,7 @@ public class TestIcebergCatalogWrapperResolve {
     IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(configProvider.getMetalakeName()).thenReturn("ml");
     Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("c1");
+    Mockito.when(configProvider.catalogConfigsFromMetalake()).thenReturn(true);
     IcebergRESTServerContext.create(configProvider, false, true, false, manager);
 
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
@@ -64,6 +65,26 @@ public class TestIcebergCatalogWrapperResolve {
     setField(ops, "useIrcCatalogWrapper", false);
 
     Assertions.assertSame(local, ops.catalogWrapper());
+  }
+
+  @Test
+  void shouldNotUseIrcWhenStaticProviderEvenIfAux() throws Exception {
+    CatalogWrapperManager manager = Mockito.mock(CatalogWrapperManager.class);
+    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    Mockito.when(configProvider.getMetalakeName()).thenReturn("ml");
+    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("c1");
+    // default catalogConfigsFromMetalake()=false (static IRC)
+    IcebergRESTServerContext.create(configProvider, false, true, false, manager);
+
+    IcebergCatalogWrapper local = new IcebergCatalogWrapper(new IcebergConfig());
+    IcebergCatalogOperations ops = new IcebergCatalogOperations();
+    ops.icebergCatalogWrapper = local;
+    setField(ops, "catalogName", "c1");
+    // Mimic initialize()'s decision for static aux IRC.
+    setField(ops, "useIrcCatalogWrapper", false);
+
+    Assertions.assertSame(local, ops.catalogWrapper());
+    Mockito.verifyNoInteractions(manager);
   }
 
   private static void setField(Object target, String name, Object value) throws Exception {

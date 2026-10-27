@@ -63,4 +63,13 @@ public interface IcebergConfigProvider extends Closeable {
   default String getDefaultCatalogName() {
     return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
   }
+
+  /**
+   * Whether catalog configs are loaded from Gravitino metalake (dynamic-config-provider).
+   *
+   * @return true when IRC catalog names align with metalake lakehouse-iceberg catalogs
+   */
+  default boolean catalogConfigsFromMetalake() {
+    return false;
+  }
 }
