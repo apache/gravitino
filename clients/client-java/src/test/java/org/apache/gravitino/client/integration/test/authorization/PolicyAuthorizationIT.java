@@ -17,8 +17,8 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -39,8 +39,9 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.PolicyList;
@@ -61,23 +62,22 @@ import org.junit.jupiter.api.TestMethodOrder;
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture
 public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
+
+  @FixtureContainer private HiveContainer hive;
 
   private static final String CATALOG = "catalog";
   private static final String SCHEMA = "schema";
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String hmsUri;
   private static String role = "role";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startHiveContainer();
     super.startIntegrationTest();
     hmsUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
     client
@@ -87,7 +87,6 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createSchema(SCHEMA, "test", new HashMap<>());
     // try to load the schema as normal user, expect failure
     assertThrows(
-        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.",
         RuntimeException.class,
         () -> {
           normalUserClient
@@ -95,7 +94,8 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadCatalog(CATALOG)
               .asSchemas()
               .loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.");
     // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -108,11 +108,11 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
-        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.");
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     tableCatalog.createTable(
         NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
@@ -139,7 +139,6 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
         "policy1", "custom", "policy1", true, PolicyContents.custom(null, supportedTypes, null));
     GravitinoMetalake metalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
-        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           metalakeLoadByNormalUser.createPolicy(
@@ -148,7 +147,8 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
               "policy2",
               true,
               PolicyContents.custom(null, supportedTypes, null));
-        });
+        },
+        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.");
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE),
@@ -178,18 +178,18 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.getPolicy("policy3");
     GravitinoMetalake metalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
-        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           metalakeLoadByNormalUser.getPolicy("policy1");
-        });
+        },
+        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.");
     metalakeLoadByNormalUser.getPolicy("policy2");
     assertThrows(
-        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           metalakeLoadByNormalUser.getPolicy("policy3");
-        });
+        },
+        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.");
 
     gravitinoMetalake.grantPrivilegesToRole(
         role,
@@ -207,11 +207,11 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake metalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     gravitinoMetalake.alterPolicy("policy1", PolicyChange.updateComment("222"));
     assertThrows(
-        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           metalakeLoadByNormalUser.alterPolicy("policy3", PolicyChange.updateComment("222"));
-        });
+        },
+        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.");
     metalakeLoadByNormalUser.alterPolicy("policy2", PolicyChange.updateComment("222"));
   }
 
@@ -288,11 +288,11 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     GravitinoMetalake metalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           metalakeLoadByNormalUser.deletePolicy("policy1");
-        });
+        },
+        "Can not access metadata.");
     gravitinoMetalake.deletePolicy("policy1");
     metalakeLoadByNormalUser.deletePolicy("policy2");
   }

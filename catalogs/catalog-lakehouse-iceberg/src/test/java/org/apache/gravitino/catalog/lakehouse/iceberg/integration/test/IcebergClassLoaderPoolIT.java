@@ -33,7 +33,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -69,6 +71,7 @@ import org.slf4j.LoggerFactory;
  * any mode via the client.
  */
 @Tag("gravitino-docker-test")
+@MySQLFixture(database = TestDatabaseName.MYSQL_TEST_ICEBERG_CLASSLOADER_POOL_A)
 public class IcebergClassLoaderPoolIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergClassLoaderPoolIT.class);
@@ -79,7 +82,7 @@ public class IcebergClassLoaderPoolIT extends BaseIT {
       TestDatabaseName.MYSQL_TEST_ICEBERG_CLASSLOADER_POOL_B;
   private static final String PROVIDER = "lakehouse-iceberg";
 
-  private static MySQLContainer mySQLContainer;
+  @FixtureContainer private static MySQLContainer mySQLContainer;
 
   // Metalakes created by tests, dropped (force) in tearDown so no state leaks across tests/runs
   // (important in deploy mode where the entity store persists between runs).
@@ -87,8 +90,6 @@ public class IcebergClassLoaderPoolIT extends BaseIT {
 
   @BeforeAll
   public void startup() throws IOException {
-    containerSuite.startMySQLContainer(DB_A);
-    mySQLContainer = containerSuite.getMySQLContainer();
     // Second database on the same MySQL container to produce a distinct backend URI.
     mySQLContainer.createDatabase(DB_B);
   }

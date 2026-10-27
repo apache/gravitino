@@ -20,9 +20,7 @@ package org.apache.gravitino.catalog.jdbc;
 
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 
-import com.google.common.collect.Maps;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,7 +28,6 @@ import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -44,11 +41,8 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.testcontainers.containers.JdbcDatabaseContainer;
 
 public abstract class TestJdbc {
-  protected static JdbcDatabaseContainer<?> CONTAINER;
-
   protected static JdbcDatabaseOperations DATABASE_OPERATIONS;
 
   protected static JdbcTableOperations TABLE_OPERATIONS;
@@ -58,16 +52,6 @@ public abstract class TestJdbc {
   protected static DataSource DATA_SOURCE;
 
   protected static final String TEST_DB_NAME = RandomNameUtils.genRandomName("test_db_");
-
-  public static void startup() throws Exception {
-    CONTAINER.start();
-    HashMap<String, String> properties = Maps.newHashMap();
-    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
-    properties.put(JdbcConfig.JDBC_URL.getKey(), CONTAINER.getJdbcUrl());
-    properties.put(JdbcConfig.USERNAME.getKey(), CONTAINER.getUsername());
-    properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());
-    DATA_SOURCE = DataSourceUtils.createDataSource(properties);
-  }
 
   protected void testBaseOperation(
       String databaseName, Map<String, String> properties, String comment) {
@@ -171,8 +155,5 @@ public abstract class TestJdbc {
   @AfterAll
   public static void stop() {
     DataSourceUtils.closeDataSource(DATA_SOURCE);
-    if (null != CONTAINER) {
-      CONTAINER.stop();
-    }
   }
 }

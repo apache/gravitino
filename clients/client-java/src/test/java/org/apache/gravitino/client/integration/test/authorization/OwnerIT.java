@@ -37,9 +37,11 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.container.KafkaContainer;
+import org.apache.gravitino.integration.test.container.KafkaFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
@@ -53,11 +55,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@KafkaFixture
+@HiveFixture
 public class OwnerIT extends BaseIT {
+  @FixtureContainer private HiveContainer hive;
+  @FixtureContainer private KafkaContainer kafka;
 
   private static final Logger LOG = LoggerFactory.getLogger(OwnerIT.class);
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String hmsUri;
   private static String kafkaBootstrapServers;
 
@@ -72,19 +77,11 @@ public class OwnerIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    containerSuite.startHiveContainer();
     hmsUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
-
-    containerSuite.startKafkaContainer();
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     kafkaBootstrapServers =
-        String.format(
-            "%s:%d",
-            containerSuite.getKafkaContainer().getContainerIpAddress(),
-            KafkaContainer.DEFAULT_BROKER_PORT);
+        String.format("%s:%d", kafka.getContainerIpAddress(), KafkaContainer.DEFAULT_BROKER_PORT);
   }
 
   @AfterAll

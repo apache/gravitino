@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 public class TrinoIcebergRESTSmokeIT extends TrinoIcebergRESTAuthorizationITBase {
 
   // Use a schema name distinct from the other IT classes: they share one PostgreSQL-backed Iceberg
-  // catalog (the shared ContainerSuite is intentionally not reset between classes), so a common
+  // catalog (the shared PostgreSQL fixture is intentionally not reset between classes), so a common
   // namespace would collide across classes.
   private static final String SCHEMA = "smoke_db";
 

@@ -23,7 +23,10 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
+import org.apache.gravitino.integration.test.container.MySQLVersion;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -34,11 +37,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@MySQLFixture(version = MySQLVersion.MYSQL_5_7, database = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT)
 public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
-  public CatalogMysqlVersion5IT() {
-    super();
-    mysqlImageName = "mysql:5.7";
-  }
 
   boolean SupportColumnDefaultValueExpression() {
     return false;
