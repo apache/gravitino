@@ -270,16 +270,13 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
             IcebergCatalogAndIdentifier.of(
                 (TableCatalog) catalog, catalogAndIdentifier.identifier()));
       }
-      // Not our catalog: return None so this strategy skips the plan and Spark falls through to
-      // the next registered strategy - the co-registered Iceberg extension serves plain Iceberg
-      // SparkCatalog/SparkSessionCatalog tables exactly as in a session without this plugin.
+      // Not a Gravitino catalog: the caller falls back to the parent Iceberg strategy.
       return Option.empty();
     }
   }
 
   private Seq<SparkPlan> superFallback(LogicalPlan plan) {
-    // Strategy.apply returns the general scala.collection.Seq while the Option chains carry
-    // the immutable.Seq that toSeq produces.
+    // Strategy.apply returns scala.collection.Seq; the parent strategy builds immutable Seqs.
     return (Seq<SparkPlan>) (Object) super.apply(plan);
   }
 
