@@ -153,7 +153,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
       Math.floor(now / slotMs) * Math.max(1, Math.floor(recentBudget / 3))) % recent.length;
     let probed = 0;
     for (let offset = 0; offset < recent.length; offset++) {
-      if (calls + 15 > recentBudget) break; // One PR may need trees, runs, paginated jobs and a status write.
+      if (calls + 16 > recentBudget) break; // One PR may need trees, workflow contents, runs, paginated jobs and a status write.
       const pr = recent[(recentStart + offset) % recent.length];
       probed++;
       await visit(pr, async () => {
@@ -183,7 +183,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     const step = Math.max(1, Math.floor(budget / 20));
     const start = manual || !prs.length ? 0 : (Math.floor(now / slotMs) * step) % prs.length;
     for (let offset = 0; offset < prs.length; offset++) {
-      if (calls + 15 > budget) break;
+      if (calls + 16 > budget) break;
       const pr = prs[(start + offset) % prs.length];
       if (visited.has(pr.number)) continue;
       await visit(pr, () => refresh(pr));
