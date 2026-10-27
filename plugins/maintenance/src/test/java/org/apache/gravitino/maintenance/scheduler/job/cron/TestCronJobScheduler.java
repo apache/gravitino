@@ -24,10 +24,12 @@ import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.MetadataObject;
@@ -150,24 +152,13 @@ class TestCronJobScheduler extends TestJDBCBackend {
     DataSource dataSource = dataSource();
     CronJobScheduler scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
+    int cap = RelationalCronJobScheduler.SNAPSHOT_EXPIRY_BATCH_CAPACITY;
 
-    Assertions.assertEquals(
-        1,
-        scheduler.enqueueDueNow(
-            policy,
-            List.of(
-                candidate(1L, MetadataObject.Type.SCHEMA),
-                candidate(2L, MetadataObject.Type.SCHEMA)),
-            2));
-    Assertions.assertEquals(
-        1,
-        scheduler.enqueueDueNow(
-            policy,
-            List.of(
-                candidate(1L, MetadataObject.Type.SCHEMA),
-                candidate(2L, MetadataObject.Type.SCHEMA),
-                candidate(3L, MetadataObject.Type.SCHEMA)),
-            2));
+    List<ExpandTableCandidate> full = schemaCandidates(1, cap);
+    Assertions.assertEquals(1, scheduler.enqueueDueNow(policy, full, 100));
+    List<ExpandTableCandidate> fullPlusOne = new ArrayList<>(full);
+    fullPlusOne.add(candidate(cap + 1L, MetadataObject.Type.SCHEMA));
+    Assertions.assertEquals(1, scheduler.enqueueDueNow(policy, fullPlusOne, 100));
 
     SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
     MaintenanceJobSpec batch0 =
@@ -186,8 +177,8 @@ class TestCronJobScheduler extends TestJDBCBackend {
                         TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forBatch(1L, 9L)))
                 .get()
                 .getData();
-    Assertions.assertEquals(List.of(1L, 2L), batch0.tableIds());
-    Assertions.assertEquals(List.of(3L), batch1.tableIds());
+    Assertions.assertEquals(cap, batch0.tableIds().size());
+    Assertions.assertEquals(List.of(cap + 1L), batch1.tableIds());
   }
 
   @TestTemplate
@@ -347,25 +338,18 @@ class TestCronJobScheduler extends TestJDBCBackend {
     DataSource dataSource = dataSource();
     CronJobScheduler scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
+    int cap = RelationalCronJobScheduler.SNAPSHOT_EXPIRY_BATCH_CAPACITY;
 
     // Full batch at capacity — must not be absorbed into a later incomplete peer.
+    Assertions.assertEquals(1, scheduler.enqueueDueNow(policy, schemaCandidates(1, cap), 100));
     Assertions.assertEquals(
         1,
         scheduler.enqueueDueNow(
             policy,
             List.of(
-                candidate(1L, MetadataObject.Type.SCHEMA),
-                candidate(2L, MetadataObject.Type.SCHEMA),
-                candidate(3L, MetadataObject.Type.SCHEMA)),
-            3));
-    Assertions.assertEquals(
-        1,
-        scheduler.enqueueDueNow(
-            policy,
-            List.of(
-                candidate(10L, MetadataObject.Type.SCHEMA),
-                candidate(11L, MetadataObject.Type.SCHEMA)),
-            3));
+                candidate(100L, MetadataObject.Type.SCHEMA),
+                candidate(101L, MetadataObject.Type.SCHEMA)),
+            100));
 
     SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
     MaintenanceJobSpec batch0 =
@@ -384,8 +368,8 @@ class TestCronJobScheduler extends TestJDBCBackend {
                         TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forBatch(1L, 9L)))
                 .get()
                 .getData();
-    Assertions.assertEquals(List.of(1L, 2L, 3L), batch0.tableIds());
-    Assertions.assertEquals(List.of(10L, 11L), batch1.tableIds());
+    Assertions.assertEquals(cap, batch0.tableIds().size());
+    Assertions.assertEquals(List.of(100L, 101L), batch1.tableIds());
   }
 
   @TestTemplate
@@ -489,6 +473,12 @@ class TestCronJobScheduler extends TestJDBCBackend {
 
   private static ExpandTableCandidate candidate(long tableId, MetadataObject.Type level) {
     return new ExpandTableCandidate(tableId, level);
+  }
+
+  private static List<ExpandTableCandidate> schemaCandidates(long fromInclusive, long toInclusive) {
+    return LongStream.rangeClosed(fromInclusive, toInclusive)
+        .mapToObj(id -> candidate(id, MetadataObject.Type.SCHEMA))
+        .collect(Collectors.toList());
   }
 
   private static PolicyEntity compactionPolicy(long id) {

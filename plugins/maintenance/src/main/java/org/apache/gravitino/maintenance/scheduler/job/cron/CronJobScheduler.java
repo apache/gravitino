@@ -42,7 +42,9 @@ public interface CronJobScheduler {
    *
    * @param policy effective maintenance policy (used to build the jobConf spec)
    * @param candidates enqueueable tables with winner levels
-   * @param batchCapacity max tables per snapshot-expiry batch row (and max candidates considered)
+   * @param batchCapacity expand enqueue budget (max candidates considered for non-snapshot types).
+   *     Snapshot-expiry merge capacity is a fixed per-batch table limit inside the implementation,
+   *     not this value.
    * @return number of newly inserted cron-job rows (merges into existing batches do not count)
    */
   int enqueueDueNow(PolicyEntity policy, List<ExpandTableCandidate> candidates, int batchCapacity);

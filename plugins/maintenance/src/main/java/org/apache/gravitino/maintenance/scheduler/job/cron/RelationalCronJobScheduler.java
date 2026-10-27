@@ -74,6 +74,13 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
 
   private static final String EXPIRE_SNAPSHOTS = "expire_snapshots";
 
+  /**
+   * Max tables in one snapshot-expiry {@code batch:} cron-job (merge capacity). Independent of
+   * {@code gravitino.maintenance.expand.enqueueBatchSize}, which only bounds how many tables one
+   * expand pick may hand to {@link #enqueueDueNow}.
+   */
+  static final int SNAPSHOT_EXPIRY_BATCH_CAPACITY = 10;
+
   private final DataSource dataSource;
   private final MaintenanceJobSpecFactory specFactory;
   private final Function<List<Long>, List<ResolvedTableRef>> tableRefResolver;
@@ -116,15 +123,15 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
           policy.policyType());
       return 0;
     }
-    int capacity = Math.max(1, batchCapacity);
+    int expandLimit = Math.max(1, batchCapacity);
     SchedulerClient client = client(dataSource);
     Instant due = Instant.now();
 
     if (policy.policyType() == Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION) {
-      return enqueueSnapshotExpiry(client, policy, candidates, capacity, due);
+      return enqueueSnapshotExpiry(client, policy, candidates, SNAPSHOT_EXPIRY_BATCH_CAPACITY, due);
     }
     int scheduled = 0;
-    int limit = Math.min(candidates.size(), capacity);
+    int limit = Math.min(candidates.size(), expandLimit);
     for (ExpandTableCandidate candidate : candidates.subList(0, limit)) {
       if (scheduleTable(client, policy, candidate.tableId(), due)) {
         scheduled++;
