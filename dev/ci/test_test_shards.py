@@ -257,7 +257,11 @@ class TestIntegrationShardExecution(unittest.TestCase):
         )
         self.assertTrue(versions)
         selected = []
-        for mode in ("embedded", "deploy"):
+        modes = json.loads(
+            subprocess.check_output(["bash", str(SCRIPT), "flink", "--list"], text=True)
+        )
+        self.assertCountEqual(("embedded", "deploy"), modes)
+        for mode in modes:
             self.log.unlink(missing_ok=True)
             calls = self.execute("flink", mode)
             self.assertEqual(len(versions), len(calls))
@@ -302,7 +306,14 @@ class TestIntegrationShardExecution(unittest.TestCase):
     def test_authorization_retains_all_backend_mode_combinations_and_unit_tests(self):
         expected = {"h2": "embedded", "mysql": "deploy", "postgresql": "deploy"}
         calls_by_shard = []
-        for backend, mode in expected.items():
+        backends = json.loads(
+            subprocess.check_output(
+                ["bash", str(SCRIPT), "access-control", "--list"], text=True
+            )
+        )
+        self.assertCountEqual(expected, backends)
+        for backend in backends:
+            mode = expected[backend]
             self.log.unlink(missing_ok=True)
             calls = self.execute("access-control", backend)
             self.assertEqual(1, len(calls))
