@@ -40,9 +40,9 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * NotAuthorized}. When gravitinoAuth is unset or {@code none}, the action runs unchanged so jdbc /
  * hive backends and unauthenticated IT setups keep working.
  */
-public final class MaintenanceGravitinoAuth {
+public final class MaintenanceAuthDoAs {
 
-  private MaintenanceGravitinoAuth() {}
+  private MaintenanceAuthDoAs() {}
 
   /**
    * Executes {@code action} under a gravitinoAuth principal when configured.
