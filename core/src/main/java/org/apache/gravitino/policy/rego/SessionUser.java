@@ -19,7 +19,7 @@
 package org.apache.gravitino.policy.rego;
 
 /** A symbolic reference to the trusted effective session user. */
-final class SessionUser implements CanonicalExpression {
+public final class SessionUser implements CanonicalExpression {
   SessionUser() {}
 
   @Override

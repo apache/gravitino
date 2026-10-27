@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Objects;
 
 /** A non-empty homogeneous array of non-null source literals. */
-final class LiteralArray implements CanonicalExpression {
+public final class LiteralArray implements CanonicalExpression {
   private final LiteralType elementType;
   private final List<Literal> values;
 
@@ -34,11 +34,21 @@ final class LiteralArray implements CanonicalExpression {
     this.values = values == null ? null : Collections.unmodifiableList(new ArrayList<>(values));
   }
 
-  LiteralType elementType() {
+  /**
+   * Returns the homogeneous element type.
+   *
+   * @return element type
+   */
+  public LiteralType elementType() {
     return elementType;
   }
 
-  List<Literal> values() {
+  /**
+   * Returns the immutable decoded literal values.
+   *
+   * @return literal values
+   */
+  public List<Literal> values() {
     return values;
   }
 
