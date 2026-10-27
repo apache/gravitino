@@ -31,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,6 +42,7 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.client.OAuth2ClientAuthenticationMethod;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.hadoop.conf.Configuration;
 
@@ -196,12 +198,29 @@ public class GravitinoVirtualFileSystemUtils {
           GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY,
           scope);
 
+      String authenticationMethodValue =
+          configuration.getOrDefault(
+              GravitinoVirtualFileSystemConfiguration
+                  .FS_GRAVITINO_CLIENT_OAUTH2_AUTHENTICATION_METHOD_KEY,
+              "client_secret_post");
+
+      OAuth2ClientAuthenticationMethod authenticationMethod;
+      try {
+        authenticationMethod =
+            OAuth2ClientAuthenticationMethod.valueOf(
+                authenticationMethodValue.toUpperCase(Locale.ROOT));
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException(
+            "Unsupported OAuth2 client authentication method: " + authenticationMethodValue, e);
+      }
+
       DefaultOAuth2TokenProvider authDataProvider =
           DefaultOAuth2TokenProvider.builder()
               .withUri(authServerUri)
               .withCredential(credential)
               .withPath(path)
               .withScope(scope)
+              .withClientAuthenticationMethod(authenticationMethod)
               .build();
 
       return GravitinoClient.builder(serverUri)
