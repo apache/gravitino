@@ -94,20 +94,18 @@ public class RangerHiveHdfsE2EIT extends RangerBaseE2EIT {
     registerCustomConfigs(configs);
 
     super.startIntegrationTest();
-    RangerITEnv.init(RangerBaseE2EIT.metalakeName, false);
-    RangerITEnv.startHiveRangerContainer();
+    RangerITEnv.init(ranger, RangerBaseE2EIT.metalakeName, false);
+    hiveRanger = RangerITEnv.startHiveRangerContainer();
 
     DEFAULT_FS =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hiveRanger.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     HIVE_METASTORE_URIS =
         String.format(
             "thrift://%s:%d",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            hiveRanger.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     createMetalake();
     createCatalog();
@@ -364,8 +362,7 @@ public class RangerHiveHdfsE2EIT extends RangerBaseE2EIT {
                       "spark.sql.warehouse.dir",
                       String.format(
                           "hdfs://%s:%d/user/hive/warehouse",
-                          containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-                          HiveContainer.HDFS_DEFAULTFS_PORT))
+                          hiveRanger.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT))
                   .config("spark.sql.storeAssignmentPolicy", "LEGACY")
                   .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
                   .enableHiveSupport()

@@ -27,18 +27,18 @@ import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.TestJdbc;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.gravitino.integration.test.container.DorisFixture;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.junit.jupiter.api.BeforeAll;
 
+@DorisFixture
 public class TestDoris extends TestJdbc {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private static DorisContainer doris;
   protected static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
 
   @BeforeAll
   public static void startup() {
-    containerSuite.startDorisContainer();
 
     DATA_SOURCE = DataSourceUtils.createDataSource(getDorisCatalogProperties());
 
@@ -54,19 +54,10 @@ public class TestDoris extends TestJdbc {
         Collections.emptyMap());
   }
 
-  // Overwrite the stop method to close the data source and stop the container
-  @AfterAll
-  public static void stop() {
-    DataSourceUtils.closeDataSource(DATA_SOURCE);
-    if (null != CONTAINER) {
-      CONTAINER.stop();
-    }
-  }
-
   private static Map<String, String> getDorisCatalogProperties() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    DorisContainer dorisContainer = containerSuite.getDorisContainer();
+    DorisContainer dorisContainer = doris;
 
     String jdbcUrl =
         String.format(

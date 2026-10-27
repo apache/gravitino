@@ -19,11 +19,11 @@
 package org.apache.gravitino.integration.test.container;
 
 public enum PGImageName {
-  VERSION_12("postgres:12"),
-  VERSION_13("postgres:13"),
-  VERSION_14("postgres:14"),
-  VERSION_15("postgres:15"),
-  VERSION_16("postgres:16");
+  VERSION_12(TestImages.POSTGRESQL_12),
+  VERSION_13(TestImages.POSTGRESQL_13),
+  VERSION_14(TestImages.POSTGRESQL_14),
+  VERSION_15(TestImages.POSTGRESQL_15),
+  VERSION_16(TestImages.POSTGRESQL_16);
 
   private final String imageName;
 

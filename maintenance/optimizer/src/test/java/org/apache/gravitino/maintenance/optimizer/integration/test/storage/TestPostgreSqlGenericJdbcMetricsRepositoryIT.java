@@ -19,34 +19,34 @@
 
 package org.apache.gravitino.maintenance.optimizer.integration.test.storage;
 
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.BaseGenericJdbcMetricsRepositoryTest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@PostgreSQLFixture(database = TestDatabaseName.PG_OPTIMIZER_JDBC_METRICS_IT)
 class TestPostgreSqlGenericJdbcMetricsRepositoryIT extends BaseGenericJdbcMetricsRepositoryTest {
 
-  private PostgreSQLContainer<?> postgres;
+  @FixtureContainer private PostgreSQLContainer postgres;
 
   @BeforeAll
   void setUp() {
-    postgres = new PostgreSQLContainer<>("postgres:13");
-    postgres.start();
+    String jdbcUrl = postgres.getJdbcUrl(TestDatabaseName.PG_OPTIMIZER_JDBC_METRICS_IT);
     JdbcMetricsRepositoryITUtils.initializeSchema(
-        postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword(), "postgresql");
+        jdbcUrl, postgres.getUsername(), postgres.getPassword(), "postgresql");
 
     storage = new GenericJdbcMetricsRepository();
     storage.initialize(
         JdbcMetricsRepositoryITUtils.createJdbcMetricsConfigs(
-            postgres.getJdbcUrl(),
-            postgres.getUsername(),
-            postgres.getPassword(),
-            postgres.getDriverClassName()));
+            jdbcUrl, postgres.getUsername(), postgres.getPassword(), "org.postgresql.Driver"));
   }
 
   @AfterAll
@@ -54,8 +54,5 @@ class TestPostgreSqlGenericJdbcMetricsRepositoryIT extends BaseGenericJdbcMetric
     storage.cleanupTableMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
     storage.cleanupJobMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
     storage.close();
-    if (postgres != null) {
-      postgres.stop();
-    }
   }
 }
