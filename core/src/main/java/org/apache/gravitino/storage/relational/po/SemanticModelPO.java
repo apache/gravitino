@@ -118,15 +118,19 @@ public class SemanticModelPO {
       SemanticModelVersionInfoPO versionPO = semanticModelPO.getSemanticModelVersionInfoPO();
       SemanticModelDefinitionDTO definitionDTO =
           SemanticModelDefinitionDTO.builder()
-              .withDatasets(
-                  JsonUtils.anyFieldMapper().readValue(versionPO.datasets(), DatasetDTO[].class))
+              .withDatasets(deserializeField(versionPO.datasets(), DatasetDTO[].class, "datasets"))
               .withRelationships(
-                  deserializeOptionalField(versionPO.relationships(), RelationshipDTO[].class))
-              .withMetrics(deserializeOptionalField(versionPO.metrics(), MetricDTO[].class))
-              .withAiContext(deserializeOptionalField(versionPO.aiContext(), AIContextDTO.class))
+                  deserializeOptionalField(
+                      versionPO.relationships(), RelationshipDTO[].class, "relationships"))
+              .withMetrics(
+                  deserializeOptionalField(versionPO.metrics(), MetricDTO[].class, "metrics"))
+              .withAiContext(
+                  deserializeOptionalField(versionPO.aiContext(), AIContextDTO.class, "ai_context"))
               .withCustomExtensions(
                   deserializeOptionalField(
-                      versionPO.customExtensions(), CustomExtensionDTO[].class))
+                      versionPO.customExtensions(),
+                      CustomExtensionDTO[].class,
+                      "custom_extensions"))
               .build();
       Map<String, String> properties =
           versionPO.properties() == null
@@ -249,9 +253,18 @@ public class SemanticModelPO {
     return value == null ? null : JsonUtils.anyFieldMapper().writeValueAsString(value);
   }
 
+  private static <T> T deserializeField(String json, Class<T> type, String columnName) {
+    try {
+      return JsonUtils.anyFieldMapper().readValue(json, type);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(
+          "Failed to deserialize Semantic Model column '" + columnName + "'", e);
+    }
+  }
+
   @Nullable
-  private static <T> T deserializeOptionalField(@Nullable String json, Class<T> type)
-      throws JsonProcessingException {
-    return json == null ? null : JsonUtils.anyFieldMapper().readValue(json, type);
+  private static <T> T deserializeOptionalField(
+      @Nullable String json, Class<T> type, String columnName) {
+    return json == null ? null : deserializeField(json, type, columnName);
   }
 }

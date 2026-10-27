@@ -37,6 +37,7 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class TestSemanticModelPO {
@@ -130,8 +131,15 @@ class TestSemanticModelPO {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"datasets", "relationships", "metrics", "aiContext", "customExtensions"})
-  void testCorruptedDefinitionColumnFailsModelLoad(String field) throws Exception {
+  @CsvSource({
+    "datasets, datasets",
+    "relationships, relationships",
+    "metrics, metrics",
+    "aiContext, ai_context",
+    "customExtensions, custom_extensions"
+  })
+  void testCorruptedDefinitionColumnFailsModelLoad(String field, String columnName)
+      throws Exception {
     SemanticModelEntity entity = entity(DEFINITION);
     SemanticModelVersionInfoPO snapshot = snapshot(entity);
     FieldUtils.writeField(snapshot, field, "{", true);
@@ -140,6 +148,8 @@ class TestSemanticModelPO {
         assertThrows(
             RuntimeException.class,
             () -> SemanticModelPO.fromSemanticModelPO(identity(snapshot), entity.namespace()));
+    assertEquals(
+        "Failed to deserialize Semantic Model column '" + columnName + "'", failure.getMessage());
     assertInstanceOf(JsonProcessingException.class, failure.getCause());
   }
 
