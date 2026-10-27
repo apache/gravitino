@@ -136,6 +136,9 @@ public enum TestDatabaseName {
   /** Represents the PostgreSQL database for experimental Iceberg authorization tests. */
   PG_ICEBERG_EXPERIMENTAL_AUTHZ_IT,
 
+  /** Represents the PostgreSQL database for Iceberg read-restriction tests. */
+  PG_ICEBERG_READ_RESTRICTION_IT,
+
   PG_ICEBERG_ASYNC_CLEANUP_IT,
 
   CLICKHOUSE_CLICKHOUSE_ABSTRACT_IT,
