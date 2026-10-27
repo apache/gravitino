@@ -21,7 +21,7 @@ import React, { useRef, useState } from 'react'
 import { Button, Dropdown, Form, FormListOperation, Input, InputNumber, Popconfirm, Select, Tooltip } from 'antd'
 import { useClickAway } from 'react-use'
 import SpecialColumnTypeComponent from '@/components/SpecialColumnTypeComponent'
-import { ColumnSpesicalType, ColumnWithParamType } from '@/config'
+import { ColumnSpesicalType, ColumnWithParamType, ColumnWithPrecisionType } from '@/config'
 import { capitalizeFirstLetter, extractNumbersInParentheses } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 
@@ -35,6 +35,7 @@ export default function ColumnTypeComponent({ ...props }) {
   const [paramL, setParamL] = useState('')
   const [paramP, setParamP] = useState('')
   const [paramS, setParamS] = useState('')
+  const [paramPrecision, setParamPrecision] = useState('')
   const [open, setOpen] = useState(false)
   const [isEditSpecialColumnType, setIsEditSpecialColumnType] = useState(false)
   const currentType = Form.useWatch([...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'], form)
@@ -51,6 +52,10 @@ export default function ColumnTypeComponent({ ...props }) {
     setParamS(value)
   }
 
+  const onChangeParamPrecision = value => {
+    setParamPrecision(value ?? '')
+  }
+
   const onFocus = e => {
     setErrorMsg('')
     setIsShowParamsInput(!isShowParamsInput)
@@ -60,6 +65,7 @@ export default function ColumnTypeComponent({ ...props }) {
     setParamL('')
     setParamP('')
     setParamS('')
+    setParamPrecision('')
     setErrorMsg('')
     if (value && ColumnSpesicalType.includes(value)) {
       setOpen(true)
@@ -121,6 +127,23 @@ export default function ColumnTypeComponent({ ...props }) {
         }
         if (errors.length) {
           setErrorMsg(errors.join(', '))
+        }
+      }
+      if (ColumnWithPrecisionType.includes(value)) {
+        const resolvedPrecision = paramPrecision === '' ? currentTypeParam : paramPrecision
+        if (currentTypeParam && paramPrecision === '') {
+          setParamPrecision(currentTypeParam)
+        }
+        if (resolvedPrecision !== '') {
+          form.setFieldValue(
+            [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
+            capitalizeFirstLetter(value) + `(${resolvedPrecision})`
+          )
+        } else {
+          form.setFieldValue(
+            [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
+            capitalizeFirstLetter(value)
+          )
         }
       }
     }
@@ -240,6 +263,22 @@ export default function ColumnTypeComponent({ ...props }) {
                 />
               </div>
             </>
+          )}
+        {typeof currentType === 'string' &&
+          ColumnWithPrecisionType.includes(currentType?.replace(/\([^)]*\)/g, '').toLowerCase()) &&
+          isShowParamsInput && (
+            <div className='ml-1 border-b focus-within:border-[color:theme(colors.defaultPrimary)]'>
+              <InputNumber
+                size='small'
+                controls={false}
+                placeholder='Precision'
+                min={0}
+                max={12}
+                value={paramPrecision}
+                onChange={onChangeParamPrecision}
+                className='w-20 border-none focus-within:shadow-none'
+              />
+            </div>
           )}
       </div>
       <div className='text-red-500'>{errorMsg}</div>
