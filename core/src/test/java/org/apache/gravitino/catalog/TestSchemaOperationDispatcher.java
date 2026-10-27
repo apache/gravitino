@@ -592,8 +592,12 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       // The catalog applies the rotation, but the schema entity update fails and is only logged,
       // so the entity still references the old secret.
       doThrow(new IOException()).when(entityStore).update(any(), any(), any(), any());
-      d.alterSchema(ident, SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "new")));
-      reset(entityStore);
+      try {
+        d.alterSchema(
+            ident, SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "new")));
+      } finally {
+        reset(entityStore);
+      }
 
       Assertions.assertEquals(
           urn.toString(),

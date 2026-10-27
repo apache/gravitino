@@ -316,12 +316,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               alterSchemaUnderLock(ident, catalogIdent, changes);
           Schema alteredSchema = alterResult.getLeft();
           SchemaChange[] effectiveChanges = alterResult.getMiddle();
-          // Secrets the alter replaced; deleted once no stored entity references them.
+          // Secrets the alter replaced in a schema entity, to delete after the entity is updated.
           SecretMaterialsHolder replacedSecrets = alterResult.getRight();
 
           // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
+            // The catalog's alterSchema already updated the entity.
             replacedSecrets.deleteReplaced(secretManager);
             return EntityCombinedSchema.of(alteredSchema)
                 .withHiddenProperties(
@@ -337,7 +338,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           if (stringId == null) {
             se = getEntity(ident, SCHEMA, SchemaEntity.class);
             if (se == null) {
-              replacedSecrets.deleteReplaced(secretManager);
               return EntityCombinedSchema.of(alteredSchema)
                   .withHiddenProperties(
                       getMaskAndOmitKeys(
@@ -381,7 +381,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .build()),
                   "UPDATE",
                   schemaId);
-          // A failed update is logged and leaves the entity on the replaced secrets, so keep them.
+          // A null result is logged, and the entity may still reference the replaced secrets.
           if (updatedSchemaEntity != null) {
             replacedSecrets.deleteReplaced(secretManager);
           }
@@ -513,7 +513,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               c -> c.doWithSchemaOps(s -> s.alterSchema(ident, effectiveChanges)),
               NoSuchSchemaException.class);
       alterCommitted = true;
-      // The caller deletes the replaced secrets after it updates the schema entity.
+      if (schemaEntityForSecrets == null) {
+        // No schema entity references the replaced secrets.
+        writtenSecretMaterials.deleteReplaced(secretManager);
+        return Triple.of(alteredSchema, effectiveChanges, new SecretMaterialsHolder());
+      }
       return Triple.of(alteredSchema, effectiveChanges, writtenSecretMaterials);
     } finally {
       if (!alterCommitted) {
