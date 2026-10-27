@@ -34,6 +34,16 @@ public interface BaseCatalogFactory extends CatalogFactory {
   String gravitinoCatalogProvider();
 
   /**
+   * Check whether this factory supports the given Gravitino catalog provider.
+   *
+   * @param provider The Gravitino catalog provider.
+   * @return true if supported, false otherwise.
+   */
+  default boolean supportsProvider(String provider) {
+    return gravitinoCatalogProvider().equalsIgnoreCase(provider);
+  }
+
+  /**
    * Define gravitino catalog type {@link Catalog.Type}.
    *
    * @return The requested gravitino catalog type.
