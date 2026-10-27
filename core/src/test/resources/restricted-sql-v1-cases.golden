@@ -89,9 +89,9 @@ result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=CaseExpres
 source: (x STRING) RETURNS BOOLEAN -> x = 'O''Brien\\n😀'
 result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, O'Brien\\n😀, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
 
-=== user_attribute ===
+=== unsupported_user_attribute ===
 source: (x STRING) RETURNS BOOLEAN -> x = user_attribute('region')
-result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, STRING], children=[]}, FunctionCall{attributes=[USER_ATTRIBUTE], children=[Literal{attributes=[STRING, region, STRING], children=[]}]}]}, quotedParameters=[], columnMask=false}
+error: Invalid restricted-sql-v1 definition at line 1, column 35: Unknown restricted-sql-v1 function: user_attribute
 
 === quoted_identifier ===
 source: ("Customer Region" STRING) RETURNS BOOLEAN -> "Customer Region" = 'US'
@@ -195,31 +195,31 @@ error: Invalid restricted-sql-v1 definition at line 1, column 23: undeclared par
 
 === non_boolean ===
 source: () RETURNS BOOLEAN -> 1
-error: Invalid restricted-sql-v1 expression: expected BOOLEAN, found NUMBER
+error: Invalid restricted-sql-v1 definition at line 1, column 23: Invalid restricted-sql-v1 expression: expected BOOLEAN, found NUMBER
 
 === invalid_branch ===
 source: () RETURNS BOOLEAN -> CASE WHEN TRUE THEN TRUE ELSE 1 END
-error: Invalid restricted-sql-v1 expression: expected BOOLEAN, found NUMBER
+error: Invalid restricted-sql-v1 definition at line 1, column 53: Invalid restricted-sql-v1 expression: expected BOOLEAN, found NUMBER
 
 === invalid_mask ===
 source: (value STRING) RETURNS STRING -> show_last_4(value, 4)
-error: Invalid restricted-sql-v1 expression: SHOW_LAST_4 requires exactly one argument
+error: Invalid restricted-sql-v1 definition at line 1, column 34: Invalid restricted-sql-v1 expression: SHOW_LAST_4 requires exactly one argument
 
 === unknown_function ===
 source: () RETURNS BOOLEAN -> unknown()
-error: Unknown restricted-sql-v1 function: unknown
+error: Invalid restricted-sql-v1 definition at line 1, column 23: Unknown restricted-sql-v1 function: unknown
 
 === integer_overflow ===
 source: (x INTEGER) RETURNS BOOLEAN -> x = 2147483648
-error: Numeric literal does not fit INTEGER: 2147483648
+error: Invalid restricted-sql-v1 definition at line 1, column 36: Numeric literal does not fit INTEGER
 
 === fractional_integer ===
 source: (x INTEGER) RETURNS BOOLEAN -> x = 1.1
-error: Numeric literal does not fit INTEGER: 1.1
+error: Invalid restricted-sql-v1 definition at line 1, column 36: Numeric literal does not fit INTEGER
 
 === invalid_date ===
 source: () RETURNS BOOLEAN -> DATE '2025-02-29' IS NULL
-error: Invalid temporal literal: 2025-02-29
+error: Invalid restricted-sql-v1 definition at line 1, column 23: Invalid temporal literal for DATE
 
 === invalid_precision ===
 source: (x TIME(3)) RETURNS BOOLEAN -> TRUE
@@ -244,3 +244,11 @@ error: Invalid restricted-sql-v1 definition at line 1, column 28: token recognit
 === invalid_quote ===
 source: () RETURNS BOOLEAN -> 'unterminated
 error: Invalid restricted-sql-v1 definition at line 1, column 23: token recognition error at: ''unterminated'
+
+=== unsupported_user_attribute_mask ===
+source: (value STRING) RETURNS STRING -> user_attribute('region')
+error: Invalid restricted-sql-v1 definition at line 1, column 34: Unknown restricted-sql-v1 function: user_attribute
+
+=== unsupported_user_attribute_unselected ===
+source: () RETURNS BOOLEAN -> CASE WHEN TRUE THEN TRUE ELSE user_attribute('active') END
+error: Invalid restricted-sql-v1 definition at line 1, column 53: Unknown restricted-sql-v1 function: user_attribute

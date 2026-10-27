@@ -19,6 +19,7 @@
 package org.apache.gravitino.policy.sql;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,7 +27,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.apache.gravitino.policy.sql.SqlTypeValidator.InvalidExpressionException;
 import org.apache.gravitino.policy.sql.antlr.RestrictedSqlBaseVisitor;
 import org.apache.gravitino.policy.sql.antlr.RestrictedSqlParser;
 import org.apache.gravitino.policy.sql.antlr.RestrictedSqlParser.AndExpressionContext;
@@ -48,6 +51,7 @@ import org.apache.gravitino.policy.sql.antlr.RestrictedSqlParser.WhenClauseConte
 final class SqlAstBuilder extends RestrictedSqlBaseVisitor<SqlExpression> {
   private final Map<String, SqlType> parameters = new LinkedHashMap<>();
   private final Set<String> quotedParameters = new LinkedHashSet<>();
+  private final IdentityHashMap<SqlExpression, Token> sourceTokens = new IdentityHashMap<>();
   private int nodes;
   private int listElements;
   private int activeOperations;
@@ -76,7 +80,11 @@ final class SqlAstBuilder extends RestrictedSqlBaseVisitor<SqlExpression> {
       require(result.equals(SqlType.BOOLEAN), context, "row filter must return BOOLEAN");
     }
     SqlExpression body = visit(context.expression());
-    new SqlTypeValidator().validate(body, result);
+    try {
+      new SqlTypeValidator().validate(body, result);
+    } catch (InvalidExpressionException e) {
+      throw RestrictedSqlSourceParser.error(sourceTokens.get(e.expression()), e.getMessage());
+    }
     return new SqlDefinition(parameters, result, body, quotedParameters, mask);
   }
 
@@ -240,7 +248,12 @@ final class SqlAstBuilder extends RestrictedSqlBaseVisitor<SqlExpression> {
         context.identifier().QUOTED_IDENTIFIER() == null,
         context,
         "quoted function names are unsupported");
-    SqlFunction function = SqlFunction.fromName(context.identifier().getText());
+    SqlFunction function;
+    try {
+      function = SqlFunction.fromName(context.identifier().getText());
+    } catch (IllegalArgumentException e) {
+      throw RestrictedSqlSourceParser.error(context.getStart(), e.getMessage());
+    }
     List<SqlExpression> arguments = new ArrayList<>();
     context.expression().forEach(argument -> arguments.add(visit(argument)));
     return node(new FunctionCall(function, arguments), context);
@@ -329,6 +342,7 @@ final class SqlAstBuilder extends RestrictedSqlBaseVisitor<SqlExpression> {
   }
 
   private <T extends SqlExpression> T node(T expression, ParserRuleContext context) {
+    sourceTokens.put(expression, context.getStart());
     require(
         ++nodes <= RestrictedSqlLimits.MAX_NODES,
         context,

@@ -29,11 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionConverter.BindingContext;
-import org.apache.gravitino.policy.sql.Literal;
-import org.apache.gravitino.policy.sql.LiteralType;
 import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.policy.sql.SqlDefinition;
-import org.apache.gravitino.policy.sql.SqlType;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.expressions.Binder;
@@ -226,7 +223,6 @@ public class TestIcebergReadRestrictionConverter {
   void testContextAndMaskShareOneSnapshot() {
     AtomicInteger users = new AtomicInteger();
     AtomicInteger groups = new AtomicInteger();
-    AtomicInteger attributes = new AtomicInteger();
     BindingContext context =
         new BindingContext() {
           @Override
@@ -240,41 +236,21 @@ public class TestIcebergReadRestrictionConverter {
             groups.incrementAndGet();
             return Optional.of(true);
           }
-
-          @Override
-          public Optional<Literal> userAttribute(String key) {
-            attributes.incrementAndGet();
-            return Optional.of(new Literal(LiteralType.STRING, "US", SqlType.STRING));
-          }
         };
     SqlDefinition filter =
         parse(
             "region STRING",
-            "region = user_attribute('region') AND is_group_member('auditors') AND region = user_attribute('region')");
+            "region = CURRENT_USER() AND is_group_member('auditors') AND region = CURRENT_USER()");
     SqlDefinition mask =
         mask("STRING", "CASE WHEN is_group_member('auditors') THEN value ELSE NULL END");
     IcebergReadRestrictionConverter.convert(
         Optional.of(filter), Collections.singletonMap(2, mask), SCHEMA, context);
     Assertions.assertEquals(1, users.get());
     Assertions.assertEquals(1, groups.get());
-    Assertions.assertEquals(1, attributes.get());
   }
 
   @Test
-  void testTypedUserAttributesAndDeclaredNulls() {
-    Literal absent = new Literal(LiteralType.NULL, "", SqlType.STRING);
-    BindingContext context = context(Collections.singletonMap("region", absent));
-    Assertions.assertEquals(
-        Expression.Operation.FALSE,
-        convert("region STRING", "region = user_attribute('region')", context).rowFilter().op());
-    Assertions.assertTrue(convert("", "user_attribute('region') IS NULL", context).isEmpty());
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> convert("id INTEGER", "id = user_attribute('region')", context));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> convert("", "user_attribute('region') = 1", context));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> filter("", "user_attribute('unknown') IS NULL"));
+  void testUnknownGroupFailsBinding() {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> filter("", "is_group_member('unknown')"));
   }
@@ -572,10 +548,6 @@ public class TestIcebergReadRestrictionConverter {
   }
 
   private static BindingContext context() {
-    return context(Collections.emptyMap());
-  }
-
-  private static BindingContext context(Map<String, Literal> attributes) {
     return new BindingContext() {
       @Override
       public String sessionUser() {
@@ -585,11 +557,6 @@ public class TestIcebergReadRestrictionConverter {
       @Override
       public Optional<Boolean> groupMembership(String group) {
         return Optional.empty();
-      }
-
-      @Override
-      public Optional<Literal> userAttribute(String key) {
-        return Optional.ofNullable(attributes.get(key));
       }
     };
   }

@@ -34,7 +34,7 @@ precedence	row	(x STRING) RETURNS BOOLEAN -> NOT x = 'US' OR x IS NULL AND FALSE
 searched_case	row	(x STRING) RETURNS BOOLEAN -> CASE WHEN is_group_member('auditors') THEN x = 'US' ELSE x = CURRENT_USER() END
 simple_case	row	(x STRING) RETURNS BOOLEAN -> CASE x WHEN 'US' THEN TRUE WHEN NULL THEN FALSE END
 quoted_string	row	(x STRING) RETURNS BOOLEAN -> x = 'O''Brien\n😀'
-user_attribute	row	(x STRING) RETURNS BOOLEAN -> x = user_attribute('region')
+unsupported_user_attribute	row	(x STRING) RETURNS BOOLEAN -> x = user_attribute('region')
 quoted_identifier	row	("Customer Region" STRING) RETURNS BOOLEAN -> "Customer Region" = 'US'
 nan	row	(x DOUBLE) RETURNS BOOLEAN -> is_nan(x)
 date_part	row	(x DATE) RETURNS BOOLEAN -> year(x) = 2026 AND month(x) = 3 OR day(x) = 15
@@ -73,3 +73,5 @@ chained_comparison	row	() RETURNS BOOLEAN -> 1 < 2 < 3
 numeric_boundary	row	() RETURNS BOOLEAN -> 1and TRUE
 sql_comment	row	() RETURNS BOOLEAN -> TRUE -- comment
 invalid_quote	row	() RETURNS BOOLEAN -> 'unterminated
+unsupported_user_attribute_mask	mask	(value STRING) RETURNS STRING -> user_attribute('region')
+unsupported_user_attribute_unselected	row	() RETURNS BOOLEAN -> CASE WHEN TRUE THEN TRUE ELSE user_attribute('active') END

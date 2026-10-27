@@ -559,6 +559,40 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testRenameAndCommentUpdateDoNotRevalidateStoredRowFilter() throws IOException {
+    String policyName = "stored_row_filter_" + UUID.randomUUID().toString().replace("-", "");
+    PolicyContent storedContent =
+        PolicyContents.rowFilter("() RETURNS BOOLEAN -> unsupported_function()");
+    PolicyEntity storedPolicy =
+        PolicyEntity.builder()
+            .withId(new RandomIdGenerator().nextId())
+            .withName(policyName)
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+            .withPolicyType(Policy.BuiltInType.ROW_FILTER)
+            .withEnabled(true)
+            .withContent(storedContent)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(storedPolicy, false /* overwritten */);
+
+    String newName = "renamed_" + policyName;
+    PolicyEntity renamed =
+        Assertions.assertDoesNotThrow(
+            () -> policyManager.alterPolicy(METALAKE, policyName, PolicyChange.rename(newName)));
+    PolicyEntity commented =
+        Assertions.assertDoesNotThrow(
+            () ->
+                policyManager.alterPolicy(
+                    METALAKE, newName, PolicyChange.updateComment("stored policy")));
+
+    Assertions.assertEquals(newName, commented.name());
+    Assertions.assertEquals("stored policy", commented.comment());
+    Assertions.assertEquals(storedContent, renamed.content());
+    Assertions.assertEquals(storedContent, commented.content());
+  }
+
+  @Test
   public void testRenameDoesNotRevalidateLegacyCompactionRewriteOptions() throws IOException {
     String policyName = "legacy_compaction_" + UUID.randomUUID().toString().replace("-", "");
     // Constructed without content validate(); would fail rewriteOptions allowlist on create.

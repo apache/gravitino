@@ -117,8 +117,6 @@ final class SqlRestrictionBinding {
         return new Literal(LiteralType.STRING, context.user, SqlType.STRING);
       case IS_GROUP_MEMBER:
         return bool(context.group(((Literal) call.arguments().get(0)).value()));
-      case USER_ATTRIBUTE:
-        return context.attribute(((Literal) call.arguments().get(0)).value());
       case YEAR:
       case MONTH:
       case DAY:
@@ -231,7 +229,6 @@ final class SqlRestrictionBinding {
     private final BindingContext delegate;
     private final String user;
     private final Map<String, Boolean> groups = new HashMap<>();
-    private final Map<String, Literal> attributes = new HashMap<>();
 
     Context(BindingContext delegate) {
       this.delegate = Objects.requireNonNull(delegate, "context cannot be null");
@@ -251,21 +248,6 @@ final class SqlRestrictionBinding {
                   "Cannot resolve group membership for read restriction");
             }
             return result.get();
-          });
-    }
-
-    Literal attribute(String name) {
-      return attributes.computeIfAbsent(
-          name,
-          key -> {
-            Optional<Literal> result = delegate.userAttribute(key);
-            if (result == null || !result.isPresent() || result.get().type() == null) {
-              throw new IllegalArgumentException(
-                  "Cannot resolve declared user attribute for read restriction");
-            }
-            Literal value = result.get();
-            SqlRestrictionLiterals.value(value, SqlRestrictionLiterals.type(value.type()));
-            return value;
           });
     }
   }

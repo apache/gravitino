@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import org.apache.gravitino.policy.sql.Literal;
 import org.apache.gravitino.policy.sql.SqlDefinition;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Expression;
@@ -36,7 +35,7 @@ import org.apache.iceberg.types.Types;
 public final class IcebergReadRestrictionConverter {
   private IcebergReadRestrictionConverter() {}
 
-  /** Trusted request-scoped identity and attribute lookups used while binding SQL expressions. */
+  /** Trusted request-scoped identity and group lookups used while binding SQL expressions. */
   public interface BindingContext {
     /**
      * @return the non-empty authenticated effective user name
@@ -50,19 +49,6 @@ public final class IcebergReadRestrictionConverter {
      * @return membership, or empty when the group or identity could not be resolved
      */
     Optional<Boolean> groupMembership(String group);
-
-    /**
-     * Resolves a declared trusted scalar attribute of the effective subject. A present typed NULL
-     * literal denotes a declared attribute with no value. Empty denotes an unknown key or failed
-     * lookup and fails conversion. Values must carry their declared SQL type; this hook never reads
-     * arbitrary request or session properties.
-     *
-     * @param key exact non-empty attribute key
-     * @return a typed scalar literal, or empty when unavailable
-     */
-    default Optional<Literal> userAttribute(String key) {
-      return Optional.empty();
-    }
   }
 
   /**
@@ -74,7 +60,7 @@ public final class IcebergReadRestrictionConverter {
    * @param rowFilter optional validated row-filter definition
    * @param columnMasks validated mask definitions keyed by selected top-level field ID
    * @param schema target Iceberg schema
-   * @param context trusted identity and attribute provider
+   * @param context trusted identity and group provider
    * @return closed read restrictions with stable field IDs
    * @throws IllegalArgumentException if binding or exact target translation is unavailable
    */

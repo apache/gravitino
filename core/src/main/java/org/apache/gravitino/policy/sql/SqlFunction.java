@@ -26,8 +26,6 @@ public enum SqlFunction {
   CURRENT_USER,
   /** Is group member. */
   IS_GROUP_MEMBER,
-  /** User attribute. */
-  USER_ATTRIBUTE,
   /** Is nan. */
   IS_NAN,
   /** Year. */

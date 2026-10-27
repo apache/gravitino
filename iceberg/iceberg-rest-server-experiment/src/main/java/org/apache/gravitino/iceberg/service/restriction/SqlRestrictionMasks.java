@@ -167,7 +167,6 @@ final class SqlRestrictionMasks {
         case IS_GROUP_MEMBER:
         case MASK_TO_FIXED_VALUE:
           return false;
-        case USER_ATTRIBUTE:
         case REPLACE_WITH_NULL:
           return true;
         default:

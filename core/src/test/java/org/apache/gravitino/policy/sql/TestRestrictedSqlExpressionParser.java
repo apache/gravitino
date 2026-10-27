@@ -54,8 +54,6 @@ class TestRestrictedSqlExpressionParser {
         "(x STRING) RETURNS BOOLEAN -> x NOT LIKE 'Acme%'",
         "(x STRING) RETURNS BOOLEAN -> x IN ('US', 'CA', NULL)",
         "(x STRING) RETURNS BOOLEAN -> x NOT IN (NULL)",
-        "(x STRING) RETURNS BOOLEAN -> x = user_attribute('region')",
-        "(x STRING) RETURNS BOOLEAN -> user_attribute('region') IS NULL",
         "(x STRING) RETURNS BOOLEAN -> CASE WHEN x IS NULL THEN FALSE ELSE x = 'US' END",
         "(x STRING) RETURNS BOOLEAN -> CASE x WHEN 'US' THEN TRUE WHEN 'CA' THEN TRUE ELSE FALSE END",
         "(x STRING) RETURNS BOOLEAN -> CASE x WHEN NULL THEN TRUE END",
@@ -162,6 +160,8 @@ class TestRestrictedSqlExpressionParser {
             "is_group_member(CURRENT_USER())",
             "is_group_member('')",
             "user_attribute('') IS NULL",
+            "user_attribute('region') IS NULL",
+            "CURRENT_USER() = user_attribute('name')",
             "is_nan('a')",
             "year('2026-01-01') = 2026",
             "CASE WHEN 1 THEN TRUE END",
@@ -370,6 +370,39 @@ class TestRestrictedSqlExpressionParser {
                 RestrictedSqlExpressionParserFacade.validateRowFilter(
                     "() RETURNS BOOLEAN ->\n TRUE;"));
     Assertions.assertTrue(error.getMessage().contains("line 2, column"));
+  }
+
+  @Test
+  void testSemanticErrorsLocateInnermostOperand() {
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                RestrictedSqlExpressionParserFacade.validateRowFilter(
+                    "(x INTEGER) RETURNS BOOLEAN ->\nx < TRUE"));
+    Assertions.assertTrue(error.getMessage().contains("line 2, column 5"));
+    Assertions.assertTrue(error.getMessage().contains("expected INTEGER, found BOOLEAN"));
+  }
+
+  @Test
+  void testSemanticDiagnosticsDoNotExpandLiteralPayloads() {
+    for (String body :
+        new String[] {
+          "x IN (" + "'private-value',".repeat(200) + "'private-value')",
+          "user_attribute('private-value') IS NULL",
+          "DATE '2025-02-29' IS NULL"
+        }) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  RestrictedSqlExpressionParserFacade.validateRowFilter(
+                      "(x INTEGER) RETURNS BOOLEAN ->\n" + body));
+      Assertions.assertTrue(error.getMessage().contains("line 2, column"));
+      Assertions.assertTrue(error.getMessage().length() < 512);
+      Assertions.assertFalse(error.getMessage().contains("private-value"));
+      Assertions.assertFalse(error.getMessage().contains("2025-02-29"));
+    }
   }
 
   private static String numbers(int count) {

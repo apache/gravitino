@@ -111,9 +111,6 @@ metadata-object API reserves `.` as a qualified-name separator, so a tag cannot 
 directly to such an object. The loader returns HTTP 400 for these names even when no policy is
 assigned. A standalone service without a policy dispatcher does not perform policy resolution.
 
-Conditional branches are evaluated from left to right. The first true condition selects its result,
-and every conditional rule must end with an unconditional `else`. Row-filter conditions and results
-must be Boolean. Column-mask conditions may use only request context; they cannot reference columns.
 Supported declaration types are `BOOLEAN`, signed `INTEGER` and `LONG`, `FLOAT`, `DOUBLE`,
 `DECIMAL(p,s)`, `STRING`, `BINARY`, `DATE`, `TIME(6)` and `TIMESTAMP(6)` with or without time zone.
 Decimal precision is 1–38 and scale is 0–precision. Omitted temporal precision means 6.
@@ -140,22 +137,21 @@ comparisons with NULL are unknown. A missing ELSE returns NULL. Schema binding m
 nullable mask result for a required column. Binary values support null tests and compatible mask
 functions, but not value predicates.
 
-Context functions are `CURRENT_USER()`, `is_group_member('group')`, and `user_attribute('key')`.
-Group and attribute names must be non-empty string literals. Context values come from the trusted
-effective subject. Attribute types and key availability must be verified during context binding;
-missing values of declared attributes are SQL NULL. Unknown keys or lookup failures are errors.
+Context functions are `CURRENT_USER()` and `is_group_member('group')`. Group names must be
+non-empty string literals. Context values come from the trusted effective subject and remain stable
+for a conversion. User attributes are not supported.
 `is_nan(value)` accepts FLOAT or DOUBLE; `year(value)`, `month(value)`, and `day(value)` accept DATE
 or supported TIMESTAMP values and return INTEGER.
 
 The type-preserving mask functions each take one scalar argument:
 
-| Function | Input type |
-| --- | --- |
-| `mask_alphanum`, `show_first_4`, `show_last_4` | STRING |
-| `mask_to_fixed_value` | STRING, numeric, BOOLEAN, DATE or TIMESTAMP |
-| `replace_with_null` | Any typed scalar |
-| `truncate_to_year`, `truncate_to_month` | DATE or TIMESTAMP |
-| `sha256_global`, `sha256_query_local` | STRING, signed INTEGER, signed LONG or BINARY |
+| Function                                       | Input type                                    |
+| ---------------------------------------------- | --------------------------------------------- |
+| `mask_alphanum`, `show_first_4`, `show_last_4` | STRING                                        |
+| `mask_to_fixed_value`                          | STRING, numeric, BOOLEAN, DATE or TIMESTAMP   |
+| `replace_with_null`                            | Any typed scalar                              |
+| `truncate_to_year`, `truncate_to_month`        | DATE or TIMESTAMP                             |
+| `sha256_global`, `sha256_query_local`          | STRING, signed INTEGER, signed LONG or BINARY |
 
 Keywords and built-in function names are case-insensitive. Unquoted identifiers use ASCII
 letters or underscore followed by letters, digits or underscores, and normalize to uppercase.
@@ -167,16 +163,16 @@ unknown functions, exponents, leading `+`, leading zeroes and trailing decimal p
 
 Limits apply before normalization and serve different purposes:
 
-| Resource | Limit |
-| --- | --- |
-| Complete definition, including declarations | 16 KiB of UTF-8 |
-| Expression nodes | 1024 |
-| Operation depth, including CASE and function calls | 16 |
-| IN elements, both per list and across the complete definition | 1000 |
-| Parenthesis nesting | 64 |
-| Declared parameters | 256 |
-| Each decoded quoted identifier or string literal | 4 KiB of UTF-8 |
-| Each numeric literal | 256 bytes |
+| Resource                                                      | Limit           |
+| ------------------------------------------------------------- | --------------- |
+| Complete definition, including declarations                   | 16 KiB of UTF-8 |
+| Expression nodes                                              | 1024            |
+| Operation depth, including CASE and function calls            | 16              |
+| IN elements, both per list and across the complete definition | 1000            |
+| Parenthesis nesting                                           | 64              |
+| Declared parameters                                           | 256             |
+| Each decoded quoted identifier or string literal              | 4 KiB of UTF-8  |
+| Each numeric literal                                          | 256 bytes       |
 
 Node and IN limits allow ordinary SQL predicates and membership lists while bounding parsing and
 validation work. Depth limits bound recursive operations independently of expression width. A
@@ -264,16 +260,16 @@ checked, including unreachable arms. Nested CASE and function calls obey the sam
 
 A filter retains rows only when its result is TRUE. These are SQL three-valued rules:
 
-| Expression | Result |
-| --- | --- |
-| `NULL IS NULL` / `NULL IS NOT NULL` | TRUE / FALSE |
-| Comparison with a NULL operand | UNKNOWN |
-| `NOT NULL` | UNKNOWN |
-| `FALSE AND NULL` / `TRUE AND NULL` | FALSE / UNKNOWN |
-| `TRUE OR NULL` / `FALSE OR NULL` | TRUE / UNKNOWN |
-| NULL input to IN, BETWEEN, LIKE or is_nan | UNKNOWN |
-| Nonmatching IN list containing NULL | UNKNOWN |
-| Nonmatching NOT IN list containing NULL | UNKNOWN |
+| Expression                                | Result          |
+| ----------------------------------------- | --------------- |
+| `NULL IS NULL` / `NULL IS NOT NULL`       | TRUE / FALSE    |
+| Comparison with a NULL operand            | UNKNOWN         |
+| `NOT NULL`                                | UNKNOWN         |
+| `FALSE AND NULL` / `TRUE AND NULL`        | FALSE / UNKNOWN |
+| `TRUE OR NULL` / `FALSE OR NULL`          | TRUE / UNKNOWN  |
+| NULL input to IN, BETWEEN, LIKE or is_nan | UNKNOWN         |
+| Nonmatching IN list containing NULL       | UNKNOWN         |
+| Nonmatching NOT IN list containing NULL   | UNKNOWN         |
 
 For example, both `region <> 'US'` and `NOT (region = 'US')` exclude null regions. Use
 `region IS NULL OR region <> 'US'` to include them. A constant FALSE filter returns no rows.
@@ -287,10 +283,8 @@ and enforcement layer must reject a nullable result for a required column.
 An unknown group, unavailable subject or failed lookup is an error; an existing group without
 the subject returns FALSE. Nested group expansion is unsupported.
 
-`user_attribute('key')` reads a trusted scalar attribute with a declared type compatible with its
-use. Keys are non-empty, case-sensitive string literals. An absent or null value of a declared
-attribute is SQL NULL. Unknown keys, incompatible types, lists, objects and failed lookups are
-errors. Context values are stable for a request; no implicit string-to-number conversion occurs.
+Context values remain stable for a conversion. User-attribute functions and implicit
+string-to-number conversions are unsupported.
 
 Date parts `year`, `month`, and `day` return INTEGER and preserve null input. Timestamp-with-timezone
 values use UTC; timestamps without timezone use their recorded calendar fields. Dates use the
@@ -299,14 +293,14 @@ proleptic Gregorian calendar. `month(order_date) = 3` means March in any year.
 Mask function behavior is as follows; each call takes one compatible scalar argument and preserves
 its input logical type:
 
-| Function | Behavior |
-| --- | --- |
-| `mask_alphanum` | ASCII digits become `n`; `(),.@-` are preserved; other Unicode code points become `x` |
-| `show_first_4` / `show_last_4` | Preserve the first/last four code points and mask the remainder as above; strings of four or fewer code points are unchanged |
-| `mask_to_fixed_value` | Return `XXXXXXXX` for STRING, zero for numeric values, FALSE for BOOLEAN, or the epoch date/timestamp, including for null input |
-| `replace_with_null` | Return a typed null |
-| `truncate_to_year` / `truncate_to_month` | Truncate to the start of the year/month, using UTC for timestamps with time zone |
-| `sha256_global` / `sha256_query_local` | Type-preserving SHA-256; the query-local variant prepends a cryptographically random salt of at least 16 bytes, shared within one query |
+| Function                                 | Behavior                                                                                                                                |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `mask_alphanum`                          | ASCII digits become `n`; `(),.@-` are preserved; other Unicode code points become `x`                                                   |
+| `show_first_4` / `show_last_4`           | Preserve the first/last four code points and mask the remainder as above; strings of four or fewer code points are unchanged            |
+| `mask_to_fixed_value`                    | Return `XXXXXXXX` for STRING, zero for numeric values, FALSE for BOOLEAN, or the epoch date/timestamp, including for null input         |
+| `replace_with_null`                      | Return a typed null                                                                                                                     |
+| `truncate_to_year` / `truncate_to_month` | Truncate to the start of the year/month, using UTC for timestamps with time zone                                                        |
+| `sha256_global` / `sha256_query_local`   | Type-preserving SHA-256; the query-local variant prepends a cryptographically random salt of at least 16 bytes, shared within one query |
 
 All masks except `mask_to_fixed_value` preserve null input. Hash input encoding is UTF-8 for
 strings, little-endian two's-complement for signed integers, and raw bytes for BINARY. STRING
@@ -323,7 +317,7 @@ and source limits. Golden fixtures pin parsed ASTs and rejected-input diagnostic
 
 The parser does not execute expressions. The experimental converter binds every declared input
 before selecting branches, checks exact schema types and mask nullability, snapshots the effective
-subject, and caches trusted group/attribute lookups for a conversion. Any binding, translation or
+subject, and caches trusted group lookups for a conversion. Any binding, translation or
 capability error fails the governed load; an unsupported restriction never becomes an unrestricted
 response.
 
@@ -331,30 +325,25 @@ response.
 
 The current converter supports the following enforcement subset of the shared SQL grammar:
 
-| SQL form | Iceberg conversion |
-| --- | --- |
-| Column and compatible literal/context scalar comparison | Bound field-ID predicate, preserving SQL NULL semantics |
-| Boolean inputs, AND/OR/NOT and Boolean comparisons | Three-valued lowering; only TRUE retains a row |
-| IN/NOT IN, BETWEEN/NOT BETWEEN, null tests, prefix LIKE and NaN tests | Closed native predicates with explicit unknown handling |
+| SQL form                                                                 | Iceberg conversion                                                      |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Column and compatible literal/context scalar comparison                  | Bound field-ID predicate, preserving SQL NULL semantics                 |
+| Boolean inputs, AND/OR/NOT and Boolean comparisons                       | Three-valued lowering; only TRUE retains a row                          |
+| IN/NOT IN, BETWEEN/NOT BETWEEN, null tests, prefix LIKE and NaN tests    | Closed native predicates with explicit unknown handling                 |
 | Searched/simple Boolean CASE and scalar CASE inside supported predicates | Ordered conditional lowering; false and unknown conditions fall through |
-| `year(date_or_timestamp_column)` | Iceberg year transform with calendar-year literal adjustment |
-| `month`/`day` on constant temporal values | Evaluated as scalar constants |
-| Mask returning its local input | No projection, preserving the original selected column |
-| NULL or `replace_with_null` | Null projection on a nullable column |
-| One of the nine direct mask functions applied to the local input | Corresponding Iceberg projection |
-| A literal equal to the target type's fixed mask value | Fixed-value projection |
-| Mask CASE using conditions that resolve to constants after binding | First matching compatible projection |
+| `year(date_or_timestamp_column)`                                         | Iceberg year transform with calendar-year literal adjustment            |
+| `month`/`day` on constant temporal values                                | Evaluated as scalar constants                                           |
+| Mask returning its local input                                           | No projection, preserving the original selected column                  |
+| NULL or `replace_with_null`                                              | Null projection on a nullable column                                    |
+| One of the nine direct mask functions applied to the local input         | Corresponding Iceberg projection                                        |
+| A literal equal to the target type's fixed mask value                    | Fixed-value projection                                                  |
+| Mask CASE using conditions that resolve to constants after binding       | First matching compatible projection                                    |
 
 General column-to-column comparisons, month/day extraction from row values, row-dependent mask
 selection, composed mask calls and arbitrary literal mask values are not representable by the
 current closed target and are rejected. A SQL mask parameter binds to the selected column by field
 ID, independently of its local name. Quoted row-filter declarations match exact physical names;
 unquoted declarations match case-folded names and reject ambiguous matches.
-
-`user_attribute` requires a trusted provider returning the declared SQL type, with a typed NULL
-for an absent value. The standard identity adapter currently supplies the subject and group
-snapshot, without a user-attribute registry. Attribute calls without a declared provider fail
-closed; request properties are not used as implicit user attributes.
 
 Source limits still apply. Conversion additionally bounds generated Iceberg expressions to 16384
 nodes and depth 256, and bounds compilation work. This protects conditional lowering and
@@ -367,10 +356,10 @@ checks and response ETags.
 Each association connects one policy to one tag and stores a selector. The selector determines
 whether that association contributes the policy to an object's lookup result.
 
-| Selector     | When it matches                                                          |
-|--------------|--------------------------------------------------------------------------|
-| `ALL_VALUES` | The effective tag is present, including an assignment without a value.   |
-| `TAG_VALUE`  | One of the effective tag assignment values equals the specified value.   |
+| Selector       | When it matches                                                            |
+| -------------- | -------------------------------------------------------------------------- |
+| `ALL_VALUES`   | The effective tag is present, including an assignment without a value.     |
+| `TAG_VALUE`    | One of the effective tag assignment values equals the specified value.     |
 
 A policy may be associated with multiple tags. Association listings show those direct relations
 and their selectors, even if no object currently matches them. An object policy lookup returns each

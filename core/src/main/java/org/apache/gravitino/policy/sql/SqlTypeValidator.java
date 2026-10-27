@@ -25,16 +25,22 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 
 /** Checks every source branch without evaluating request context or lowering SQL null semantics. */
 final class SqlTypeValidator {
-  private final Map<String, SqlType> attributeTypes = new HashMap<>();
-
   void validate(SqlExpression node, @Nullable SqlType expected) {
+    try {
+      validateNode(node, expected);
+    } catch (InvalidExpressionException e) {
+      throw e;
+    } catch (IllegalArgumentException e) {
+      throw new InvalidExpressionException(node, e);
+    }
+  }
+
+  private void validateNode(SqlExpression node, @Nullable SqlType expected) {
     SqlType actual = naturalType(node);
     require(
         expected == null
@@ -93,8 +99,6 @@ final class SqlTypeValidator {
         case MONTH:
         case DAY:
           return SqlType.INTEGER;
-        case USER_ATTRIBUTE:
-          return null;
         default:
           return call.arguments().size() == 1 ? naturalType(call.arguments().get(0)) : null;
       }
@@ -158,20 +162,11 @@ final class SqlTypeValidator {
     SqlType type = naturalType(arg);
     switch (node.function()) {
       case IS_GROUP_MEMBER:
-      case USER_ATTRIBUTE:
         require(
             arg instanceof Literal
                 && ((Literal) arg).literalType() == LiteralType.STRING
                 && !((Literal) arg).value().isEmpty(),
             "context key must be a non-empty string literal");
-        if (node.function() == SqlFunction.USER_ATTRIBUTE
-            && hint != null
-            && !hint.equals(SqlType.NUMBER)) {
-          SqlType previous = attributeTypes.putIfAbsent(((Literal) arg).value(), hint);
-          require(
-              previous == null || previous.equals(hint),
-              "inconsistent user attribute type for " + ((Literal) arg).value());
-        }
         return;
       case IS_NAN:
         require(
@@ -249,7 +244,7 @@ final class SqlTypeValidator {
           break;
       }
     } catch (ArithmeticException e) {
-      throw new IllegalArgumentException("Numeric literal does not fit " + type + ": " + source, e);
+      throw new IllegalArgumentException("Numeric literal does not fit " + type, e);
     }
   }
 
@@ -281,13 +276,27 @@ final class SqlTypeValidator {
         }
       }
     } catch (DateTimeException e) {
-      throw new IllegalArgumentException("Invalid temporal literal: " + value, e);
+      throw new IllegalArgumentException("Invalid temporal literal for " + type, e);
     }
   }
 
   private static void require(boolean valid, String message) {
     if (!valid) {
       throw new IllegalArgumentException("Invalid restricted-sql-v1 expression: " + message);
+    }
+  }
+
+  /** Retains the innermost failing node without expanding literal payloads in diagnostics. */
+  static final class InvalidExpressionException extends IllegalArgumentException {
+    private final SqlExpression expression;
+
+    private InvalidExpressionException(SqlExpression expression, IllegalArgumentException cause) {
+      super(cause.getMessage(), cause);
+      this.expression = expression;
+    }
+
+    SqlExpression expression() {
+      return expression;
     }
   }
 }
