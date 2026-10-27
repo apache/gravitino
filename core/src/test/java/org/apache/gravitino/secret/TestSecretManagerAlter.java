@@ -261,7 +261,9 @@ public class TestSecretManagerAlter {
                       "jdbc-password", new SecretBinding("memory", "new")),
                   CatalogChange.setProperty("other", "******")));
 
-      Assertions.assertNotNull(
+      // The URN stays resolvable, but holds the value the failed alter wrote.
+      Assertions.assertEquals(
+          "new",
           secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
     }
   }
@@ -297,7 +299,9 @@ public class TestSecretManagerAlter {
                       "jdbc-password", new SecretBinding("memory", "new")),
                   CatalogChange.setProperty("other", "******")));
 
-      Assertions.assertNotNull(
+      // The URN stays resolvable, but holds the value the failed alter wrote.
+      Assertions.assertEquals(
+          "new",
           secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
     }
   }
@@ -371,7 +375,9 @@ public class TestSecretManagerAlter {
 
       secretManager.rollbackSecrets(result.getRight().get());
 
-      Assertions.assertNotNull(
+      // The URN stays resolvable, but holds the value the failed alter wrote.
+      Assertions.assertEquals(
+          "new",
           secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
     }
   }
