@@ -21,22 +21,38 @@ package org.apache.gravitino.policy.sql;
 import java.util.Locale;
 
 /** Allowlisted context, predicate, date-part and mask functions. */
-enum SqlFunction {
+public enum SqlFunction {
+  /** Current user. */
   CURRENT_USER,
+  /** Is group member. */
   IS_GROUP_MEMBER,
+  /** User attribute. */
   USER_ATTRIBUTE,
+  /** Is nan. */
   IS_NAN,
+  /** Year. */
   YEAR,
+  /** Month. */
   MONTH,
+  /** Day. */
   DAY,
+  /** Mask alphanum. */
   MASK_ALPHANUM,
+  /** Show first 4. */
   SHOW_FIRST_4,
+  /** Show last 4. */
   SHOW_LAST_4,
+  /** Mask to fixed value. */
   MASK_TO_FIXED_VALUE,
+  /** Replace with null. */
   REPLACE_WITH_NULL,
+  /** Truncate to year. */
   TRUNCATE_TO_YEAR,
+  /** Truncate to month. */
   TRUNCATE_TO_MONTH,
+  /** Sha256 global. */
   SHA256_GLOBAL,
+  /** Sha256 query local. */
   SHA256_QUERY_LOCAL;
 
   static SqlFunction fromName(String name) {

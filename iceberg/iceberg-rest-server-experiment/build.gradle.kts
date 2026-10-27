@@ -51,6 +51,7 @@ configurations.configureEach {
 }
 
 dependencies {
+  compileOnly(libs.jsr305)
   implementation(project(":api"))
   implementation(project(":common")) {
     exclude("*")
@@ -67,6 +68,8 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testRuntimeOnly(libs.junit.jupiter.engine)
+  // The hosting server supplies core's runtime; isolated module tests need its SQL parser runtime.
+  testRuntimeOnly(libs.antlr.runtime)
 }
 
 tasks {

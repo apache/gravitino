@@ -297,6 +297,25 @@ class TestRestrictedSqlExpressionParser {
   }
 
   @Test
+  void testPublicParseInterfacesPreserveBindingMetadata() {
+    SqlDefinition filter =
+        RestrictedSqlExpressionParserFacade.parseRowFilter(
+            "(\"Region\" STRING, owner STRING) RETURNS BOOLEAN -> \"Region\" = owner");
+    Assertions.assertFalse(filter.isColumnMask());
+    Assertions.assertTrue(filter.isQuotedParameter("Region"));
+    Assertions.assertFalse(filter.isQuotedParameter("OWNER"));
+    SqlDefinition mask =
+        RestrictedSqlExpressionParserFacade.parseColumnMask(
+            "(local STRING) RETURNS STRING -> local");
+    Assertions.assertTrue(mask.isColumnMask());
+    Assertions.assertEquals(SqlType.STRING, mask.resultType());
+    Assertions.assertEquals("STRING", mask.resultType().name());
+    Assertions.assertEquals(0, mask.resultType().precision());
+    Assertions.assertEquals(0, mask.resultType().scale());
+    Assertions.assertFalse(mask.resultType().withTimeZone());
+  }
+
+  @Test
   void testSourceAndLiteralLimits() {
     String prefix = "() RETURNS BOOLEAN -> TRUE";
     Assertions.assertDoesNotThrow(

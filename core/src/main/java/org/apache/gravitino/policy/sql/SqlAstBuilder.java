@@ -20,9 +20,11 @@ package org.apache.gravitino.policy.sql;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.apache.gravitino.policy.sql.antlr.RestrictedSqlBaseVisitor;
@@ -45,6 +47,7 @@ import org.apache.gravitino.policy.sql.antlr.RestrictedSqlParser.WhenClauseConte
 /** Converts an ANTLR parse tree into operation-specific immutable SQL nodes. */
 final class SqlAstBuilder extends RestrictedSqlBaseVisitor<SqlExpression> {
   private final Map<String, SqlType> parameters = new LinkedHashMap<>();
+  private final Set<String> quotedParameters = new LinkedHashSet<>();
   private int nodes;
   private int listElements;
   private int activeOperations;
@@ -53,6 +56,9 @@ final class SqlAstBuilder extends RestrictedSqlBaseVisitor<SqlExpression> {
     for (ParameterContext parameter : context.parameter()) {
       String name = identifier(parameter.identifier());
       SqlType type = type(parameter.dataType());
+      if (parameter.identifier().QUOTED_IDENTIFIER() != null) {
+        quotedParameters.add(name);
+      }
       require(parameters.putIfAbsent(name, type) == null, parameter, "duplicate parameter " + name);
       require(
           parameters.size() <= RestrictedSqlLimits.MAX_PARAMETERS,
@@ -71,7 +77,7 @@ final class SqlAstBuilder extends RestrictedSqlBaseVisitor<SqlExpression> {
     }
     SqlExpression body = visit(context.expression());
     new SqlTypeValidator().validate(body, result);
-    return new SqlDefinition(parameters, result, body);
+    return new SqlDefinition(parameters, result, body, quotedParameters, mask);
   }
 
   /** {@inheritDoc} */

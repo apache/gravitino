@@ -23,16 +23,26 @@ import java.util.Collections;
 import java.util.List;
 
 /** A case-sensitive fixed-prefix SQL LIKE predicate. */
-final class Like extends SqlExpression {
+public final class Like extends SqlExpression {
   Like(SqlExpression operand, Literal pattern) {
     super(Arrays.asList(operand, pattern));
   }
 
-  SqlExpression operand() {
+  /**
+   * Returns the source operand.
+   *
+   * @return the source operand
+   */
+  public SqlExpression operand() {
     return children().get(0);
   }
 
-  Literal pattern() {
+  /**
+   * Returns the literal prefix pattern.
+   *
+   * @return the literal prefix pattern
+   */
+  public Literal pattern() {
     return (Literal) children().get(1);
   }
 

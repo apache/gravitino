@@ -204,12 +204,13 @@ public class TestExperimentalIcebergReadRestrictionLoader {
               MetadataObject object = invocation.getArgument(1);
               if (object.type() == MetadataObject.Type.TABLE) {
                 return new PolicyEntity[] {
-                  rowPolicy(1, "regional", "filter := col(\"region\") == \"US\"")
+                  rowPolicy(1, "regional", "(region STRING) RETURNS BOOLEAN -> region = 'US'")
                 };
               }
               if (object.type() == MetadataObject.Type.COLUMN && "region".equals(object.name())) {
                 return new PolicyEntity[] {
-                  maskPolicy(2, "regional_mask", "mask := action(\"show-last-4\")")
+                  maskPolicy(
+                      2, "regional_mask", "(value STRING) RETURNS STRING -> show_last_4(value)")
                 };
               }
               return new PolicyEntity[0];
@@ -299,15 +300,21 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   void testResolvesAndDeduplicatesCanonicalPolicies() {
     PolicyEntity[] rowPolicies =
         new PolicyEntity[] {
-          rowPolicy(1, "first", "filter := col(\"region\") == \"US\" and col(\"id\") in [2, 1]"),
-          rowPolicy(2, "second", "filter := col(\"id\") in [1, 2] and col(\"region\") == \"US\"")
+          rowPolicy(
+              1,
+              "first",
+              "(region STRING, id INTEGER) RETURNS BOOLEAN -> region = 'US' AND id IN (2, 1)"),
+          rowPolicy(
+              2,
+              "second",
+              "(id INTEGER, region STRING) RETURNS BOOLEAN -> id IN (1, 2) AND region = 'US'")
         };
     Map<Integer, PolicyEntity[]> columnPolicies = new LinkedHashMap<>();
     columnPolicies.put(
         2,
         new PolicyEntity[] {
-          maskPolicy(3, "mask_one", "mask := action(\"show-last-4\")"),
-          maskPolicy(4, "mask_two", "mask := action(\"show-last-4\")")
+          maskPolicy(3, "mask_one", "(value STRING) RETURNS STRING -> show_last_4(value)"),
+          maskPolicy(4, "mask_two", "(value STRING) RETURNS STRING -> show_last_4(value)")
         });
 
     ReadRestrictions restrictions =
@@ -322,7 +329,8 @@ public class TestExperimentalIcebergReadRestrictionLoader {
 
   @Test
   void testRejectsTableMaskOnIncompatibleFieldTypes() {
-    PolicyEntity mask = maskPolicy(1, "string_mask", "mask := action(\"show-last-4\")");
+    PolicyEntity mask =
+        maskPolicy(1, "string_mask", "(value STRING) RETURNS STRING -> show_last_4(value)");
     Map<Integer, PolicyEntity[]> policiesByField = new LinkedHashMap<>();
     for (int fieldId = 1; fieldId <= 3; fieldId++) {
       policiesByField.put(fieldId, new PolicyEntity[] {mask});
@@ -340,7 +348,8 @@ public class TestExperimentalIcebergReadRestrictionLoader {
 
   @Test
   void testRejectsReplaceWithNullOnRequiredField() {
-    PolicyEntity mask = maskPolicy(1, "null_mask", "mask := action(\"replace-with-null\")");
+    PolicyEntity mask =
+        maskPolicy(1, "null_mask", "(value INTEGER) RETURNS INTEGER -> replace_with_null(value)");
     Map<Integer, PolicyEntity[]> policiesByField = new LinkedHashMap<>();
     policiesByField.put(1, new PolicyEntity[] {mask});
     policiesByField.put(2, new PolicyEntity[] {mask});
@@ -353,29 +362,28 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   }
 
   @Test
-  void testUnselectedIncompatibleMaskDoesNotRejectTable() {
+  void testRejectsNullableMaskResultForRequiredColumn() {
     PolicyEntity mask =
         maskPolicy(
             1,
             "conditional_mask",
-            "mask := action(\"mask-to-fixed-value\") if true "
-                + "else := action(\"replace-with-null\")");
+            "(value INTEGER) RETURNS INTEGER -> CASE WHEN TRUE THEN mask_to_fixed_value(value) ELSE replace_with_null(value) END");
     Map<Integer, PolicyEntity[]> policiesByField = new LinkedHashMap<>();
     policiesByField.put(1, new PolicyEntity[] {mask});
 
-    ReadRestrictions restrictions =
-        ExperimentalIcebergReadRestrictionLoader.resolve(
-            new PolicyEntity[0], policiesByField, SCHEMA, context("alice"));
-
-    assertEquals(1, restrictions.columnProjections().size());
-    assertEquals("mask-to-fixed-value", restrictions.columnProjections().get(0).name());
-    assertEquals(1, restrictions.columnProjections().get(0).fieldId());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ExperimentalIcebergReadRestrictionLoader.resolve(
+                new PolicyEntity[0], policiesByField, SCHEMA, context("alice")));
   }
 
   @Test
   void testBindsSubjectForRowFilterAndMask() {
     PolicyEntity[] rowPolicies =
-        new PolicyEntity[] {rowPolicy(1, "owner", "filter := col(\"owner\") == session_user()")};
+        new PolicyEntity[] {
+          rowPolicy(1, "owner", "(owner STRING) RETURNS BOOLEAN -> owner = CURRENT_USER()")
+        };
     Map<Integer, PolicyEntity[]> columnPolicies = new LinkedHashMap<>();
     columnPolicies.put(
         2,
@@ -383,8 +391,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
           maskPolicy(
               2,
               "conditional_mask",
-              "mask := action(\"show-last-4\") if is_group_member(\"auditors\") "
-                  + "else := action(\"replace-with-null\")")
+              "(value STRING) RETURNS STRING -> CASE WHEN is_group_member('auditors') THEN show_last_4(value) ELSE replace_with_null(value) END")
         });
 
     ReadRestrictions restrictions =
@@ -404,8 +411,8 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   void testRejectsDistinctRowFilters() {
     PolicyEntity[] policies =
         new PolicyEntity[] {
-          rowPolicy(1, "us", "filter := col(\"region\") == \"US\""),
-          rowPolicy(2, "eu", "filter := col(\"region\") == \"EU\"")
+          rowPolicy(1, "us", "(region STRING) RETURNS BOOLEAN -> region = 'US'"),
+          rowPolicy(2, "eu", "(region STRING) RETURNS BOOLEAN -> region = 'EU'")
         };
 
     IllegalArgumentException exception =
@@ -423,8 +430,8 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   void testIgnoresAllowAllAlongsideRowFilter() {
     PolicyEntity[] policies =
         new PolicyEntity[] {
-          rowPolicy(1, "allow", "filter := true"),
-          rowPolicy(2, "us", "filter := col(\"region\") == \"US\"")
+          rowPolicy(1, "allow", "() RETURNS BOOLEAN -> TRUE"),
+          rowPolicy(2, "us", "(region STRING) RETURNS BOOLEAN -> region = 'US'")
         };
 
     ReadRestrictions restrictions =
@@ -437,7 +444,8 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   void testAllAllowAllRowFiltersAreUnrestricted() {
     PolicyEntity[] policies =
         new PolicyEntity[] {
-          rowPolicy(1, "first", "filter := true"), rowPolicy(2, "second", "filter := true")
+          rowPolicy(1, "first", "() RETURNS BOOLEAN -> TRUE"),
+          rowPolicy(2, "second", "() RETURNS BOOLEAN -> TRUE")
         };
 
     ReadRestrictions restrictions =
@@ -450,7 +458,10 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   void testLoadErrorDoesNotExposePolicyContent() {
     PolicyEntity[] policies =
         new PolicyEntity[] {
-          rowPolicy(1, "secret_policy", "filter := col(\"secret_column\") == \"secret_value\"")
+          rowPolicy(
+              1,
+              "secret_policy",
+              "(secret_column STRING) RETURNS BOOLEAN -> secret_column = 'secret_value'")
         };
 
     IllegalStateException exception =
@@ -481,7 +492,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
                     rowPolicy(
                         1,
                         "restrict_members",
-                        "filter := false if is_group_member(\"auditors\") else := true")
+                        "() RETURNS BOOLEAN -> CASE WHEN is_group_member('auditors') THEN FALSE ELSE TRUE END")
                   },
                   Collections.emptyMap(),
                   SCHEMA,
@@ -494,8 +505,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
                     rowPolicy(
                         2,
                         "restrict_non_members",
-                        "filter := true if is_group_member(\"auditors\") "
-                            + "else := col(\"owner\") == session_user()")
+                        "(owner STRING) RETURNS BOOLEAN -> CASE WHEN is_group_member('auditors') THEN TRUE ELSE owner = CURRENT_USER() END")
                   },
                   Collections.emptyMap(),
                   SCHEMA,
@@ -535,8 +545,8 @@ public class TestExperimentalIcebergReadRestrictionLoader {
     policies.put(
         2,
         new PolicyEntity[] {
-          maskPolicy(1, "first", "mask := action(\"show-first-4\")"),
-          maskPolicy(2, "last", "mask := action(\"show-last-4\")")
+          maskPolicy(1, "first", "(value STRING) RETURNS STRING -> show_first_4(value)"),
+          maskPolicy(2, "last", "(value STRING) RETURNS STRING -> show_last_4(value)")
         });
 
     IllegalArgumentException exception =
@@ -552,7 +562,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   void testOmitsConstantTrueRowFilter() {
     ReadRestrictions restrictions =
         ExperimentalIcebergReadRestrictionLoader.resolve(
-            new PolicyEntity[] {rowPolicy(1, "allow", "filter := true")},
+            new PolicyEntity[] {rowPolicy(1, "allow", "() RETURNS BOOLEAN -> TRUE")},
             Collections.emptyMap(),
             SCHEMA,
             context("alice"));

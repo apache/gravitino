@@ -23,20 +23,35 @@ import java.util.Collections;
 import java.util.List;
 
 /** An inclusive SQL range test. */
-final class Between extends SqlExpression {
+public final class Between extends SqlExpression {
   Between(SqlExpression operand, SqlExpression lower, SqlExpression upper) {
     super(Arrays.asList(operand, lower, upper));
   }
 
-  SqlExpression operand() {
+  /**
+   * Returns the source operand.
+   *
+   * @return the source operand
+   */
+  public SqlExpression operand() {
     return children().get(0);
   }
 
-  SqlExpression lower() {
+  /**
+   * Returns the inclusive lower bound.
+   *
+   * @return the inclusive lower bound
+   */
+  public SqlExpression lower() {
     return children().get(1);
   }
 
-  SqlExpression upper() {
+  /**
+   * Returns the inclusive upper bound.
+   *
+   * @return the inclusive upper bound
+   */
+  public SqlExpression upper() {
     return children().get(2);
   }
 

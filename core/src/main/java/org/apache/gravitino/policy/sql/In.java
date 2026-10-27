@@ -23,16 +23,26 @@ import java.util.Collections;
 import java.util.List;
 
 /** SQL membership in a literal list, including null members. */
-final class In extends SqlExpression {
+public final class In extends SqlExpression {
   In(SqlExpression operand, List<Literal> values) {
     super(children(operand, values));
   }
 
-  SqlExpression operand() {
+  /**
+   * Returns the source operand.
+   *
+   * @return the source operand
+   */
+  public SqlExpression operand() {
     return children().get(0);
   }
 
-  List<SqlExpression> values() {
+  /**
+   * Returns the immutable membership list.
+   *
+   * @return the immutable membership list
+   */
+  public List<SqlExpression> values() {
     return children().subList(1, children().size());
   }
 

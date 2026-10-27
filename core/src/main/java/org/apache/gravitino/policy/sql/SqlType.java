@@ -21,10 +21,13 @@ package org.apache.gravitino.policy.sql;
 import java.util.Objects;
 
 /** Exact logical types in the restricted SQL profile, independent of a target schema. */
-final class SqlType {
-  static final SqlType BOOLEAN = new SqlType("BOOLEAN");
-  static final SqlType STRING = new SqlType("STRING");
-  static final SqlType INTEGER = new SqlType("INTEGER");
+public final class SqlType {
+  /** SQL Boolean type. */
+  public static final SqlType BOOLEAN = new SqlType("BOOLEAN");
+  /** SQL string type. */
+  public static final SqlType STRING = new SqlType("STRING");
+  /** SQL signed integer type. */
+  public static final SqlType INTEGER = new SqlType("INTEGER");
   // Exact, as yet unbound numeric constants (not a supported declaration type).
   static final SqlType NUMBER = new SqlType("NUMBER");
 
@@ -33,22 +36,77 @@ final class SqlType {
   final int scale;
   final boolean withTimeZone;
 
-  SqlType(String name) {
+  /**
+   * Creates a scalar type without precision or timezone attributes.
+   *
+   * @param name canonical SQL type name
+   */
+  public SqlType(String name) {
     this(name, 0, 0, false);
   }
 
-  SqlType(String name, int precision, int scale, boolean withTimeZone) {
+  /**
+   * Creates an exact logical type descriptor.
+   *
+   * @param name canonical SQL type name
+   * @param precision decimal precision or temporal fractional precision
+   * @param scale decimal scale
+   * @param withTimeZone whether a timestamp has a timezone
+   */
+  public SqlType(String name, int precision, int scale, boolean withTimeZone) {
     this.name = name;
     this.precision = precision;
     this.scale = scale;
     this.withTimeZone = withTimeZone;
   }
 
-  boolean numeric() {
+  /**
+   * Returns the canonical SQL type name.
+   *
+   * @return canonical SQL type name
+   */
+  public String name() {
+    return name;
+  }
+  /**
+   * Returns decimal or temporal precision.
+   *
+   * @return declared precision, or zero when unset
+   */
+  public int precision() {
+    return precision;
+  }
+  /**
+   * Returns decimal scale.
+   *
+   * @return decimal scale
+   */
+  public int scale() {
+    return scale;
+  }
+  /**
+   * Returns whether the timestamp carries a timezone.
+   *
+   * @return whether this timestamp has a timezone
+   */
+  public boolean withTimeZone() {
+    return withTimeZone;
+  }
+  /**
+   * Returns whether this is a numeric type.
+   *
+   * @return whether this is a numeric type
+   */
+  public boolean numeric() {
     return name.matches("INTEGER|LONG|FLOAT|DOUBLE|DECIMAL|NUMBER");
   }
 
-  boolean temporal() {
+  /**
+   * Returns whether this is a date or timestamp type.
+   *
+   * @return whether this is a date or timestamp type
+   */
+  public boolean temporal() {
     return name.equals("DATE") || name.equals("TIMESTAMP");
   }
 

@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 /** An n-ary SQL Boolean conjunction or disjunction, retaining source operand order. */
-final class LogicalExpression extends SqlExpression {
+public final class LogicalExpression extends SqlExpression {
   private final LogicalOperator operator;
 
   LogicalExpression(LogicalOperator operator, List<SqlExpression> operands) {
@@ -30,11 +30,21 @@ final class LogicalExpression extends SqlExpression {
     this.operator = operator;
   }
 
-  LogicalOperator operator() {
+  /**
+   * Returns the typed operator.
+   *
+   * @return the typed operator
+   */
+  public LogicalOperator operator() {
     return operator;
   }
 
-  List<SqlExpression> operands() {
+  /**
+   * Returns the immutable logical operands.
+   *
+   * @return the immutable logical operands
+   */
+  public List<SqlExpression> operands() {
     return children();
   }
 

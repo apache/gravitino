@@ -25,7 +25,7 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 
 /** Base for immutable, typed SQL AST nodes. Each operation has its own node class. */
-abstract class SqlExpression {
+public abstract class SqlExpression {
   private final List<SqlExpression> children;
 
   SqlExpression(List<SqlExpression> children) {
@@ -33,12 +33,22 @@ abstract class SqlExpression {
     this.children.forEach(Objects::requireNonNull);
   }
 
-  List<SqlExpression> children() {
+  /**
+   * Returns the immutable ordered source operands.
+   *
+   * @return the immutable ordered source operands
+   */
+  public List<SqlExpression> children() {
     return children;
   }
 
+  /**
+   * Returns the intrinsic logical type, or null when inferred from context.
+   *
+   * @return the intrinsic logical type, or null when inferred from context
+   */
   @Nullable
-  SqlType type() {
+  public SqlType type() {
     return null;
   }
 

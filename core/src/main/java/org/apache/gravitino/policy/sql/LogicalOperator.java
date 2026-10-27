@@ -19,7 +19,9 @@
 package org.apache.gravitino.policy.sql;
 
 /** N-ary Boolean composition operators. */
-enum LogicalOperator {
+public enum LogicalOperator {
+  /** And. */
   AND,
+  /** Or. */
   OR
 }

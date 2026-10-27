@@ -40,14 +40,15 @@ policy. A table with only `data_domain=risk` does not.
 | `system_iceberg_compaction`          | Compaction thresholds and scheduling       | Table maintenance service |
 | `system_iceberg_rewrite_manifests`   | Manifest count and average-size thresholds | Table maintenance service |
 | `system_iceberg_orphan_file_removal` | Orphan-file cleanup options                | Table maintenance service |
-| `system_row_filter`                  | Row-filter expression                      | Not enforced yet          |
-| `system_column_mask`                 | Column-mask expression                     | Not enforced yet          |
+| `system_row_filter`                  | Row-filter expression                      | Experimental Iceberg REST |
+| `system_column_mask`                 | Column-mask expression                     | Experimental Iceberg REST |
 | `system_access_control`              | Privileges and applicable roles            | Not enforced yet          |
 | `custom`                             | A free-form map that you define            | A system that you provide |
 
-The row-filter, column-mask, and access-control policy types can be created and associated with
-tags, but Gravitino does not enforce them yet. Until enforcement is available, these policy types
-do not restrict data access.
+Row-filter and column-mask policies can be associated with tags and returned as read restrictions
+by the experimental Iceberg REST service. Compatible readers enforce those restrictions. The
+stable service does not load the experimental provider by default. Access-control policy
+enforcement remains separate.
 
 ### Read-Restriction Expressions
 
@@ -68,11 +69,12 @@ END
 END
 ```
 
-The server validates complete definitions on policy creation and content updates. It does not
-reparse content on reads, renames, or comment updates. The SQL parser rejects the previous
+The server validates complete definitions on policy creation and content updates. Ordinary policy
+metadata reads, renames, and comment updates do not reparse source. The SQL parser rejects the previous
 `filter :=` and `mask :=` syntax.
-This validation does not enable enforcement. Schema binding, trusted context lookup, target
-nullability checks, expression evaluation, and Iceberg translation require the enforcement path.
+The experimental Iceberg REST loader binds applicable SQL definitions to the request identity and
+table schema, validates target nullability, and converts supported expressions to closed Iceberg
+read restrictions.
 
 A row filter declares zero or more parameters and `RETURNS BOOLEAN`. Parameters bind to table
 columns by name and must match their logical types. A mask declares exactly one parameter and
@@ -85,10 +87,10 @@ for one table, a filter that resolves to `true` adds no restriction and is ignor
 effective filters are deduplicated. Distinct restrictive filters conflict and cause the load-table
 request to fail; the loader does not combine them.
 
-If the selected column-mask action is not applicable to a column type, the experimental loader
-fails the load-table request rather than omitting the mask and exposing the original values.
-Unselected actions do not need to be applicable to that column. For example, `replace-with-null`
-cannot apply to a required column when that action is selected.
+All mask branches must match the declared result type. A possibly null result, including a missing
+ELSE or an explicit NULL branch, is invalid for a required target. If the selected SQL result cannot
+be represented by a compatible Iceberg mask, the experimental loader fails the table load.
+Unselected CASE results and later conditions are not evaluated after a matching branch.
 
 Experimental Iceberg REST read restrictions require authorization to be enabled with
 `gravitino.authorization.enable=true` and a policy dispatcher to be available. When a policy dispatcher
@@ -319,10 +321,46 @@ nodes. Static validation checks parameter/result declarations, unique names, ava
 references, every CASE arm, operand types, allowlisted calls and arguments, exact literal ranges,
 and source limits. Golden fixtures pin parsed ASTs and rejected-input diagnostics.
 
-This parser does not evaluate expressions or establish enforcement support. Table/schema and
-trusted-context binding must still check actual types, nullability, attribute availability and
-identity lookup results. Any binding, translation, or enforcement-capability error must fail
-closed; an unsupported required restriction must never become an unrestricted read.
+The parser does not execute expressions. The experimental converter binds every declared input
+before selecting branches, checks exact schema types and mask nullability, snapshots the effective
+subject, and caches trusted group/attribute lookups for a conversion. Any binding, translation or
+capability error fails the governed load; an unsupported restriction never becomes an unrestricted
+response.
+
+#### Experimental Iceberg Conversion
+
+The current converter supports the following enforcement subset of the shared SQL grammar:
+
+| SQL form | Iceberg conversion |
+| --- | --- |
+| Column and compatible literal/context scalar comparison | Bound field-ID predicate, preserving SQL NULL semantics |
+| Boolean inputs, AND/OR/NOT and Boolean comparisons | Three-valued lowering; only TRUE retains a row |
+| IN/NOT IN, BETWEEN/NOT BETWEEN, null tests, prefix LIKE and NaN tests | Closed native predicates with explicit unknown handling |
+| Searched/simple Boolean CASE and scalar CASE inside supported predicates | Ordered conditional lowering; false and unknown conditions fall through |
+| `year(date_or_timestamp_column)` | Iceberg year transform with calendar-year literal adjustment |
+| `month`/`day` on constant temporal values | Evaluated as scalar constants |
+| Mask returning its local input | No projection, preserving the original selected column |
+| NULL or `replace_with_null` | Null projection on a nullable column |
+| One of the nine direct mask functions applied to the local input | Corresponding Iceberg projection |
+| A literal equal to the target type's fixed mask value | Fixed-value projection |
+| Mask CASE using conditions that resolve to constants after binding | First matching compatible projection |
+
+General column-to-column comparisons, month/day extraction from row values, row-dependent mask
+selection, composed mask calls and arbitrary literal mask values are not representable by the
+current closed target and are rejected. A SQL mask parameter binds to the selected column by field
+ID, independently of its local name. Quoted row-filter declarations match exact physical names;
+unquoted declarations match case-folded names and reject ambiguous matches.
+
+`user_attribute` requires a trusted provider returning the declared SQL type, with a typed NULL
+for an absent value. The standard identity adapter currently supplies the subject and group
+snapshot, without a user-attribute registry. Attribute calls without a declared provider fail
+closed; request properties are not used as implicit user attributes.
+
+Source limits still apply. Conversion additionally bounds generated Iceberg expressions to 16384
+nodes and depth 256, and bounds compilation work. This protects conditional lowering and
+serialization independently of source width. Exceeding a target limit rejects the load. Closed
+filters and mask projections are canonicalized deterministically for deduplication, conflict
+checks and response ETags.
 
 ### Policy-to-Tag Associations
 

@@ -24,29 +24,51 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 /** A literal retaining its exact decoded text, including negative zero. */
-final class Literal extends SqlExpression {
+public final class Literal extends SqlExpression {
   private final LiteralType literalType;
   private final String value;
   @Nullable private final SqlType type;
 
-  Literal(LiteralType literalType, String value, @Nullable SqlType type) {
+  /**
+   * Creates a literal retaining its exact decoded text.
+   *
+   * @param literalType source literal kind
+   * @param value decoded literal text
+   * @param type intrinsic or trusted declared type, or null for an inferred literal
+   */
+  public Literal(LiteralType literalType, String value, @Nullable SqlType type) {
     super(Collections.emptyList());
     this.literalType = literalType;
     this.value = value;
     this.type = type;
   }
 
-  LiteralType literalType() {
+  /**
+   * Returns the source literal kind.
+   *
+   * @return the source literal kind
+   */
+  public LiteralType literalType() {
     return literalType;
   }
 
-  String value() {
+  /**
+   * Returns the exact decoded literal text.
+   *
+   * @return the exact decoded literal text
+   */
+  public String value() {
     return value;
   }
 
+  /**
+   * Returns the intrinsic logical type, or null when inferred from context.
+   *
+   * @return the intrinsic logical type, or null when inferred from context
+   */
   @Nullable
   @Override
-  SqlType type() {
+  public SqlType type() {
     return type;
   }
 

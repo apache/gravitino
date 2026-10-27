@@ -19,7 +19,7 @@
 package org.apache.gravitino.policy.sql;
 
 /** One ordered WHEN/THEN arm in a searched or simple CASE expression. */
-final class CaseBranch {
+public final class CaseBranch {
   private final SqlExpression condition;
   private final SqlExpression result;
 
@@ -28,11 +28,21 @@ final class CaseBranch {
     this.result = result;
   }
 
-  SqlExpression condition() {
+  /**
+   * Returns the WHEN condition or simple CASE match value.
+   *
+   * @return the WHEN condition or simple CASE match value
+   */
+  public SqlExpression condition() {
     return condition;
   }
 
-  SqlExpression result() {
+  /**
+   * Returns the THEN result.
+   *
+   * @return the THEN result
+   */
+  public SqlExpression result() {
     return result;
   }
 }

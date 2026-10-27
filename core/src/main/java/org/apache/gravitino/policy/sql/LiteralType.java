@@ -19,10 +19,15 @@
 package org.apache.gravitino.policy.sql;
 
 /** Source literal kinds; numeric and NULL values acquire their expected type during validation. */
-enum LiteralType {
+public enum LiteralType {
+  /** String. */
   STRING,
+  /** Number. */
   NUMBER,
+  /** Boolean. */
   BOOLEAN,
+  /** Null. */
   NULL,
+  /** Temporal. */
   TEMPORAL
 }

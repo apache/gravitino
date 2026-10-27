@@ -20,30 +20,72 @@ package org.apache.gravitino.policy.sql;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 /** A validated definition; parameter names are local and have no physical field IDs yet. */
-final class SqlDefinition {
+public final class SqlDefinition {
   private final Map<String, SqlType> parameters;
   private final SqlType resultType;
   private final SqlExpression body;
+  private final Set<String> quotedParameters;
+  private final boolean columnMask;
 
-  SqlDefinition(Map<String, SqlType> parameters, SqlType resultType, SqlExpression body) {
+  SqlDefinition(
+      Map<String, SqlType> parameters,
+      SqlType resultType,
+      SqlExpression body,
+      Set<String> quotedParameters,
+      boolean columnMask) {
     this.parameters = Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
     this.resultType = resultType;
     this.body = body;
+    this.quotedParameters = Collections.unmodifiableSet(new LinkedHashSet<>(quotedParameters));
+    this.columnMask = columnMask;
   }
 
-  Map<String, SqlType> parameters() {
+  /**
+   * Returns the immutable declared parameter types keyed by normalized local name.
+   *
+   * @return the immutable declared parameter types keyed by normalized local name
+   */
+  public Map<String, SqlType> parameters() {
     return parameters;
   }
 
-  SqlType resultType() {
+  /**
+   * Returns the declared result type.
+   *
+   * @return the declared result type
+   */
+  public SqlType resultType() {
     return resultType;
   }
 
-  SqlExpression body() {
+  /**
+   * Returns the validated unresolved expression body.
+   *
+   * @return the validated unresolved expression body
+   */
+  public SqlExpression body() {
     return body;
+  }
+
+  /**
+   * Checks whether a parameter was declared with exact SQL quoting.
+   *
+   * @param name normalized local parameter name
+   * @return whether physical column matching must be case sensitive
+   */
+  public boolean isQuotedParameter(String name) {
+    return quotedParameters.contains(name);
+  }
+  /**
+   * @return whether this definition was validated as a column mask
+   */
+  public boolean isColumnMask() {
+    return columnMask;
   }
 
   /** {@inheritDoc} */
@@ -55,6 +97,10 @@ final class SqlDefinition {
         + resultType
         + ", body="
         + body
+        + ", quotedParameters="
+        + quotedParameters
+        + ", columnMask="
+        + columnMask
         + "}";
   }
 }

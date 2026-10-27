@@ -45,6 +45,27 @@ public final class RestrictedSqlExpressionParserFacade {
     parse(source, true);
   }
 
+  /**
+   * Parses and validates a complete SQL row-filter definition.
+   *
+   * @param source complete typed SQL definition
+   * @return immutable unresolved row filter
+   * @throws IllegalArgumentException if syntax, semantics or resource limits are invalid
+   */
+  public static SqlDefinition parseRowFilter(String source) {
+    return parse(source, false);
+  }
+  /**
+   * Parses and validates a complete SQL column-mask definition.
+   *
+   * @param source complete typed SQL definition
+   * @return immutable unresolved column mask
+   * @throws IllegalArgumentException if syntax, semantics or resource limits are invalid
+   */
+  public static SqlDefinition parseColumnMask(String source) {
+    return parse(source, true);
+  }
+
   static SqlDefinition parse(String source, boolean mask) {
     if (source == null || source.trim().isEmpty()) {
       throw new IllegalArgumentException("restricted-sql-v1 definition cannot be blank");

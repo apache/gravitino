@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.List;
 
 /** A binary comparison with SQL three-valued null semantics. */
-final class Comparison extends SqlExpression {
+public final class Comparison extends SqlExpression {
   private final ComparisonOperator operator;
 
   Comparison(ComparisonOperator operator, SqlExpression left, SqlExpression right) {
@@ -31,15 +31,30 @@ final class Comparison extends SqlExpression {
     this.operator = operator;
   }
 
-  ComparisonOperator operator() {
+  /**
+   * Returns the typed operator.
+   *
+   * @return the typed operator
+   */
+  public ComparisonOperator operator() {
     return operator;
   }
 
-  SqlExpression left() {
+  /**
+   * Returns the left comparison operand.
+   *
+   * @return the left comparison operand
+   */
+  public SqlExpression left() {
     return children().get(0);
   }
 
-  SqlExpression right() {
+  /**
+   * Returns the right comparison operand.
+   *
+   * @return the right comparison operand
+   */
+  public SqlExpression right() {
     return children().get(1);
   }
 

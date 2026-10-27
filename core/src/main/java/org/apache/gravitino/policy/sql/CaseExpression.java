@@ -25,7 +25,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 /** A searched or simple CASE, preserving first-match order and an optional ELSE. */
-final class CaseExpression extends SqlExpression {
+public final class CaseExpression extends SqlExpression {
   @Nullable private final SqlExpression selector;
   private final List<CaseBranch> branches;
   @Nullable private final SqlExpression fallback;
@@ -40,21 +40,41 @@ final class CaseExpression extends SqlExpression {
     this.fallback = fallback;
   }
 
+  /**
+   * Returns the simple CASE selector, or null for searched CASE.
+   *
+   * @return the simple CASE selector, or null for searched CASE
+   */
   @Nullable
-  SqlExpression selector() {
+  public SqlExpression selector() {
     return selector;
   }
 
-  List<CaseBranch> branches() {
+  /**
+   * Returns the immutable ordered WHEN/THEN branches.
+   *
+   * @return the immutable ordered WHEN/THEN branches
+   */
+  public List<CaseBranch> branches() {
     return branches;
   }
 
+  /**
+   * Returns the ELSE expression, or null when omitted.
+   *
+   * @return the ELSE expression, or null when omitted
+   */
   @Nullable
-  SqlExpression fallback() {
+  public SqlExpression fallback() {
     return fallback;
   }
 
-  List<SqlExpression> results() {
+  /**
+   * Returns the immutable explicitly authored result branches.
+   *
+   * @return the immutable explicitly authored result branches
+   */
+  public List<SqlExpression> results() {
     List<SqlExpression> result = new ArrayList<>();
     branches.forEach(branch -> result.add(branch.result()));
     if (fallback != null) {

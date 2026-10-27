@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 /** A call to an allowlisted function; it is not executed during parsing. */
-final class FunctionCall extends SqlExpression {
+public final class FunctionCall extends SqlExpression {
   private final SqlFunction function;
 
   FunctionCall(SqlFunction function, List<SqlExpression> arguments) {
@@ -30,11 +30,21 @@ final class FunctionCall extends SqlExpression {
     this.function = function;
   }
 
-  SqlFunction function() {
+  /**
+   * Returns the allowlisted function.
+   *
+   * @return the allowlisted function
+   */
+  public SqlFunction function() {
     return function;
   }
 
-  List<SqlExpression> arguments() {
+  /**
+   * Returns the immutable ordered function arguments.
+   *
+   * @return the immutable ordered function arguments
+   */
+  public List<SqlExpression> arguments() {
     return children();
   }
 

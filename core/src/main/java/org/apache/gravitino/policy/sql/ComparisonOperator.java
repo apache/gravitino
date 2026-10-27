@@ -19,12 +19,18 @@
 package org.apache.gravitino.policy.sql;
 
 /** Binary comparison operators in restricted SQL. */
-enum ComparisonOperator {
+public enum ComparisonOperator {
+  /** SQL EQ comparison. */
   EQ("="),
+  /** SQL NEQ comparison. */
   NEQ("<>"),
+  /** SQL LT comparison. */
   LT("<"),
+  /** SQL LTE comparison. */
   LTE("<="),
+  /** SQL GT comparison. */
   GT(">"),
+  /** SQL GTE comparison. */
   GTE(">=");
   private final String sourceToken;
 
@@ -32,11 +38,21 @@ enum ComparisonOperator {
     this.sourceToken = sourceToken;
   }
 
-  String sourceToken() {
+  /**
+   * Returns the SQL source token.
+   *
+   * @return the SQL source token
+   */
+  public String sourceToken() {
     return sourceToken;
   }
 
-  boolean ordered() {
+  /**
+   * Returns whether this is an ordering comparison.
+   *
+   * @return whether this is an ordering comparison
+   */
+  public boolean ordered() {
     return this != EQ && this != NEQ;
   }
 

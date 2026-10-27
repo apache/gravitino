@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.List;
 
 /** A declared local parameter, unresolved against a physical column. */
-final class InputReference extends SqlExpression {
+public final class InputReference extends SqlExpression {
   private final String name;
   private final SqlType type;
 
@@ -33,12 +33,22 @@ final class InputReference extends SqlExpression {
     this.type = type;
   }
 
-  String name() {
+  /**
+   * Returns the normalized local parameter name.
+   *
+   * @return the normalized local parameter name
+   */
+  public String name() {
     return name;
   }
 
+  /**
+   * Returns the intrinsic logical type, or null when inferred from context.
+   *
+   * @return the intrinsic logical type, or null when inferred from context
+   */
   @Override
-  SqlType type() {
+  public SqlType type() {
     return type;
   }
 

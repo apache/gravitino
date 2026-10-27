@@ -22,12 +22,17 @@ import java.util.Collections;
 import java.util.List;
 
 /** SQL negation; an unknown operand stays unknown. */
-final class Not extends SqlExpression {
+public final class Not extends SqlExpression {
   Not(SqlExpression operand) {
     super(Collections.singletonList(operand));
   }
 
-  SqlExpression operand() {
+  /**
+   * Returns the source operand.
+   *
+   * @return the source operand
+   */
+  public SqlExpression operand() {
     return children().get(0);
   }
 

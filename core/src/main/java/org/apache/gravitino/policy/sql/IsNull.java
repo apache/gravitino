@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 /** IS NULL or IS NOT NULL, without rewriting ordinary comparisons with null. */
-final class IsNull extends SqlExpression {
+public final class IsNull extends SqlExpression {
   private final boolean negated;
 
   IsNull(SqlExpression operand, boolean negated) {
@@ -30,11 +30,21 @@ final class IsNull extends SqlExpression {
     this.negated = negated;
   }
 
-  SqlExpression operand() {
+  /**
+   * Returns the source operand.
+   *
+   * @return the source operand
+   */
+  public SqlExpression operand() {
     return children().get(0);
   }
 
-  boolean negated() {
+  /**
+   * Returns whether this is IS NOT NULL.
+   *
+   * @return whether this is IS NOT NULL
+   */
+  public boolean negated() {
     return negated;
   }
 
