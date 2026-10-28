@@ -444,8 +444,8 @@ public class TestJobManager {
         .delete(NameIdentifierUtil.ofJob(metalake, registered.name()), Entity.EntityType.JOB);
     assertNoJobStagingDir();
 
-    // A failed deletion keeps its original cause, and metadata can still settle the known
-    // rejection without consulting a runner that may not support lookup.
+    // A failed deletion keeps its original cause, and the known rejection is settled as FAILED
+    // without a lookup in the job executor.
     IOException deleteFailure = new IOException("store unavailable");
     doThrow(deleteFailure).when(entityStore).delete(any(), eq(Entity.EntityType.JOB));
     RuntimeException second =
@@ -4144,6 +4144,8 @@ public class TestJobManager {
             RuntimeException.class,
             () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
     Assertions.assertSame(executorFailure, failure.getCause());
+    // A gone job is not a failure to record the cancellation.
+    Assertions.assertEquals(0, failure.getSuppressed().length);
     // Only a conflict is retried.
     verify(entityStore, times(1))
         .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());

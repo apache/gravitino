@@ -499,8 +499,9 @@ every tenth of that time. Until then, they are still reported as queued, started
 they keep their job templates from being deleted.
 
 For jobs whose execution id was recorded, cancelling them settles them as `CANCELLED` within about
-four times `gravitino.job.statusPullIntervalInMs`, as described above. Lowering `gravitino.job.stagingDirKeepTimeInMs` shortens retention, but finished jobs are then kept
-for a shorter time, and a job that runs longer than that without changing its status is marked as
+four times `gravitino.job.statusPullIntervalInMs`, as described above. Lowering
+`gravitino.job.stagingDirKeepTimeInMs` shortens retention, but finished jobs are then kept for a
+shorter time, and a job that runs longer than that without changing its status is marked as
 `FAILED`.
 :::
 

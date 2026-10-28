@@ -182,7 +182,9 @@ public class JobManager implements JobOperationDispatcher {
       Config config, EntityStore entityStore, IdGenerator idGenerator, JobExecutor jobExecutor) {
     this.entityStore = entityStore;
     this.jobExecutor = jobExecutor;
-    this.findsSubmittedJobs = implementsFindSubmittedJob(jobExecutor);
+    this.findsSubmittedJobs =
+        JobExecutorFactory.implementsMethod(
+            jobExecutor.getClass(), "findSubmittedJob", JobContext.class, JobTemplate.class);
     this.idGenerator = idGenerator;
 
     String stagingDirPath = config.get(Configs.JOB_STAGING_DIR);
@@ -882,8 +884,9 @@ public class JobManager implements JobOperationDispatcher {
     }
   }
 
-  // Only used when no execution was submitted, including owner-registration failure. Never
-  // remove this recovery anchor for a transport error whose submission outcome is unknown.
+  // Only used when no execution was submitted, including owner-registration failure, or when the
+  // job executor can't look up submissions. Never remove this recovery anchor for a submission
+  // whose outcome is unknown if findSubmittedJob() could recover its execution.
   private void deleteUnsubmittedJob(
       String metalake, JobEntity pendingJobEntity, File jobStagingDir, Exception failure) {
     try {
@@ -1909,19 +1912,5 @@ public class JobManager implements JobOperationDispatcher {
 
   private static long timeInMs(@Nullable Long time) {
     return time == null ? 0L : time;
-  }
-
-  private static boolean implementsFindSubmittedJob(JobExecutor jobExecutor) {
-    try {
-      // An inherited default method of the interface is declared by the interface itself.
-      return jobExecutor
-              .getClass()
-              .getMethod("findSubmittedJob", JobContext.class, JobTemplate.class)
-              .getDeclaringClass()
-          != JobExecutor.class;
-    } catch (NoSuchMethodException e) {
-      // Never happens, as the interface declares the method.
-      throw new IllegalStateException(e);
-    }
   }
 }

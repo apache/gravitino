@@ -136,7 +136,9 @@ public interface JobExecutor extends Closeable {
    *       execution as an unrecorded one.
    *   <li>Empty means that the job has no execution. The job is marked as {@link
    *       JobHandle.Status#FAILED}, or {@link JobHandle.Status#CANCELLED} if it is being cancelled.
-   *       Only return empty when the job runner confirms that it has no execution of the job.
+   *       Only return empty when the job runner confirms that it has no execution of the job,
+   *       unless the job executor can't look up an execution at all, see the default implementation
+   *       below.
    *   <li>An exception means that the lookup failed. The job stays as it is, and the lookup is
    *       retried in the next status pull.
    * </ul>
