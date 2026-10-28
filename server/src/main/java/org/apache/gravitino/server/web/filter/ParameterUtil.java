@@ -90,8 +90,13 @@ public class ParameterUtil {
         } catch (IllegalArgumentException e) {
           throw new IllegalMetadataObjectException(e, "Invalid metadata object type: %s", rawType);
         }
-        NameIdentifier nameIdentifier =
-            MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName.get(), type));
+        MetadataObject object;
+        try {
+          object = MetadataObjects.parse(fullName.get(), type);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalMetadataObjectException(e, "%s", e.getMessage());
+        }
+        NameIdentifier nameIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
         nameIdentifierMap.putAll(
             NameIdentifierUtil.splitNameIdentifier(
                 metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
