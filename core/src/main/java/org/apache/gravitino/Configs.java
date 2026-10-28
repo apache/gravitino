@@ -745,4 +745,15 @@ public class Configs {
                       && valueList.stream().allMatch(SensitivePropertyKeyKeywords::isValidKeyword),
               SensitivePropertyKeyKeywords.invalidKeywordMessage())
           .createWithDefault(SensitivePropertyKeyKeywords.defaultKeywords());
+
+  public static final ConfigEntry<String> SEMANTIC_MODEL_QUERY_PLANNER =
+      new ConfigBuilder("gravitino.semanticModel.queryPlanner")
+          .doc(
+              "The Semantic Model query planner: 'none' (the default) disables planning and makes"
+                  + " the plan endpoint return 501, or a custom planner name whose class is set by"
+                  + " gravitino.semanticModelQueryPlanner.<name>.class.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault("none");
 }

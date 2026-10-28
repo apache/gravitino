@@ -52,6 +52,7 @@ import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.semantic.SemanticQueryPlanner;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.web.ClientAddressResolver;
@@ -192,6 +193,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.semanticModelDispatcher())
                 .to(SemanticModelDispatcher.class)
                 .ranked(1);
+            bind(gravitinoEnv.semanticQueryPlanner()).to(SemanticQueryPlanner.class).ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
             bind(gravitinoEnv.jobOperationDispatcher()).to(JobOperationDispatcher.class).ranked(1);
             bind(gravitinoEnv.statisticDispatcher()).to(StatisticDispatcher.class).ranked(1);

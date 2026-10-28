@@ -67,6 +67,9 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticQuery;
+import org.apache.gravitino.semantic.SemanticQueryFilter;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
 
 try (GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
     .withMetalake("example").build()) {
@@ -94,6 +97,8 @@ from gravitino.api.semantic.metric import Metric
 from gravitino.api.semantic.relationship import Relationship
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_query import SemanticQuery
+from gravitino.api.semantic.semantic_query_filter import SemanticQueryFilter
 from gravitino.namespace import Namespace
 
 client = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
@@ -507,6 +512,72 @@ server's default when the property is omitted; import records the document versi
 properties are exchanged through the root `GRAVITINO_PROPERTIES` custom extension, whose `data`
 is a JSON object encoded as a string. Its values must be strings. Use `properties` when creating a
 model through the native API; the reserved extension is for Ossie exchange.
+
+## Plan a Semantic Query
+
+A Semantic Model describes metrics and dimensions; compiling a query to SQL for a specific engine
+is a separate step. The server asks its configured query planner to compile a `SemanticQuery` and
+returns the SQL without executing it. Planning is read-only and the generated SQL is not cached.
+
+A query must select at least one metric or dimension. Filters compare a field with a string value
+using `eq`, `ne`, `gt`, `ge`, `lt`, or `le`. The dialect is a free-form identifier such as `trino`
+or `ANSI_SQL`; the server preserves it without validation or normalization, so custom engine names
+are valid.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metrics": ["total_revenue"],
+    "filters": [{"field": "region", "operator": "eq", "value": "EMEA"}],
+    "dialect": "trino"
+  }' \
+  http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/mart/semantic-models/sales_model/plan
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+SemanticQuery query = SemanticQuery.builder()
+    .withMetrics(List.of("total_revenue"))
+    .withDimensions(List.of())
+    .withFilters(List.of(
+        SemanticQueryFilter.of("region", SemanticQueryFilter.Operator.EQ, "EMEA")))
+    .withDialect("trino")
+    .build();
+SemanticQueryPlan plan = models.planSemanticQuery(ident, query);
+String sql = plan.sql();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+plan = models.plan_semantic_query(
+    ident,
+    SemanticQuery(
+        dialect="trino",
+        metrics=["total_revenue"],
+        filters=[
+            SemanticQueryFilter.of("region", SemanticQueryFilter.Operator.EQ, "EMEA")
+        ],
+    ),
+)
+sql = plan.sql()
+```
+
+</TabItem>
+</Tabs>
+
+The response contains `sql`, the requested `dialect`, the `planner` that compiled it, and any
+non-fatal `warnings`. A malformed query is rejected with `400`. A well-formed query that the
+planner cannot compile returns `422` with a `SemanticQueryPlanException`. When no planner is
+configured, the endpoint returns `501`; set `gravitino.semanticModel.queryPlanner` on the server to
+enable planning (see [Server Configuration](./gravitino-server-config.md#semantic-query-planner)).
 
 ## Ownership and Privileges
 

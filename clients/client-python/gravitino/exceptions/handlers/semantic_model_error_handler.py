@@ -31,6 +31,7 @@ from gravitino.exceptions.base import (
     NotFoundException,
     NotInUseException,
     SemanticModelAlreadyExistsException,
+    SemanticQueryPlanException,
     UnsupportedOperationException,
 )
 from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
@@ -67,6 +68,9 @@ class SemanticModelErrorHandler(RestErrorHandler):
 
         if code == ErrorConstants.NOT_IN_USE_CODE:
             self._raise_not_in_use(exception_type, error_message)
+
+        if code == ErrorConstants.UNPROCESSABLE_ENTITY_CODE:
+            raise SemanticQueryPlanException(error_message)
 
         super().handle(error_response)
 

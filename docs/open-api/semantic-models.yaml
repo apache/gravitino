@@ -336,6 +336,48 @@ paths:
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/plan:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/semanticModel"
+
+    post:
+      tags:
+        - semantic-model
+      summary: Plan a Semantic Model query
+      description: >-
+        Compiles a Semantic Model query to SQL without executing it. The configured query planner
+        compiles the query for the requested dialect. The dialect is a free-form identifier that
+        the server preserves without validation or normalization. Planning is read-only and the
+        generated SQL is not cached. A query must select at least one metric or dimension.
+      operationId: planSemanticQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanSemanticQueryRequest"
+            examples:
+              PlanSemanticQueryRequest:
+                $ref: "#/components/examples/PlanSemanticQueryRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticQueryPlanResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelNotFoundResponse"
+        "422":
+          $ref: "#/components/responses/SemanticQueryPlanUnprocessableResponse"
+        "501":
+          $ref: "#/components/responses/SemanticQueryPlanUnsupportedResponse"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 components:
 
   schemas:
@@ -1054,6 +1096,89 @@ components:
             $ref: "#/components/schemas/SemanticModelUpdateRequest"
       additionalProperties: false
 
+    SemanticQueryFilter:
+      type: object
+      description: One filter applied to a field in a Semantic Model query
+      required:
+        - field
+        - operator
+        - value
+      properties:
+        field:
+          type: string
+          minLength: 1
+          description: The non-blank field name to filter on
+        operator:
+          type: string
+          minLength: 1
+          description: >-
+            The comparison operator: eq, ne, gt, ge, lt, or le. Matching is case-insensitive.
+        value:
+          type: string
+          description: The literal value to compare with; an empty string is valid
+      additionalProperties: false
+
+    PlanSemanticQueryRequest:
+      type: object
+      description: >-
+        A query to compile for a Semantic Model. At least one metric or dimension must be selected.
+      required:
+        - dialect
+      properties:
+        metrics:
+          type: array
+          description: Metric names to select; omitted or empty selects none
+          items:
+            type: string
+            minLength: 1
+        dimensions:
+          type: array
+          description: Dimension names to select; omitted or empty selects none
+          items:
+            type: string
+            minLength: 1
+        filters:
+          type: array
+          description: Filters applied to the query; omitted or empty applies none
+          items:
+            $ref: "#/components/schemas/SemanticQueryFilter"
+        dialect:
+          type: string
+          minLength: 1
+          description: >-
+            The target engine dialect, for example trino or ANSI_SQL. The server preserves it
+            without validation or normalization.
+      additionalProperties: false
+
+    SemanticQueryPlan:
+      type: object
+      description: The SQL compiled from a Semantic Model query
+      required:
+        - sql
+        - dialect
+        - planner
+        - warnings
+      properties:
+        sql:
+          type: string
+          minLength: 1
+          description: The generated SQL
+        dialect:
+          type: string
+          minLength: 1
+          description: The dialect the SQL targets
+        planner:
+          type: string
+          minLength: 1
+          description: The name of the planner that generated the SQL
+        warnings:
+          type: array
+          description: Non-fatal warnings produced while planning; empty when there are none
+          items:
+            type: string
+            minLength: 1
+      additionalProperties: false
+
     SemanticModelUpdateRequest:
       description: One polymorphic Semantic Model update
       oneOf:
@@ -1398,6 +1523,78 @@ components:
             ConnectionFailedException:
               $ref: "#/components/examples/ConnectionFailedException"
 
+    SemanticQueryPlanResponse:
+      description: Returns the compiled SQL with the dialect, planner name, and warnings
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            required:
+              - code
+              - sql
+              - dialect
+              - planner
+              - warnings
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              sql:
+                type: string
+                minLength: 1
+                description: The generated SQL
+              dialect:
+                type: string
+                minLength: 1
+                description: The dialect the SQL targets
+              planner:
+                type: string
+                minLength: 1
+                description: The name of the planner that generated the SQL
+              warnings:
+                type: array
+                description: Non-fatal warnings produced while planning
+                items:
+                  type: string
+                  minLength: 1
+            additionalProperties: false
+          examples:
+            SemanticQueryPlanResponse:
+              $ref: "#/components/examples/SemanticQueryPlanResponse"
+
+    SemanticQueryPlanUnprocessableResponse:
+      description: >-
+        Unprocessable Entity - The query is well-formed but the configured planner cannot compile
+        it
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            SemanticQueryPlanException:
+              $ref: "#/components/examples/SemanticQueryPlanException"
+
+    SemanticQueryPlanUnsupportedResponse:
+      description: Not Implemented - No Semantic Model query planner is configured
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            UnsupportedOperationException:
+              value: {
+                "code": 1006,
+                "type": "UnsupportedOperationException",
+                "message": "No Semantic Model query planner is configured; set gravitino.semanticModel.queryPlanner to a planner name",
+                "stack": [
+                  "java.lang.UnsupportedOperationException: No Semantic Model query planner is configured; set gravitino.semanticModel.queryPlanner to a planner name",
+                  "..."
+                ]
+              }
+
   examples:
     OssieSemanticModelDocument:
       value: {
@@ -1718,6 +1915,40 @@ components:
         "message": "The Semantic Model changed during the internal transaction",
         "stack": [
           "org.apache.gravitino.exceptions.OptimisticLockException: The Semantic Model changed during the internal transaction",
+          "..."
+        ]
+      }
+
+    PlanSemanticQueryRequest:
+      value: {
+        "metrics": ["total_revenue"],
+        "dimensions": ["region"],
+        "filters": [
+          {
+            "field": "region",
+            "operator": "eq",
+            "value": "EMEA"
+          }
+        ],
+        "dialect": "trino"
+      }
+
+    SemanticQueryPlanResponse:
+      value: {
+        "code": 0,
+        "sql": "SELECT region, SUM(orders.order_amount) AS total_revenue FROM sales.mart.orders WHERE region = 'EMEA' GROUP BY region",
+        "dialect": "trino",
+        "planner": "custom",
+        "warnings": []
+      }
+
+    SemanticQueryPlanException:
+      value: {
+        "code": 1013,
+        "type": "SemanticQueryPlanException",
+        "message": "Metric total_revenue has no expression for dialect trino",
+        "stack": [
+          "org.apache.gravitino.exceptions.SemanticQueryPlanException: Metric total_revenue has no expression for dialect trino",
           "..."
         ]
       }
