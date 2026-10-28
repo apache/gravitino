@@ -80,7 +80,7 @@ class IcebergCatalogWrapperProvider {
 
   IcebergCatalogWrapper get() {
     try {
-      IcebergCatalogWrapper wrapper = manager.getCatalogWrapper(catalogName, icebergConfig);
+      IcebergCatalogWrapper wrapper = manager.getOrCreateCatalogWrapper(catalogName, icebergConfig);
       // Force backend load: REST warehouse / connectivity fail here, not at wrapper construction.
       wrapper.getCatalog();
       return wrapper;

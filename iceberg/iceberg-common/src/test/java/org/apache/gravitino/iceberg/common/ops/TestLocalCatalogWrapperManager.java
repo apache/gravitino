@@ -31,8 +31,8 @@ public class TestLocalCatalogWrapperManager {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
     try (LocalCatalogWrapperManager manager = new LocalCatalogWrapperManager(config)) {
-      IcebergCatalogWrapper first = manager.getCatalogWrapper("c1", config);
-      IcebergCatalogWrapper second = manager.getCatalogWrapper("c1", config);
+      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("c1", config);
+      IcebergCatalogWrapper second = manager.getOrCreateCatalogWrapper("c1", config);
       Assertions.assertSame(first, second);
     }
   }
@@ -52,9 +52,9 @@ public class TestLocalCatalogWrapperManager {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
     try (LocalCatalogWrapperManager manager = new LocalCatalogWrapperManager(config)) {
-      IcebergCatalogWrapper first = manager.getCatalogWrapper("c1", config);
+      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("c1", config);
       manager.invalidateCatalogWrapper("c1");
-      IcebergCatalogWrapper second = manager.getCatalogWrapper("c1", config);
+      IcebergCatalogWrapper second = manager.getOrCreateCatalogWrapper("c1", config);
       Assertions.assertNotSame(first, second);
     }
   }

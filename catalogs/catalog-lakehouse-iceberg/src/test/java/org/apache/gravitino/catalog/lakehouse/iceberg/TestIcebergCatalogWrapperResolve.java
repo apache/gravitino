@@ -46,7 +46,7 @@ public class TestIcebergCatalogWrapperResolve {
     IcebergCatalogWrapper shared = new IcebergCatalogWrapper(new IcebergConfig());
     IcebergConfig config = new IcebergConfig();
     CatalogWrapperManager manager = Mockito.mock(CatalogWrapperManager.class);
-    Mockito.when(manager.getCatalogWrapper("c1", config)).thenReturn(shared);
+    Mockito.when(manager.getOrCreateCatalogWrapper("c1", config)).thenReturn(shared);
 
     IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(configProvider.getMetalakeName()).thenReturn("ml");
@@ -55,7 +55,7 @@ public class TestIcebergCatalogWrapperResolve {
 
     IcebergCatalogWrapperProvider provider = IcebergCatalogWrapperProvider.create("c1", config);
     Assertions.assertSame(shared, provider.get());
-    Mockito.verify(manager).getCatalogWrapper("c1", config);
+    Mockito.verify(manager).getOrCreateCatalogWrapper("c1", config);
   }
 
   @Test
@@ -73,7 +73,7 @@ public class TestIcebergCatalogWrapperResolve {
             new NoSuchWarehouseException("Warehouse not found: %s", "s3://not-a-real-catalog/"));
 
     CatalogWrapperManager manager = Mockito.mock(CatalogWrapperManager.class);
-    Mockito.when(manager.getCatalogWrapper("c1", config)).thenReturn(broken);
+    Mockito.when(manager.getOrCreateCatalogWrapper("c1", config)).thenReturn(broken);
 
     IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(configProvider.getMetalakeName()).thenReturn("ml");
@@ -102,7 +102,7 @@ public class TestIcebergCatalogWrapperResolve {
         .thenThrow(new RESTException("Error occurred while processing GET request"));
 
     CatalogWrapperManager manager = Mockito.mock(CatalogWrapperManager.class);
-    Mockito.when(manager.getCatalogWrapper("c1", config)).thenReturn(broken);
+    Mockito.when(manager.getOrCreateCatalogWrapper("c1", config)).thenReturn(broken);
 
     IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(configProvider.getMetalakeName()).thenReturn("ml");

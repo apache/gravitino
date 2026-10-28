@@ -46,15 +46,15 @@ public interface CatalogWrapperManager {
   IcebergCatalogWrapper getCatalogWrapper(String catalogName);
 
   /**
-   * Returns the catalog wrapper for {@code catalogName}, creating and caching it from {@code
-   * icebergConfig} when absent. Used by metalake lakehouse when the IRC provider may not know the
-   * catalog name (static-config-provider).
+   * Returns a cached wrapper for {@code catalogName}, or creates one from the caller-supplied
+   * {@code icebergConfig}. Unlike {@link #getCatalogWrapper(String)}, config is not loaded from the
+   * IRC provider (used by metalake lakehouse with static-config-provider).
    *
    * @param catalogName catalog name
    * @param icebergConfig catalog configuration used on cache miss
    * @return catalog wrapper
    */
-  IcebergCatalogWrapper getCatalogWrapper(String catalogName, IcebergConfig icebergConfig);
+  IcebergCatalogWrapper getOrCreateCatalogWrapper(String catalogName, IcebergConfig icebergConfig);
 
   /**
    * Invalidates a cached wrapper for {@code catalogName}.

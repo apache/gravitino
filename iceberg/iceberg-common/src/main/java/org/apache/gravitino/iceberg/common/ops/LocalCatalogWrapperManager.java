@@ -39,7 +39,8 @@ public final class LocalCatalogWrapperManager implements CatalogWrapperManager, 
   }
 
   /**
-   * Unsupported: no IRC config provider. Use {@link #getCatalogWrapper(String, IcebergConfig)}.
+   * Unsupported: no IRC config provider. Use {@link #getOrCreateCatalogWrapper(String,
+   * IcebergConfig)}.
    *
    * @param catalogName catalog name
    * @return never
@@ -47,12 +48,13 @@ public final class LocalCatalogWrapperManager implements CatalogWrapperManager, 
   @Override
   public IcebergCatalogWrapper getCatalogWrapper(String catalogName) {
     throw new UnsupportedOperationException(
-        "LocalCatalogWrapperManager requires an IcebergConfig; use "
-            + "getCatalogWrapper(catalogName, icebergConfig)");
+        "LocalCatalogWrapperManager has no IRC config provider; use "
+            + "getOrCreateCatalogWrapper(catalogName, icebergConfig)");
   }
 
   @Override
-  public IcebergCatalogWrapper getCatalogWrapper(String catalogName, IcebergConfig icebergConfig) {
+  public IcebergCatalogWrapper getOrCreateCatalogWrapper(
+      String catalogName, IcebergConfig icebergConfig) {
     return cache.get(catalogName, name -> IcebergCatalogWrapper.create(icebergConfig));
   }
 

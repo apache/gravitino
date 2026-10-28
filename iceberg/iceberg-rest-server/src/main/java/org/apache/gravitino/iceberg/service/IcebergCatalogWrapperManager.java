@@ -84,8 +84,9 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
   }
 
   @Override
-  public IcebergCatalogWrapper getCatalogWrapper(String catalogName, IcebergConfig icebergConfig) {
-    LOG.debug("getCatalogWrapper(name,config) catalogName={}", catalogName);
+  public IcebergCatalogWrapper getOrCreateCatalogWrapper(
+      String catalogName, IcebergConfig icebergConfig) {
+    LOG.debug("getOrCreateCatalogWrapper catalogName={}", catalogName);
     return catalogWrapperCache.get(catalogName, name -> createCatalogWrapper(name, icebergConfig));
   }
 
