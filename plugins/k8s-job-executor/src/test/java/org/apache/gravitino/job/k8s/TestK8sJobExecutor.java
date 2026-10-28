@@ -758,9 +758,13 @@ public class TestK8sJobExecutor {
         .resource(created)
         .update();
 
-    Assertions.assertThrows(
-        JobSubmissionRejectedException.class,
-        () -> executor.submitJob(context(1L), sparkTemplate()));
+    // Its pods may still run, so it is not a confirmed rejection, and recovery still finds it.
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    Assertions.assertFalse(e instanceof JobSubmissionRejectedException, e.toString());
+    Assertions.assertFalse(e instanceof IllegalArgumentException, e.toString());
+    Assertions.assertTrue(executor.findSubmittedJob(context(1L), sparkTemplate()).isPresent());
   }
 
   @Test

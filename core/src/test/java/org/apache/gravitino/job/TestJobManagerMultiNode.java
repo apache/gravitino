@@ -931,6 +931,67 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testRecordingFailureRetriesCancellationWithoutLookup() throws Exception {
+    AtomicInteger updates = new AtomicInteger();
+    EntityStore conflictingStore = Mockito.spy(entityStore);
+    Mockito.doAnswer(
+            invocation -> {
+              if (updates.incrementAndGet() <= 3) {
+                throw new OptimisticLockException("recording conflict");
+              }
+              return invocation.callRealMethod();
+            })
+        .when(conflictingStore)
+        .update(
+            Mockito.any(),
+            Mockito.eq(JobEntity.class),
+            Mockito.eq(Entity.EntityType.JOB),
+            Mockito.any());
+    AtomicInteger cancellations = new AtomicInteger();
+    AtomicReference<JobHandle.Status> runnerStatus =
+        new AtomicReference<>(JobHandle.Status.STARTED);
+    JobExecutor shared = Mockito.mock(JobExecutor.class);
+    Mockito.when(shared.ownsJob(Mockito.any())).thenReturn(true);
+    Mockito.when(shared.submitJob(Mockito.any(), Mockito.any())).thenReturn("accepted-execution");
+    // Like the default findSubmittedJob(), a lookup never finds the accepted execution.
+    Mockito.when(shared.findSubmittedJob(Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.empty());
+    Mockito.when(shared.getJobExecutionInfo("accepted-execution"))
+        .thenAnswer(invocation -> JobExecutionInfo.of(runnerStatus.get()));
+    Mockito.doAnswer(
+            invocation -> {
+              if (cancellations.incrementAndGet() == 1) {
+                throw new RuntimeException("temporary cancellation failure");
+              }
+              runnerStatus.set(JobHandle.Status.CANCELLED);
+              return null;
+            })
+        .when(shared)
+        .cancelJob("accepted-execution");
+    JobManager submitting = newJobManager(config, conflictingStore, shared);
+    JobManager recovering = newJobManager(config, entityStore, shared);
+    try {
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () -> submitting.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600")));
+      JobEntity pending = onlyJob();
+      Assertions.assertEquals("accepted-execution", pending.jobExecutionId());
+      Assertions.assertEquals(JobHandle.Status.CANCELLING, pending.status());
+      moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+
+      // The execution is still running, so the job is not settled as CANCELLED before it is.
+      recovering.pullAndUpdateJobStatus();
+      recovering.pullAndUpdateJobStatus();
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, getJob(pending.name()).status());
+      Assertions.assertEquals(2, cancellations.get());
+      Mockito.verify(shared, Mockito.never()).findSubmittedJob(Mockito.any(), Mockito.any());
+    } finally {
+      submitting.close();
+      recovering.close();
+    }
+  }
+
+  @TestTemplate
   public void testRecordingFailureRecoversAndRetriesCancellation() throws Exception {
     AtomicInteger updates = new AtomicInteger();
     EntityStore conflictingStore = Mockito.spy(entityStore);
@@ -977,6 +1038,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
       Assertions.assertFalse(failure instanceof OptimisticLockException);
       JobEntity pending = onlyJob();
       Assertions.assertEquals(JobHandle.Status.CANCELLING, pending.status());
+      Assertions.assertEquals("accepted-execution", pending.jobExecutionId());
       Assertions.assertEquals(4, updates.get());
       moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
       recovering.pullAndUpdateJobStatus();

@@ -711,15 +711,18 @@ public class JobManager implements JobOperationDispatcher {
               e);
       // A failed request is not proof that nothing was submitted. Keep the recovery anchor
       // and persist cancellation before returning the failure. Never replay the submission.
-      markFailedSubmissionForCancellation(metalake, pendingJobEntity, failure);
+      markFailedSubmissionForCancellation(metalake, pendingJobEntity, null, failure);
       throw failure;
     }
 
     return recordSubmission(metalake, pendingJobEntity, jobExecutionId);
   }
 
+  // Persists the cancellation of a job whose submission failed. The execution id, if the job
+  // executor returned one, is recorded along with it, so the status pull keeps cancelling that
+  // execution rather than settling the job when a lookup doesn't find it.
   private void markFailedSubmissionForCancellation(
-      String metalake, JobEntity job, Exception failure) {
+      String metalake, JobEntity job, @Nullable String jobExecutionId, Exception failure) {
     NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
     for (int attempt = 1; attempt <= SUBMISSION_WRITE_MAX_ATTEMPTS; attempt++) {
       try {
@@ -728,7 +731,14 @@ public class JobManager implements JobOperationDispatcher {
             LockType.WRITE,
             () ->
                 entityStore.update(
-                    jobIdent, JobEntity.class, Entity.EntityType.JOB, this::toCancellingJobEntity));
+                    jobIdent,
+                    JobEntity.class,
+                    Entity.EntityType.JOB,
+                    latest ->
+                        toCancellingJobEntity(
+                            jobExecutionId == null
+                                ? latest
+                                : withSubmittedExecution(latest, jobExecutionId))));
         return;
       } catch (OptimisticLockException e) {
         failure.addSuppressed(e);
@@ -839,8 +849,10 @@ public class JobManager implements JobOperationDispatcher {
         failure);
     if (recorded == null && !(failure instanceof NoSuchEntityException)) {
       // The registration still anchors recovery even when recording the id conflicted. Persist
-      // the cancellation intent too, so a failed immediate cancellation is retried after lookup.
-      markFailedSubmissionForCancellation(metalake, pendingJobEntity, registrationFailure);
+      // the cancellation intent with the known execution id, so a failed immediate cancellation is
+      // retried even if the job executor can't look up the submission.
+      markFailedSubmissionForCancellation(
+          metalake, pendingJobEntity, jobExecutionId, registrationFailure);
     }
     cancelSubmittedExecution(pendingJobEntity, jobExecutionId, registrationFailure);
     throw registrationFailure;
