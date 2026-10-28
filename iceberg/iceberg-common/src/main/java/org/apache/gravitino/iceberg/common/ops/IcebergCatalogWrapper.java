@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
@@ -88,6 +89,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
 
   private final Object initializationLock = new Object();
+  private final AtomicBoolean closed = new AtomicBoolean();
   private volatile Catalog catalog;
   private volatile SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
@@ -472,8 +474,39 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return true;
   }
 
+  /**
+   * Claims the single close of this wrapper.
+   *
+   * @return {@code true} when this caller should run cleanup, {@code false} when it already ran
+   */
+  protected final boolean beginClose() {
+    return closed.compareAndSet(false, true);
+  }
+
+  /**
+   * Returns whether {@link #close()} has already claimed this wrapper.
+   *
+   * @return {@code true} after the first close
+   */
+  public boolean isClosed() {
+    return closed.get();
+  }
+
   @Override
   public void close() throws Exception {
+    if (!beginClose()) {
+      return;
+    }
+    closeResources();
+  }
+
+  /**
+   * Releases the catalog and metadata cache. Callers that override {@link #close()} must claim
+   * {@link #beginClose()} themselves and then call this method.
+   *
+   * @throws Exception if closing the underlying catalog fails
+   */
+  protected void closeResources() throws Exception {
     Catalog loadedCatalog = catalog;
     if (loadedCatalog != null) {
       LOG.info("Closing IcebergCatalogWrapper for catalog: {}", loadedCatalog.name());

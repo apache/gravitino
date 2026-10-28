@@ -123,6 +123,21 @@ public class CatalogMetaBaseSQLProvider {
         + " AND cm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
+  /**
+   * Selects only {@code current_version} so a cache can see whether the catalog changed without
+   * loading its properties.
+   */
+  public String selectCatalogCurrentVersionByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return "SELECT cm.current_version FROM "
+        + TABLE_NAME
+        + " cm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE cm.catalog_name = #{catalogName} AND mm.metalake_name = #{metalakeName}"
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0";
+  }
+
   public String selectCatalogIdByMetalakeNameAndCatalogName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
     return "SELECT me.metalake_id as metalakeId, ca.catalog_id as catalogId FROM "

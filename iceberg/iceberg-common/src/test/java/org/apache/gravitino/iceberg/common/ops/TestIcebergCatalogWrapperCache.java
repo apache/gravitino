@@ -54,6 +54,46 @@ public class TestIcebergCatalogWrapperCache {
   }
 
   @Test
+  void sameCatalogVersionReusesWrapper() {
+    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
+    AtomicInteger creates = new AtomicInteger();
+    IcebergCatalogWrapper first = cache.get("c1", 1L, name -> newMemoryWrapper(creates));
+    IcebergCatalogWrapper second = cache.get("c1", 1L, name -> newMemoryWrapper(creates));
+    Assertions.assertSame(first, second);
+    Assertions.assertEquals(1, creates.get());
+    cache.close();
+  }
+
+  @Test
+  void newerCatalogVersionReplacesWrapperAndHeldLeaseKeepsTheOldOneOpen() {
+    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
+    AtomicInteger creates = new AtomicInteger();
+    IcebergCatalogWrapper first = cache.get("c1", 1L, name -> newMemoryWrapper(creates));
+    cache.acquire(first);
+
+    IcebergCatalogWrapper second = cache.get("c1", 2L, name -> newMemoryWrapper(creates));
+
+    Assertions.assertNotSame(first, second);
+    Assertions.assertEquals(2, creates.get());
+    Assertions.assertFalse(first.isClosed());
+    cache.release(first);
+    Assertions.assertTrue(first.isClosed());
+    Assertions.assertFalse(second.isClosed());
+    cache.close();
+    Assertions.assertTrue(second.isClosed());
+  }
+
+  @Test
+  void newerCatalogVersionClosesUnheldWrapper() {
+    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
+    IcebergCatalogWrapper first =
+        cache.get("c1", 1L, name -> newMemoryWrapper(new AtomicInteger()));
+    cache.get("c1", 2L, name -> newMemoryWrapper(new AtomicInteger()));
+    Assertions.assertTrue(first.isClosed());
+    cache.close();
+  }
+
+  @Test
   void computeCacheDurationNanosWithoutTokenExpiryUsesAccessEviction() {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
@@ -115,5 +155,11 @@ public class TestIcebergCatalogWrapperCache {
         accessEvictionNanos,
         IcebergCatalogWrapperCache.computeCacheDurationNanos(
             config, accessEvictionNanos, System.currentTimeMillis()));
+  }
+
+  private static IcebergCatalogWrapper newMemoryWrapper(AtomicInteger creates) {
+    creates.incrementAndGet();
+    return new IcebergCatalogWrapper(
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory")));
   }
 }

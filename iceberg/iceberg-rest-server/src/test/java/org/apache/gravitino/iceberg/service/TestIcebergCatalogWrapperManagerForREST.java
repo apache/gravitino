@@ -23,11 +23,9 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -151,17 +149,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
   }
 
   @Test
-  public void testDefaultCatalogAliasInvalidatedWhenCatalogRemoved() throws Exception {
-    Mockito.clearInvocations(mockCatalogManager);
-    AtomicReference<Consumer<NameIdentifier>> removeListener = new AtomicReference<>();
-    Mockito.doAnswer(
-            invocation -> {
-              removeListener.set(invocation.getArgument(0));
-              return null;
-            })
-        .when(mockCatalogManager)
-        .addCatalogCacheRemoveListener(Mockito.any());
-
+  public void testNewerCatalogVersionReplacesWrapperWithoutClosingTheHeldOne() throws Exception {
     IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
     IcebergConfig icebergConfig =
@@ -171,21 +159,32 @@ public class TestIcebergCatalogWrapperManagerForREST {
                 "memory",
                 IcebergConstants.WAREHOUSE,
                 "/tmp/warehouse"));
-    Mockito.when(
-            configProvider.getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG))
+    Mockito.when(configProvider.getIcebergCatalogConfig(Mockito.anyString()))
         .thenReturn(Optional.of(icebergConfig));
 
+    AtomicReference<Long> version = new AtomicReference<>(1L);
     try (IcebergCatalogWrapperManager manager =
-        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, "metalake")) {
+        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, "metalake") {
+          @Override
+          protected Optional<Long> catalogCurrentVersion(String catalogName) {
+            return Optional.of(version.get());
+          }
+        }) {
       IcebergRESTServerContext.create(configProvider, false, false, true, manager);
-      CatalogWrapperForREST original =
-          manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+      CatalogWrapperForREST original = manager.getCatalogWrapper("test");
+      manager.acquireCatalogWrapper(original);
 
-      removeListener.get().accept(NameIdentifier.of("metalake", "test"));
+      CatalogWrapperForREST sameVersion = manager.getCatalogWrapper("test");
+      Assertions.assertSame(original, sameVersion);
 
-      CatalogWrapperForREST replacement =
-          manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+      version.set(2L);
+      CatalogWrapperForREST replacement = manager.getCatalogWrapper("test");
       Assertions.assertNotSame(original, replacement);
+      Assertions.assertFalse(original.isClosed());
+
+      manager.releaseCatalogWrapper(original);
+      Assertions.assertTrue(original.isClosed());
+      Assertions.assertFalse(replacement.isClosed());
     }
   }
 

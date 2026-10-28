@@ -44,6 +44,7 @@ class IcebergCatalogWrapperProvider {
   private final String catalogName;
   private final IcebergConfig icebergConfig;
   private final CatalogWrapperManager manager;
+  private IcebergCatalogWrapper held;
 
   private IcebergCatalogWrapperProvider(
       String catalogName, IcebergConfig icebergConfig, CatalogWrapperManager manager) {
@@ -72,11 +73,10 @@ class IcebergCatalogWrapperProvider {
   }
 
   IcebergCatalogWrapper get() {
+    IcebergCatalogWrapper wrapper = manager.getOrCreateCatalogWrapper(catalogName, icebergConfig);
     try {
-      IcebergCatalogWrapper wrapper = manager.getOrCreateCatalogWrapper(catalogName, icebergConfig);
       // Force backend load: REST warehouse / connectivity fail here, not at wrapper construction.
       wrapper.getCatalog();
-      return wrapper;
     } catch (NoSuchWarehouseException e) {
       invalidate();
       throw new IllegalArgumentException(
@@ -91,6 +91,14 @@ class IcebergCatalogWrapperProvider {
       invalidate();
       throw IcebergCatalogOperations.handleRestException(e);
     }
+    if (held != wrapper) {
+      if (held != null) {
+        manager.releaseCatalogWrapper(held);
+      }
+      manager.acquireCatalogWrapper(wrapper);
+      held = wrapper;
+    }
+    return wrapper;
   }
 
   void invalidate() {
@@ -101,12 +109,19 @@ class IcebergCatalogWrapperProvider {
 
   void close() {
     // Standalone manager is owned by this provider; IRC manager is shared and must stay open.
+    // The shared cache keeps the current wrapper. This lease only releases the one it holds, which
+    // closes it when a newer catalog version has already replaced that entry.
     if (manager instanceof StandaloneCatalogWrapperManager) {
       try {
         ((StandaloneCatalogWrapperManager) manager).close();
       } catch (Exception e) {
         LOG.warn("Failed to close standalone catalog wrapper manager", e);
       }
+      return;
+    }
+    if (held != null) {
+      manager.releaseCatalogWrapper(held);
+      held = null;
     }
   }
 }

@@ -76,6 +76,19 @@ public interface CatalogMetaMapper {
   CatalogPO selectCatalogMetaByName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName);
 
+  /**
+   * Reads {@code catalog_meta.current_version} for one active catalog.
+   *
+   * @param metalakeName metalake name
+   * @param catalogName catalog name
+   * @return the current version, or {@code null} when the catalog is not active
+   */
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "selectCatalogCurrentVersionByName")
+  Long selectCatalogCurrentVersionByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName);
+
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
 
