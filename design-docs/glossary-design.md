@@ -23,9 +23,9 @@
 | ------- | ------ | ---------- | ------ |
 | 0.3     | Qi Yu  | 2026-10-27 | Draft  |
 
-This design covers the open-source part of the Business Glossary PRD (requirements G1–G10) and
-builds on the Domain design (apache/gravitino#13867). Enterprise features (G11–G18: approval
-workflow, version history, CSV import/export, UI) plug in through the hooks described here.
+This design covers requirements G1–G10 of the Business Glossary PRD and builds on the Domain
+design (apache/gravitino#13867). An approval workflow, version history, CSV import/export and a UI
+are out of scope; they can plug in through the hooks described here.
 
 ## Goals
 
@@ -48,9 +48,9 @@ workflow, version history, CSV import/export, UI) plug in through the hooks desc
 ## Non-Goals
 
 1. **Approval workflow, version history API, CSV import/export, KB articles, UI** (G11–G13, G15,
-   G16): Enterprise 2.0. OSS edits apply at once and record versions, but OSS exposes no version
-   API; the hook is `TermChangeHandler` (see Versions).
-2. **Ranked or fuzzy lookup, SKOS, connectors** (G14, G17, G18): Enterprise 2.1.
+   G16): edits apply at once and record versions, but no version API is exposed; a workflow can
+   plug in through `TermChangeHandler` (see Versions).
+2. **Ranked or fuzzy lookup, SKOS, connectors** (G14, G17, G18).
 3. **Access through terms**: a term or binding never grants or denies data access and carries no
    policies.
 4. **Agent writes**: the MCP tools are read-only.
@@ -109,8 +109,8 @@ TermBinding  { termId, objectId, objectType, metricName?, audit_info }
   to 128 characters, `/` allowed and URL-encoded in paths).
 - Two terms may share a synonym. A synonym cannot equal another term's name: adding a synonym
   checks names, and creating or renaming a term checks other terms' synonyms (400).
-- `sourceRef` is optional and unique per metalake when set; Enterprise import matches on it first,
-  then on the name.
+- `sourceRef` is optional and unique per metalake when set; an importer matches on it first, then
+  on the name.
 
 ### Relations
 
@@ -134,7 +134,7 @@ is proposed.
 - `glossary_term_domain_rel (term_id, domain_id)`, changed only through the term API
   (`addDomain`, `removeDomain`, `domains` on create).
 - Adding a domain needs the edit privilege on the term and `CREATE_DEFINITION` on that domain, so
-  nobody can move a term into a domain they cannot write. In Enterprise the change goes through
+  nobody can move a term into a domain they cannot write. The change goes through
   `TermChangeHandler` like any other term change.
 - **Terms of a domain** (`GET /domains/{domain}/terms`) use the Domain design's scope: terms linked
   to the domain or to a subdomain the caller can see, reported as `Direct` or `Via subdomain`.
@@ -154,8 +154,8 @@ is proposed.
   `GLOSSARY_TERM`:
   1. besides `APPLY_TAG`, the edit privilege on the term and `CREATE_DEFINITION` on the domain
      that the (tag, value) backs, found through the Domain design's reverse lookup;
-  2. in Enterprise, a backing-tag change on a term goes through `TermChangeHandler` for approval
-     (Q6), instead of applying at once.
+  2. a backing-tag change on a term goes through `TermChangeHandler`, so an approval workflow
+     can hold it like any other term change, instead of applying at once.
 - Changing or deleting a domain's backing tag silently moves terms out of the domain, so who
   manages them changes with no term change. A domain drop works as for assets.
 
@@ -165,7 +165,7 @@ is proposed.
 | ---------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | Meaning                      | "Term T belongs to domain D" is stored as such                     | Derived from tags: (T carries tag X) and (X backs D)                     |
 | Who can change it            | Term privileges + `CREATE_DEFINITION` on D, in one place           | `APPLY_TAG`, plus the two term-specific checks above                     |
-| Approval (Enterprise)        | Same path as other term edits                                      | Needs a hook in the tag association API                                  |
+| Approval workflow            | Same path as other term edits                                      | Needs a hook in the tag association API                                  |
 | Stable governance            | Changes only through the term API                                  | Also changes when a backing tag is replaced or deleted                   |
 | Authorization lookup         | One indexed read of the term's domains                             | Term tags → reverse lookup of the domains they back                      |
 | Consistency with assets      | A second membership mechanism; terms listed by a separate endpoint | One mechanism (G5 wording); terms appear in domain member listings       |
@@ -196,31 +196,31 @@ keeps free of special cases.
 | `APPROVED`        | `VIEW_DEFINITION`; MCP                      | `MANAGE_DEFINITIONS` | not allowed; deprecate first                            |
 | `DEPRECATED`      | `VIEW_DEFINITION`; not MCP                  | `MANAGE_DEFINITIONS` | `MANAGE_DEFINITIONS`                                    |
 
-- In OSS, a `MANAGE_DEFINITIONS` holder on any of the term's domains or on the metalake sets the
-  status directly with `PATCH`. There are no submissions, so no self-approval rule.
+- A `MANAGE_DEFINITIONS` holder on any of the term's domains or on the metalake sets the status
+  directly with `PATCH`. There are no submissions, so no self-approval rule.
 - Edits apply at once in any status and are audited, and each content change records a version
   (see Versions).
 
 ### Versions
 
-The storage supports versions in OSS, so Enterprise needs no schema of its own and no later data
-migration; this follows the existing `current_version` + `table_column_version_info` pattern.
+Every content change records a version, so an approval workflow or a history API can be added
+later without a schema change or data migration. This follows the existing `current_version` +
+`table_column_version_info` pattern.
 
 - **What is versioned**: a change to the name, definition, synonyms, properties, relations,
   domains or bindings. Owner and status changes are not; they are audited only.
 - **Snapshot**: each version row stores the whole term as JSON (fields, synonyms, broader and
   related term IDs, domain IDs, bindings). The live tables hold only the current state, so a
   snapshot is the only way to store a change that is not applied yet.
-- **OSS write path**: in the same transaction as the change, under the term's exclusive lock,
+- **Write path**: in the same transaction as the change, under the term's exclusive lock,
   increment `current_version`, insert a `CURRENT` row and mark the previous one `SUPERSEDED`. Cost:
   one extra insert and one update per edit; a snapshot grows with the term's bindings.
-- **OSS read path**: none. Product keeps the version history API in Enterprise (G12); exposing
+- **Read path**: none in this design (G12 is out of scope); adding
   `GET /glossary/terms/{term}/versions` later needs no storage change.
-- **Enterprise hook**: `GlossaryManager` sends every content change through a `TermChangeHandler`.
-  The OSS implementation applies it at once as above. Enterprise replaces it to write a `PENDING`
-  row instead, without touching the live tables; on approval it applies the snapshot to the live
-  tables and promotes the row to `CURRENT`. It also adds `IN_REVIEW`, blocks self-approval and
-  serves the history (G12, G13).
+- **Workflow hook**: `GlossaryManager` sends every content change through a `TermChangeHandler`.
+  The default implementation applies it at once as above. An approval workflow replaces it to
+  write a `PENDING` row instead, without touching the live tables; on approval it applies the
+  snapshot to the live tables and promotes the row to `CURRENT`.
 - Dropping a term soft-deletes its version rows.
 
 ### Locking
@@ -336,8 +336,7 @@ Together with the `domain` tools of #13867, an agent can go from a domain to its
   reaches the audit log (G8): create, alter, status, bind and unbind, drop. A drop also records one
   entry for each child that lost a broader term.
 - `ResolveTermEvent{text, caller, defined}` is emitted on every resolve; `defined` is `true` when
-  any term of any status matches. Enterprise records lookups with `defined = false` as undefined
-  terms.
+  any term of any status matches, so a listener can collect undefined business words.
 
 ## Alternatives Considered
 
