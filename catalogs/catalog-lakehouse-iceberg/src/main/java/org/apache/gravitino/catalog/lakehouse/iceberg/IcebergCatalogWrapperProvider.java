@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -27,6 +27,7 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperCache;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.exceptions.NoSuchWarehouseException;
 import org.apache.iceberg.exceptions.RESTException;
+import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * create). Non-aux: lakehouse-owned {@link IcebergCatalogWrapperCache} with the same eviction/token
  * policy.
  */
-final class IcebergCatalogWrapperProvider {
+class IcebergCatalogWrapperProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapperProvider.class);
 
@@ -46,8 +47,6 @@ final class IcebergCatalogWrapperProvider {
   private final IcebergConfig icebergConfig;
   private final boolean useIrc;
   private final IcebergCatalogWrapperCache localCache;
-
-  @VisibleForTesting IcebergCatalogWrapper lastResolved;
 
   private IcebergCatalogWrapperProvider(
       String catalogName,
@@ -61,37 +60,19 @@ final class IcebergCatalogWrapperProvider {
   }
 
   /**
-   * Creates a provider for the given catalog. Non-aux eagerly loads into the local cache; aux
-   * defers IRC resolution to avoid re-entering catalog load during initialize.
+   * Creates a provider for the given catalog. Aux defers IRC resolution to first {@link #get()} to
+   * avoid re-entering catalog load during initialize.
    *
    * @param catalogName catalog name
    * @param icebergConfig catalog configuration
    * @return provider
    */
   static IcebergCatalogWrapperProvider create(String catalogName, IcebergConfig icebergConfig) {
-    boolean useIrc = auxIrcAvailable();
-    if (useIrc) {
+    if (auxIrcAvailable()) {
       return new IcebergCatalogWrapperProvider(catalogName, icebergConfig, true, null);
     }
-    IcebergCatalogWrapperProvider provider =
-        new IcebergCatalogWrapperProvider(
-            catalogName, icebergConfig, false, IcebergCatalogWrapperCache.create(icebergConfig));
-    provider.get();
-    return provider;
-  }
-
-  /**
-   * Test helper that always returns {@code wrapper}.
-   *
-   * @param wrapper fixed wrapper
-   * @return provider
-   */
-  @VisibleForTesting
-  static IcebergCatalogWrapperProvider fixed(IcebergCatalogWrapper wrapper) {
-    IcebergCatalogWrapperProvider provider =
-        new IcebergCatalogWrapperProvider(null, null, false, null);
-    provider.lastResolved = wrapper;
-    return provider;
+    return new IcebergCatalogWrapperProvider(
+        catalogName, icebergConfig, false, IcebergCatalogWrapperCache.create(icebergConfig));
   }
 
   /**
@@ -107,14 +88,10 @@ final class IcebergCatalogWrapperProvider {
           manager != null,
           "Internal CatalogWrapperManager is not available. "
               + "Aux lakehouse catalog requires Iceberg REST embedded in Gravitino server.");
-      lastResolved = manager.getCatalogWrapper(catalogName, icebergConfig);
-      return lastResolved;
+      return manager.getCatalogWrapper(catalogName, icebergConfig);
     }
-    if (localCache != null) {
-      lastResolved = loadFromLocalCache();
-      return lastResolved;
-    }
-    return lastResolved;
+    Preconditions.checkState(localCache != null, "Local catalog wrapper cache is not initialized");
+    return loadFromLocalCache();
   }
 
   void invalidate() {
@@ -142,14 +119,6 @@ final class IcebergCatalogWrapperProvider {
       } catch (Exception e) {
         LOG.warn("Failed to close Iceberg catalog wrapper cache", e);
       }
-      return;
-    }
-    if (!useIrc && lastResolved != null) {
-      try {
-        lastResolved.close();
-      } catch (Exception e) {
-        LOG.warn("Failed to close Iceberg catalog", e);
-      }
     }
   }
 
@@ -166,8 +135,16 @@ final class IcebergCatalogWrapperProvider {
               icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
           e);
     } catch (RESTException e) {
-      throw IcebergCatalogOperations.handleRestException(e);
+      throw translateRestException(e);
     }
+  }
+
+  private static RuntimeException translateRestException(RESTException e) {
+    if (e.getClass() == RESTException.class || e instanceof ServiceUnavailableException) {
+      return new ConnectionFailedException(
+          e, "The Iceberg REST backend is unavailable: %s", e.getMessage());
+    }
+    return e;
   }
 
   private static boolean auxIrcAvailable() {

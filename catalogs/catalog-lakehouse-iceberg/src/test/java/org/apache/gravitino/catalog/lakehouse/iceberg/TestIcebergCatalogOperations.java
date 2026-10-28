@@ -89,8 +89,7 @@ public class TestIcebergCatalogOperations {
     when(mockWrapper.getIcebergConfig()).thenReturn(config);
     when(mockWrapper.listNamespace(any())).thenThrow(new RuntimeException("boom"));
 
-    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    IcebergCatalogOperations catalogOperations = opsWithWrapper(mockWrapper);
 
     Exception exception =
         Assertions.assertThrows(
@@ -112,8 +111,7 @@ public class TestIcebergCatalogOperations {
   @Test
   public void testListSchemasConvertsMultiLevelNamespacesToLogicalNames() {
     IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
-    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    IcebergCatalogOperations catalogOperations = opsWithWrapper(mockWrapper);
 
     org.apache.iceberg.catalog.Namespace flatNs = org.apache.iceberg.catalog.Namespace.of("mydb");
     org.apache.iceberg.catalog.Namespace hierarchicalNs =
@@ -134,8 +132,7 @@ public class TestIcebergCatalogOperations {
   @Test
   public void testListSchemasFlatOnlyReturnsUnchangedNames() {
     IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
-    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    IcebergCatalogOperations catalogOperations = opsWithWrapper(mockWrapper);
 
     org.apache.iceberg.catalog.Namespace ns1 = org.apache.iceberg.catalog.Namespace.of("db1");
     org.apache.iceberg.catalog.Namespace ns2 = org.apache.iceberg.catalog.Namespace.of("db2");
@@ -148,6 +145,14 @@ public class TestIcebergCatalogOperations {
     Assertions.assertEquals(2, result.length);
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db1".equals(id.name())));
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db2".equals(id.name())));
+  }
+
+  private static IcebergCatalogOperations opsWithWrapper(IcebergCatalogWrapper wrapper) {
+    IcebergCatalogWrapperProvider provider = mock(IcebergCatalogWrapperProvider.class);
+    when(provider.get()).thenReturn(wrapper);
+    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
+    catalogOperations.wrapperProvider = provider;
+    return catalogOperations;
   }
 
   @Test

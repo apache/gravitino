@@ -48,8 +48,7 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
    * Evict a cached catalog this long before its minted GCS OAuth2 token expires, so the next
    * request recreates the catalog and refreshes the token.
    */
-  @VisibleForTesting
-  public static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
+  @VisibleForTesting static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
 
   private final Cache<String, IcebergCatalogWrapper> cache;
 
@@ -107,16 +106,6 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
     T wrapper = (T) cache.get(catalogName, loader);
     wrapper.reloadHadoopConf();
     return wrapper;
-  }
-
-  /**
-   * Returns the cached wrapper if present.
-   *
-   * @param catalogName catalog name
-   * @return cached wrapper or {@code null}
-   */
-  public IcebergCatalogWrapper getIfPresent(String catalogName) {
-    return cache.getIfPresent(catalogName);
   }
 
   /**

@@ -79,23 +79,14 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
 
   @Override
   public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
-    logCacheAccess(catalogName);
+    LOG.debug("getCatalogWrapper catalogName={}", catalogName);
     return catalogWrapperCache.get(catalogName, this::createCatalogWrapperFromProvider);
   }
 
   @Override
   public IcebergCatalogWrapper getCatalogWrapper(String catalogName, IcebergConfig icebergConfig) {
-    logCacheAccess(catalogName);
+    LOG.debug("getCatalogWrapper(name,config) catalogName={}", catalogName);
     return catalogWrapperCache.get(catalogName, name -> createCatalogWrapper(name, icebergConfig));
-  }
-
-  private void logCacheAccess(String catalogName) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "getCatalogWrapper catalogName={} cacheHit={}",
-          catalogName,
-          catalogWrapperCache.getIfPresent(catalogName) != null);
-    }
   }
 
   @Override

@@ -60,7 +60,7 @@ public class TestIcebergViewCatalogOperations {
   public void testLoadViewTranslatesOnlyNoSuchViewException() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     when(wrapper.loadView(any(TableIdentifier.class)))
@@ -73,7 +73,7 @@ public class TestIcebergViewCatalogOperations {
   public void testLoadViewPropagatesNonNoSuchViewException() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     when(wrapper.loadView(any(TableIdentifier.class)))
@@ -86,7 +86,7 @@ public class TestIcebergViewCatalogOperations {
   public void testViewExistsDelegatesToWrapper() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     when(wrapper.viewExists(any(TableIdentifier.class))).thenReturn(true);
@@ -99,7 +99,7 @@ public class TestIcebergViewCatalogOperations {
   public void testAlterViewRejectsRenameWithOtherChanges() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
@@ -120,7 +120,7 @@ public class TestIcebergViewCatalogOperations {
   public void testAlterViewRenameTranslatesAlreadyExistsException() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     doThrow(new AlreadyExistsException("view already exists"))
@@ -137,7 +137,7 @@ public class TestIcebergViewCatalogOperations {
       throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {Column.of("id", Types.LongType.get(), null)};
@@ -176,7 +176,7 @@ public class TestIcebergViewCatalogOperations {
   public void testCreateViewStoresDefaultCatalogInViewVersion() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {Column.of("id", Types.LongType.get(), null)};
@@ -213,7 +213,7 @@ public class TestIcebergViewCatalogOperations {
   public void testCreateViewAllowsNullDefaultCatalogInViewVersion() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {Column.of("id", Types.LongType.get(), null)};
@@ -251,7 +251,7 @@ public class TestIcebergViewCatalogOperations {
     // reaching ConvertUtil.toIcebergSchema(), which otherwise rejects it as unsupported.
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {Column.of("c", Types.VarCharType.of(1), null)};
@@ -287,7 +287,7 @@ public class TestIcebergViewCatalogOperations {
     // ListType, which ToIcebergType otherwise rejects just like a top-level VarCharType.
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {
@@ -351,7 +351,7 @@ public class TestIcebergViewCatalogOperations {
     // column, must still succeed at the server boundary.
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
@@ -389,7 +389,7 @@ public class TestIcebergViewCatalogOperations {
   public void testAlterViewSetAfterRemoveKeepsProperty() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     LoadViewResponse loaded = mockLoadViewResponseWithUuid("view-uuid");
@@ -417,7 +417,7 @@ public class TestIcebergViewCatalogOperations {
   public void testAlterViewRemoveAfterSetRemovesProperty() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     LoadViewResponse loaded = mockLoadViewResponseWithUuid("view-uuid");
@@ -446,7 +446,7 @@ public class TestIcebergViewCatalogOperations {
       throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
@@ -486,7 +486,7 @@ public class TestIcebergViewCatalogOperations {
   public void testAlterViewBuildsOptimisticConcurrencyRequirements() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations =
-        new IcebergViewCatalogOperations(IcebergCatalogWrapperProvider.fixed(wrapper));
+        new IcebergViewCatalogOperations(providerFor(wrapper));
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
@@ -554,5 +554,11 @@ public class TestIcebergViewCatalogOperations {
         .map(update -> ((MetadataUpdate.AddSchema) update).schema())
         .findFirst()
         .orElseThrow(() -> new AssertionError("No AddSchema update found"));
+  }
+
+  private static IcebergCatalogWrapperProvider providerFor(IcebergCatalogWrapper wrapper) {
+    IcebergCatalogWrapperProvider provider = Mockito.mock(IcebergCatalogWrapperProvider.class);
+    when(provider.get()).thenReturn(wrapper);
+    return provider;
   }
 }

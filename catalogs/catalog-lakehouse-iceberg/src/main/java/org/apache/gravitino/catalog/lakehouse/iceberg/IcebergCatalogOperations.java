@@ -97,10 +97,8 @@ public class IcebergCatalogOperations
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogOperations.class);
 
-  @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
-
   @VisibleForTesting @Nullable String catalogUuid;
-  private IcebergCatalogWrapperProvider wrapperProvider;
+  @VisibleForTesting IcebergCatalogWrapperProvider wrapperProvider;
   private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
   /**
@@ -129,18 +127,13 @@ public class IcebergCatalogOperations
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.wrapperProvider = IcebergCatalogWrapperProvider.create(info.name(), icebergConfig);
-    this.icebergCatalogWrapper = wrapperProvider.get();
     this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(wrapperProvider);
   }
 
   /** Returns the Iceberg catalog wrapper via the shared {@link IcebergCatalogWrapperProvider}. */
   @VisibleForTesting
   IcebergCatalogWrapper catalogWrapper() {
-    if (wrapperProvider != null) {
-      this.icebergCatalogWrapper = wrapperProvider.get();
-      return icebergCatalogWrapper;
-    }
-    return icebergCatalogWrapper;
+    return wrapperProvider.get();
   }
 
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper() {
