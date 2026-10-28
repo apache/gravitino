@@ -21,6 +21,8 @@ package org.apache.gravitino.maintenance.scheduler.policy.expand;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -28,8 +30,12 @@ import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.catalog.EntityCombinedTable;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -39,6 +45,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -49,6 +56,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 class TestNearestPolicyTableEnumerator {
 
@@ -59,6 +67,8 @@ class TestNearestPolicyTableEnumerator {
   private SchemaMetaService schemaMetaService;
   private TableMetaService tableMetaService;
   private NearestMaintenancePolicyResolver nearest;
+  private SchemaDispatcher schemaDispatcher;
+  private TableDispatcher tableDispatcher;
   private NearestPolicyTableEnumerator enumerator;
 
   @BeforeEach
@@ -68,13 +78,22 @@ class TestNearestPolicyTableEnumerator {
     schemaMetaService = mock(SchemaMetaService.class);
     tableMetaService = mock(TableMetaService.class);
     nearest = mock(NearestMaintenancePolicyResolver.class);
+    // Force meta fallback for tests that only stub SchemaMetaService / TableMetaService.
+    schemaDispatcher = mock(SchemaDispatcher.class);
+    tableDispatcher = mock(TableDispatcher.class);
+    when(schemaDispatcher.listSchemas(any()))
+        .thenThrow(new RuntimeException("use meta listing in unit test"));
+    when(tableDispatcher.listTables(any()))
+        .thenThrow(new RuntimeException("use meta listing in unit test"));
     enumerator =
         new NearestPolicyTableEnumerator(
             policyTagRelService,
             tagMetaService,
             schemaMetaService,
             tableMetaService,
-            () -> nearest);
+            nearest,
+            schemaDispatcher,
+            tableDispatcher);
     when(schemaMetaService.listSchemasByNamespace(any())).thenReturn(List.of());
   }
 
@@ -287,6 +306,107 @@ class TestNearestPolicyTableEnumerator {
 
     Assertions.assertEquals(
         List.of(), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
+  }
+
+  @Test
+  void testImportsOnlyMissingTablesAfterCatalogList() throws Exception {
+    PolicyEntity policy = stubTaggedObject("catalog.schema", Entity.EntityType.SCHEMA);
+    SchemaDispatcher schemas = mock(SchemaDispatcher.class);
+    TableDispatcher tables = mock(TableDispatcher.class);
+    NameIdentifier known = NameIdentifierUtil.ofTable(METALAKE, "catalog", "schema", "known");
+    NameIdentifier missing = NameIdentifierUtil.ofTable(METALAKE, "catalog", "schema", "missing");
+    when(tables.listTables(eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
+        .thenReturn(new NameIdentifier[] {known, missing});
+    when(tableMetaService.listTablesByNamespace(
+            eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
+        .thenReturn(List.of(table(500L, "known")));
+    when(tables.loadTable(eq(missing)))
+        .thenReturn(
+            EntityCombinedTable.of(Mockito.mock(Table.class), table(501L, "missing"))
+                .withImported(true));
+
+    MetadataObject schemaObj =
+        MetadataObjects.of(
+            java.util.Arrays.asList("catalog", "schema"), MetadataObject.Type.SCHEMA);
+    stubWinner(tableMeta("catalog", "schema", "known"), schemaObj);
+    stubWinner(tableMeta("catalog", "schema", "missing"), schemaObj);
+
+    Assertions.assertEquals(
+        List.of(500L, 501L),
+        tableIds(catalogEnumerator(schemas, tables).listTableIds(policy, 10, allowAll(), 0L)));
+    verify(tables).loadTable(missing);
+    verify(tables, never()).loadTable(known);
+  }
+
+  @Test
+  void testImportsOnlyMissingSchemasAfterCatalogList() throws Exception {
+    PolicyEntity policy = stubTaggedObject("catalog", Entity.EntityType.CATALOG);
+    SchemaDispatcher schemas = mock(SchemaDispatcher.class);
+    TableDispatcher tables = mock(TableDispatcher.class);
+    NameIdentifier known = NameIdentifierUtil.ofSchema(METALAKE, "catalog", "known");
+    NameIdentifier missing = NameIdentifierUtil.ofSchema(METALAKE, "catalog", "missing");
+    when(schemas.listSchemas(eq(NamespaceUtil.ofSchema(METALAKE, "catalog"))))
+        .thenReturn(new NameIdentifier[] {known, missing});
+    when(schemaMetaService.listSchemasByNamespace(eq(NamespaceUtil.ofSchema(METALAKE, "catalog"))))
+        .thenReturn(List.of(schema(2L, "known")));
+    when(schemas.loadSchema(eq(missing))).thenReturn(mock(org.apache.gravitino.Schema.class));
+    when(tables.listTables(any())).thenReturn(new NameIdentifier[0]);
+    when(tableMetaService.listTablesByNamespace(any())).thenReturn(List.of());
+
+    Assertions.assertEquals(
+        List.of(),
+        tableIds(catalogEnumerator(schemas, tables).listTableIds(policy, 10, allowAll(), 0L)));
+    verify(schemas).loadSchema(missing);
+    verify(schemas, never()).loadSchema(known);
+  }
+
+  private PolicyEntity stubTaggedObject(String objectName, Entity.EntityType type)
+      throws Exception {
+    PolicyEntity policy = policy(10L, "compaction");
+    TagEntity tag = tag(1L, "maint");
+    when(policyTagRelService.listRelations(
+            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
+            eq(Entity.EntityType.POLICY)))
+        .thenReturn(List.of(policyTagEdge(policy, tag)));
+    when(tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier()))
+        .thenReturn(
+            List.of(
+                GenericEntity.builder()
+                    .withId(1L)
+                    .withName(objectName)
+                    .withEntityType(type)
+                    .build()));
+    return policy;
+  }
+
+  private void stubWinner(MetadataObject table, MetadataObject nearestObject) {
+    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, nearestObject));
+  }
+
+  private NearestPolicyTableEnumerator catalogEnumerator(
+      SchemaDispatcher schemas, TableDispatcher tables) {
+    return new NearestPolicyTableEnumerator(
+        policyTagRelService,
+        tagMetaService,
+        schemaMetaService,
+        tableMetaService,
+        nearest,
+        schemas,
+        tables);
+  }
+
+  private static MetadataObject tableMeta(String... parts) {
+    return MetadataObjects.of(java.util.Arrays.asList(parts), MetadataObject.Type.TABLE);
+  }
+
+  private static TableEntity table(long id, String name) {
+    return TableEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))
+        .withAuditInfo(audit())
+        .build();
   }
 
   private static List<Long> tableIds(List<ExpandTableCandidate> candidates) {
