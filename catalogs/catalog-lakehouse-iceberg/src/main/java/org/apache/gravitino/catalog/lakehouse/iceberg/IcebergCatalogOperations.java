@@ -138,10 +138,6 @@ public class IcebergCatalogOperations
     return wrapperProvider.get();
   }
 
-  private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper() {
-    return new IcebergCatalogWrapperHelper(catalogWrapper().getCatalog());
-  }
-
   @Override
   public void onCatalogDropped() {
     if (catalogUuid != null) {
@@ -477,11 +473,12 @@ public class IcebergCatalogOperations
       throws NoSuchTableException, IllegalArgumentException {
     try {
       String[] levels = tableIdent.namespace().levels();
+      IcebergCatalogWrapper wrapper = catalogWrapper();
       IcebergTableChange icebergTableChange =
-          icebergCatalogWrapperHelper()
+          new IcebergCatalogWrapperHelper(wrapper.getCatalog())
               .buildIcebergTableChanges(
                   NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
-      LoadTableResponse loadTableResponse = catalogWrapper().updateTable(icebergTableChange);
+      LoadTableResponse loadTableResponse = wrapper.updateTable(icebergTableChange);
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {

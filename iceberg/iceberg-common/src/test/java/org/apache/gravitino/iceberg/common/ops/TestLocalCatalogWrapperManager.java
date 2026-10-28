@@ -30,7 +30,7 @@ public class TestLocalCatalogWrapperManager {
   void getWithConfigReusesCachedWrapper() {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (LocalCatalogWrapperManager manager = LocalCatalogWrapperManager.create(config)) {
+    try (LocalCatalogWrapperManager manager = new LocalCatalogWrapperManager(config)) {
       IcebergCatalogWrapper first = manager.getCatalogWrapper("c1", config);
       IcebergCatalogWrapper second = manager.getCatalogWrapper("c1", config);
       Assertions.assertSame(first, second);
@@ -41,7 +41,7 @@ public class TestLocalCatalogWrapperManager {
   void getWithoutConfigUnsupported() {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (LocalCatalogWrapperManager manager = LocalCatalogWrapperManager.create(config)) {
+    try (LocalCatalogWrapperManager manager = new LocalCatalogWrapperManager(config)) {
       Assertions.assertThrows(
           UnsupportedOperationException.class, () -> manager.getCatalogWrapper("c1"));
     }
@@ -51,7 +51,7 @@ public class TestLocalCatalogWrapperManager {
   void invalidateDropsCachedWrapper() {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (LocalCatalogWrapperManager manager = LocalCatalogWrapperManager.create(config)) {
+    try (LocalCatalogWrapperManager manager = new LocalCatalogWrapperManager(config)) {
       IcebergCatalogWrapper first = manager.getCatalogWrapper("c1", config);
       manager.invalidateCatalogWrapper("c1");
       IcebergCatalogWrapper second = manager.getCatalogWrapper("c1", config);

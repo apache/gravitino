@@ -21,34 +21,25 @@ package org.apache.gravitino.iceberg.common.ops;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 
 /**
- * Lakehouse-side {@link CatalogWrapperManager} that caches wrappers with {@link
- * IcebergCatalogWrapperCache} when IRC is not embedded (non-aux).
+ * Lakehouse-side {@link CatalogWrapperManager} backed by {@link IcebergCatalogWrapperCache} when
+ * IRC is not embedded (non-aux).
  *
- * <p>Symmetric to IRC {@code IcebergCatalogWrapperManager}: same cache policy, but creates wrappers
- * via {@link IcebergCatalogWrapper#create(IcebergConfig)} from the caller-supplied config (no IRC
- * config provider).
+ * <p>Same cache policy as IRC {@code IcebergCatalogWrapperManager}, but creates wrappers via {@link
+ * IcebergCatalogWrapper#create(IcebergConfig)} from the caller-supplied config.
  */
 public final class LocalCatalogWrapperManager implements CatalogWrapperManager, AutoCloseable {
 
   private final IcebergCatalogWrapperCache cache;
 
   /**
-   * Creates a manager whose cache eviction interval comes from {@code config}.
-   *
-   * @param config Iceberg configuration (typically the lakehouse catalog props)
-   * @return new manager
+   * @param config Iceberg configuration (eviction interval and lakehouse catalog props)
    */
-  public static LocalCatalogWrapperManager create(IcebergConfig config) {
-    return new LocalCatalogWrapperManager(IcebergCatalogWrapperCache.create(config));
-  }
-
-  private LocalCatalogWrapperManager(IcebergCatalogWrapperCache cache) {
-    this.cache = cache;
+  public LocalCatalogWrapperManager(IcebergConfig config) {
+    this.cache = IcebergCatalogWrapperCache.create(config);
   }
 
   /**
-   * Unsupported: local managers have no IRC config provider. Use {@link #getCatalogWrapper(String,
-   * IcebergConfig)}.
+   * Unsupported: no IRC config provider. Use {@link #getCatalogWrapper(String, IcebergConfig)}.
    *
    * @param catalogName catalog name
    * @return never
