@@ -77,19 +77,18 @@ public final class MaintenanceCommitSubmitPipeline {
   }
 
   /**
-   * Runs one commit-job pick for {@code instanceId} ({@code {table_id}}).
+   * Runs one commit-job pick for {@code instanceId} ({@code table:{table_id}}).
    *
    * @param instanceId db-scheduler commit-job instance id
    * @param spec enqueue-time payload; required
    */
   public void submit(String instanceId, @Nullable MaintenanceJobSpec spec) {
-    long tableId;
-    try {
-      tableId = Long.parseLong(instanceId);
-    } catch (NumberFormatException e) {
+    Optional<Long> parsed = CommitJobIds.parseTable(instanceId);
+    if (parsed.isEmpty()) {
       LOG.warn("Skipping commit-job submit for unparseable instance id {}", instanceId);
       return;
     }
+    long tableId = parsed.get();
     if (tableId <= 0) {
       LOG.warn("Skipping commit-job submit for non-positive table id {}", instanceId);
       return;

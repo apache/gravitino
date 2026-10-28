@@ -27,7 +27,7 @@ class TestCronJobIds {
   @Test
   void testForTableAndParseRoundTrip() {
     String id = CronJobIds.forTable(10L, 20L);
-    Assertions.assertEquals("table:10:20", id);
+    Assertions.assertEquals("table:10;policy:20", id);
     Optional<CronJobIds.TablePolicyIds> parsed = CronJobIds.parseTable(id);
     Assertions.assertTrue(parsed.isPresent());
     Assertions.assertEquals(10L, parsed.get().tableId());
@@ -36,9 +36,9 @@ class TestCronJobIds {
 
   @Test
   void testForBatchAndParseRoundTrip() {
-    Assertions.assertEquals("batch:0:9", CronJobIds.forBatch(0L, 9L));
-    Assertions.assertEquals("batch:12:9", CronJobIds.forBatch(12L, 9L));
-    Optional<CronJobIds.BatchPolicyIds> parsed = CronJobIds.parseBatch("batch:12:9");
+    Assertions.assertEquals("batch:0;policy:9", CronJobIds.forBatch(0L, 9L));
+    Assertions.assertEquals("batch:12;policy:9", CronJobIds.forBatch(12L, 9L));
+    Optional<CronJobIds.BatchPolicyIds> parsed = CronJobIds.parseBatch("batch:12;policy:9");
     Assertions.assertTrue(parsed.isPresent());
     Assertions.assertEquals(12L, parsed.get().batchId());
     Assertions.assertEquals(9L, parsed.get().policyId());
@@ -47,12 +47,15 @@ class TestCronJobIds {
   @Test
   void testParseRejectsInvalid() {
     Assertions.assertTrue(CronJobIds.parseTable(null).isEmpty());
-    Assertions.assertTrue(CronJobIds.parseTable("batch:1:2").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseTable("batch:1;policy:2").isEmpty());
     Assertions.assertTrue(CronJobIds.parseTable("table:").isEmpty());
     Assertions.assertTrue(CronJobIds.parseTable("table:1").isEmpty());
-    Assertions.assertTrue(CronJobIds.parseTable("table:a:2").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseTable("table:1:2").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseTable("table:1:policy:2").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseTable("table:a;policy:2").isEmpty());
     Assertions.assertTrue(CronJobIds.parseBatch(null).isEmpty());
-    Assertions.assertTrue(CronJobIds.parseBatch("table:1:2").isEmpty());
-    Assertions.assertTrue(CronJobIds.parseBatch("batch:pending:9").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseBatch("table:1;policy:2").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseBatch("batch:1:2").isEmpty());
+    Assertions.assertTrue(CronJobIds.parseBatch("batch:pending;policy:9").isEmpty());
   }
 }

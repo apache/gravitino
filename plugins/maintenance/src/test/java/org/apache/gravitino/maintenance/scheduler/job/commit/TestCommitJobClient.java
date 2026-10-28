@@ -63,7 +63,7 @@ class TestCommitJobClient extends TestJDBCBackend {
         CommitJobClient.schedulerClient(dataSource())
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.COMMIT_JOB, Long.toString(TABLE_ID)))
+                    TableMaintenanceSchedulerPools.COMMIT_JOB, CommitJobIds.forTable(TABLE_ID)))
             .isEmpty());
   }
 
@@ -85,7 +85,7 @@ class TestCommitJobClient extends TestJDBCBackend {
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.COMMIT_JOB, Long.toString(TABLE_ID)))
+                        TableMaintenanceSchedulerPools.COMMIT_JOB, CommitJobIds.forTable(TABLE_ID)))
                 .get()
                 .getData();
     Assertions.assertTrue(spec.isValid());

@@ -207,7 +207,7 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
 
     ExecutionOperations<Void> operations = Mockito.mock(ExecutionOperations.class);
     ExecutionComplete complete = ExecutionComplete.simulatedSuccess(Instant.now());
-    PolicyExpandLifecycleHook.completePick(Long.toString(policy.id()), complete, operations);
+    PolicyExpandLifecycleHook.completePick("policy:" + policy.id(), complete, operations);
 
     Mockito.verify(operations)
         .reschedule(Mockito.eq(complete), Mockito.argThat(due -> due.isAfter(Instant.now())));
@@ -218,7 +218,7 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
   void testCompletePickRemovesMissingPolicy() {
     ExecutionOperations<Void> operations = Mockito.mock(ExecutionOperations.class);
     ExecutionComplete complete = ExecutionComplete.simulatedSuccess(Instant.now());
-    PolicyExpandLifecycleHook.completePick("424242", complete, operations);
+    PolicyExpandLifecycleHook.completePick("policy:424242", complete, operations);
     Mockito.verify(operations).remove();
   }
 

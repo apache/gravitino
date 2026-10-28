@@ -110,7 +110,7 @@ public class CommitJobClient {
   public CommitJobEnqueueResult enqueueNow(long tableId) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
     SchedulerClient client = schedulerClient(dataSource);
-    String id = Long.toString(tableId);
+    String id = CommitJobIds.forTable(tableId);
     // Coalesce without rebuilding task_data: keep the first enqueue-time spec.
     if (client
         .getScheduledExecution(TaskInstanceId.of(TableMaintenanceSchedulerPools.COMMIT_JOB, id))

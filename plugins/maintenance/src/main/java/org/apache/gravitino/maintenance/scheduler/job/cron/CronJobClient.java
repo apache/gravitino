@@ -61,8 +61,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Existing instance ids are left untouched so a repeated expand pick does not reset an
  * already-queued submit. Snapshot-expiry winners attached at schema/catalog are packed into {@code
- * batch:{batch_id}:{policy_id}} rows; incomplete batches are filled before a new {@code batch_id}
- * is allocated (§5.2.2).
+ * batch:{batch_id};policy:{policy_id}} rows; incomplete batches are filled before a new {@code
+ * batch_id} is allocated (§5.2.2).
  *
  * <p>Snapshot-expiry coalesce happens at expand enqueue (not cron pick): unpicked same-catalog
  * {@code expire_snapshots} {@code table:} / {@code batch:} rows may merge while under capacity. A

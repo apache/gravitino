@@ -23,6 +23,7 @@ import com.github.kagkarlsson.scheduler.task.ExecutionOperations;
 import java.time.Instant;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandIds;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -122,19 +123,18 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
    * completion would leave the row picked, and db-scheduler then rejects alter and delete of that
    * policy.
    *
-   * @param instanceId db-scheduler task instance id, the policy id
+   * @param instanceId db-scheduler task instance id ({@code policy:{policy_id}})
    * @param complete the pick that just finished
    * @param operations completion actions for that pick
    */
   public static void completePick(
       String instanceId, ExecutionComplete complete, ExecutionOperations<Void> operations) {
-    long policyId;
-    try {
-      policyId = Long.parseLong(instanceId);
-    } catch (NumberFormatException ignored) {
+    Optional<Long> parsed = PolicyExpandIds.parsePolicy(instanceId);
+    if (parsed.isEmpty()) {
       operations.remove();
       return;
     }
+    long policyId = parsed.get();
     PolicyEntity policy = findPolicy(policyId);
     if (policy == null || !isMaintenance(policy.content())) {
       operations.remove();

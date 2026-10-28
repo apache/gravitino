@@ -25,84 +25,78 @@ import javax.annotation.Nullable;
 /**
  * Builds and parses db-scheduler instance ids for one-shot {@code cron-job} rows (§5.2.2).
  *
- * <p>Most types use {@code table:{table_id}:{policy_id}}. Batched snapshot-expiry uses {@code
- * batch:{batch_id}:{policy_id}} where {@code batch_id} is a per-policy sequence ({@code 0}, {@code
- * 1}, …) so concurrent batch names stay distinct under one {@code policy_id}.
+ * <p>Most types use {@code table:{table_id};policy:{policy_id}}. Batched snapshot-expiry uses
+ * {@code batch:{batch_id};policy:{policy_id}} where {@code batch_id} is a per-policy sequence
+ * ({@code 0}, {@code 1}, …) so concurrent batch names stay distinct under one {@code policy_id}.
+ * {@code ;} separates key-value pairs; {@code :} separates key and value within a pair.
  */
 public final class CronJobIds {
 
   private static final String TABLE_PREFIX = "table:";
   private static final String BATCH_PREFIX = "batch:";
+  private static final String POLICY_PAIR = ";policy:";
 
   private CronJobIds() {}
 
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return cron-job instance id
+   * @return cron-job instance id {@code table:{table_id};policy:{policy_id}}
    */
   public static String forTable(long tableId, long policyId) {
-    return TABLE_PREFIX + tableId + ":" + policyId;
+    return TABLE_PREFIX + tableId + POLICY_PAIR + policyId;
   }
 
   /**
    * @param batchId per-policy batch sequence id ({@code 0}, {@code 1}, …)
    * @param policyId policy entity id
-   * @return cron-job instance id {@code batch:{batch_id}:{policy_id}}
+   * @return cron-job instance id {@code batch:{batch_id};policy:{policy_id}}
    */
   public static String forBatch(long batchId, long policyId) {
-    return BATCH_PREFIX + batchId + ":" + policyId;
+    return BATCH_PREFIX + batchId + POLICY_PAIR + policyId;
   }
 
   /**
    * Parses a single-table cron-job instance id.
    *
    * @param instanceId db-scheduler task instance id
-   * @return table and policy ids when the id matches {@code table:{tableId}:{policyId}}
+   * @return table and policy ids when the id matches {@code table:{tableId};policy:{policyId}}
    */
   public static Optional<TablePolicyIds> parseTable(String instanceId) {
-    if (instanceId == null || !instanceId.startsWith(TABLE_PREFIX)) {
-      return Optional.empty();
-    }
-    String rest = instanceId.substring(TABLE_PREFIX.length());
-    int sep = rest.indexOf(':');
-    if (sep <= 0 || sep == rest.length() - 1) {
-      return Optional.empty();
-    }
-    try {
-      long tableId = Long.parseLong(rest.substring(0, sep));
-      long policyId = Long.parseLong(rest.substring(sep + 1));
-      return Optional.of(new TablePolicyIds(tableId, policyId));
-    } catch (NumberFormatException e) {
-      return Optional.empty();
-    }
+    return parsePrefixed(instanceId, TABLE_PREFIX)
+        .map(parts -> new TablePolicyIds(parts[0], parts[1]));
   }
 
   /**
    * Parses a batched snapshot-expiry cron-job instance id.
    *
    * @param instanceId db-scheduler task instance id
-   * @return batch and policy ids when the id matches {@code batch:{batchId}:{policyId}}
+   * @return batch and policy ids when the id matches {@code batch:{batchId};policy:{policyId}}
    */
   public static Optional<BatchPolicyIds> parseBatch(String instanceId) {
-    if (instanceId == null || !instanceId.startsWith(BATCH_PREFIX)) {
+    return parsePrefixed(instanceId, BATCH_PREFIX)
+        .map(parts -> new BatchPolicyIds(parts[0], parts[1]));
+  }
+
+  private static Optional<long[]> parsePrefixed(String instanceId, String prefix) {
+    if (instanceId == null || !instanceId.startsWith(prefix)) {
       return Optional.empty();
     }
-    String rest = instanceId.substring(BATCH_PREFIX.length());
-    int sep = rest.indexOf(':');
-    if (sep <= 0 || sep == rest.length() - 1) {
+    String rest = instanceId.substring(prefix.length());
+    int sep = rest.indexOf(POLICY_PAIR);
+    if (sep <= 0 || sep + POLICY_PAIR.length() >= rest.length()) {
       return Optional.empty();
     }
     try {
-      long batchId = Long.parseLong(rest.substring(0, sep));
-      long policyId = Long.parseLong(rest.substring(sep + 1));
-      return Optional.of(new BatchPolicyIds(batchId, policyId));
+      long left = Long.parseLong(rest.substring(0, sep));
+      long policyId = Long.parseLong(rest.substring(sep + POLICY_PAIR.length()));
+      return Optional.of(new long[] {left, policyId});
     } catch (NumberFormatException e) {
       return Optional.empty();
     }
   }
 
-  /** Parsed {@code table:{tableId}:{policyId}} ids. */
+  /** Parsed {@code table:{tableId};policy:{policyId}} ids. */
   public static final class TablePolicyIds {
     private final long tableId;
     private final long policyId;
@@ -153,7 +147,7 @@ public final class CronJobIds {
     }
   }
 
-  /** Parsed {@code batch:{batchId}:{policyId}} ids. */
+  /** Parsed {@code batch:{batchId};policy:{policyId}} ids. */
   public static final class BatchPolicyIds {
     private final long batchId;
     private final long policyId;
