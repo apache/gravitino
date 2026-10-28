@@ -48,6 +48,7 @@ import org.apache.gravitino.maintenance.integration.test.MaintenanceSchedulerITS
 import org.apache.gravitino.maintenance.listener.PostCommitMaintenanceListener;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
 import org.apache.iceberg.PartitionSpec;
@@ -131,7 +132,7 @@ public class IrcToCommitEnqueueIT extends BaseIT {
         NameIdentifier.of(metalake, seeded.catalogName, seeded.schemaName, seeded.tableName);
     GravitinoEnv.getInstance().eventBus().dispatchEvent(icebergUpdateTableEvent(tableId));
 
-    awaitCommitCapture(Long.toString(seeded.tableId), 30L);
+    awaitCommitCapture(MaintenanceTaskIds.forCommitTable(seeded.tableId), 30L);
 
     MaintenanceJobSpec spec = CAPTURED_COMMIT_SPEC.get();
     assertNotNull(spec);
