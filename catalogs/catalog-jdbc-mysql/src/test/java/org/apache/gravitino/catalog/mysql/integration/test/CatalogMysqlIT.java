@@ -72,6 +72,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -121,6 +122,33 @@ public class CatalogMysqlIT extends BaseIT {
 
   boolean SupportColumnDefaultValueExpression() {
     return true;
+  }
+
+  /**
+   * Returns a VARCHAR type carrying the default metadata for the tested MySQL version.
+   *
+   * @param length the VARCHAR length
+   * @return the attributed VARCHAR type
+   */
+  protected Types.VarCharType defaultVarchar(int length) {
+    return Types.VarCharType.of(length, defaultCharset(), defaultCollation());
+  }
+
+  /**
+   * Returns a string type carrying the default metadata for the tested MySQL version.
+   *
+   * @return the attributed string type
+   */
+  protected Types.StringType defaultString() {
+    return Types.StringType.of(defaultCharset(), defaultCollation());
+  }
+
+  private String defaultCharset() {
+    return mysqlImageName.equals("mysql:5.7") ? "latin1" : "utf8mb4";
+  }
+
+  private String defaultCollation() {
+    return mysqlImageName.equals("mysql:5.7") ? "latin1_swedish_ci" : "utf8mb4_0900_ai_ci";
   }
 
   @BeforeAll
@@ -247,7 +275,7 @@ public class CatalogMysqlIT extends BaseIT {
   private Column[] createColumns() {
     Column col1 = Column.of(MYSQL_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
     Column col2 = Column.of(MYSQL_COL_NAME2, Types.DateType.get(), "col_2_comment");
-    Column col3 = Column.of(MYSQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
+    Column col3 = Column.of(MYSQL_COL_NAME3, defaultString(), "col_3_comment");
 
     return new Column[] {col1, col2, col3};
   }
@@ -268,8 +296,7 @@ public class CatalogMysqlIT extends BaseIT {
           false,
           false,
           FunctionExpression.of("current_timestamp")),
-      Column.of(
-          MYSQL_COL_NAME3, Types.VarCharType.of(255), "col_3_comment", true, false, Literals.NULL),
+      Column.of(MYSQL_COL_NAME3, defaultVarchar(255), "col_3_comment", true, false, Literals.NULL),
       Column.of(
           MYSQL_COL_NAME4,
           Types.IntegerType.get(),
@@ -505,18 +532,12 @@ public class CatalogMysqlIT extends BaseIT {
             FunctionExpression.of("current_timestamp"));
     Column col3 =
         Column.of(
-            MYSQL_COL_NAME3,
-            Types.VarCharType.of(255),
-            "col_3_comment",
-            true,
-            false,
-            Literals.NULL);
-    Column col4 =
-        Column.of(MYSQL_COL_NAME4, Types.StringType.get(), "col_4_comment", false, false, null);
+            MYSQL_COL_NAME3, defaultVarchar(255), "col_3_comment", true, false, Literals.NULL);
+    Column col4 = Column.of(MYSQL_COL_NAME4, defaultString(), "col_4_comment", false, false, null);
     Column col5 =
         Column.of(
             MYSQL_COL_NAME5,
-            Types.VarCharType.of(255),
+            defaultVarchar(255),
             "col_5_comment",
             true,
             false,
@@ -782,6 +803,37 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testCharacterMetadataRoundTrip() {
+    mysqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s ("
+                + "utf8_col VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin, "
+                + "latin1_col CHAR(20) CHARACTER SET latin1 COLLATE latin1_bin, "
+                + "text_col TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci)",
+            schemaName, tableName));
+
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(
+        Types.VarCharType.of(100, "utf8mb4", "utf8mb4_bin"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.FixedCharType.of(20, "latin1", "latin1_bin"), loadedTable.columns()[1].dataType());
+    Assertions.assertEquals(
+        Types.StringType.of("utf8mb4", "utf8mb4_unicode_ci"), loadedTable.columns()[2].dataType());
+
+    String copiedTableName = GravitinoITUtils.genRandomName("character_metadata_copy");
+    NameIdentifier copiedTableIdent = NameIdentifier.of(schemaName, copiedTableName);
+    catalog
+        .asTableCatalog()
+        .createTable(copiedTableIdent, loadedTable.columns(), null, ImmutableMap.of());
+    Table copiedTable = catalog.asTableCatalog().loadTable(copiedTableIdent);
+
+    Assertions.assertArrayEquals(
+        Arrays.stream(loadedTable.columns()).map(Column::dataType).toArray(Type[]::new),
+        Arrays.stream(copiedTable.columns()).map(Column::dataType).toArray(Type[]::new));
+  }
+
+  @Test
   void testColumnTypeConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_type_converter");
@@ -895,10 +947,10 @@ public class CatalogMysqlIT extends BaseIT {
           Assertions.assertEquals(Types.DecimalType.of(6, 2), column.dataType());
           break;
         case "varchar20_col":
-          Assertions.assertEquals(Types.VarCharType.of(20), column.dataType());
+          Assertions.assertEquals(defaultVarchar(20), column.dataType());
           break;
         case "text_col":
-          Assertions.assertEquals(Types.StringType.get(), column.dataType());
+          Assertions.assertEquals(defaultString(), column.dataType());
           break;
         case "binary_col":
           Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
@@ -957,7 +1009,7 @@ public class CatalogMysqlIT extends BaseIT {
         .alterTable(
             NameIdentifier.of(schemaName, alertTableName),
             TableChange.updateComment(table_comment + "_new"),
-            TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()),
+            TableChange.addColumn(new String[] {"col_4"}, defaultString()),
             TableChange.renameColumn(new String[] {MYSQL_COL_NAME2}, "col_2_new"),
             TableChange.updateColumnType(new String[] {MYSQL_COL_NAME1}, Types.IntegerType.get()));
 
@@ -972,11 +1024,11 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertEquals("col_2_comment", table.columns()[1].comment());
 
     Assertions.assertEquals(MYSQL_COL_NAME3, table.columns()[2].name());
-    Assertions.assertEquals(Types.StringType.get(), table.columns()[2].dataType());
+    Assertions.assertEquals(defaultString(), table.columns()[2].dataType());
     Assertions.assertEquals("col_3_comment", table.columns()[2].comment());
 
     Assertions.assertEquals("col_4", table.columns()[3].name());
-    Assertions.assertEquals(Types.StringType.get(), table.columns()[3].dataType());
+    Assertions.assertEquals(defaultString(), table.columns()[3].dataType());
     Assertions.assertNull(table.columns()[3].comment());
     Assertions.assertNotNull(table.auditInfo());
     Assertions.assertNotNull(table.auditInfo().createTime());
@@ -984,8 +1036,8 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertNotNull(table.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(table.auditInfo().lastModifier());
 
-    Column col1 = Column.of("name", Types.StringType.get(), "comment");
-    Column col2 = Column.of("address", Types.StringType.get(), "comment");
+    Column col1 = Column.of("name", defaultString(), "comment");
+    Column col2 = Column.of("address", defaultString(), "comment");
     Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
 
     Column[] newColumns = new Column[] {col1, col2, col3};
@@ -1047,7 +1099,7 @@ public class CatalogMysqlIT extends BaseIT {
   @Test
   void testClearColumnComments() {
     Column col1 = Column.of("col_with_comment1", Types.IntegerType.get(), "original comment 1");
-    Column col2 = Column.of("col_with_comment2", Types.StringType.get(), "original comment 2");
+    Column col2 = Column.of("col_with_comment2", defaultString(), "original comment 2");
     Column col3 = Column.of("col_with_comment3", Types.DateType.get(), "original comment 3");
     Column[] columns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
@@ -1199,8 +1251,8 @@ public class CatalogMysqlIT extends BaseIT {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
-    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column col4 = Column.of("col_4", defaultVarchar(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", defaultVarchar(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
 
     Index[] indexes =
@@ -1422,8 +1474,8 @@ public class CatalogMysqlIT extends BaseIT {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, true, null);
     Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
-    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column col4 = Column.of("col_4", defaultVarchar(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", defaultVarchar(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
 
     Index[] indexes =
@@ -1607,7 +1659,7 @@ public class CatalogMysqlIT extends BaseIT {
     Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("delete", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("show", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("status", Types.VarCharType.of(255), "code", false, false, null);
+    Column col4 = Column.of("status", defaultVarchar(255), "code", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3, col4};
     TableCatalog tableCatalog = catalog.asTableCatalog();
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "table");
@@ -1632,7 +1684,7 @@ public class CatalogMysqlIT extends BaseIT {
                 new TableChange[] {
                   TableChange.addColumn(
                       new String[] {"int"},
-                      Types.StringType.get(),
+                      defaultString(),
                       TableChange.ColumnPosition.after("status")),
                   TableChange.deleteColumn(new String[] {"create"}, true),
                   TableChange.renameColumn(new String[] {"delete"}, "varchar")
@@ -1871,8 +1923,8 @@ public class CatalogMysqlIT extends BaseIT {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
-    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column col4 = Column.of("col_4", defaultVarchar(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", defaultVarchar(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
 
     Index[] indexes =
@@ -2058,8 +2110,8 @@ public class CatalogMysqlIT extends BaseIT {
   @Test
   void testMySQLSchemaNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
-    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
-    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
+    Column col2 = Column.of("col_2", defaultVarchar(255), "code", false, false, null);
+    Column col3 = Column.of("col_3", defaultVarchar(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
 
     Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})};
@@ -2131,8 +2183,8 @@ public class CatalogMysqlIT extends BaseIT {
   void testOperationTableIndex() {
     String tableName = GravitinoITUtils.genRandomName("test_add_index");
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
-    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
-    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
+    Column col2 = Column.of("col_2", defaultVarchar(255), "code", false, false, null);
+    Column col3 = Column.of("col_3", defaultVarchar(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
     TableCatalog tableCatalog = catalog.asTableCatalog();
     tableCatalog.createTable(
@@ -2175,9 +2227,7 @@ public class CatalogMysqlIT extends BaseIT {
         NameIdentifier.of(schemaName, tableName),
         TableChange.deleteIndex("u1_key", false),
         TableChange.addColumn(
-            new String[] {"col_4"},
-            Types.VarCharType.of(255),
-            TableChange.ColumnPosition.defaultPos()),
+            new String[] {"col_4"}, defaultVarchar(255), TableChange.ColumnPosition.defaultPos()),
         TableChange.addIndex(Index.IndexType.UNIQUE_KEY, "u2_key", new String[][] {{"col_4"}}));
 
     indexes =
@@ -2186,7 +2236,7 @@ public class CatalogMysqlIT extends BaseIT {
           Indexes.unique("u2_key", new String[][] {{"col_4"}})
         };
     table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
+    Column col4 = Column.of("col_4", defaultVarchar(255), null, true, false, null);
     newColumns = new Column[] {col1, col2, col3, col4};
     ITUtils.assertionsTableInfo(
         tableName,
@@ -2228,8 +2278,8 @@ public class CatalogMysqlIT extends BaseIT {
     Column col1 = Column.of("col_1", Types.LongType.get(), "uid", false, false, null);
     Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
-    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
-    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column col4 = Column.of("col_4", defaultVarchar(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", defaultVarchar(255), "config", false, false, null);
     String tableName = "auto_increment_table";
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
 
@@ -2331,7 +2381,7 @@ public class CatalogMysqlIT extends BaseIT {
   void testAddColumnDefaultValue() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "uid", true, false, null);
     Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", true, false, null);
-    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "comment", true, false, null);
+    Column col3 = Column.of("col_3", defaultVarchar(255), "comment", true, false, null);
     String tableName = "default_value_table";
     Column[] newColumns = new Column[] {col1, col2, col3};
 

@@ -141,6 +141,14 @@ public class TestTypeUtils {
     Assertions.assertEquals(
         DataTypes.DECIMAL(10, 3), TypeUtils.toFlinkType(Types.DecimalType.of(10, 3)));
     Assertions.assertEquals(DataTypes.CHAR(10), TypeUtils.toFlinkType(Types.FixedCharType.of(10)));
+    Assertions.assertEquals(
+        DataTypes.STRING(), TypeUtils.toFlinkType(Types.StringType.of("utf8mb4", "utf8mb4_bin")));
+    Assertions.assertEquals(
+        DataTypes.VARCHAR(10),
+        TypeUtils.toFlinkType(Types.VarCharType.of(10, "utf8mb4", "utf8mb4_bin")));
+    Assertions.assertEquals(
+        DataTypes.CHAR(10),
+        TypeUtils.toFlinkType(Types.FixedCharType.of(10, "utf8mb4", "utf8mb4_bin")));
     Assertions.assertEquals(DataTypes.BYTES(), TypeUtils.toFlinkType(Types.BinaryType.get()));
     Assertions.assertEquals(DataTypes.BINARY(10), TypeUtils.toFlinkType(Types.FixedType.of(10)));
     Assertions.assertEquals(

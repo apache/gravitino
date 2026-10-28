@@ -148,6 +148,12 @@ public class TestTypes {
     Assertions.assertEquals(Type.Name.STRING, stringType.name());
     Assertions.assertSame(stringType, Types.StringType.get());
     Assertions.assertEquals("string", stringType.simpleString());
+    Assertions.assertTrue(stringType.charset().isEmpty());
+    Assertions.assertTrue(stringType.collation().isEmpty());
+    Types.StringType attributedString = Types.StringType.of("utf8mb4", "utf8mb4_bin");
+    Assertions.assertEquals("utf8mb4", attributedString.charset().orElseThrow());
+    Assertions.assertEquals("utf8mb4_bin", attributedString.collation().orElseThrow());
+    Assertions.assertNotEquals(stringType, attributedString);
 
     Types.UUIDType uuidType = Types.UUIDType.get();
     Assertions.assertEquals(Type.Name.UUID, uuidType.name());
@@ -196,12 +202,23 @@ public class TestTypes {
     Assertions.assertEquals(20, varcharType.length());
     Assertions.assertEquals("varchar(20)", varcharType.simpleString());
     Assertions.assertEquals(varcharType, Types.VarCharType.of(20));
+    Types.VarCharType attributedVarchar = Types.VarCharType.of(20, "utf8mb4", "utf8mb4_bin");
+    Assertions.assertEquals("utf8mb4", attributedVarchar.charset().orElseThrow());
+    Assertions.assertEquals("utf8mb4_bin", attributedVarchar.collation().orElseThrow());
+    Assertions.assertNotEquals(varcharType, attributedVarchar);
+    Assertions.assertNotEquals(attributedVarchar, Types.VarCharType.of(20, "latin1", "latin1_bin"));
 
     Types.FixedCharType fixedCharType = Types.FixedCharType.of(30);
     Assertions.assertEquals(Type.Name.FIXEDCHAR, fixedCharType.name());
     Assertions.assertEquals(30, fixedCharType.length());
     Assertions.assertEquals("char(30)", fixedCharType.simpleString());
     Assertions.assertEquals(fixedCharType, Types.FixedCharType.of(30));
+    Types.FixedCharType attributedFixedChar = Types.FixedCharType.of(30, "utf8mb4", "utf8mb4_bin");
+    Assertions.assertEquals("utf8mb4", attributedFixedChar.charset().orElseThrow());
+    Assertions.assertEquals("utf8mb4_bin", attributedFixedChar.collation().orElseThrow());
+    Assertions.assertNotEquals(fixedCharType, attributedFixedChar);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> Types.FixedCharType.of(30, " ", null));
 
     Types.BinaryType binaryType = Types.BinaryType.get();
     Assertions.assertEquals(Type.Name.BINARY, binaryType.name());

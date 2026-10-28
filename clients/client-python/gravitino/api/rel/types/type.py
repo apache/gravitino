@@ -17,6 +17,7 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import Optional
 
 
 class Name(Enum):
@@ -147,6 +148,35 @@ class PrimitiveType(Type, ABC):
     """Base class for all primitive types."""
 
     pass
+
+
+class CharacterType(PrimitiveType, ABC):
+    """Base class for all character types."""
+
+    def __init__(
+        self, charset: Optional[str] = None, collation: Optional[str] = None
+    ) -> None:
+        self._validate_metadata(charset, "charset")
+        self._validate_metadata(collation, "collation")
+        self._charset = charset
+        self._collation = collation
+
+    def charset(self) -> Optional[str]:
+        """Returns the optional character set associated with this type."""
+        return self._charset
+
+    def collation(self) -> Optional[str]:
+        """Returns the optional collation associated with this type."""
+        return self._collation
+
+    def _character_metadata(self):
+        """Returns character metadata for equality and hashing."""
+        return self._charset, self._collation
+
+    @staticmethod
+    def _validate_metadata(value: Optional[str], name: str) -> None:
+        if value is not None and not value.strip():
+            raise ValueError(f"{name} cannot be empty or blank")
 
 
 class NumericType(PrimitiveType, ABC):

@@ -187,6 +187,40 @@ public class TestMysqlTableOperationsSqlGeneration {
   }
 
   @Test
+  void testCharacterMetadataInGeneratedSql() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    JdbcColumn varcharColumn =
+        JdbcColumn.builder()
+            .withName("varchar_col")
+            .withType(Types.VarCharType.of(100, "utf8mb4", "utf8mb4_bin"))
+            .build();
+    JdbcColumn textColumn =
+        JdbcColumn.builder()
+            .withName("text_col")
+            .withType(Types.StringType.of("latin1", "latin1_bin"))
+            .build();
+
+    String createSql =
+        ops.createTableSql("test_table", new JdbcColumn[] {varcharColumn, textColumn});
+    Assertions.assertTrue(
+        createSql.contains("`varchar_col` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"),
+        createSql);
+    Assertions.assertTrue(
+        createSql.contains("`text_col` text CHARACTER SET latin1 COLLATE latin1_bin"), createSql);
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(
+                new String[] {"char_col"},
+                Types.FixedCharType.of(10, "utf8mb4", "utf8mb4_unicode_ci")));
+    Assertions.assertTrue(
+        alterSql.contains(
+            "ADD COLUMN `char_col` char(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"),
+        alterSql);
+  }
+
+  @Test
   public void testCurrentTimestampDefaultValueKeepsColumnPrecision() {
     TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
 

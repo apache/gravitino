@@ -58,7 +58,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestMysqlTableOperations extends TestMysql {
-  private static final Type VARCHAR = Types.VarCharType.of(255);
+  private static final String DEFAULT_CHARSET = "utf8mb4";
+  private static final String DEFAULT_COLLATION = "utf8mb4_0900_ai_ci";
+  private static final Type VARCHAR = varchar(255);
+  private static final Type VARCHAR_LITERAL = Types.VarCharType.of(255);
   private static final Type INT = Types.IntegerType.get();
 
   @Test
@@ -91,7 +94,7 @@ public class TestMysqlTableOperations extends TestMysql {
         JdbcColumn.builder()
             .withName("col_4")
             .withType(VARCHAR)
-            .withDefaultValue(Literals.of("hello world", VARCHAR))
+            .withDefaultValue(Literals.of("hello world", VARCHAR_LITERAL))
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();
@@ -131,7 +134,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(VARCHAR)
             .withComment("new_add")
             .withNullable(true)
-            .withDefaultValue(Literals.of("hello test", VARCHAR))
+            .withDefaultValue(Literals.of("hello test", VARCHAR_LITERAL))
             .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
@@ -207,7 +210,7 @@ public class TestMysqlTableOperations extends TestMysql {
     JdbcColumn col_2 =
         JdbcColumn.builder()
             .withName("col_2")
-            .withType(Types.VarCharType.of(16))
+            .withType(varchar(16))
             .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
             .withNullable(false)
             .build();
@@ -224,11 +227,11 @@ public class TestMysqlTableOperations extends TestMysql {
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
         tableName,
-        TableChange.updateColumnType(new String[] {col_2.name()}, Types.VarCharType.of(32)));
+        TableChange.updateColumnType(new String[] {col_2.name()}, varchar(32)));
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     Column updated = load.columns()[1];
-    Assertions.assertEquals(Types.VarCharType.of(32), updated.dataType());
+    Assertions.assertEquals(varchar(32), updated.dataType());
     Assertions.assertEquals(Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
   }
 
@@ -291,7 +294,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withName("col_2")
             .withType(VARCHAR)
             .withComment("name")
-            .withDefaultValue(Literals.of("hello world", VARCHAR))
+            .withDefaultValue(Literals.of("hello world", VARCHAR_LITERAL))
             .withNullable(false)
             .build();
     columns.add(col_2);
@@ -446,7 +449,7 @@ public class TestMysqlTableOperations extends TestMysql {
         TableChange.addColumn(new String[] {"col_4"}, VARCHAR, "txt4", false),
         TableChange.updateColumnComment(new String[] {newColName_2}, newCol2Comment),
         TableChange.addColumn(
-            new String[] {"col_5"}, VARCHAR, "txt5", Literals.of("hello world", VARCHAR)));
+            new String[] {"col_5"}, VARCHAR, "txt5", Literals.of("hello world", VARCHAR_LITERAL)));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
 
     columns.clear();
@@ -475,7 +478,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withName("col_5")
             .withType(VARCHAR)
             .withComment("txt5")
-            .withDefaultValue(Literals.of("hello world", VARCHAR))
+            .withDefaultValue(Literals.of("hello world", VARCHAR_LITERAL))
             .withNullable(true)
             .build());
     assertionsTableInfo(
@@ -506,7 +509,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(VARCHAR)
             .withNullable(false)
             .withComment("xxx")
-            .withDefaultValue(Literals.of("hello world", VARCHAR))
+            .withDefaultValue(Literals.of("hello world", VARCHAR_LITERAL))
             .build());
     columns.add(col3);
     columns.add(
@@ -572,10 +575,10 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_4")
-            .withType(Types.VarCharType.of(255))
+            .withType(VARCHAR)
             .withNullable(false)
             .withComment("varchar")
-            .withDefaultValue(Literals.of("hello", Types.VarCharType.of(255)))
+            .withDefaultValue(Literals.of("hello", VARCHAR_LITERAL))
             .build());
     Map<String, String> properties = new HashMap<>();
 
@@ -611,7 +614,7 @@ public class TestMysqlTableOperations extends TestMysql {
             new String[] {columns.get(2).name()},
             Literals.timestampLiteral(LocalDateTime.parse("2024-04-01T00:00:00"))),
         TableChange.updateColumnDefaultValue(
-            new String[] {columns.get(3).name()}, Literals.of("world", Types.VarCharType.of(255))));
+            new String[] {columns.get(3).name()}, Literals.of("world", VARCHAR_LITERAL)));
 
     loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     Assertions.assertEquals(
@@ -621,7 +624,7 @@ public class TestMysqlTableOperations extends TestMysql {
         Literals.timestampLiteral(LocalDateTime.parse("2024-04-01T00:00:00")),
         loaded.columns()[2].defaultValue());
     Assertions.assertEquals(
-        Literals.of("world", Types.VarCharType.of(255)), loaded.columns()[3].defaultValue());
+        Literals.of("world", VARCHAR_LITERAL), loaded.columns()[3].defaultValue());
   }
 
   @Test
@@ -634,11 +637,7 @@ public class TestMysqlTableOperations extends TestMysql {
           .withAutoIncrement(true)
           .withNullable(false)
           .build(),
-      JdbcColumn.builder()
-          .withName("col_2")
-          .withType(Types.VarCharType.of(255))
-          .withNullable(false)
-          .build()
+      JdbcColumn.builder().withName("col_2").withType(VARCHAR).withNullable(false).build()
     };
     Index[] indexes =
         new Index[] {
@@ -817,15 +816,11 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_12")
-            .withType(Types.FixedCharType.of(10))
+            .withType(fixedChar(10))
             .withNullable(false)
             .build());
     columns.add(
-        JdbcColumn.builder()
-            .withName("col_13")
-            .withType(Types.StringType.get())
-            .withNullable(false)
-            .build());
+        JdbcColumn.builder().withName("col_13").withType(stringType()).withNullable(false).build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_14")
@@ -835,7 +830,7 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_15")
-            .withType(Types.FixedCharType.of(10))
+            .withType(fixedChar(10))
             .withNullable(false)
             .build());
 
@@ -1001,13 +996,13 @@ public class TestMysqlTableOperations extends TestMysql {
           .build(),
       JdbcColumn.builder()
           .withName("col_2")
-          .withType(Types.VarCharType.of(255))
+          .withType(VARCHAR)
           .withComment("city")
           .withNullable(false)
           .build(),
       JdbcColumn.builder()
           .withName("col_3")
-          .withType(Types.VarCharType.of(255))
+          .withType(VARCHAR)
           .withComment("name")
           .withNullable(false)
           .build()
@@ -1481,5 +1476,17 @@ public class TestMysqlTableOperations extends TestMysql {
     } finally {
       TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
     }
+  }
+
+  private static Types.VarCharType varchar(int length) {
+    return Types.VarCharType.of(length, DEFAULT_CHARSET, DEFAULT_COLLATION);
+  }
+
+  private static Types.FixedCharType fixedChar(int length) {
+    return Types.FixedCharType.of(length, DEFAULT_CHARSET, DEFAULT_COLLATION);
+  }
+
+  private static Types.StringType stringType() {
+    return Types.StringType.of(DEFAULT_CHARSET, DEFAULT_COLLATION);
   }
 }

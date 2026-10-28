@@ -17,9 +17,10 @@
 # pylint: disable=C0302
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from gravitino.api.rel.types.type import (
+    CharacterType,
     ComplexType,
     DateTimeType,
     FractionType,
@@ -525,27 +526,45 @@ class Types:
         def simple_string(self) -> str:
             return "interval_day"
 
-    class StringType(PrimitiveType):
+    class StringType(CharacterType):
         """The string type in Gravitino, equivalent to varchar(MAX),
         which the MAX is determined by the underlying catalog."""
 
         _instance: Types.StringType = None
 
-        def __new__(cls):
-            if cls._instance is None:
-                cls._instance = super(Types.StringType, cls).__new__(cls)
-                cls._instance.__init__()
-            return cls._instance
+        def __new__(
+            cls, charset: Optional[str] = None, collation: Optional[str] = None
+        ):
+            if charset is None and collation is None:
+                if cls._instance is None:
+                    cls._instance = super(Types.StringType, cls).__new__(cls)
+                return cls._instance
+            return super(Types.StringType, cls).__new__(cls)
 
         @classmethod
         def get(cls) -> Types.StringType:
             return cls()
+
+        @classmethod
+        def of(
+            cls, charset: Optional[str], collation: Optional[str]
+        ) -> Types.StringType:
+            """Returns a string type with optional character metadata."""
+            return cls(charset, collation)
 
         def name(self) -> Name:
             return Name.STRING
 
         def simple_string(self) -> str:
             return "string"
+
+        def __eq__(self, other):
+            return isinstance(other, Types.StringType) and (
+                self._character_metadata() == other._character_metadata()
+            )
+
+        def __hash__(self):
+            return hash(self._character_metadata())
 
     class UUIDType(PrimitiveType):
         """The uuid type in Gravitino."""
@@ -620,17 +639,28 @@ class Types:
         def __hash__(self):
             return hash(self._length)
 
-    class VarCharType(PrimitiveType):
+    class VarCharType(CharacterType):
         """The varchar type in Gravitino."""
 
         _length: int
 
-        def __init__(self, length: int):
+        def __init__(
+            self,
+            length: int,
+            charset: Optional[str] = None,
+            collation: Optional[str] = None,
+        ):
+            super().__init__(charset, collation)
             self._length = length
 
         @classmethod
-        def of(cls, length: int) -> Types.VarCharType:
-            return cls(length)
+        def of(
+            cls,
+            length: int,
+            charset: Optional[str] = None,
+            collation: Optional[str] = None,
+        ) -> Types.VarCharType:
+            return cls(length, charset, collation)
 
         def name(self) -> Name:
             return Name.VARCHAR
@@ -652,23 +682,36 @@ class Types:
                 True if both VarCharType objects have the same length, False otherwise.
             """
             if isinstance(other, Types.VarCharType):
-                return self._length == other._length
+                return self._length == other._length and (
+                    self._character_metadata() == other._character_metadata()
+                )
             return False
 
         def __hash__(self):
-            return hash(self._length)
+            return hash((self._length, self._character_metadata()))
 
-    class FixedCharType(PrimitiveType):
+    class FixedCharType(CharacterType):
         """The fixed char type in Gravitino."""
 
         _length: int
 
-        def __init__(self, length: int):
+        def __init__(
+            self,
+            length: int,
+            charset: Optional[str] = None,
+            collation: Optional[str] = None,
+        ):
+            super().__init__(charset, collation)
             self._length = length
 
         @classmethod
-        def of(cls, length: int) -> Types.FixedCharType:
-            return cls(length)
+        def of(
+            cls,
+            length: int,
+            charset: Optional[str] = None,
+            collation: Optional[str] = None,
+        ) -> Types.FixedCharType:
+            return cls(length, charset, collation)
 
         def name(self) -> Name:
             return Name.FIXEDCHAR
@@ -682,10 +725,12 @@ class Types:
         def __eq__(self, other):
             if not isinstance(other, Types.FixedCharType):
                 return False
-            return self._length == other._length
+            return self._length == other._length and (
+                self._character_metadata() == other._character_metadata()
+            )
 
         def __hash__(self):
-            return hash(self._length)
+            return hash((self._length, self._character_metadata()))
 
     class BinaryType(PrimitiveType):
         _instance: Types.BinaryType = None
