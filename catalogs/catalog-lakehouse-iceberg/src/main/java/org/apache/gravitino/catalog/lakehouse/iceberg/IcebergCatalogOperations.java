@@ -127,11 +127,9 @@ public class IcebergCatalogOperations
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.wrapperProvider = IcebergCatalogWrapperProvider.create(info.name(), icebergConfig);
-    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(wrapperProvider::get);
-    // Eagerly resolve the backend catalog so create-time validation (REST warehouse / unreachable
-    // URI) and first-use ops keep the same IllegalArgumentException / ConnectionFailedException
-    // taxonomy as before lazy IRC/local caching. Provider.get() maps Iceberg REST failures.
-    this.wrapperProvider.get();
+    // Eagerly resolve so create-time REST validation and view ops share the same wrapper instance.
+    // Provider.get() maps NoSuchWarehouse / unreachable REST into Gravitino's exception taxonomy.
+    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(catalogWrapper());
   }
 
   /** Returns the Iceberg catalog wrapper via the shared {@link IcebergCatalogWrapperProvider}. */

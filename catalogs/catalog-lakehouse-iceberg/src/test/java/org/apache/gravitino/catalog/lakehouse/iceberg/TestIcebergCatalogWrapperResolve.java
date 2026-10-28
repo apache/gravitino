@@ -122,7 +122,7 @@ public class TestIcebergCatalogWrapperResolve {
 
     IcebergCatalogOperations catalogOps = new IcebergCatalogOperations();
     catalogOps.wrapperProvider = provider;
-    IcebergViewCatalogOperations viewOps = new IcebergViewCatalogOperations(provider::get);
+    IcebergViewCatalogOperations viewOps = new IcebergViewCatalogOperations(shared);
 
     Assertions.assertSame(shared, catalogOps.catalogWrapper());
     Assertions.assertSame(shared, provider.get());
