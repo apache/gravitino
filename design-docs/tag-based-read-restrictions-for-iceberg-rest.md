@@ -79,10 +79,10 @@ request context and can resolve Gravitino policies, tags, users, and groups dire
 
 This design introduces two built-in policy types:
 
-| Policy type | Evaluation target | Effect |
-| --- | --- | --- |
-| `system_row_filter` | Table | Retains only rows matching one resolved predicate. |
-| `system_column_mask` | Top-level column | Produces a type-preserving SQL masking expression. |
+| Policy type          | Evaluation target | Effect                                             |
+| -------------------- | ----------------- | -------------------------------------------------- |
+| `system_row_filter`  | Table             | Retains only rows matching one resolved predicate. |
+| `system_column_mask` | Top-level column  | Produces a type-preserving SQL masking expression. |
 
 Policies are associated with tags. The existing policy-on-tag resolver selects enabled policies
 from effective tags. Row-filter resolution consumes effective policies for a table. Column-mask
@@ -239,9 +239,8 @@ results. Every definition contains a parameter list, `RETURNS`, a result type, a
 by the SQL body. Row filters declare `BOOLEAN`; column masks declare the masked column's logical
 type. There is no separate function name or creation statement.
 
-[PR #14237](https://github.com/apache/gravitino/pull/14237) implements this dialect with an ANTLR
-parser, typed AST validation, and experimental Iceberg conversion. It replaces the unreleased
-`restricted-rego-v1` dialect; Rego definitions are no longer accepted. The server validates SQL
+An ANTLR parser builds immutable typed operation nodes and validates complete SQL definitions.
+Definitions must use `restricted-sql-v1`; Rego syntax is invalid. The server validates SQL
 on policy creation and content updates. Metadata reads, renames, and comment updates do not
 reparse source. The experimental loader binds selected definitions to the authenticated subject
 and table schema before converting them to closed Iceberg restrictions.
@@ -305,10 +304,10 @@ Bound parameters inherit the columns' nullability. No implicit `value` parameter
 the column's physical name is not an additional alias in a mask body. Trusted context functions
 do not require parameter declarations. The definition also declares the result type:
 
-| Use | Expected result | Accepted expression forms |
-| --- | --- | --- |
-| Row filter | `BOOLEAN` | Predicate, Boolean input or literal, Boolean function result, Boolean `CASE` |
-| Column mask | Target column's logical type | Original input, literal, null, function result, scalar `CASE` |
+| Use         | Expected result              | Accepted expression forms                                                    |
+| ----------- | ---------------------------- | ---------------------------------------------------------------------------- |
+| Row filter  | `BOOLEAN`                    | Predicate, Boolean input or literal, Boolean function result, Boolean `CASE` |
+| Column mask | Target column's logical type | Original input, literal, null, function result, scalar `CASE`                |
 
 A mask's result type must match the target column, including precision, scale, and timezone
 characteristics. Its conditions may use its declared parameter and trusted context functions.
@@ -411,19 +410,19 @@ as part of an expression.
 
 #### Supported Predicates
 
-| Category | Examples | Requirements |
-| --- | --- | --- |
-| Comparison | `amount = 100`, `amount <> 100`, `amount < 100`, `amount <= 100`, `amount > 100`, `amount >= 100` | Compatible scalar operands, including available inputs |
-| Range | `amount BETWEEN 10 AND 100`, `amount NOT BETWEEN 10 AND 100` | Inclusive bounds; compatible ordered type |
-| Membership | `region IN ('US', 'CA')`, `region NOT IN ('US', 'CA')` | Non-empty literal list; non-null values have compatible types |
-| Null test | `val IS NULL`, `region IS NOT NULL` | Typed scalar operand; non-null Boolean result |
-| NaN test | `is_nan(score)`, `NOT is_nan(score)` | Floating-point argument |
-| Prefix matching | `name LIKE 'Acme%'`, `name NOT LIKE 'Acme%'` | String operand; non-empty fixed prefix followed by exactly one `%` |
-| Boolean composition | `region = 'US' AND amount < 100`, `region = 'US' OR region = 'CA'`, `NOT (region = 'US')` | Boolean operands; parentheses may nest |
-| Boolean constant | `TRUE`, `FALSE` | Visible-row predicate |
-| Date part | `year(order_date) = 2026`, `month(order_date) = 3`, `day(order_date) = 15` | Date-part result compared with a compatible integer literal |
-| Current user | `owner = CURRENT_USER()` | Compatible string operands |
-| Group membership | `is_group_member('auditors')` | Non-empty literal group name; trusted flat membership |
+| Category            | Examples                                                                                          | Requirements                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Comparison          | `amount = 100`, `amount <> 100`, `amount < 100`, `amount <= 100`, `amount > 100`, `amount >= 100` | Compatible scalar operands, including available inputs             |
+| Range               | `amount BETWEEN 10 AND 100`, `amount NOT BETWEEN 10 AND 100`                                      | Inclusive bounds; compatible ordered type                          |
+| Membership          | `region IN ('US', 'CA')`, `region NOT IN ('US', 'CA')`                                            | Non-empty literal list; non-null values have compatible types      |
+| Null test           | `val IS NULL`, `region IS NOT NULL`                                                               | Typed scalar operand; non-null Boolean result                      |
+| NaN test            | `is_nan(score)`, `NOT is_nan(score)`                                                              | Floating-point argument                                            |
+| Prefix matching     | `name LIKE 'Acme%'`, `name NOT LIKE 'Acme%'`                                                      | String operand; non-empty fixed prefix followed by exactly one `%` |
+| Boolean composition | `region = 'US' AND amount < 100`, `region = 'US' OR region = 'CA'`, `NOT (region = 'US')`         | Boolean operands; parentheses may nest                             |
+| Boolean constant    | `TRUE`, `FALSE`                                                                                   | Visible-row predicate                                              |
+| Date part           | `year(order_date) = 2026`, `month(order_date) = 3`, `day(order_date) = 15`                        | Date-part result compared with a compatible integer literal        |
+| Current user        | `owner = CURRENT_USER()`                                                                          | Compatible string operands                                         |
+| Group membership    | `is_group_member('auditors')`                                                                     | Non-empty literal group name; trusted flat membership              |
 
 `!=` is accepted as an alias for `<>`. `BETWEEN` is equivalent to inclusive lower and upper
 comparisons joined by `AND`; `NOT BETWEEN` negates that result. Prefix patterns cannot contain
@@ -476,15 +475,15 @@ parameter name is independent of the physical column name.
 Missing or ambiguous names, unavailable inputs, unsupported types, incompatible operands, and
 invalid function arguments are errors.
 
-| Gravitino type | Supported value predicates |
-| --- | --- |
-| `BOOLEAN` | Equality and membership |
-| Signed `INTEGER`, signed `LONG` | Equality, ordering, membership, and ranges |
-| `FLOAT`, `DOUBLE` | Equality, ordering, membership, ranges, and NaN tests |
-| `DECIMAL(p,s)` | Equality, ordering, membership, and ranges; no rounding |
-| `STRING` | Equality, ordering, membership, ranges, and prefix matching |
-| `DATE` | Equality, ordering, membership, ranges, and date-part functions |
-| `TIME(6)` | Equality, ordering, membership, and ranges |
+| Gravitino type                          | Supported value predicates                                      |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `BOOLEAN`                               | Equality and membership                                         |
+| Signed `INTEGER`, signed `LONG`         | Equality, ordering, membership, and ranges                      |
+| `FLOAT`, `DOUBLE`                       | Equality, ordering, membership, ranges, and NaN tests           |
+| `DECIMAL(p,s)`                          | Equality, ordering, membership, and ranges; no rounding         |
+| `STRING`                                | Equality, ordering, membership, ranges, and prefix matching     |
+| `DATE`                                  | Equality, ordering, membership, ranges, and date-part functions |
+| `TIME(6)`                               | Equality, ordering, membership, and ranges                      |
 | `TIMESTAMP(6)` with or without timezone | Equality, ordering, membership, ranges, and date-part functions |
 
 Unset temporal precision means six fractional digits in this profile. Other value-predicate types
@@ -503,9 +502,9 @@ most six fractional-second digits. Timestamp-with-timezone literals require an e
 
 #### Context Functions
 
-| Function | Result | Meaning |
-| --- | --- | --- |
-| `CURRENT_USER()` | Non-null `STRING` | Trusted effective subject name |
+| Function                   | Result             | Meaning                                       |
+| -------------------------- | ------------------ | --------------------------------------------- |
+| `CURRENT_USER()`           | Non-null `STRING`  | Trusted effective subject name                |
 | `is_group_member('group')` | Non-null `BOOLEAN` | Exact flat membership in the current metalake |
 
 `CURRENT_USER()` follows Snowflake's context-function spelling. `is_group_member` retains the
@@ -534,13 +533,13 @@ fields. Dates use the proleptic Gregorian calendar.
 Row filters use SQL three-valued logic: `TRUE`, `FALSE`, and `UNKNOWN` (SQL `NULL`). Only `TRUE`
 retains a row. A null column produces:
 
-| Predicate | Result |
-| --- | --- |
-| `column IS NULL` | `TRUE` |
-| `column IS NOT NULL` | `FALSE` |
-| Comparison with a non-null value | `UNKNOWN` |
+| Predicate                                | Result    |
+| ---------------------------------------- | --------- |
+| `column IS NULL`                         | `TRUE`    |
+| `column IS NOT NULL`                     | `FALSE`   |
+| Comparison with a non-null value         | `UNKNOWN` |
 | `IN`, `NOT IN`, `BETWEEN`, `NOT BETWEEN` | `UNKNOWN` |
-| `LIKE`, `NOT LIKE`, `is_nan(column)` | `UNKNOWN` |
+| `LIKE`, `NOT LIKE`, `is_nan(column)`     | `UNKNOWN` |
 
 `NOT UNKNOWN` is unknown. `FALSE AND UNKNOWN` is false; `TRUE AND UNKNOWN` is unknown.
 `TRUE OR UNKNOWN` is true; `FALSE OR UNKNOWN` is unknown.
@@ -557,17 +556,17 @@ types. They are Gravitino functions rather than a claim of Snowflake function co
 function preserves its input logical type. In the examples below, `value` denotes the explicitly
 declared mask parameter, which must have a type accepted by the function.
 
-| SQL expression | Input types | Meaning |
-| --- | --- | --- |
-| `mask_alphanum(value)` | `STRING` | ASCII digits become `n`; `(),.@-` are preserved; every other Unicode code point becomes `x` |
-| `show_first_4(value)` | `STRING` | Keep the first four code points; apply the same masking rules to the remainder |
-| `show_last_4(value)` | `STRING` | Keep the last four code points; apply the same masking rules to the preceding portion |
-| `mask_to_fixed_value(value)` | `STRING`, numeric, `BOOLEAN`, `DATE`, or supported timestamp types | Replace with the type's fixed value, including null input |
-| `replace_with_null(value)` | Any typed scalar | Return a null of the input's type; the result is nullable |
-| `truncate_to_year(value)` | Date and supported timestamp types | Truncate to the beginning of the year |
-| `truncate_to_month(value)` | Date and supported timestamp types | Truncate to the beginning of the month |
-| `sha256_global(value)` | `STRING`, signed `INTEGER`, signed `LONG`, `BINARY` | Stable type-preserving SHA-256 transformation |
-| `sha256_query_local(value)` | Same as `sha256_global` | Type-preserving SHA-256 transformation salted per query |
+| SQL expression               | Input types                                                        | Meaning                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `mask_alphanum(value)`       | `STRING`                                                           | ASCII digits become `n`; `(),.@-` are preserved; every other Unicode code point becomes `x` |
+| `show_first_4(value)`        | `STRING`                                                           | Keep the first four code points; apply the same masking rules to the remainder              |
+| `show_last_4(value)`         | `STRING`                                                           | Keep the last four code points; apply the same masking rules to the preceding portion       |
+| `mask_to_fixed_value(value)` | `STRING`, numeric, `BOOLEAN`, `DATE`, or supported timestamp types | Replace with the type's fixed value, including null input                                   |
+| `replace_with_null(value)`   | Any typed scalar                                                   | Return a null of the input's type; the result is nullable                                   |
+| `truncate_to_year(value)`    | Date and supported timestamp types                                 | Truncate to the beginning of the year                                                       |
+| `truncate_to_month(value)`   | Date and supported timestamp types                                 | Truncate to the beginning of the month                                                      |
+| `sha256_global(value)`       | `STRING`, signed `INTEGER`, signed `LONG`, `BINARY`                | Stable type-preserving SHA-256 transformation                                               |
+| `sha256_query_local(value)`  | Same as `sha256_global`                                            | Type-preserving SHA-256 transformation salted per query                                     |
 
 The mask behaviors remain the same. All masks except `mask_to_fixed_value` preserve null input.
 Strings of four or fewer Unicode code points are returned unchanged by
@@ -634,21 +633,21 @@ general regular expressions, and general wildcard patterns such as `'%Acme'` or 
 
 ### Experimental Iceberg Conversion
 
-The implementation merged in #14237 converts the following subset to native Iceberg restrictions:
+The experimental converter supports the following subset of native Iceberg restrictions:
 
-| SQL form | Iceberg conversion |
-| --- | --- |
-| Column compared with a compatible literal or bound context scalar | Field-ID predicate with SQL null semantics |
-| Boolean inputs, comparisons, `AND`, `OR`, and `NOT` | Three-valued lowering; only true retains a row |
-| `IN`, `NOT IN`, ranges, null tests, prefix `LIKE`, and NaN tests | Closed predicates with explicit unknown handling |
-| Searched/simple Boolean `CASE` and scalar `CASE` inside supported predicates | Ordered lowering; false and unknown conditions fall through |
-| `year(date_or_timestamp_column)` | Iceberg year transform with calendar-year literal adjustment |
-| `month` or `day` on constant temporal values | Scalar constant evaluation |
-| Mask returning its local parameter | No projection; retain the original selected column |
-| Null or `replace_with_null(value)` | Null projection on a nullable column |
-| One of the nine direct mask functions applied to the local parameter | Corresponding Iceberg projection |
-| Literal equal to the target type's fixed mask value | Fixed-value projection |
-| Mask `CASE` whose conditions resolve to constants after binding | First matching compatible projection |
+| SQL form                                                                     | Iceberg conversion                                           |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Column compared with a compatible literal or bound context scalar            | Field-ID predicate with SQL null semantics                   |
+| Boolean inputs, comparisons, `AND`, `OR`, and `NOT`                          | Three-valued lowering; only true retains a row               |
+| `IN`, `NOT IN`, ranges, null tests, prefix `LIKE`, and NaN tests             | Closed predicates with explicit unknown handling             |
+| Searched/simple Boolean `CASE` and scalar `CASE` inside supported predicates | Ordered lowering; false and unknown conditions fall through  |
+| `year(date_or_timestamp_column)`                                             | Iceberg year transform with calendar-year literal adjustment |
+| `month` or `day` on constant temporal values                                 | Scalar constant evaluation                                   |
+| Mask returning its local parameter                                           | No projection; retain the original selected column           |
+| Null or `replace_with_null(value)`                                           | Null projection on a nullable column                         |
+| One of the nine direct mask functions applied to the local parameter         | Corresponding Iceberg projection                             |
+| Literal equal to the target type's fixed mask value                          | Fixed-value projection                                       |
+| Mask `CASE` whose conditions resolve to constants after binding              | First matching compatible projection                         |
 
 General column-to-column comparisons, month/day extraction from row values, row-dependent mask
 selection, composed mask calls, and arbitrary literal mask values are not representable by the
@@ -796,13 +795,13 @@ mechanism. Governed data credentials must not be issued when that trust check fa
 
 The server applies these outcomes:
 
-| Active restriction | `read-restrictions.v1` | Trusted reader | Result |
-| --- | --- | --- | --- |
-| No | Missing or present | Any | Return the normal response without read restrictions. |
-| Yes | Missing | Any | Return `406 Not Acceptable`; do not return unrestricted metadata. |
-| Yes | Unsupported version | Any | Return `406 Not Acceptable`; do not return unrestricted metadata. |
-| Yes | Present | No | Return `403 Forbidden`; the header does not establish trust. |
-| Yes | Present | Yes | Return `200 OK` with the resolved read restrictions. |
+| Active restriction | `read-restrictions.v1` | Trusted reader | Result                                                            |
+| ------------------ | ---------------------- | -------------- | ----------------------------------------------------------------- |
+| No                 | Missing or present     | Any            | Return the normal response without read restrictions.             |
+| Yes                | Missing                | Any            | Return `406 Not Acceptable`; do not return unrestricted metadata. |
+| Yes                | Unsupported version    | Any            | Return `406 Not Acceptable`; do not return unrestricted metadata. |
+| Yes                | Present                | No             | Return `403 Forbidden`; the header does not establish trust.      |
+| Yes                | Present                | Yes            | Return `200 OK` with the resolved read restrictions.              |
 
 An applicable restriction that cannot be loaded, parsed, bound, canonicalized, serialized, or
 enforced also fails the request. No error path falls back to an unrestricted response.
@@ -895,16 +894,6 @@ Coverage includes:
 
 ## Implementation Plan
 
-The policy content, experimental load-table integration, and SQL parser/converter have been merged
-through [#13693](https://github.com/apache/gravitino/pull/13693),
-[#13778](https://github.com/apache/gravitino/pull/13778), and
-[#14237](https://github.com/apache/gravitino/pull/14237). The SQL implementation uses an ANTLR
-parser and immutable typed operation nodes; the parser runtime is relocated in the published core
-JAR to coexist with readers such as Spark that use another ANTLR version.
-
-The steps below describe the overall design roadmap, including delivery and trust requirements
-that are not supplied by the SQL parser change alone:
-
 1. Add the SQL expression parser, `CASE` evaluation, and typed row-filter and column-mask
    validation; reject unsupported function content explicitly.
 2. Add a Gravitino-owned Iceberg read-restriction model and exact wire serializer.
@@ -918,7 +907,6 @@ that are not supplied by the SQL parser change alone:
 
 ## References
 
-- [SQL parser and experimental converter implementation](https://github.com/apache/gravitino/pull/14237)
 - [Policy expression runtime reference](../docs/policies.md)
 - [Policy-on-tag design](policy-on-tag.md)
 - [Apache Iceberg read-restrictions specification](https://github.com/apache/iceberg/pull/13879)
