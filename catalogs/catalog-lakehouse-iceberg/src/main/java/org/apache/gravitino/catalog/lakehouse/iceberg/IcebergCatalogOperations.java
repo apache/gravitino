@@ -168,7 +168,7 @@ public class IcebergCatalogOperations
   }
 
   @Override
-  public Optional<Long> gcsOAuth2TokenExpiresAtEpochMs() {
+  public Optional<Long> expiresAtMs() {
     if (icebergCatalogWrapper == null) {
       return Optional.empty();
     }

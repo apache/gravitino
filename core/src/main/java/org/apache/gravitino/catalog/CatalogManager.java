@@ -1899,7 +1899,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               if (ops instanceof GcsOAuthTokenAware) {
                 wrapper.gcsTokenRefreshAtEpochMs =
                     ((GcsOAuthTokenAware) ops)
-                        .gcsOAuth2TokenExpiresAtEpochMs()
+                        .expiresAtMs()
                         .map(expiresAt -> expiresAt - GCS_TOKEN_REFRESH_BUFFER_MS)
                         .orElse(null);
               }

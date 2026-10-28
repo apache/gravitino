@@ -30,10 +30,9 @@ import org.apache.gravitino.annotation.Evolving;
 public interface GcsOAuthTokenAware {
 
   /**
-   * Wall-clock epoch millis when the minted GCS OAuth2 token expires ({@code
-   * gcs.oauth2.token-expires-at}). Empty when no minted token expiry is present.
+   * Epoch millis for {@code gcs.oauth2.token-expires-at}, or empty when unset.
    *
    * @return token expiry epoch millis, or empty
    */
-  Optional<Long> gcsOAuth2TokenExpiresAtEpochMs();
+  Optional<Long> expiresAtMs();
 }

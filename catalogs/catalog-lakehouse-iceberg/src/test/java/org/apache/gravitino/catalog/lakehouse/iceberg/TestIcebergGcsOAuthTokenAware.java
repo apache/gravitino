@@ -31,7 +31,7 @@ public class TestIcebergGcsOAuthTokenAware {
   void tokenExpiryEmptyWithoutGcsProperty() {
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
     ops.icebergCatalogWrapper = new IcebergCatalogWrapper(memoryConfig());
-    Assertions.assertFalse(ops.gcsOAuth2TokenExpiresAtEpochMs().isPresent());
+    Assertions.assertFalse(ops.expiresAtMs().isPresent());
   }
 
   @Test
@@ -48,7 +48,7 @@ public class TestIcebergGcsOAuthTokenAware {
                 String.valueOf(expiresAt)));
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
     ops.icebergCatalogWrapper = new IcebergCatalogWrapper(config);
-    Assertions.assertEquals(expiresAt, ops.gcsOAuth2TokenExpiresAtEpochMs().orElse(-1L));
+    Assertions.assertEquals(expiresAt, ops.expiresAtMs().orElse(-1L));
   }
 
   private static IcebergConfig memoryConfig() {
