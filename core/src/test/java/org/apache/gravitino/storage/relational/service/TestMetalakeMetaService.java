@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -38,16 +40,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -58,6 +68,7 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -470,6 +481,61 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteMetalakeRemovesGovernanceRows() throws IOException {
+    for (boolean cascade : new boolean[] {true, false}) {
+      String metalakeName = METALAKE_NAME + (cascade ? "_cascade" : "_non_cascade");
+      BaseMetalake metalake = createAndInsertMakeLake(metalakeName);
+
+      RoleEntity role =
+          createRoleEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofRole(metalakeName),
+              "role",
+              AUDIT_INFO,
+              List.of(
+                  SecurableObjects.ofMetalake(
+                      metalakeName, List.of(Privileges.CreateCatalog.allow()))),
+              null);
+      backend.insert(role, false);
+
+      // Tags attach to catalogs and below, and a non-cascade drop needs a metalake without
+      // catalogs, so only the cascade drop can still have live tag relations.
+      TagEntity tag = createAndInsertTagEntity("tag", "tag", metalakeName);
+      if (cascade) {
+        CatalogEntity catalog = createAndInsertCatalog(metalakeName, "catalog");
+        TagMetaService.getInstance()
+            .associateTagsWithMetadataObject(
+                catalog.nameIdentifier(),
+                Entity.EntityType.CATALOG,
+                new NameIdentifier[] {NameIdentifierUtil.ofTag(metalakeName, tag.name())},
+                new NameIdentifier[0]);
+      }
+
+      PolicyEntity policy =
+          createAndInsertPolicyEntity(
+              "policy",
+              "policy",
+              PolicyContents.custom(
+                  ImmutableMap.of("field", 1), ImmutableSet.of(MetadataObject.Type.TABLE), null),
+              metalakeName);
+
+      assertEquals(1, countActiveRows("role_meta_securable_object", "role_id", role.id()));
+      assertEquals(cascade ? 1 : 0, countActiveRows("tag_relation_meta", "tag_id", tag.id()));
+      assertEquals(1, countActiveRows("policy_meta", "policy_id", policy.id()));
+      assertEquals(1, countActiveRows("policy_version_info", "policy_id", policy.id()));
+
+      assertTrue(
+          MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), cascade));
+
+      // Rows left with deleted_at = 0 are never collected by the legacy-data cleanup.
+      assertEquals(0, countActiveRows("role_meta_securable_object", "role_id", role.id()));
+      assertEquals(0, countActiveRows("tag_relation_meta", "tag_id", tag.id()));
+      assertEquals(0, countActiveRows("policy_meta", "policy_id", policy.id()));
+      assertEquals(0, countActiveRows("policy_version_info", "policy_id", policy.id()));
+    }
+  }
+
+  @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     // meta data creation
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
@@ -495,6 +561,22 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
       backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
     }
     assertFalse(legacyRecordExistsInDB(metalake.id(), Entity.EntityType.METALAKE));
+  }
+
+  private int countActiveRows(String table, String idColumn, Long id) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s = %d AND deleted_at = 0",
+                    table, idColumn, id))) {
+      return rs.next() ? rs.getInt(1) : 0;
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
   }
 
   private int countActiveTableVersionRows(Long tableId) {

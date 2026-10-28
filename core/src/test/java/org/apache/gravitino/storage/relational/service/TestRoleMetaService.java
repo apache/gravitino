@@ -77,6 +77,7 @@ import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
@@ -188,7 +189,11 @@ class TestRoleMetaService extends TestJDBCBackend {
     // The failed grant must roll back the role CAS and properties. Deletion must still remove
     // the old relation, and no replacement relation may survive for the deleted endpoint.
     assertEquals(beforeUpdate, getRolePO(role.name()));
-    assertTrue(RoleMetaService.listSecurableObjectsByRoleId(role.id()).isEmpty());
+    assertTrue(
+        SessionUtils.getWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper -> mapper.listSecurableObjectsByRoleId(role.id()))
+            .isEmpty());
     assertTrue(service.getRoleByIdentifier(role.nameIdentifier()).securableObjects().isEmpty());
     Assertions.assertThrows(
         NoSuchEntityException.class,
@@ -1624,14 +1629,15 @@ class TestRoleMetaService extends TestJDBCBackend {
     // hard delete after soft delete
     deletedCount =
         roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
-    assertEquals(3, deletedCount); // delete 1 role + 1 userRoleRel + 1 groupRoleRel
+    // delete 1 role + 1 userRoleRel + 1 groupRoleRel + 1 securableObject
+    assertEquals(4, deletedCount);
     assertEquals(1, countRoles(metalake.id())); // 2 - 1
     assertEquals(1, countUserRoleRels()); // 2 - 1
     assertEquals(1, countGroupRoleRels()); // 2 - 1
 
     deletedCount =
         roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
-    assertEquals(3, deletedCount);
+    assertEquals(4, deletedCount);
     assertEquals(0, countRoles(metalake.id()));
     assertEquals(0, countUserRoleRels());
     assertEquals(0, countGroupRoleRels());
