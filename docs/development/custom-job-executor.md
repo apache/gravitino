@@ -75,6 +75,10 @@ status pull intervals. Otherwise the job may be marked as `FAILED`, and the serv
 cancels the execution once `submitJob` returns and fails the request. An execution id must not
 start with `pending-submission:`, which Gravitino reserves for a job being submitted.
 
+If `submitJob` throws, the request fails and Gravitino removes the job without looking it up. So
+before throwing, remove what may have been created for the job, for example when your job runner
+couldn't be reached or answered with an error, otherwise it may run unknown to Gravitino.
+
 The default implementation finds nothing. Implement it if your job runner can look up a job by the
 Gravitino job id, for example when the execution is named after `JobContext#jobId()`, so that such
 a job is tracked rather than left running unknown to Gravitino. The `k8s` job executor does this.

@@ -254,13 +254,22 @@ job = client.run_job(
 </TabItem>
 </Tabs>
 
-Gravitino records a job as `QUEUED` before it hands the job to the job executor, so a job is never
-left running unknown to Gravitino, for example when the server exits right after the submission.
-If the submission isn't recorded within three times `gravitino.job.statusPullIntervalInMs`, another
-server, or the same server after a restart, looks the job up in the job executor when it pulls job
-statuses. A job found there is tracked as usual. Otherwise, it is marked as `FAILED`, or as
-`CANCELLED` if it was being cancelled. Not every job executor can look jobs up: the `k8s` one can,
-the local one can't.
+Gravitino records a job as `QUEUED` before it hands the job to the job executor, so that a job
+submitted right before the server exits isn't left running unknown to Gravitino. If the submission
+isn't recorded within three times `gravitino.job.statusPullIntervalInMs`, another server, or the
+same server after a restart, looks the job up in the job executor when it pulls job statuses. A job
+found there is tracked as usual. Otherwise, it is marked as `FAILED`, or as `CANCELLED` if it was
+being cancelled. Not every job executor can look jobs up: the `k8s` one can, as long as its name
+prefix and default namespace are unchanged since the submission, the local one can't.
+
+A run request that fails removes its job. If the job executor may have started the job anyway, for
+example because it couldn't be reached, it removes what it created. If that fails too, the `k8s`
+job executor logs how to delete the SparkApplication by hand.
+
+A job cancelled while it is being submitted is marked as `CANCELLING`, and its execution is
+cancelled once the submission is recorded. If cancelling it fails then, for example because the job
+executor can't be reached, the failure is logged, or returned by the cancel request, and cancelling
+the job again in Gravitino doesn't retry it: cancel the execution in the job executor instead.
 
 :::caution
 With several Gravitino servers, this requires all servers to use the same

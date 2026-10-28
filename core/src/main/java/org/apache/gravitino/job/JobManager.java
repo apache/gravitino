@@ -923,8 +923,8 @@ public class JobManager implements JobOperationDispatcher {
         throw new RuntimeException(
             String.format(
                 "Job %s under metalake %s is marked as CANCELLING, but failed to cancel its"
-                    + " execution %s, which was submitted meanwhile. Cancel the execution in the"
-                    + " job executor",
+                    + " execution %s, which was submitted meanwhile. Retrying the cancellation in"
+                    + " Gravitino won't cancel it, cancel the execution in the job executor",
                 jobId, metalake, cancellingJobEntity.jobExecutionId()),
             e);
       }

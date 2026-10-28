@@ -2406,7 +2406,16 @@ public class TestJobManager {
             RuntimeException.class, () -> jobManager.cancelJob(metalake, job.name()));
     Assertions.assertSame(cancelFailure, failure.getCause());
     Assertions.assertTrue(failure.getMessage().contains("submitted_execution"));
-    Assertions.assertTrue(failure.getMessage().contains("Cancel the execution"));
+    Assertions.assertTrue(
+        failure.getMessage().contains("Retrying the cancellation in Gravitino won't cancel it"));
+
+    // The job is CANCELLING by then, so cancelling it again doesn't retry, as the message says.
+    Mockito.clearInvocations(jobExecutor);
+    when(jobManager.getJob(metalake, job.name(), false))
+        .thenReturn(withStatus(submitted, JobHandle.Status.CANCELLING));
+    Assertions.assertEquals(
+        JobHandle.Status.CANCELLING, jobManager.cancelJob(metalake, job.name()).status());
+    verify(jobExecutor, never()).cancelJob(any());
   }
 
   @Test
