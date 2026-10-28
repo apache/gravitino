@@ -27,8 +27,8 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
  *
  * <ul>
  *   <li>IRC {@code IcebergCatalogWrapperManager} — config provider + {@code CatalogWrapperForREST}
- *   <li>{@link LocalCatalogWrapperManager} — lakehouse non-aux, creates via {@link
- *       IcebergCatalogWrapper#create(IcebergConfig)}
+ *   <li>{@link StandaloneCatalogWrapperManager} — standalone lakehouse (no embedded IRC), creates
+ *       via {@link IcebergCatalogWrapper#create(IcebergConfig)}
  * </ul>
  *
  * <p>Symmetric to {@code CatalogManager} used by {@code

@@ -24,13 +24,13 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestLocalCatalogWrapperManager {
+public class TestStandaloneCatalogWrapperManager {
 
   @Test
   void getWithConfigReusesCachedWrapper() {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (LocalCatalogWrapperManager manager = new LocalCatalogWrapperManager(config)) {
+    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(config)) {
       IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("c1", config);
       IcebergCatalogWrapper second = manager.getOrCreateCatalogWrapper("c1", config);
       Assertions.assertSame(first, second);
@@ -41,7 +41,7 @@ public class TestLocalCatalogWrapperManager {
   void getWithoutConfigUnsupported() {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (LocalCatalogWrapperManager manager = new LocalCatalogWrapperManager(config)) {
+    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(config)) {
       Assertions.assertThrows(
           UnsupportedOperationException.class, () -> manager.getCatalogWrapper("c1"));
     }
@@ -51,7 +51,7 @@ public class TestLocalCatalogWrapperManager {
   void invalidateDropsCachedWrapper() {
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (LocalCatalogWrapperManager manager = new LocalCatalogWrapperManager(config)) {
+    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(config)) {
       IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("c1", config);
       manager.invalidateCatalogWrapper("c1");
       IcebergCatalogWrapper second = manager.getOrCreateCatalogWrapper("c1", config);

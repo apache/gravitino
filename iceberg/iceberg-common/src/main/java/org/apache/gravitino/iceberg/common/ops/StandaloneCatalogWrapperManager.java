@@ -21,20 +21,20 @@ package org.apache.gravitino.iceberg.common.ops;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 
 /**
- * Lakehouse-side {@link CatalogWrapperManager} backed by {@link IcebergCatalogWrapperCache} when
- * IRC is not embedded (non-aux).
+ * Standalone (non-auxiliary) {@link CatalogWrapperManager} backed by {@link
+ * IcebergCatalogWrapperCache} when IRC is not embedded in the Gravitino server.
  *
  * <p>Same cache policy as IRC {@code IcebergCatalogWrapperManager}, but creates wrappers via {@link
  * IcebergCatalogWrapper#create(IcebergConfig)} from the caller-supplied config.
  */
-public final class LocalCatalogWrapperManager implements CatalogWrapperManager, AutoCloseable {
+public final class StandaloneCatalogWrapperManager implements CatalogWrapperManager, AutoCloseable {
 
   private final IcebergCatalogWrapperCache cache;
 
   /**
    * @param config Iceberg configuration (eviction interval and lakehouse catalog props)
    */
-  public LocalCatalogWrapperManager(IcebergConfig config) {
+  public StandaloneCatalogWrapperManager(IcebergConfig config) {
     this.cache = IcebergCatalogWrapperCache.create(config);
   }
 
@@ -48,7 +48,7 @@ public final class LocalCatalogWrapperManager implements CatalogWrapperManager, 
   @Override
   public IcebergCatalogWrapper getCatalogWrapper(String catalogName) {
     throw new UnsupportedOperationException(
-        "LocalCatalogWrapperManager has no IRC config provider; use "
+        "StandaloneCatalogWrapperManager has no IRC config provider; use "
             + "getOrCreateCatalogWrapper(catalogName, icebergConfig)");
   }
 

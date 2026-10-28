@@ -127,8 +127,8 @@ public class TestIcebergCatalogWrapperResolve {
   }
 
   @Test
-  void nonAuxProviderUsesLocalManagerAndReusesWrapper() {
-    // No aux IRC context → LocalCatalogWrapperManager path.
+  void nonAuxProviderUsesStandaloneManagerAndReusesWrapper() {
+    // No aux IRC context → StandaloneCatalogWrapperManager path.
     IcebergConfig config =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
     IcebergCatalogWrapperProvider provider =
