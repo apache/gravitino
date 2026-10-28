@@ -137,9 +137,30 @@ public class ObjectPolicyResolver {
         tagIdentifiers.isEmpty()
             ? Collections.emptyList()
             : loadRelations(new ArrayList<>(tagIdentifiers.values()), metadataObjects);
+    Map<String, List<Integer>> relationPositionsByTag = new LinkedHashMap<>();
+    for (int i = 0; i < relations.size(); i++) {
+      relationPositionsByTag
+          .computeIfAbsent(relations.get(i).source().name(), ignored -> new ArrayList<>())
+          .add(i);
+    }
     Map<MetadataObject, PolicyEntity[]> result = new LinkedHashMap<>();
     tagsByObject.forEach(
-        (object, tags) -> result.put(object, policies(selectMatches(tags, relations))));
+        (object, tags) -> {
+          // Retain relation order while visiting only relations for this object's effective tags.
+          List<RelationalEntity<?>> objectRelations =
+              Arrays.stream(tags)
+                  .map(resolvedTag -> resolvedTag.tag().name())
+                  .distinct()
+                  .flatMap(
+                      name ->
+                          relationPositionsByTag
+                              .getOrDefault(name, Collections.emptyList())
+                              .stream())
+                  .sorted()
+                  .map(relations::get)
+                  .collect(Collectors.toList());
+          result.put(object, policies(selectMatches(tags, objectRelations)));
+        });
     return result;
   }
 

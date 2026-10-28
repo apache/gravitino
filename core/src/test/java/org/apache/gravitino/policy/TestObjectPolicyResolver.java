@@ -19,6 +19,7 @@
 package org.apache.gravitino.policy;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -35,6 +37,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
@@ -225,6 +228,91 @@ public class TestObjectPolicyResolver {
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             List.of(NameIdentifierUtil.ofTag(METALAKE, "domain")),
             Entity.EntityType.TAG);
+  }
+
+  /** Verifies distinct column tags do not cause every column to scan all policy relations. */
+  @Test
+  public void testBatchVisitsOnlyRelationsForEffectiveTags() throws Exception {
+    List<MetadataObject> objects = new ArrayList<>();
+    Map<MetadataObject, ResolvedTag[]> tags = new LinkedHashMap<>();
+    List<NameIdentifier> tagIdentifiers = new ArrayList<>();
+    List<RelationalEntity<?>> relations = new ArrayList<>();
+    List<PolicyEntity> expectedPolicies = new ArrayList<>();
+    for (int i = 0; i < 1000; i++) {
+      MetadataObject column =
+          MetadataObjects.of(
+              List.of("catalog", "schema", "table", "column_" + i), MetadataObject.Type.COLUMN);
+      TagEntity tag = tag(i, "tag_" + i, TagAssignment.noValue()).copyWithInherited(false);
+      PolicyEntity policy = policy(1000L + i, "policy_" + i, true);
+      objects.add(column);
+      tags.put(column, new ResolvedTag[] {new ResolvedTag(tag, column)});
+      tagIdentifiers.add(tag.nameIdentifier());
+      relations.add(spy(relation(tag, policy, AllValuesSelector.get())));
+      expectedPolicies.add(policy);
+    }
+    MetadataObject untagged =
+        MetadataObjects.of(
+            List.of("catalog", "schema", "table", "untagged"), MetadataObject.Type.COLUMN);
+    objects.add(untagged);
+    tags.put(untagged, new ResolvedTag[0]);
+    when(effectiveTagResolver.resolveWithSources(METALAKE, objects)).thenReturn(tags);
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL, tagIdentifiers, Entity.EntityType.TAG))
+        .thenReturn(relations);
+
+    Map<MetadataObject, PolicyEntity[]> result = resolver.resolve(METALAKE, objects);
+
+    Assertions.assertEquals(objects.size(), result.size());
+    for (int i = 0; i < expectedPolicies.size(); i++) {
+      Assertions.assertArrayEquals(
+          new PolicyEntity[] {expectedPolicies.get(i)}, result.get(objects.get(i)));
+      // One visit to build the index and one visit for the column that owns this tag.
+      verify(relations.get(i), times(2)).source();
+    }
+    Assertions.assertEquals(0, result.get(untagged).length);
+    verify(relationOperations, times(1))
+        .batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL, tagIdentifiers, Entity.EntityType.TAG);
+  }
+
+  /**
+   * Verifies indexed matching retains relation order, deduplication and direct-match precedence.
+   */
+  @Test
+  public void testBatchIndexPreservesPolicyOrderAndInheritance() throws Exception {
+    TagEntity direct = tag(1L, "direct", TagAssignment.ofValues("finance"));
+    TagEntity inherited = tag(2L, "inherited", TagAssignment.noValue()).copyWithInherited(true);
+    TagEntity unrelated = tag(3L, "unrelated", TagAssignment.noValue());
+    PolicyEntity first = policy(10L, "first", true);
+    PolicyEntity second = policy(11L, "second", true);
+    PolicyEntity disabled = policy(12L, "disabled", false);
+    Map<MetadataObject, ResolvedTag[]> tags = new LinkedHashMap<>();
+    tags.put(
+        OBJECT,
+        new ResolvedTag[] {new ResolvedTag(direct, OBJECT), new ResolvedTag(inherited, CATALOG)});
+    tags.put(CATALOG, new ResolvedTag[] {new ResolvedTag(unrelated, CATALOG)});
+    when(effectiveTagResolver.resolveWithSources(METALAKE, List.of(OBJECT, CATALOG)))
+        .thenReturn(tags);
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            List.of(
+                direct.nameIdentifier(), inherited.nameIdentifier(), unrelated.nameIdentifier()),
+            Entity.EntityType.TAG))
+        .thenReturn(
+            List.of(
+                relation(inherited, first, AllValuesSelector.get()),
+                relation(unrelated, second, AllValuesSelector.get()),
+                relation(direct, second, TagValueSelector.of("finance")),
+                relation(direct, first, TagValueSelector.of("finance")),
+                relation(direct, disabled, AllValuesSelector.get())));
+
+    Map<MetadataObject, PolicyEntity[]> result =
+        resolver.resolve(METALAKE, List.of(OBJECT, CATALOG));
+
+    Assertions.assertArrayEquals(new PolicyEntity[] {first, second}, result.get(OBJECT));
+    Assertions.assertFalse(result.get(OBJECT)[0].inherited().orElseThrow());
+    Assertions.assertFalse(result.get(OBJECT)[1].inherited().orElseThrow());
+    Assertions.assertArrayEquals(new PolicyEntity[] {second}, result.get(CATALOG));
   }
 
   private static RelationalEntity<PolicyEntity> relation(
