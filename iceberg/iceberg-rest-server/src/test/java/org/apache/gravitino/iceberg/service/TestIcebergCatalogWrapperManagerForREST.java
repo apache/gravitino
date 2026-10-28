@@ -22,17 +22,18 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
-import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -106,7 +107,8 @@ public class TestIcebergCatalogWrapperManagerForREST {
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
     IcebergCatalogWrapperManager manager =
-        new IcebergCatalogWrapperManager(config, configProvider, true, "metalake");
+        new IcebergCatalogWrapperManager(
+            config, configProvider, true, configProvider.getMetalakeName());
     IcebergRESTServerContext.create(configProvider, true, true, true, manager);
 
     IllegalArgumentException exception =
@@ -150,95 +152,106 @@ public class TestIcebergCatalogWrapperManagerForREST {
   }
 
   @Test
-  public void testNewerCatalogVersionUsesNewCacheEntryWithoutClosingTheOldOne() throws Exception {
-    IcebergConfig config = memoryWarehouseConfig();
-    DynamicIcebergConfigProvider provider = dynamicProvider(config);
-    AtomicReference<Long> version = new AtomicReference<>(1L);
-    try (IcebergCatalogWrapperManager manager = versionedManager(provider, version)) {
-      IcebergRESTServerContext.create(provider, false, false, true, manager);
-      CatalogWrapperForREST original = manager.getCatalogWrapper("test");
-      Assertions.assertSame(original, manager.getCatalogWrapper("test"));
+  public void testDefaultCatalogAliasInvalidatedWhenCatalogRemoved() throws Exception {
+    Mockito.clearInvocations(mockCatalogManager);
+    AtomicReference<Consumer<NameIdentifier>> removeListener = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              removeListener.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(mockCatalogManager)
+        .addCatalogCacheRemoveListener(Mockito.any());
 
-      version.set(2L);
-      CatalogWrapperForREST replacement = manager.getCatalogWrapper("test");
+    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    Mockito.when(
+            configProvider.getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG))
+        .thenReturn(Optional.of(icebergConfig));
+
+    try (IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, "metalake")) {
+      IcebergRESTServerContext.create(configProvider, false, false, true, manager);
+      CatalogWrapperForREST original =
+          manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+
+      removeListener.get().accept(NameIdentifier.of("metalake", "test"));
+
+      CatalogWrapperForREST replacement =
+          manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
       Assertions.assertNotSame(original, replacement);
-      Assertions.assertFalse(original.isClosed());
-      Assertions.assertFalse(replacement.isClosed());
-      Assertions.assertSame(replacement, manager.getCatalogWrapper("test"));
     }
   }
 
   @Test
-  public void testMissingCatalogVersionFailsFastAndClearsCache() throws Exception {
-    IcebergConfig config = memoryWarehouseConfig();
-    DynamicIcebergConfigProvider provider = dynamicProvider(config);
-    AtomicReference<Optional<Long>> version = new AtomicReference<>(Optional.of(1L));
-    try (IcebergCatalogWrapperManager manager =
-        new IcebergCatalogWrapperManager(Maps.newHashMap(), provider, true, "metalake") {
-          @Override
-          protected Optional<Long> catalogCurrentVersion(String catalogName) {
-            return version.get();
-          }
-        }) {
-      IcebergRESTServerContext.create(provider, false, false, true, manager);
-      CatalogWrapperForREST original = manager.getCatalogWrapper("test");
-      version.set(Optional.empty());
-      Assertions.assertThrows(
-          NoSuchCatalogException.class, () -> manager.getCatalogWrapper("test"));
-      Assertions.assertTrue(original.isClosed());
-    }
+  public void testComputeCacheDurationNanosWithoutTokenExpiryUsesAccessEviction() {
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    long accessEvictionNanos = TimeUnit.HOURS.toNanos(1);
+    Assertions.assertEquals(
+        accessEvictionNanos,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, accessEvictionNanos, System.currentTimeMillis()));
   }
 
   @Test
-  public void testStaticAuxModeSkipsCatalogVersionCache() throws Exception {
-    IcebergConfig config = memoryWarehouseConfig();
-    IcebergConfigProvider provider = Mockito.mock(IcebergConfigProvider.class);
-    Mockito.when(provider.getMetalakeName()).thenReturn(null);
-    Mockito.when(provider.getDefaultCatalogName()).thenReturn("iceberg");
-    Mockito.when(provider.getIcebergCatalogConfig("iceberg")).thenReturn(Optional.of(config));
-    try (IcebergCatalogWrapperManager manager =
-        new IcebergCatalogWrapperManager(Maps.newHashMap(), provider, true, null)) {
-      IcebergRESTServerContext.create(provider, false, true, false, manager);
-      CatalogWrapperForREST first = manager.getCatalogWrapper("iceberg");
-      Assertions.assertSame(first, manager.getCatalogWrapper("iceberg"));
-      Assertions.assertFalse(first.isClosed());
-    }
+  public void testComputeCacheDurationNanosCapsByGcsTokenExpiry() {
+    long now = 1_700_000_000_000L;
+    long expiresAt = now + TimeUnit.HOURS.toMillis(1); // token valid for 1h
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                String.valueOf(expiresAt)));
+    long accessEvictionNanos = TimeUnit.HOURS.toNanos(2);
+    long expected =
+        TimeUnit.MILLISECONDS.toNanos(
+            TimeUnit.HOURS.toMillis(1) - IcebergCatalogWrapperManager.GCS_TOKEN_REFRESH_BUFFER_MS);
+    Assertions.assertEquals(
+        expected,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(config, accessEvictionNanos, now));
   }
 
   @Test
-  public void testDynamicAuxModeRequiresMetalakeName() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            new IcebergCatalogWrapperManager(
-                Maps.newHashMap(), Mockito.mock(DynamicIcebergConfigProvider.class), true, " "));
+  public void testComputeCacheDurationNanosExpiresImmediatelyWhenPastRefreshDeadline() {
+    long now = 1_700_000_000_000L;
+    long expiresAt = now + TimeUnit.MINUTES.toMillis(2); // within 5-minute buffer
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                String.valueOf(expiresAt)));
+    Assertions.assertEquals(
+        0L,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, TimeUnit.HOURS.toNanos(1), now));
   }
 
-  private static IcebergConfig memoryWarehouseConfig() {
-    return new IcebergConfig(
-        ImmutableMap.of(
-            IcebergConstants.CATALOG_BACKEND,
-            "memory",
-            IcebergConstants.WAREHOUSE,
-            "/tmp/warehouse"));
-  }
-
-  private static DynamicIcebergConfigProvider dynamicProvider(IcebergConfig config) {
-    DynamicIcebergConfigProvider provider = Mockito.mock(DynamicIcebergConfigProvider.class);
-    Mockito.when(provider.getDefaultCatalogName()).thenReturn("test");
-    Mockito.when(provider.getIcebergCatalogConfig(Mockito.anyString()))
-        .thenReturn(Optional.of(config));
-    return provider;
-  }
-
-  private static IcebergCatalogWrapperManager versionedManager(
-      DynamicIcebergConfigProvider provider, AtomicReference<Long> version) {
-    return new IcebergCatalogWrapperManager(Maps.newHashMap(), provider, true, "metalake") {
-      @Override
-      protected Optional<Long> catalogCurrentVersion(String catalogName) {
-        return Optional.of(version.get());
-      }
-    };
+  @Test
+  public void testComputeCacheDurationNanosIgnoresInvalidExpiresAt() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                "not-a-number"));
+    long accessEvictionNanos = TimeUnit.MINUTES.toNanos(30);
+    Assertions.assertEquals(
+        accessEvictionNanos,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, accessEvictionNanos, System.currentTimeMillis()));
   }
 
   private static IcebergCatalogWrapperManager newManager() {

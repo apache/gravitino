@@ -20,21 +20,16 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
-/**
- * Process-wide Iceberg REST server context. Lives in iceberg-common so lakehouse can resolve IRC
- * catalog wrappers via {@link #catalogWrapperManager()} the same way {@code InternalCatalogFetcher}
- * uses {@code GravitinoEnv#catalogManager()}.
- */
 public class IcebergRESTServerContext {
   private boolean isAuthorizationEnabled;
   private boolean auxMode;
   private boolean skipAuthorizationForRestBackend;
   private String metalakeName;
   private String defaultCatalogName;
-  private CatalogWrapperManager catalogWrapperManager;
+  private IcebergCatalogWrapperManager catalogWrapperManager;
 
   private IcebergRESTServerContext(
       Boolean isAuthorizationEnabled,
@@ -42,7 +37,7 @@ public class IcebergRESTServerContext {
       Boolean skipAuthorizationForRestBackend,
       String metalakeName,
       String defaultCatalogName,
-      CatalogWrapperManager catalogWrapperManager) {
+      IcebergCatalogWrapperManager catalogWrapperManager) {
     this.isAuthorizationEnabled = isAuthorizationEnabled;
     this.auxMode = auxMode;
     this.skipAuthorizationForRestBackend = skipAuthorizationForRestBackend;
@@ -60,7 +55,7 @@ public class IcebergRESTServerContext {
       Boolean enableAuth,
       Boolean auxMode,
       Boolean skipAuthorizationForRestBackend,
-      CatalogWrapperManager catalogWrapperManager) {
+      IcebergCatalogWrapperManager catalogWrapperManager) {
     InstanceHolder.INSTANCE =
         new IcebergRESTServerContext(
             enableAuth,
@@ -97,7 +92,7 @@ public class IcebergRESTServerContext {
     return defaultCatalogName;
   }
 
-  public CatalogWrapperManager catalogWrapperManager() {
+  public IcebergCatalogWrapperManager catalogWrapperManager() {
     return catalogWrapperManager;
   }
 }

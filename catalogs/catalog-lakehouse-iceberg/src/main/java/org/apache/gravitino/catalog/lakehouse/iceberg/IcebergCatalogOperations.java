@@ -55,8 +55,11 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -105,8 +108,7 @@ public class IcebergCatalogOperations
 
   /**
    * Evict the metalake {@code catalogCache} entry this long before a minted GCS OAuth2 token
-   * expires, matching IRC {@code IcebergCatalogWrapperCache} so lakehouse rebuilds with a fresh
-   * token. IRC keeps a separate wrapper cache; objects are not shared.
+   * expires so lakehouse rebuilds with a fresh token. IRC keeps its own wrapper cache separately.
    */
   private static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
 
@@ -141,12 +143,19 @@ public class IcebergCatalogOperations
     resultConf.putAll(gravitinoConfig);
     this.catalogUuid = info.id().toString();
     resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
-    IcebergConfig icebergConfig = new IcebergConfig(resultConf);
+    // Mint GCS OAuth into config so catalogCache can expire before token expiry; lakehouse owns
+    // this wrapper independently of IRC.
+    IcebergConfig icebergConfig =
+        IcebergCatalogUtil.withGcsServiceAccountCredentials(new IcebergConfig(resultConf));
 
     try {
-      // create() mints GCS OAuth tokens (for catalogCache expiry) and applies Kerberos when set.
-      // Lakehouse owns this wrapper; IRC keeps a separate cache (properties-only toward metalake).
-      this.icebergCatalogWrapper = IcebergCatalogWrapper.create(icebergConfig);
+      IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
+      AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
+      this.icebergCatalogWrapper =
+          authenticationConfig.isKerberosAuth()
+                  && rawWrapper.getCatalog() instanceof SupportsKerberos
+              ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
+              : rawWrapper;
       this.icebergCatalogWrapperHelper =
           new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
       this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);

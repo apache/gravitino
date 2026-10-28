@@ -200,9 +200,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   @Override
   public void close() throws Exception {
-    if (!beginClose()) {
-      return;
-    }
     try {
       if (catalogCredentialManager != null) {
         catalogCredentialManager.close();
@@ -211,11 +208,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         scanPlanCache.close();
       }
     } finally {
-      // Release parent class resources including:
+      // Call super.close() to release parent class resources including:
       // 1. Close underlying catalog (JdbcCatalog, WrappedHiveCatalog, etc.)
       // 2. Close metadata cache
       // 3. Cleanup JDBC drivers and threads (MySQL AbandonedConnectionCleanupThread, etc.)
-      closeResources();
+      super.close();
     }
   }
 
