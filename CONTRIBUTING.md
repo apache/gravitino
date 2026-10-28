@@ -107,7 +107,7 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 * **Re-run the run:** Open the run for your PR's current commit and choose **Re-run all jobs**, which also tests the latest base branch, or **Re-run jobs → Re-run failed jobs** to retry only failed and cancelled jobs against the same base. A run can be re-run only after it has finished; Fork CI cancels the rest of a run as soon as a job fails. See [GitHub's rerun instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
 * **Push a commit:** Any push to the PR branch starts a new run and cancels the previous one. An empty commit (`git commit --allow-empty -m "Trigger Fork CI"`) is enough.
 
-The **Fork CI** check on the PR links to the run and to **Run workflow**. Its **Re-run** button and the **Update Fork CI Status** workflow only refresh the reported result; neither runs tests.
+The **Fork CI** status on the PR links to the exact run attempt it reports, where you can re-run it. The **Update Fork CI Status** workflow only refreshes the reported result; it does not run tests.
 
 | Action                                                 | Fork CI                                                   | PR status                                                 |
 | ------------------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------------- |
@@ -115,17 +115,19 @@ The **Fork CI** check on the PR links to the run and to **Run workflow**. Its **
 | Close the PR                                           | The running fork run cancels itself within about a minute | Synchronization stops while the PR is closed              |
 | Reopen the PR                                          | Starts nothing                                            | Shows the latest fork run's result; run CI again as above |
 
-If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. A branch created before Fork CI was introduced does not contain `.github/workflows/fork-ci.yml`, so pushing it runs no CI; the check then asks you to merge or rebase onto the latest base branch. Please fix failures before requesting a review.
+If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. A branch created before Fork CI was introduced does not contain `.github/workflows/fork-ci.yml`, so pushing it runs no CI; the **Fork CI** status then asks you to merge or rebase onto the latest base branch. Please fix failures before requesting a review.
 
-If the check requests trusted verification for CI-definition changes, a committer must dispatch the trusted upstream **Fork CI** run described below; running CI in the fork does not satisfy that requirement.
+If **Fork CI** requests trusted verification for CI-definition changes, a committer must dispatch the trusted upstream **Fork CI** run described below; running CI in the fork does not satisfy that requirement.
 
 ### CI status synchronization
 
-Status synchronization closes unfinished checks for confirmed canceled runs among the fork branch's ten most recent runs.
+Status synchronization marks the pending status of a previous commit as an error once its fork run, among the fork branch's ten most recent runs, is confirmed cancelled.
 
-Fork runs cannot notify `apache/gravitino` when they finish, so a sweep polls recently updated PRs every minute for 11 minutes and then starts the next sweep, which keeps polling continuous; the five-minute schedule restarts the chain if it breaks. PR events are processed in order in a separate queue of up to 100 runs, so they never wait behind a sweep. Before writing the commit status, each publisher re-reads the check and publishes what it records, and the next pass repairs any interleaving. GitHub cancels excess runs when the queue is full; later sweeps recover Fork CI updates, and committers can manually dispatch either publisher for a specific PR.
+Fork runs cannot notify `apache/gravitino` when they finish, so a sweep polls recently updated PRs every minute for 11 minutes and then starts the next sweep, which keeps polling continuous; the five-minute schedule restarts the chain if it breaks. PR events are processed in order in a separate queue of up to 100 runs, so they never wait behind a sweep. Each publisher reads the current status just before writing it and never replaces a newer run attempt, or a finished result with a running one; the next pass repairs any remaining interleaving. GitHub cancels excess runs when the queue is full; later sweeps recover Fork CI updates, and committers can manually dispatch either publisher for a specific PR.
 
-The publishers report **Fork CI** and **ASF Allowlist Check** as commit statuses with direct links to the corresponding runs. Additional check runs retain diagnostic metadata; GitHub can omit those checks from the PR's latest-check view after another signal run. Queued and running CI both have a pending status, with the description distinguishing whether jobs have started. This also applies to PRs that edit CI definitions: their check explains that trusted verification will be needed, while continuing to show execution progress. Failed tests report failure; cancellation reports error. A successful fork run with changed CI definitions stays pending as **Fork CI passed; trusted verification required** until a trusted run verifies the PR. The job that stops a run on the first failure only observes the other jobs: its own errors never fail the run.
+The publishers report **Fork CI** and **ASF Allowlist Check** only as commit statuses, each listed once on the PR and linking to the corresponding run; the **Fork CI** link names the run attempt, which also records what the status reports. Commit statuses do not appear on the PR's **Checks** tab. Queued and running CI both have a pending status, with the description distinguishing whether jobs have started; this also applies to PRs that edit CI definitions. Failed tests report failure and cancellation reports error, both suggesting a re-run in the fork when the description has room. A successful fork run with changed CI definitions stays pending as **Fork CI passed; trusted verification required** until a trusted run verifies the PR. The job that stops a run on the first failure only observes the other jobs: its own errors never fail the run.
+
+The status publisher checks required suites against the upstream commit the run tested: the base-branch commit merged into the head for fork runs, or the dispatch commit for trusted runs. Adding a suite on the default branch does not invalidate earlier successful runs. A later run that tests a base commit with the new suite needs it, so merge the latest base branch and push if the status reports a missing suite.
 
 Known limitations of Fork CI:
 
@@ -203,7 +205,7 @@ Reviewing and triaging helps maintain the project. You can:
 
 * Use feature branches
 * Write clear commit messages and PR descriptions
-* Link to issues (e.g., `Fixes #123`)
+* Link to issues in the PR description using a [GitHub closing keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword) (e.g., `Fixes #123` or `Fix: #123`; for multiple issues, repeat the keyword for each issue, e.g., `Fixes #123, fixes #456`). Do not replace the keyword with the issue type (e.g., `Improvement: #123`), as that prevents GitHub from automatically closing the issue.
 * Respond to reviewer feedback
 * Please add Copilot on the PR. Automatic review runs once when the PR is marked ready; later pushes do not re-review, so add Copilot again after you push. Treat Copilot comments as hints: implement the suggestion, or reply with why you are not taking it. Human reviewers remain responsible for the merge decision. Project-specific Copilot guidance lives in [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 

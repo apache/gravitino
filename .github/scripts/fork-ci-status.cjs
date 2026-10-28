@@ -14,10 +14,43 @@
  */
 'use strict';
 const { TRUSTED_REQUIRED } = require('./publish-ci-status.cjs');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
 const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
-const SUITES = ['build', 'backend', 'spark', 'flink', 'trino', 'iceberg_rest_trino', 'python',
-  'frontend', 'access_control', 'idp_basic', 'mcp', 'maintenance', 'web_ui', 'charts',
-  'contrib_catalog', 'asf_allowlist'];
+
+// Only the block-list syntax used by Required CI is accepted. Unsupported workflow
+// changes must fail closed rather than silently dropping required callers. SUITES below
+// parses the default branch's fork-ci.yml when this module loads, so an unsupported
+// format there stops the publisher for every PR; the script tests parse it first.
+function requiredSuites(source) {
+  const lines = source.split(/\r?\n/);
+  const starts = lines.flatMap((line, i) => /^  required_ci:/.test(line) ? [i] : []);
+  if (starts.length !== 1 || lines[starts[0]].trim() !== 'required_ci:') {
+    throw new Error('Expected one required_ci job in Fork CI workflow');
+  }
+  const block = [];
+  for (const line of lines.slice(starts[0] + 1)) {
+    if (/^\s*(#.*)?$/.test(line)) continue;
+    if (/^\S|^ {1,2}\S/.test(line)) break;
+    block.push(line);
+  }
+  const needs = block.flatMap((line, i) => /^    needs:/.test(line) ? [i] : []);
+  if (needs.length !== 1 || block[needs[0]].trim() !== 'needs:') {
+    throw new Error('Expected a block-list of required_ci.needs');
+  }
+  const names = [];
+  for (const line of block.slice(needs[0] + 1)) {
+    if (/^ {0,4}\S/.test(line)) break;
+    const match = /^      - ([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*$/.exec(line);
+    if (!match) throw new Error('Unsupported required_ci.needs entry');
+    names.push(match[1]);
+  }
+  if (!names.includes('eligibility') || names.length < 2 || new Set(names).size !== names.length) {
+    throw new Error('Invalid required_ci.needs callers');
+  }
+  return names.filter(name => name !== 'eligibility');
+}
+const SUITES = requiredSuites(readFileSync(path.join(__dirname, '../workflows/fork-ci.yml'), 'utf8'));
 // The fail-fast watcher in fork-ci.yml never fails the run (continue-on-error), but runs that
 // started before that change can still fail on the watcher's own API errors.
 const FAIL_FAST = 'Stop on first failure';
@@ -29,7 +62,7 @@ const MISSING_WORKFLOW = 'Your fork has no Fork CI workflow, so pushes to this b
 const requiredAction = note => ({ status: 'completed', conclusion: 'action_required',
   title: 'Fork CI needs attention', note });
 
-function evaluate(pr, run, jobs, baseSha = pr.base.sha) {
+function evaluateExecution(pr, run, jobs, baseSha) {
   const required = jobs.find(job => job.name === requiredName(pr, baseSha));
   if (run.status !== 'completed') {
     // A workflow can remain queued while some of its matrix jobs already have runners.
@@ -54,9 +87,17 @@ function evaluate(pr, run, jobs, baseSha = pr.base.sha) {
     return requiredAction('The run did not finish Required CI for this exact head, base branch and base SHA. ' +
       'Update the branch and push again, or ask a committer to dispatch a trusted Fork CI run.');
   }
-  for (const suite of SUITES) {
+}
+
+function evaluateSuites(jobs, suites, trusted = false) {
+  for (const suite of suites) {
     const children = jobs.filter(job => job.name.startsWith(`${suite} / `));
-    if (!children.length || !children.some(job => job.conclusion === 'success') ||
+    if (!children.length) {
+      // A trusted run executes the upstream workflow that defines its suites, so only a fork can lack one.
+      return requiredAction(trusted ? `The trusted run has no ${suite} jobs. Dispatch trusted Fork CI again.`
+        : `The run has no ${suite} jobs. If the base branch added this suite, merge the latest base branch and push.`);
+    }
+    if (!children.some(job => job.conclusion === 'success') ||
         children.some(job => !['success', 'skipped'].includes(job.conclusion))) {
       return requiredAction(`The ${suite} caller did not report successful jobs. Open the run and verify its suites.`);
     }
@@ -64,9 +105,25 @@ function evaluate(pr, run, jobs, baseSha = pr.base.sha) {
   return { status: 'completed', conclusion: 'success', title: 'All required suites passed' };
 }
 
-function createService(github) {
+function evaluate(pr, run, jobs, baseSha = pr.base.sha, suites = SUITES) {
+  return evaluateExecution(pr, run, jobs, baseSha) || evaluateSuites(jobs, suites);
+}
+
+function createService(github, { readWorkflow = sha => github.rest.repos.getContent({ ...UPSTREAM,
+  path: '.github/workflows/fork-ci.yml', ref: sha }).then(response => response.data) } = {}) {
   const definitions = new Map();
   const trees = new Map();
+  const suitesBySha = new Map();
+  async function suitesAt(sha) {
+    if (!suitesBySha.has(sha)) suitesBySha.set(sha, (async () => {
+      const data = await readWorkflow(sha);
+      if (data.encoding !== 'base64' || typeof data.content !== 'string') {
+        throw new Error(`Cannot read trusted Fork CI workflow contents at ${sha}; retry the status refresh`);
+      }
+      return requiredSuites(Buffer.from(data.content, 'base64').toString('utf8'));
+    })());
+    return suitesBySha.get(sha);
+  }
   async function ciTree(owner, repo, sha) {
     const key = `${owner}/${repo}@${sha}`;
     if (!trees.has(key)) trees.set(key, (async () => {
@@ -120,7 +177,10 @@ function createService(github) {
     // branch moves on; strict branch protection, not this check, requires an up-to-date branch.
     const prefix = `Required CI / ${pr.base.ref} / `;
     const suffix = ` / ${pr.head.sha}`;
-    const job = jobs.find(job => job.name.startsWith(prefix) && job.name.endsWith(suffix));
+    // A rerun of the whole run repeats eligibility, which can name a newer base commit. jobsFor keeps
+    // both names, so take the newest attempt: it selects the tested callers and Required CI result.
+    const job = jobs.filter(job => job.name.startsWith(prefix) && job.name.endsWith(suffix))
+      .sort((a, b) => (b.run_attempt || 1) - (a.run_attempt || 1) || b.id - a.id)[0];
     const sha = job?.name.slice(prefix.length, -suffix.length);
     return acceptedBase(pr, sha);
   }
@@ -177,7 +237,16 @@ function createService(github) {
     // A manual upstream run uses the workflow definitions at run.head_sha, not the PR definitions.
     const jobs = selected.trusted ? trustedJobs : await jobsFor(owner, repo, run);
     const base = selected.trusted ? run.head_sha : !sameDefinitions ? pr.base.sha : await testedBase(pr, jobs);
-    let result = evaluate(pr, run, jobs, base);
+    let result = evaluateExecution(pr, run, jobs, base);
+    const needsSuiteChecks = !result;
+    if (needsSuiteChecks) {
+      // Require the callers of the commit the run tested: the upstream dispatch commit for trusted
+      // runs, or the base-branch commit merged into the head for fork runs. A suite added on the
+      // base branch after that commit does not fail the run, but one the tested code already had
+      // must have run, even when the head's own workflow predates it.
+      result = !selected.trusted && !sameDefinitions ? requiredAction(TRUSTED_REQUIRED)
+        : evaluateSuites(jobs, await suitesAt(base), selected.trusted);
+    }
     if (selected.trusted && result.conclusion === 'success' && await acceptedBase(pr, base) !== base) {
       result = requiredAction('Trusted CI tested a commit outside the current base branch. Dispatch trusted Fork CI again from the current default branch.');
     }
@@ -186,7 +255,7 @@ function createService(github) {
         'After reviewing these changes, a committer must dispatch Fork CI from the current upstream default branch with this PR number.';
       // Approval of CI edits is separate from execution progress. Never turn a running fork
       // into a completed error, or hide an actual failure behind the trust requirement.
-      result = run.status === 'completed' && run.conclusion === 'success'
+      result = run.status === 'completed' && (run.conclusion === 'success' || needsSuiteChecks)
         ? { ...requiredAction(note), title: TRUSTED_REQUIRED }
         : { ...result, note: `${result.title}. ${note}` };
     }
@@ -194,4 +263,4 @@ function createService(github) {
   }
   return { mirror, unchanged, findRun };
 }
-module.exports = { FAIL_FAST, FORK_EVENTS, SUITES, requiredName, evaluate, createService };
+module.exports = { requiredSuites, FAIL_FAST, FORK_EVENTS, SUITES, requiredName, evaluate, createService };

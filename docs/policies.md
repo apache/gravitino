@@ -35,14 +35,15 @@ policy. A table with only `data_domain=risk` does not.
 
 ### Policy Types and Content
 
-| Type                                 | Rules                                | Consumer                  |
-|--------------------------------------|--------------------------------------|---------------------------|
-| `system_iceberg_compaction`          | Compaction thresholds and scheduling | Table maintenance service |
-| `system_iceberg_orphan_file_removal` | Orphan-file cleanup options          | Table maintenance service |
-| `system_row_filter`                  | Row-filter expression                | Not enforced yet          |
-| `system_column_mask`                 | Column-mask expression               | Not enforced yet          |
-| `system_access_control`              | Privileges and applicable roles      | Not enforced yet          |
-| `custom`                             | A free-form map that you define      | A system that you provide |
+| Type                                 | Rules                                      | Consumer                  |
+| ------------------------------------ | ------------------------------------------ | ------------------------- |
+| `system_iceberg_compaction`          | Compaction thresholds and scheduling       | Table maintenance service |
+| `system_iceberg_rewrite_manifests`   | Manifest count and average-size thresholds | Table maintenance service |
+| `system_iceberg_orphan_file_removal` | Orphan-file cleanup options                | Table maintenance service |
+| `system_row_filter`                  | Row-filter expression                      | Not enforced yet          |
+| `system_column_mask`                 | Column-mask expression                     | Not enforced yet          |
+| `system_access_control`              | Privileges and applicable roles            | Not enforced yet          |
+| `custom`                             | A free-form map that you define            | A system that you provide |
 
 The row-filter, column-mask, and access-control policy types can be created and associated with
 tags, but Gravitino does not enforce them yet. Until enforcement is available, these policy types
@@ -102,6 +103,35 @@ This column-mask program selects a masking action in the same way:
 mask := action("show-last-4") if is_group_member("support")
 else := action("replace-with-null")
 ```
+
+When the experimental Iceberg REST read-restriction loader resolves several row-filter policies
+for one table, a filter that resolves to `true` adds no restriction and is ignored. Identical
+effective filters are deduplicated. Distinct restrictive filters conflict and cause the load-table
+request to fail; the loader does not combine them.
+
+If the selected column-mask action is not applicable to a column type, the experimental loader
+fails the load-table request rather than omitting the mask and exposing the original values.
+Unselected actions do not need to be applicable to that column. For example, `replace-with-null`
+cannot apply to a required column when that action is selected.
+
+Experimental Iceberg REST read restrictions require authorization to be enabled with
+`gravitino.authorization.enable=true` and a policy dispatcher to be available. When a policy dispatcher
+is available but authorization is disabled, the Iceberg REST service fails to start with an error
+identifying the required configuration, even when no policy applies. In auxiliary mode, this also
+aborts startup of the Gravitino server.
+
+`is_group_member` uses group membership supplied by the authenticated principal; enabling
+authorization does not populate these groups. An empty group list is valid and means that the user
+is not a member of any group. Authenticators that do not supply groups, including `simple`, therefore
+select the non-member branch of group-based policies, which may be unrestricted if the policy allows
+it. The referenced group must still exist in Gravitino; an unknown group or an unresolved identity
+causes the load-table request to fail.
+
+When the experimental Iceberg REST read-restriction loader is enabled, load-table does not support
+names containing `.` in the metalake, catalog, schema, table, or top-level column path. The
+metadata-object API reserves `.` as a qualified-name separator, so a tag cannot be assigned
+directly to such an object. The loader returns HTTP 400 for these names even when no policy is
+assigned. A standalone service without a policy dispatcher does not perform policy resolution.
 
 Conditional branches are evaluated from left to right. The first true condition selects its result,
 and every conditional rule must end with an unconditional `else`. Row-filter conditions and results
@@ -170,7 +200,8 @@ do not re-parse stored policy expressions.
 
 A custom policy's rules live in `customRules`. Gravitino stores them and returns them to clients;
 it does not interpret their names or values. Built-in types have a defined content shape. See
-[Iceberg compaction policy](./iceberg-compaction-policy.md) for the compaction rules and
+[Iceberg compaction policy](./iceberg-compaction-policy.md) for the compaction rules,
+[Iceberg manifest rewrite policy](./iceberg-rewrite-manifests-policy.md) for manifest thresholds, and
 [Table maintenance service](./table-maintenance-service/optimizer.md) for a worked example.
 
 Policy content also has `properties` and `supportedObjectTypes`. Properties describe the policy
