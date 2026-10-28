@@ -514,7 +514,7 @@ allprojects {
 
       val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
       param.environment("dockerTest", dockerTest.toString())
-      // Must stay inside doFirst: tasks such as :core's database lanes set this flag in their own
+      // Must stay inside doFirst: tasks such as :core's test tasks set this flag in their own
       // configuration action, which may run after this configureEach action registers.
       val includeDockerTaggedTests =
         param.extensions.extraProperties.properties["includeDockerTaggedTests"] as? Boolean
@@ -1025,17 +1025,7 @@ subprojects {
       val extraArgs = project.property("extraJvmArgs") as List<String>
       jvmArgs = listOf("-Xmx4G") + extraArgs
       useJUnitPlatform()
-      val isCoreSuiteTask =
-        project.path == ":core" &&
-          name in setOf(
-          "coreUnitTest",
-          "coreH2Test",
-          "coreMySQLTest",
-          "corePostgreSQLTest"
-        )
-      if (!isCoreSuiteTask) {
-        finalizedBy(tasks.getByName("jacocoTestReport"))
-      }
+      finalizedBy(tasks.getByName("jacocoTestReport"))
     }
   }
 
