@@ -26,6 +26,7 @@ import static org.apache.gravitino.secret.SecretConstants.ATTR_WRITE_ID;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -67,16 +68,19 @@ public class TestSecretUrn {
   @Test
   public void testBuildWriteThroughUrnWithWriteId() {
     Map<String, String> attributes = new HashMap<>(attributes("catalog", "42", "jdbc-password"));
-    attributes.put(ATTR_WRITE_ID, "w1");
+    String writeId = "0b9c5f4e-6f3a-4a52-9d1e-2b7c1e8f3a10";
+    attributes.put(ATTR_WRITE_ID, writeId);
     SecretUrn urn = SecretUrn.buildWriteThrough("memory", attributes);
     Assertions.assertEquals(
-        "urn:gravitino-secret:memory:catalog:42:w1:jdbc-password", urn.toString());
+        "urn:gravitino-secret:memory:catalog:42:" + writeId + ":jdbc-password", urn.toString());
     Assertions.assertEquals("jdbc-password", urn.propertyKey());
     Assertions.assertEquals(urn, SecretUrn.parse(urn.toString()));
 
-    attributes.put(ATTR_WRITE_ID, "bad/id");
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> SecretUrn.buildWriteThrough("memory", attributes));
+    for (String bad : new String[] {"w1", "1-2-3-4-5", writeId.toUpperCase(Locale.ROOT)}) {
+      attributes.put(ATTR_WRITE_ID, bad);
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> SecretUrn.buildWriteThrough("memory", attributes));
+    }
   }
 
   @Test

@@ -240,7 +240,7 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testFailedSameProviderRotationKeepsUrnResolvable() {
+  void testFailedSameProviderRotationKeepsOldValue() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> current = new HashMap<>();
       List<SecretMaterial> written = new ArrayList<>();
@@ -275,7 +275,7 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testFailedRemoveAndRebindKeepsUrnResolvable() {
+  void testFailedRemoveAndRebindKeepsOldValue() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> current = new HashMap<>();
       List<SecretMaterial> written = new ArrayList<>();
@@ -311,7 +311,7 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testSuccessfulPrepareCollectsAndFiltersReplacedUrns() {
+  void testRemoveAndRebindCollectsTheOldUrn() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> current = new HashMap<>();
       List<SecretMaterial> written = new ArrayList<>();
@@ -350,7 +350,7 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testPostPrepareRollbackKeepsReboundUrnResolvable() {
+  void testPostPrepareRollbackKeepsOldValue() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> current = new HashMap<>();
       List<SecretMaterial> written = new ArrayList<>();

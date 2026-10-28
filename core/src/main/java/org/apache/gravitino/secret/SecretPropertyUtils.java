@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -43,6 +43,9 @@ import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 public final class SecretPropertyUtils {
 
   /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
+  private static final Set<String> WRITE_THROUGH_ENTITY_TYPES =
+      Set.of("catalog", "schema", "fileset");
+
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
       new PropertiesMetadata() {
         @Override
@@ -274,26 +277,24 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Returns whether {@code urn} has the shape of a write-through URN: three identifier segments
-   * ({@code entityType:entityId:propertyKey}), or four whose third segment is a UUID write id.
+   * Returns whether {@code urn} has the shape of a write-through URN: {@code
+   * entityType:entityId:propertyKey}, or {@code entityType:entityId:writeId:propertyKey} with a
+   * UUID write id, where the entity type is {@code catalog}, {@code schema} or {@code fileset} and
+   * the entity id is numeric.
    *
    * @param urn the secret URN
    * @return true when the URN has a write-through shape
    */
   public static boolean isWriteThroughShape(SecretUrn urn) {
     List<String> segments = urn.identifierSegments();
-    if (segments.size() == 3) {
-      return true;
-    }
-    if (segments.size() != 4) {
+    if (segments.size() != 3 && segments.size() != 4) {
       return false;
     }
-    try {
-      UUID.fromString(segments.get(2));
-      return true;
-    } catch (IllegalArgumentException e) {
+    if (!WRITE_THROUGH_ENTITY_TYPES.contains(segments.get(0))
+        || !StringUtils.isNumeric(segments.get(1))) {
       return false;
     }
+    return segments.size() == 3 || SecretUrn.isWriteId(segments.get(2));
   }
 
   /**

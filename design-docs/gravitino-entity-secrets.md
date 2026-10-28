@@ -534,7 +534,7 @@ Persisted example (write-through owned key):
 }
 ```
 
-Write-through ownership is visible in the URN shape (`…:catalog:<id>:<propertyKey>`). Drop and
+Write-through ownership is visible in the URN shape (`…:catalog:<id>[:<writeId>]:<propertyKey>`). Drop and
 alter `removeProperty` call `deleteSecret` only for that shape (§5.5.2 C).
 
 **Affected endpoints** (entity paths unchanged; secrets behavior shared — §5.9.2–5.9.5, drop §5.5.2 C;

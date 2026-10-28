@@ -323,6 +323,7 @@ public class SecretManager implements Closeable {
    * @param secretUrns URNs of the secrets to delete
    */
   public void deleteSecrets(List<SecretUrn> secretUrns) {
+    Preconditions.checkArgument(secretUrns != null, "secretUrns must not be null");
     if (secretUrns.isEmpty()) {
       return;
     }
@@ -457,7 +458,8 @@ public class SecretManager implements Closeable {
    * @param entityId stable numeric entity id
    * @param property property key
    * @param value new property value (plaintext when rewriting a secret, or plain value)
-   * @param written list that receives newly written materials for rollback
+   * @param written list that receives newly written materials for rollback, when the secret is
+   *     owned by this entity
    * @param replacedUrns list that receives URNs of replaced write-through secrets, to be deleted
    *     only after the alter commits
    * @return value to use in SetProperty change (URN or plaintext)

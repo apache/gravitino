@@ -164,6 +164,16 @@ public class TestSecretPropertyUtils {
     Assertions.assertFalse(
         SecretPropertyUtils.isWriteThroughShape(
             SecretUrn.parse("urn:gravitino-secret:memory:path:kv:jdbc-password:jdbc-password")));
+    // External references that only look similar are not write-through secrets.
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:vault:kv:prod:1-2-3-4-5:jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:vault:kv:" + writeId + ":jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:vault:kv:prod:jdbc-password")));
 
     String urn = "urn:gravitino-secret:memory:catalog:7:" + writeId + ":jdbc-password";
     Assertions.assertTrue(

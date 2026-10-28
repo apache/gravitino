@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -87,7 +88,7 @@ public final class SecretUrn {
    *
    * <p>Required attributes: {@link SecretConstants#ATTR_ENTITY_TYPE}, {@link
    * SecretConstants#ATTR_ENTITY_ID}, and {@link SecretConstants#ATTR_PROPERTY_KEY}. When {@link
-   * SecretConstants#ATTR_WRITE_ID} is present, the identifier is {@code
+   * SecretConstants#ATTR_WRITE_ID} (a lowercase UUID) is present, the identifier is {@code
    * entityType:entityId:writeId:propertyKey}; otherwise it is {@code
    * entityType:entityId:propertyKey}.
    *
@@ -118,10 +119,27 @@ public final class SecretUrn {
           providerName,
           Collections.unmodifiableList(Arrays.asList(entityType, entityId, propertyKey)));
     }
-    validateSegment(writeId);
+    if (!isWriteId(writeId)) {
+      throw new IllegalArgumentException(
+          "attributes." + ATTR_WRITE_ID + " must be a lowercase UUID: " + writeId);
+    }
     return new SecretUrn(
         providerName,
         Collections.unmodifiableList(Arrays.asList(entityType, entityId, writeId, propertyKey)));
+  }
+
+  /**
+   * Returns whether {@code segment} is a write id: a UUID in its lowercase string form.
+   *
+   * @param segment the URN segment
+   * @return true when the segment is a write id
+   */
+  public static boolean isWriteId(String segment) {
+    try {
+      return segment != null && UUID.fromString(segment).toString().equals(segment);
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   /**

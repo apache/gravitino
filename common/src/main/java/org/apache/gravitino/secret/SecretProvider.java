@@ -51,8 +51,8 @@ public interface SecretProvider {
    * <p>Provider-specific write metadata is supplied as {@code attributes}. Required keys depend on
    * the provider implementation; for example the in-memory write-through provider expects {@link
    * SecretConstants#ATTR_ENTITY_TYPE}, {@link SecretConstants#ATTR_ENTITY_ID}, and {@link
-   * SecretConstants#ATTR_PROPERTY_KEY}. Alters also pass {@link SecretConstants#ATTR_WRITE_ID}, and
-   * expect the URN that {@link SecretUrn#buildWriteThrough} builds from all of them.
+   * SecretConstants#ATTR_PROPERTY_KEY}, and alters add {@link SecretConstants#ATTR_WRITE_ID}. The
+   * returned URN must be the one {@link SecretUrn#buildWriteThrough} builds from the attributes.
    *
    * @param plaintext the secret plaintext
    * @param attributes provider-specific write attributes
