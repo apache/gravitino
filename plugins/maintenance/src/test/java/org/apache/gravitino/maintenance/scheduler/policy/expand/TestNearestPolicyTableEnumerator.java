@@ -28,8 +28,12 @@ import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.catalog.EntityCombinedTable;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -39,6 +43,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -49,6 +54,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 class TestNearestPolicyTableEnumerator {
 
@@ -287,6 +293,71 @@ class TestNearestPolicyTableEnumerator {
 
     Assertions.assertEquals(
         List.of(), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
+  }
+
+  @Test
+  void testSchemaExpansionImportsTableViaCatalogDispatcher() throws Exception {
+    PolicyEntity policy = policy(10L, "compaction");
+    TagEntity tag = tag(1L, "maint");
+    when(policyTagRelService.listRelations(
+            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
+            eq(Entity.EntityType.POLICY)))
+        .thenReturn(List.of(policyTagEdge(policy, tag)));
+    when(tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier()))
+        .thenReturn(
+            List.of(
+                GenericEntity.builder()
+                    .withId(1L)
+                    .withName("catalog.schema")
+                    .withEntityType(Entity.EntityType.SCHEMA)
+                    .build()));
+
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(METALAKE, "catalog", "schema");
+    NameIdentifier tableIdent = NameIdentifierUtil.ofTable(METALAKE, "catalog", "schema", "ice");
+    when(schemaDispatcher.loadSchema(eq(schemaIdent)))
+        .thenReturn(mock(org.apache.gravitino.Schema.class));
+    when(tableDispatcher.listTables(eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
+        .thenReturn(new NameIdentifier[] {tableIdent});
+
+    TableEntity imported =
+        TableEntity.builder()
+            .withId(501L)
+            .withName("ice")
+            .withNamespace(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))
+            .withAuditInfo(audit())
+            .build();
+    Table loaded = EntityCombinedTable.of(Mockito.mock(Table.class), imported).withImported(true);
+    when(tableDispatcher.loadTable(eq(tableIdent))).thenReturn(loaded);
+
+    // Meta list empty: only catalog dispatcher can discover the table.
+    when(tableMetaService.listTablesByNamespace(
+            eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
+        .thenReturn(List.of());
+
+    MetadataObject tableObj =
+        MetadataObjects.of(
+            java.util.Arrays.asList("catalog", "schema", "ice"), MetadataObject.Type.TABLE);
+    MetadataObject schemaObj =
+        MetadataObjects.of(
+            java.util.Arrays.asList("catalog", "schema"), MetadataObject.Type.SCHEMA);
+    when(nearest.resolve(METALAKE, tableObj, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, schemaObj));
+
+    NearestPolicyTableEnumerator withCatalog =
+        new NearestPolicyTableEnumerator(
+            policyTagRelService,
+            tagMetaService,
+            schemaMetaService,
+            tableMetaService,
+            () -> nearest,
+            () -> schemaDispatcher,
+            () -> tableDispatcher);
+
+    Assertions.assertEquals(
+        List.of(501L), tableIds(withCatalog.listTableIds(policy, 10, allowAll(), 0L)));
+    Mockito.verify(tableDispatcher).loadTable(tableIdent);
   }
 
   private static List<Long> tableIds(List<ExpandTableCandidate> candidates) {

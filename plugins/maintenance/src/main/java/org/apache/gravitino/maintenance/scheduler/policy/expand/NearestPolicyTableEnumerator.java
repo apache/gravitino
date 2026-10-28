@@ -27,18 +27,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.catalog.EntityCombinedTable;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -57,6 +66,11 @@ import org.slf4j.LoggerFactory;
  * NearestMaintenancePolicyResolver} selects this policy id and {@link ExpandOccupancyGate} allows
  * enqueue. Scanning continues until {@code limit} enqueueable tables are found (cooldown /
  * in-flight winners do not consume the batch budget).
+ *
+ * <p>For catalog/schema attachments, prefers {@link SchemaDispatcher}/{@link TableDispatcher}
+ * {@code list*} + {@code load*} so Iceberg-backed tables missing from the entity store are
+ * imported. Falls back to relational meta listing when dispatchers are unavailable or listing
+ * fails. Direct table-tagged objects still use the stored table id.
  */
 public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator {
 
@@ -67,18 +81,24 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   private final SchemaMetaService schemaMetaService;
   private final TableMetaService tableMetaService;
   private final Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier;
+  @Nullable private final Supplier<SchemaDispatcher> schemaDispatcherSupplier;
+  @Nullable private final Supplier<TableDispatcher> tableDispatcherSupplier;
 
-  /** Uses relational singletons and {@link GravitinoEnv#entityStore()}. */
+  /** Uses relational singletons and {@link GravitinoEnv} dispatchers / entity store. */
   public NearestPolicyTableEnumerator() {
     this(
         PolicyTagRelService.getInstance(),
         TagMetaService.getInstance(),
         SchemaMetaService.getInstance(),
         TableMetaService.getInstance(),
-        () -> new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore()));
+        () -> new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore()),
+        () -> GravitinoEnv.getInstance().internalSchemaDispatcher(),
+        () -> GravitinoEnv.getInstance().internalTableDispatcher());
   }
 
   /**
+   * Meta-only constructor for unit tests (no catalog list/import).
+   *
    * @param policyTagRelService policy-tag relations
    * @param tagMetaService tag metadata
    * @param schemaMetaService schema listing
@@ -91,11 +111,40 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       SchemaMetaService schemaMetaService,
       TableMetaService tableMetaService,
       Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier) {
+    this(
+        policyTagRelService,
+        tagMetaService,
+        schemaMetaService,
+        tableMetaService,
+        nearestResolverSupplier,
+        null,
+        null);
+  }
+
+  /**
+   * @param policyTagRelService policy-tag relations
+   * @param tagMetaService tag metadata
+   * @param schemaMetaService schema listing
+   * @param tableMetaService table listing
+   * @param nearestResolverSupplier nearest maintenance-policy resolver
+   * @param schemaDispatcherSupplier optional schema dispatcher for Iceberg list/import
+   * @param tableDispatcherSupplier optional table dispatcher for Iceberg list/import
+   */
+  public NearestPolicyTableEnumerator(
+      PolicyTagRelService policyTagRelService,
+      TagMetaService tagMetaService,
+      SchemaMetaService schemaMetaService,
+      TableMetaService tableMetaService,
+      Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier,
+      @Nullable Supplier<SchemaDispatcher> schemaDispatcherSupplier,
+      @Nullable Supplier<TableDispatcher> tableDispatcherSupplier) {
     this.policyTagRelService = policyTagRelService;
     this.tagMetaService = tagMetaService;
     this.schemaMetaService = schemaMetaService;
     this.tableMetaService = tableMetaService;
     this.nearestResolverSupplier = nearestResolverSupplier;
+    this.schemaDispatcherSupplier = schemaDispatcherSupplier;
+    this.tableDispatcherSupplier = tableDispatcherSupplier;
   }
 
   @Override
@@ -186,6 +235,42 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   private void expandCatalog(MetadataObject catalog, ScanContext ctx) {
+    SchemaDispatcher schemaDispatcher = schemaDispatcherOrNull();
+    if (schemaDispatcher != null) {
+      try {
+        Namespace catalogNs = NamespaceUtil.ofSchema(ctx.metalake, catalog.name());
+        NameIdentifier[] schemas = schemaDispatcher.listSchemas(catalogNs);
+        for (NameIdentifier schemaIdent : schemas) {
+          if (ctx.enqueueable.size() >= ctx.limit) {
+            return;
+          }
+          try {
+            schemaDispatcher.loadSchema(schemaIdent);
+          } catch (RuntimeException e) {
+            LOG.warn(
+                "Skip schema {} while expanding catalog policy attachment: {}",
+                schemaIdent,
+                e.toString());
+            continue;
+          }
+          MetadataObject schemaObject =
+              MetadataObjects.of(catalog.name(), schemaIdent.name(), MetadataObject.Type.SCHEMA);
+          expandSchema(schemaObject, ctx, false);
+        }
+        return;
+      } catch (NoSuchCatalogException e) {
+        LOG.warn(
+            "Catalog {} missing while expanding policy attachment; falling back to meta list: {}",
+            catalog.fullName(),
+            e.toString());
+      } catch (RuntimeException e) {
+        LOG.warn(
+            "Failed to list schemas from catalog {} for policy expand; falling back to meta: {}",
+            catalog.fullName(),
+            e.toString());
+      }
+    }
+
     List<SchemaEntity> schemas =
         schemaMetaService.listSchemasByNamespace(
             NamespaceUtil.ofSchema(ctx.metalake, catalog.name()));
@@ -211,6 +296,39 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     }
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     String descendantPrefix = schema.name() + separator;
+
+    SchemaDispatcher schemaDispatcher = schemaDispatcherOrNull();
+    if (schemaDispatcher != null) {
+      try {
+        NameIdentifier[] schemas =
+            schemaDispatcher.listSchemas(NamespaceUtil.ofSchema(ctx.metalake, catalogName));
+        for (NameIdentifier descendant : schemas) {
+          if (ctx.enqueueable.size() >= ctx.limit) {
+            return;
+          }
+          if (descendant.name() == null || !descendant.name().startsWith(descendantPrefix)) {
+            continue;
+          }
+          try {
+            schemaDispatcher.loadSchema(descendant);
+          } catch (RuntimeException e) {
+            LOG.warn(
+                "Skip descendant schema {} while expanding schema policy: {}",
+                descendant,
+                e.toString());
+            continue;
+          }
+          expandTables(catalogName, descendant.name(), ctx);
+        }
+        return;
+      } catch (RuntimeException e) {
+        LOG.warn(
+            "Failed to list descendant schemas under {} from catalog; falling back to meta: {}",
+            schema.fullName(),
+            e.toString());
+      }
+    }
+
     List<SchemaEntity> schemas =
         schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(ctx.metalake, catalogName));
     for (SchemaEntity descendant : schemas) {
@@ -225,6 +343,53 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   private void expandTables(String catalogName, String schemaName, ScanContext ctx) {
+    TableDispatcher tableDispatcher = tableDispatcherOrNull();
+    SchemaDispatcher schemaDispatcher = schemaDispatcherOrNull();
+    if (tableDispatcher != null && schemaDispatcher != null) {
+      try {
+        NameIdentifier schemaIdent =
+            NameIdentifierUtil.ofSchema(ctx.metalake, catalogName, schemaName);
+        schemaDispatcher.loadSchema(schemaIdent);
+        Namespace tableNs = NamespaceUtil.ofTable(ctx.metalake, catalogName, schemaName);
+        NameIdentifier[] tables = tableDispatcher.listTables(tableNs);
+        for (NameIdentifier tableIdent : tables) {
+          if (ctx.enqueueable.size() >= ctx.limit) {
+            return;
+          }
+          try {
+            Table table = tableDispatcher.loadTable(tableIdent);
+            Long tableId = resolveTableId(table, tableIdent);
+            if (tableId == null) {
+              LOG.warn("Skip table {} after load: missing entity id", tableIdent);
+              continue;
+            }
+            MetadataObject tableObject =
+                NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
+            considerTable(tableId, tableObject, ctx);
+          } catch (NoSuchTableException e) {
+            LOG.debug("Table {} disappeared during expand: {}", tableIdent, e.toString());
+          } catch (RuntimeException e) {
+            LOG.warn("Skip table {} during catalog expand: {}", tableIdent, e.toString());
+          }
+        }
+        return;
+      } catch (NoSuchSchemaException e) {
+        LOG.warn(
+            "Schema {}.{}.{} missing for policy expand; falling back to meta: {}",
+            ctx.metalake,
+            catalogName,
+            schemaName,
+            e.toString());
+      } catch (RuntimeException e) {
+        LOG.warn(
+            "Failed to list/load tables from catalog for {}.{}.{}; falling back to meta: {}",
+            ctx.metalake,
+            catalogName,
+            schemaName,
+            e.toString());
+      }
+    }
+
     List<TableEntity> tables =
         tableMetaService.listTablesByNamespace(
             NamespaceUtil.ofTable(ctx.metalake, catalogName, schemaName));
@@ -235,6 +400,53 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       MetadataObject tableObject =
           NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE);
       considerTable(table.id(), tableObject, ctx);
+    }
+  }
+
+  @Nullable
+  private Long resolveTableId(Table table, NameIdentifier tableIdent) {
+    if (table instanceof EntityCombinedTable) {
+      TableEntity entity = ((EntityCombinedTable) table).tableFromGravitino();
+      if (entity != null && entity.id() != null) {
+        return entity.id();
+      }
+    }
+    try {
+      List<TableEntity> stored = tableMetaService.listTablesByNamespace(tableIdent.namespace());
+      for (TableEntity entity : stored) {
+        if (tableIdent.name().equals(entity.name())) {
+          return entity.id();
+        }
+      }
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to resolve table id for {}: {}", tableIdent, e.toString());
+    }
+    return null;
+  }
+
+  @Nullable
+  private SchemaDispatcher schemaDispatcherOrNull() {
+    if (schemaDispatcherSupplier == null) {
+      return null;
+    }
+    try {
+      return schemaDispatcherSupplier.get();
+    } catch (RuntimeException e) {
+      LOG.debug("Schema dispatcher unavailable for policy expand: {}", e.toString());
+      return null;
+    }
+  }
+
+  @Nullable
+  private TableDispatcher tableDispatcherOrNull() {
+    if (tableDispatcherSupplier == null) {
+      return null;
+    }
+    try {
+      return tableDispatcherSupplier.get();
+    } catch (RuntimeException e) {
+      LOG.debug("Table dispatcher unavailable for policy expand: {}", e.toString());
+      return null;
     }
   }
 
