@@ -2203,6 +2203,87 @@ public class TestJcasbinAuthorizer {
     }
   }
 
+  /** A role dropped after its version probe loses the policies of its previous load. */
+  @Test
+  public void testRoleDroppedBeforeFallbackReadClearsItsPolicies() throws Exception {
+    long roleId = 9115L;
+    String roleName = "droppedDuringLoad";
+    RoleEntity role =
+        mockRoleInStore(roleId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    RoleUpdatedAt loaded = mockedRoleVersions.get(roleId);
+    assertTrue(
+        invokeVersionCheckAndLoadRoles(
+                jcasbinAuthorizer,
+                METALAKE,
+                ImmutableList.of(roleId),
+                roleContext(ImmutableMap.of(roleId, loaded)))
+            .isEmpty());
+    assertFalse(
+        getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, String.valueOf(roleId)).isEmpty());
+
+    // The role changed and was then dropped, so the read that follows the probe finds nothing.
+    RoleUpdatedAt changed = new RoleUpdatedAt(roleId, roleName, nextRoleVersion());
+    Mockito.doThrow(new NoSuchEntityException("Role %s does not exist", roleName))
+        .when(entityStore)
+        .get(eq(role.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    try {
+      assertTrue(
+          invokeVersionCheckAndLoadRoles(
+                  jcasbinAuthorizer,
+                  METALAKE,
+                  ImmutableList.of(roleId),
+                  roleContext(ImmutableMap.of(roleId, changed)))
+              .isEmpty(),
+          "a dropped role has no policies, which is not a read failure");
+      assertTrue(
+          getAllowEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(roleId))
+              .isEmpty(),
+          "the dropped role must not keep granting the privileges of its previous load");
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(roleId).isPresent());
+      assertNoRolePolicyLoadStates();
+    } finally {
+      Mockito.doReturn(role)
+          .when(entityStore)
+          .get(eq(role.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /** A role recreated under its name after its version probe fails closed without loading. */
+  @Test
+  public void testRoleRecreatedUnderSameNameFailsClosed() throws Exception {
+    long roleId = 9116L;
+    long recreatedId = 9117L;
+    String roleName = "recreatedDuringLoad";
+    RoleEntity role =
+        mockRoleInStore(roleId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity recreated =
+        getRoleEntity(recreatedId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    Mockito.doReturn(recreated)
+        .when(entityStore)
+        .get(eq(role.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    try {
+      assertEquals(
+          ImmutableSet.of(roleId),
+          invokeVersionCheckAndLoadRoles(
+              jcasbinAuthorizer,
+              METALAKE,
+              ImmutableList.of(roleId),
+              roleContext(ImmutableMap.of(roleId, mockedRoleVersions.get(roleId)))));
+      for (long id : ImmutableList.of(roleId, recreatedId)) {
+        assertTrue(
+            getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, String.valueOf(id)).isEmpty(),
+            "neither the probed role nor the recreated one may receive the other's policies");
+        assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(id).isPresent());
+      }
+      assertNoRolePolicyLoadStates();
+    } finally {
+      Mockito.doReturn(role)
+          .when(entityStore)
+          .get(eq(role.nameIdentifier()), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
   /** Generation capture observes the map removal and pruning watermark as one publication. */
   @Test
   public void testRoleGenerationCaptureWaitsForPruningPublication() throws Exception {

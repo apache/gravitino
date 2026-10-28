@@ -1654,7 +1654,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
       }
     }
-    if (roleEntity == null || roleEntity.id() != roleId) {
+    if (roleEntity == null) {
+      return false;
+    }
+    if (roleEntity.id() != roleId) {
+      LOG.warn(
+          "Role {} ({}) was read with id {}: it was dropped and recreated after its version was"
+              + " probed, so its policies are not loaded and requests on it fail closed",
+          roleId,
+          rv.getRoleName(),
+          roleEntity.id());
       return false;
     }
 
@@ -1938,8 +1947,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, AuthorizationRequestContext requestContext, BooleanSupplier evaluation) {
     if (!requestContext.getUnreadableRoleIds().isEmpty()) {
       LOG.warn(
-          "Roles {} could not be read or were superseded by a newer version during the initial"
-              + " role load; failing closed",
+          "Roles {} could not be read, were superseded by a newer version, or were recreated"
+              + " during the initial role load; failing closed",
           requestContext.getUnreadableRoleIds());
       return Optional.empty();
     }
@@ -1981,8 +1990,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       // the same one any request would see.
       if (!unreadableRoleIds.isEmpty()) {
         LOG.warn(
-            "Roles {} could not be read or were superseded by a newer version while reloading"
-                + " their cleared policies; failing closed",
+            "Roles {} could not be read, were superseded by a newer version, or were recreated"
+                + " while reloading their cleared policies; failing closed",
             unreadableRoleIds);
         return Optional.empty();
       }
