@@ -61,19 +61,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Lists tables for which {@code policy} is the nearest maintenance policy of its type.
+ * Finds tables where {@code policy} is the nearest maintenance policy of its type.
  *
- * <p>Walks {@code policy → tags → metadata objects}, expands catalog/schema attachments to tables
- * (including tables in hierarchical descendant schemas), then keeps a table only when {@link
- * NearestMaintenancePolicyResolver} selects this policy id and {@link ExpandOccupancyGate} allows
- * enqueue. Scanning continues until {@code limit} enqueueable tables are found (cooldown /
- * in-flight winners do not consume the batch budget).
+ * <p>Flow: {@code policy → tags → tagged objects}. Catalog/schema tags expand to tables (including
+ * hierarchical child schemas). A table is kept only when {@link NearestMaintenancePolicyResolver}
+ * picks this policy and {@link ExpandOccupancyGate} allows enqueue. Stops after {@code limit}
+ * accepted tables (skipped cooldown / in-flight tables do not count).
  *
- * <p>For catalog/schema attachments, prefers {@link SchemaDispatcher}/{@link TableDispatcher}
- * {@code list*} against the live catalog, then imports only schemas/tables missing from the entity
- * store via {@code loadSchema}/{@code loadTable}. Already-stored entities are used by id without
- * reloading. Falls back to relational meta listing when catalog listing fails. Direct table-tagged
- * objects still use the stored table id.
+ * <p>Catalog/schema expansion prefers live {@code listSchemas}/{@code listTables}, then imports
+ * only missing entities with {@code loadSchema}/{@code loadTable}. On list failure, falls back to
+ * the relational store. A direct table tag uses the stored table id as-is.
  */
 public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator {
 
@@ -87,7 +84,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   private final SchemaDispatcher schemaDispatcher;
   private final TableDispatcher tableDispatcher;
 
-  /** Uses relational singletons and {@link GravitinoEnv} dispatchers / entity store. */
+  /** Production wiring via {@link GravitinoEnv} and relational singletons. */
   public NearestPolicyTableEnumerator() {
     this(
         PolicyTagRelService.getInstance(),
@@ -100,13 +97,13 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   /**
-   * @param policyTagRelService policy-tag relations
-   * @param tagMetaService tag metadata
-   * @param schemaMetaService schema listing
-   * @param tableMetaService table listing
-   * @param nearestResolver nearest maintenance-policy resolver
-   * @param schemaDispatcher schema dispatcher for catalog list/import
-   * @param tableDispatcher table dispatcher for catalog list/import
+   * @param policyTagRelService policy ↔ tag edges
+   * @param tagMetaService tagged metadata objects
+   * @param schemaMetaService schemas already in the entity store
+   * @param tableMetaService tables already in the entity store
+   * @param nearestResolver decides which policy wins for a table
+   * @param schemaDispatcher live catalog schema list/import
+   * @param tableDispatcher live catalog table list/import
    */
   public NearestPolicyTableEnumerator(
       PolicyTagRelService policyTagRelService,
@@ -133,101 +130,100 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     if (limit <= 0) {
       return List.of();
     }
-    Policy.BuiltInType policyType = policy.policyType();
+
     String metalake = policy.namespace().level(0);
     NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policy.name());
-    List<RelationalEntity<?>> tagEdges =
+    List<RelationalEntity<?>> policyTagEdges =
         policyTagRelService.listRelations(List.of(policyIdent), Entity.EntityType.POLICY);
 
-    Set<Long> seenTables = new LinkedHashSet<>();
-    Map<Long, ExpandTableCandidate> enqueueable = new LinkedHashMap<>();
-    long nowMs = System.currentTimeMillis();
-    ScanContext ctx =
-        new ScanContext(
+    ScanState scan =
+        new ScanState(
             metalake,
             policy.id(),
-            policyType,
+            policy.policyType(),
             nearestResolver,
             occupancyGate,
             minIntervalMs,
-            nowMs,
-            seenTables,
-            enqueueable,
+            System.currentTimeMillis(),
+            new LinkedHashSet<>(),
+            new LinkedHashMap<>(),
             limit);
 
-    for (RelationalEntity<?> edge : tagEdges) {
+    for (RelationalEntity<?> edge : policyTagEdges) {
       Object target = edge.targetEntity();
       if (!(target instanceof TagEntity)) {
         continue;
       }
       TagEntity tag = (TagEntity) target;
-      List<GenericEntity> objects;
-      try {
-        objects = tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier());
-      } catch (IOException e) {
-        throw new UncheckedIOException("Failed to list objects for tag " + tag.nameIdentifier(), e);
-      }
-      for (GenericEntity object : objects) {
-        if (enqueueable.size() >= limit) {
-          return new ArrayList<>(enqueueable.values());
+      for (GenericEntity taggedObject : listTaggedObjects(tag)) {
+        if (scan.batchFull()) {
+          return scan.acceptedTables();
         }
-        collectCandidates(object, ctx);
+        expandTaggedObject(taggedObject, scan);
       }
     }
-    return new ArrayList<>(enqueueable.values());
+    return scan.acceptedTables();
   }
 
-  private void collectCandidates(GenericEntity object, ScanContext ctx) {
+  private List<GenericEntity> listTaggedObjects(TagEntity tag) {
+    try {
+      return tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier());
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to list objects for tag " + tag.nameIdentifier(), e);
+    }
+  }
+
+  /** Expands one tagged catalog/schema/table into candidate tables. */
+  private void expandTaggedObject(GenericEntity taggedObject, ScanState scan) {
     MetadataObject.Type objectType;
     try {
-      objectType = MetadataObject.Type.valueOf(object.type().name());
+      objectType = MetadataObject.Type.valueOf(taggedObject.type().name());
     } catch (IllegalArgumentException e) {
       return;
     }
-    if (object.name() == null || object.name().isBlank()) {
+    if (taggedObject.name() == null || taggedObject.name().isBlank()) {
       return;
     }
+
     MetadataObject metadataObject;
     try {
-      metadataObject = MetadataObjects.parse(object.name(), objectType);
+      metadataObject = MetadataObjects.parse(taggedObject.name(), objectType);
     } catch (RuntimeException e) {
       return;
     }
 
     switch (objectType) {
       case TABLE:
-        if (object.id() == null) {
-          return;
+        if (taggedObject.id() != null) {
+          tryEnqueueTable(taggedObject.id(), metadataObject, scan);
         }
-        considerTable(object.id(), metadataObject, ctx);
         break;
       case SCHEMA:
-        // A tag on a parent schema also covers tables in child schemas such as {@code a:b}.
-        expandSchema(metadataObject, ctx, true);
+        // Parent schema tags also cover hierarchical children (e.g. a → a:b).
+        expandSchema(metadataObject, scan, /*includeChildSchemas=*/ true);
         break;
       case CATALOG:
-        expandCatalog(metadataObject, ctx);
+        expandCatalog(metadataObject, scan);
         break;
       default:
         break;
     }
   }
 
-  private void expandCatalog(MetadataObject catalog, ScanContext ctx) {
+  /** Lists schemas under a catalog tag, imports missing ones, then expands each to tables. */
+  private void expandCatalog(MetadataObject catalog, ScanState scan) {
     try {
-      Namespace catalogNs = NamespaceUtil.ofSchema(ctx.metalake, catalog.name());
-      NameIdentifier[] schemas = schemaDispatcher.listSchemas(catalogNs);
-      Set<String> knownSchemas = knownSchemaNames(ctx.metalake, catalog.name());
-      for (NameIdentifier schemaIdent : schemas) {
-        if (ctx.enqueueable.size() >= ctx.limit) {
+      NameIdentifier[] liveSchemas =
+          schemaDispatcher.listSchemas(NamespaceUtil.ofSchema(scan.metalake, catalog.name()));
+      Set<String> storedSchemaNames = storedSchemaNames(scan.metalake, catalog.name());
+      for (NameIdentifier schemaIdent : liveSchemas) {
+        if (scan.batchFull()) {
           return;
         }
-        if (!importSchemaIfMissing(schemaIdent, knownSchemas)) {
+        if (!importSchemaIfMissing(schemaIdent, storedSchemaNames)) {
           continue;
         }
-        MetadataObject schemaObject =
-            MetadataObjects.of(catalog.name(), schemaIdent.name(), MetadataObject.Type.SCHEMA);
-        expandSchema(schemaObject, ctx, false);
+        expandSchema(schemaObject(catalog.name(), schemaIdent.name()), scan, false);
       }
       return;
     } catch (NoSuchCatalogException e) {
@@ -242,167 +238,139 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
           e.toString());
     }
 
-    List<SchemaEntity> schemas =
-        schemaMetaService.listSchemasByNamespace(
-            NamespaceUtil.ofSchema(ctx.metalake, catalog.name()));
-    for (SchemaEntity schema : schemas) {
-      if (ctx.enqueueable.size() >= ctx.limit) {
-        return;
-      }
-      MetadataObject schemaObject =
-          MetadataObjects.of(catalog.name(), schema.name(), MetadataObject.Type.SCHEMA);
-      // Catalog listing already includes every hierarchical schema name.
-      expandSchema(schemaObject, ctx, false);
-    }
+    expandSchemasFromStore(scan.metalake, catalog.name(), scan);
   }
 
-  private void expandSchema(MetadataObject schema, ScanContext ctx, boolean includeDescendants) {
+  /**
+   * Expands tables in {@code schema}, and optionally hierarchical child schemas under it.
+   *
+   * @param includeChildSchemas when true (schema tag), also walk descendants such as {@code a:b}
+   */
+  private void expandSchema(MetadataObject schema, ScanState scan, boolean includeChildSchemas) {
     String catalogName = schema.parent();
     if (catalogName == null || schema.name() == null || schema.name().isBlank()) {
       return;
     }
-    expandTables(catalogName, schema.name(), ctx);
-    if (!includeDescendants || ctx.enqueueable.size() >= ctx.limit) {
+
+    expandTablesInSchema(catalogName, schema.name(), scan);
+    if (!includeChildSchemas || scan.batchFull()) {
       return;
     }
-    String separator = HierarchicalSchemaUtil.schemaSeparator();
-    String descendantPrefix = schema.name() + separator;
 
+    String childPrefix = schema.name() + HierarchicalSchemaUtil.schemaSeparator();
     try {
-      NameIdentifier[] schemas =
-          schemaDispatcher.listSchemas(NamespaceUtil.ofSchema(ctx.metalake, catalogName));
-      Set<String> knownSchemas = knownSchemaNames(ctx.metalake, catalogName);
-      for (NameIdentifier descendant : schemas) {
-        if (ctx.enqueueable.size() >= ctx.limit) {
+      NameIdentifier[] liveSchemas =
+          schemaDispatcher.listSchemas(NamespaceUtil.ofSchema(scan.metalake, catalogName));
+      Set<String> storedSchemaNames = storedSchemaNames(scan.metalake, catalogName);
+      for (NameIdentifier childSchema : liveSchemas) {
+        if (scan.batchFull()) {
           return;
         }
-        if (descendant.name() == null || !descendant.name().startsWith(descendantPrefix)) {
+        if (childSchema.name() == null || !childSchema.name().startsWith(childPrefix)) {
           continue;
         }
-        if (!importSchemaIfMissing(descendant, knownSchemas)) {
+        if (!importSchemaIfMissing(childSchema, storedSchemaNames)) {
           continue;
         }
-        expandTables(catalogName, descendant.name(), ctx);
+        expandTablesInSchema(catalogName, childSchema.name(), scan);
       }
       return;
     } catch (RuntimeException e) {
       LOG.warn(
-          "Failed to list descendant schemas under {} from catalog; falling back to meta: {}",
+          "Failed to list child schemas under {} from catalog; falling back to meta: {}",
           schema.fullName(),
           e.toString());
     }
 
-    List<SchemaEntity> schemas =
-        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(ctx.metalake, catalogName));
-    for (SchemaEntity descendant : schemas) {
-      if (ctx.enqueueable.size() >= ctx.limit) {
+    expandChildSchemasFromStore(catalogName, childPrefix, scan);
+  }
+
+  /** Meta fallback: every stored schema under the catalog (already hierarchical). */
+  private void expandSchemasFromStore(String metalake, String catalogName, ScanState scan) {
+    for (SchemaEntity schema :
+        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalake, catalogName))) {
+      if (scan.batchFull()) {
         return;
       }
-      if (descendant.name() == null || !descendant.name().startsWith(descendantPrefix)) {
-        continue;
-      }
-      expandTables(catalogName, descendant.name(), ctx);
+      expandSchema(schemaObject(catalogName, schema.name()), scan, false);
     }
   }
 
-  private void expandTables(String catalogName, String schemaName, ScanContext ctx) {
+  /** Meta fallback: stored schemas whose names start with {@code childPrefix}. */
+  private void expandChildSchemasFromStore(String catalogName, String childPrefix, ScanState scan) {
+    for (SchemaEntity child :
+        schemaMetaService.listSchemasByNamespace(
+            NamespaceUtil.ofSchema(scan.metalake, catalogName))) {
+      if (scan.batchFull()) {
+        return;
+      }
+      if (child.name() == null || !child.name().startsWith(childPrefix)) {
+        continue;
+      }
+      expandTablesInSchema(catalogName, child.name(), scan);
+    }
+  }
+
+  /** Lists tables in one schema: live catalog first, entity store on failure. */
+  private void expandTablesInSchema(String catalogName, String schemaName, ScanState scan) {
+    Namespace tableNamespace = NamespaceUtil.ofTable(scan.metalake, catalogName, schemaName);
     try {
-      Namespace tableNs = NamespaceUtil.ofTable(ctx.metalake, catalogName, schemaName);
-      NameIdentifier[] listed = tableDispatcher.listTables(tableNs);
-      Map<String, TableEntity> knownTables = knownTablesByName(tableNs);
-      for (NameIdentifier tableIdent : listed) {
-        if (ctx.enqueueable.size() >= ctx.limit) {
+      NameIdentifier[] liveTables = tableDispatcher.listTables(tableNamespace);
+      Map<String, TableEntity> storedTables = storedTablesByName(tableNamespace);
+      for (NameIdentifier tableIdent : liveTables) {
+        if (scan.batchFull()) {
           return;
         }
-        TableEntity existing = knownTables.get(tableIdent.name());
-        if (existing != null) {
-          MetadataObject tableObject =
-              NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
-          considerTable(existing.id(), tableObject, ctx);
+        Long tableId = importTableIfMissing(tableIdent, storedTables);
+        if (tableId == null) {
           continue;
         }
-        try {
-          Table table = tableDispatcher.loadTable(tableIdent);
-          Long tableId = resolveTableId(table, tableIdent);
-          if (tableId == null) {
-            LOG.warn("Skip table {} after import load: missing entity id", tableIdent);
-            continue;
-          }
-          MetadataObject tableObject =
-              NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
-          considerTable(tableId, tableObject, ctx);
-        } catch (NoSuchTableException e) {
-          LOG.debug("Table {} disappeared during expand: {}", tableIdent, e.toString());
-        } catch (RuntimeException e) {
-          LOG.warn("Skip table {} during catalog expand import: {}", tableIdent, e.toString());
-        }
+        tryEnqueueTable(tableId, tableObject(tableIdent), scan);
       }
       return;
     } catch (NoSuchSchemaException e) {
       LOG.warn(
           "Schema {}.{}.{} missing for policy expand; falling back to meta: {}",
-          ctx.metalake,
+          scan.metalake,
           catalogName,
           schemaName,
           e.toString());
     } catch (RuntimeException e) {
       LOG.warn(
           "Failed to list tables from catalog for {}.{}.{}; falling back to meta: {}",
-          ctx.metalake,
+          scan.metalake,
           catalogName,
           schemaName,
           e.toString());
     }
 
-    List<TableEntity> tables =
-        tableMetaService.listTablesByNamespace(
-            NamespaceUtil.ofTable(ctx.metalake, catalogName, schemaName));
-    for (TableEntity table : tables) {
-      if (ctx.enqueueable.size() >= ctx.limit) {
+    expandTablesFromStore(tableNamespace, scan);
+  }
+
+  private void expandTablesFromStore(Namespace tableNamespace, ScanState scan) {
+    for (TableEntity table : tableMetaService.listTablesByNamespace(tableNamespace)) {
+      if (scan.batchFull()) {
         return;
       }
-      MetadataObject tableObject =
-          NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE);
-      considerTable(table.id(), tableObject, ctx);
+      tryEnqueueTable(
+          table.id(),
+          NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE),
+          scan);
     }
-  }
-
-  private Set<String> knownSchemaNames(String metalake, String catalogName) {
-    List<SchemaEntity> stored =
-        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalake, catalogName));
-    Set<String> names = new HashSet<>();
-    for (SchemaEntity schema : stored) {
-      if (schema.name() != null) {
-        names.add(schema.name());
-      }
-    }
-    return names;
-  }
-
-  private Map<String, TableEntity> knownTablesByName(Namespace tableNs) {
-    List<TableEntity> stored = tableMetaService.listTablesByNamespace(tableNs);
-    Map<String, TableEntity> byName = new HashMap<>();
-    for (TableEntity table : stored) {
-      if (table.name() != null) {
-        byName.put(table.name(), table);
-      }
-    }
-    return byName;
   }
 
   /**
-   * Imports {@code schemaIdent} when it is absent from the entity store.
+   * Ensures {@code schemaIdent} exists in the entity store.
    *
-   * @return {@code false} when import was attempted and failed; {@code true} when already known or
-   *     import succeeded
+   * @return {@code true} if already stored or import succeeded; {@code false} if import failed
    */
-  private boolean importSchemaIfMissing(NameIdentifier schemaIdent, Set<String> knownSchemas) {
-    if (knownSchemas.contains(schemaIdent.name())) {
+  private boolean importSchemaIfMissing(NameIdentifier schemaIdent, Set<String> storedSchemaNames) {
+    if (storedSchemaNames.contains(schemaIdent.name())) {
       return true;
     }
     try {
       schemaDispatcher.loadSchema(schemaIdent);
-      knownSchemas.add(schemaIdent.name());
+      storedSchemaNames.add(schemaIdent.name());
       return true;
     } catch (RuntimeException e) {
       LOG.warn(
@@ -413,6 +381,56 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     }
   }
 
+  /**
+   * Returns the table id from the entity store, importing via {@code loadTable} when missing.
+   *
+   * @return table id, or {@code null} when the table cannot be imported / resolved
+   */
+  @Nullable
+  private Long importTableIfMissing(
+      NameIdentifier tableIdent, Map<String, TableEntity> storedTables) {
+    TableEntity stored = storedTables.get(tableIdent.name());
+    if (stored != null) {
+      return stored.id();
+    }
+    try {
+      Table loaded = tableDispatcher.loadTable(tableIdent);
+      Long tableId = resolveTableId(loaded, tableIdent);
+      if (tableId == null) {
+        LOG.warn("Skip table {} after import load: missing entity id", tableIdent);
+      }
+      return tableId;
+    } catch (NoSuchTableException e) {
+      LOG.debug("Table {} disappeared during expand: {}", tableIdent, e.toString());
+      return null;
+    } catch (RuntimeException e) {
+      LOG.warn("Skip table {} during catalog expand import: {}", tableIdent, e.toString());
+      return null;
+    }
+  }
+
+  private Set<String> storedSchemaNames(String metalake, String catalogName) {
+    Set<String> names = new HashSet<>();
+    for (SchemaEntity schema :
+        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalake, catalogName))) {
+      if (schema.name() != null) {
+        names.add(schema.name());
+      }
+    }
+    return names;
+  }
+
+  private Map<String, TableEntity> storedTablesByName(Namespace tableNamespace) {
+    Map<String, TableEntity> byName = new HashMap<>();
+    for (TableEntity table : tableMetaService.listTablesByNamespace(tableNamespace)) {
+      if (table.name() != null) {
+        byName.put(table.name(), table);
+      }
+    }
+    return byName;
+  }
+
+  /** Prefer the id carried by {@link EntityCombinedTable}; otherwise look up the store. */
   @Nullable
   private Long resolveTableId(Table table, NameIdentifier tableIdent) {
     if (table instanceof EntityCombinedTable) {
@@ -422,8 +440,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       }
     }
     try {
-      List<TableEntity> stored = tableMetaService.listTablesByNamespace(tableIdent.namespace());
-      for (TableEntity entity : stored) {
+      for (TableEntity entity : tableMetaService.listTablesByNamespace(tableIdent.namespace())) {
         if (tableIdent.name().equals(entity.name())) {
           return entity.id();
         }
@@ -434,73 +451,95 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     return null;
   }
 
-  private static void considerTable(long tableId, MetadataObject tableObject, ScanContext ctx) {
-    if (tableId <= 0 || !ctx.seenTables.add(tableId)) {
+  /**
+   * Accepts {@code tableId} into the batch when this policy is the nearest winner and occupancy
+   * allows enqueue.
+   */
+  private static void tryEnqueueTable(long tableId, MetadataObject tableObject, ScanState scan) {
+    if (tableId <= 0 || !scan.visitedTableIds.add(tableId)) {
       return;
     }
+
     NearestMaintenancePolicyResolver.Decision decision =
-        ctx.nearest.resolve(ctx.metalake, tableObject, ctx.policyType);
+        scan.nearestResolver.resolve(scan.metalake, tableObject, scan.policyType);
     if (decision.kind() == NearestMaintenancePolicyResolver.Decision.Kind.CONFLICT) {
       LOG.error(
           "Skip table {} for maintenance type {}: ambiguous policies {} on nearest level {} ({})",
           tableObject.fullName(),
-          ctx.policyType,
+          scan.policyType,
           decision.conflictingPolicyIds(),
           decision.conflictLevel() == null ? "?" : decision.conflictLevel().type(),
           decision.conflictLevel() == null ? "?" : decision.conflictLevel().fullName());
       return;
     }
-    if (decision.winnerPolicyId().orElse(-1L) != ctx.policyId) {
+    if (decision.winnerPolicyId().orElse(-1L) != scan.policyId) {
       return;
     }
     MetadataObject winnerLevel = decision.winnerLevel();
     if (winnerLevel == null) {
       return;
     }
-    if (ctx.occupancyGate.shouldSkip(tableId, ctx.policyId, ctx.minIntervalMs, ctx.nowMs)) {
+    if (scan.occupancyGate.shouldSkip(tableId, scan.policyId, scan.minIntervalMs, scan.nowMs)) {
       LOG.debug(
           "Skip cron-job enqueue for table {} policy {} (in-flight or within minIntervalMs={})",
           tableId,
-          ctx.policyId,
-          ctx.minIntervalMs);
+          scan.policyId,
+          scan.minIntervalMs);
       return;
     }
-    ctx.enqueueable.put(tableId, new ExpandTableCandidate(tableId, winnerLevel.type()));
+    scan.acceptedByTableId.put(tableId, new ExpandTableCandidate(tableId, winnerLevel.type()));
   }
 
-  private static final class ScanContext {
+  private static MetadataObject schemaObject(String catalogName, String schemaName) {
+    return MetadataObjects.of(catalogName, schemaName, MetadataObject.Type.SCHEMA);
+  }
+
+  private static MetadataObject tableObject(NameIdentifier tableIdent) {
+    return NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
+  }
+
+  /** Mutable progress for one {@link #listTableIds} call. */
+  private static final class ScanState {
     private final String metalake;
     private final long policyId;
     private final Policy.BuiltInType policyType;
-    private final NearestMaintenancePolicyResolver nearest;
+    private final NearestMaintenancePolicyResolver nearestResolver;
     private final ExpandOccupancyGate occupancyGate;
     private final long minIntervalMs;
     private final long nowMs;
-    private final Set<Long> seenTables;
-    private final Map<Long, ExpandTableCandidate> enqueueable;
+    private final Set<Long> visitedTableIds;
+    private final Map<Long, ExpandTableCandidate> acceptedByTableId;
     private final int limit;
 
-    private ScanContext(
+    private ScanState(
         String metalake,
         long policyId,
         Policy.BuiltInType policyType,
-        NearestMaintenancePolicyResolver nearest,
+        NearestMaintenancePolicyResolver nearestResolver,
         ExpandOccupancyGate occupancyGate,
         long minIntervalMs,
         long nowMs,
-        Set<Long> seenTables,
-        Map<Long, ExpandTableCandidate> enqueueable,
+        Set<Long> visitedTableIds,
+        Map<Long, ExpandTableCandidate> acceptedByTableId,
         int limit) {
       this.metalake = metalake;
       this.policyId = policyId;
       this.policyType = policyType;
-      this.nearest = nearest;
+      this.nearestResolver = nearestResolver;
       this.occupancyGate = occupancyGate;
       this.minIntervalMs = minIntervalMs;
       this.nowMs = nowMs;
-      this.seenTables = seenTables;
-      this.enqueueable = enqueueable;
+      this.visitedTableIds = visitedTableIds;
+      this.acceptedByTableId = acceptedByTableId;
       this.limit = limit;
+    }
+
+    private boolean batchFull() {
+      return acceptedByTableId.size() >= limit;
+    }
+
+    private List<ExpandTableCandidate> acceptedTables() {
+      return new ArrayList<>(acceptedByTableId.values());
     }
   }
 }
