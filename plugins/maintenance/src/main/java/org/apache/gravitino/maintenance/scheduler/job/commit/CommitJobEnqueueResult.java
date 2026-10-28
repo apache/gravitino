@@ -19,14 +19,14 @@
 package org.apache.gravitino.maintenance.scheduler.job.commit;
 
 /**
- * Outcome of {@link CommitJobClient#upsertDueNow(long)}.
+ * Outcome of {@link CommitJobClient#enqueueNow(long)}.
  *
  * <p>Distinguishes coalesce ({@link #ALREADY_QUEUED}) from enqueue gate skips ({@link #SKIPPED}) so
  * callers do not log "already queued" when no spec was written.
  */
-public enum CommitJobUpsertResult {
+public enum CommitJobEnqueueResult {
 
-  /** A new due-now {@code commit-job} row was inserted with a MaintenanceJobSpec. */
+  /** A new {@code commit-job} row was inserted with a MaintenanceJobSpec. */
   INSERTED,
 
   /** A {@code commit-job} row already exists for the table (coalesced; {@code task_data} kept). */

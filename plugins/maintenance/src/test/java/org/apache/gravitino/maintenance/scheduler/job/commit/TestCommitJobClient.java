@@ -58,9 +58,9 @@ class TestCommitJobClient extends TestJDBCBackend {
             configWithUri(),
             fixedCollector(List.of(member(POLICY_ID))),
             coolingGate(POLICY_ID));
-    Assertions.assertEquals(CommitJobUpsertResult.SKIPPED, scheduler.upsertDueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobEnqueueResult.SKIPPED, scheduler.enqueueNow(TABLE_ID));
     Assertions.assertTrue(
-        CommitJobClient.client(dataSource())
+        CommitJobClient.schedulerClient(dataSource())
             .getScheduledExecution(
                 TaskInstanceId.of(
                     TableMaintenanceSchedulerPools.COMMIT_JOB, Long.toString(TABLE_ID)))
@@ -76,10 +76,10 @@ class TestCommitJobClient extends TestJDBCBackend {
             fixedCollector(List.of(member(POLICY_ID))),
             allowAllGate());
 
-    Assertions.assertEquals(CommitJobUpsertResult.INSERTED, scheduler.upsertDueNow(TABLE_ID));
-    Assertions.assertEquals(CommitJobUpsertResult.ALREADY_QUEUED, scheduler.upsertDueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobEnqueueResult.INSERTED, scheduler.enqueueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobEnqueueResult.ALREADY_QUEUED, scheduler.enqueueNow(TABLE_ID));
 
-    SchedulerClient client = CommitJobClient.client(dataSource());
+    SchedulerClient client = CommitJobClient.schedulerClient(dataSource());
     MaintenanceJobSpec spec =
         (MaintenanceJobSpec)
             client

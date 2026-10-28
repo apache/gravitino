@@ -66,8 +66,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Snapshot-expiry coalesce happens at expand enqueue (not cron pick): unpicked same-catalog
  * {@code expire_snapshots} {@code table:} / {@code batch:} rows may merge while under capacity. A
- * peer is absorbed only when it is not already at capacity and the combined size would not exceed
- * capacity (all-or-nothing). Policy id need not match. Picked rows are never cancelled or merged.
+ * queued row is merged only when it is not already at capacity and the combined size would not
+ * exceed capacity (all-or-nothing). Policy id need not match. Picked rows are never cancelled or
+ * merged.
  *
  * <p>Enqueue builds a {@link MaintenanceJobSpec} once (policy → jobConf) into {@code task_data};
  * pick consumes that spec. The entity store disables JDBC autocommit; connections are wrapped via
@@ -78,14 +79,12 @@ public class CronJobClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(CronJobClient.class);
 
-  private static final String EXPIRE_SNAPSHOTS = "expire_snapshots";
-
   /**
    * Max tables in one snapshot-expiry {@code batch:} cron-job (merge capacity). Independent of
    * {@code gravitino.maintenance.expand.enqueueBatchSize}, which only bounds how many tables one
-   * expand pick may hand to {@link #enqueueDueNow}.
+   * expand pick may hand to {@link #enqueueNow}.
    */
-  static final int SNAPSHOT_EXPIRY_BATCH_CAPACITY = 10;
+  private static final int SNAPSHOT_EXPIRY_BATCH_CAPACITY = 10;
 
   private final DataSource dataSource;
   private final MaintenanceJobSpecFactory specFactory;
@@ -126,7 +125,7 @@ public class CronJobClient {
    *     this value.
    * @return number of newly inserted cron-job rows (merges into existing batches do not count)
    */
-  public int enqueueDueNow(
+  public int enqueueNow(
       PolicyEntity policy, List<ExpandTableCandidate> candidates, int batchCapacity) {
     if (policy == null || candidates == null || candidates.isEmpty()) {
       return 0;
@@ -139,7 +138,7 @@ public class CronJobClient {
       return 0;
     }
     int expandLimit = Math.max(1, batchCapacity);
-    SchedulerClient client = client(dataSource);
+    SchedulerClient client = schedulerClient(dataSource);
     Instant due = Instant.now();
 
     if (policy.policyType() == Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION) {
@@ -156,13 +155,13 @@ public class CronJobClient {
   }
 
   /**
-   * Builds a SchedulerClient that can commit against the entity-store DataSource.
+   * Builds a db-scheduler {@link SchedulerClient} that can commit against the entity-store
+   * DataSource.
    *
    * @param dataSource entity-store pool
    * @return client bound to {@link TableMaintenanceSchedulerPools#CRON_TASKS_TABLE}
    */
-  @VisibleForTesting
-  public static SchedulerClient client(DataSource dataSource) {
+  public static SchedulerClient schedulerClient(DataSource dataSource) {
     return SchedulerClient.Builder.create(
             AutocommitDataSources.wrap(dataSource), TableMaintenanceSchedulerPools.cronJobTask())
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
@@ -179,7 +178,7 @@ public class CronJobClient {
     List<Long> batchable = new ArrayList<>();
     List<Long> tableLevel = new ArrayList<>();
     for (ExpandTableCandidate candidate : slice) {
-      if (isQueuedForPolicy(client, candidate.tableId(), policy.id())) {
+      if (isTableAlreadyQueued(client, candidate.tableId(), policy.id())) {
         continue;
       }
       if (candidate.batchableForSnapshotExpiry()) {
@@ -188,68 +187,59 @@ public class CronJobClient {
         tableLevel.add(candidate.tableId());
       }
     }
-    int scheduled = packIntoBatches(client, policy, batchable, batchCapacity, due);
+    int scheduled = 0;
+    if (!batchable.isEmpty()) {
+      for (Map.Entry<String, List<Long>> entry : groupByCatalog(batchable).entrySet()) {
+        scheduled +=
+            enqueueSameCatalog(
+                client, policy, entry.getKey(), entry.getValue(), batchCapacity, due);
+      }
+    }
     for (Long tableId : tableLevel) {
       scheduled += enqueueTableSnapshotExpiry(client, policy, tableId, batchCapacity, due);
     }
-    absorbPeersIntoOpenBatches(client, batchCapacity);
+    mergeJobsIntoOpenBatches(client, batchCapacity);
     return scheduled;
   }
 
   /**
    * Enqueues one table-level snapshot-expiry winner: prefer filling an incomplete same-catalog
-   * {@code batch:}, else coalesce with other unpicked expire peers into a new {@code batch:}, else
+   * {@code batch:}, else coalesce with other unpicked expire rows into a new {@code batch:}, else
    * schedule a lone {@code table:} row.
    */
   private int enqueueTableSnapshotExpiry(
       SchedulerClient client, PolicyEntity policy, long tableId, int batchCapacity, Instant due) {
-    if (isQueuedForPolicy(client, tableId, policy.id())) {
+    if (isTableAlreadyQueued(client, tableId, policy.id())) {
       return 0;
     }
-    Optional<String> catalog = catalogNameOf(tableId);
-    if (catalog.isEmpty()) {
+    List<ResolvedTableRef> resolved = tableRefResolver.apply(List.of(tableId));
+    if (resolved.isEmpty()) {
+      LOG.warn("Skipping unresolved table {} from snapshot-expiry table enqueue", tableId);
       return 0;
     }
-    Optional<OpenExpireJob> incomplete =
-        findIncompleteExpireBatch(client, batchCapacity, catalog.get());
+    String catalogName = resolved.get(0).catalogName();
+    Optional<QueuedExpireJob> incomplete =
+        findIncompleteExpireBatch(client, batchCapacity, catalogName);
     if (incomplete.isPresent()
-        && mergeTablesIntoJob(client, incomplete.get(), List.of(tableId), batchCapacity)) {
+        && mergeTablesIntoCronRow(client, incomplete.get(), List.of(tableId), batchCapacity)) {
       return 0;
     }
 
-    List<OpenExpireJob> peers =
-        selectAbsorbablePeers(
-            client, catalog.get(), batchCapacity - 1, batchCapacity, Set.of(), Set.of(tableId));
-    if (!peers.isEmpty()) {
+    List<QueuedExpireJob> toMerge =
+        selectJobsToMerge(
+            client, catalogName, batchCapacity - 1, batchCapacity, Set.of(), Set.of(tableId));
+    if (!toMerge.isEmpty()) {
       List<Long> chunk = new ArrayList<>();
       chunk.add(tableId);
-      for (OpenExpireJob peer : peers) {
-        chunk.addAll(peer.spec.tableIds());
+      for (QueuedExpireJob job : toMerge) {
+        chunk.addAll(job.spec.tableIds());
       }
       if (chunk.size() <= batchCapacity && scheduleBatch(client, policy, chunk, due)) {
-        cancelJobs(client, peers);
+        cancelJobs(client, toMerge);
         return 1;
       }
     }
     return scheduleTable(client, policy, tableId, due) ? 1 : 0;
-  }
-
-  private int packIntoBatches(
-      SchedulerClient client,
-      PolicyEntity policy,
-      List<Long> tableIds,
-      int batchCapacity,
-      Instant due) {
-    if (tableIds.isEmpty()) {
-      return 0;
-    }
-    Map<String, List<Long>> byCatalog = groupByCatalog(tableIds);
-    int newRows = 0;
-    for (Map.Entry<String, List<Long>> entry : byCatalog.entrySet()) {
-      newRows +=
-          packSameCatalog(client, policy, entry.getKey(), entry.getValue(), batchCapacity, due);
-    }
-    return newRows;
   }
 
   private Map<String, List<Long>> groupByCatalog(List<Long> tableIds) {
@@ -262,7 +252,7 @@ public class CronJobClient {
     for (Long tableId : tableIds) {
       ResolvedTableRef ref = byId.get(tableId);
       if (ref == null) {
-        LOG.warn("Skipping unresolved table {} from snapshot-expiry batch packing", tableId);
+        LOG.warn("Skipping unresolved table {} from snapshot-expiry batch enqueue", tableId);
         continue;
       }
       byCatalog.computeIfAbsent(ref.catalogName(), ignored -> new ArrayList<>()).add(tableId);
@@ -270,16 +260,7 @@ public class CronJobClient {
     return byCatalog;
   }
 
-  private Optional<String> catalogNameOf(long tableId) {
-    List<ResolvedTableRef> resolved = tableRefResolver.apply(List.of(tableId));
-    if (resolved.isEmpty()) {
-      LOG.warn("Skipping unresolved table {} from snapshot-expiry table enqueue", tableId);
-      return Optional.empty();
-    }
-    return Optional.of(resolved.get(0).catalogName());
-  }
-
-  private int packSameCatalog(
+  private int enqueueSameCatalog(
       SchedulerClient client,
       PolicyEntity policy,
       String catalogName,
@@ -289,49 +270,49 @@ public class CronJobClient {
     List<Long> remaining = new ArrayList<>(tableIds);
     int newRows = 0;
     while (!remaining.isEmpty()) {
-      Optional<OpenExpireJob> incomplete =
+      Optional<QueuedExpireJob> incomplete =
           findIncompleteExpireBatch(client, batchCapacity, catalogName);
       if (incomplete.isPresent()) {
-        OpenExpireJob open = incomplete.get();
+        QueuedExpireJob open = incomplete.get();
         int room = batchCapacity - open.spec.tableIds().size();
         int fromRemaining = Math.min(room, remaining.size());
         List<Long> chunk = new ArrayList<>(remaining.subList(0, fromRemaining));
         Set<Long> excludeTables = new HashSet<>(open.spec.tableIds());
         excludeTables.addAll(chunk);
-        List<OpenExpireJob> peers =
-            selectAbsorbablePeers(
+        List<QueuedExpireJob> toMerge =
+            selectJobsToMerge(
                 client,
                 catalogName,
                 room - chunk.size(),
                 batchCapacity,
                 Set.of(open.instanceId.getId()),
                 excludeTables);
-        for (OpenExpireJob peer : peers) {
-          chunk.addAll(peer.spec.tableIds());
+        for (QueuedExpireJob job : toMerge) {
+          chunk.addAll(job.spec.tableIds());
         }
-        if (mergeTablesIntoJob(client, open, chunk, batchCapacity)) {
+        if (mergeTablesIntoCronRow(client, open, chunk, batchCapacity)) {
           remaining.subList(0, fromRemaining).clear();
-          cancelJobs(client, peers);
+          cancelJobs(client, toMerge);
           continue;
         }
       }
       int end = Math.min(batchCapacity, remaining.size());
       List<Long> chunk = new ArrayList<>(remaining.subList(0, end));
-      List<OpenExpireJob> peers =
-          selectAbsorbablePeers(
+      List<QueuedExpireJob> toMerge =
+          selectJobsToMerge(
               client,
               catalogName,
               batchCapacity - chunk.size(),
               batchCapacity,
               Set.of(),
               new HashSet<>(chunk));
-      for (OpenExpireJob peer : peers) {
-        chunk.addAll(peer.spec.tableIds());
+      for (QueuedExpireJob job : toMerge) {
+        chunk.addAll(job.spec.tableIds());
       }
       if (chunk.size() <= batchCapacity && scheduleBatch(client, policy, chunk, due)) {
         newRows++;
         remaining.subList(0, end).clear();
-        cancelJobs(client, peers);
+        cancelJobs(client, toMerge);
         continue;
       }
       Long first = remaining.remove(0);
@@ -347,12 +328,12 @@ public class CronJobClient {
     return newRows;
   }
 
-  /** Fills incomplete expire {@code batch:} rows with whole unpicked same-catalog peers. */
-  private void absorbPeersIntoOpenBatches(SchedulerClient client, int batchCapacity) {
+  /** Fills incomplete expire {@code batch:} rows with whole unpicked same-catalog cron rows. */
+  private void mergeJobsIntoOpenBatches(SchedulerClient client, int batchCapacity) {
     Set<String> saturated = new HashSet<>();
     for (; ; ) {
-      Optional<OpenExpireJob> incomplete =
-          listOpenExpireJobs(client).stream()
+      Optional<QueuedExpireJob> incomplete =
+          listQueuedExpireJobs(client).stream()
               .filter(j -> j.isBatch && !j.picked && j.spec.tableIds().size() < batchCapacity)
               .filter(j -> j.catalog != null)
               .filter(j -> !saturated.contains(j.instanceId.getId()))
@@ -360,36 +341,36 @@ public class CronJobClient {
       if (incomplete.isEmpty()) {
         return;
       }
-      OpenExpireJob open = incomplete.get();
+      QueuedExpireJob open = incomplete.get();
       int room = batchCapacity - open.spec.tableIds().size();
-      List<OpenExpireJob> peers =
-          selectAbsorbablePeers(
+      List<QueuedExpireJob> toMerge =
+          selectJobsToMerge(
               client,
               open.catalog,
               room,
               batchCapacity,
               Set.of(open.instanceId.getId()),
               new HashSet<>(open.spec.tableIds()));
-      if (peers.isEmpty()) {
+      if (toMerge.isEmpty()) {
         saturated.add(open.instanceId.getId());
         continue;
       }
       List<Long> extra = new ArrayList<>();
-      for (OpenExpireJob peer : peers) {
-        extra.addAll(peer.spec.tableIds());
+      for (QueuedExpireJob job : toMerge) {
+        extra.addAll(job.spec.tableIds());
       }
-      if (!mergeTablesIntoJob(client, open, extra, batchCapacity)) {
+      if (!mergeTablesIntoCronRow(client, open, extra, batchCapacity)) {
         return;
       }
-      cancelJobs(client, peers);
+      cancelJobs(client, toMerge);
     }
   }
 
   /**
-   * Selects whole unpicked expire peers that fit in {@code room} without exceeding capacity. Skips
-   * peers already at capacity. All-or-nothing per peer.
+   * Selects whole unpicked expire cron rows that fit in {@code room} without exceeding capacity.
+   * Skips rows already at capacity. All-or-nothing per row.
    */
-  private static List<OpenExpireJob> selectAbsorbablePeers(
+  private static List<QueuedExpireJob> selectJobsToMerge(
       SchedulerClient client,
       String catalogName,
       int room,
@@ -399,30 +380,30 @@ public class CronJobClient {
     if (room <= 0) {
       return List.of();
     }
-    List<OpenExpireJob> candidates =
-        listOpenExpireJobs(client).stream()
+    List<QueuedExpireJob> candidates =
+        listQueuedExpireJobs(client).stream()
             .filter(j -> !j.picked)
             .filter(j -> catalogName.equals(j.catalog))
             .filter(j -> !excludeInstanceIds.contains(j.instanceId.getId()))
             .filter(j -> j.spec.tableIds().size() < batchCapacity)
             .filter(j -> j.spec.tableIds().stream().noneMatch(excludeTableIds::contains))
             .sorted(
-                Comparator.comparingInt((OpenExpireJob j) -> j.spec.tableIds().size())
+                Comparator.comparingInt((QueuedExpireJob j) -> j.spec.tableIds().size())
                     .thenComparing(j -> j.instanceId.getId()))
             .toList();
-    List<OpenExpireJob> taken = new ArrayList<>();
+    List<QueuedExpireJob> taken = new ArrayList<>();
     int left = room;
     Set<Long> claimedTables = new HashSet<>(excludeTableIds);
-    for (OpenExpireJob peer : candidates) {
-      int size = peer.spec.tableIds().size();
+    for (QueuedExpireJob candidate : candidates) {
+      int size = candidate.spec.tableIds().size();
       if (size > left) {
         continue;
       }
-      if (peer.spec.tableIds().stream().anyMatch(claimedTables::contains)) {
+      if (candidate.spec.tableIds().stream().anyMatch(claimedTables::contains)) {
         continue;
       }
-      taken.add(peer);
-      claimedTables.addAll(peer.spec.tableIds());
+      taken.add(candidate);
+      claimedTables.addAll(candidate.spec.tableIds());
       left -= size;
       if (left == 0) {
         break;
@@ -431,8 +412,8 @@ public class CronJobClient {
     return taken;
   }
 
-  private boolean mergeTablesIntoJob(
-      SchedulerClient client, OpenExpireJob open, List<Long> extraTableIds, int batchCapacity) {
+  private boolean mergeTablesIntoCronRow(
+      SchedulerClient client, QueuedExpireJob open, List<Long> extraTableIds, int batchCapacity) {
     if (extraTableIds.isEmpty()) {
       return true;
     }
@@ -502,8 +483,8 @@ public class CronJobClient {
     }
   }
 
-  private static void cancelJobs(SchedulerClient client, List<OpenExpireJob> jobs) {
-    for (OpenExpireJob job : jobs) {
+  private static void cancelJobs(SchedulerClient client, List<QueuedExpireJob> jobs) {
+    for (QueuedExpireJob job : jobs) {
       Optional<ScheduledExecution<Object>> execution = client.getScheduledExecution(job.instanceId);
       if (execution.isEmpty()) {
         continue;
@@ -518,7 +499,7 @@ public class CronJobClient {
         client.cancel(job.instanceId);
       } catch (RuntimeException e) {
         LOG.warn(
-            "Failed to cancel absorbed cron-job {} after snapshot-expiry merge: {}",
+            "Failed to cancel merged cron-job {} after snapshot-expiry merge: {}",
             job.instanceId.getId(),
             e.toString());
       }
@@ -570,16 +551,16 @@ public class CronJobClient {
     }
   }
 
-  private static Optional<OpenExpireJob> findIncompleteExpireBatch(
+  private static Optional<QueuedExpireJob> findIncompleteExpireBatch(
       SchedulerClient client, int batchCapacity, String catalogName) {
-    return listOpenExpireJobs(client).stream()
+    return listQueuedExpireJobs(client).stream()
         .filter(j -> j.isBatch && !j.picked && j.spec.tableIds().size() < batchCapacity)
         .filter(j -> catalogName.equals(j.catalog))
         .min(Comparator.comparingLong(j -> j.batchId));
   }
 
-  private static List<OpenExpireJob> listOpenExpireJobs(SchedulerClient client) {
-    List<OpenExpireJob> open = new ArrayList<>();
+  private static List<QueuedExpireJob> listQueuedExpireJobs(SchedulerClient client) {
+    List<QueuedExpireJob> open = new ArrayList<>();
     for (ScheduledExecution<MaintenanceJobSpec> execution :
         client.getScheduledExecutionsForTask(
             TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)) {
@@ -592,7 +573,7 @@ public class CronJobClient {
       Optional<CronJobIds.BatchPolicyIds> batch = CronJobIds.parseBatch(instanceId);
       if (batch.isPresent()) {
         open.add(
-            new OpenExpireJob(
+            new QueuedExpireJob(
                 TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, instanceId),
                 true,
                 batch.get().batchId(),
@@ -606,7 +587,7 @@ public class CronJobClient {
       Optional<CronJobIds.TablePolicyIds> table = CronJobIds.parseTable(instanceId);
       if (table.isPresent()) {
         open.add(
-            new OpenExpireJob(
+            new QueuedExpireJob(
                 TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, instanceId),
                 false,
                 -1L,
@@ -621,13 +602,15 @@ public class CronJobClient {
   }
 
   private static boolean isExpireSnapshots(MaintenanceJobSpec spec) {
-    return spec.getOperations().stream()
-        .anyMatch(op -> EXPIRE_SNAPSHOTS.equals(op.getMaintenanceType()));
+    String expireType =
+        MaintenanceJobTemplates.maintenanceType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
+            .orElseThrow();
+    return spec.getOperations().stream().anyMatch(op -> expireType.equals(op.getMaintenanceType()));
   }
 
-  static long nextBatchId(SchedulerClient client, long policyId) {
+  private static long nextBatchId(SchedulerClient client, long policyId) {
     long max = -1L;
-    for (OpenExpireJob job : listOpenExpireJobs(client)) {
+    for (QueuedExpireJob job : listQueuedExpireJobs(client)) {
       if (job.isBatch && job.policyId == policyId) {
         max = Math.max(max, job.batchId);
       }
@@ -636,10 +619,11 @@ public class CronJobClient {
   }
 
   /**
-   * True when a table already has a queued cron-job for this policy, or any queued snapshot-expiry
-   * cron-job (any policy) that already covers the table.
+   * True when the table should not be enqueued again: a {@code table:} row already exists for this
+   * policy, any queued snapshot-expiry cron-job (any policy) already covers the table, or a
+   * non-expire {@code batch:} for this policy already includes the table.
    */
-  static boolean isQueuedForPolicy(SchedulerClient client, long tableId, long policyId) {
+  static boolean isTableAlreadyQueued(SchedulerClient client, long tableId, long policyId) {
     if (client
         .getScheduledExecution(
             TaskInstanceId.of(
@@ -647,7 +631,7 @@ public class CronJobClient {
         .isPresent()) {
       return true;
     }
-    for (OpenExpireJob job : listOpenExpireJobs(client)) {
+    for (QueuedExpireJob job : listQueuedExpireJobs(client)) {
       if (job.spec.tableIds().contains(tableId)) {
         return true;
       }
@@ -671,7 +655,7 @@ public class CronJobClient {
     return false;
   }
 
-  private static final class OpenExpireJob {
+  private static final class QueuedExpireJob {
     private final TaskInstanceId instanceId;
     private final boolean isBatch;
     private final long batchId;
@@ -681,7 +665,7 @@ public class CronJobClient {
     private final String catalog;
     private final boolean picked;
 
-    private OpenExpireJob(
+    private QueuedExpireJob(
         TaskInstanceId instanceId,
         boolean isBatch,
         long batchId,

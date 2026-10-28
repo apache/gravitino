@@ -149,7 +149,7 @@ public final class PolicyExpandPipeline {
             config, policy.policyType(), policyMinIntervalMs(policy.content()));
     List<ExpandTableCandidate> toEnqueue =
         tableEnumerator.listTableIds(policy, enqueueBatchSize, occupancyGate, minIntervalMs);
-    int scheduled = cronJobClient.enqueueDueNow(policy, toEnqueue, enqueueBatchSize);
+    int scheduled = cronJobClient.enqueueNow(policy, toEnqueue, enqueueBatchSize);
     LOG.info(
         "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}, minIntervalMs={}); next expand due {}",
         policyId,

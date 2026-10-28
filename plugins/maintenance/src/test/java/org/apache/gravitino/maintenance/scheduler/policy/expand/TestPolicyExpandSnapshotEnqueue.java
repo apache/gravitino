@@ -87,7 +87,7 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
     Assertions.assertTrue(expandA.expand(9L).isPresent());
     Assertions.assertTrue(expandB.expand(10L).isPresent());
 
-    SchedulerClient client = CronJobClient.client(dataSource);
+    SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     Assertions.assertTrue(
         client
             .getScheduledExecution(
@@ -138,7 +138,7 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
     Assertions.assertTrue(tableExpand.expand(9L).isPresent());
     Assertions.assertTrue(schemaExpand.expand(9L).isPresent());
 
-    SchedulerClient client = CronJobClient.client(dataSource);
+    SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     Assertions.assertTrue(
         client
             .getScheduledExecution(

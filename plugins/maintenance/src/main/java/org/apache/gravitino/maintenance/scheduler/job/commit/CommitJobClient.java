@@ -101,41 +101,42 @@ public class CommitJobClient {
   }
 
   /**
-   * Builds an enqueue-time spec (chain + jobConf) and schedules a due-now {@code commit-job} when
-   * one is not already queued and the spec is non-empty.
+   * Builds an enqueue-time spec (chain + jobConf) and schedules a {@code commit-job} when one is
+   * not already queued and the spec is non-empty.
    *
    * @param tableId table entity id
    * @return insert / coalesce / skip outcome
    */
-  public CommitJobUpsertResult upsertDueNow(long tableId) {
+  public CommitJobEnqueueResult enqueueNow(long tableId) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
-    SchedulerClient client = client(dataSource);
+    SchedulerClient client = schedulerClient(dataSource);
     String id = Long.toString(tableId);
     // Coalesce without rebuilding task_data: keep the first enqueue-time spec.
     if (client
         .getScheduledExecution(TaskInstanceId.of(TableMaintenanceSchedulerPools.COMMIT_JOB, id))
         .isPresent()) {
-      return CommitJobUpsertResult.ALREADY_QUEUED;
+      return CommitJobEnqueueResult.ALREADY_QUEUED;
     }
     Optional<MaintenanceJobSpec> spec = buildSpec(tableId);
     if (spec.isEmpty()) {
-      return CommitJobUpsertResult.SKIPPED;
+      return CommitJobEnqueueResult.SKIPPED;
     }
     boolean inserted =
         client.scheduleIfNotExists(
             new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, spec.get()),
             Instant.now());
-    return inserted ? CommitJobUpsertResult.INSERTED : CommitJobUpsertResult.ALREADY_QUEUED;
+    return inserted ? CommitJobEnqueueResult.INSERTED : CommitJobEnqueueResult.ALREADY_QUEUED;
   }
 
   /**
-   * Builds a SchedulerClient that can commit against the entity-store DataSource.
+   * Builds a db-scheduler {@link SchedulerClient} that can commit against the entity-store
+   * DataSource.
    *
    * @param dataSource entity-store pool
    * @return client bound to {@link TableMaintenanceSchedulerPools#COMMIT_TASKS_TABLE}
    */
   @VisibleForTesting
-  public static SchedulerClient client(DataSource dataSource) {
+  public static SchedulerClient schedulerClient(DataSource dataSource) {
     return SchedulerClient.Builder.create(
             AutocommitDataSources.wrap(dataSource), TableMaintenanceSchedulerPools.commitJobTask())
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
@@ -155,7 +156,7 @@ public class CommitJobClient {
     }
 
     long nowMs = System.currentTimeMillis();
-    List<CommitChainMember> chain = filterDueToMinInterval(tableId, members, nowMs);
+    List<CommitChainMember> chain = filterByMinInterval(tableId, members, nowMs);
     if (chain.isEmpty()) {
       LOG.debug(
           "Skipping commit-job enqueue for table {}: all onCommit types within minIntervalMs",
@@ -181,7 +182,7 @@ public class CommitJobClient {
     }
   }
 
-  private List<CommitChainMember> filterDueToMinInterval(
+  private List<CommitChainMember> filterByMinInterval(
       long tableId, List<CommitChainMember> collected, long nowMs) {
     List<CommitChainMember> due = new ArrayList<>();
     for (CommitChainMember member : collected) {

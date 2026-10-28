@@ -31,7 +31,7 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient;
-import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobUpsertResult;
+import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobEnqueueResult;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -55,14 +55,14 @@ class TestPostCommitMaintenanceListener {
 
     listener.onPostEvent(new OtherEvent("u", NameIdentifier.of("ml", "c", "s", "t")));
 
-    verify(scheduler, never()).upsertDueNow(anyLong());
+    verify(scheduler, never()).enqueueNow(anyLong());
   }
 
   @Test
   void testEnqueueUpsertsCommitJob() {
     PostCommitMaintenanceListener listener = new PostCommitMaintenanceListener();
     CommitJobClient scheduler = mock(CommitJobClient.class);
-    when(scheduler.upsertDueNow(eq(42L))).thenReturn(CommitJobUpsertResult.INSERTED);
+    when(scheduler.enqueueNow(eq(42L))).thenReturn(CommitJobEnqueueResult.INSERTED);
     listener.setCommitJobClient(scheduler);
     listener.setTableLookup(
         ident ->
@@ -76,7 +76,7 @@ class TestPostCommitMaintenanceListener {
 
     listener.enqueueCommitJob(NameIdentifier.of("ml", "c", "s", "t"));
 
-    verify(scheduler).upsertDueNow(42L);
+    verify(scheduler).enqueueNow(42L);
   }
 
   @Test
