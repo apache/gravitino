@@ -189,6 +189,7 @@ public class TestSemanticModelMetricOperations extends BaseOperationsTest {
                 ? RuntimeException.class.getSimpleName()
                 : failures.get(i).getClass().getSimpleName(),
             error.getType());
+        assertTrue(error.getMessage().contains("operation [LIST_SEMANTIC_MODEL_METRICS]"));
         assertTrue(error.getMessage().contains(failures.get(i).getMessage()));
       }
     }

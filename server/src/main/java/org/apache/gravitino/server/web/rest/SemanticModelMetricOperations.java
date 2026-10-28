@@ -139,7 +139,8 @@ public class SemanticModelMetricOperations {
             return Utils.ok(new MetricInfoListResponse(visible));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleSemanticModelException(OperationType.LIST, "", schema, e);
+      return ExceptionHandlers.handleSemanticModelException(
+          OperationType.LIST_SEMANTIC_MODEL_METRICS, "", schema, e);
     }
   }
 
