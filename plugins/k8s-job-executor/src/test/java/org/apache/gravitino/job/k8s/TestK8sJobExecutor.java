@@ -778,11 +778,10 @@ public class TestK8sJobExecutor {
         .andReturn(409, new StatusBuilder().withCode(409).build())
         .once();
 
-    RuntimeException e =
+    IllegalStateException e =
         Assertions.assertThrows(
-            RuntimeException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
-    Assertions.assertFalse(e instanceof JobSubmissionRejectedException, e.toString());
-    Assertions.assertFalse(e instanceof IllegalArgumentException, e.toString());
+            IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    Assertions.assertEquals(409, ((KubernetesClientException) e.getCause()).getCode());
   }
 
   @Test

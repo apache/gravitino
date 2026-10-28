@@ -218,7 +218,7 @@ public class K8sJobExecutor implements JobExecutor {
         throw new IllegalStateException(
             String.format(
                 "SparkApplication %s/%s conflicted with job %s but is being deleted or already"
-                    + " gone, so it can't be submitted again",
+                    + " gone, so whether it was created for this job can't be told",
                 namespace, name, context.jobId()),
             e);
       }
