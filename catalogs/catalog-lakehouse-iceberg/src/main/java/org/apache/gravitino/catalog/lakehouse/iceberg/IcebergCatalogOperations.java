@@ -53,13 +53,10 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
-import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -81,7 +78,6 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
-import org.apache.iceberg.exceptions.NoSuchWarehouseException;
 import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -104,10 +100,7 @@ public class IcebergCatalogOperations
   @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
 
   @VisibleForTesting @Nullable String catalogUuid;
-  private String catalogName;
-  private IcebergConfig icebergConfig;
-  private boolean useIrcCatalogWrapper;
-  private IcebergCatalogWrapperCache wrapperCache;
+  private IcebergCatalogWrapperProvider wrapperProvider;
   private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
   /**
@@ -133,71 +126,25 @@ public class IcebergCatalogOperations
     resultConf.putAll(gravitinoConfig);
     this.catalogUuid = info.id().toString();
     resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
-    this.icebergConfig = new IcebergConfig(resultConf);
+    IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    this.catalogName = info.name();
-    // Aux: do not touch IRC Manager here — provider-based create can re-enter catalog load.
-    // Non-aux: eager get-or-create into the shared cache (safe; no CatalogManager).
-    this.useIrcCatalogWrapper = shouldUseIrcCatalogWrapper();
-    if (!useIrcCatalogWrapper) {
-      this.wrapperCache = IcebergCatalogWrapperCache.create(icebergConfig);
-      catalogWrapper();
-    }
-    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(this::catalogWrapper);
+    this.wrapperProvider = IcebergCatalogWrapperProvider.create(info.name(), icebergConfig);
+    this.icebergCatalogWrapper = wrapperProvider.get();
+    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(wrapperProvider);
   }
 
-  /**
-   * Returns the Iceberg catalog wrapper from the shared get-or-create cache (IRC Manager when aux,
-   * otherwise {@link IcebergCatalogWrapperCache}), creating with this catalog's config on miss.
-   */
+  /** Returns the Iceberg catalog wrapper via the shared {@link IcebergCatalogWrapperProvider}. */
   @VisibleForTesting
   IcebergCatalogWrapper catalogWrapper() {
-    if (useIrcCatalogWrapper) {
-      CatalogWrapperManager manager =
-          IcebergRESTServerContext.getInstance().catalogWrapperManager();
-      Preconditions.checkState(
-          manager != null,
-          "Internal CatalogWrapperManager is not available. "
-              + "Aux lakehouse catalog requires Iceberg REST embedded in Gravitino server.");
-      // Pass metalake config so static IRC can still create+cache when the provider has no name.
-      this.icebergCatalogWrapper = manager.getCatalogWrapper(catalogName, icebergConfig);
-      return icebergCatalogWrapper;
-    }
-    if (wrapperCache != null) {
-      this.icebergCatalogWrapper = loadFromLocalCache();
+    if (wrapperProvider != null) {
+      this.icebergCatalogWrapper = wrapperProvider.get();
       return icebergCatalogWrapper;
     }
     return icebergCatalogWrapper;
   }
 
-  private IcebergCatalogWrapper loadFromLocalCache() {
-    try {
-      return wrapperCache.get(catalogName, name -> IcebergCatalogWrapper.create(icebergConfig));
-    } catch (NoSuchWarehouseException e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
-                  + "the REST backend 'warehouse' selects a catalog by name on the remote server "
-                  + "and is not a storage location; remove 'warehouse' to use the server's default "
-                  + "catalog, or set it to a catalog name/identifier that the server recognizes.",
-              icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
-          e);
-    } catch (RESTException e) {
-      throw handleRestException(e);
-    }
-  }
-
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper() {
     return new IcebergCatalogWrapperHelper(catalogWrapper().getCatalog());
-  }
-
-  private static boolean shouldUseIrcCatalogWrapper() {
-    try {
-      IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
-      return serverContext.isAuxMode() && serverContext.catalogWrapperManager() != null;
-    } catch (IllegalStateException e) {
-      return false;
-    }
   }
 
   @Override
@@ -205,18 +152,8 @@ public class IcebergCatalogOperations
     if (catalogUuid != null) {
       IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
     }
-    if (useIrcCatalogWrapper) {
-      try {
-        CatalogWrapperManager manager =
-            IcebergRESTServerContext.getInstance().catalogWrapperManager();
-        if (manager != null) {
-          manager.invalidateCatalogWrapper(catalogName);
-        }
-      } catch (IllegalStateException e) {
-        // IRC already shut down
-      }
-    } else if (wrapperCache != null && catalogName != null) {
-      wrapperCache.invalidate(catalogName);
+    if (wrapperProvider != null) {
+      wrapperProvider.invalidate();
     }
   }
 
@@ -236,21 +173,8 @@ public class IcebergCatalogOperations
   /** Closes the Iceberg catalog and releases the associated client pool. */
   @Override
   public void close() {
-    // Cached wrappers are closed by IcebergCatalogWrapperCache / IRC Manager eviction.
-    if (wrapperCache != null) {
-      try {
-        wrapperCache.close();
-      } catch (Exception e) {
-        LOG.warn("Failed to close Iceberg catalog wrapper cache", e);
-      }
-      return;
-    }
-    if (!useIrcCatalogWrapper && null != icebergCatalogWrapper) {
-      try {
-        icebergCatalogWrapper.close();
-      } catch (Exception e) {
-        LOG.warn("Failed to close Iceberg catalog", e);
-      }
+    if (wrapperProvider != null) {
+      wrapperProvider.close();
     }
   }
 

@@ -38,7 +38,7 @@ public class TestIcebergCatalogWrapperResolve {
   }
 
   @Test
-  void catalogWrapperUsesIrcManagerWithConfigWhenAux() throws Exception {
+  void providerUsesIrcManagerWithConfigWhenAux() {
     IcebergCatalogWrapper shared = new IcebergCatalogWrapper(new IcebergConfig());
     IcebergConfig config = new IcebergConfig();
     CatalogWrapperManager manager = Mockito.mock(CatalogWrapperManager.class);
@@ -49,29 +49,41 @@ public class TestIcebergCatalogWrapperResolve {
     Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("c1");
     IcebergRESTServerContext.create(configProvider, false, true, false, manager);
 
-    IcebergCatalogOperations ops = new IcebergCatalogOperations();
-    setField(ops, "catalogName", "c1");
-    setField(ops, "icebergConfig", config);
-    setField(ops, "useIrcCatalogWrapper", true);
-
-    Assertions.assertSame(shared, ops.catalogWrapper());
+    IcebergCatalogWrapperProvider provider = IcebergCatalogWrapperProvider.create("c1", config);
+    Assertions.assertSame(shared, provider.get());
     Mockito.verify(manager).getCatalogWrapper("c1", config);
   }
 
   @Test
-  void catalogWrapperUsesFieldWhenNoCacheConfigured() throws Exception {
-    IcebergCatalogWrapper local = new IcebergCatalogWrapper(new IcebergConfig());
-    IcebergCatalogOperations ops = new IcebergCatalogOperations();
-    ops.icebergCatalogWrapper = local;
-    setField(ops, "useIrcCatalogWrapper", false);
+  void catalogAndViewOpsShareSameProvider() {
+    IcebergCatalogWrapper shared = new IcebergCatalogWrapper(new IcebergConfig());
+    IcebergCatalogWrapperProvider provider = IcebergCatalogWrapperProvider.fixed(shared);
 
-    Assertions.assertSame(local, ops.catalogWrapper());
+    IcebergCatalogOperations catalogOps = new IcebergCatalogOperations();
+    setField(catalogOps, "wrapperProvider", provider);
+    IcebergViewCatalogOperations viewOps = new IcebergViewCatalogOperations(provider);
+
+    Assertions.assertSame(shared, catalogOps.catalogWrapper());
+    // View ops resolve through the same provider instance.
+    Assertions.assertSame(provider.get(), catalogOps.catalogWrapper());
+    Assertions.assertNotNull(viewOps);
   }
 
-  private static void setField(Object target, String name, Object value) throws Exception {
-    Field field = IcebergCatalogOperations.class.getDeclaredField(name);
-    field.setAccessible(true);
-    field.set(target, value);
+  @Test
+  void fixedProviderReturnsInjectedWrapper() {
+    IcebergCatalogWrapper local = new IcebergCatalogWrapper(new IcebergConfig());
+    IcebergCatalogWrapperProvider provider = IcebergCatalogWrapperProvider.fixed(local);
+    Assertions.assertSame(local, provider.get());
+  }
+
+  private static void setField(Object target, String name, Object value) {
+    try {
+      Field field = IcebergCatalogOperations.class.getDeclaredField(name);
+      field.setAccessible(true);
+      field.set(target, value);
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static void resetIcebergRESTServerContext() throws Exception {
