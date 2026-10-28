@@ -25,6 +25,7 @@ import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -56,6 +57,8 @@ import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.COSProperties;
 import org.apache.gravitino.storage.GCSProperties;
@@ -97,6 +100,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private Map<String, String> conf;
 
   private SecretManager secretManager;
+
+  // Plaintext of the write-through secrets the entity owns, read when the secret manager is set.
+  // An alter writes such a secret to a new URN and deletes the old one after it commits, so a
+  // catalog built from the old entity must not read the old URN again.
+  private Map<String, String> ownedSecretPlaintext = Map.of();
 
   private volatile CatalogOperations ops;
 
@@ -519,7 +527,22 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   public T withSecretManager(SecretManager secretManager) {
     this.secretManager = secretManager;
+    this.ownedSecretPlaintext = readOwnedSecrets();
     return (T) this;
+  }
+
+  private Map<String, String> readOwnedSecrets() {
+    if (secretManager == null || entity == null || entity.getProperties() == null) {
+      return Map.of();
+    }
+    Map<String, String> plaintext = new HashMap<>();
+    for (Map.Entry<String, String> entry : entity.getProperties().entrySet()) {
+      if (SecretPropertyUtils.isWriteThroughForEntity(
+          entry.getKey(), entry.getValue(), "catalog", entity.id())) {
+        plaintext.put(entry.getKey(), secretManager.readSecret(SecretUrn.parse(entry.getValue())));
+      }
+    }
+    return plaintext;
   }
 
   /**
@@ -605,6 +628,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     // Entity storage keeps secret URNs; resolve to plaintext when SecretManager is available.
     Map<String, String> props = Maps.newHashMap(entity().getProperties());
     if (secretManager != null) {
+      props.putAll(ownedSecretPlaintext);
       props = Maps.newHashMap(secretManager.toPlaintextProperties(props));
     }
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {

@@ -112,6 +112,52 @@ public class TestBaseCatalogCredentialSecrets {
   }
 
   @Test
+  void testCatalogKeepsOwnedSecretAfterItsUrnIsDeleted() throws Exception {
+    try (SecretManager secretManager = memorySecretManager()) {
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE,
+                  "catalog",
+                  SecretConstants.ATTR_ENTITY_ID,
+                  "3",
+                  SecretConstants.ATTR_PROPERTY_KEY,
+                  JdbcCredential.GRAVITINO_JDBC_PASSWORD));
+      secretManager.writeSecrets(java.util.List.of(new SecretMaterial(urn, "old-pass")));
+      Map<String, String> entityProps =
+          Map.of(
+              JdbcCredential.GRAVITINO_JDBC_USER,
+              "iceberg",
+              JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+              urn.toString());
+      CatalogEntity entity =
+          CatalogEntity.builder()
+              .withId(3L)
+              .withName("rotated-catalog")
+              .withNamespace(Namespace.of("metalake"))
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider("test")
+              .withProperties(entityProps)
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build();
+      TestCatalog catalog =
+          new TestCatalog()
+              .withCatalogEntity(entity)
+              .withCatalogConf(entityProps)
+              .withSecretManager(secretManager);
+
+      // A rotation committed elsewhere deletes the old URN while this catalog is still in use.
+      secretManager.deleteSecrets(java.util.List.of(urn));
+
+      Assertions.assertEquals(
+          "old-pass",
+          catalog.propertiesWithCredentialProviders().get(JdbcCredential.GRAVITINO_JDBC_PASSWORD));
+    }
+  }
+
+  @Test
   void testPropertiesWithCredentialProvidersResolvesEntityUrn() throws Exception {
     try (SecretManager secretManager = memorySecretManager()) {
       SecretUrn urn =
