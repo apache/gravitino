@@ -1382,19 +1382,22 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 copyProperties(catalogWrapper.catalog().entity().getProperties());
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
-              // Unmanaged catalogs keep their external schemas and tables. Those objects still
-              // carry the Gravitino identifier written at create/import time, so a catalog that
-              // later manages them again would inherit stale ownership (see issue #13475). Collect
-              // the schemas that remain in the external system and let the connector strip the
-              // identifiers; managed catalogs already dropped their external objects above, so the
-              // list stays empty.
-              List<NameIdentifier> remainingExternalSchemas =
-                  managedStorage ? Collections.emptyList() : listExternalSchemas(catalogWrapper);
               try {
                 catalogWrapper.doWithCatalogOps(
                     operations -> {
                       if (operations instanceof CatalogDropAware) {
-                        ((CatalogDropAware) operations).onCatalogDropped(remainingExternalSchemas);
+                        CatalogDropAware dropAware = (CatalogDropAware) operations;
+                        if (dropAware.supportsExternalIdentifierCleanup()) {
+                          // Only opted-in connectors need external discovery. Existing callbacks
+                          // keep their previous behavior and perform no schema listing.
+                          List<NameIdentifier> remainingExternalSchemas =
+                              managedStorage
+                                  ? Collections.emptyList()
+                                  : listExternalSchemas(catalogWrapper);
+                          dropAware.onCatalogDropped(remainingExternalSchemas);
+                        } else {
+                          dropAware.onCatalogDropped();
+                        }
                       }
                       return null;
                     });
@@ -1459,8 +1462,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   /**
    * Lists the schemas that still exist in the external system for a catalog that is being dropped,
    * so the connector can strip the Gravitino identifier from those objects. A failure to reach the
-   * external system is logged and treated as "nothing to clean up": the identifier cleanup is
-   * best-effort and must never make a drop fail.
+   * external system is logged and represented by an empty discovery list. This does not establish
+   * that no external objects exist. Cleanup is best-effort and must never make a drop fail.
    *
    * @param catalogWrapper The wrapper of the catalog being dropped.
    * @return The identifiers of the schemas that remain in the external system; empty if the

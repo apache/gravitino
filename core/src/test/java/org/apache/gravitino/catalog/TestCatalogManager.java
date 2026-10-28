@@ -29,6 +29,7 @@ import static org.apache.gravitino.TestCatalog.PROPERTY_KEY6_PREFIX;
 import static org.apache.gravitino.TestCatalog.PROPERTY_RESERVED_KEY;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 
 import com.google.common.collect.ImmutableMap;
@@ -40,8 +41,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1828,16 +1829,22 @@ public class TestCatalogManager {
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
-    // The drop hands the connector the schemas that remain externally (empty here: the wrapper's
-    // schema operations are stubbed to return nothing), so residual identifiers can be cleared.
-    Mockito.verify((CatalogDropAware) operations)
-        .onCatalogDropped(Mockito.eq(Collections.emptyList()));
+    Mockito.verify((CatalogDropAware) operations).onCatalogDropped();
+    Mockito.verify(catalogWrapper, Mockito.never()).doWithSchemaOps(any());
   }
 
-  @Test
-  void testDropUnmanagedCatalogCleansResidualExternalIdentifiers() throws Exception {
-    // Regression test for #13475: dropping an unmanaged catalog must tell the connector which
-    // external schemas remain, so it can clear the Gravitino identifiers those objects still carry.
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "success",
+        "list-failure",
+        "callback-failure",
+        "unsupported",
+        "legacy",
+        "legacy-failure"
+      })
+  void testDropUnmanagedCatalogCallbackDiscoveryAndFailures(String scenario) throws Exception {
+    // This tests callback wiring, not external identifier removal (tracked by #13475).
     NameIdentifier ident = NameIdentifier.of("metalake", "residual_identifier_drop_test");
     Map<String, String> props =
         ImmutableMap.of(
@@ -1863,15 +1870,22 @@ public class TestCatalogManager {
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
-    // The external system still holds the schema after the registration is dropped.
-    Mockito.doReturn(new NameIdentifier[] {externalSchema})
-        .when(catalogWrapper)
-        .doWithSchemaOps(any());
+    if (scenario.equals("list-failure")) {
+      Mockito.doThrow(new RuntimeException("external listing unavailable"))
+          .when(catalogWrapper)
+          .doWithSchemaOps(any());
+    } else {
+      Mockito.doReturn(new NameIdentifier[] {externalSchema})
+          .when(catalogWrapper)
+          .doWithSchemaOps(any());
+    }
 
     CatalogOperations operations =
-        Mockito.mock(
-            CatalogOperations.class,
-            Mockito.withSettings().extraInterfaces(CatalogDropAware.class));
+        scenario.equals("unsupported")
+            ? Mockito.mock(CatalogOperations.class)
+            : Mockito.mock(
+                CatalogOperations.class,
+                Mockito.withSettings().extraInterfaces(CatalogDropAware.class));
     Mockito.doAnswer(
             invocation -> {
               ThrowableFunction<CatalogOperations, ?> function = invocation.getArgument(0);
@@ -1880,14 +1894,39 @@ public class TestCatalogManager {
         .when(catalogWrapper)
         .doWithCatalogOps(any());
 
+    if (operations instanceof CatalogDropAware) {
+      Mockito.when(((CatalogDropAware) operations).supportsExternalIdentifierCleanup())
+          .thenReturn(!scenario.startsWith("legacy"));
+      if (scenario.equals("legacy-failure")) {
+        Mockito.doThrow(new RuntimeException("legacy cleanup unavailable"))
+            .when((CatalogDropAware) operations)
+            .onCatalogDropped();
+      }
+      if (scenario.equals("callback-failure")) {
+        Mockito.doThrow(new RuntimeException("external cleanup unavailable"))
+            .when((CatalogDropAware) operations)
+            .onCatalogDropped(anyList());
+      }
+    }
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
     boolean dropped = catalogManager.dropCatalog(ident, true);
 
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
-    // The connector is handed the schemas that remain externally so it can strip the identifiers.
-    Mockito.verify((CatalogDropAware) operations)
-        .onCatalogDropped(Mockito.eq(Collections.singletonList(externalSchema)));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    if (scenario.equals("unsupported") || scenario.startsWith("legacy")) {
+      Mockito.verify(catalogWrapper, Mockito.never()).doWithSchemaOps(any());
+      if (scenario.startsWith("legacy")) {
+        Mockito.verify((CatalogDropAware) operations).onCatalogDropped();
+        Mockito.verify((CatalogDropAware) operations, Mockito.never()).onCatalogDropped(anyList());
+      }
+    } else {
+      Mockito.verify((CatalogDropAware) operations)
+          .onCatalogDropped(
+              scenario.equals("list-failure")
+                  ? Collections.emptyList()
+                  : Collections.singletonList(externalSchema));
+    }
   }
 
   @Test
@@ -1933,6 +1972,8 @@ public class TestCatalogManager {
         .when(catalogWrapper)
         .doWithCatalogOps(any());
 
+    Mockito.when(((CatalogDropAware) operations).supportsExternalIdentifierCleanup())
+        .thenReturn(true);
     catalogManager.getCatalogCache().put(ident, catalogWrapper);
     boolean dropped = catalogManager.dropCatalog(ident, true);
 
