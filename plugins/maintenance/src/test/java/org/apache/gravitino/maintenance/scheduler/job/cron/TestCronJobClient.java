@@ -50,14 +50,14 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-class TestCronJobScheduler extends TestJDBCBackend {
+class TestCronJobClient extends TestJDBCBackend {
 
   private static final String GRAVITINO_URI = "http://localhost:8090";
 
   @TestTemplate
   void testEnqueueIsIdempotentAndRespectsBatchSize() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = compactionPolicy(7L);
 
     List<ExpandTableCandidate> three =
@@ -74,7 +74,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
                 candidate(1L, MetadataObject.Type.TABLE), candidate(2L, MetadataObject.Type.TABLE)),
             2));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     Assertions.assertTrue(
         client
             .getScheduledExecution(
@@ -110,7 +110,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpiryFillsIncompleteBatchBeforeAllocatingNextId() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
 
     Assertions.assertEquals(
@@ -133,7 +133,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
                 candidate(13L, MetadataObject.Type.SCHEMA)),
             10));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     TaskInstanceId batch0 =
         TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forBatch(0L, 9L));
     TaskInstanceId batch1 =
@@ -150,9 +150,9 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpiryAllocatesNextBatchWhenCapacityFull() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
-    int cap = RelationalCronJobScheduler.SNAPSHOT_EXPIRY_BATCH_CAPACITY;
+    int cap = CronJobClient.SNAPSHOT_EXPIRY_BATCH_CAPACITY;
 
     List<ExpandTableCandidate> full = schemaCandidates(1, cap);
     Assertions.assertEquals(1, scheduler.enqueueDueNow(policy, full, 100));
@@ -160,7 +160,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
     fullPlusOne.add(candidate(cap + 1L, MetadataObject.Type.SCHEMA));
     Assertions.assertEquals(1, scheduler.enqueueDueNow(policy, fullPlusOne, 100));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     MaintenanceJobSpec batch0 =
         (MaintenanceJobSpec)
             client
@@ -184,13 +184,13 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpiryIncompleteBatchAbsorbsUnpickedTableJob() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
 
     Assertions.assertEquals(
         1, scheduler.enqueueDueNow(policy, List.of(candidate(99L, MetadataObject.Type.TABLE)), 10));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     TaskInstanceId tableJob =
         TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(99L, 9L));
     Assertions.assertTrue(client.getScheduledExecution(tableJob).isPresent());
@@ -218,7 +218,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpiryTableJobsCoalesceIntoBatch() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
 
     Assertions.assertEquals(
@@ -226,7 +226,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
     Assertions.assertEquals(
         1, scheduler.enqueueDueNow(policy, List.of(candidate(22L, MetadataObject.Type.TABLE)), 10));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     TaskInstanceId table21 =
         TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(21L, 9L));
     TaskInstanceId table22 =
@@ -244,7 +244,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpiryTableMergesIntoExistingIncompleteBatch() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
 
     Assertions.assertEquals(
@@ -258,7 +258,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
     Assertions.assertEquals(
         0, scheduler.enqueueDueNow(policy, List.of(candidate(99L, MetadataObject.Type.TABLE)), 10));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     TaskInstanceId tableJob =
         TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(99L, 9L));
     TaskInstanceId batch0 =
@@ -272,7 +272,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpiryMergesAcrossPoliciesSameCatalog() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
 
     Assertions.assertEquals(
         1,
@@ -283,7 +283,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
         scheduler.enqueueDueNow(
             expirePolicy(10L), List.of(candidate(22L, MetadataObject.Type.TABLE)), 10));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     Assertions.assertTrue(
         client
             .getScheduledExecution(
@@ -307,7 +307,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpiryDoesNotMergeDifferentCatalogs() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = multiCatalogScheduler(dataSource);
+    CronJobClient scheduler = multiCatalogScheduler(dataSource);
 
     Assertions.assertEquals(
         1,
@@ -318,7 +318,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
         scheduler.enqueueDueNow(
             expirePolicy(9L), List.of(candidate(1001L, MetadataObject.Type.TABLE)), 10));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     Assertions.assertTrue(
         client
             .getScheduledExecution(
@@ -336,9 +336,9 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpirySkipsPeerWhenMergeWouldExceedCapacity() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
-    int cap = RelationalCronJobScheduler.SNAPSHOT_EXPIRY_BATCH_CAPACITY;
+    int cap = CronJobClient.SNAPSHOT_EXPIRY_BATCH_CAPACITY;
 
     // Full batch at capacity — must not be absorbed into a later incomplete peer.
     Assertions.assertEquals(1, scheduler.enqueueDueNow(policy, schemaCandidates(1, cap), 100));
@@ -351,7 +351,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
                 candidate(101L, MetadataObject.Type.SCHEMA)),
             100));
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     MaintenanceJobSpec batch0 =
         (MaintenanceJobSpec)
             client
@@ -375,7 +375,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testPendingCronGateSkipsQueuedTables() {
     DataSource dataSource = dataSource();
-    CronJobScheduler scheduler = scheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
     Assertions.assertEquals(
         1,
         scheduler.enqueueDueNow(
@@ -394,7 +394,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
   @TestTemplate
   void testCronJobTaskRemovesRowAfterPick() throws Exception {
     DataSource dataSource = dataSource();
-    CronJobScheduler enqueue = scheduler(dataSource);
+    CronJobClient enqueue = scheduler(dataSource);
     Assertions.assertEquals(
         1,
         enqueue.enqueueDueNow(
@@ -402,7 +402,7 @@ class TestCronJobScheduler extends TestJDBCBackend {
 
     TaskInstanceId instanceId =
         TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(99L, 9L));
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
 
     Scheduler cronPool =
@@ -432,8 +432,8 @@ class TestCronJobScheduler extends TestJDBCBackend {
     Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
   }
 
-  private static CronJobScheduler scheduler(DataSource dataSource) {
-    return new RelationalCronJobScheduler(
+  private static CronJobClient scheduler(DataSource dataSource) {
+    return new CronJobClient(
         dataSource,
         configWithUri(),
         ids ->
@@ -443,8 +443,8 @@ class TestCronJobScheduler extends TestJDBCBackend {
   }
 
   /** Tables with id &gt;= 1000 resolve to catalog {@code other}; others to {@code iceberg}. */
-  private static CronJobScheduler multiCatalogScheduler(DataSource dataSource) {
-    return new RelationalCronJobScheduler(
+  private static CronJobClient multiCatalogScheduler(DataSource dataSource) {
+    return new CronJobClient(
         dataSource,
         configWithUri(),
         ids ->

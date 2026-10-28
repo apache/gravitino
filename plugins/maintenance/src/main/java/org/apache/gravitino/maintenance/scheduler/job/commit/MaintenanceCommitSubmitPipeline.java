@@ -42,8 +42,8 @@ import org.slf4j.LoggerFactory;
  * runJob} → bind the same job id on every claim.
  *
  * <p>Chain collection, cooldown filtering, auth consistency, and jobConf merge happen at enqueue
- * (see {@link RelationalCommitJobScheduler}). The caller always deletes the one-shot {@code
- * commit-job} row after this method returns.
+ * (see {@link CommitJobClient}). The caller always deletes the one-shot {@code commit-job} row
+ * after this method returns.
  */
 public final class MaintenanceCommitSubmitPipeline {
 

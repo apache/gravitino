@@ -31,10 +31,9 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobIds;
-import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobScheduler;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
-import org.apache.gravitino.maintenance.scheduler.job.cron.RelationalCronJobScheduler;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
@@ -46,8 +45,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
 /**
- * Expand pipeline → real {@link RelationalCronJobScheduler}: snapshot-expiry coalesce across two
- * policy expands (same catalog).
+ * Expand pipeline → real {@link CronJobClient}: snapshot-expiry coalesce across two policy expands
+ * (same catalog).
  */
 class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
 
@@ -57,7 +56,7 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
   @TestTemplate
   void testTwoPolicyExpandsCoalesceSameCatalogTables() {
     DataSource dataSource = dataSource();
-    CronJobScheduler cronJobs = cronScheduler(dataSource);
+    CronJobClient cronJobs = cronScheduler(dataSource);
 
     PolicyEntity policyA = expirePolicy(9L);
     PolicyEntity policyB = expirePolicy(10L);
@@ -88,7 +87,7 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
     Assertions.assertTrue(expandA.expand(9L).isPresent());
     Assertions.assertTrue(expandB.expand(10L).isPresent());
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     Assertions.assertTrue(
         client
             .getScheduledExecution(
@@ -112,7 +111,7 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
   @TestTemplate
   void testSchemaExpandAbsorbsPriorTableCronJob() {
     DataSource dataSource = dataSource();
-    CronJobScheduler cronJobs = cronScheduler(dataSource);
+    CronJobClient cronJobs = cronScheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);
 
     PolicyExpandPipeline tableExpand =
@@ -139,7 +138,7 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
     Assertions.assertTrue(tableExpand.expand(9L).isPresent());
     Assertions.assertTrue(schemaExpand.expand(9L).isPresent());
 
-    SchedulerClient client = RelationalCronJobScheduler.client(dataSource);
+    SchedulerClient client = CronJobClient.client(dataSource);
     Assertions.assertTrue(
         client
             .getScheduledExecution(
@@ -157,8 +156,8 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
     Assertions.assertEquals(List.of(10L, 11L, 99L), data.tableIds());
   }
 
-  private static CronJobScheduler cronScheduler(DataSource dataSource) {
-    return new RelationalCronJobScheduler(
+  private static CronJobClient cronScheduler(DataSource dataSource) {
+    return new CronJobClient(
         dataSource,
         configWithUri(),
         ids ->

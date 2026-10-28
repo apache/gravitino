@@ -19,7 +19,7 @@
 package org.apache.gravitino.maintenance.scheduler.job.commit;
 
 /**
- * Outcome of {@link CommitJobScheduler#upsertDueNow(long)}.
+ * Outcome of {@link CommitJobClient#upsertDueNow(long)}.
  *
  * <p>Distinguishes coalesce ({@link #ALREADY_QUEUED}) from enqueue gate skips ({@link #SKIPPED}) so
  * callers do not log "already queued" when no spec was written.

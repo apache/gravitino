@@ -51,7 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Schedules {@code cron-job} rows through a db-scheduler {@link SchedulerClient} on the
+ * Enqueues one-shot {@code cron-job} rows through a db-scheduler {@link SchedulerClient} on the
  * entity-store DataSource.
  *
  * <p>Follows the usual client pattern: {@link SchedulerClient#scheduleIfNotExists} for new instance
@@ -59,18 +59,24 @@ import org.slf4j.LoggerFactory;
  * SchedulerClient#reschedule(TaskInstanceId, Instant, Object)} to replace {@code task_data} when
  * filling an incomplete snapshot-expiry batch.
  *
+ * <p>Existing instance ids are left untouched so a repeated expand pick does not reset an
+ * already-queued submit. Snapshot-expiry winners attached at schema/catalog are packed into {@code
+ * batch:{batch_id}:{policy_id}} rows; incomplete batches are filled before a new {@code batch_id}
+ * is allocated (§5.2.2).
+ *
  * <p>Snapshot-expiry coalesce happens at expand enqueue (not cron pick): unpicked same-catalog
  * {@code expire_snapshots} {@code table:} / {@code batch:} rows may merge while under capacity. A
  * peer is absorbed only when it is not already at capacity and the combined size would not exceed
  * capacity (all-or-nothing). Policy id need not match. Picked rows are never cancelled or merged.
  *
- * <p>The entity store disables JDBC autocommit; connections are wrapped via {@link
- * AutocommitDataSources} so each client call commits. {@code task_data} is JSON via {@link
+ * <p>Enqueue builds a {@link MaintenanceJobSpec} once (policy → jobConf) into {@code task_data};
+ * pick consumes that spec. The entity store disables JDBC autocommit; connections are wrapped via
+ * {@link AutocommitDataSources} so each client call commits. {@code task_data} is JSON via {@link
  * JacksonSerializer + JsonUtils.anyFieldMapper()}.
  */
-public final class RelationalCronJobScheduler implements CronJobScheduler {
+public class CronJobClient {
 
-  private static final Logger LOG = LoggerFactory.getLogger(RelationalCronJobScheduler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CronJobClient.class);
 
   private static final String EXPIRE_SNAPSHOTS = "expire_snapshots";
 
@@ -89,7 +95,7 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
    * @param dataSource relational JDBC pool shared with the entity store
    * @param gravitinoConfig server config for jobConf overlay
    */
-  public RelationalCronJobScheduler(DataSource dataSource, Config gravitinoConfig) {
+  public CronJobClient(DataSource dataSource, Config gravitinoConfig) {
     this(dataSource, gravitinoConfig, MaintenanceTableRefs::resolve);
   }
 
@@ -101,7 +107,7 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
    * @param tableRefResolver resolves entity ids to catalog + schema.table
    */
   @VisibleForTesting
-  public RelationalCronJobScheduler(
+  public CronJobClient(
       DataSource dataSource,
       Config gravitinoConfig,
       Function<List<Long>, List<ResolvedTableRef>> tableRefResolver) {
@@ -110,7 +116,16 @@ public final class RelationalCronJobScheduler implements CronJobScheduler {
     this.tableRefResolver = Preconditions.checkNotNull(tableRefResolver);
   }
 
-  @Override
+  /**
+   * Enqueues due-now cron jobs for the given expand candidates.
+   *
+   * @param policy effective maintenance policy (used to build the jobConf spec)
+   * @param candidates enqueueable tables with winner levels
+   * @param batchCapacity expand enqueue budget (max candidates considered for non-snapshot types).
+   *     Snapshot-expiry merge capacity is a fixed per-batch table limit inside this client, not
+   *     this value.
+   * @return number of newly inserted cron-job rows (merges into existing batches do not count)
+   */
   public int enqueueDueNow(
       PolicyEntity policy, List<ExpandTableCandidate> candidates, int batchCapacity) {
     if (policy == null || candidates == null || candidates.isEmpty()) {

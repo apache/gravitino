@@ -35,7 +35,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
-import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobScheduler;
+import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -51,7 +51,7 @@ class TestPolicyExpandPipeline {
 
   @Test
   void testMissingPolicyRemovesExpandRow() {
-    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    CronJobClient cronJobs = mock(CronJobClient.class);
     PolicyExpandPipeline pipeline =
         pipeline(id -> Optional.empty(), mock(PolicyTableEnumerator.class), cronJobs, allowAll());
 
@@ -61,7 +61,7 @@ class TestPolicyExpandPipeline {
 
   @Test
   void testDisabledPolicyRemovesExpandRow() {
-    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    CronJobClient cronJobs = mock(CronJobClient.class);
     PolicyExpandPipeline pipeline =
         pipeline(
             lookup(2L, policy(false, CRON, null)),
@@ -75,7 +75,7 @@ class TestPolicyExpandPipeline {
 
   @Test
   void testBlankTimeTriggerRemovesExpandRow() {
-    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    CronJobClient cronJobs = mock(CronJobClient.class);
     PolicyExpandPipeline pipeline =
         pipeline(
             lookup(3L, policy(true, "  ", null)),
@@ -90,7 +90,7 @@ class TestPolicyExpandPipeline {
   @Test
   void testInvalidTimeTriggerRemovesExpandRowWithoutEnqueue() {
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
-    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    CronJobClient cronJobs = mock(CronJobClient.class);
     PolicyExpandPipeline pipeline =
         pipeline(lookup(4L, policy(true, "not-a-cron", null)), tables, cronJobs, allowAll());
 
@@ -110,7 +110,7 @@ class TestPolicyExpandPipeline {
             eq(gate),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(List.of(c(10L), c(11L)));
-    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    CronJobClient cronJobs = mock(CronJobClient.class);
     when(cronJobs.enqueueDueNow(eq(policy), eq(List.of(c(10L), c(11L))), eq(2))).thenReturn(2);
     PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 2);
 
@@ -127,7 +127,7 @@ class TestPolicyExpandPipeline {
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
     when(tables.listTableIds(eq(policy), eq(10), eq(gate), eq(60_000L)))
         .thenReturn(List.of(c(11L)));
-    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    CronJobClient cronJobs = mock(CronJobClient.class);
     when(cronJobs.enqueueDueNow(eq(policy), eq(List.of(c(11L))), eq(10))).thenReturn(1);
 
     PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 10);
@@ -147,7 +147,7 @@ class TestPolicyExpandPipeline {
             eq(gate),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(List.of(c(10L)));
-    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    CronJobClient cronJobs = mock(CronJobClient.class);
     when(cronJobs.enqueueDueNow(eq(policy), eq(List.of(c(10L))), eq(10))).thenReturn(1);
 
     PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 10);
@@ -175,7 +175,7 @@ class TestPolicyExpandPipeline {
             eq(gate),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(candidates);
-    CronJobScheduler cronJobs = mock(CronJobScheduler.class);
+    CronJobClient cronJobs = mock(CronJobClient.class);
     when(cronJobs.enqueueDueNow(eq(policy), eq(candidates), eq(5))).thenReturn(1);
 
     PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 5);
@@ -186,7 +186,7 @@ class TestPolicyExpandPipeline {
   private static PolicyExpandPipeline pipeline(
       Function<Long, Optional<PolicyEntity>> policyLoader,
       PolicyTableEnumerator tables,
-      CronJobScheduler cronJobs,
+      CronJobClient cronJobs,
       ExpandOccupancyGate gate) {
     return pipeline(policyLoader, tables, cronJobs, gate, 100);
   }
@@ -194,7 +194,7 @@ class TestPolicyExpandPipeline {
   private static PolicyExpandPipeline pipeline(
       Function<Long, Optional<PolicyEntity>> policyLoader,
       PolicyTableEnumerator tables,
-      CronJobScheduler cronJobs,
+      CronJobClient cronJobs,
       ExpandOccupancyGate gate,
       int batchSize) {
     return new PolicyExpandPipeline(

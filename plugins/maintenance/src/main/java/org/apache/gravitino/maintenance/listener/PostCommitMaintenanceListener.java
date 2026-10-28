@@ -28,9 +28,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
-import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobScheduler;
+import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobUpsertResult;
-import org.apache.gravitino.maintenance.scheduler.job.commit.RelationalCommitJobScheduler;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -56,7 +55,7 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
   static final String ICEBERG_UPDATE_TABLE_EVENT =
       "org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent";
 
-  private CommitJobScheduler commitJobScheduler;
+  private CommitJobClient commitJobClient;
   private Function<NameIdentifier, TableEntity> tableLookupOverride;
 
   @Override
@@ -71,13 +70,13 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
     if (gravitinoConfig == null) {
       throw new IllegalStateException("GravitinoEnv config is not available");
     }
-    this.commitJobScheduler = new RelationalCommitJobScheduler(dataSource, gravitinoConfig);
+    this.commitJobClient = new CommitJobClient(dataSource, gravitinoConfig);
     LOG.info("PostCommitMaintenanceListener started (commit-job upsert with spec)");
   }
 
   @Override
   public void stop() throws RuntimeException {
-    commitJobScheduler = null;
+    commitJobClient = null;
   }
 
   @Override
@@ -100,9 +99,9 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
    */
   @VisibleForTesting
   void enqueueCommitJob(NameIdentifier identifier) {
-    CommitJobScheduler scheduler = commitJobScheduler;
-    if (scheduler == null) {
-      LOG.debug("Ignoring IcebergUpdateTableEvent; commit-job scheduler is not started");
+    CommitJobClient client = commitJobClient;
+    if (client == null) {
+      LOG.debug("Ignoring IcebergUpdateTableEvent; commit-job client is not started");
       return;
     }
     if (identifier == null) {
@@ -110,7 +109,7 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
     }
     try {
       long tableId = resolveTableId(identifier);
-      CommitJobUpsertResult result = scheduler.upsertDueNow(tableId);
+      CommitJobUpsertResult result = client.upsertDueNow(tableId);
       switch (result) {
         case INSERTED:
           LOG.info("Upserted commit-job for table {} ({})", tableId, identifier);
@@ -135,8 +134,8 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
   }
 
   @VisibleForTesting
-  void setCommitJobScheduler(CommitJobScheduler commitJobScheduler) {
-    this.commitJobScheduler = commitJobScheduler;
+  void setCommitJobClient(CommitJobClient commitJobClient) {
+    this.commitJobClient = commitJobClient;
   }
 
   @VisibleForTesting

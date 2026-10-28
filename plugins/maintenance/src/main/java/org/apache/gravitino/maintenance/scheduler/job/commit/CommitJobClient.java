@@ -46,16 +46,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Schedules {@code commit-job} rows through a db-scheduler {@link SchedulerClient} on the
- * entity-store DataSource.
+ * Enqueues one-shot {@code commit-job} rows through a db-scheduler {@link SchedulerClient} on the
+ * entity-store DataSource (§5.2.3).
  *
- * <p>Enqueue collects the onCommit chain, drops members still inside {@code minIntervalMs}, checks
- * auth consistency, builds a {@link MaintenanceJobSpec}, and inserts only when the spec is
- * non-empty. Coalesce leaves an existing row's {@code task_data} untouched.
+ * <p>Instance id is {@code {table_id}}; bursts of commits on the same table coalesce via {@code
+ * scheduleIfNotExists}. Enqueue collects the onCommit chain, drops members still inside {@code
+ * minIntervalMs}, checks auth consistency, builds a {@link MaintenanceJobSpec}, and inserts only
+ * when the spec is non-empty. Coalesce leaves an existing row's {@code task_data} untouched.
  */
-public final class RelationalCommitJobScheduler implements CommitJobScheduler {
+public class CommitJobClient {
 
-  private static final Logger LOG = LoggerFactory.getLogger(RelationalCommitJobScheduler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CommitJobClient.class);
 
   private final DataSource dataSource;
   private final Config gravitinoConfig;
@@ -67,7 +68,7 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
    * @param dataSource relational JDBC pool shared with the entity store
    * @param gravitinoConfig server config for auth overlay and minInterval fallbacks
    */
-  public RelationalCommitJobScheduler(DataSource dataSource, Config gravitinoConfig) {
+  public CommitJobClient(DataSource dataSource, Config gravitinoConfig) {
     this(
         dataSource,
         gravitinoConfig,
@@ -87,7 +88,7 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
    * @param occupancyGate cooldown / in-flight checks for enqueue gating
    */
   @VisibleForTesting
-  public RelationalCommitJobScheduler(
+  public CommitJobClient(
       DataSource dataSource,
       Config gravitinoConfig,
       Function<Long, Optional<CollectedCommitChain>> chainCollector,
@@ -99,7 +100,13 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
     this.specFactory = new CommitJobSpecFactory(gravitinoConfig);
   }
 
-  @Override
+  /**
+   * Builds an enqueue-time spec (chain + jobConf) and schedules a due-now {@code commit-job} when
+   * one is not already queued and the spec is non-empty.
+   *
+   * @param tableId table entity id
+   * @return insert / coalesce / skip outcome
+   */
   public CommitJobUpsertResult upsertDueNow(long tableId) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
     SchedulerClient client = client(dataSource);
