@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -81,21 +82,27 @@ class TestTagPolicyResolver {
   }
 
   @Test
-  void testTargetOverrideSurvivesAncestorResolutionAndRepeatedChecks() {
-    Assertions.assertArrayEquals(
-        new String[] {"gold"},
-        resolver
-            .resolve(METALAKE, CATALOG, context)
-            .get(0)
-            .tag()
-            .assignment()
-            .orElseThrow()
-            .values());
+  void testTargetOverrideSurvivesAncestorResolutionAndRepeatedPrivilegeChecks() {
+    Assertions.assertTrue(
+        TagPolicyMatcher.match(
+                Privilege.Name.SELECT_TABLE,
+                Set.of("analyst"),
+                resolver.resolve(METALAKE, CATALOG, context))
+            .isPresent());
 
     List<ResolvedTagPolicy> resolved = resolver.resolve(METALAKE, TABLE, context);
     Assertions.assertArrayEquals(
         new String[] {"bronze"}, resolved.get(0).tag().assignment().orElseThrow().values());
     Assertions.assertFalse(resolved.get(0).tag().inherited().orElseThrow());
+    Assertions.assertFalse(
+        TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), resolved)
+            .isPresent());
+    Assertions.assertFalse(
+        TagPolicyMatcher.match(
+                Privilege.Name.MODIFY_TABLE,
+                Set.of("engineer"),
+                resolver.resolve(METALAKE, TABLE, context))
+            .isPresent());
     Assertions.assertSame(resolved, resolver.resolve(METALAKE, TABLE, context));
     Assertions.assertEquals(4, reader.tagReads.get());
     Assertions.assertEquals(2, reader.policyReads.get());
@@ -113,7 +120,9 @@ class TestTagPolicyResolver {
     Assertions.assertEquals(2, result.size());
     Assertions.assertArrayEquals(
         new String[] {"bronze"}, result.get(0).tag().assignment().orElseThrow().values());
-    ResolvedTagPolicy match = result.get(1);
+    ResolvedTagPolicy match =
+        TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), result)
+            .orElseThrow();
     Assertions.assertEquals(2L, match.tag().id());
     Assertions.assertTrue(match.tag().inherited().orElseThrow());
   }
@@ -124,6 +133,8 @@ class TestTagPolicyResolver {
         TABLE, Collections.singletonList(tag(1L, "certified", TagAssignment.noValue())));
     List<ResolvedTagPolicy> result = resolver.resolve(METALAKE, TABLE, context);
     Assertions.assertFalse(result.get(0).tag().assignment().orElseThrow().hasValues());
+    Assertions.assertFalse(
+        TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), result).isPresent());
   }
 
   @Test
@@ -147,8 +158,8 @@ class TestTagPolicyResolver {
     Assertions.assertSame(before, resolver.resolve(METALAKE, TABLE, context));
     List<ResolvedTagPolicy> after =
         resolver.resolve(METALAKE, TABLE, new AuthorizationRequestContext());
-    Assertions.assertArrayEquals(
-        new String[] {"gold"}, after.get(0).tag().assignment().orElseThrow().values());
+    Assertions.assertTrue(
+        TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), after).isPresent());
     Assertions.assertEquals(6, reader.tagReads.get());
   }
 
@@ -253,14 +264,19 @@ class TestTagPolicyResolver {
   }
 
   @Test
-  void testMultiplePoliciesResolveInDeterministicOrder() {
+  void testMultipleMatchesReturnDeterministicEvidence() {
     reader.bindings.clear();
     reader.bind(
         bronze,
         policy(20L, true, List.of(Privilege.Name.SELECT_TABLE), List.of("analyst")),
         AllValuesSelector.get());
     reader.bind(bronze, access, AllValuesSelector.get());
-    ResolvedTagPolicy match = resolver.resolve(METALAKE, TABLE, context).get(0);
+    ResolvedTagPolicy match =
+        TagPolicyMatcher.match(
+                Privilege.Name.SELECT_TABLE,
+                Set.of("analyst"),
+                resolver.resolve(METALAKE, TABLE, context))
+            .orElseThrow();
     Assertions.assertEquals(10L, match.policy().id());
   }
 

@@ -31,6 +31,7 @@ import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -112,6 +113,9 @@ class TestEntityStoreTagPolicyReader {
           new TagPolicyResolver(input).resolve(METALAKE, TABLE, new AuthorizationRequestContext());
       Assertions.assertArrayEquals(
           new String[] {"bronze"}, result.get(0).tag().assignment().orElseThrow().values());
+      Assertions.assertFalse(
+          TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), result)
+              .isPresent());
       Assertions.assertEquals(1L, result.get(0).tag().id());
       Assertions.assertEquals(10L, result.get(0).policy().id());
     }
