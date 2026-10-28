@@ -44,9 +44,8 @@ import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.RowFilterContent;
-import org.apache.gravitino.policy.rego.RestrictedRegoExpressionParserFacade;
-import org.apache.gravitino.policy.rego.RestrictedRegoProgram.ColumnMask;
-import org.apache.gravitino.policy.rego.RestrictedRegoProgram.RowFilter;
+import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
+import org.apache.gravitino.policy.sql.SqlDefinition;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -155,8 +154,8 @@ public final class ExperimentalIcebergReadRestrictionLoader
       Map<Integer, PolicyEntity[]> columnPolicies,
       Schema schema,
       IcebergReadRestrictionConverter.BindingContext bindingContext) {
-    Optional<RowFilter> rowFilter = resolveRowFilter(tablePolicies, schema, bindingContext);
-    Map<Integer, ColumnMask> columnMasks =
+    Optional<SqlDefinition> rowFilter = resolveRowFilter(tablePolicies, schema, bindingContext);
+    Map<Integer, SqlDefinition> columnMasks =
         resolveColumnMasks(columnPolicies, schema, bindingContext);
     return IcebergReadRestrictionConverter.convert(rowFilter, columnMasks, schema, bindingContext);
   }
@@ -175,17 +174,17 @@ public final class ExperimentalIcebergReadRestrictionLoader
     }
   }
 
-  private static Optional<RowFilter> resolveRowFilter(
+  private static Optional<SqlDefinition> resolveRowFilter(
       PolicyEntity[] policies,
       Schema schema,
       IcebergReadRestrictionConverter.BindingContext bindingContext) {
-    Map<String, RowFilter> distinct = new LinkedHashMap<>();
+    Map<String, SqlDefinition> distinct = new LinkedHashMap<>();
     for (PolicyEntity policy : policies) {
       if (policy.policyType() != Policy.BuiltInType.ROW_FILTER) {
         continue;
       }
-      RowFilter program =
-          RestrictedRegoExpressionParserFacade.parseRowFilter(
+      SqlDefinition program =
+          RestrictedSqlExpressionParserFacade.parseRowFilter(
               ((RowFilterContent) policy.content()).expression());
       ReadRestrictions resolved =
           IcebergReadRestrictionConverter.convert(
@@ -202,21 +201,21 @@ public final class ExperimentalIcebergReadRestrictionLoader
     return distinct.values().stream().findFirst();
   }
 
-  private static Map<Integer, ColumnMask> resolveColumnMasks(
+  private static Map<Integer, SqlDefinition> resolveColumnMasks(
       Map<Integer, PolicyEntity[]> policiesByField,
       Schema schema,
       IcebergReadRestrictionConverter.BindingContext bindingContext) {
-    Map<Integer, ColumnMask> resolvedMasks = new HashMap<>();
+    Map<Integer, SqlDefinition> resolvedMasks = new HashMap<>();
     List<Integer> fieldIds = new ArrayList<>(policiesByField.keySet());
     Collections.sort(fieldIds);
     for (Integer fieldId : fieldIds) {
-      Map<String, ColumnMask> distinct = new LinkedHashMap<>();
+      Map<String, SqlDefinition> distinct = new LinkedHashMap<>();
       for (PolicyEntity policy : policiesByField.get(fieldId)) {
         if (policy.policyType() != Policy.BuiltInType.COLUMN_MASK) {
           continue;
         }
-        ColumnMask program =
-            RestrictedRegoExpressionParserFacade.parseColumnMask(
+        SqlDefinition program =
+            RestrictedSqlExpressionParserFacade.parseColumnMask(
                 ((ColumnMaskContent) policy.content()).expression());
         ReadRestrictions resolved =
             IcebergReadRestrictionConverter.convert(

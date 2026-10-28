@@ -42,7 +42,7 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.policy.rego.RestrictedRegoExpressionParserFacade;
+import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -381,11 +381,11 @@ public class PolicyManager implements PolicyDispatcher {
   private static void validateReadRestrictionContent(
       Policy.BuiltInType policyType, PolicyContent content) {
     if (policyType == Policy.BuiltInType.ROW_FILTER && content instanceof RowFilterContent) {
-      RestrictedRegoExpressionParserFacade.validateRowFilter(
+      RestrictedSqlExpressionParserFacade.validateRowFilter(
           ((RowFilterContent) content).expression());
     } else if (policyType == Policy.BuiltInType.COLUMN_MASK
         && content instanceof ColumnMaskContent) {
-      RestrictedRegoExpressionParserFacade.validateColumnMask(
+      RestrictedSqlExpressionParserFacade.validateColumnMask(
           ((ColumnMaskContent) content).expression());
     }
   }

@@ -29,10 +29,10 @@ public class TestReadRestrictionContent {
   @Test
   void testCreatesReadRestrictionContent() {
     String rowFilterExpression =
-        "filter := col(\"region\") == \"US\" if is_group_member(\"analysts\") else := false";
+        "(region STRING) RETURNS BOOLEAN -> CASE WHEN is_group_member('analysts') THEN region = 'US' ELSE FALSE END";
     String columnMaskExpression =
-        "mask := action(\"show-last-4\") if is_group_member(\"analysts\") "
-            + "else := action(\"replace-with-null\")";
+        "(value STRING) RETURNS STRING -> CASE WHEN is_group_member('analysts') "
+            + "THEN show_last_4(value) ELSE NULL END";
 
     RowFilterContent rowFilter = PolicyContents.rowFilter(rowFilterExpression);
     ColumnMaskContent columnMask = PolicyContents.columnMask(columnMaskExpression);
@@ -54,15 +54,16 @@ public class TestReadRestrictionContent {
 
   @Test
   void testEqualityUsesPolicyTypeAndExpression() {
-    String expression = "filter := col(\"region\") == \"US\"";
+    String expression = "(region STRING) RETURNS BOOLEAN -> region = 'US'";
 
     Assertions.assertEquals(
         PolicyContents.rowFilter(expression), PolicyContents.rowFilter(expression));
     Assertions.assertNotEquals(
-        PolicyContents.rowFilter(expression), PolicyContents.rowFilter("filter := true"));
+        PolicyContents.rowFilter(expression),
+        PolicyContents.rowFilter("() RETURNS BOOLEAN -> TRUE"));
     Assertions.assertNotEquals(
         PolicyContents.rowFilter(expression),
-        PolicyContents.columnMask("mask := action(\"replace-with-null\")"));
+        PolicyContents.columnMask("(value STRING) RETURNS STRING -> NULL"));
   }
 
   @Test
@@ -77,11 +78,11 @@ public class TestReadRestrictionContent {
   void testValidatesUtf8ExpressionLength() {
     Assertions.assertEquals(16 * 1024, ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES);
 
-    String rowFilterPrefix = "filter := true";
+    String rowFilterPrefix = "() RETURNS BOOLEAN -> TRUE";
     String maximumRowFilter =
         rowFilterPrefix
             + " ".repeat(ReadRestrictionContent.MAX_SOURCE_LENGTH_BYTES - rowFilterPrefix.length());
-    String columnMaskPrefix = "mask := action(\"replace-with-null\")";
+    String columnMaskPrefix = "(value STRING) RETURNS STRING -> NULL";
     String maximumColumnMask =
         columnMaskPrefix
             + " "
