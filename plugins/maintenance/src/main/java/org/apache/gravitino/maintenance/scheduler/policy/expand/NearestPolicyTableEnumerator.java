@@ -321,11 +321,10 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         if (scan.batchFull()) {
           return;
         }
-        Long tableId = importTableIfMissing(tableIdent, storedTables);
-        if (tableId == null) {
+        if (!importTableIfMissing(tableIdent, storedTables)) {
           continue;
         }
-        tryEnqueueTable(tableId, tableObject(tableIdent), scan);
+        tryEnqueueTable(storedTables.get(tableIdent.name()).id(), tableObject(tableIdent), scan);
       }
       return;
     } catch (NoSuchSchemaException e) {
@@ -382,30 +381,30 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   /**
-   * Returns the table id from the entity store, importing via {@code loadTable} when missing.
+   * Ensures {@code tableIdent} exists in the entity store and records it in {@code storedTables}.
    *
-   * @return table id, or {@code null} when the table cannot be imported / resolved
+   * @return {@code true} if already stored or import succeeded; {@code false} if import failed
    */
-  @Nullable
-  private Long importTableIfMissing(
+  private boolean importTableIfMissing(
       NameIdentifier tableIdent, Map<String, TableEntity> storedTables) {
-    TableEntity stored = storedTables.get(tableIdent.name());
-    if (stored != null) {
-      return stored.id();
+    if (storedTables.containsKey(tableIdent.name())) {
+      return true;
     }
     try {
       Table loaded = tableDispatcher.loadTable(tableIdent);
-      Long tableId = resolveTableId(loaded, tableIdent);
-      if (tableId == null) {
+      TableEntity entity = resolveStoredTable(loaded, tableIdent);
+      if (entity == null || entity.id() == null) {
         LOG.warn("Skip table {} after import load: missing entity id", tableIdent);
+        return false;
       }
-      return tableId;
+      storedTables.put(tableIdent.name(), entity);
+      return true;
     } catch (NoSuchTableException e) {
       LOG.debug("Table {} disappeared during expand: {}", tableIdent, e.toString());
-      return null;
+      return false;
     } catch (RuntimeException e) {
       LOG.warn("Skip table {} during catalog expand import: {}", tableIdent, e.toString());
-      return null;
+      return false;
     }
   }
 
@@ -430,23 +429,23 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     return byName;
   }
 
-  /** Prefer the id carried by {@link EntityCombinedTable}; otherwise look up the store. */
+  /** Prefer the entity on {@link EntityCombinedTable}; otherwise look up the store. */
   @Nullable
-  private Long resolveTableId(Table table, NameIdentifier tableIdent) {
+  private TableEntity resolveStoredTable(Table table, NameIdentifier tableIdent) {
     if (table instanceof EntityCombinedTable) {
       TableEntity entity = ((EntityCombinedTable) table).tableFromGravitino();
       if (entity != null && entity.id() != null) {
-        return entity.id();
+        return entity;
       }
     }
     try {
       for (TableEntity entity : tableMetaService.listTablesByNamespace(tableIdent.namespace())) {
         if (tableIdent.name().equals(entity.name())) {
-          return entity.id();
+          return entity;
         }
       }
     } catch (RuntimeException e) {
-      LOG.warn("Failed to resolve table id for {}: {}", tableIdent, e.toString());
+      LOG.warn("Failed to resolve table entity for {}: {}", tableIdent, e.toString());
     }
     return null;
   }
