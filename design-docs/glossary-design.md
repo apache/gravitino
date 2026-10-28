@@ -126,7 +126,7 @@ TermVersion  { termId, version, state: PENDING | CURRENT | SUPERSEDED, snapshot,
   `VIEW_DEFINITION` on the other term.
 - **Cycle check**: adding A → B fails with 400 if A is reachable from B through `BROADER` edges.
   The walk reads B's ancestors breadth-first under the hierarchy lock (see Locking). No self-edges.
-- Hierarchy reads take `depth` (default 1, at most 10).
+- A hierarchy read returns all ancestors or all descendants of a term; the graph is acyclic, so it ends.
 - Deprecating a term leaves its children unchanged. Deleting a term removes its edges; each child
   that loses a broader term gets its own audit record, and keeps its other parents or becomes
   top-level.
@@ -321,21 +321,21 @@ Under `/api/metalakes/{metalake}`, following the Tag, Policy and Domain conventi
 `PUT` with updates to alter, `PATCH` to set status, `DropResponse` on delete, and associations
 written on the object.
 
-| Operation              | Endpoint                                                              | Request → response                                                      |
-| ---------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| List, filter, match    | `GET /terms?details=&domain=&status=&nameContains=&sourceRef=&match=` | → `NameListResponse` / `TermListResponse`                               |
-| Create                 | `POST /terms`                                                         | `TermCreateRequest` → `TermResponse`                                    |
-| Get                    | `GET /terms/{term}`                                                   | → `TermResponse`                                                        |
-| Alter                  | `PUT /terms/{term}`                                                   | `TermUpdatesRequest` → `TermResponse`                                   |
-| Set status             | `PATCH /terms/{term}`                                                 | `TermSetRequest{status}` → `TermResponse`                               |
-| Drop                   | `DELETE /terms/{term}`                                                | → `DropResponse`                                                        |
-| Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER&depth=`      | → `TermTreeResponse`                                                    |
-| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=`                              | → `TermBindingListResponse`                                             |
-| Terms of an object     | `GET /objects/{type}/{fullName}/terms`                                | → `NameListResponse` / `TermListResponse`                               |
-| Bind / unbind          | `POST /objects/{type}/{fullName}/terms`                               | `TermsAssociateRequest{termsToAdd, termsToRemove}` → `NameListResponse` |
-| Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms`       | → `NameListResponse` / `TermListResponse`                               |
-| Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`      | `TermsAssociateRequest` → `NameListResponse`                            |
-| Owner                  | existing `/owners/glossary_term/{term}`                               |                                                                         |
+| Operation              | Endpoint                                                         | Request → response                                                      |
+| ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| List, filter, match    | `GET /terms?details=&domain=&status=&nameContains=&match=`       | → `NameListResponse` / `TermListResponse`                               |
+| Create                 | `POST /terms`                                                    | `TermCreateRequest` → `TermResponse`                                    |
+| Get                    | `GET /terms/{term}`                                              | → `TermResponse`                                                        |
+| Alter                  | `PUT /terms/{term}`                                              | `TermUpdatesRequest` → `TermResponse`                                   |
+| Set status             | `PATCH /terms/{term}`                                            | `TermSetRequest{status}` → `TermResponse`                               |
+| Drop                   | `DELETE /terms/{term}`                                           | → `DropResponse`                                                        |
+| Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER`        | → `TermTreeResponse`                                                    |
+| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=`                         | → `TermBindingListResponse`                                             |
+| Terms of an object     | `GET /objects/{type}/{fullName}/terms`                           | → `NameListResponse` / `TermListResponse`                               |
+| Bind / unbind          | `POST /objects/{type}/{fullName}/terms`                          | `TermsAssociateRequest{termsToAdd, termsToRemove}` → `NameListResponse` |
+| Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms`  | → `NameListResponse` / `TermListResponse`                               |
+| Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms` | `TermsAssociateRequest` → `NameListResponse`                            |
+| Owner                  | existing `/owners/glossary_term/{term}`                          |                                                                         |
 
 ```
 TermCreateRequest     { name, definition, synonyms, domains, broader, related, sourceRef, properties }
@@ -365,7 +365,7 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 - **Clients** (Java, Python):
   - `GlossaryOperations` on `GravitinoMetalake`: `listTerms`, `listTermsInfo`, `getTerm`,
     `createTerm`, `alterTerm`, `setTermStatus`, `dropTerm`, `matchTerms`.
-  - On a `Term`: `broader(depth)`, `narrower(depth)`, `listBindings(kind)`.
+  - On a `Term`: `broader()`, `narrower()`, `listBindings(kind)`.
   - `SupportsTerms` (`listTerms()`, `associateTerms(add, remove)`) on catalogs, schemas, tables,
     views, columns, filesets, topics and models, and `listMetricTerms` / `associateMetricTerms` on
     `SemanticModel`.
@@ -394,9 +394,6 @@ domain to its terms to the data.
 - Every operation emits pre, success and failure events through a `GlossaryEventDispatcher` and
   reaches the audit log: create, alter, status, bind and unbind, drop. A drop also records one entry
   for each child that lost a broader term.
-- `MatchTermsEvent{text, caller, defined}` is emitted on every `match` lookup; `defined` is `true`
-  when any term of any status matches, so a listener can collect business words that have no term
-  yet.
 
 ## Alternatives Considered
 
@@ -430,7 +427,7 @@ domain to its terms to the data.
 ### Phase 2: Bindings and lookup
 
 - [ ] Binding storage; term-side and object-side endpoints with their privilege checks; cleanup on object drop, column drop and metric removal
-- [ ] `domain` and `match` filters on the list endpoint; `MatchTermsEvent`
+- [ ] `domain` and `match` filters on the list endpoint
 
 ### Phase 3: Clients, MCP and docs
 
