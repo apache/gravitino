@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +30,8 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
@@ -106,6 +109,38 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
     Map<String, String> catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
     this.configuration = FileSystemUtils.createConfiguration(null, catalogPropertiesMap);
+  }
+
+  /**
+   * Creates a wrapper with GCS OAuth2 token minting (for cache expiry) and optional Kerberos proxy.
+   * Shared by lakehouse and IRC cache loaders.
+   *
+   * @param icebergConfig catalog configuration
+   * @return wrapper ready to cache
+   */
+  public static IcebergCatalogWrapper create(IcebergConfig icebergConfig) {
+    IcebergConfig enriched = IcebergCatalogUtil.withGcsServiceAccountCredentials(icebergConfig);
+    return applyKerberos(new IcebergCatalogWrapper(enriched), null, enriched);
+  }
+
+  /**
+   * Wraps {@code wrapper} with a Kerberos proxy when configured.
+   *
+   * @param wrapper base wrapper
+   * @param catalogName catalog name for REST wrappers that take {@code (name, config)}; {@code
+   *     null} for the config-only constructor
+   * @param config Iceberg configuration (typically after GCS enrichment)
+   * @return kerberos proxy or the original wrapper
+   */
+  public static IcebergCatalogWrapper applyKerberos(
+      IcebergCatalogWrapper wrapper, @Nullable String catalogName, IcebergConfig config) {
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(config.getAllConfig());
+    if (!authenticationConfig.isKerberosAuth()
+        || !(wrapper.getCatalog() instanceof SupportsKerberos)) {
+      return wrapper;
+    }
+    KerberosAwareIcebergCatalogProxy proxy = new KerberosAwareIcebergCatalogProxy(wrapper);
+    return catalogName == null ? proxy.getProxy(config) : proxy.getProxy(catalogName, config);
   }
 
   public Catalog getCatalog() {

@@ -53,13 +53,10 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
-import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperCache;
-import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -139,31 +136,14 @@ public class IcebergCatalogOperations
     this.icebergConfig = new IcebergConfig(resultConf);
 
     this.catalogName = info.name();
-    // Do not resolve wrappers during initialize — provider-based IRC create can re-enter catalog
-    // load. Wrappers are created on first use via shared cache (IRC Manager when aux, otherwise a
-    // lakehouse-owned IcebergCatalogWrapperCache with the same eviction/token policy).
+    // Aux: do not touch IRC Manager here — provider-based create can re-enter catalog load.
+    // Non-aux: eager get-or-create into the shared cache (safe; no CatalogManager).
     this.useIrcCatalogWrapper = shouldUseIrcCatalogWrapper();
     if (!useIrcCatalogWrapper) {
       long accessEvictionMs =
           icebergConfig.get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL);
       this.wrapperCache = new IcebergCatalogWrapperCache(accessEvictionMs);
-      // Create eagerly into the shared cache (same eviction/token policy as IRC). Safe: does not
-      // call IRC provider / CatalogManager.
-      try {
-        this.icebergCatalogWrapper =
-            wrapperCache.get(catalogName, name -> createLocalWrapper(icebergConfig));
-      } catch (NoSuchWarehouseException e) {
-        throw new IllegalArgumentException(
-            String.format(
-                "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
-                    + "the REST backend 'warehouse' selects a catalog by name on the remote server "
-                    + "and is not a storage location; remove 'warehouse' to use the server's default "
-                    + "catalog, or set it to a catalog name/identifier that the server recognizes.",
-                icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
-            e);
-      } catch (RESTException e) {
-        throw handleRestException(e);
-      }
+      catalogWrapper();
     }
     this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(this::catalogWrapper);
   }
@@ -182,41 +162,31 @@ public class IcebergCatalogOperations
           "Internal CatalogWrapperManager is not available. "
               + "Aux lakehouse catalog requires Iceberg REST embedded in Gravitino server.");
       // Pass metalake config so static IRC can still create+cache when the provider has no name.
-      IcebergCatalogWrapper wrapper = manager.getCatalogWrapper(catalogName, icebergConfig);
-      this.icebergCatalogWrapper = wrapper;
-      return wrapper;
+      this.icebergCatalogWrapper = manager.getCatalogWrapper(catalogName, icebergConfig);
+      return icebergCatalogWrapper;
     }
     if (wrapperCache != null) {
-      try {
-        IcebergCatalogWrapper wrapper =
-            wrapperCache.get(catalogName, name -> createLocalWrapper(icebergConfig));
-        this.icebergCatalogWrapper = wrapper;
-        return wrapper;
-      } catch (NoSuchWarehouseException e) {
-        throw new IllegalArgumentException(
-            String.format(
-                "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
-                    + "the REST backend 'warehouse' selects a catalog by name on the remote server "
-                    + "and is not a storage location; remove 'warehouse' to use the server's default "
-                    + "catalog, or set it to a catalog name/identifier that the server recognizes.",
-                icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
-            e);
-      } catch (RESTException e) {
-        throw handleRestException(e);
-      }
+      this.icebergCatalogWrapper = loadFromLocalCache();
+      return icebergCatalogWrapper;
     }
     return icebergCatalogWrapper;
   }
 
-  private static IcebergCatalogWrapper createLocalWrapper(IcebergConfig config) {
-    IcebergConfig enriched = IcebergCatalogUtil.withGcsServiceAccountCredentials(config);
-    IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(enriched);
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(enriched.getAllConfig());
-    if (authenticationConfig.isKerberosAuth()
-        && rawWrapper.getCatalog() instanceof SupportsKerberos) {
-      return new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(enriched);
+  private IcebergCatalogWrapper loadFromLocalCache() {
+    try {
+      return wrapperCache.get(catalogName, name -> IcebergCatalogWrapper.create(icebergConfig));
+    } catch (NoSuchWarehouseException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
+                  + "the REST backend 'warehouse' selects a catalog by name on the remote server "
+                  + "and is not a storage location; remove 'warehouse' to use the server's default "
+                  + "catalog, or set it to a catalog name/identifier that the server recognizes.",
+              icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
+          e);
+    } catch (RESTException e) {
+      throw handleRestException(e);
     }
-    return rawWrapper;
   }
 
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper() {

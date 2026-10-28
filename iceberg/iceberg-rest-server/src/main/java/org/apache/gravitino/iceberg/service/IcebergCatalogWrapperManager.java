@@ -27,12 +27,9 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
-import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperCache;
-import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
@@ -85,20 +82,23 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
 
   @Override
   public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
-    if (LOG.isDebugEnabled()) {
-      boolean cacheHit = catalogWrapperCache.getIfPresent(catalogName) != null;
-      LOG.debug("getCatalogWrapper catalogName={} cacheHit={}", catalogName, cacheHit);
-    }
+    logCacheAccess(catalogName);
     return catalogWrapperCache.get(catalogName, this::createCatalogWrapperFromProvider);
   }
 
   @Override
   public IcebergCatalogWrapper getCatalogWrapper(String catalogName, IcebergConfig icebergConfig) {
-    if (LOG.isDebugEnabled()) {
-      boolean cacheHit = catalogWrapperCache.getIfPresent(catalogName) != null;
-      LOG.debug("getCatalogWrapper(name,config) catalogName={} cacheHit={}", catalogName, cacheHit);
-    }
+    logCacheAccess(catalogName);
     return catalogWrapperCache.get(catalogName, name -> createCatalogWrapper(name, icebergConfig));
+  }
+
+  private void logCacheAccess(String catalogName) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          "getCatalogWrapper catalogName={} cacheHit={}",
+          catalogName,
+          catalogWrapperCache.getIfPresent(catalogName) != null);
+    }
   }
 
   @Override
@@ -127,14 +127,9 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
   @VisibleForTesting
   protected CatalogWrapperForREST createCatalogWrapper(
       String catalogName, IcebergConfig icebergConfig) {
-    // Mint GCS OAuth2 tokens into the config before constructing the wrapper so the IRC catalog
-    // cache can expire the entry before gcs.oauth2.token-expires-at.
     IcebergConfig enrichedConfig =
         IcebergCatalogUtil.withGcsServiceAccountCredentials(icebergConfig);
-    // When the backend is a federated Iceberg REST catalog, use FederatedCatalogWrapper so
-    // federation-aware behavior (FileIO property extraction, remote credential vending, remote
-    // /v1/config defaults) is applied through polymorphic dispatch rather than scattered
-    // instanceof checks. All other backends use the base CatalogWrapperForREST.
+    // Federated REST backends use FederatedCatalogWrapper for FileIO / credential vending.
     IcebergCatalogBackend backend =
         IcebergCatalogBackend.valueOf(
             enrichedConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
@@ -142,14 +137,8 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
         backend == IcebergCatalogBackend.REST
             ? new FederatedCatalogWrapper(catalogName, enrichedConfig)
             : new CatalogWrapperForREST(catalogName, enrichedConfig);
-    AuthenticationConfig authenticationConfig =
-        new AuthenticationConfig(enrichedConfig.getAllConfig());
-    if (authenticationConfig.isKerberosAuth() && rest.getCatalog() instanceof SupportsKerberos) {
-      return (CatalogWrapperForREST)
-          new KerberosAwareIcebergCatalogProxy(rest).getProxy(catalogName, enrichedConfig);
-    }
-
-    return rest;
+    return (CatalogWrapperForREST)
+        IcebergCatalogWrapper.applyKerberos(rest, catalogName, enrichedConfig);
   }
 
   @Override
