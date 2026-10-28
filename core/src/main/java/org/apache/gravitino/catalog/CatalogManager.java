@@ -567,10 +567,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     this.classLoaderSharingEnabled = config.get(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED);
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
-    long cacheEvictionIntervalNanos = TimeUnit.MILLISECONDS.toNanos(cacheEvictionIntervalInMs);
     this.catalogCache =
         Caffeine.newBuilder()
-            .expireAfter(new CatalogCacheExpiry(cacheEvictionIntervalNanos))
+            .expireAfter(new CatalogCacheExpiry(cacheEvictionIntervalInMs))
             .removalListener(
                 (k, v, c) -> {
                   LOG.debug("Removed catalog cache entry, identifier={}, cause={}", k, c);
@@ -2305,39 +2304,41 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   private static final class CatalogCacheExpiry implements Expiry<NameIdentifier, CatalogWrapper> {
 
-    private final long accessEvictionNanos;
+    private final long accessEvictionMs;
 
-    CatalogCacheExpiry(long accessEvictionNanos) {
-      this.accessEvictionNanos = accessEvictionNanos;
+    CatalogCacheExpiry(long accessEvictionMs) {
+      this.accessEvictionMs = accessEvictionMs;
     }
 
     @Override
     public long expireAfterCreate(NameIdentifier key, CatalogWrapper value, long currentTime) {
-      return computeDurationNanos(value);
+      return durationNanos(value);
     }
 
     @Override
     public long expireAfterUpdate(
         NameIdentifier key, CatalogWrapper value, long currentTime, long currentDuration) {
-      return computeDurationNanos(value);
+      return durationNanos(value);
     }
 
     @Override
     public long expireAfterRead(
         NameIdentifier key, CatalogWrapper value, long currentTime, long currentDuration) {
-      return computeDurationNanos(value);
+      return durationNanos(value);
     }
 
-    private long computeDurationNanos(CatalogWrapper value) {
+    /** Caffeine {@link Expiry} durations are nanoseconds. */
+    private long durationNanos(CatalogWrapper value) {
+      long durationMs = accessEvictionMs;
       Long refreshAt = value == null ? null : value.gcsTokenRefreshAtEpochMs;
-      if (refreshAt == null) {
-        return accessEvictionNanos;
+      if (refreshAt != null) {
+        long remainingMs = refreshAt - System.currentTimeMillis();
+        if (remainingMs <= 0) {
+          return 0L;
+        }
+        durationMs = Math.min(accessEvictionMs, remainingMs);
       }
-      long remainingMs = refreshAt - System.currentTimeMillis();
-      if (remainingMs <= 0) {
-        return 0L;
-      }
-      return Math.min(accessEvictionNanos, TimeUnit.MILLISECONDS.toNanos(remainingMs));
+      return TimeUnit.MILLISECONDS.toNanos(durationMs);
     }
   }
 }
