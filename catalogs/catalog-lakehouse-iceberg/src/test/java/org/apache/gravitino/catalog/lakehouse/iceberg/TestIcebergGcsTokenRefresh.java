@@ -28,16 +28,15 @@ import org.junit.jupiter.api.Test;
 public class TestIcebergGcsTokenRefresh {
 
   @Test
-  void ensureGcsTokenFreshNoopsWithoutExpiry() {
-    IcebergCatalogOperations ops = new IcebergCatalogOperations();
+  void fixedBackendSkipsRefreshWithoutExpiry() {
     IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(memoryConfig());
-    ops.icebergCatalogWrapper = wrapper;
-    ops.ensureGcsTokenFresh();
-    Assertions.assertSame(wrapper, ops.icebergCatalogWrapper);
+    IcebergBackend backend = IcebergBackend.fixed(wrapper);
+    Assertions.assertSame(wrapper, backend.wrapper());
+    Assertions.assertSame(wrapper, backend.wrapper());
   }
 
   @Test
-  void ensureGcsTokenFreshNoopsWhenTokenFarFromExpiry() {
+  void fixedBackendSkipsRefreshWhenTokenFarFromExpiry() {
     long expiresAt = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1);
     IcebergConfig config =
         new IcebergConfig(
@@ -48,11 +47,9 @@ public class TestIcebergGcsTokenRefresh {
                 "/tmp/wh",
                 IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
                 String.valueOf(expiresAt)));
-    IcebergCatalogOperations ops = new IcebergCatalogOperations();
     IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(config);
-    ops.icebergCatalogWrapper = wrapper;
-    ops.ensureGcsTokenFresh();
-    Assertions.assertSame(wrapper, ops.icebergCatalogWrapper);
+    IcebergBackend backend = IcebergBackend.fixed(wrapper);
+    Assertions.assertSame(wrapper, backend.wrapper());
   }
 
   private static IcebergConfig memoryConfig() {

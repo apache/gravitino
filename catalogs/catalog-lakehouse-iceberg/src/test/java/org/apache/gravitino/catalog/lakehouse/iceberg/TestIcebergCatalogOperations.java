@@ -90,7 +90,7 @@ public class TestIcebergCatalogOperations {
     when(mockWrapper.listNamespace(any())).thenThrow(new RuntimeException("boom"));
 
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    catalogOperations.backend = IcebergBackend.fixed(mockWrapper);
 
     Exception exception =
         Assertions.assertThrows(
@@ -113,7 +113,7 @@ public class TestIcebergCatalogOperations {
   public void testListSchemasConvertsMultiLevelNamespacesToLogicalNames() {
     IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    catalogOperations.backend = IcebergBackend.fixed(mockWrapper);
 
     org.apache.iceberg.catalog.Namespace flatNs = org.apache.iceberg.catalog.Namespace.of("mydb");
     org.apache.iceberg.catalog.Namespace hierarchicalNs =
@@ -135,7 +135,7 @@ public class TestIcebergCatalogOperations {
   public void testListSchemasFlatOnlyReturnsUnchangedNames() {
     IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    catalogOperations.backend = IcebergBackend.fixed(mockWrapper);
 
     org.apache.iceberg.catalog.Namespace ns1 = org.apache.iceberg.catalog.Namespace.of("db1");
     org.apache.iceberg.catalog.Namespace ns2 = org.apache.iceberg.catalog.Namespace.of("db2");
