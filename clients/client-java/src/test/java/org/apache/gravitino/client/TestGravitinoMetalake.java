@@ -203,6 +203,15 @@ public class TestGravitinoMetalake extends TestBase {
     Assertions.assertEquals("comment2", catalogs[1].comment());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogs[1].type());
 
+    Map<String, String> lightweightParams =
+        ImmutableMap.of("details", "true", "includeProperties", "false");
+    buildMockResource(Method.GET, path, lightweightParams, null, resp, HttpStatus.SC_OK);
+    Catalog[] catalogDescriptors = gravitinoClient.listCatalogsInfo(false);
+    Assertions.assertEquals(2, catalogDescriptors.length);
+    Assertions.assertEquals("mock", catalogDescriptors[0].name());
+    Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDescriptors[0].type());
+    Assertions.assertEquals("test", catalogDescriptors[0].provider());
+
     // Test return no found
     ErrorResponse errorResponse =
         ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
