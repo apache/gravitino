@@ -61,6 +61,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
+import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobExecutorFactory;
 import org.apache.gravitino.job.JobHandle;
@@ -758,7 +759,8 @@ public class TestK8sJobExecutor {
         .update();
 
     Assertions.assertThrows(
-        IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+        JobSubmissionRejectedException.class,
+        () -> executor.submitJob(context(1L), sparkTemplate()));
   }
 
   @Test
@@ -1109,7 +1111,8 @@ public class TestK8sJobExecutor {
         .create();
 
     Assertions.assertThrows(
-        IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+        JobSubmissionRejectedException.class,
+        () -> executor.submitJob(context(1L), sparkTemplate()));
   }
 
   @Test

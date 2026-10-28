@@ -64,22 +64,27 @@ execution id afterwards. If that id is not recorded within three
 `findSubmittedJob(JobContext, JobTemplate)` with the original job id, metalake and runtime template:
 
 - A returned execution id is recorded. It must be the same string that `submitJob` returns.
-- An empty result confirms that the runner has no execution. The job becomes `FAILED`, or
-  `CANCELLED` if cancellation was requested.
-- An exception retains the registration for a later lookup. The default implementation throws
-  `UnsupportedOperationException`: inability to look up a job is not evidence that it is absent.
-  Implement the lookup if the runner can identify an execution by `JobContext#jobId()`.
+- An empty result means that the runner has no execution. The job becomes `FAILED`, or
+  `CANCELLED` if cancellation was requested. Only return it when the runner confirms it.
+- An exception keeps the job for a lookup in the next status pull.
+
+The default implementation returns empty. Implement the lookup if the runner can identify an
+execution by `JobContext#jobId()`.
 
 The lookup may run concurrently with a slow submission. Keep the registration-to-recording phase
 within three pull intervals; a submission that returns after another server settled the job is
 cancelled and its run request fails. An execution id must not start with `pending-submission:`.
 
 Throw `IllegalArgumentException` for invalid input, or `JobSubmissionRejectedException` when no
-execution was created or its removal is confirmed. Gravitino can then remove the registration.
-Other failures, including a lost response, have an unknown outcome: Gravitino retains the job and
-requests cancellation rather than replaying submission. If the metadata store cannot record that
-intent, the registration is still retained, but a found execution may be tracked as running; check
-that job before retrying the run request.
+execution was created or its removal is confirmed. Gravitino then removes the job. Other failures,
+including a lost response, have an unknown outcome:
+
+- If the job executor implements `findSubmittedJob`, Gravitino keeps the job and marks it as
+  `CANCELLING` rather than replaying the submission, so an execution found for it later is
+  cancelled. If the metadata store cannot record that, the job is still kept, but a found execution
+  may be tracked as running; check that job before retrying the run request.
+- Otherwise Gravitino removes the job, as it couldn't find an execution left behind. Remove what
+  the submission may have created before throwing.
 
 `cancelJob` must be safe to repeat. A persisted `CANCELLING` job is retried while the runner reports
 `QUEUED` or `STARTED`, including for shared runners. Report `CANCELLING` once an asynchronous

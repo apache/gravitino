@@ -54,10 +54,17 @@ public interface JobExecutor extends Closeable {
    *
    * <p>Throw {@link IllegalArgumentException} for invalid input, or {@link
    * JobSubmissionRejectedException} for a confirmed rejection that left no execution. Gravitino
-   * removes the registration for these failures. For any other exception the outcome is unknown:
-   * Gravitino retains the registration, requests cancellation, and uses {@link
-   * #findSubmittedJob(JobContext, JobTemplate)} to recover and cancel any execution after the
-   * runner becomes available. Do not classify a lost response as a confirmed rejection.
+   * removes the registration for these failures. Any other exception means that the outcome is
+   * unknown, for example when the response of the job runner was lost:
+   *
+   * <ul>
+   *   <li>If the job executor implements {@link #findSubmittedJob(JobContext, JobTemplate)},
+   *       Gravitino retains the registration, marks the job as cancelling, and uses that method to
+   *       find and cancel any execution once the job runner is available again. Do not classify a
+   *       lost response as a confirmed rejection.
+   *   <li>Otherwise Gravitino can't find such an execution, so it removes the registration. The job
+   *       executor must remove what it may have created before throwing.
+   * </ul>
    *
    * <p>Gravitino registers the job before calling this method. On a deployment with several
    * Gravitino servers, the registration-to-recording phase should finish within three {@code
@@ -129,9 +136,7 @@ public interface JobExecutor extends Closeable {
    *       execution as an unrecorded one.
    *   <li>Empty means that the job has no execution. The job is marked as {@link
    *       JobHandle.Status#FAILED}, or {@link JobHandle.Status#CANCELLED} if it is being cancelled.
-   *       Only return empty when absence can be established for this job runner; unsupported lookup
-   *       must throw {@link UnsupportedOperationException}, so an unknown execution is not mistaken
-   *       for an absent one.
+   *       Only return empty when the job runner confirms that it has no execution of the job.
    *   <li>An exception means that the lookup failed. The job stays as it is, and the lookup is
    *       retried in the next status pull.
    * </ul>
@@ -142,10 +147,11 @@ public interface JobExecutor extends Closeable {
    * found then, the job is marked as failed, and the execution that the submission returns is
    * cancelled.
    *
-   * <p>The default implementation throws {@link UnsupportedOperationException}. An unsupported
-   * lookup retains the pending registration for operator intervention, just like a failed lookup;
-   * it does not prove the absence of an execution. A job executor that can look up an execution by
-   * {@link JobContext#jobId()} should implement this method to support recovery.
+   * <p>The default implementation returns empty, for a job executor that can't look up an
+   * execution, or whose job state is lost with the server submitting the job. Such a job executor
+   * must not leave an execution behind when {@link #submitJob(JobContext, JobTemplate)} throws, see
+   * there. A job executor that can look up an execution by {@link JobContext#jobId()} should
+   * implement this method, so Gravitino recovers the jobs whose submission outcome is unknown.
    *
    * @param context The context of the job, with the same job id and metalake as the submission. Its
    *     staging directory is the one of the calling server, which may not exist, rather than the
@@ -153,11 +159,9 @@ public interface JobExecutor extends Closeable {
    * @param jobTemplate The runtime job template the job was submitted with, whose resources are
    *     URIs.
    * @return The unique identifier of the execution of the job, or empty if there is none.
-   * @throws UnsupportedOperationException if the runner cannot establish whether it has this job
    */
   default Optional<String> findSubmittedJob(JobContext context, JobTemplate jobTemplate) {
-    throw new UnsupportedOperationException(
-        getClass().getName() + " cannot look up submitted jobs");
+    return Optional.empty();
   }
 
   /**

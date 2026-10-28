@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
@@ -126,14 +127,13 @@ public class TestJobExecutor {
   }
 
   @Test
-  public void testUnsupportedSubmissionLookupDoesNotReportAbsence() {
+  public void testSubmissionLookupFindsNothingByDefault() {
     JobExecutor executor = new UriJobExecutor();
     ShellJobTemplate template =
         ShellJobTemplate.builder().withName("shell_job").withExecutable("/bin/echo").build();
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () ->
-            executor.findSubmittedJob(new JobContext(1L, "metalake", tempDir.toFile()), template));
+    Assertions.assertEquals(
+        Optional.empty(),
+        executor.findSubmittedJob(new JobContext(1L, "metalake", tempDir.toFile()), template));
   }
 
   @Test

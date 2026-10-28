@@ -165,7 +165,7 @@ public class TestJobManager {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     entityStore = Mockito.mock(EntityStore.class);
-    jobExecutor = Mockito.mock(JobExecutor.class);
+    jobExecutor = Mockito.mock(LookupJobExecutor.class);
     // Mocks don't call the default interface methods, so stub the defaults explicitly.
     when(jobExecutor.ownsJob(any())).thenReturn(true);
     stubEntityStoreUpdateToApplyToRegisteredJob();
@@ -454,6 +454,9 @@ public class TestJobManager {
             () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
     Assertions.assertSame(executorFailure, second);
     Assertions.assertTrue(List.of(second.getSuppressed()).contains(deleteFailure));
+    JobEntity rejected = lastRegisteredJob();
+    Assertions.assertEquals(
+        JobHandle.Status.FAILED, captureUpdatedJobEntity(rejected, rejected).status());
     assertNoJobStagingDir();
     verify(jobExecutor, never()).cancelJob(any());
   }
@@ -4127,6 +4130,76 @@ public class TestJobManager {
   }
 
   @Test
+  public void testUnknownSubmissionOutcomeOfJobGoneIsNotRetried() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    RuntimeException executorFailure = new RuntimeException("runner response lost");
+    when(jobExecutor.submitJob(any(), any())).thenThrow(executorFailure);
+    // The job is gone before its cancellation is recorded, e.g. its metalake was dropped.
+    when(entityStore.update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenThrow(new NoSuchEntityException("Job was deleted"));
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertSame(executorFailure, failure.getCause());
+    // Only a conflict is retried.
+    verify(entityStore, times(1))
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    verify(entityStore, never()).delete(any(), eq(Entity.EntityType.JOB));
+  }
+
+  @Test
+  public void testRunJobDeletesJobWhenExecutorCannotFindSubmissions() throws Exception {
+    // A job executor that doesn't implement findSubmittedJob() can't help recover an execution
+    // the failed submission may have left, so the job is removed as before.
+    RuntimeException executorFailure = new IllegalStateException("runner response lost");
+    JobExecutor executor =
+        new JobExecutor() {
+          @Override
+          public void initialize(Map<String, String> configs) {}
+
+          @Override
+          public String submitJob(JobContext context, JobTemplate jobTemplate) {
+            throw executorFailure;
+          }
+
+          @Override
+          public JobExecutionInfo getJobExecutionInfo(String jobId) {
+            throw new NoSuchJobException("No job %s", jobId);
+          }
+
+          @Override
+          public void cancelJob(String jobId) {}
+
+          @Override
+          public void close() {}
+        };
+    JobManager manager = Mockito.spy(new JobManager(config, entityStore, idGenerator, executor));
+    try {
+      JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+      doReturn(template).when(manager).getJobTemplate(metalake, template.name());
+
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> manager.runJob(metalake, template.name(), Collections.emptyMap()));
+      Assertions.assertSame(executorFailure, failure.getCause());
+      Assertions.assertFalse(failure.getMessage().contains("unknown"), failure.getMessage());
+      verify(entityStore, times(1))
+          .delete(
+              NameIdentifierUtil.ofJob(metalake, lastRegisteredJob().name()),
+              Entity.EntityType.JOB);
+      verify(entityStore, never())
+          .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    } finally {
+      manager.statusPullExecutor.shutdownNow();
+      manager.cleanUpExecutor.shutdownNow();
+    }
+  }
+
+  @Test
   public void testPendingCancellationRecoversAfterTransientFailure() throws Exception {
     JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
     doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
@@ -4218,7 +4291,7 @@ public class TestJobManager {
             RuntimeException.class,
             () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
     Assertions.assertSame(submitFailure, failure.getCause());
-    Assertions.assertSame(storeFailure, failure.getSuppressed()[0].getCause());
+    Assertions.assertSame(storeFailure, failure.getSuppressed()[0]);
     verify(entityStore, times(1))
         .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
     verify(entityStore, never()).delete(any(), eq(Entity.EntityType.JOB));

@@ -258,18 +258,19 @@ Gravitino records a job as `QUEUED` and sets its initial owner before handing it
 A recovered job therefore keeps the permissions of its original submitter. If the execution id is
 not recorded within three times `gravitino.job.statusPullIntervalInMs`, another server, or the same
 server after a restart, looks the job up in the runner. A found execution is tracked, or cancelled
-if the job is `CANCELLING`. Confirmed absence settles it as `FAILED` or `CANCELLED`. Failed or
-unsupported lookup leaves the registration for a later pull or operator intervention. The `k8s`
-executor supports lookup while its name prefix and namespace configuration remain unchanged. The
-local executor cannot look up an execution after losing its node-local state; its existing retention
-policy still applies.
+if the job is `CANCELLING`. Otherwise the job is settled as `FAILED`, or `CANCELLED` if it is
+`CANCELLING`. A failed lookup is retried in the next pull. The `k8s` executor finds a job while its
+name prefix and namespace configuration remain unchanged. The local executor finds none, as the job
+state is lost with the server that submitted it.
 
-Invalid input and confirmed rejection remove the job. A failed submission with an unknown outcome,
-such as a lost response after the runner accepted it, keeps the registration and requests
-cancellation. If the store cannot persist cancellation, the job is still retained for recovery and
-may be tracked as running. The error identifies the job: check it before retrying, since retrying a
-run request creates a new job. The `k8s` executor also attempts immediate cleanup, and logs a manual
-`kubectl` remedy if that fails.
+Invalid input and a rejected submission remove the job. For the `k8s` executor, a failed submission
+with an unknown outcome, such as a lost response after the runner accepted it, keeps the job as
+`CANCELLING`, so an execution found for it later is cancelled, and the job is then settled as
+`CANCELLED`. If the store cannot record the cancellation, the job is still kept and may be tracked
+as running. The error identifies the job: check it before retrying, since retrying a run request
+creates a new job. The `k8s` executor also attempts immediate cleanup, and logs a manual `kubectl`
+remedy if that fails. With a job executor that can't find a job, such as the local executor, any
+failed submission removes the job.
 
 Cancelling a job during submission persists `CANCELLING`. Once an execution is recorded, Gravitino
 cancels it and retries temporary cancellation failures during status pulls. Repeating the cancel
@@ -281,9 +282,9 @@ With several Gravitino servers, use the same `gravitino.job.statusPullIntervalIn
 clocks in sync. The entire registration-to-recording phase must fit within three pull intervals.
 Otherwise another server may settle the job, and cancellation of a late submission is attempted
 before its run request fails. Cancellation cannot undo completed work. If the job was already
-settled and this late cancellation fails, check the execution in the runner before retrying. The local executor's staging retention must also exceed resource preparation, submission,
-queueing and execution time; the in-flight guard protects status reconciliation, not the existing
-retention cleanup.
+settled and this late cancellation fails, check the execution in the runner before retrying.
+`gravitino.job.stagingDirKeepTimeInMs` must also be longer than preparing, submitting, queueing and
+running a job of the local executor, as described below.
 :::
 
 ### List Jobs, Get a Job, and Cancel
@@ -477,9 +478,8 @@ only tracks the jobs it runs itself:
   `CANCELLING` more than three times `gravitino.job.statusPullIntervalInMs` after the cancel request,
   the server running it is considered gone, and another server marks it as `CANCELLED` when it
   pulls job statuses. Its job template can then be deleted.
-- This shortcut does not apply to a pending submission whose execution id was never recorded.
-  The local executor cannot look it up, so cancelling it retains `CANCELLING` until the retention
-  policy expires it or an operator resolves it. Its job template remains in use until then.
+- A job whose execution id was never recorded is settled within about four times
+  `gravitino.job.statusPullIntervalInMs` too, as described in [Run a Job](#run-a-job).
 
 :::caution
 The local job executor can't tell a job left behind by an exited server from a job that is still
@@ -499,9 +499,7 @@ every tenth of that time. Until then, they are still reported as queued, started
 they keep their job templates from being deleted.
 
 For jobs whose execution id was recorded, cancelling them settles them as `CANCELLED` within about
-four times `gravitino.job.statusPullIntervalInMs`, as described above. A pending submission with
-unsupported lookup cannot use this shortcut and waits for retention or operator intervention.
-Lowering `gravitino.job.stagingDirKeepTimeInMs` shortens retention, but finished jobs are then kept
+four times `gravitino.job.statusPullIntervalInMs`, as described above. Lowering `gravitino.job.stagingDirKeepTimeInMs` shortens retention, but finished jobs are then kept
 for a shorter time, and a job that runs longer than that without changing its status is marked as
 `FAILED`.
 :::

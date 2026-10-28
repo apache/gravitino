@@ -161,6 +161,10 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long submissionTimeoutInMs;
 
+  // Whether the job executor implements findSubmittedJob(), so a job whose submission outcome is
+  // unknown can be recovered rather than removed.
+  private final boolean findsSubmittedJobs;
+
   // The ids of the jobs this server is submitting. The status pull of this server leaves them to
   // their submission however long it takes, only the other servers settle them once it times out.
   private final Set<Long> jobsBeingSubmitted = ConcurrentHashMap.newKeySet();
@@ -178,6 +182,7 @@ public class JobManager implements JobOperationDispatcher {
       Config config, EntityStore entityStore, IdGenerator idGenerator, JobExecutor jobExecutor) {
     this.entityStore = entityStore;
     this.jobExecutor = jobExecutor;
+    this.findsSubmittedJobs = implementsFindSubmittedJob(jobExecutor);
     this.idGenerator = idGenerator;
 
     String stagingDirPath = config.get(Configs.JOB_STAGING_DIR);
@@ -681,12 +686,25 @@ public class JobManager implements JobOperationDispatcher {
       deleteUnsubmittedJob(metalake, pendingJobEntity, jobStagingDir, e);
       throw e;
     } catch (Exception e) {
+      if (!findsSubmittedJobs) {
+        // The job executor can't find an execution the submission may have left, so the
+        // registration couldn't recover it. The job executor removes what it created instead.
+        RuntimeException failure =
+            new RuntimeException(
+                String.format(
+                    "Failed to submit job %s of job template %s for execution: %s",
+                    pendingJobEntity.name(), jobTemplateName, e.getMessage()),
+                e);
+        deleteUnsubmittedJob(metalake, pendingJobEntity, jobStagingDir, failure);
+        throw failure;
+      }
+
       RuntimeException failure =
           new RuntimeException(
               String.format(
                   "Failed to submit job %s of job template %s for execution: %s. The outcome is"
-                      + " unknown; the registration"
-                      + " is retained for recovery. Check the job before retrying",
+                      + " unknown, so the job is kept and cancelled, and any execution found for it"
+                      + " in the job executor is cancelled too. Check the job before retrying",
                   pendingJobEntity.name(), jobTemplateName, e.getMessage()),
               e);
       // A failed request is not proof that nothing was submitted. Keep the recovery anchor
@@ -700,12 +718,30 @@ public class JobManager implements JobOperationDispatcher {
 
   private void markFailedSubmissionForCancellation(
       String metalake, JobEntity job, Exception failure) {
+    NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
     for (int attempt = 1; attempt <= SUBMISSION_WRITE_MAX_ATTEMPTS; attempt++) {
       try {
-        if (updateJobEntity(metalake, job, this::toCancellingJobEntity).isPresent()) {
-          return;
-        }
-      } catch (RuntimeException e) {
+        TreeLockUtils.doWithTreeLock(
+            jobIdent,
+            LockType.WRITE,
+            () ->
+                entityStore.update(
+                    jobIdent, JobEntity.class, Entity.EntityType.JOB, this::toCancellingJobEntity));
+        return;
+      } catch (OptimisticLockException e) {
+        failure.addSuppressed(e);
+      } catch (NoSuchEntityException e) {
+        // E.g. its metalake was dropped. Nothing is left to recover the execution with.
+        LOG.error(
+            "Job {} under metalake {} has an unknown submission outcome and no longer exists, so"
+                + " an execution of it can't be found and cancelled. Check the job executor for"
+                + " an execution of job id {}",
+            job.name(),
+            metalake,
+            job.id(),
+            failure);
+        return;
+      } catch (Exception e) {
         failure.addSuppressed(e);
         break;
       }
@@ -1873,5 +1909,19 @@ public class JobManager implements JobOperationDispatcher {
 
   private static long timeInMs(@Nullable Long time) {
     return time == null ? 0L : time;
+  }
+
+  private static boolean implementsFindSubmittedJob(JobExecutor jobExecutor) {
+    try {
+      // An inherited default method of the interface is declared by the interface itself.
+      return jobExecutor
+              .getClass()
+              .getMethod("findSubmittedJob", JobContext.class, JobTemplate.class)
+              .getDeclaringClass()
+          != JobExecutor.class;
+    } catch (NoSuchMethodException e) {
+      // Never happens, as the interface declares the method.
+      throw new IllegalStateException(e);
+    }
   }
 }

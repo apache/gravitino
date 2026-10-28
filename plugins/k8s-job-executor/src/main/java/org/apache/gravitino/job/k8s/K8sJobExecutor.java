@@ -55,6 +55,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
@@ -203,7 +204,8 @@ public class K8sJobExecutor implements JobExecutor {
       if (existing == null
           || existing.getMetadata().getDeletionTimestamp() != null
           || !K8sJobResourceUtils.isOfJob(existing, context.jobId())) {
-        throw new IllegalStateException(
+        // Nothing was created for this job, so the submission is rejected for sure.
+        throw new JobSubmissionRejectedException(
             String.format(
                 "SparkApplication %s/%s already exists and can't be used for job %s. If it belongs"
                     + " to another Gravitino deployment sharing the namespace, use a different %s"

@@ -201,7 +201,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUnsupportedLookupRetainsSubmissionUntilLocalRetentionExpires() throws Exception {
+  public void testSubmissionLeftByExitedNodeIsSettledByAnotherNode() throws Exception {
     // The server exits right after the job executor accepts the job, before it records the
     // submission. The job was registered before the submission, so it's not lost.
     AtomicReference<String> submitted = new AtomicReference<>();
@@ -227,15 +227,10 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
       nodeB.pullAndUpdateJobStatus();
       Assertions.assertEquals(pending, getJob(pending.name()));
 
-      // Beyond it, node B attempts lookup, but its local executor cannot establish whether
-      // another node submitted an execution. Unsupported lookup leaves the registration intact.
+      // Beyond it, the job is reconciled with the job executor, which has no execution of it on
+      // node B, so it's marked as FAILED.
       moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
       nodeB.pullAndUpdateJobStatus();
-      Assertions.assertEquals(JobHandle.Status.QUEUED, getJob(pending.name()).status());
-      // Unsupported lookup is not evidence of absence. The existing local retention policy
-      // eventually expires an untrackable job instead.
-      moveJobTimestampsBack(pending.name());
-      nodeB.cleanUpStagingDirs();
       JobEntity settled = getJob(pending.name());
       Assertions.assertEquals(JobHandle.Status.FAILED, settled.status());
       Assertions.assertTrue(settled.finishedAt() > 0);
@@ -883,7 +878,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
         new AtomicReference<>(JobHandle.Status.STARTED);
     AtomicReference<Boolean> reachable = new AtomicReference<>(false);
     AtomicInteger cancellations = new AtomicInteger();
-    JobExecutor shared = Mockito.mock(JobExecutor.class);
+    JobExecutor shared = Mockito.mock(LookupJobExecutor.class);
     Mockito.when(shared.ownsJob(Mockito.any())).thenReturn(true);
     Mockito.when(shared.submitJob(Mockito.any(), Mockito.any()))
         .thenThrow(new RuntimeException("accepted execution, response lost"));
