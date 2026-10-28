@@ -49,7 +49,7 @@ declaration while reader support is maturing.
 
 1. Replacing table-level authorization or granting access through a read-restriction policy.
 2. Executing arbitrary expressions or UDFs through the first Iceberg REST implementation.
-3. Supporting nested-field masks, roles, nested groups, or arbitrary query/session attribute
+3. Supporting nested-field masks, roles, identity attributes, nested groups, or general attribute
    expressions in the first version.
 4. Defining a new direct policy-to-metadata-object association model.
 5. Guaranteeing that a reader without Iceberg read-restriction support can safely read governed
@@ -233,20 +233,29 @@ an Iceberg `read-restrictions` response.
 
 ## SQL Expressions
 
-Both built-in policy types keep exactly one `expression` string. The proposed authoring language
+Both built-in policy types keep exactly one `expression` string. The authoring language
 is `restricted-sql-v1`, using a Snowflake-style typed definition and SQL `CASE` for conditional
 results. Every definition contains a parameter list, `RETURNS`, a result type, and `->` followed
 by the SQL body. Row filters declare `BOOLEAN`; column masks declare the masked column's logical
-type. There is no separate function name or creation statement. SQL parser and enforcement changes
-require separate implementation work; the existing implementation still accepts `restricted-rego-v1`.
+type. There is no separate function name or creation statement.
+
+[PR #14237](https://github.com/apache/gravitino/pull/14237) implements this dialect with an ANTLR
+parser, typed AST validation, and experimental Iceberg conversion. It replaces the unreleased
+`restricted-rego-v1` dialect; Rego definitions are no longer accepted. The server validates SQL
+on policy creation and content updates. Metadata reads, renames, and comment updates do not
+reparse source. The experimental loader binds selected definitions to the authenticated subject
+and table schema before converting them to closed Iceberg restrictions.
+
+The grammar below defines authoring validity. The experimental converter supports the narrower
+enforcement subset documented below; a valid SQL expression that cannot be represented by that
+target fails the governed load. The runtime reference is [Policies](../docs/policies.md).
 
 ### Authoring Examples
 
 With a string parameter `region`, a row filter declares a Boolean result:
 
 ```sql
-(region STRING) RETURNS BOOLEAN ->
-  region = user_attribute('region')
+(region STRING) RETURNS BOOLEAN -> region = 'US'
 ```
 
 The same filter can express conditional behavior with SQL `CASE`:
@@ -254,7 +263,7 @@ The same filter can express conditional behavior with SQL `CASE`:
 ```sql
 (region STRING) RETURNS BOOLEAN -> CASE
   WHEN CURRENT_USER() = 'alice' THEN TRUE
-  ELSE region = user_attribute('region')
+  ELSE region = 'US'
 END
 ```
 
@@ -323,7 +332,7 @@ type        := BOOLEAN | INTEGER | LONG | FLOAT | DOUBLE | STRING | BINARY | DAT
 expr        := orExpr
 orExpr      := andExpr (OR andExpr)*
 andExpr     := notExpr (AND notExpr)*
-notExpr     := NOT notExpr | predicate
+notExpr     := NOT* predicate
 predicate   := scalar (compareOp scalar
              | IS NOT? NULL
              | NOT? IN "(" literal ("," literal)* ")"
@@ -343,7 +352,14 @@ number      := "-"? ("0" | nonZeroDigit digit*) ("." digit+)?
 digit       := "0" | nonZeroDigit
 nonZeroDigit := "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 unsignedInteger := "0" | nonZeroDigit digit*
+identifier  := unquotedIdentifier | quotedIdentifier
+unquotedIdentifier := (asciiLetter | "_") (asciiLetter | digit | "_")*
+quotedIdentifier := '"' (nonDoubleQuote | '""')+ '"'
+string      := "'" (nonSingleQuote | "''")* "'"
 ```
+
+`asciiLetter` means A–Z or a–z. Quoted identifiers must not be empty. Quoted identifiers and
+strings decode doubled quotes once; there is no backslash escape layer inside SQL literals.
 
 Keywords and allowlisted built-in function names are case-insensitive. `functionCall` does not
 permit arbitrary functions: names and signatures must match the function tables below. `EOF`
@@ -371,7 +387,7 @@ the same parameter; `"val"` is distinct. Names bind only within the declared par
 qualified input references and nested paths are unsupported.
 
 String literals use single quotes; an embedded single quote is doubled, as in `'O''Brien'`.
-Backslashes are literal characters. Unicode is not normalized, and isolated surrogates are invalid.
+Backslashes are literal characters. Unicode is not normalized; isolated surrogates and NUL are invalid.
 Whitespace is allowed between tokens. Numeric literals are exact base-10 values until type binding.
 Leading `+`, exponents, leading zeroes, and trailing decimal points are unsupported.
 
@@ -400,14 +416,14 @@ as part of an expression.
 | Comparison | `amount = 100`, `amount <> 100`, `amount < 100`, `amount <= 100`, `amount > 100`, `amount >= 100` | Compatible scalar operands, including available inputs |
 | Range | `amount BETWEEN 10 AND 100`, `amount NOT BETWEEN 10 AND 100` | Inclusive bounds; compatible ordered type |
 | Membership | `region IN ('US', 'CA')`, `region NOT IN ('US', 'CA')` | Non-empty literal list; non-null values have compatible types |
-| Null test | `val IS NULL`, `user_attribute('region') IS NOT NULL` | Typed scalar operand |
+| Null test | `val IS NULL`, `region IS NOT NULL` | Typed scalar operand; non-null Boolean result |
 | NaN test | `is_nan(score)`, `NOT is_nan(score)` | Floating-point argument |
 | Prefix matching | `name LIKE 'Acme%'`, `name NOT LIKE 'Acme%'` | String operand; non-empty fixed prefix followed by exactly one `%` |
 | Boolean composition | `region = 'US' AND amount < 100`, `region = 'US' OR region = 'CA'`, `NOT (region = 'US')` | Boolean operands; parentheses may nest |
 | Boolean constant | `TRUE`, `FALSE` | Visible-row predicate |
 | Date part | `year(order_date) = 2026`, `month(order_date) = 3`, `day(order_date) = 15` | Date-part result compared with a compatible integer literal |
 | Current user | `owner = CURRENT_USER()` | Compatible string operands |
-| User attribute | `region = user_attribute('region')` | Compatible declared scalar types |
+| Group membership | `is_group_member('auditors')` | Non-empty literal group name; trusted flat membership |
 
 `!=` is accepted as an alias for `<>`. `BETWEEN` is equivalent to inclusive lower and upper
 comparisons joined by `AND`; `NOT BETWEEN` negates that result. Prefix patterns cannot contain
@@ -428,7 +444,7 @@ Both Snowflake forms of `CASE` are supported:
 CASE
   WHEN region IS NULL THEN FALSE
   WHEN region = 'US' THEN TRUE
-  ELSE region = user_attribute('region')
+  ELSE FALSE
 END
 
 CASE region
@@ -478,7 +494,10 @@ required column, `IS NULL` is false and `IS NOT NULL` is true.
 There is no implicit cross-family conversion, signedness conversion, rounding, or timezone
 assumption. Integer values must be mathematical integers within range. Decimal values must fit
 the target precision and scale exactly. Floating-point literals preserve negative zero and reject
-overflow, infinity, and NaN. String comparisons are case-sensitive and do not normalize Unicode.
+overflow, infinity, and NaN. Strings compare lexicographically by Unicode code point,
+case-sensitively and without Unicode normalization. Constant/context comparisons and bound string
+column predicates use the same ordering. `BINARY` supports null tests and compatible scalar masks,
+but no value comparisons.
 Temporal literals must use the matching type keyword, valid calendar or clock values, and at
 most six fractional-second digits. Timestamp-with-timezone literals require an explicit offset.
 
@@ -488,21 +507,18 @@ most six fractional-second digits. Timestamp-with-timezone literals require an e
 | --- | --- | --- |
 | `CURRENT_USER()` | Non-null `STRING` | Trusted effective subject name |
 | `is_group_member('group')` | Non-null `BOOLEAN` | Exact flat membership in the current metalake |
-| `user_attribute('key')` | Declared scalar type, possibly null | Trusted attribute of the effective subject |
 
 `CURRENT_USER()` follows Snowflake's context-function spelling. `is_group_member` retains the
-existing trusted group-membership behavior. `user_attribute` reads a declared scalar user
-attribute. The latter two functions are Gravitino extensions, not Snowflake built-ins. An unknown
-group, group lookup failure, missing subject, or inconsistent identity snapshot is an error.
-An existing group without the subject returns false; nested group expansion is unsupported.
-Attribute keys are non-empty, case-sensitive string literals. Attribute types must be compatible
-with their use in the body. Lists, objects, and implicit string-to-number conversions are
-unsupported. Context values are stable for one request and use the effective subject.
+trusted group-membership behavior and is a Gravitino extension, not a Snowflake built-in.
+Group names must be non-empty string literals. An unknown group, group lookup failure, missing
+subject, or inconsistent identity snapshot is an error. An existing group without the subject
+returns false; nested group expansion is unsupported. Context values are stable for one conversion
+and use the effective subject. Group lookups are cached within that conversion.
 
-An absent or explicitly null value for a declared attribute returns SQL `NULL`. For example,
-`region = user_attribute('region')` returns `UNKNOWN` when the region attribute has no value, so
-that expression retains no rows. The enclosing Boolean expression still follows SQL null rules.
-An unknown attribute key, incompatible type, missing subject, or failed lookup is an error.
+Membership comes from the authenticated principal's supplied groups. An empty group list is valid
+and means non-membership. Enabling authorization does not populate groups; authenticators such
+as `simple` that supply none take the non-member branch. The referenced group must still exist
+in Gravitino. User attributes, including `user_attribute(...)`, are unsupported.
 
 #### Date-Part Functions
 
@@ -546,7 +562,7 @@ declared mask parameter, which must have a type accepted by the function.
 | `mask_alphanum(value)` | `STRING` | ASCII digits become `n`; `(),.@-` are preserved; every other Unicode code point becomes `x` |
 | `show_first_4(value)` | `STRING` | Keep the first four code points; apply the same masking rules to the remainder |
 | `show_last_4(value)` | `STRING` | Keep the last four code points; apply the same masking rules to the preceding portion |
-| `mask_to_fixed_value(value)` | Types with a defined fixed value | Replace with the type's fixed value, including null input |
+| `mask_to_fixed_value(value)` | `STRING`, numeric, `BOOLEAN`, `DATE`, or supported timestamp types | Replace with the type's fixed value, including null input |
 | `replace_with_null(value)` | Any typed scalar | Return a null of the input's type; the result is nullable |
 | `truncate_to_year(value)` | Date and supported timestamp types | Truncate to the beginning of the year |
 | `truncate_to_month(value)` | Date and supported timestamp types | Truncate to the beginning of the month |
@@ -571,12 +587,16 @@ separate queries use independent salts.
 Only allowlisted functions and the shared expression grammar are accepted. Each mask function
 takes one compatible scalar argument; additional arguments to these calls are invalid. Conditions
 may use the declared mask parameter and trusted context functions. Conditional disclosure is
-expressed with ordinary SQL `CASE`, as in the email mask example above.
+expressed with ordinary SQL `CASE`, as in the column-mask example above. Row-dependent conditions
+and nested mask calls may be valid source but are outside the experimental conversion subset.
 
 A mask expression must have the expected result type on every branch. Returning null, explicitly or
 through an omitted `ELSE`, is allowed only for a nullable target column. An expression whose inferred
 nullability is incompatible with a required target is rejected. For example, a string-returning
-mask cannot return a number in one branch, and a required target cannot use `THEN NULL`.
+mask cannot return a number in one branch, and a required target cannot use `THEN NULL`, even in
+an unselected arm. `IS NULL` and `IS NOT NULL` always produce non-null Boolean results;
+`mask_to_fixed_value` also produces a non-null result for null input. Nullability is propagated
+by operation rather than inherited unconditionally from every child.
 
 ### Validation and Failure Behavior
 
@@ -584,19 +604,27 @@ Static validation checks complete definitions, declared parameter and result typ
 names, Boolean row-filter results, exact mask result types, every `CASE` branch, supported operand
 shapes, allowlisted functions, function arguments, and resource limits. Binding and context
 validation check compatible types, literal ranges, nullability, and trusted context values.
-Invalid content is rejected; an input or
-context error must never silently remove a required restriction.
+Invalid content is rejected; an input or context error must never silently remove a required
+restriction. The parser builds typed operation nodes without executing expressions. Binding
+checks every declared input before selecting branches and checks mask nullability across all
+result arms. Conversion and context lookups evaluate only selected `CASE` results and stop
+evaluating later conditions after a match.
 
 The expression limits apply to the complete stored definition, including its parameter list,
 return type, and SQL body:
 
 - Source length: 16 KiB of UTF-8.
-- Operation depth: 8, including nested `CASE` expressions and function calls.
-- Expression nodes: 256.
-- Decoded string literal: 4 KiB of UTF-8.
+- Operation depth: 16, including nested `CASE` expressions and function calls.
+- Expression nodes: 1024.
+- Declared parameters: 256.
+- Each decoded quoted identifier or string literal: 4 KiB of UTF-8.
 - Numeric literal: 256 bytes.
-- `IN` list elements: 256 per list and 256 in the complete source.
-- Parenthesis nesting: 256 levels.
+- `IN` list elements: 1000 per list and 1000 in the complete source.
+- Parenthesis nesting: 64 levels.
+
+A consecutive `AND` or `OR` chain is one n-ary operation. Parentheses alone add no AST nodes or
+operation depth. Literal lists and all `CASE` arms count toward the node limit, even when an arm
+is unreachable. These source limits are separate from the target conversion limits below.
 
 Limits apply before normalization. Unknown functions, unsupported types, and expressions outside
 this grammar are errors. This Snowflake-style expression profile supports conditional SQL
@@ -604,11 +632,40 @@ expressions without adopting every Snowflake SQL feature. The first version reje
 casts, arithmetic, undeclared column references, nested fields, subqueries, custom functions,
 general regular expressions, and general wildcard patterns such as `'%Acme'` or `'A_me'`.
 
+### Experimental Iceberg Conversion
+
+The implementation merged in #14237 converts the following subset to native Iceberg restrictions:
+
+| SQL form | Iceberg conversion |
+| --- | --- |
+| Column compared with a compatible literal or bound context scalar | Field-ID predicate with SQL null semantics |
+| Boolean inputs, comparisons, `AND`, `OR`, and `NOT` | Three-valued lowering; only true retains a row |
+| `IN`, `NOT IN`, ranges, null tests, prefix `LIKE`, and NaN tests | Closed predicates with explicit unknown handling |
+| Searched/simple Boolean `CASE` and scalar `CASE` inside supported predicates | Ordered lowering; false and unknown conditions fall through |
+| `year(date_or_timestamp_column)` | Iceberg year transform with calendar-year literal adjustment |
+| `month` or `day` on constant temporal values | Scalar constant evaluation |
+| Mask returning its local parameter | No projection; retain the original selected column |
+| Null or `replace_with_null(value)` | Null projection on a nullable column |
+| One of the nine direct mask functions applied to the local parameter | Corresponding Iceberg projection |
+| Literal equal to the target type's fixed mask value | Fixed-value projection |
+| Mask `CASE` whose conditions resolve to constants after binding | First matching compatible projection |
+
+General column-to-column comparisons, month/day extraction from row values, row-dependent mask
+selection, composed mask calls, and arbitrary literal mask values are not representable by the
+current target and are rejected. An incompatible selected mask fails the table load. SQL
+authoring support does not imply that the Iceberg target supports every expression form.
+
+The converter tracks separate predicates for rows where a SQL expression is true and false;
+unknown matches neither. Negation exchanges those predicates instead of treating unknown as
+false. Ordered `CASE` lowering preserves this distinction for both conditions and results.
+Generated Iceberg expressions are limited to 16384 nodes and depth 256, with an additional bound
+on compilation work. Exceeding a target limit rejects the governed load.
+
 ### Conformance
 
 Examples and validation cases cover every supported operator and type; SQL quoting and escaping;
 numeric boundaries, decimal scale, and temporal precision; null comparisons and nested negation;
-prefix matching; NaN tests; date parts; current-user and attribute binding; every mask function;
+prefix matching; NaN tests; date parts; current-user and group binding; every mask function;
 expected result types; available inputs; searched and simple `CASE`; first-match
 evaluation; null conditions and selectors; omitted `ELSE`; nested expressions; incompatible branch
 types and nullability; invalid type/function pairs; and all resource limits.
@@ -624,6 +681,13 @@ named string columns and verify independent binding, local parameter renaming, i
 nullability, and type checks. A reference to `phone_number` or `email` in a mask body is invalid
 unless it is the explicitly declared parameter. Row-filter cases must resolve declared parameters
 against the target table schema and reject mismatched column types.
+
+Conformance also covers rejection of user attributes, NUL, and empty quoted identifiers;
+Unicode code-point string ordering for constants, context values, and bound columns;
+operation-specific mask nullability, including unselected null arms; and lazy context lookup
+on selected `CASE` paths. Versioned golden fixtures pin parsed ASTs and rejected-input diagnostics.
+Conversion cases cover the supported target subset, unsupported source-valid expressions,
+three-valued negation, and generated-expression and compilation-work limits.
 
 ## Resolution and Conflicts
 
@@ -831,6 +895,16 @@ Coverage includes:
 
 ## Implementation Plan
 
+The policy content, experimental load-table integration, and SQL parser/converter have been merged
+through [#13693](https://github.com/apache/gravitino/pull/13693),
+[#13778](https://github.com/apache/gravitino/pull/13778), and
+[#14237](https://github.com/apache/gravitino/pull/14237). The SQL implementation uses an ANTLR
+parser and immutable typed operation nodes; the parser runtime is relocated in the published core
+JAR to coexist with readers such as Spark that use another ANTLR version.
+
+The steps below describe the overall design roadmap, including delivery and trust requirements
+that are not supplied by the SQL parser change alone:
+
 1. Add the SQL expression parser, `CASE` evaluation, and typed row-filter and column-mask
    validation; reject unsupported function content explicitly.
 2. Add a Gravitino-owned Iceberg read-restriction model and exact wire serializer.
@@ -844,6 +918,8 @@ Coverage includes:
 
 ## References
 
+- [SQL parser and experimental converter implementation](https://github.com/apache/gravitino/pull/14237)
+- [Policy expression runtime reference](../docs/policies.md)
 - [Policy-on-tag design](policy-on-tag.md)
 - [Apache Iceberg read-restrictions specification](https://github.com/apache/iceberg/pull/13879)
 - [Iceberg client-capabilities proposal](https://github.com/apache/iceberg/pull/16394)
