@@ -65,7 +65,8 @@ execution id afterwards. If that id is not recorded within three
 
 - A returned execution id is recorded. It must be the same string that `submitJob` returns.
 - An empty result means that the runner has no execution. The job becomes `FAILED`, or
-  `CANCELLED` if cancellation was requested. Only return it when the runner confirms it.
+  `CANCELLED` if cancellation was requested. Only return it when the runner confirms it, unless
+  the job executor can't look up executions at all, see the default implementation below.
 - An exception keeps the job for a lookup in the next status pull.
 
 The default implementation returns empty. Implement the lookup if the runner can identify an

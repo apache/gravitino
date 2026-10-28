@@ -458,6 +458,7 @@ public class TestJobManager {
     Assertions.assertEquals(
         JobHandle.Status.FAILED, captureUpdatedJobEntity(rejected, rejected).status());
     assertNoJobStagingDir();
+    verify(jobExecutor, never()).findSubmittedJob(any(), any());
     verify(jobExecutor, never()).cancelJob(any());
   }
 

@@ -895,7 +895,7 @@ public class JobManager implements JobOperationDispatcher {
     } catch (Exception e) {
       failure.addSuppressed(e);
       LOG.warn(
-          "Failed to delete rejected job {}, settling its registration as FAILED",
+          "Failed to delete unsubmitted job {}, settling its registration as FAILED",
           pendingJobEntity.name(),
           e);
       try {
@@ -907,7 +907,7 @@ public class JobManager implements JobOperationDispatcher {
       } catch (RuntimeException settleFailure) {
         failure.addSuppressed(settleFailure);
         LOG.warn(
-            "Failed to settle rejected job {}; its registration is retained",
+            "Failed to settle unsubmitted job {}; its registration is retained",
             pendingJobEntity.name(),
             settleFailure);
       }
