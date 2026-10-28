@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -77,19 +78,24 @@ class IcebergViewCatalogOperations {
   /** Iceberg sentinel value for {@code SetCurrentViewVersion}: "use the last added version". */
   private static final int ICEBERG_LAST_ADDED_VIEW_VERSION = -1;
 
-  private final IcebergCatalogWrapper icebergCatalogWrapper;
+  private final Supplier<IcebergCatalogWrapper> catalogWrapperSupplier;
 
-  IcebergViewCatalogOperations(IcebergCatalogWrapper icebergCatalogWrapper) {
+  IcebergViewCatalogOperations(Supplier<IcebergCatalogWrapper> catalogWrapperSupplier) {
     Preconditions.checkArgument(
-        icebergCatalogWrapper != null, "icebergCatalogWrapper must not be null");
-    this.icebergCatalogWrapper = icebergCatalogWrapper;
+        catalogWrapperSupplier != null, "catalogWrapperSupplier must not be null");
+    this.catalogWrapperSupplier = catalogWrapperSupplier;
+  }
+
+  private IcebergCatalogWrapper catalogWrapper() {
+    IcebergCatalogWrapper wrapper = catalogWrapperSupplier.get();
+    Preconditions.checkState(wrapper != null, "catalogWrapperSupplier returned null");
+    return wrapper;
   }
 
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
     try {
       LoadViewResponse response =
-          icebergCatalogWrapper.loadView(
-              IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
+          catalogWrapper().loadView(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
       return IcebergView.fromLoadViewResponse(response, ident.name());
     } catch (org.apache.iceberg.exceptions.NoSuchViewException e) {
       throw new NoSuchViewException(e, "Iceberg view %s does not exist", ident);
@@ -97,18 +103,18 @@ class IcebergViewCatalogOperations {
   }
 
   public boolean viewExists(NameIdentifier ident) {
-    return icebergCatalogWrapper.viewExists(
-        IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
+    return catalogWrapper()
+        .viewExists(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
   }
 
   public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
     org.apache.iceberg.catalog.Namespace icebergNamespace =
         IcebergCatalogWrapperHelper.getIcebergNamespace(namespace);
-    if (!icebergCatalogWrapper.namespaceExists(icebergNamespace)) {
+    if (!catalogWrapper().namespaceExists(icebergNamespace)) {
       throw new NoSuchSchemaException("Schema %s does not exist", namespace);
     }
     try {
-      ListTablesResponse response = icebergCatalogWrapper.listView(icebergNamespace);
+      ListTablesResponse response = catalogWrapper().listView(icebergNamespace);
       return response.identifiers().stream()
           .map(id -> NameIdentifier.of(ArrayUtils.add(namespace.levels(), id.name())))
           .toArray(NameIdentifier[]::new);
@@ -170,7 +176,7 @@ class IcebergViewCatalogOperations {
             .build();
 
     try {
-      icebergCatalogWrapper.createView(icebergNamespace, request);
+      catalogWrapper().createView(icebergNamespace, request);
       LOG.info("Created Iceberg view {}", ident);
       return IcebergView.builder()
           .withName(ident.name())
@@ -208,8 +214,7 @@ class IcebergViewCatalogOperations {
 
   public boolean dropView(NameIdentifier ident) {
     try {
-      icebergCatalogWrapper.dropView(
-          IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
+      catalogWrapper().dropView(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
       LOG.info("Dropped Iceberg view {}", ident);
       return true;
     } catch (org.apache.iceberg.exceptions.NoSuchViewException e) {
@@ -228,7 +233,7 @@ class IcebergViewCatalogOperations {
                   IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(
                       ident.namespace(), rename.getNewName()))
               .build();
-      icebergCatalogWrapper.renameView(request);
+      catalogWrapper().renameView(request);
       return loadView(
           NameIdentifier.of(ArrayUtils.add(ident.namespace().levels(), rename.getNewName())));
     } catch (org.apache.iceberg.exceptions.NoSuchViewException e) {
@@ -245,7 +250,7 @@ class IcebergViewCatalogOperations {
       throws NoSuchViewException, IllegalArgumentException {
     TableIdentifier viewId = IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident);
     try {
-      LoadViewResponse current = icebergCatalogWrapper.loadView(viewId);
+      LoadViewResponse current = catalogWrapper().loadView(viewId);
       ViewMetadata metadata = current.metadata();
 
       GroupedViewChanges groupedChanges = groupViewChanges(changes);
@@ -267,7 +272,7 @@ class IcebergViewCatalogOperations {
       UpdateTableRequest request =
           UpdateTableRequest.create(
               viewId, UpdateRequirements.forReplaceView(metadata, updates), updates);
-      LoadViewResponse response = icebergCatalogWrapper.updateView(viewId, request);
+      LoadViewResponse response = catalogWrapper().updateView(viewId, request);
       LOG.info("Altered Iceberg view {}", ident);
       return IcebergView.fromLoadViewResponse(response, ident.name());
     } catch (org.apache.iceberg.exceptions.NoSuchViewException e) {

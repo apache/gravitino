@@ -115,14 +115,16 @@ public class TestIcebergCatalogWrapperResolve {
   }
 
   @Test
-  void catalogAndViewOpsShareSameWrapper() {
+  void catalogAndViewOpsResolveViaCatalogWrapperEachCall() {
     IcebergCatalogWrapper shared = new IcebergCatalogWrapper(new IcebergConfig());
 
     IcebergCatalogOperations catalogOps = new IcebergCatalogOperations();
     catalogOps.icebergCatalogWrapper = shared;
-    IcebergViewCatalogOperations viewOps = new IcebergViewCatalogOperations(shared);
+    IcebergViewCatalogOperations viewOps =
+        new IcebergViewCatalogOperations(catalogOps::catalogWrapper);
 
-    Assertions.assertSame(shared, catalogOps.icebergCatalogWrapper);
+    Assertions.assertSame(shared, catalogOps.catalogWrapper());
+    Assertions.assertSame(shared, catalogOps.catalogWrapper());
     Assertions.assertNotNull(viewOps);
   }
 
@@ -137,6 +139,9 @@ public class TestIcebergCatalogWrapperResolve {
       IcebergCatalogWrapper first = provider.get();
       IcebergCatalogWrapper second = provider.get();
       Assertions.assertSame(first, second);
+      provider.invalidate();
+      IcebergCatalogWrapper third = provider.get();
+      Assertions.assertNotSame(first, third);
     } finally {
       provider.close();
     }
