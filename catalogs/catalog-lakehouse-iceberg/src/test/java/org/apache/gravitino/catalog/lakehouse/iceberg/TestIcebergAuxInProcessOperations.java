@@ -24,12 +24,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.auxiliary.IcebergAuxCatalogHooks;
+import org.apache.gravitino.auxiliary.AuxiliaryIcebergCatalogBridge;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergAuxCatalogBridge;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.meta.AuditInfo;
 import org.junit.jupiter.api.AfterEach;
@@ -39,30 +38,34 @@ import org.mockito.Mockito;
 
 public class TestIcebergAuxInProcessOperations {
 
+  private AuxiliaryIcebergCatalogBridge.OperationsFactory operationsFactory;
+
   @AfterEach
   void tearDown() {
-    IcebergAuxCatalogBridge.clear();
-    IcebergAuxCatalogHooks.registerOperationsFactory(null);
+    if (operationsFactory != null) {
+      AuxiliaryIcebergCatalogBridge.unregister(operationsFactory);
+      operationsFactory = null;
+    }
   }
 
   @Test
   void metalakeCatalogUsesAuxIrcWrapper() {
     IcebergCatalogWrapper ircWrapper = new IcebergCatalogWrapper(memoryConfig());
-    IcebergAuxCatalogBridge.register(
-        name -> {
-          if ("orders".equals(name)) {
-            return ircWrapper;
-          }
-          throw new NoSuchCatalogException("missing %s", name);
-        },
-        null);
     AtomicReference<IcebergCatalogOperations> auxOps = new AtomicReference<>();
-    IcebergAuxCatalogHooks.registerOperationsFactory(
+    operationsFactory =
         () -> {
-          IcebergCatalogOperations created = IcebergCatalogOperations.createForLocalIrc();
+          IcebergCatalogOperations created =
+              IcebergCatalogOperations.createForLocalIrc(
+                  catalogName -> {
+                    if ("orders".equals(catalogName)) {
+                      return ircWrapper;
+                    }
+                    throw new NoSuchCatalogException("missing %s", catalogName);
+                  });
           auxOps.set(created);
           return created;
-        });
+        };
+    AuxiliaryIcebergCatalogBridge.register(operationsFactory);
 
     CatalogInfo info =
         new CatalogInfo(

@@ -27,11 +27,10 @@ import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.auxiliary.AuxiliaryIcebergCatalogBridge;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
-import org.apache.gravitino.auxiliary.IcebergAuxCatalogHooks;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogOperations;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergAuxCatalogBridge;
 import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
@@ -91,6 +90,7 @@ public class RESTService implements GravitinoAuxiliaryService {
       "org.apache.gravitino.iceberg.service.rest";
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private AuxiliaryIcebergCatalogBridge.OperationsFactory operationsFactory;
   private IcebergMetricsManager icebergMetricsManager;
   private Optional<IcebergCleanupManager> cleanupManager;
   private IcebergConfigProvider configProvider;
@@ -140,10 +140,12 @@ public class RESTService implements GravitinoAuxiliaryService {
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
     if (auxMode) {
-      // Lakehouse catalogs loaded from catalogCache use this IRC's wrappers in-process.
-      IcebergAuxCatalogBridge.register(icebergCatalogWrapperManager::getCatalogWrapper, null);
-      // Metalake catalogs delegate here so they call this IRC's wrapper in-process.
-      IcebergAuxCatalogHooks.registerOperationsFactory(IcebergCatalogOperations::createForLocalIrc);
+      // Metalake catalogs delegate here and borrow this IRC's wrapper in-process.
+      operationsFactory =
+          () ->
+              IcebergCatalogOperations.createForLocalIrc(
+                  icebergCatalogWrapperManager::getCatalogWrapper);
+      AuxiliaryIcebergCatalogBridge.register(operationsFactory);
     }
     IcebergRESTServerContext authorizationContext =
         IcebergRESTServerContext.create(
@@ -311,8 +313,8 @@ public class RESTService implements GravitinoAuxiliaryService {
   @Override
   public void serviceStop() throws Exception {
     if (auxMode) {
-      IcebergAuxCatalogBridge.clear();
-      IcebergAuxCatalogHooks.registerOperationsFactory(null);
+      AuxiliaryIcebergCatalogBridge.unregister(operationsFactory);
+      operationsFactory = null;
     }
     if (server != null) {
       server.stop();

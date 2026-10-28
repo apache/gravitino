@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.auxiliary;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicReference;
@@ -26,12 +27,12 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 
 /**
- * Process-wide hook so a metalake Iceberg catalog can call the auxiliary Iceberg REST service in
+ * Process-wide bridge so a metalake Iceberg catalog can call the auxiliary Iceberg REST service in
  * this JVM. The holder lives on the server class loader, which both the catalog plugin and the
  * auxiliary service can see. The operations object itself is created on the auxiliary class loader,
  * next to that service's catalog wrapper, so the call does not go through HTTP.
  */
-public final class IcebergAuxCatalogHooks {
+public final class AuxiliaryIcebergCatalogBridge {
 
   /** Builds catalog operations on the auxiliary class loader. */
   @FunctionalInterface
@@ -62,28 +63,34 @@ public final class IcebergAuxCatalogHooks {
 
   private static final AtomicReference<ClassLoader> AUX_LOADER = new AtomicReference<>();
 
-  private IcebergAuxCatalogHooks() {}
+  private AuxiliaryIcebergCatalogBridge() {}
 
   /**
-   * Installs the factory used while auxiliary IRC is running. Pass {@code null} to clear it.
+   * Installs the factory used while auxiliary IRC is running.
    *
    * <p>The current thread's context class loader is stored and restored around later calls so
    * Hadoop and Iceberg see the auxiliary loader.
    *
-   * @param factory factory that creates in-process operations, or {@code null} to clear
+   * @param factory factory that creates in-process operations
+   * @throws IllegalStateException if a factory is already registered
    */
-  public static void registerOperationsFactory(@Nullable OperationsFactory factory) {
-    FACTORY.set(factory);
-    AUX_LOADER.set(factory == null ? null : Thread.currentThread().getContextClassLoader());
+  public static void register(OperationsFactory factory) {
+    Preconditions.checkNotNull(factory, "factory");
+    if (!FACTORY.compareAndSet(null, factory)) {
+      throw new IllegalStateException("An auxiliary Iceberg catalog factory is already registered");
+    }
+    AUX_LOADER.set(Thread.currentThread().getContextClassLoader());
   }
 
   /**
-   * Whether auxiliary IRC has published an in-process operations factory.
+   * Removes the factory installed by {@link #register}.
    *
-   * @return true when {@link #registerOperationsFactory} installed a factory
+   * @param factory factory passed to {@link #register}
    */
-  public static boolean hasOperationsFactory() {
-    return FACTORY.get() != null;
+  public static void unregister(OperationsFactory factory) {
+    if (FACTORY.compareAndSet(factory, null)) {
+      AUX_LOADER.set(null);
+    }
   }
 
   /**
@@ -93,7 +100,7 @@ public final class IcebergAuxCatalogHooks {
    * @return operations that call the IRC wrapper in-process, or {@code null}
    */
   @Nullable
-  public static CatalogOperations createOperations() {
+  public static CatalogOperations create() {
     OperationsFactory factory = FACTORY.get();
     if (factory == null) {
       return null;

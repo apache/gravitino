@@ -22,31 +22,16 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergAuxCatalogBridge;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.iceberg.catalog.Namespace;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergEmbeddedRestBackend {
 
-  @AfterEach
-  void tearDown() {
-    IcebergAuxCatalogBridge.clear();
-  }
-
   @Test
   void auxModeUsesIrcWrapperForCatalogName() {
     IcebergCatalogWrapper ircWrapper = new IcebergCatalogWrapper(memoryConfig());
-    IcebergAuxCatalogBridge.register(
-        name -> {
-          if ("orders".equals(name)) {
-            return ircWrapper;
-          }
-          throw new NoSuchCatalogException("missing %s", name);
-        },
-        null);
 
     Map<String, String> conf =
         ImmutableMap.of(
@@ -57,7 +42,17 @@ public class TestIcebergEmbeddedRestBackend {
             IcebergConstants.WAREHOUSE,
             "not-the-catalog-name");
 
-    IcebergBackend backend = IcebergBackend.create("orders", "metalake", conf);
+    IcebergBackend backend =
+        IcebergBackend.create(
+            "orders",
+            "metalake",
+            conf,
+            catalogName -> {
+              if ("orders".equals(catalogName)) {
+                return ircWrapper;
+              }
+              throw new NoSuchCatalogException("missing %s", catalogName);
+            });
     Assertions.assertSame(ircWrapper, backend.wrapper());
     Assertions.assertSame(ircWrapper, backend.wrapper());
     backend.close();
@@ -68,12 +63,12 @@ public class TestIcebergEmbeddedRestBackend {
   @Test
   void auxModeUsesIrcWrapperForHiveBackend() {
     IcebergCatalogWrapper ircWrapper = new IcebergCatalogWrapper(memoryConfig());
-    IcebergAuxCatalogBridge.register(name -> ircWrapper, null);
 
     Map<String, String> conf =
         ImmutableMap.of(
             IcebergConstants.CATALOG_BACKEND, "hive", IcebergConstants.WAREHOUSE, "/tmp/wh");
-    IcebergBackend backend = IcebergBackend.create("hive_cat", "metalake", conf);
+    IcebergBackend backend =
+        IcebergBackend.create("hive_cat", "metalake", conf, catalogName -> ircWrapper);
     Assertions.assertSame(ircWrapper, backend.wrapper());
     backend.close();
     Assertions.assertDoesNotThrow(ircWrapper::close);
