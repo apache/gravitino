@@ -140,9 +140,7 @@ public class IcebergCatalogOperations
     // Non-aux: eager get-or-create into the shared cache (safe; no CatalogManager).
     this.useIrcCatalogWrapper = shouldUseIrcCatalogWrapper();
     if (!useIrcCatalogWrapper) {
-      long accessEvictionMs =
-          icebergConfig.get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL);
-      this.wrapperCache = new IcebergCatalogWrapperCache(accessEvictionMs);
+      this.wrapperCache = IcebergCatalogWrapperCache.create(icebergConfig);
       catalogWrapper();
     }
     this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(this::catalogWrapper);

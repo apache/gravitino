@@ -54,11 +54,23 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
   private final Cache<String, IcebergCatalogWrapper> cache;
 
   /**
+   * Creates a cache using {@link IcebergConfig#ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL}.
+   *
+   * @param config Iceberg configuration (IRC server props or lakehouse catalog props)
+   * @return new cache
+   */
+  public static IcebergCatalogWrapperCache create(IcebergConfig config) {
+    return new IcebergCatalogWrapperCache(
+        config.get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL));
+  }
+
+  /**
    * Creates a cache with the given access-based eviction interval.
    *
    * @param accessEvictionMs expire-after-access interval in milliseconds
    */
-  public IcebergCatalogWrapperCache(long accessEvictionMs) {
+  @VisibleForTesting
+  IcebergCatalogWrapperCache(long accessEvictionMs) {
     long accessEvictionNanos = TimeUnit.MILLISECONDS.toNanos(accessEvictionMs);
     this.cache =
         Caffeine.newBuilder()

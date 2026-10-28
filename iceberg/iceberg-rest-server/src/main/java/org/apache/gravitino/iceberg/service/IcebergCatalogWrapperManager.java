@@ -51,10 +51,7 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
       boolean auxMode,
       String metalakeName) {
     this.configProvider = configProvider;
-    long accessEvictionMs =
-        new IcebergConfig(properties)
-            .get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL);
-    this.catalogWrapperCache = new IcebergCatalogWrapperCache(accessEvictionMs);
+    this.catalogWrapperCache = IcebergCatalogWrapperCache.create(new IcebergConfig(properties));
     if (auxMode) {
       GravitinoEnv.getInstance()
           .catalogManager()
