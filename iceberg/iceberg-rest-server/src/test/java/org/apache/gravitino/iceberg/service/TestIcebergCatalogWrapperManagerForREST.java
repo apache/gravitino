@@ -32,6 +32,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -150,7 +151,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
 
   @Test
   public void testNewerCatalogVersionUsesNewCacheEntryWithoutClosingTheOldOne() throws Exception {
-    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    DynamicIcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
     Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
     IcebergConfig icebergConfig =
         new IcebergConfig(
@@ -189,7 +190,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
 
   @Test
   public void testMissingCatalogVersionFailsFastAndClearsCache() throws Exception {
-    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    DynamicIcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
     Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
     IcebergConfig icebergConfig =
         new IcebergConfig(
@@ -224,8 +225,30 @@ public class TestIcebergCatalogWrapperManagerForREST {
   }
 
   @Test
-  public void testAuxModeRequiresMetalakeName() {
-    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+  public void testStaticAuxModeSkipsCatalogVersionCache() throws Exception {
+    IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(Maps.newHashMap());
+    configProvider.initialize(Maps.newHashMap());
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    try (IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(
+            Maps.newHashMap(), configProvider, true, configProvider.getMetalakeName())) {
+      IcebergRESTServerContext.create(configProvider, false, true, false, manager);
+      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("iceberg", icebergConfig);
+      IcebergCatalogWrapper second = manager.getOrCreateCatalogWrapper("iceberg", icebergConfig);
+      Assertions.assertSame(first, second);
+      Assertions.assertFalse(first.isClosed());
+    }
+  }
+
+  @Test
+  public void testDynamicAuxModeRequiresMetalakeName() {
+    DynamicIcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, " "));
