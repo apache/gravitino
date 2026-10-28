@@ -21,7 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
-import org.apache.gravitino.storage.relational.po.ModelVersionSnapshotPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionSnapshotRowPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -40,11 +40,13 @@ public interface ModelVersionMetaMapper {
    * @param modelName the model name
    * @param version the version number, or null when selecting an alias or listing all versions
    * @param alias the alias, or null when selecting a number or listing all versions
-   * @return the snapshot, including empty collections for a model with no matching version, or null
-   *     when the model was dropped, renamed, or moved; version and alias must not both be set
+   * @return flat rows from one snapshot, a model-ID-only row when no version matches, or an empty
+   *     list when the model was dropped, renamed, or moved; version and alias must not both be set
    */
-  @Nullable
-  ModelVersionSnapshotPO selectModelVersionSnapshot(
+  @SelectProvider(
+      type = ModelVersionMetaSQLProviderFactory.class,
+      method = "selectModelVersionSnapshot")
+  List<ModelVersionSnapshotRowPO> selectModelVersionSnapshot(
       @Param("modelId") Long modelId,
       @Param("schemaId") Long schemaId,
       @Param("modelName") String modelName,

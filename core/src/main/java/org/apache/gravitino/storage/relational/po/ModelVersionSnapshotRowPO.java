@@ -18,17 +18,41 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
-import java.util.ArrayList;
-import java.util.List;
+import javax.annotation.Nullable;
 import lombok.Getter;
 
-/** A model's version and alias rows loaded together from one database statement snapshot. */
+/**
+ * A flat row from a model-version snapshot query. A row contains URI data, alias data, or only the
+ * model ID when no version matches. All rows come from the same statement snapshot.
+ */
 @Getter
-public class ModelVersionSnapshotPO {
+public class ModelVersionSnapshotRowPO {
 
   private Long modelId;
 
-  private List<ModelVersionPO> modelVersions = new ArrayList<>();
+  @Nullable private Long metalakeId;
 
-  private List<ModelVersionAliasRelPO> aliases = new ArrayList<>();
+  @Nullable private Long catalogId;
+
+  @Nullable private Long schemaId;
+
+  @Nullable private Integer modelVersion;
+
+  @Nullable private String modelVersionComment;
+
+  @Nullable private String modelVersionProperties;
+
+  @Nullable private String modelVersionUriName;
+
+  @Nullable private String modelVersionUri;
+
+  @Nullable private String auditInfo;
+
+  @Nullable private Long deletedAt;
+
+  @Nullable private Integer aliasVersion;
+
+  @Nullable private String aliasName;
+
+  @Nullable private Long aliasDeletedAt;
 }

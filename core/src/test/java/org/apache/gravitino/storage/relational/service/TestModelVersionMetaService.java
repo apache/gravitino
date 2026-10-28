@@ -59,6 +59,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionSnapshotRowPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -2080,7 +2081,8 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotKeepsAllUrisAndAliasesAcrossVersions() throws IOException {
     ModelVersionEntity first = insertModelWithVersion("first_alias");
-    Map<String, String> uris = ImmutableMap.of("uri_a", "path_a", "uri_b", "path_b");
+    Map<String, String> uris =
+        ImmutableMap.of("uri_a", "path_a", "uri_b", "path_b", "uri_c", "path_c");
     updateModelVersionUnchecked(
         first.nameIdentifier(),
         current ->
@@ -2088,7 +2090,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                 current.modelIdentifier(),
                 current.version(),
                 uris,
-                List.of("first_alias", "other_alias"),
+                List.of("first_alias", "other_alias", "third_alias"),
                 current.comment(),
                 current.properties(),
                 current.auditInfo()));
@@ -2103,6 +2105,23 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     ModelVersionMetaService.getInstance().insertModelVersion(second);
 
+    ModelPO model = ModelMetaService.getInstance().getModelPOByIdentifier(first.modelIdentifier());
+    List<ModelVersionSnapshotRowPO> rows =
+        SessionUtils.getWithoutCommit(
+            ModelVersionMetaMapper.class,
+            mapper ->
+                mapper.selectModelVersionSnapshot(
+                    model.getModelId(),
+                    model.getSchemaId(),
+                    first.modelIdentifier().name(),
+                    null,
+                    null));
+    // Three URIs and three aliases must yield six rows, rather than a nine-row cross product.
+    // The second version contributes one URI row and has no aliases.
+    Assertions.assertEquals(7, rows.size());
+    Assertions.assertEquals(4, rows.stream().filter(row -> row.getModelVersion() != null).count());
+    Assertions.assertEquals(3, rows.stream().filter(row -> row.getAliasVersion() != null).count());
+
     List<ModelVersionEntity> versions =
         ModelVersionMetaService.getInstance().listModelVersionsByNamespace(first.namespace());
     Assertions.assertEquals(2, versions.size());
@@ -2111,15 +2130,16 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             .collect(Collectors.toMap(ModelVersionEntity::version, Function.identity()));
     Assertions.assertEquals(uris, byNumber.get(0).uris());
     Assertions.assertEquals(
-        Set.of("first_alias", "other_alias"), Set.copyOf(byNumber.get(0).aliases()));
-    Assertions.assertEquals(2, byNumber.get(0).aliases().size());
+        Set.of("first_alias", "other_alias", "third_alias"), Set.copyOf(byNumber.get(0).aliases()));
+    Assertions.assertEquals(3, byNumber.get(0).aliases().size());
     Assertions.assertEquals(second.uris(), byNumber.get(1).uris());
     Assertions.assertTrue(byNumber.get(1).aliases().isEmpty());
     ModelVersionEntity selected =
         ModelVersionMetaService.getInstance()
             .getModelVersionByIdentifier(NameIdentifier.of(first.namespace(), "other_alias"));
     Assertions.assertEquals(uris, selected.uris());
-    Assertions.assertEquals(Set.of("first_alias", "other_alias"), Set.copyOf(selected.aliases()));
+    Assertions.assertEquals(
+        Set.of("first_alias", "other_alias", "third_alias"), Set.copyOf(selected.aliases()));
   }
 
   private enum SnapshotWrite {
