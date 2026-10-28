@@ -164,7 +164,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
       Assertions.assertNotSame(original, replacement);
       Assertions.assertFalse(original.isClosed());
       Assertions.assertFalse(replacement.isClosed());
-      Assertions.assertSame(replacement, manager.getOrCreateCatalogWrapper("test", config));
+      Assertions.assertSame(replacement, manager.getCatalogWrapper("test"));
     }
   }
 
@@ -185,23 +185,22 @@ public class TestIcebergCatalogWrapperManagerForREST {
       version.set(Optional.empty());
       Assertions.assertThrows(
           NoSuchCatalogException.class, () -> manager.getCatalogWrapper("test"));
-      Assertions.assertThrows(
-          NoSuchCatalogException.class, () -> manager.getOrCreateCatalogWrapper("test", config));
       Assertions.assertTrue(original.isClosed());
     }
   }
 
   @Test
   public void testStaticAuxModeSkipsCatalogVersionCache() throws Exception {
-    IcebergConfigProvider provider = IcebergConfigProviderFactory.create(Maps.newHashMap());
-    provider.initialize(Maps.newHashMap());
     IcebergConfig config = memoryWarehouseConfig();
+    IcebergConfigProvider provider = Mockito.mock(IcebergConfigProvider.class);
+    Mockito.when(provider.getMetalakeName()).thenReturn(null);
+    Mockito.when(provider.getDefaultCatalogName()).thenReturn("iceberg");
+    Mockito.when(provider.getIcebergCatalogConfig("iceberg")).thenReturn(Optional.of(config));
     try (IcebergCatalogWrapperManager manager =
-        new IcebergCatalogWrapperManager(
-            Maps.newHashMap(), provider, true, provider.getMetalakeName())) {
+        new IcebergCatalogWrapperManager(Maps.newHashMap(), provider, true, null)) {
       IcebergRESTServerContext.create(provider, false, true, false, manager);
-      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("iceberg", config);
-      Assertions.assertSame(first, manager.getOrCreateCatalogWrapper("iceberg", config));
+      CatalogWrapperForREST first = manager.getCatalogWrapper("iceberg");
+      Assertions.assertSame(first, manager.getCatalogWrapper("iceberg"));
       Assertions.assertFalse(first.isClosed());
     }
   }

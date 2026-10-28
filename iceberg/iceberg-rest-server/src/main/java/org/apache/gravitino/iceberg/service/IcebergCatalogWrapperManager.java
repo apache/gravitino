@@ -92,18 +92,6 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
     return getVersionedCatalogWrapper(catalogName, this::createCatalogWrapperFromProvider);
   }
 
-  @Override
-  public IcebergCatalogWrapper getOrCreateCatalogWrapper(
-      String catalogName, IcebergConfig icebergConfig) {
-    LOG.debug("getOrCreateCatalogWrapper catalogName={}", catalogName);
-    if (!(auxMode && configProvider instanceof DynamicIcebergConfigProvider)) {
-      return catalogWrapperCache.get(
-          catalogName, name -> createCatalogWrapper(name, icebergConfig));
-    }
-    return getVersionedCatalogWrapper(
-        catalogName, name -> createCatalogWrapper(name, icebergConfig));
-  }
-
   /**
    * Aux + dynamic lookup keyed by {@code catalog_meta.current_version}. Missing catalog rows clear
    * stale versioned entries and fail fast instead of falling back to an unversioned cache key.

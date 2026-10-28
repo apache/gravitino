@@ -38,14 +38,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Shared get-or-create cache for {@link IcebergCatalogWrapper} instances.
+ * Get-or-create cache for IRC {@link IcebergCatalogWrapper} instances.
  *
- * <p>Used by IRC {@code IcebergCatalogWrapperManager} and by {@link
- * StandaloneCatalogWrapperManager} when IRC runs standalone (not embedded). The cache key is {@link
- * Key}({@code catalogName}, {@code current_version}): a catalog alter that bumps {@code
- * catalog_meta.current_version} stores a new entry and leaves the previous one until
- * expire-after-access removes it. Eviction is also capped so minted GCS OAuth2 tokens are refreshed
- * before {@code gcs.oauth2.token-expires-at}.
+ * <p>Used by IRC {@code IcebergCatalogWrapperManager}. Metalake lakehouse keeps a separate owned
+ * wrapper and refreshes GCS tokens via {@code CatalogManager}'s catalog cache — objects are not
+ * shared with this cache. The cache key is {@link Key}({@code catalogName}, {@code
+ * current_version}): a catalog alter that bumps {@code catalog_meta.current_version} stores a new
+ * entry and leaves the previous one until expire-after-access removes it. Eviction is also capped
+ * so minted GCS OAuth2 tokens are refreshed before {@code gcs.oauth2.token-expires-at}.
  */
 public final class IcebergCatalogWrapperCache implements AutoCloseable {
 

@@ -56,16 +56,10 @@ import org.mockito.Mockito;
 
 public class TestIcebergViewCatalogOperations {
 
-  private static IcebergViewCatalogOperations viewOps(IcebergCatalogWrapper wrapper) {
-    IcebergCatalogWrapperProvider provider = Mockito.mock(IcebergCatalogWrapperProvider.class);
-    when(provider.get()).thenReturn(wrapper);
-    return new IcebergViewCatalogOperations(provider);
-  }
-
   @Test
   public void testLoadViewTranslatesOnlyNoSuchViewException() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     when(wrapper.loadView(any(TableIdentifier.class)))
@@ -77,7 +71,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testLoadViewPropagatesNonNoSuchViewException() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     when(wrapper.loadView(any(TableIdentifier.class)))
@@ -89,7 +83,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testViewExistsDelegatesToWrapper() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     when(wrapper.viewExists(any(TableIdentifier.class))).thenReturn(true);
@@ -101,7 +95,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testAlterViewRejectsRenameWithOtherChanges() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
@@ -121,7 +115,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testAlterViewRenameTranslatesAlreadyExistsException() {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     doThrow(new AlreadyExistsException("view already exists"))
@@ -137,7 +131,7 @@ public class TestIcebergViewCatalogOperations {
   public void testCreateViewRejectsSqlLikeRepresentationWithoutSqlRepresentationClass()
       throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {Column.of("id", Types.LongType.get(), null)};
@@ -175,7 +169,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testCreateViewStoresDefaultCatalogInViewVersion() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {Column.of("id", Types.LongType.get(), null)};
@@ -211,7 +205,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testCreateViewAllowsNullDefaultCatalogInViewVersion() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {Column.of("id", Types.LongType.get(), null)};
@@ -248,7 +242,7 @@ public class TestIcebergViewCatalogOperations {
     // view columns. Iceberg has no length-bound string type, so this must be widened before
     // reaching ConvertUtil.toIcebergSchema(), which otherwise rejects it as unsupported.
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {Column.of("c", Types.VarCharType.of(1), null)};
@@ -283,7 +277,7 @@ public class TestIcebergViewCatalogOperations {
     // ARRAY['x'] AS c reaches ConvertUtil.toIcebergSchema() with a VarCharType nested inside a
     // ListType, which ToIcebergType otherwise rejects just like a top-level VarCharType.
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     Column[] columns = {
@@ -346,7 +340,7 @@ public class TestIcebergViewCatalogOperations {
     // StringType columns, then replaced with a query that now produces a varchar(n) output
     // column, must still succeed at the server boundary.
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
@@ -383,7 +377,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testAlterViewSetAfterRemoveKeepsProperty() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     LoadViewResponse loaded = mockLoadViewResponseWithUuid("view-uuid");
@@ -410,7 +404,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testAlterViewRemoveAfterSetRemovesProperty() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
     LoadViewResponse loaded = mockLoadViewResponseWithUuid("view-uuid");
@@ -438,7 +432,7 @@ public class TestIcebergViewCatalogOperations {
   public void testAlterViewReplaceDoesNotApplyLegacyDefaultCatalogPropertyCleanup()
       throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
@@ -477,7 +471,7 @@ public class TestIcebergViewCatalogOperations {
   @Test
   public void testAlterViewBuildsOptimisticConcurrencyRequirements() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
-    IcebergViewCatalogOperations operations = viewOps(wrapper);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 

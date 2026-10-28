@@ -18,21 +18,12 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
-import org.apache.gravitino.iceberg.common.IcebergConfig;
-
 /**
- * Resolves {@link IcebergCatalogWrapper} instances by catalog name.
+ * Resolves {@link IcebergCatalogWrapper} instances by catalog name for the Iceberg REST service.
  *
- * <p>Implementations share {@link IcebergCatalogWrapperCache} eviction/token policy:
- *
- * <ul>
- *   <li>IRC {@code IcebergCatalogWrapperManager} — config provider + {@code CatalogWrapperForREST}
- *   <li>{@link StandaloneCatalogWrapperManager} — standalone lakehouse (no embedded IRC), creates
- *       via {@link IcebergCatalogWrapper#create(IcebergConfig)}
- * </ul>
- *
- * <p>Symmetric to {@code CatalogManager} used by {@code
- * DynamicIcebergConfigProvider.InternalCatalogFetcher}.
+ * <p>Implemented by IRC {@code IcebergCatalogWrapperManager}. Lakehouse metalake ops keep a
+ * separate, owned {@link IcebergCatalogWrapper} (and refresh via {@code CatalogManager}'s catalog
+ * cache); they do not share wrapper instances with this manager.
  */
 public interface CatalogWrapperManager {
 
@@ -44,17 +35,6 @@ public interface CatalogWrapperManager {
    * @return catalog wrapper
    */
   IcebergCatalogWrapper getCatalogWrapper(String catalogName);
-
-  /**
-   * Returns a cached wrapper for {@code catalogName}, or creates one from the caller-supplied
-   * {@code icebergConfig}. Unlike {@link #getCatalogWrapper(String)}, config is not loaded from the
-   * IRC provider (used by metalake lakehouse with static-config-provider).
-   *
-   * @param catalogName catalog name
-   * @param icebergConfig catalog configuration used on cache miss
-   * @return catalog wrapper
-   */
-  IcebergCatalogWrapper getOrCreateCatalogWrapper(String catalogName, IcebergConfig icebergConfig);
 
   /**
    * Invalidates cached wrappers for {@code catalogName}.

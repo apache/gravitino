@@ -28,6 +28,7 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -84,6 +85,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.SupportsCatalogCacheExpiry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -205,6 +207,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     /** Set by the thread that claims the (exactly-once) resource cleanup. */
     private boolean cleanupStarted = false;
+
+    /**
+     * Optional wall-clock refresh deadline from {@link SupportsCatalogCacheExpiry} (for example GCS
+     * OAuth token refresh). Null means default expire-after-access only.
+     */
+    @Nullable private Long cacheRefreshAtEpochMs;
 
     /** Non-pooled constructor: each catalog owns its ClassLoader exclusively. */
     CatalogWrapper(IsolatedClassLoader classLoader) {
@@ -553,16 +561,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     this.classLoaderSharingEnabled = config.get(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED);
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
+    long cacheEvictionIntervalNanos = TimeUnit.MILLISECONDS.toNanos(cacheEvictionIntervalInMs);
     this.catalogCache =
         Caffeine.newBuilder()
-            .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
+            .expireAfter(new CatalogCacheExpiry(cacheEvictionIntervalNanos))
             .removalListener(
                 (k, v, c) -> {
                   LOG.debug("Removed catalog cache entry, identifier={}, cause={}", k, c);
                   try {
                     for (Consumer<NameIdentifier> listener : removalListeners) {
                       if (k != null) {
-                        listener.accept((NameIdentifier) k);
+                        listener.accept(k);
                       }
                     }
                   } finally {
@@ -570,7 +579,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     // keeps it alive, and the actual catalog/ClassLoader cleanup runs when the
                     // last lease is released. Keep this in finally so a faulty external listener
                     // cannot skip resource cleanup.
-                    ((CatalogWrapper) v).retire();
+                    if (v != null) {
+                      v.retire();
+                    }
                   }
                 })
             .scheduler(
@@ -1874,6 +1885,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             if (validateBackend && propsToValidate != null && catalog.shouldValidateOnCreate()) {
               catalog.validateOnCreate();
             }
+
+            // Iceberg lakehouse may mint GCS OAuth tokens in ops.initialize(); capture the refresh
+            // deadline for catalogCache Expiry. Other providers stay lazy.
+            if ("lakehouse-iceberg".equals(entity.getProvider())) {
+              CatalogOperations ops = catalog.ops();
+              if (ops instanceof SupportsCatalogCacheExpiry) {
+                wrapper.cacheRefreshAtEpochMs =
+                    ((SupportsCatalogCacheExpiry) ops).catalogCacheRefreshAtEpochMs().orElse(null);
+              }
+            }
             return null;
           },
           IllegalArgumentException.class,
@@ -2266,6 +2287,48 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       store.delete(ident, EntityType.CATALOG, true);
     } catch (IOException e) {
       LOG.error("Failed to clean up catalog {}", ident, e);
+    }
+  }
+
+  /**
+   * Expire-after-access capped by an optional per-entry refresh deadline from {@link
+   * SupportsCatalogCacheExpiry}.
+   */
+  private static final class CatalogCacheExpiry implements Expiry<NameIdentifier, CatalogWrapper> {
+
+    private final long accessEvictionNanos;
+
+    CatalogCacheExpiry(long accessEvictionNanos) {
+      this.accessEvictionNanos = accessEvictionNanos;
+    }
+
+    @Override
+    public long expireAfterCreate(NameIdentifier key, CatalogWrapper value, long currentTime) {
+      return computeDurationNanos(value);
+    }
+
+    @Override
+    public long expireAfterUpdate(
+        NameIdentifier key, CatalogWrapper value, long currentTime, long currentDuration) {
+      return computeDurationNanos(value);
+    }
+
+    @Override
+    public long expireAfterRead(
+        NameIdentifier key, CatalogWrapper value, long currentTime, long currentDuration) {
+      return computeDurationNanos(value);
+    }
+
+    private long computeDurationNanos(CatalogWrapper value) {
+      Long refreshAt = value == null ? null : value.cacheRefreshAtEpochMs;
+      if (refreshAt == null) {
+        return accessEvictionNanos;
+      }
+      long remainingMs = refreshAt - System.currentTimeMillis();
+      if (remainingMs <= 0) {
+        return 0L;
+      }
+      return Math.min(accessEvictionNanos, TimeUnit.MILLISECONDS.toNanos(remainingMs));
     }
   }
 }
