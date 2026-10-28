@@ -133,6 +133,9 @@ public class JsonUtils {
   private static final String UNPARSED_TYPE = "unparsedType";
   private static final String EXTERNAL = "external";
   private static final String CATALOG_STRING = "catalogString";
+  private static final String LENGTH = "length";
+  private static final String CHARSET = "charset";
+  private static final String COLLATION = "collation";
   private static final String FIELDS = "fields";
   private static final String UNION_TYPES = "types";
   private static final String STRUCT_FIELD_NAME = "name";
@@ -693,9 +696,6 @@ public class JsonUtils {
       case DATE:
       case TIME:
       case TIMESTAMP:
-      case STRING:
-      case FIXEDCHAR:
-      case VARCHAR:
       case INTERVAL_DAY:
       case INTERVAL_YEAR:
       case UUID:
@@ -707,6 +707,11 @@ public class JsonUtils {
       case NULL:
         // Primitive types and nullType are serialized as string
         gen.writeString(dataType.simpleString());
+        break;
+      case STRING:
+      case FIXEDCHAR:
+      case VARCHAR:
+        writeCharacterType((Type.CharacterType) dataType, gen);
         break;
       case STRUCT:
         writeStructType((Types.StructType) dataType, gen);
@@ -767,6 +772,12 @@ public class JsonUtils {
         return readUnionType(node);
       }
 
+      if (Types.StringType.get().simpleString().equals(type)
+          || "char".equals(type)
+          || "varchar".equals(type)) {
+        return readCharacterType(node);
+      }
+
       if (UNPARSED.equals(type)) {
         return readUnparsedType(node);
       }
@@ -777,6 +788,59 @@ public class JsonUtils {
     }
 
     return Types.UnparsedType.of(node.toString());
+  }
+
+  private static void writeCharacterType(Type.CharacterType characterType, JsonGenerator gen)
+      throws IOException {
+    if (!characterType.charset().isPresent() && !characterType.collation().isPresent()) {
+      gen.writeString(characterType.simpleString());
+      return;
+    }
+
+    gen.writeStartObject();
+    switch (characterType.name()) {
+      case STRING:
+        gen.writeStringField(TYPE, "string");
+        break;
+      case FIXEDCHAR:
+        gen.writeStringField(TYPE, "char");
+        gen.writeNumberField(LENGTH, ((Types.FixedCharType) characterType).length());
+        break;
+      case VARCHAR:
+        gen.writeStringField(TYPE, "varchar");
+        gen.writeNumberField(LENGTH, ((Types.VarCharType) characterType).length());
+        break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Unsupported character type: %s", characterType.name()));
+    }
+    if (characterType.charset().isPresent()) {
+      gen.writeStringField(CHARSET, characterType.charset().get());
+    }
+    if (characterType.collation().isPresent()) {
+      gen.writeStringField(COLLATION, characterType.collation().get());
+    }
+    gen.writeEndObject();
+  }
+
+  private static Type.CharacterType readCharacterType(JsonNode node) {
+    String type = getString(TYPE, node);
+    String charset = node.has(CHARSET) ? getString(CHARSET, node) : null;
+    String collation = node.has(COLLATION) ? getString(COLLATION, node) : null;
+    switch (type) {
+      case "string":
+        return Types.StringType.of(charset, collation);
+      case "char":
+        Preconditions.checkArgument(
+            node.has(LENGTH), "Cannot parse char type from missing length: %s", node);
+        return Types.FixedCharType.of(getInt(LENGTH, node), charset, collation);
+      case "varchar":
+        Preconditions.checkArgument(
+            node.has(LENGTH), "Cannot parse varchar type from missing length: %s", node);
+        return Types.VarCharType.of(getInt(LENGTH, node), charset, collation);
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported character type: %s", type));
+    }
   }
 
   private static void writeUnionType(Types.UnionType unionType, JsonGenerator gen)

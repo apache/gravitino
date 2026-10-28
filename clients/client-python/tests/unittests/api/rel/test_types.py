@@ -176,6 +176,12 @@ class TestTypes(unittest.TestCase):
         instance: Types.StringType = Types.StringType.get()
         self.assertEqual(instance.name(), Name.STRING)
         self.assertEqual(instance.simple_string(), "string")
+        self.assertIsNone(instance.charset())
+        self.assertIsNone(instance.collation())
+        attributed = Types.StringType.of("utf8mb4", "utf8mb4_bin")
+        self.assertEqual(attributed.charset(), "utf8mb4")
+        self.assertEqual(attributed.collation(), "utf8mb4_bin")
+        self.assertNotEqual(instance, attributed)
 
     def test_uuid_type(self):
         instance: Types.UUIDType = Types.UUIDType.get()
@@ -225,12 +231,25 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(instance.name(), Name.VARCHAR)
         self.assertEqual(instance.length(), 10)
         self.assertEqual(instance.simple_string(), "varchar(10)")
+        attributed = Types.VarCharType.of(10, "utf8mb4", "utf8mb4_bin")
+        self.assertEqual(attributed.charset(), "utf8mb4")
+        self.assertEqual(attributed.collation(), "utf8mb4_bin")
+        self.assertNotEqual(instance, attributed)
+        self.assertNotEqual(
+            attributed, Types.VarCharType.of(10, "latin1", "latin1_bin")
+        )
 
     def test_fixed_char_type(self):
         instance: Types.FixedCharType = Types.FixedCharType.of(3)
         self.assertEqual(instance.name(), Name.FIXEDCHAR)
         self.assertEqual(instance.length(), 3)
         self.assertEqual(instance.simple_string(), "char(3)")
+        attributed = Types.FixedCharType.of(3, "utf8mb4", "utf8mb4_bin")
+        self.assertEqual(attributed.charset(), "utf8mb4")
+        self.assertEqual(attributed.collation(), "utf8mb4_bin")
+        self.assertNotEqual(instance, attributed)
+        with self.assertRaises(ValueError):
+            Types.FixedCharType.of(3, " ", None)
 
     def test_binary_type(self):
         instance: Types.BinaryType = Types.BinaryType.get()

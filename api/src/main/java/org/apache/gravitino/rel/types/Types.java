@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
+import javax.annotation.Nullable;
 
 /** The helper class for {@link Type}. */
 public class Types {
@@ -611,8 +612,8 @@ public class Types {
    * The string type in Gravitino, equivalent to varchar(MAX), which the MAX is determined by the
    * underlying catalog.
    */
-  public static class StringType extends Type.PrimitiveType {
-    private static final StringType INSTANCE = new StringType();
+  public static class StringType extends Type.CharacterType {
+    private static final StringType INSTANCE = new StringType(null, null);
 
     /**
      * @return The singleton instance of {@link StringType}.
@@ -621,7 +622,18 @@ public class Types {
       return INSTANCE;
     }
 
-    private StringType() {}
+    /**
+     * @param charset The character set, or null if it is not specified.
+     * @param collation The collation, or null if it is not specified.
+     * @return A {@link StringType} with the given character metadata.
+     */
+    public static StringType of(@Nullable String charset, @Nullable String collation) {
+      return charset == null && collation == null ? INSTANCE : new StringType(charset, collation);
+    }
+
+    private StringType(@Nullable String charset, @Nullable String collation) {
+      super(charset, collation);
+    }
 
     @Override
     public Name name() {
@@ -900,19 +912,30 @@ public class Types {
   }
 
   /** The varchar type in Gravitino. */
-  public static class VarCharType extends Type.PrimitiveType {
+  public static class VarCharType extends Type.CharacterType {
 
     /**
      * @param length The length of the var char type.
      * @return An {@link VarCharType} with the given length.
      */
     public static VarCharType of(int length) {
-      return new VarCharType(length);
+      return new VarCharType(length, null, null);
+    }
+
+    /**
+     * @param length The length of the var char type.
+     * @param charset The character set, or null if it is not specified.
+     * @param collation The collation, or null if it is not specified.
+     * @return A {@link VarCharType} with the given length and character metadata.
+     */
+    public static VarCharType of(int length, @Nullable String charset, @Nullable String collation) {
+      return new VarCharType(length, charset, collation);
     }
 
     private final int length;
 
-    private VarCharType(int length) {
+    private VarCharType(int length, @Nullable String charset, @Nullable String collation) {
+      super(charset, collation);
       this.length = length;
     }
 
@@ -935,10 +958,7 @@ public class Types {
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof VarCharType)) {
+      if (!super.equals(o)) {
         return false;
       }
       VarCharType that = (VarCharType) o;
@@ -947,24 +967,36 @@ public class Types {
 
     @Override
     public int hashCode() {
-      return Objects.hash(length);
+      return Objects.hash(super.hashCode(), length);
     }
   }
 
   /** The fixed char type in Gravitino. */
-  public static class FixedCharType extends Type.PrimitiveType {
+  public static class FixedCharType extends Type.CharacterType {
 
     /**
      * @param length The length of the fixed char type.
      * @return An {@link FixedCharType} with the given length.
      */
     public static FixedCharType of(int length) {
-      return new FixedCharType(length);
+      return new FixedCharType(length, null, null);
+    }
+
+    /**
+     * @param length The length of the fixed char type.
+     * @param charset The character set, or null if it is not specified.
+     * @param collation The collation, or null if it is not specified.
+     * @return A {@link FixedCharType} with the given length and character metadata.
+     */
+    public static FixedCharType of(
+        int length, @Nullable String charset, @Nullable String collation) {
+      return new FixedCharType(length, charset, collation);
     }
 
     private final int length;
 
-    private FixedCharType(int length) {
+    private FixedCharType(int length, @Nullable String charset, @Nullable String collation) {
+      super(charset, collation);
       this.length = length;
     }
 
@@ -987,10 +1019,7 @@ public class Types {
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof FixedCharType)) {
+      if (!super.equals(o)) {
         return false;
       }
       FixedCharType that = (FixedCharType) o;
@@ -999,7 +1028,7 @@ public class Types {
 
     @Override
     public int hashCode() {
-      return Objects.hash(length);
+      return Objects.hash(super.hashCode(), length);
     }
   }
 

@@ -56,18 +56,12 @@ public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
             FunctionExpression.of("current_timestamp"));
     Column col2 =
         Column.of(
-            MYSQL_COL_NAME3,
-            Types.VarCharType.of(255),
-            "col_3_comment",
-            true,
-            false,
-            Literals.NULL);
-    Column col3 =
-        Column.of(MYSQL_COL_NAME4, Types.StringType.get(), "col_4_comment", false, false, null);
+            MYSQL_COL_NAME3, defaultVarchar(255), "col_3_comment", true, false, Literals.NULL);
+    Column col3 = Column.of(MYSQL_COL_NAME4, defaultString(), "col_4_comment", false, false, null);
     Column col4 =
         Column.of(
             MYSQL_COL_NAME5,
-            Types.VarCharType.of(255),
+            defaultVarchar(255),
             "col_5_comment",
             true,
             false,

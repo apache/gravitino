@@ -19,12 +19,15 @@
 package org.apache.gravitino.catalog.mysql.converter;
 
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter {
+
+  private static final Pattern CHARACTER_METADATA_PATTERN = Pattern.compile("[A-Za-z0-9_]+$");
 
   // Keep this limit in sync with Types.DecimalType.checkPrecisionScale.
   static final int MAX_DECIMAL_PRECISION = 38;
@@ -138,7 +141,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.DoubleType) {
       return type.simpleString();
     } else if (type instanceof Types.StringType) {
-      return TEXT;
+      return withCharacterMetadata(TEXT, (Type.CharacterType) type);
     } else if (type instanceof Types.DateType) {
       return type.simpleString();
     } else if (type instanceof Types.TimeType) {
@@ -155,9 +158,9 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();
     } else if (type instanceof Types.VarCharType) {
-      return type.simpleString();
+      return withCharacterMetadata(type.simpleString(), (Type.CharacterType) type);
     } else if (type instanceof Types.FixedCharType) {
-      return type.simpleString();
+      return withCharacterMetadata(type.simpleString(), (Type.CharacterType) type);
     } else if (type instanceof Types.BinaryType) {
       return type.simpleString();
     } else if (type instanceof Types.BooleanType) {
@@ -167,6 +170,25 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to MySQL type", type.simpleString()));
+  }
+
+  private static String withCharacterMetadata(String baseType, Type.CharacterType characterType) {
+    StringBuilder builder = new StringBuilder(baseType);
+    characterType
+        .charset()
+        .ifPresent(charset -> builder.append(" CHARACTER SET ").append(validateMetadata(charset)));
+    characterType
+        .collation()
+        .ifPresent(collation -> builder.append(" COLLATE ").append(validateMetadata(collation)));
+    return builder.toString();
+  }
+
+  private static String validateMetadata(String value) {
+    if (!CHARACTER_METADATA_PATTERN.matcher(value).matches()) {
+      throw new IllegalArgumentException(
+          String.format("Invalid MySQL character set or collation: %s", value));
+    }
+    return value;
   }
 
   private static Type toGravitinoDecimal(JdbcTypeBean typeBean) {

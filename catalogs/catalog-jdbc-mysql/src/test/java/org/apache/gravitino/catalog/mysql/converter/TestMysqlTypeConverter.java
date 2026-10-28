@@ -107,13 +107,23 @@ public class TestMysqlTypeConverter {
     checkGravitinoTypeToJdbcType(
         "decimal(65,30) unsigned", Types.ExternalType.of("decimal(65,30) unsigned"));
     checkGravitinoTypeToJdbcType(VARCHAR + "(20)", Types.VarCharType.of(20));
+    checkGravitinoTypeToJdbcType(
+        VARCHAR + "(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+        Types.VarCharType.of(20, "utf8mb4", "utf8mb4_bin"));
     checkGravitinoTypeToJdbcType(CHAR + "(20)", Types.FixedCharType.of(20));
+    checkGravitinoTypeToJdbcType(
+        CHAR + "(20) COLLATE latin1_bin", Types.FixedCharType.of(20, null, "latin1_bin"));
     checkGravitinoTypeToJdbcType(TEXT, Types.StringType.get());
+    checkGravitinoTypeToJdbcType(
+        TEXT + " CHARACTER SET utf8mb4", Types.StringType.of("utf8mb4", null));
     checkGravitinoTypeToJdbcType(BINARY, Types.BinaryType.get());
     checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.StringType.of("utf8mb4; DROP", null)));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
