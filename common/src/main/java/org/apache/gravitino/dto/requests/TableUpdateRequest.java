@@ -44,6 +44,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Represents a request to update a table. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -404,6 +405,8 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"fieldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
           dataType != null, "\"type\" field is required and cannot be empty");
+      WritableDataTypeValidator.validate(dataType, "type");
+      WritableDataTypeValidator.validateExpression(defaultValue, "defaultValue");
     }
 
     /**
@@ -517,6 +520,7 @@ public interface TableUpdateRequest extends RESTRequest {
       Preconditions.checkArgument(
           (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
           "\"newDefaultValue\" field is required and cannot be empty");
+      WritableDataTypeValidator.validateExpression(newDefaultValue, "newDefaultValue");
     }
 
     /**
@@ -573,6 +577,7 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"fieldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
           newType != null, "\"newType\" field is required and cannot be empty");
+      WritableDataTypeValidator.validate(newType, "newType");
     }
 
     /**

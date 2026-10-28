@@ -314,7 +314,7 @@ components:
           description: The comment of the parameter
           nullable: true
         defaultValue:
-          $ref: "./expression.yaml#/components/schemas/FunctionArg"
+          $ref: "./expression.yaml#/components/schemas/WritableFunctionArg"
           description: The default value expression of the parameter
 
     WritableFunctionColumn:
