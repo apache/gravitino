@@ -60,8 +60,9 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
       String metalakeName) {
     // Versioned caching reads catalog_meta and needs the metalake from dynamic-config-provider.
     // Static / custom providers keep the unversioned name-keyed cache (Spark IT embedded IRC).
+    boolean versionedCache = auxMode && configProvider instanceof DynamicIcebergConfigProvider;
     Preconditions.checkArgument(
-        !usesCatalogVersionCache(auxMode, configProvider) || StringUtils.isNotBlank(metalakeName),
+        !versionedCache || StringUtils.isNotBlank(metalakeName),
         "Dynamic IcebergCatalogWrapperManager requires a non-blank metalake name to read "
             + "catalog_meta.current_version");
     this.configProvider = configProvider;
@@ -84,7 +85,8 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
   public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
     LOG.debug("getCatalogWrapper catalogName={}", catalogName);
     rejectStaticProviderWhenAuthorizationEnabled();
-    if (!usesCatalogVersionCache()) {
+    // Only aux + dynamic-config-provider has a metalake that maps to catalog_meta rows.
+    if (!(auxMode && configProvider instanceof DynamicIcebergConfigProvider)) {
       return catalogWrapperCache.get(catalogName, this::createCatalogWrapperFromProvider);
     }
     return getVersionedCatalogWrapper(catalogName, this::createCatalogWrapperFromProvider);
@@ -94,27 +96,12 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
   public IcebergCatalogWrapper getOrCreateCatalogWrapper(
       String catalogName, IcebergConfig icebergConfig) {
     LOG.debug("getOrCreateCatalogWrapper catalogName={}", catalogName);
-    if (!usesCatalogVersionCache()) {
+    if (!(auxMode && configProvider instanceof DynamicIcebergConfigProvider)) {
       return catalogWrapperCache.get(
           catalogName, name -> createCatalogWrapper(name, icebergConfig));
     }
     return getVersionedCatalogWrapper(
         catalogName, name -> createCatalogWrapper(name, icebergConfig));
-  }
-
-  /**
-   * Whether this manager keys wrappers by {@code catalog_meta.current_version}.
-   *
-   * <p>Only auxiliary IRC with {@link DynamicIcebergConfigProvider} has a metalake that maps to
-   * Gravitino catalog rows. Static providers (default embedded IRC) keep a name-only cache.
-   */
-  private boolean usesCatalogVersionCache() {
-    return usesCatalogVersionCache(auxMode, configProvider);
-  }
-
-  private static boolean usesCatalogVersionCache(
-      boolean auxMode, IcebergConfigProvider configProvider) {
-    return auxMode && configProvider instanceof DynamicIcebergConfigProvider;
   }
 
   /**
