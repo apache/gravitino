@@ -23,6 +23,7 @@ import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.Config;
@@ -174,6 +175,19 @@ public class TestSecretPropertyUtils {
     Assertions.assertFalse(
         SecretPropertyUtils.isWriteThroughShape(
             SecretUrn.parse("urn:gravitino-secret:vault:kv:prod:jdbc-password")));
+    // The entity id must be numeric and the write id a lowercase UUID.
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:memory:catalog:prod:jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:memory:catalog:7:1-2-3-4-5:jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse(
+                "urn:gravitino-secret:memory:catalog:7:"
+                    + writeId.toUpperCase(Locale.ROOT)
+                    + ":jdbc-password")));
 
     String urn = "urn:gravitino-secret:memory:catalog:7:" + writeId + ":jdbc-password";
     Assertions.assertTrue(

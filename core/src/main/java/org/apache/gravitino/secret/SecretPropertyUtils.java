@@ -42,10 +42,10 @@ import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
  */
 public final class SecretPropertyUtils {
 
-  /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final Set<String> WRITE_THROUGH_ENTITY_TYPES =
       Set.of("catalog", "schema", "fileset");
 
+  /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
       new PropertiesMetadata() {
         @Override
