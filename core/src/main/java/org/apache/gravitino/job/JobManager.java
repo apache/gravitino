@@ -879,11 +879,10 @@ public class JobManager implements JobOperationDispatcher {
             () -> {
               try {
                 // entityStore.update() re-fetches the latest entity itself right before applying
-                // the
-                // updater, rather than reusing the snapshot taken before the (potentially slow)
-                // external cancel call above - a concurrent status poll could have persisted a real
-                // startedAt/finishedAt in that gap, and carrying forward the stale snapshot would
-                // clobber it back to the sentinel.
+                // the updater, rather than reusing the snapshot taken before the (potentially
+                // slow) external cancel call above - a concurrent status poll could have persisted
+                // a real startedAt/finishedAt in that gap, and carrying forward the stale snapshot
+                // would clobber it back to the sentinel.
                 return entityStore.update(
                     NameIdentifierUtil.ofJob(metalake, jobId),
                     JobEntity.class,
@@ -924,7 +923,9 @@ public class JobManager implements JobOperationDispatcher {
             String.format(
                 "Job %s under metalake %s is marked as CANCELLING, but failed to cancel its"
                     + " execution %s, which was submitted meanwhile. Retrying the cancellation in"
-                    + " Gravitino won't cancel it, cancel the execution in the job executor",
+                    + " Gravitino won't cancel it, cancel the execution in the job executor,"
+                    + " unless the job executor keeps its job state on the Gravitino server,"
+                    + " which cancels it again when it pulls job statuses",
                 jobId, metalake, cancellingJobEntity.jobExecutionId()),
             e);
       }

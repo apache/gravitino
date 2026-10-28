@@ -262,14 +262,18 @@ found there is tracked as usual. Otherwise, it is marked as `FAILED`, or as `CAN
 being cancelled. Not every job executor can look jobs up: the `k8s` one can, as long as its name
 prefix and default namespace are unchanged since the submission, the local one can't.
 
-A run request that fails removes its job. If the job executor may have started the job anyway, for
-example because it couldn't be reached, it removes what it created. If that fails too, the `k8s`
-job executor logs how to delete the SparkApplication by hand.
+A run request whose submission fails removes its job, or leaves it to be looked up as above if it
+can't be removed. If the job executor may have started the job anyway, for example because it
+couldn't be reached, it removes what it created. If that fails too, the `k8s` job executor logs how
+to delete the SparkApplication by hand. A run request that fails after the submission, as described
+in the caution below, cancels the execution and leaves the job as it was settled, e.g. `FAILED`.
 
 A job cancelled while it is being submitted is marked as `CANCELLING`, and its execution is
 cancelled once the submission is recorded. If cancelling it fails then, for example because the job
 executor can't be reached, the failure is logged, or returned by the cancel request, and cancelling
 the job again in Gravitino doesn't retry it: cancel the execution in the job executor instead.
+Only a job executor that keeps its job state on the Gravitino server, such as the local one, has it
+cancelled again when job statuses are pulled.
 
 :::caution
 With several Gravitino servers, this requires all servers to use the same

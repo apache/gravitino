@@ -52,10 +52,11 @@ public interface JobExecutor extends Closeable {
    * the job status or cancel it later. It must not start with {@code pending-submission:}, which
    * Gravitino reserves for a job being submitted.
    *
-   * <p>If this method throws, Gravitino removes the job, as the request fails, and never looks it
-   * up with {@link #findSubmittedJob(JobContext, JobTemplate)}. So before throwing, remove what may
-   * have been created for the job, for example when the job runner couldn't be reached or answered
-   * with an error, otherwise it may run unknown to Gravitino.
+   * <p>If this method throws, the request fails and Gravitino removes the job rather than look it
+   * up with {@link #findSubmittedJob(JobContext, JobTemplate)}, unless the job can't be removed, in
+   * which case it is looked up later. So before throwing, remove what may have been created for the
+   * job, for example when the job runner couldn't be reached or answered with an error, otherwise
+   * it may run unknown to Gravitino.
    *
    * <p>Gravitino registers the job before calling this method. On a deployment with several
    * Gravitino servers, this method should return within three {@code
