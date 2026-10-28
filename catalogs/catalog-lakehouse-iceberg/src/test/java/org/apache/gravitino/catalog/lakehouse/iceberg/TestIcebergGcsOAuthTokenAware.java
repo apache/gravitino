@@ -25,19 +25,17 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIcebergCatalogCacheExpiry {
-
-  private static final long BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
+public class TestIcebergGcsOAuthTokenAware {
 
   @Test
-  void refreshDeadlineEmptyWithoutGcsTokenExpiry() {
+  void tokenExpiryEmptyWithoutGcsProperty() {
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
     ops.icebergCatalogWrapper = new IcebergCatalogWrapper(memoryConfig());
-    Assertions.assertFalse(ops.catalogCacheRefreshAtEpochMs().isPresent());
+    Assertions.assertFalse(ops.gcsOAuth2TokenExpiresAtEpochMs().isPresent());
   }
 
   @Test
-  void refreshDeadlineIsTokenExpiryMinusBuffer() {
+  void tokenExpiryReadsGcsProperty() {
     long expiresAt = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1);
     IcebergConfig config =
         new IcebergConfig(
@@ -50,7 +48,7 @@ public class TestIcebergCatalogCacheExpiry {
                 String.valueOf(expiresAt)));
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
     ops.icebergCatalogWrapper = new IcebergCatalogWrapper(config);
-    Assertions.assertEquals(expiresAt - BUFFER_MS, ops.catalogCacheRefreshAtEpochMs().orElse(-1L));
+    Assertions.assertEquals(expiresAt, ops.gcsOAuth2TokenExpiresAtEpochMs().orElse(-1L));
   }
 
   private static IcebergConfig memoryConfig() {

@@ -22,18 +22,18 @@ import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * Optional hook for catalogs that need {@link org.apache.gravitino.catalog.CatalogManager}'s
- * catalog cache entry refreshed earlier than the default expire-after-access interval (for example
- * when a minted cloud OAuth token is about to expire).
+ * Catalogs that mint a GCS OAuth2 access token into config (for example {@code gcs.oauth2.token} /
+ * {@code gcs.oauth2.token-expires-at}) so {@link org.apache.gravitino.catalog.CatalogManager} can
+ * refresh the catalog cache entry before the token expires.
  */
 @Evolving
-public interface CatalogCacheRefreshAware {
+public interface GcsOAuthTokenAware {
 
   /**
-   * Wall-clock epoch millis when the catalog cache entry should be refreshed. Empty means the
-   * default catalog-cache eviction interval alone applies.
+   * Wall-clock epoch millis when the minted GCS OAuth2 token expires ({@code
+   * gcs.oauth2.token-expires-at}). Empty when no minted token expiry is present.
    *
-   * @return refresh deadline, or empty
+   * @return token expiry epoch millis, or empty
    */
-  Optional<Long> catalogCacheRefreshAtEpochMs();
+  Optional<Long> gcsOAuth2TokenExpiresAtEpochMs();
 }

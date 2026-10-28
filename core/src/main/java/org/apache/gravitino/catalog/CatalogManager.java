@@ -84,8 +84,8 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.GcsOAuthTokenAware;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.CatalogCacheRefreshAware;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -209,10 +209,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     private boolean cleanupStarted = false;
 
     /**
-     * Optional wall-clock refresh deadline from {@link CatalogCacheRefreshAware} (for example GCS
-     * OAuth token refresh). Null means default expire-after-access only.
+     * Optional wall-clock time to refresh this entry so a minted GCS OAuth2 token is renewed before
+     * expiry. Null means default expire-after-access only.
      */
-    @Nullable private Long cacheRefreshAtEpochMs;
+    @Nullable private Long gcsTokenRefreshAtEpochMs;
 
     /** Non-pooled constructor: each catalog owns its ClassLoader exclusively. */
     CatalogWrapper(IsolatedClassLoader classLoader) {
@@ -552,6 +552,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param idGenerator The id generator to use.
    * @param secretManager The secret manager to use for create-time secret bindings/references.
    */
+  /**
+   * Refresh a catalogCache entry this long before its minted GCS OAuth2 token expires, matching
+   * IRC's GCS token refresh buffer so lakehouse rebuilds with a fresh token.
+   */
+  @VisibleForTesting static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
+
   public CatalogManager(
       Config config, EntityStore store, IdGenerator idGenerator, SecretManager secretManager) {
     this.config = config;
@@ -1886,13 +1892,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               catalog.validateOnCreate();
             }
 
-            // Iceberg lakehouse may mint GCS OAuth tokens in ops.initialize(); capture the refresh
-            // deadline for catalogCache Expiry. Other providers stay lazy.
+            // Catalogs that mint GCS OAuth tokens (lakehouse-iceberg) report expiry so catalogCache
+            // can refresh before the token dies. Other providers stay lazy.
             if ("lakehouse-iceberg".equals(entity.getProvider())) {
               CatalogOperations ops = catalog.ops();
-              if (ops instanceof CatalogCacheRefreshAware) {
-                wrapper.cacheRefreshAtEpochMs =
-                    ((CatalogCacheRefreshAware) ops).catalogCacheRefreshAtEpochMs().orElse(null);
+              if (ops instanceof GcsOAuthTokenAware) {
+                wrapper.gcsTokenRefreshAtEpochMs =
+                    ((GcsOAuthTokenAware) ops)
+                        .gcsOAuth2TokenExpiresAtEpochMs()
+                        .map(expiresAt -> expiresAt - GCS_TOKEN_REFRESH_BUFFER_MS)
+                        .orElse(null);
               }
             }
             return null;
@@ -2291,8 +2300,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * Expire-after-access capped by an optional per-entry refresh deadline from {@link
-   * CatalogCacheRefreshAware}.
+   * Expire-after-access capped by an optional GCS OAuth2 token refresh deadline from {@link
+   * GcsOAuthTokenAware}.
    */
   private static final class CatalogCacheExpiry implements Expiry<NameIdentifier, CatalogWrapper> {
 
@@ -2320,7 +2329,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
 
     private long computeDurationNanos(CatalogWrapper value) {
-      Long refreshAt = value == null ? null : value.cacheRefreshAtEpochMs;
+      Long refreshAt = value == null ? null : value.gcsTokenRefreshAtEpochMs;
       if (refreshAt == null) {
         return accessEvictionNanos;
       }

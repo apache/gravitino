@@ -30,7 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
@@ -42,8 +41,8 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperH
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.GcsOAuthTokenAware;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.CatalogCacheRefreshAware;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -102,15 +101,9 @@ public class IcebergCatalogOperations
         TableCatalog,
         ViewCatalog,
         CatalogDropAware,
-        CatalogCacheRefreshAware {
+        GcsOAuthTokenAware {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
-
-  /**
-   * Evict the metalake {@code catalogCache} entry this long before a minted GCS OAuth2 token
-   * expires so lakehouse rebuilds with a fresh token. IRC keeps its own wrapper cache separately.
-   */
-  private static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogOperations.class);
 
@@ -175,7 +168,7 @@ public class IcebergCatalogOperations
   }
 
   @Override
-  public Optional<Long> catalogCacheRefreshAtEpochMs() {
+  public Optional<Long> gcsOAuth2TokenExpiresAtEpochMs() {
     if (icebergCatalogWrapper == null) {
       return Optional.empty();
     }
@@ -188,7 +181,7 @@ public class IcebergCatalogOperations
       return Optional.empty();
     }
     try {
-      return Optional.of(Long.parseLong(expiresAt) - GCS_TOKEN_REFRESH_BUFFER_MS);
+      return Optional.of(Long.parseLong(expiresAt));
     } catch (NumberFormatException e) {
       LOG.warn("Invalid {}: {}", IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT, expiresAt);
       return Optional.empty();
