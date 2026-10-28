@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -77,14 +78,15 @@ class IcebergViewCatalogOperations {
   /** Iceberg sentinel value for {@code SetCurrentViewVersion}: "use the last added version". */
   private static final int ICEBERG_LAST_ADDED_VIEW_VERSION = -1;
 
-  private final IcebergCatalogWrapperProvider wrapperProvider;
+  private final Supplier<IcebergCatalogWrapper> catalogWrapper;
 
-  IcebergViewCatalogOperations(IcebergCatalogWrapperProvider wrapperProvider) {
-    this.wrapperProvider = wrapperProvider;
+  IcebergViewCatalogOperations(Supplier<IcebergCatalogWrapper> catalogWrapper) {
+    Preconditions.checkArgument(catalogWrapper != null, "catalogWrapper must not be null");
+    this.catalogWrapper = catalogWrapper;
   }
 
   private IcebergCatalogWrapper catalogWrapper() {
-    return wrapperProvider.get();
+    return catalogWrapper.get();
   }
 
   public View loadView(NameIdentifier ident) throws NoSuchViewException {

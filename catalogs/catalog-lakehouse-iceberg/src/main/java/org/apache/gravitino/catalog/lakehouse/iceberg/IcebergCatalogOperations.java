@@ -127,7 +127,7 @@ public class IcebergCatalogOperations
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.wrapperProvider = IcebergCatalogWrapperProvider.create(info.name(), icebergConfig);
-    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(wrapperProvider);
+    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(wrapperProvider::get);
     // Eagerly resolve the backend catalog so create-time validation (REST warehouse / unreachable
     // URI) and first-use ops keep the same IllegalArgumentException / ConnectionFailedException
     // taxonomy as before lazy IRC/local caching. Provider.get() maps Iceberg REST failures.
