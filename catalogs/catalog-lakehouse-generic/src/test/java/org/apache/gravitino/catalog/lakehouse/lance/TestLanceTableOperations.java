@@ -1115,6 +1115,36 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testHandleLanceTableChangeValidatesBeforeChangingDataset() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    Dataset dataset = mock(Dataset.class);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location", Map.of());
+
+    // Each request starts with a valid change, which must not reach the dataset when a later
+    // change in the same request is rejected.
+    List<TableChange> rejectedChanges =
+        List.of(
+            TableChange.renameColumn(new String[] {"parent", "nested"}, "renamed"),
+            TableChange.deleteColumn(new String[] {"parent", "nested"}, false),
+            TableChange.addColumn(new String[] {"required"}, Types.StringType.get(), false),
+            TableChange.updateColumnComment(new String[] {"col1"}, "comment"));
+    for (TableChange rejected : rejectedChanges) {
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              lanceTableOps.handleLanceTableChange(
+                  table,
+                  new TableChange[] {
+                    TableChange.deleteColumn(new String[] {"col1"}, false), rejected
+                  }));
+    }
+    verify(lanceTableOps, never()).openDataset("location", Map.of());
+    verify(dataset, never()).dropColumns(anyList());
+    verify(dataset, never()).alterColumns(anyList());
+  }
+
+  @Test
   public void testHandleLanceTableChangeRespectsOrder() {
     Table table = mock(Table.class);
     when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));

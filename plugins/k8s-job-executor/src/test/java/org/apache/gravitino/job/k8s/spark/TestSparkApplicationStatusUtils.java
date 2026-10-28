@@ -652,6 +652,33 @@ public class TestSparkApplicationStatusUtils {
   }
 
   @Test
+  public void testIsDriverRunning() {
+    GenericKubernetesResource app = app("Submitted", "DriverRequested", "DriverStartTimedOut");
+    Pod running = driverPod("spark-kubernetes-driver", "2026-09-30T00:00:10Z", null);
+    Pod terminated =
+        driverPod("spark-kubernetes-driver", "2026-09-30T00:00:10Z", "2026-09-30T00:00:20Z");
+
+    Assertions.assertTrue(SparkApplicationStatusUtils.isDriverRunning(app, running));
+    Assertions.assertFalse(SparkApplicationStatusUtils.isDriverRunning(app, terminated));
+    // Nothing tells the driver has terminated: a pending pod, or one without a status.
+    Assertions.assertTrue(SparkApplicationStatusUtils.isDriverRunning(app, podInPhase("Pending")));
+    Assertions.assertTrue(SparkApplicationStatusUtils.isDriverRunning(app, new Pod()));
+
+    // A terminated pod runs nothing, even if its container status still says running, for example
+    // after its node was lost.
+    for (String phase : new String[] {"Succeeded", "Failed"}) {
+      running.getStatus().setPhase(phase);
+      Assertions.assertFalse(SparkApplicationStatusUtils.isDriverRunning(app, running), phase);
+      Assertions.assertFalse(
+          SparkApplicationStatusUtils.isDriverRunning(app, podInPhase(phase)), phase);
+    }
+
+    // A sidecar keeps the pod running after the driver exited.
+    terminated.getStatus().setPhase("Running");
+    Assertions.assertFalse(SparkApplicationStatusUtils.isDriverRunning(app, terminated));
+  }
+
+  @Test
   public void testHasState() {
     Assertions.assertFalse(SparkApplicationStatusUtils.hasState(app()));
     Assertions.assertTrue(SparkApplicationStatusUtils.hasState(app("Submitted")));
@@ -841,6 +868,10 @@ public class TestSparkApplicationStatusUtils {
         .endContainerStatus()
         .endStatus()
         .build();
+  }
+
+  private static Pod podInPhase(String phase) {
+    return new PodBuilder().withNewStatus().withPhase(phase).endStatus().build();
   }
 
   private static void cancel(GenericKubernetesResource app) {

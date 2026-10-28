@@ -19,7 +19,7 @@
 package org.apache.gravitino.policy.rego;
 
 /** N-ary logical operators supported by {@code restricted-rego-v1}. */
-enum LogicalOperator {
+public enum LogicalOperator {
   /** Boolean conjunction. */
   AND("and"),
   /** Boolean disjunction. */
