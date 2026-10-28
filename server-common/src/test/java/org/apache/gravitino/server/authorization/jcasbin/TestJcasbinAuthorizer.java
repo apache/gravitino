@@ -145,6 +145,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -1212,6 +1213,136 @@ public class TestJcasbinAuthorizer {
     assertFalse(
         getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
         "the completed load's policies must survive a late partial result");
+  }
+
+  /**
+   * A role failure must not fail waiters for a healthy role in the same owner's batch.
+   *
+   * @param failedRoleFirst whether the failed role precedes the healthy role
+   * @param failWithError whether the resolver throws an Error instead of a RuntimeException
+   */
+  @ParameterizedTest
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  public void testHealthyRoleWaiterDoesNotInheritOtherRoleFailure(
+      boolean failedRoleFirst, boolean failWithError) throws Exception {
+    long goodId = 9201L;
+    long badId = 9202L;
+    RoleEntity good =
+        mockRoleInStore(
+            goodId,
+            "healthyBatchRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    goodId,
+                    MetadataObject.Type.CATALOG,
+                    "healthyBatchCatalog",
+                    USE_CATALOG,
+                    "ALLOW")));
+    RoleEntity bad =
+        mockRoleInStore(
+            badId,
+            "failedBatchRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    badId,
+                    MetadataObject.Type.CATALOG,
+                    "failedBatchCatalog",
+                    USE_CATALOG,
+                    "ALLOW")));
+    RoleUpdatedAt goodVersion = mockedRoleVersions.get(goodId);
+    RoleUpdatedAt badVersion = mockedRoleVersions.get(badId);
+    CountDownLatch enteredRead = new CountDownLatch(1);
+    CountDownLatch releaseRead = new CountDownLatch(1);
+    CountDownLatch joined = new CountDownLatch(1);
+    Map<Object, CompletableFuture<Boolean>> flights = observeRoleLoadJoins(joined);
+    Throwable badFailure =
+        failWithError
+            ? new AssertionError("only the unrelated catalog failed")
+            : new IllegalStateException("only the unrelated catalog failed");
+    List<Long> roleIds =
+        failedRoleFirst ? ImmutableList.of(badId, goodId) : ImmutableList.of(goodId, badId);
+    List<NameIdentifier> roleIdents =
+        failedRoleFirst
+            ? ImmutableList.of(bad.nameIdentifier(), good.nameIdentifier())
+            : ImmutableList.of(good.nameIdentifier(), bad.nameIdentifier());
+    AtomicInteger batchReads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              batchReads.incrementAndGet();
+              enteredRead.countDown();
+              assertTrue(releaseRead.await(10, TimeUnit.SECONDS));
+              return ImmutableList.of(good, bad);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> owner =
+          workers.submit(
+              () -> {
+                try (MockedStatic<GravitinoEnv> env = mockStatic(GravitinoEnv.class);
+                    MockedStatic<MetadataIdConverter> metadata =
+                        mockStatic(
+                            MetadataIdConverter.class,
+                            invocation -> {
+                              String method = invocation.getMethod().getName();
+                              if (method.equals("getID")
+                                  || method.equals("getIdForNormalizedObject")) {
+                                MetadataObject object = invocation.getArgument(0);
+                                if (object.fullName().equals("failedBatchCatalog")) {
+                                  if (badFailure instanceof Error) {
+                                    throw (Error) badFailure;
+                                  }
+                                  throw (RuntimeException) badFailure;
+                                }
+                                return Optional.of(CATALOG_ID);
+                              }
+                              return invocation.callRealMethod();
+                            })) {
+                  env.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
+                  try {
+                    invokeVersionCheckAndLoadRoles(
+                        jcasbinAuthorizer,
+                        METALAKE,
+                        roleIds,
+                        roleContext(ImmutableMap.of(goodId, goodVersion, badId, badVersion)));
+                    return null;
+                  } catch (InvocationTargetException e) {
+                    return e.getCause();
+                  }
+                }
+              });
+      assertTrue(enteredRead.await(10, TimeUnit.SECONDS));
+      Future<Set<Long>> goodOnly =
+          workers.submit(
+              () ->
+                  reloadRolesInWorker(
+                      ImmutableList.of(goodId), ImmutableMap.of(goodId, goodVersion)));
+      assertTrue(joined.await(10, TimeUnit.SECONDS));
+      releaseRead.countDown();
+      assertSame(badFailure, owner.get(10, TimeUnit.SECONDS));
+      assertEquals(
+          goodVersion.getUpdatedAt(),
+          getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(goodId).orElse(null));
+      assertFalse(
+          getAllowEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(goodId))
+              .isEmpty());
+      assertTrue(flights.isEmpty());
+      assertFalse(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(badId).isPresent());
+      assertEquals(1, batchReads.get(), "the owner must retain its batched role read");
+      assertTrue(
+          goodOnly.get(10, TimeUnit.SECONDS).isEmpty(),
+          "a waiter for the fully loaded healthy role must not inherit the other role's failure");
+      assertNoRolePolicyLoadStates();
+    } finally {
+      releaseRead.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
   }
 
   /** Concurrent stale observations must share the entity read, including delayed owners. */

@@ -1475,16 +1475,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
       // Claim every role before doing I/O, and finish every load we own before waiting for another
       // request. Waiting first could deadlock requests owning opposite halves of a role batch.
-      List<RolePolicyLoadKey> pendingLoads =
-          ownedLoads.stream()
-              .filter(key -> needsRolePolicyLoad(key.roleVersion))
-              .collect(Collectors.toList());
+      List<RolePolicyLoadKey> pendingLoads = new ArrayList<>();
       // Recheck after claiming: a request can observe a stale marker, be delayed, and become the
       // owner after the previous owner has already completed and removed its flight.
-      Set<Long> unreadableRoleIds = loadRolePolicies(metalake, pendingLoads, requestContext);
       for (RolePolicyLoadKey key : ownedLoads) {
-        requestLoads.get(key).complete(!unreadableRoleIds.contains(key.roleVersion.getRoleId()));
+        if (needsRolePolicyLoad(key.roleVersion)) {
+          pendingLoads.add(key);
+        } else {
+          requestLoads.get(key).complete(true);
+        }
       }
+      loadRolePolicies(metalake, pendingLoads, requestContext, requestLoads);
     } catch (RuntimeException | Error e) {
       for (RolePolicyLoadKey key : ownedLoads) {
         requestLoads.get(key).completeExceptionally(e);
@@ -1566,12 +1567,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
-  private Set<Long> loadRolePolicies(
+  private void loadRolePolicies(
       String metalake,
       List<RolePolicyLoadKey> pendingLoads,
-      AuthorizationRequestContext requestContext) {
+      AuthorizationRequestContext requestContext,
+      Map<RolePolicyLoadKey, CompletableFuture<Boolean>> requestLoads) {
     if (pendingLoads.isEmpty()) {
-      return Collections.emptySet();
+      return;
     }
     Set<Long> unreadableRoleIds = new HashSet<>();
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
@@ -1596,61 +1598,81 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
 
     for (RolePolicyLoadKey key : pendingLoads) {
-      RoleUpdatedAt rv = key.roleVersion;
-      long roleId = rv.getRoleId();
-      RoleEntity roleEntity = roleEntitiesById.get(roleId);
-      // Stores may not support batchGet for ROLE, or may return only part of a batch. Every owned
-      // role needs a concrete outcome so all its waiters receive the same read failure, if any.
-      if (roleEntity == null) {
-        try {
-          roleEntity =
-              entityStore.get(
-                  NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
-                  Entity.EntityType.ROLE,
-                  RoleEntity.class);
-        } catch (NoSuchEntityException e) {
-          LOG.debug("Role {} was dropped before its policies could be loaded", roleId, e);
-          invalidateRolePolicies(roleId);
-          continue;
-        } catch (Exception e) {
-          LOG.warn("Failed to load role policies for roleId {}", roleId, e);
-          unreadableRoleIds.add(roleId);
-          continue;
-        }
-      }
-      if (roleEntity == null || roleEntity.id() != roleId) {
-        unreadableRoleIds.add(roleId);
-        continue;
-      }
-
-      // Resolve every securable object to a metadata id before touching the enforcers, so the
-      // critical section below stays free of DB round-trips.
-      Optional<ResolvedRolePolicies> resolution = resolveRolePolicies(roleEntity, requestContext);
-      if (!resolution.isPresent()) {
-        unreadableRoleIds.add(roleId);
-        continue;
-      }
-      ResolvedRolePolicies resolved = resolution.get();
-
-      if (!replaceUnclearedRolePolicies(key, resolved, unreadableRoleIds)) {
-        // A newer load or an invalidation superseded this work. The caller retains its pre-load
-        // request generation, so the existing bounded evaluation loop reloads cleared policies.
-        continue;
-      }
-
-      if (!resolved.isComplete()) {
-        LOG.warn(
-            "Loaded role {} ({}) with {} of {} securable objects; unresolved objects: {}. "
-                + "The role is not marked as loaded and will be retried in at most {} ms.",
-            roleId,
-            rv.getRoleName(),
-            roleEntity.securableObjects().size() - resolved.getUnresolvedObjects().size(),
-            roleEntity.securableObjects().size(),
-            resolved.getUnresolvedObjects(),
-            PARTIAL_ROLE_LOAD_RETRY_MS);
+      CompletableFuture<Boolean> result = requestLoads.get(key);
+      try {
+        result.complete(
+            loadRolePolicy(
+                entityStore,
+                metalake,
+                key,
+                roleEntitiesById.get(key.roleVersion.getRoleId()),
+                requestContext,
+                unreadableRoleIds));
+      } catch (RuntimeException | Error e) {
+        // A failed role must not fail another role's waiters, including roles still to be loaded.
+        // Settle each owned flight before the caller awaits results and propagates its failure.
+        result.completeExceptionally(e);
       }
     }
-    return unreadableRoleIds;
+  }
+
+  private boolean loadRolePolicy(
+      EntityStore entityStore,
+      String metalake,
+      RolePolicyLoadKey key,
+      @Nullable RoleEntity roleEntity,
+      AuthorizationRequestContext requestContext,
+      Set<Long> unreadableRoleIds) {
+    RoleUpdatedAt rv = key.roleVersion;
+    long roleId = rv.getRoleId();
+    // Stores may not support batchGet for ROLE, or may return only part of a batch. Every owned
+    // role needs a concrete outcome so all its waiters receive the same read failure, if any.
+    if (roleEntity == null) {
+      try {
+        roleEntity =
+            entityStore.get(
+                NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
+                Entity.EntityType.ROLE,
+                RoleEntity.class);
+      } catch (NoSuchEntityException e) {
+        LOG.debug("Role {} was dropped before its policies could be loaded", roleId, e);
+        invalidateRolePolicies(roleId);
+        return true;
+      } catch (Exception e) {
+        LOG.warn("Failed to load role policies for roleId {}", roleId, e);
+        return false;
+      }
+    }
+    if (roleEntity == null || roleEntity.id() != roleId) {
+      return false;
+    }
+
+    // Resolve every securable object to a metadata id before touching the enforcers, so the
+    // critical section below stays free of DB round-trips.
+    Optional<ResolvedRolePolicies> resolution = resolveRolePolicies(roleEntity, requestContext);
+    if (!resolution.isPresent()) {
+      return false;
+    }
+    ResolvedRolePolicies resolved = resolution.get();
+
+    if (!replaceUnclearedRolePolicies(key, resolved, unreadableRoleIds)) {
+      // A newer load or an invalidation superseded this work. The caller retains its pre-load
+      // request generation, so the existing bounded evaluation loop reloads cleared policies.
+      return !unreadableRoleIds.contains(roleId);
+    }
+
+    if (!resolved.isComplete()) {
+      LOG.warn(
+          "Loaded role {} ({}) with {} of {} securable objects; unresolved objects: {}. "
+              + "The role is not marked as loaded and will be retried in at most {} ms.",
+          roleId,
+          rv.getRoleName(),
+          roleEntity.securableObjects().size() - resolved.getUnresolvedObjects().size(),
+          roleEntity.securableObjects().size(),
+          resolved.getUnresolvedObjects(),
+          PARTIAL_ROLE_LOAD_RETRY_MS);
+    }
+    return true;
   }
 
   private long roleClearGeneration(long roleId) {
