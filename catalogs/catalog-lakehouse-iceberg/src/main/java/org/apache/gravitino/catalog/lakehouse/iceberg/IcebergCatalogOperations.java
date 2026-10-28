@@ -137,54 +137,45 @@ public class IcebergCatalogOperations
     this.catalogUuid = info.id().toString();
     resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
     this.catalogConf = resultConf;
-    openCatalogWrapper();
+    reloadCatalogWrapper();
   }
 
   /**
-   * Returns the Iceberg catalog wrapper, refreshing it when a minted GCS OAuth2 token is near
-   * expiry. CatalogManager's catalogCache is unchanged; token lifecycle stays in lakehouse ops.
+   * Returns the Iceberg catalog wrapper, reminting a GCS OAuth2 token and rebuilding the wrapper
+   * when the token is near expiry.
    */
   @VisibleForTesting
-  IcebergCatalogWrapper catalogWrapper() {
-    refreshGcsTokenIfNeeded();
+  synchronized IcebergCatalogWrapper catalogWrapper() {
+    if (catalogConf != null && icebergCatalogWrapper != null) {
+      String expiresAt =
+          icebergCatalogWrapper
+              .getIcebergConfig()
+              .getAllConfig()
+              .get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT);
+      if (StringUtils.isNotBlank(expiresAt)) {
+        try {
+          if (Long.parseLong(expiresAt) - GCS_TOKEN_REFRESH_BUFFER_MS
+              <= System.currentTimeMillis()) {
+            IcebergCatalogWrapper previous = icebergCatalogWrapper;
+            reloadCatalogWrapper();
+            try {
+              previous.close();
+            } catch (Exception e) {
+              LOG.warn("Failed to close Iceberg catalog wrapper", e);
+            }
+          }
+        } catch (NumberFormatException e) {
+          LOG.warn(
+              "Invalid {}: {}", IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT, expiresAt);
+        }
+      }
+    }
     Preconditions.checkState(
         icebergCatalogWrapper != null, "IcebergCatalogOperations is not initialized");
     return icebergCatalogWrapper;
   }
 
-  private IcebergCatalogWrapperHelper catalogWrapperHelper() {
-    refreshGcsTokenIfNeeded();
-    return icebergCatalogWrapperHelper;
-  }
-
-  private synchronized void refreshGcsTokenIfNeeded() {
-    if (catalogConf == null || icebergCatalogWrapper == null || !gcsTokenNeedsRefresh()) {
-      return;
-    }
-    IcebergCatalogWrapper previous = icebergCatalogWrapper;
-    openCatalogWrapper();
-    closeQuietly(previous);
-  }
-
-  private boolean gcsTokenNeedsRefresh() {
-    String expiresAt =
-        icebergCatalogWrapper
-            .getIcebergConfig()
-            .getAllConfig()
-            .get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT);
-    if (StringUtils.isBlank(expiresAt)) {
-      return false;
-    }
-    try {
-      return Long.parseLong(expiresAt) - GCS_TOKEN_REFRESH_BUFFER_MS
-          <= System.currentTimeMillis();
-    } catch (NumberFormatException e) {
-      LOG.warn("Invalid {}: {}", IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT, expiresAt);
-      return false;
-    }
-  }
-
-  private void openCatalogWrapper() {
+  private void reloadCatalogWrapper() {
     IcebergConfig icebergConfig =
         IcebergCatalogUtil.withGcsServiceAccountCredentials(new IcebergConfig(catalogConf));
     try {
@@ -210,17 +201,6 @@ public class IcebergCatalogOperations
           e);
     } catch (RESTException e) {
       throw handleRestException(e);
-    }
-  }
-
-  private static void closeQuietly(IcebergCatalogWrapper wrapper) {
-    if (wrapper == null) {
-      return;
-    }
-    try {
-      wrapper.close();
-    } catch (Exception e) {
-      LOG.warn("Failed to close Iceberg catalog wrapper", e);
     }
   }
 
@@ -560,10 +540,11 @@ public class IcebergCatalogOperations
       throws NoSuchTableException, IllegalArgumentException {
     try {
       String[] levels = tableIdent.namespace().levels();
+      IcebergCatalogWrapper wrapper = catalogWrapper();
       IcebergTableChange icebergTableChange =
-          catalogWrapperHelper().buildIcebergTableChanges(
+          icebergCatalogWrapperHelper.buildIcebergTableChanges(
               NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
-      LoadTableResponse loadTableResponse = catalogWrapper().updateTable(icebergTableChange);
+      LoadTableResponse loadTableResponse = wrapper.updateTable(icebergTableChange);
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
@@ -756,7 +737,8 @@ public class IcebergCatalogOperations
    */
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    return viewCatalogOperations().loadView(ident);
+    catalogWrapper();
+    return icebergViewCatalogOperations.loadView(ident);
   }
 
   /**
@@ -767,7 +749,8 @@ public class IcebergCatalogOperations
    */
   @Override
   public boolean viewExists(NameIdentifier ident) {
-    return viewCatalogOperations().viewExists(ident);
+    catalogWrapper();
+    return icebergViewCatalogOperations.viewExists(ident);
   }
 
   /**
@@ -779,7 +762,8 @@ public class IcebergCatalogOperations
    */
   @Override
   public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
-    return viewCatalogOperations().listViews(namespace);
+    catalogWrapper();
+    return icebergViewCatalogOperations.listViews(namespace);
   }
 
   /**
@@ -809,9 +793,9 @@ public class IcebergCatalogOperations
       String defaultSchema,
       Map<String, String> properties)
       throws NoSuchSchemaException, ViewAlreadyExistsException {
-    return viewCatalogOperations()
-        .createView(
-            ident, comment, columns, representations, defaultCatalog, defaultSchema, properties);
+    catalogWrapper();
+    return icebergViewCatalogOperations.createView(
+        ident, comment, columns, representations, defaultCatalog, defaultSchema, properties);
   }
 
   /**
@@ -827,7 +811,8 @@ public class IcebergCatalogOperations
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
-    return viewCatalogOperations().alterView(ident, changes);
+    catalogWrapper();
+    return icebergViewCatalogOperations.alterView(ident, changes);
   }
 
   /**
@@ -838,7 +823,8 @@ public class IcebergCatalogOperations
    */
   @Override
   public boolean dropView(NameIdentifier ident) {
-    return viewCatalogOperations().dropView(ident);
+    catalogWrapper();
+    return icebergViewCatalogOperations.dropView(ident);
   }
 
   private static Distribution getIcebergDefaultDistribution(
@@ -855,8 +841,4 @@ public class IcebergCatalogOperations
     return PrincipalUtils.getCurrentUserName();
   }
 
-  private IcebergViewCatalogOperations viewCatalogOperations() {
-    refreshGcsTokenIfNeeded();
-    return icebergViewCatalogOperations;
-  }
 }
