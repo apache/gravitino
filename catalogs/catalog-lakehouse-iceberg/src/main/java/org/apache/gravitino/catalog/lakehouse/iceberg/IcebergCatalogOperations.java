@@ -129,8 +129,10 @@ public class IcebergCatalogOperations
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.wrapperProvider = IcebergCatalogWrapperProvider.create(info.name(), icebergConfig);
-    // Resolve once: create-time REST validation + stable fields for catalog/view ops.
-    // Provider.get() maps NoSuchWarehouse / unreachable REST into Gravitino's exception taxonomy.
+    // Resolve once for this CatalogOperations lifetime. CatalogManager rebuilds ops after
+    // alterCatalog, so the next initialize() reads catalog_meta.current_version again and the
+    // shared IRC cache returns a fresh wrapper. Provider.get() also maps NoSuchWarehouse /
+    // unreachable REST into Gravitino's create-time exception taxonomy.
     this.icebergCatalogWrapper = wrapperProvider.get();
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());

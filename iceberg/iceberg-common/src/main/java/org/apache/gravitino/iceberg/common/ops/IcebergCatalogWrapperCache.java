@@ -132,8 +132,10 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
   }
 
   /**
-   * Removes every cached wrapper for {@code catalogName}, including all versions. Closing runs on
-   * this thread; Caffeine's removal listener may also run later and is idempotent.
+   * Removes every cached wrapper for {@code catalogName}, including all versions.
+   *
+   * <p>Closes on this thread via {@code asMap().remove}. Caffeine may also invoke the removal
+   * listener later; {@link IcebergCatalogWrapper#close()} is idempotent ({@code beginClose()}).
    *
    * @param catalogName catalog name
    */
@@ -153,7 +155,9 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
   @Override
   public void close() {
     List<IcebergCatalogWrapper> wrappers = new ArrayList<>(cache.asMap().values());
-    cache.invalidateAll();
+    for (Key key : new ArrayList<>(cache.asMap().keySet())) {
+      cache.asMap().remove(key);
+    }
     for (IcebergCatalogWrapper wrapper : wrappers) {
       closeQuietly(wrapper);
     }

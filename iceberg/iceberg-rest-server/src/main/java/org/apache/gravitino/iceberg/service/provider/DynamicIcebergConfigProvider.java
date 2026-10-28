@@ -308,9 +308,9 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
    * Internal catalog fetcher that uses the lease-aware CatalogManager API. This bypasses the HTTP
    * layer and is used when running in auxiliary mode (embedded in Gravitino server).
    *
-   * <p>Note: When authorization is enabled (which requires auxiliary mode),
-   * IcebergCatalogWrapperManager bypasses its cache to avoid consistency issues between the
-   * IcebergCatalogWrapper cache and CatalogManager cache.
+   * <p>Aux {@code IcebergCatalogWrapperManager} still caches wrappers, keyed by {@code
+   * catalog_meta.current_version}, so an alter that bumps the version loads a fresh wrapper while
+   * CatalogManager publishes a new catalog ops instance.
    */
   private static class InternalCatalogFetcher implements CatalogFetcher {
     private final String metalake;

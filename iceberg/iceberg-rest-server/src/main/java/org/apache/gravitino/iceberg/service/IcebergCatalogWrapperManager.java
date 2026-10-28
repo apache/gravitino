@@ -19,9 +19,11 @@
 package org.apache.gravitino.iceberg.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -56,6 +58,10 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
       IcebergConfigProvider configProvider,
       boolean auxMode,
       String metalakeName) {
+    Preconditions.checkArgument(
+        !auxMode || StringUtils.isNotBlank(metalakeName),
+        "Auxiliary IcebergCatalogWrapperManager requires a non-blank metalake name to read "
+            + "catalog_meta.current_version");
     this.configProvider = configProvider;
     this.auxMode = auxMode;
     this.metalakeName = metalakeName;
@@ -79,13 +85,7 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
     if (!auxMode) {
       return catalogWrapperCache.get(catalogName, this::createCatalogWrapperFromProvider);
     }
-    Optional<Long> version = catalogCurrentVersion(catalogName);
-    if (!version.isPresent()) {
-      // Catalog row is gone; do not reuse a versioned cache entry.
-      return createCatalogWrapperFromProvider(catalogName);
-    }
-    return catalogWrapperCache.get(
-        catalogName, version.get(), this::createCatalogWrapperFromProvider);
+    return getVersionedCatalogWrapper(catalogName, this::createCatalogWrapperFromProvider);
   }
 
   @Override
@@ -96,13 +96,23 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
       return catalogWrapperCache.get(
           catalogName, name -> createCatalogWrapper(name, icebergConfig));
     }
+    return getVersionedCatalogWrapper(
+        catalogName, name -> createCatalogWrapper(name, icebergConfig));
+  }
+
+  /**
+   * Aux-mode lookup keyed by {@code catalog_meta.current_version}. Missing catalog rows clear any
+   * stale versioned entries and fail fast instead of falling back to an unversioned cache key.
+   */
+  private <T extends IcebergCatalogWrapper> T getVersionedCatalogWrapper(
+      String catalogName, Function<String, T> loader) {
     Optional<Long> version = catalogCurrentVersion(catalogName);
     if (!version.isPresent()) {
-      return catalogWrapperCache.get(
-          catalogName, name -> createCatalogWrapper(name, icebergConfig));
+      invalidateCatalogWrapper(catalogName);
+      throw new NoSuchCatalogException(
+          "Couldn't find Iceberg catalog %s in metalake %s", catalogName, metalakeName);
     }
-    return catalogWrapperCache.get(
-        catalogName, version.get(), name -> createCatalogWrapper(name, icebergConfig));
+    return catalogWrapperCache.get(catalogName, version.get(), loader);
   }
 
   @Override
@@ -118,14 +128,14 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
 
   /**
    * Reads {@code catalog_meta.current_version} for {@code catalogName}. Empty when the row is gone
-   * or this manager has no metalake to query.
+   * or {@code catalogName} cannot be resolved to a metalake catalog.
    *
    * @param catalogName catalog name, or the Iceberg REST default-catalog alias
    * @return the catalog version stored in the database
    */
   @VisibleForTesting
   protected Optional<Long> catalogCurrentVersion(String catalogName) {
-    if (StringUtils.isBlank(metalakeName) || StringUtils.isBlank(catalogName)) {
+    if (StringUtils.isBlank(catalogName)) {
       return Optional.empty();
     }
     String name = catalogName;

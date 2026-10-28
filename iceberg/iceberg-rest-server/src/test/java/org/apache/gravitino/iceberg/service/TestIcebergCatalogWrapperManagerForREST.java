@@ -28,6 +28,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -104,8 +105,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
     IcebergCatalogWrapperManager manager =
-        new IcebergCatalogWrapperManager(
-            config, configProvider, true, configProvider.getMetalakeName());
+        new IcebergCatalogWrapperManager(config, configProvider, true, "metalake");
     IcebergRESTServerContext.create(configProvider, true, true, true, manager);
 
     IllegalArgumentException exception =
@@ -181,7 +181,54 @@ public class TestIcebergCatalogWrapperManagerForREST {
       Assertions.assertNotSame(original, replacement);
       Assertions.assertFalse(original.isClosed());
       Assertions.assertFalse(replacement.isClosed());
+
+      IcebergCatalogWrapper fromConfig = manager.getOrCreateCatalogWrapper("test", icebergConfig);
+      Assertions.assertSame(replacement, fromConfig);
     }
+  }
+
+  @Test
+  public void testMissingCatalogVersionFailsFastAndClearsCache() throws Exception {
+    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    Mockito.when(configProvider.getIcebergCatalogConfig(Mockito.anyString()))
+        .thenReturn(Optional.of(icebergConfig));
+
+    AtomicReference<Optional<Long>> version = new AtomicReference<>(Optional.of(1L));
+    try (IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, "metalake") {
+          @Override
+          protected Optional<Long> catalogCurrentVersion(String catalogName) {
+            return version.get();
+          }
+        }) {
+      IcebergRESTServerContext.create(configProvider, false, false, true, manager);
+      CatalogWrapperForREST original = manager.getCatalogWrapper("test");
+      Assertions.assertFalse(original.isClosed());
+
+      version.set(Optional.empty());
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> manager.getCatalogWrapper("test"));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () -> manager.getOrCreateCatalogWrapper("test", icebergConfig));
+      Assertions.assertTrue(original.isClosed());
+    }
+  }
+
+  @Test
+  public void testAuxModeRequiresMetalakeName() {
+    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, " "));
   }
 
   private static IcebergCatalogWrapperManager newManager() {
