@@ -155,22 +155,20 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         continue;
       }
       TagEntity tag = (TagEntity) target;
-      for (GenericEntity taggedObject : listTaggedObjects(tag)) {
+      List<GenericEntity> taggedObjects;
+      try {
+        taggedObjects = tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier());
+      } catch (IOException e) {
+        throw new UncheckedIOException("Failed to list objects for tag " + tag.nameIdentifier(), e);
+      }
+      for (GenericEntity taggedObject : taggedObjects) {
         if (scan.batchFull()) {
-          return scan.acceptedTables();
+          return new ArrayList<>(scan.acceptedByTableId.values());
         }
         expandTaggedObject(taggedObject, scan);
       }
     }
-    return scan.acceptedTables();
-  }
-
-  private List<GenericEntity> listTaggedObjects(TagEntity tag) {
-    try {
-      return tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier());
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to list objects for tag " + tag.nameIdentifier(), e);
-    }
+    return new ArrayList<>(scan.acceptedByTableId.values());
   }
 
   /** Expands one tagged catalog/schema/table into candidate tables. */
@@ -223,7 +221,10 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         if (!importSchemaIfMissing(schemaIdent, storedSchemaNames)) {
           continue;
         }
-        expandSchema(schemaObject(catalog.name(), schemaIdent.name()), scan, false);
+        expandSchema(
+            MetadataObjects.of(catalog.name(), schemaIdent.name(), MetadataObject.Type.SCHEMA),
+            scan,
+            false);
       }
       return;
     } catch (NoSuchCatalogException e) {
@@ -238,7 +239,17 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
           e.toString());
     }
 
-    expandSchemasFromStore(scan.metalake, catalog.name(), scan);
+    for (SchemaEntity schema :
+        schemaMetaService.listSchemasByNamespace(
+            NamespaceUtil.ofSchema(scan.metalake, catalog.name()))) {
+      if (scan.batchFull()) {
+        return;
+      }
+      expandSchema(
+          MetadataObjects.of(catalog.name(), schema.name(), MetadataObject.Type.SCHEMA),
+          scan,
+          false);
+    }
   }
 
   /**
@@ -282,22 +293,6 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
           e.toString());
     }
 
-    expandChildSchemasFromStore(catalogName, childPrefix, scan);
-  }
-
-  /** Meta fallback: every stored schema under the catalog (already hierarchical). */
-  private void expandSchemasFromStore(String metalake, String catalogName, ScanState scan) {
-    for (SchemaEntity schema :
-        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalake, catalogName))) {
-      if (scan.batchFull()) {
-        return;
-      }
-      expandSchema(schemaObject(catalogName, schema.name()), scan, false);
-    }
-  }
-
-  /** Meta fallback: stored schemas whose names start with {@code childPrefix}. */
-  private void expandChildSchemasFromStore(String catalogName, String childPrefix, ScanState scan) {
     for (SchemaEntity child :
         schemaMetaService.listSchemasByNamespace(
             NamespaceUtil.ofSchema(scan.metalake, catalogName))) {
@@ -324,7 +319,10 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         if (!importTableIfMissing(tableIdent, storedTables)) {
           continue;
         }
-        tryEnqueueTable(storedTables.get(tableIdent.name()).id(), tableObject(tableIdent), scan);
+        tryEnqueueTable(
+            storedTables.get(tableIdent.name()).id(),
+            NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE),
+            scan);
       }
       return;
     } catch (NoSuchSchemaException e) {
@@ -343,10 +341,6 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
           e.toString());
     }
 
-    expandTablesFromStore(tableNamespace, scan);
-  }
-
-  private void expandTablesFromStore(Namespace tableNamespace, ScanState scan) {
     for (TableEntity table : tableMetaService.listTablesByNamespace(tableNamespace)) {
       if (scan.batchFull()) {
         return;
@@ -489,14 +483,6 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     scan.acceptedByTableId.put(tableId, new ExpandTableCandidate(tableId, winnerLevel.type()));
   }
 
-  private static MetadataObject schemaObject(String catalogName, String schemaName) {
-    return MetadataObjects.of(catalogName, schemaName, MetadataObject.Type.SCHEMA);
-  }
-
-  private static MetadataObject tableObject(NameIdentifier tableIdent) {
-    return NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
-  }
-
   /** Mutable progress for one {@link #listTableIds} call. */
   private static final class ScanState {
     private final String metalake;
@@ -535,10 +521,6 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
 
     private boolean batchFull() {
       return acceptedByTableId.size() >= limit;
-    }
-
-    private List<ExpandTableCandidate> acceptedTables() {
-      return new ArrayList<>(acceptedByTableId.values());
     }
   }
 }
