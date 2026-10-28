@@ -27,6 +27,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -231,6 +234,16 @@ public class PolicyManager implements PolicyDispatcher {
 
     // Tag-derived policy reads are best-effort across the object and its ancestors.
     return objectPolicyResolver.resolve(metalake, metadataObject);
+  }
+
+  @Override
+  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
+      String metalake, List<MetadataObject> metadataObjects) {
+    if (metadataObjects.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    return objectPolicyResolver.resolve(metalake, metadataObjects);
   }
 
   private PolicyEntity loadPolicyEntity(String metalake, String policyName) {

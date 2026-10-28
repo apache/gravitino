@@ -750,6 +750,27 @@ public class TestPolicyManager {
     Assertions.assertEquals(
         ImmutableSet.of(policy1, policy2, policy3), ImmutableSet.copyOf(policiesInfo2));
 
+    MetadataObject columnObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
+            Entity.EntityType.COLUMN);
+    associatePolicyThroughTag(policy1, columnObject);
+    Map<MetadataObject, PolicyEntity[]> batched =
+        policyManager.listPolicyInfosForMetadataObjects(
+            METALAKE, List.of(tableObject, columnObject));
+    Assertions.assertEquals(3, batched.get(tableObject).length);
+    Assertions.assertEquals(3, batched.get(columnObject).length);
+    Assertions.assertFalse(
+        Arrays.stream(batched.get(columnObject))
+            .filter(policy -> policy.name().equals(policy1.name()))
+            .findFirst()
+            .orElseThrow()
+            .inherited()
+            .orElseThrow());
+    Assertions.assertEquals(
+        ImmutableSet.copyOf(policyManager.listPolicyInfosForMetadataObject(METALAKE, columnObject)),
+        ImmutableSet.copyOf(batched.get(columnObject)));
+
     // List policies for non-existent metadata object
     MetadataObject nonExistentObject =
         NameIdentifierUtil.toMetadataObject(
