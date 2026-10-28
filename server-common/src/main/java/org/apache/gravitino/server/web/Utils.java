@@ -250,6 +250,32 @@ public class Utils {
   }
 
   /**
+   * Returns an HTTP 422 response for a well-formed request that cannot be processed.
+   *
+   * @param message the error message
+   * @param throwable the exception that caused the error
+   * @return the HTTP response
+   */
+  public static Response unprocessableEntity(String message, Throwable throwable) {
+    return unprocessableEntity(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  /**
+   * Returns an HTTP 422 response for a well-formed request that cannot be processed.
+   *
+   * @param type the error type
+   * @param message the error message
+   * @param throwable the exception that caused the error
+   * @return the HTTP response
+   */
+  public static Response unprocessableEntity(String type, String message, Throwable throwable) {
+    return Response.status(422)
+        .entity(ErrorResponse.unprocessableEntity(type, message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  /**
    * Returns an HTTP 409 response when an operation conflicts with the target object's state.
    *
    * <p>The unsupported-operation error payload is retained so existing clients can reconstruct

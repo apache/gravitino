@@ -28,7 +28,12 @@ from gravitino.api.semantic.semantic_model_change import (
     UpdateComment,
 )
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_query import SemanticQuery
+from gravitino.api.semantic.semantic_query_plan import SemanticQueryPlan
 from gravitino.client.generic_semantic_model import GenericSemanticModel
+from gravitino.dto.requests.plan_semantic_query_request import (
+    PlanSemanticQueryRequest,
+)
 from gravitino.dto.requests.semantic_model_create_request import (
     SemanticModelCreateRequest,
 )
@@ -42,6 +47,9 @@ from gravitino.dto.requests.semantic_model_updates_request import (
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.semantic_model_response import SemanticModelResponse
+from gravitino.dto.responses.semantic_query_plan_response import (
+    SemanticQueryPlanResponse,
+)
 from gravitino.dto.semantic.semantic_model_definition_dto import (
     SemanticModelDefinitionDTO,
 )
@@ -153,6 +161,27 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
         return resp.body.decode("utf-8")
+
+    def plan_semantic_query(
+        self, identifier: NameIdentifier, query: SemanticQuery
+    ) -> SemanticQueryPlan:
+        self._check_semantic_model_name_identifier(identifier)
+        if query is None:
+            raise IllegalArgumentException("Semantic query must not be null")
+
+        req = PlanSemanticQueryRequest.from_query(query)
+        req.validate()
+
+        full_namespace = self._get_semantic_model_full_namespace(identifier.namespace())
+        resp = self._rest_client.post(
+            f"{self._format_semantic_model_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}/plan",
+            json=req,
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        plan_resp = SemanticQueryPlanResponse.from_json(resp.body, infer_missing=True)
+        plan_resp.validate()
+        return plan_resp.to_plan()
 
     def alter_semantic_model(
         self, identifier: NameIdentifier, *changes: SemanticModelChange

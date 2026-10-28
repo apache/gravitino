@@ -29,12 +29,14 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.requests.PlanSemanticQueryRequest;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticQueryPlanResponse;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -47,6 +49,8 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticQuery;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
 import org.apache.hc.core5.http.HttpHeaders;
 
 /** Implements schema-scoped Semantic Model operations through the Gravitino REST API. */
@@ -178,6 +182,32 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
             ErrorHandlers.semanticModelErrorHandler());
 
     return format == OssieFormat.JSON ? OssieDocument.json(content) : OssieDocument.yaml(content);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticQueryPlan planSemanticQuery(NameIdentifier ident, SemanticQuery query)
+      throws NoSuchSemanticModelException {
+    checkSemanticModelNameIdentifier(ident);
+    Preconditions.checkArgument(query != null, "Semantic query must not be null");
+
+    PlanSemanticQueryRequest request = PlanSemanticQueryRequest.fromQuery(query);
+    request.validate();
+
+    Namespace fullNamespace = getSemanticModelFullNamespace(ident.namespace());
+    SemanticQueryPlanResponse response =
+        restClient.post(
+            formatSemanticModelRequestPath(fullNamespace)
+                + "/"
+                + RESTUtils.encodeString(ident.name())
+                + "/plan",
+            request,
+            SemanticQueryPlanResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.semanticModelErrorHandler());
+    response.validate();
+
+    return response.toPlan();
   }
 
   /** {@inheritDoc} */

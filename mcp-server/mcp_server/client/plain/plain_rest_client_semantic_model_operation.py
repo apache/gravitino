@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 from typing import Optional
 
 from httpx import AsyncClient
@@ -22,6 +23,7 @@ from httpx import AsyncClient
 from mcp_server.client.plain.utils import (
     encode_path_segment,
     extract_content_from_response,
+    extract_response,
 )
 from mcp_server.client.semantic_model_operation import SemanticModelOperation
 
@@ -89,6 +91,37 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
             self._model_path(catalog_name, schema_name, semantic_model_name)
         )
         return extract_content_from_response(response, "dropped", False)
+
+    # pylint: disable=too-many-positional-arguments
+    async def compile_semantic_query(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        dialect: str,
+        metrics: Optional[list[str]] = None,
+        dimensions: Optional[list[str]] = None,
+        filters: Optional[list[dict]] = None,
+    ) -> str:
+        body = {"dialect": dialect}
+        if metrics is not None:
+            body["metrics"] = metrics
+        if dimensions is not None:
+            body["dimensions"] = dimensions
+        if filters is not None:
+            body["filters"] = filters
+        response = await self.rest_client.post(
+            f"{self._model_path(catalog_name, schema_name, semantic_model_name)}"
+            "/plan",
+            json=body,
+        )
+        return self._extract_plan(response)
+
+    @staticmethod
+    def _extract_plan(response) -> str:
+        plan = json.loads(extract_response(response))
+        plan.pop("code", None)
+        return json.dumps(plan)
 
     def _models_path(self, catalog_name: str, schema_name: str) -> str:
         return (

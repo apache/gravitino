@@ -202,6 +202,59 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 self.assertIs(result, dropped)
                 self._assert_request("DELETE", f"{_MODELS_PATH}/sales_model")
 
+    async def test_compile_semantic_query(self):
+        plan = {
+            "sql": "SELECT SUM(amount) FROM orders",
+            "dialect": "trino",
+            "planner": "custom",
+            "warnings": [],
+        }
+        self.response = {"code": 0, **plan}
+        result = await self._call(
+            "compile_semantic_query",
+            {
+                **_MODEL_ARGS,
+                "dialect": "trino",
+                "metrics": ["total_revenue"],
+                "dimensions": ["region"],
+                "filters": [
+                    {"field": "region", "operator": "eq", "value": "EMEA"}
+                ],
+            },
+        )
+        self.assertEqual(result, plan)
+        self._assert_request(
+            "POST",
+            f"{_MODELS_PATH}/sales_model/plan",
+            {
+                "dialect": "trino",
+                "metrics": ["total_revenue"],
+                "dimensions": ["region"],
+                "filters": [
+                    {"field": "region", "operator": "eq", "value": "EMEA"}
+                ],
+            },
+        )
+
+    async def test_compile_semantic_query_omits_unset_fields(self):
+        self.response = {
+            "code": 0,
+            "sql": "SELECT COUNT(*) FROM orders",
+            "dialect": "trino",
+            "planner": "custom",
+            "warnings": ["approximate"],
+        }
+        result = await self._call(
+            "compile_semantic_query",
+            {**_MODEL_ARGS, "dialect": "trino", "metrics": ["order_count"]},
+        )
+        self.assertEqual(result["warnings"], ["approximate"])
+        self._assert_request(
+            "POST",
+            f"{_MODELS_PATH}/sales_model/plan",
+            {"dialect": "trino", "metrics": ["order_count"]},
+        )
+
     async def test_all_operations_encode_each_path_segment(self):
         namespace = {
             "metalake": "ml/a",
@@ -240,6 +293,16 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 "DELETE",
                 {"semantic_model_name": model_name},
                 "/sales%20%25",
+            ),
+            (
+                "compile_semantic_query",
+                "POST",
+                {
+                    "semantic_model_name": model_name,
+                    "dialect": "trino",
+                    "metrics": ["m"],
+                },
+                "/sales%20%25/plan",
             ),
         ):
             with self.subTest(tool=tool):
@@ -335,6 +398,16 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             ),
             ("drop_semantic_model", _MODEL_ARGS, 409, "NotInUseException"),
             ("drop_semantic_model", _MODEL_ARGS, 403, "ForbiddenException"),
+            (
+                "compile_semantic_query",
+                {
+                    **_MODEL_ARGS,
+                    "dialect": "trino",
+                    "metrics": ["total_revenue"],
+                },
+                422,
+                "SemanticQueryPlanException",
+            ),
         ):
             with self.subTest(tool=tool, status=status):
                 self.status = status
@@ -354,7 +427,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(self.requests, [])
 
-    async def test_semantic_model_tag_exposes_all_five_tools(self):
+    async def test_semantic_model_tag_exposes_all_six_tools(self):
         self.mcp = GravitinoMCPServer(
             Setting("test_metalake", tags={"semantic_model"})
         ).mcp
@@ -368,6 +441,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 "create_semantic_model",
                 "alter_semantic_model",
                 "drop_semantic_model",
+                "compile_semantic_query",
             },
         )
         for tool in tools.values():
@@ -379,6 +453,15 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             set(tools["drop_semantic_model"].inputSchema["required"]),
             {"catalog_name", "schema_name", "semantic_model_name"},
+        )
+        self.assertEqual(
+            set(tools["compile_semantic_query"].inputSchema["required"]),
+            {
+                "catalog_name",
+                "schema_name",
+                "semantic_model_name",
+                "dialect",
+            },
         )
 
 
@@ -408,6 +491,20 @@ class TestSemanticModelToolWithMockOperation(unittest.IsolatedAsyncioTestCase):
                 model,
             ),
             ("drop_semantic_model", model_args, True),
+            (
+                "compile_semantic_query",
+                {
+                    **model_args,
+                    "dialect": "trino",
+                    "metrics": ["total_revenue"],
+                },
+                {
+                    "sql": "SELECT 1",
+                    "dialect": "trino",
+                    "planner": "mock",
+                    "warnings": [],
+                },
+            ),
         )
         with patch.object(
             RESTClientFactory, "_rest_client_class", MockOperation

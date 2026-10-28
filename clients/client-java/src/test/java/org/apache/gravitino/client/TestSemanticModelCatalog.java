@@ -22,6 +22,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
+import static org.apache.hc.core5.http.HttpStatus.SC_UNPROCESSABLE_CONTENT;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,6 +50,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
+import org.apache.gravitino.dto.requests.PlanSemanticQueryRequest;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
@@ -56,6 +58,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticQueryPlanResponse;
 import org.apache.gravitino.dto.semantic.SemanticModelDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
@@ -72,6 +75,7 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticQueryPlanException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.AIContextObject;
@@ -91,6 +95,10 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticQuery;
+import org.apache.gravitino.semantic.SemanticQueryFilter;
+import org.apache.gravitino.semantic.SemanticQueryFilter.Operator;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.BeforeAll;
@@ -326,6 +334,89 @@ public class TestSemanticModelCatalog extends TestBase {
     NameIdentifier ident = NameIdentifier.of(SCHEMA_NAME, MODEL_NAME);
     assertTrue(semanticModels.dropSemanticModel(ident));
     assertFalse(semanticModels.dropSemanticModel(ident));
+  }
+
+  @Test
+  public void testPlanSemanticQueryCompilesSql() throws JsonProcessingException {
+    SemanticQuery query =
+        SemanticQuery.builder()
+            .withMetrics(Collections.singletonList("revenue"))
+            .withDimensions(Collections.singletonList("region"))
+            .withFilters(
+                Collections.singletonList(
+                    SemanticQueryFilter.of("order_date", Operator.GE, "2024-01-01")))
+            .withDialect("trino")
+            .build();
+    PlanSemanticQueryRequest request = PlanSemanticQueryRequest.fromQuery(query);
+    SemanticQueryPlan plan =
+        SemanticQueryPlan.of(
+            "SELECT region, SUM(amount) FROM orders GROUP BY region",
+            "trino",
+            "test-planner",
+            Collections.singletonList("amount treated as decimal"));
+    String path =
+        withSlash(semanticModelPath() + "/" + RESTUtils.encodeString(MODEL_NAME) + "/plan");
+    buildMockResource(Method.POST, path, request, new SemanticQueryPlanResponse(plan), SC_OK);
+
+    SemanticQueryPlan actual =
+        catalog
+            .asSemanticModelCatalog()
+            .planSemanticQuery(NameIdentifier.of(SCHEMA_NAME, MODEL_NAME), query);
+
+    assertEquals(plan, actual);
+
+    JsonNode body = MAPPER.valueToTree(request);
+    assertEquals("revenue", body.path("metrics").get(0).asText());
+    assertEquals("ge", body.path("filters").get(0).path("operator").asText());
+    assertEquals("trino", body.path("dialect").asText());
+  }
+
+  @Test
+  public void testPlanSemanticQueryMapsUnprocessableToException() throws JsonProcessingException {
+    SemanticQuery query =
+        SemanticQuery.builder()
+            .withMetrics(Collections.singletonList("revenue"))
+            .withDimensions(Collections.emptyList())
+            .withFilters(Collections.emptyList())
+            .withDialect("unknown-dialect")
+            .build();
+    PlanSemanticQueryRequest request = PlanSemanticQueryRequest.fromQuery(query);
+    ErrorResponse unprocessable =
+        ErrorResponse.unprocessableEntity(
+            SemanticQueryPlanException.class.getSimpleName(), "Unsupported dialect", null);
+    String path =
+        withSlash(semanticModelPath() + "/" + RESTUtils.encodeString(MODEL_NAME) + "/plan");
+    buildMockResource(Method.POST, path, request, unprocessable, SC_UNPROCESSABLE_CONTENT);
+
+    SemanticQueryPlanException exception =
+        assertThrows(
+            SemanticQueryPlanException.class,
+            () ->
+                catalog
+                    .asSemanticModelCatalog()
+                    .planSemanticQuery(NameIdentifier.of(SCHEMA_NAME, MODEL_NAME), query));
+    assertTrue(exception.getMessage().contains("Unsupported dialect"));
+  }
+
+  @Test
+  public void testPlanSemanticQueryRejectsInvalidInput() {
+    SemanticModelCatalog semanticModels = catalog.asSemanticModelCatalog();
+    SemanticQuery query =
+        SemanticQuery.builder()
+            .withMetrics(Collections.singletonList("revenue"))
+            .withDimensions(Collections.emptyList())
+            .withFilters(Collections.emptyList())
+            .withDialect("trino")
+            .build();
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> semanticModels.planSemanticQuery(NameIdentifier.of(SCHEMA_NAME, MODEL_NAME), null));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            semanticModels.planSemanticQuery(
+                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME), query));
   }
 
   @Test

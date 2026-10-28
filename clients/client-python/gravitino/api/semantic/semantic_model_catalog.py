@@ -21,6 +21,8 @@ from typing import Optional
 from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_query import SemanticQuery
+from gravitino.api.semantic.semantic_query_plan import SemanticQueryPlan
 from gravitino.exceptions.base import (
     NoSuchSemanticModelException,
     UnsupportedOperationException,
@@ -167,6 +169,29 @@ class SemanticModelCatalog(ABC):
             UnsupportedOperationException: If this catalog does not support export.
         """
         raise UnsupportedOperationException("Ossie export is not supported")
+
+    def plan_semantic_query(
+        self, identifier: NameIdentifier, query: SemanticQuery
+    ) -> SemanticQueryPlan:
+        """Compile a Semantic Model query to SQL without executing it.
+
+        The configured query planner compiles the query for the requested
+        dialect and returns the SQL with any non-fatal warnings. Planning is
+        read-only and does not cache the generated SQL.
+
+        Args:
+            identifier (NameIdentifier): The Semantic Model identifier.
+            query (SemanticQuery): The query to compile.
+
+        Returns:
+            SemanticQueryPlan: The compiled SQL, dialect, planner name, and warnings.
+
+        Raises:
+            NoSuchSemanticModelException: If the model does not exist.
+            SemanticQueryPlanException: If the planner cannot compile the query.
+            UnsupportedOperationException: If no query planner is configured.
+        """
+        raise UnsupportedOperationException("Semantic query planning is not supported")
 
     @abstractmethod
     def alter_semantic_model(

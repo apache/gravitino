@@ -385,6 +385,20 @@ public class ErrorResponse extends BaseResponse {
         ErrorConstants.UNAUTHORIZED_CODE, type, message, getStackTrace(throwable));
   }
 
+  /**
+   * Create a new unprocessable entity error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse unprocessableEntity(
+      String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.UNPROCESSABLE_ENTITY_CODE, type, message, getStackTrace(throwable));
+  }
+
   private static List<String> getStackTrace(Throwable throwable) {
     if (throwable == null) {
       return null;

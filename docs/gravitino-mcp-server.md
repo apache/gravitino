@@ -143,13 +143,14 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
 | `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
 | `drop_semantic_model`               | Drop a Semantic Model's metadata.                                             | `semantic_model` |
+| `compile_semantic_query`            | Compile a Semantic Model query to SQL without executing it.                    | `semantic_model` |
 
 ### Semantic Models
 
 Semantic Model tools manage schema-scoped semantic metadata through the Gravitino REST API.
 For concepts and source requirements, see [Semantic Models](./semantic-models.md). For governance
 and Ossie import/export, see [Manage Semantic Model Metadata](./manage-semantic-model-metadata-using-gravitino.md).
-Use the `semantic_model` tag with `--include-tool-tags` to expose these five tools.
+Use the `semantic_model` tag with `--include-tool-tags` to expose these six tools.
 They use the same per-call `metalake` selection and authentication as other tools;
 Gravitino filters listings and enforces authorization, including access to referenced source tables.
 Names used in REST paths must be non-empty and cannot be `.` or `..`, which HTTP clients
@@ -192,6 +193,14 @@ an ordered, non-empty `updates` array. Supported `@type` values are `rename`,
 
 `drop_semantic_model` takes the model's catalog, schema, and name and returns a JSON boolean
 indicating whether it was dropped. It removes semantic metadata without deleting source tables or data.
+
+`compile_semantic_query` takes `catalog_name`, `schema_name`, `semantic_model_name`, a `dialect`,
+and optional `metrics`, `dimensions`, and `filters` arrays, and returns the compiled `sql`,
+`dialect`, `planner`, and `warnings` as JSON. Filters are objects with `field`, `operator`
+(`eq`, `ne`, `gt`, `ge`, `lt`, or `le`), and `value` strings. A query must select at least one
+metric or dimension. Planning requires a query planner on the server; see
+[Server Configuration](./gravitino-server-config.md#semantic-query-planner). A well-formed query
+the planner cannot compile is reported as an error.
 
 ## Configuration
 
