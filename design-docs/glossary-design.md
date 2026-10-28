@@ -71,14 +71,15 @@ its bindings to the data.
 1. A steward with `MANAGE_DEFINITIONS` on domain Sales creates term `Customer` in Sales. It starts
    as `DRAFT`, visible only to `CREATE_DEFINITION` and `MANAGE_DEFINITIONS` holders.
 2. An analyst with `CREATE_DEFINITION` on Sales creates `Active Customer` with broader term
-   `Customer` and synonym `active user`, and binds it to column `dw.sales.customers.is_active` and
-   metric `active_customers` of semantic model `dw.sales.sales_model`. The analyst owns this term
-   and can edit it, but cannot edit `Customer`.
+   `Customer` and synonym `active user`, and binds it to column `dw.sales.customers.is_active`
+   (Implemented by). The analyst owns this term and can edit it, but cannot edit `Customer`.
 3. The steward sets both terms to `APPROVED`; users with `VIEW_DEFINITION` now see them.
-4. An agent asks about "active users". `resolve_business_term` returns `Active Customer` (matched
+4. The owner of semantic model `dw.sales.sales_model` links its metric `active_customers` to
+   `Active Customer` from the metric side; the term now lists the metric under Used by.
+5. An agent asks about "active users". `resolve_business_term` returns `Active Customer` (matched
    by synonym), its definition and the column and metric it is bound to, filtered to what the
    agent can read.
-5. The term is later replaced. The steward sets it to `DEPRECATED`, so agents stop seeing it, and
+6. The term is later replaced. The steward sets it to `DEPRECATED`, so agents stop seeing it, and
    then deletes it.
 
 ## Design
@@ -182,15 +183,58 @@ special cases.
 
 ### Bindings
 
-- Targets: `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`, `MODEL`, and a
-  metric as (`SEMANTIC_MODEL`, `metricName`). Binding a missing object or metric fails with 404.
-- A binding is direct only: binding a schema does not bind the tables in it.
-- Binding needs the edit privilege on the term **and** read access to the object.
-- Reads are filtered both ways: a term's bindings list only objects the caller can access
-  (`filterMetadataObject`), and an object's terms list only terms the caller can see.
+A binding links a term to the data behind it. A term page shows two kinds, and an object page
+shows the terms linked to it:
+
+| Kind               | Meaning                                                 | Targets                                                                     | Example                                                                                        |
+| ------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Implemented by** | The object stores or computes the term                  | `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`, `MODEL` | `Customer` is implemented by table `sales.public.customers` and column `customers.customer_id` |
+| **Used by**        | A semantic-model metric is defined in terms of the term | a metric: (`SEMANTIC_MODEL`, `metricName`)                                  | metric `net_revenue` uses `Net revenue` and `Order`                                            |
+
+Both kinds live in `glossary_term_binding`; the kind follows from `metric_name` (set only for
+Used by). A binding is direct only: binding a schema does not bind the tables in it.
+
+**Two sides, two kinds of owner**
+
+A binding can be created from either side, because two different people know about it: the term's
+owner knows which data implements the term, and the object's owner knows which terms the object
+represents.
+
+| Side   | Endpoint                                                          | Needs                                                              | Terms allowed                                            |
+| ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------- |
+| Term   | `POST /glossary/terms/{term}/objects`                             | Edit privilege on the term, and read access to each object         | Any status, so a draft can be prepared with its bindings |
+| Object | `POST /objects/{type}/{fullName}/terms` (`?metric=` for a metric) | Curate privilege on the object, and `VIEW_DEFINITION` on each term | `APPROVED` only                                          |
+
+- **Curate privilege on an object**: for tables and columns, the existing
+  `MODIFY_TABLE_AUTHORIZATION_EXPRESSION` (an owner of the table or of an ancestor, or
+  `MODIFY_TABLE` with `USE_CATALOG` and `USE_SCHEMA`); for metrics,
+  `MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION`. The other types have no modify privilege, so
+  they need ownership of the object or of one of its ancestors (metalake, catalog, schema).
+- Either side can remove a binding with the same privilege it needs to add one.
+- Both sides call the same `GlossaryManager#updateBindings`, so a binding change is a term change
+  wherever it starts: it records a term version and goes through `TermChangeHandler`, and a
+  workflow can hold it for approval.
+- Binding a missing object or metric fails with 404, and binding from the object side to a term
+  that is not `APPROVED` fails with 400.
+- A term that is later deprecated keeps its bindings; it simply stops appearing in resolve and MCP
+  results.
+
+**Reads**
+
+- `GET /glossary/terms/{term}/objects?kind=IMPLEMENTED_BY|USED_BY&types=` lists a term's
+  bindings, keeping only objects and metrics the caller can access (`filterMetadataObject`; a
+  metric needs access to its semantic model).
+- `GET /objects/{type}/{fullName}/terms` (`?metric=` for a metric) lists an object's terms,
+  keeping only terms the caller can see.
+
+**Cleanup**
+
 - Dropping an object soft-deletes its bindings, in the same places that clean up
   `tag_relation_meta` (by object, schema, catalog and metalake). Renames keep them, since bindings
   refer to IDs.
+- Dropping a column in `alterTable` soft-deletes the column's bindings in the same transaction.
+- Metrics have no IDs: altering a semantic model soft-deletes the bindings of metrics that no
+  longer exist. A renamed metric loses its bindings and must be linked again.
 
 ### Status and versions
 
@@ -233,6 +277,8 @@ special cases.
   privilege holds when it is allowed on at least one level and denied on none. If Finance allows
   `VIEW_DEFINITION` and Sales denies it, a role cannot see a term in both. The metalake owner
   always passes.
+- **Bindings** can also be created from the object side, by the object's curators, for
+  `APPROVED` terms only; see Bindings.
 - **Owner** (user or group) through `/owners/glossary_term/{term}`. Changing it needs the current
   owner, or `MANAGE_GRANTS` on the metalake or one of the term's domains.
 - **Create** needs `CREATE_DEFINITION` on every listed domain, or on the metalake when none is
@@ -250,14 +296,14 @@ Term operations use the store's existing primitives, in one order: the live-endp
 binding), the per-metalake hierarchy lock if needed, term rows in ID order (exclusive), then domain
 rows (shared). Each row is locked once, in its final mode.
 
-| Operation                       | Locks                                                        | Conflict it excludes                 |
-| ------------------------------- | ------------------------------------------------------------ | ------------------------------------ |
-| Create                          | metalake (shared) → domains (shared)                         | metalake or domain drop              |
-| Edit content, synonyms, domains | term (exclusive) → added domains (shared)                    | concurrent edits; domain drop        |
-| Add a `BROADER` edge            | metalake (shared) → hierarchy lock → child (exclusive)       | two edges that together form a cycle |
-| Add a `RELATED` edge            | both terms (exclusive, ID order)                             | the other term being deleted         |
-| Bind                            | object chain (`lockLiveEndpoint`, shared) → term (exclusive) | object drop                          |
-| Set status, delete              | term (exclusive)                                             | concurrent edits                     |
+| Operation                       | Locks                                                                   | Conflict it excludes                 |
+| ------------------------------- | ----------------------------------------------------------------------- | ------------------------------------ |
+| Create                          | metalake (shared) → domains (shared)                                    | metalake or domain drop              |
+| Edit content, synonyms, domains | term (exclusive) → added domains (shared)                               | concurrent edits; domain drop        |
+| Add a `BROADER` edge            | metalake (shared) → hierarchy lock → child (exclusive)                  | two edges that together form a cycle |
+| Add a `RELATED` edge            | both terms (exclusive, ID order)                                        | the other term being deleted         |
+| Bind or link (either side)      | object chain (`lockLiveEndpoint`, shared) → terms (exclusive, ID order) | object drop; concurrent term edits   |
+| Set status, delete              | term (exclusive)                                                        | concurrent edits                     |
 
 - The **hierarchy lock** is a `SELECT … FOR UPDATE` on a per-metalake row in
   `glossary_hierarchy_lock`, inserted on first use. Locking only the two terms is not enough: the
@@ -271,20 +317,21 @@ rows (shared). Each row is locked once, in its final mode.
 Under `/api/metalakes/{metalake}`, with the Domain and Tag conventions: `?details=` on lists, `PUT`
 with updates to alter, `PATCH` to set status, `DropResponse` on delete.
 
-| Operation          | Endpoint                                                                | Request → response                                                 |
-| ------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| List               | `GET /glossary/terms?details=&domain=&status=&nameContains=&sourceRef=` | → `NameListResponse` / `TermListResponse`                          |
-| Create             | `POST /glossary/terms`                                                  | `TermCreateRequest` → `TermResponse`                               |
-| Get                | `GET /glossary/terms/{term}`                                            | → `TermResponse`                                                   |
-| Alter              | `PUT /glossary/terms/{term}`                                            | `TermUpdatesRequest` → `TermResponse`                              |
-| Set status         | `PATCH /glossary/terms/{term}`                                          | `TermSetRequest{status}` → `TermResponse`                          |
-| Drop               | `DELETE /glossary/terms/{term}`                                         | → `DropResponse`                                                   |
-| Hierarchy          | `GET /glossary/terms/{term}/hierarchy?direction=&depth=`                | → `TermTreeResponse`                                               |
-| List bindings      | `GET /glossary/terms/{term}/objects?types=`                             | → `TermBindingListResponse`                                        |
-| Bind / unbind      | `POST /glossary/terms/{term}/objects`                                   | `TermBindingsRequest{toAdd, toRemove}` → `TermBindingListResponse` |
-| Terms of an object | `GET /objects/{type}/{fullName}/terms`                                  | → `TermListResponse`                                               |
-| Terms of a domain  | `GET /domains/{domain}/terms?details=`                                  | → `TermListResponse`                                               |
-| Resolve            | `GET /glossary/resolve?text=&domain=`                                   | → `TermMatchListResponse`                                          |
+| Operation                   | Endpoint                                                                | Request → response                                                      |
+| --------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| List                        | `GET /glossary/terms?details=&domain=&status=&nameContains=&sourceRef=` | → `NameListResponse` / `TermListResponse`                               |
+| Create                      | `POST /glossary/terms`                                                  | `TermCreateRequest` → `TermResponse`                                    |
+| Get                         | `GET /glossary/terms/{term}`                                            | → `TermResponse`                                                        |
+| Alter                       | `PUT /glossary/terms/{term}`                                            | `TermUpdatesRequest` → `TermResponse`                                   |
+| Set status                  | `PATCH /glossary/terms/{term}`                                          | `TermSetRequest{status}` → `TermResponse`                               |
+| Drop                        | `DELETE /glossary/terms/{term}`                                         | → `DropResponse`                                                        |
+| Hierarchy                   | `GET /glossary/terms/{term}/hierarchy?direction=&depth=`                | → `TermTreeResponse`                                                    |
+| List bindings               | `GET /glossary/terms/{term}/objects?kind=&types=`                       | → `TermBindingListResponse`                                             |
+| Bind / unbind (term side)   | `POST /glossary/terms/{term}/objects`                                   | `TermBindingsRequest{toAdd, toRemove}` → `TermBindingListResponse`      |
+| Terms of an object          | `GET /objects/{type}/{fullName}/terms?metric=`                          | → `TermListResponse`                                                    |
+| Link / unlink (object side) | `POST /objects/{type}/{fullName}/terms?metric=`                         | `TermsAssociateRequest{termsToAdd, termsToRemove}` → `TermListResponse` |
+| Terms of a domain           | `GET /domains/{domain}/terms?details=`                                  | → `TermListResponse`                                                    |
+| Resolve                     | `GET /glossary/resolve?text=&domain=`                                   | → `TermMatchListResponse`                                               |
 
 ```
 TermCreateRequest  { name, definition, synonyms, domains, broader, related, sourceRef, properties }
@@ -293,7 +340,7 @@ TermUpdatesRequest { updates: [rename, updateDefinition, addSynonym, removeSynon
                      setSourceRef, setProperty, removeProperty] }
 TermDTO            { name, definition, synonyms, status, domains, broader, narrower, related,
                      owner, sourceRef, properties, audit }
-TermBindingDTO     { object: MetadataObjectDTO, metricName? }
+TermBindingDTO     { kind: IMPLEMENTED_BY | USED_BY, object: MetadataObjectDTO, metricName? }
 TermMatchDTO       { term: TermDTO, matchedBy: NAME | SYNONYM, bindings: [TermBindingDTO] }
 ```
 
@@ -306,8 +353,8 @@ TermMatchDTO       { term: TermDTO, matchedBy: NAME | SYNONYM, bindings: [TermBi
   (name or source reference) and `NonEmptyDomainException`; 400 for a cycle, a self-edge, a synonym
   equal to another term's name, or deleting an `APPROVED` term; 403 `ForbiddenException`.
 - **Clients** (Java, Python): `GlossaryOperations` on `GravitinoMetalake` (list, get, create, alter,
-  setStatus, drop, resolve, hierarchy, bind); `SupportsTerms#listTerms()` on the bindable objects
-  and on `Domain`.
+  setStatus, drop, resolve, hierarchy, bind); `SupportsTerms` (`listTerms()`, `associateTerms(...)`)
+  on the bindable objects, and `listTerms()` on `Domain`.
 
 ### MCP tools
 
@@ -321,8 +368,8 @@ filtering applies.
 | `get_term`                | `GET /glossary/terms/{term}`                       | Definition, synonyms, domains, relations                                 |
 | `list_terms`              | `GET /glossary/terms?details=true&status=APPROVED` | Browse a domain's vocabulary (`domain`, `name_contains`)                 |
 | `get_term_hierarchy`      | `GET /glossary/terms/{term}/hierarchy`             | Widen or narrow a concept                                                |
-| `list_metadata_by_term`   | `GET /glossary/terms/{term}/objects`               | Find the data that implements a term                                     |
-| `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms`             | Explain what an object means                                             |
+| `list_metadata_by_term`   | `GET /glossary/terms/{term}/objects`               | Find the objects that implement a term and the metrics that use it       |
+| `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms`             | Explain what an object or metric means                                   |
 
 Together with the `domain` tools of #13867, an agent can go from a domain to its terms to the data.
 
@@ -365,7 +412,7 @@ Together with the `domain` tools of #13867, an agent can go from a domain to its
 
 ### Phase 2: Bindings and lookup
 
-- [ ] Binding storage, endpoints from both sides, cleanup on object drop
+- [ ] Binding storage; term-side and object-side endpoints with their privilege checks; cleanup on object drop, column drop and metric removal
 - [ ] Terms of a domain; resolve endpoint; `ResolveTermEvent`
 
 ### Phase 3: Clients, MCP and docs
