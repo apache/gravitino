@@ -246,6 +246,10 @@ tasks.generateGrammarSource {
   arguments = arguments + listOf("-visitor", "-no-listener", "-package", "org.apache.gravitino.policy.sql.antlr")
 }
 
+tasks.named<Jar>("sourcesJar") {
+  dependsOn(tasks.generateGrammarSource)
+}
+
 tasks.javadoc {
   exclude("**/policy/sql/antlr/**")
 }
