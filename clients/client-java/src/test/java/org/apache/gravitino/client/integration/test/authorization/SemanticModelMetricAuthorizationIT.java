@@ -171,7 +171,8 @@ public class SemanticModelMetricAuthorizationIT extends BaseRestApiAuthorization
                     new DialectExpression[] {
                       DialectExpression.builder()
                           .withDialect("ANSI_SQL")
-                          .withExpression("SUM(orders.amount)")
+                          .withExpression(
+                              "count".equals(name) ? "COUNT(orders.amount)" : "SUM(orders.amount)")
                           .build()
                     })
                 .build())

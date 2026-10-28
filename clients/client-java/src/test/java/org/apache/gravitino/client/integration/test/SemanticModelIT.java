@@ -1342,6 +1342,10 @@ public class SemanticModelIT extends BaseIT {
   }
 
   private void assertMetricDiscovery(NameIdentifier[] identifiers, Metric... metrics) {
+    assertEquals(
+        identifiers.length,
+        metrics.length,
+        "Expected identifiers and metric definitions must have the same length");
     Namespace namespace = Namespace.of(SCHEMA_NAME);
     assertArrayEquals(identifiers, semanticModelCatalog.listMetrics(namespace));
     SemanticModelMetric[] infos = semanticModelCatalog.listMetricInfos(namespace);
