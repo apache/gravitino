@@ -47,6 +47,8 @@ than federating an external one, so no provider is needed when creating it.
 **2. Create the fileset.** Give it a name, a type, and a storage location. Choose `MANAGED` to let
 Gravitino manage the data lifecycle, or `EXTERNAL` to retain the data when the fileset is dropped.
 Pointing at an existing path does not automatically make a fileset external.
+An existing empty directory can be adopted as `MANAGED`; when filesystem operations are enabled,
+adopting an existing non-empty directory requires `allow-existing-location-as-managed=true`.
 
 **3. Read it by name.** Engines reach the files through GVFS or the client rather than the raw path.
 See [How to use GVFS](./how-to-use-gvfs.md).
@@ -56,11 +58,16 @@ See [How to use GVFS](./how-to-use-gvfs.md).
 ### Managed and External
 
 A managed fileset belongs to Gravitino. Creating it creates the directory if needed, and deleting
-it deletes the data.
+it deletes the data. An existing empty directory can also be used. With filesystem operations enabled,
+creating a managed fileset on an existing non-empty location is rejected by default. Register such a
+location as an external fileset, or set `allow-existing-location-as-managed` to `true` to explicitly
+allow Gravitino to manage the existing data and delete it when the fileset is dropped.
 
 An external fileset leaves data lifecycle management to the user. Deleting it removes only the
 Gravitino record and preserves the files. With filesystem operations enabled, creating either
 type creates the storage directory if it does not exist.
+
+Choose the type based on who owns the data and whether dropping the fileset should delete it.
 
 An existing fileset can be converted between the two types using
 [`FilesetChange.updateType`](./manage-fileset-metadata-using-gravitino.md#change-the-fileset-type).
