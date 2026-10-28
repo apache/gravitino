@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -45,18 +44,12 @@ class IcebergCatalogWrapperProvider {
   private final String catalogName;
   private final IcebergConfig icebergConfig;
   private final CatalogWrapperManager manager;
-  /** Non-null only for standalone: lakehouse-created manager that this provider must close. */
-  @Nullable private final StandaloneCatalogWrapperManager standaloneOwned;
 
   private IcebergCatalogWrapperProvider(
-      String catalogName,
-      IcebergConfig icebergConfig,
-      CatalogWrapperManager manager,
-      @Nullable StandaloneCatalogWrapperManager standaloneOwned) {
+      String catalogName, IcebergConfig icebergConfig, CatalogWrapperManager manager) {
     this.catalogName = catalogName;
     this.icebergConfig = icebergConfig;
     this.manager = manager;
-    this.standaloneOwned = standaloneOwned;
   }
 
   static IcebergCatalogWrapperProvider create(String catalogName, IcebergConfig icebergConfig) {
@@ -69,13 +62,13 @@ class IcebergCatalogWrapperProvider {
             "Internal CatalogWrapperManager is not available. "
                 + "Aux lakehouse catalog requires Iceberg REST embedded in Gravitino server.");
         // Borrow IRC manager; do not close it with this provider.
-        return new IcebergCatalogWrapperProvider(catalogName, icebergConfig, ircManager, null);
+        return new IcebergCatalogWrapperProvider(catalogName, icebergConfig, ircManager);
       }
     } catch (IllegalStateException e) {
       // IRC context not initialized (standalone / unit tests).
     }
-    StandaloneCatalogWrapperManager standalone = new StandaloneCatalogWrapperManager(icebergConfig);
-    return new IcebergCatalogWrapperProvider(catalogName, icebergConfig, standalone, standalone);
+    return new IcebergCatalogWrapperProvider(
+        catalogName, icebergConfig, new StandaloneCatalogWrapperManager(icebergConfig));
   }
 
   IcebergCatalogWrapper get() {
@@ -107,11 +100,12 @@ class IcebergCatalogWrapperProvider {
   }
 
   void close() {
-    if (standaloneOwned == null) {
+    // Only close managers this provider created (standalone); borrowed IRC managers stay open.
+    if (!(manager instanceof StandaloneCatalogWrapperManager)) {
       return;
     }
     try {
-      standaloneOwned.close();
+      ((StandaloneCatalogWrapperManager) manager).close();
     } catch (Exception e) {
       LOG.warn("Failed to close standalone catalog wrapper manager", e);
     }
