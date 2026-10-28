@@ -63,6 +63,8 @@ public class TestPolicyAssociationSelectorSerde {
   @Test
   void testRejectMissingRequiredFields() {
     Assertions.assertThrows(
+        IllegalArgumentException.class, () -> PolicyAssociationSelectorSerde.deserialize("null"));
+    Assertions.assertThrows(
         IllegalArgumentException.class, () -> PolicyAssociationSelectorSerde.deserialize("{}"));
     Assertions.assertThrows(
         IllegalArgumentException.class,
