@@ -730,6 +730,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return OwnerMetaService.getInstance().batchGetOwner(nameIdentifiers, identType);
       case POLICY_TAG_REL:
         return PolicyTagRelService.getInstance().listRelations(nameIdentifiers, identType);
+      case TAG_METADATA_OBJECT_REL:
+        return TagMetaService.getInstance().listTagsForMetadataObjects(nameIdentifiers, identType);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

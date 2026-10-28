@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -177,7 +178,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
 
   @Test
   void testLoadWithoutApplicablePoliciesQueriesTableAndColumns() throws Exception {
-    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class, CALLS_REAL_METHODS);
     when(dispatcher.listPolicyInfosForMetadataObject(eq(METALAKE), any(MetadataObject.class)))
         .thenReturn(new PolicyEntity[0]);
     LoadTableResponse response = response(SCHEMA);
@@ -189,6 +190,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
     assertFalse(result.etagSeed().isPresent());
     ArgumentCaptor<MetadataObject> objects = ArgumentCaptor.forClass(MetadataObject.class);
     verify(dispatcher, times(4)).listPolicyInfosForMetadataObject(eq(METALAKE), objects.capture());
+    verify(dispatcher, times(1)).listPolicyInfosForMetadataObjects(eq(METALAKE), any());
     assertEquals(MetadataObject.Type.TABLE, objects.getAllValues().get(0).type());
     for (int index = 1; index < 4; index++) {
       assertEquals(MetadataObject.Type.COLUMN, objects.getAllValues().get(index).type());
@@ -197,7 +199,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
 
   @Test
   void testLoadBuildsRestrictedResponseAndSeed() throws Exception {
-    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class, CALLS_REAL_METHODS);
     when(dispatcher.listPolicyInfosForMetadataObject(eq(METALAKE), any(MetadataObject.class)))
         .thenAnswer(
             invocation -> {
@@ -239,7 +241,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
 
   @Test
   void testLoadRejectsDottedTableNameWithPolicyDispatcher() throws Exception {
-    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class, CALLS_REAL_METHODS);
 
     IllegalNameIdentifierException exception =
         assertThrows(
@@ -254,7 +256,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   @Test
   void testLoadRejectsDottedColumnNameWithPolicyDispatcher() throws Exception {
     Schema schema = new Schema(Types.NestedField.optional(1, "a.b", Types.StringType.get()));
-    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class, CALLS_REAL_METHODS);
     when(dispatcher.listPolicyInfosForMetadataObject(eq(METALAKE), any(MetadataObject.class)))
         .thenReturn(new PolicyEntity[0]);
 
@@ -268,7 +270,7 @@ public class TestExperimentalIcebergReadRestrictionLoader {
 
   @Test
   void testLoadRejectsDottedAncestorNamesWithPolicyDispatcher() throws Exception {
-    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class);
+    PolicyDispatcher dispatcher = mock(PolicyDispatcher.class, CALLS_REAL_METHODS);
     TableIdentifier table = TableIdentifier.of("schema", "table");
 
     IllegalNameIdentifierException metalakeError =
