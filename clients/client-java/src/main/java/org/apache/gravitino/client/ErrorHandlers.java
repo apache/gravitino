@@ -83,6 +83,7 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticQueryPlanException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -1560,6 +1561,12 @@ public class ErrorHandlers {
 
         case ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE:
           throw new OptimisticLockException(errorMessage);
+
+        case ErrorConstants.UNPROCESSABLE_ENTITY_CODE:
+          if (SemanticQueryPlanException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new SemanticQueryPlanException(errorMessage);
+          }
+          throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
           if (CatalogNotInUseException.class.getSimpleName().equals(errorResponse.getType())) {

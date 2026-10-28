@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
@@ -58,6 +59,21 @@ public class TestSemanticModelCatalog {
         UnsupportedOperationException.class,
         () ->
             catalog.exportOssieDocument(NameIdentifier.of("schema", "existing"), OssieFormat.YAML));
+  }
+
+  @Test
+  public void testPlanSemanticQueryIsUnsupportedByDefault() {
+    SemanticModelCatalog catalog = new ExistsOnlySemanticModelCatalog();
+    SemanticQuery query =
+        SemanticQuery.builder()
+            .withMetrics(Collections.singletonList("order_amount"))
+            .withDimensions(Collections.emptyList())
+            .withFilters(Collections.emptyList())
+            .withDialect("trino")
+            .build();
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.planSemanticQuery(NameIdentifier.of("schema", "existing"), query));
   }
 
   private static class ExistsOnlySemanticModelCatalog implements SemanticModelCatalog {

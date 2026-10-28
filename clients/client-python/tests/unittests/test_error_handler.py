@@ -59,6 +59,7 @@ from gravitino.exceptions.base import (
     RoleAlreadyExistsException,
     SchemaAlreadyExistsException,
     SemanticModelAlreadyExistsException,
+    SemanticQueryPlanException,
     TableAlreadyExistsException,
     UnauthorizedException,
     UnsupportedOperationException,
@@ -1008,6 +1009,13 @@ class TestErrorHandler(unittest.TestCase):
             SEMANTIC_MODEL_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(NotInUseException, "mock error")
             )
+
+        plan_response = ErrorResponse.from_json(
+            '{"code":1013,"type":"SemanticQueryPlanException",'
+            '"message":"Unsupported dialect","stack":null}'
+        )
+        with self.assertRaisesRegex(SemanticQueryPlanException, "Unsupported dialect"):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(plan_response)
 
         with self.assertRaises(RESTException):
             SEMANTIC_MODEL_ERROR_HANDLER.handle(

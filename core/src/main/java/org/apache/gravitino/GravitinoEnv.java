@@ -109,6 +109,8 @@ import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.semantic.SemanticQueryPlanner;
+import org.apache.gravitino.semantic.SemanticQueryPlannerFactory;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
@@ -164,6 +166,8 @@ public class GravitinoEnv {
 
   private SemanticModelDispatcher semanticModelDispatcher;
   private SemanticModelDispatcher internalSemanticModelDispatcher;
+
+  private SemanticQueryPlanner semanticQueryPlanner;
 
   private ViewDispatcher viewDispatcher;
   private ViewDispatcher internalViewDispatcher;
@@ -427,6 +431,15 @@ public class GravitinoEnv {
    */
   public SemanticModelDispatcher internalSemanticModelDispatcher() {
     return internalSemanticModelDispatcher;
+  }
+
+  /**
+   * Returns the Semantic Model query planner configured for the server.
+   *
+   * @return the configured Semantic Model query planner
+   */
+  public SemanticQueryPlanner semanticQueryPlanner() {
+    return semanticQueryPlanner;
   }
 
   /**
@@ -876,6 +889,15 @@ public class GravitinoEnv {
       secretManager.close();
     }
 
+    if (semanticQueryPlanner != null) {
+      try {
+        semanticQueryPlanner.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close SemanticQueryPlanner", e);
+      }
+      semanticQueryPlanner = null;
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
@@ -1059,6 +1081,8 @@ public class GravitinoEnv {
   private void initGravitinoServerComponents() {
     MetadataOperations metadataOperations = initMetadataComponents();
     initPublicMetadataDispatchers(metadataOperations);
+
+    this.semanticQueryPlanner = SemanticQueryPlannerFactory.create(config);
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(config);

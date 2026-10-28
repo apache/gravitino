@@ -158,3 +158,48 @@ def load_semantic_model_tools(mcp: FastMCP):
         return await client.as_semantic_model_operation().drop_semantic_model(
             catalog_name, schema_name, semantic_model_name
         )
+
+    @mcp.tool(tags={"semantic_model"})
+    # pylint: disable=too-many-positional-arguments
+    async def compile_semantic_query(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        dialect: str,
+        metrics: Optional[list[str]] = None,
+        dimensions: Optional[list[str]] = None,
+        filters: Optional[list[dict]] = None,
+    ) -> str:
+        """Compile a Semantic Model query to SQL without executing it.
+
+        The server uses its configured query planner. Planning is read-only and
+        does not cache the generated SQL.
+
+        Args:
+            ctx: The request context.
+            catalog_name: Name of the catalog.
+            schema_name: Name of the schema.
+            semantic_model_name: Name of the Semantic Model to query.
+            dialect: Target engine dialect, for example "trino" or "ANSI_SQL".
+                Gravitino preserves it without validation.
+            metrics: Optional metric names to select.
+            dimensions: Optional dimension names to select.
+            filters: Optional filters, each a JSON object with field,
+                operator (eq, ne, gt, ge, lt, or le), and value strings.
+
+        Returns:
+            A JSON object containing sql, dialect, planner, and warnings.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return (
+            await client.as_semantic_model_operation().compile_semantic_query(
+                catalog_name,
+                schema_name,
+                semantic_model_name,
+                dialect,
+                metrics,
+                dimensions,
+                filters,
+            )
+        )

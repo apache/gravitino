@@ -261,6 +261,10 @@ class IllegalSemanticModelException(IllegalArgumentException):
     """An exception thrown when a Semantic Model definition is invalid."""
 
 
+class SemanticQueryPlanException(GravitinoRuntimeException):
+    """An exception thrown when a well-formed Semantic Model query cannot be compiled."""
+
+
 class IllegalPrivilegeException(IllegalArgumentException):
     """An exception thrown when a privilege is invalid."""
 

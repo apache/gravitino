@@ -67,3 +67,18 @@ class SemanticModelOperation(ABC):
     ) -> str:
         """Return a JSON boolean indicating whether the model was dropped."""
         pass
+
+    # pylint: disable=too-many-positional-arguments
+    @abstractmethod
+    async def compile_semantic_query(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        dialect: str,
+        metrics: Optional[list[str]] = None,
+        dimensions: Optional[list[str]] = None,
+        filters: Optional[list[dict]] = None,
+    ) -> str:
+        """Compile a Semantic Model query to SQL and return the plan as JSON."""
+        pass

@@ -60,6 +60,9 @@ public class ErrorConstants {
   /** Error codes for optimistic-lock conflicts. */
   public static final int OPTIMISTIC_LOCK_CONFLICT_CODE = 1012;
 
+  /** Error codes for well-formed requests that cannot be processed. */
+  public static final int UNPROCESSABLE_ENTITY_CODE = 1013;
+
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
 

@@ -27,6 +27,7 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticQueryPlanException;
 
 /** The public catalog API for managing Semantic Models in a schema. */
 @Evolving
@@ -163,6 +164,27 @@ public interface SemanticModelCatalog {
   default OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format)
       throws NoSuchSemanticModelException, IllegalSemanticModelException {
     throw new UnsupportedOperationException("Ossie export is not supported");
+  }
+
+  /**
+   * Plans a semantic query against a Semantic Model without executing it.
+   *
+   * <p>The current committed definition is used; version pinning is not part of this contract.
+   * Gravitino validates the query, authorizes the caller, resolves the model, and returns the
+   * generated SQL. The configured {@link SemanticQueryPlanner} owns SQL generation and dialect
+   * semantics. The server never executes the SQL or caches the plan.
+   *
+   * @param ident The Semantic Model identifier.
+   * @param query The semantic query to compile.
+   * @return The generated plan.
+   * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
+   * @throws IllegalArgumentException If the query is malformed.
+   * @throws SemanticQueryPlanException If the query cannot be compiled for the requested dialect.
+   * @throws UnsupportedOperationException If no query planner is configured.
+   */
+  default SemanticQueryPlan planSemanticQuery(NameIdentifier ident, SemanticQuery query)
+      throws NoSuchSemanticModelException {
+    throw new UnsupportedOperationException("Semantic query planning is not supported");
   }
 
   /**

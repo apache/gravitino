@@ -22,11 +22,17 @@ from gravitino.api.semantic.dataset import Dataset
 from gravitino.api.semantic.semantic_model_catalog import SemanticModelCatalog
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_query import SemanticQuery
+from gravitino.api.semantic.semantic_query_filter import SemanticQueryFilter
+from gravitino.api.semantic.semantic_query_plan import SemanticQueryPlan
 from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.semantic_model_response import SemanticModelResponse
+from gravitino.dto.responses.semantic_query_plan_response import (
+    SemanticQueryPlanResponse,
+)
 from gravitino.dto.semantic.semantic_model_definition_dto import (
     SemanticModelDefinitionDTO,
 )
@@ -38,6 +44,7 @@ from gravitino.exceptions.base import (
     NoSuchSchemaException,
     NoSuchSemanticModelException,
     SemanticModelAlreadyExistsException,
+    SemanticQueryPlanException,
 )
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
@@ -91,6 +98,23 @@ class TestSemanticModelCatalog(unittest.TestCase):
         )
         return self._get_mock_http_resp(
             SemanticModelResponse(_code=0, _semantic_model=semantic_model).to_json()
+        )
+
+    def _mock_plan_response(self) -> Response:
+        plan = SemanticQueryPlan(
+            sql="SELECT region, SUM(amount) FROM orders GROUP BY region",
+            dialect="trino",
+            planner="test-planner",
+            warnings=["amount treated as decimal"],
+        )
+        return self._get_mock_http_resp(
+            SemanticQueryPlanResponse(
+                _code=0,
+                _sql=plan.sql(),
+                _dialect=plan.dialect(),
+                _planner=plan.planner(),
+                _warnings=plan.warnings(),
+            ).to_json()
         )
 
     def test_relational_catalog_exposes_semantic_models(self):
@@ -352,6 +376,79 @@ class TestSemanticModelCatalog(unittest.TestCase):
                     NameIdentifier.of(self.schema_name, self.model_name)
                 )
             )
+
+    def test_plan_semantic_query(self):
+        identifier = NameIdentifier.of(self.schema_name, self.model_name)
+        query = SemanticQuery(
+            dialect="trino",
+            metrics=["revenue"],
+            dimensions=["region"],
+            filters=[
+                SemanticQueryFilter.of(
+                    "order_date", SemanticQueryFilter.Operator.GE, "2024-01-01"
+                )
+            ],
+        )
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=self._mock_plan_response(),
+        ) as mock_post:
+            plan = self.catalog.as_semantic_model_catalog().plan_semantic_query(
+                identifier, query
+            )
+
+        self.assertEqual(
+            f"{self.request_path}/{self.model_name}/plan",
+            mock_post.call_args.args[0],
+        )
+        request = mock_post.call_args.kwargs["json"]
+        self.assertEqual(
+            {
+                "metrics": ["revenue"],
+                "dimensions": ["region"],
+                "filters": [
+                    {"field": "order_date", "operator": "ge", "value": "2024-01-01"}
+                ],
+                "dialect": "trino",
+            },
+            request.to_dict(),
+        )
+        self.assertEqual(
+            "SELECT region, SUM(amount) FROM orders GROUP BY region", plan.sql()
+        )
+        self.assertEqual("trino", plan.dialect())
+        self.assertEqual("test-planner", plan.planner())
+        self.assertEqual(["amount treated as decimal"], plan.warnings())
+
+    def test_plan_semantic_query_requires_a_query(self):
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "Semantic query must not be null"
+        ):
+            self.catalog.as_semantic_model_catalog().plan_semantic_query(
+                NameIdentifier.of(self.schema_name, self.model_name), None
+            )
+
+    def test_plan_semantic_query_rejects_an_invalid_identifier(self):
+        query = SemanticQuery(dialect="trino", metrics=["revenue"])
+
+        with self.assertRaises(IllegalNamespaceException):
+            self.catalog.as_semantic_model_catalog().plan_semantic_query(
+                NameIdentifier.of(self.catalog_name, self.schema_name, self.model_name),
+                query,
+            )
+
+    def test_plan_semantic_query_maps_an_unprocessable_response(self):
+        query = SemanticQuery(dialect="unknown-dialect", metrics=["revenue"])
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            side_effect=SemanticQueryPlanException("Unsupported dialect"),
+        ):
+            with self.assertRaises(SemanticQueryPlanException):
+                self.catalog.as_semantic_model_catalog().plan_semantic_query(
+                    NameIdentifier.of(self.schema_name, self.model_name), query
+                )
 
     def test_rejects_an_invalid_namespace(self):
         catalog = self.catalog.as_semantic_model_catalog()
