@@ -53,11 +53,8 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
-import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
-import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -81,7 +78,6 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
-import org.apache.iceberg.exceptions.NoSuchWarehouseException;
 import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -101,9 +97,9 @@ public class IcebergCatalogOperations
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogOperations.class);
 
-  @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
-
   @VisibleForTesting @Nullable String catalogUuid;
+  @VisibleForTesting IcebergCatalogWrapperProvider wrapperProvider;
+  @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper;
   private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
@@ -132,37 +128,22 @@ public class IcebergCatalogOperations
     resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
-
-    try {
-      AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
-      this.icebergCatalogWrapper =
-          authenticationConfig.isKerberosAuth()
-                  && rawWrapper.getCatalog() instanceof SupportsKerberos
-              ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
-              : rawWrapper;
-      this.icebergCatalogWrapperHelper =
-          new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
-      this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
-    } catch (NoSuchWarehouseException e) {
-      // A reachable server rejecting the `warehouse` selector is a user error. See issue #11943.
-      throw new IllegalArgumentException(
-          String.format(
-              "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
-                  + "the REST backend 'warehouse' selects a catalog by name on the remote server "
-                  + "and is not a storage location; remove 'warehouse' to use the server's default "
-                  + "catalog, or set it to a catalog name/identifier that the server recognizes.",
-              icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
-          e);
-    } catch (RESTException e) {
-      throw handleRestException(e);
-    }
+    this.wrapperProvider = IcebergCatalogWrapperProvider.create(info.name(), icebergConfig);
+    // Lakehouse-owned StandaloneCatalogWrapperManager (jdbc/hive/rest). Provider.get() maps
+    // NoSuchWarehouse / unreachable REST into Gravitino's create-time exception taxonomy.
+    this.icebergCatalogWrapper = wrapperProvider.get();
+    this.icebergCatalogWrapperHelper =
+        new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
+    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
   }
 
   @Override
   public void onCatalogDropped() {
     if (catalogUuid != null) {
       IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
+    }
+    if (wrapperProvider != null) {
+      wrapperProvider.invalidate();
     }
   }
 
@@ -182,6 +163,10 @@ public class IcebergCatalogOperations
   /** Closes the Iceberg catalog and releases the associated client pool. */
   @Override
   public void close() {
+    if (wrapperProvider != null) {
+      wrapperProvider.close();
+      return;
+    }
     if (null != icebergCatalogWrapper) {
       try {
         icebergCatalogWrapper.close();
