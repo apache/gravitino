@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
@@ -28,6 +27,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -35,21 +35,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionSnapshotRowPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -61,9 +61,6 @@ import org.slf4j.LoggerFactory;
 public class ModelVersionMetaService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ModelVersionMetaService.class);
-
-  /** How many times a model-version read is re-run when the model changes underneath it. */
-  @VisibleForTesting static final int MAX_STABLE_READ_ATTEMPTS = 3;
 
   private static final ModelVersionMetaService INSTANCE = new ModelVersionMetaService();
 
@@ -80,8 +77,8 @@ public class ModelVersionMetaService {
     NamespaceUtil.checkModelVersion(ns);
 
     NameIdentifier modelIdent = NameIdentifier.of(ns.levels());
-    return readWithStableModel(
-        modelIdent, modelPO -> listModelVersions(modelIdent, modelPO.getModelId()));
+    ModelVersionSnapshot snapshot = readSnapshot(modelIdent, null, null);
+    return listModelVersions(modelIdent, snapshot);
   }
 
   @Monitored(
@@ -91,8 +88,16 @@ public class ModelVersionMetaService {
     NameIdentifierUtil.checkModelVersion(ident);
 
     NameIdentifier modelIdent = NameIdentifier.of(ident.namespace().levels());
-    return readWithStableModel(
-        modelIdent, modelPO -> getModelVersion(ident, modelIdent, modelPO.getModelId()));
+    boolean isVersionNumber = NumberUtils.isCreatable(ident.name());
+    ModelVersionSnapshot snapshot =
+        readSnapshot(
+            modelIdent,
+            isVersionNumber ? Integer.valueOf(ident.name()) : null,
+            isVersionNumber ? null : ident.name());
+    if (snapshot.modelVersions.isEmpty()) {
+      throw noSuchModelVersionException(ident);
+    }
+    return POConverters.fromModelVersionPO(modelIdent, snapshot.modelVersions, snapshot.aliases);
   }
 
   @Monitored(
@@ -376,20 +381,15 @@ public class ModelVersionMetaService {
     return !oldAliases.equals(newAliases);
   }
 
-  private List<ModelVersionEntity> listModelVersions(NameIdentifier modelIdent, long modelId) {
-    List<ModelVersionPO> modelVersionPOs =
-        SessionUtils.getWithoutCommit(
-            ModelVersionMetaMapper.class, mapper -> mapper.listModelVersionMetasByModelId(modelId));
+  private List<ModelVersionEntity> listModelVersions(
+      NameIdentifier modelIdent, ModelVersionSnapshot snapshot) {
+    List<ModelVersionPO> modelVersionPOs = snapshot.modelVersions;
 
     if (modelVersionPOs.isEmpty()) {
       return Collections.emptyList();
     }
 
-    // Get the aliases for all the model versions.
-    List<ModelVersionAliasRelPO> aliasRelPOs =
-        SessionUtils.getWithoutCommit(
-            ModelVersionAliasRelMapper.class,
-            mapper -> mapper.selectModelVersionAliasRelsByModelId(modelId));
+    List<ModelVersionAliasRelPO> aliasRelPOs = snapshot.aliases;
     Multimap<Integer, ModelVersionAliasRelPO> aliasRelPOsByModelVersion =
         ArrayListMultimap.create();
     aliasRelPOs.forEach(r -> aliasRelPOsByModelVersion.put(r.getModelVersion(), r));
@@ -410,95 +410,68 @@ public class ModelVersionMetaService {
             .values());
   }
 
-  private ModelVersionEntity getModelVersion(
-      NameIdentifier ident, NameIdentifier modelIdent, long modelId) {
-    boolean isVersionNumber = NumberUtils.isCreatable(ident.name());
-
-    List<ModelVersionPO> modelVersionPOs =
+  private ModelVersionSnapshot readSnapshot(
+      NameIdentifier modelIdent, @Nullable Integer version, @Nullable String alias) {
+    ModelPO modelPO = ModelMetaService.getInstance().getModelPOByIdentifier(modelIdent);
+    // The initial lookup preserves namespace validation and pins the model identity. Version
+    // rows, alias resolution, and model existence are then read in one statement snapshot, so
+    // linking or altering the model cannot tear the result or force a read to retry.
+    List<ModelVersionSnapshotRowPO> rows =
         SessionUtils.getWithoutCommit(
             ModelVersionMetaMapper.class,
-            mapper -> {
-              if (isVersionNumber) {
-                return mapper.selectModelVersionMeta(modelId, Integer.valueOf(ident.name()));
-              } else {
-                return mapper.selectModelVersionMetaByAlias(modelId, ident.name());
-              }
-            });
-
-    if (modelVersionPOs.isEmpty()) {
+            mapper ->
+                mapper.selectModelVersionSnapshot(
+                    modelPO.getModelId(),
+                    modelPO.getSchemaId(),
+                    modelIdent.name(),
+                    version,
+                    alias));
+    if (rows.isEmpty()) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.MODEL_VERSION.name().toLowerCase(Locale.ROOT),
-          ident.toString());
+          Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
+          modelIdent.toString());
     }
-
-    List<ModelVersionAliasRelPO> aliasRelPOs =
-        SessionUtils.getWithoutCommit(
-            ModelVersionAliasRelMapper.class,
-            mapper -> {
-              if (isVersionNumber) {
-                return mapper.selectModelVersionAliasRelsByModelIdAndVersion(
-                    modelId, Integer.valueOf(ident.name()));
-              } else {
-                return mapper.selectModelVersionAliasRelsByModelIdAndAlias(modelId, ident.name());
-              }
-            });
-
-    return POConverters.fromModelVersionPO(modelIdent, modelVersionPOs, aliasRelPOs);
+    List<ModelVersionPO> modelVersions = new ArrayList<>();
+    List<ModelVersionAliasRelPO> aliases = new ArrayList<>();
+    for (ModelVersionSnapshotRowPO row : rows) {
+      if (row.getModelVersion() != null) {
+        modelVersions.add(
+            ModelVersionPO.builder()
+                .withModelId(row.getModelId())
+                .withMetalakeId(row.getMetalakeId())
+                .withCatalogId(row.getCatalogId())
+                .withSchemaId(row.getSchemaId())
+                .withModelVersion(row.getModelVersion())
+                .withModelVersionComment(row.getModelVersionComment())
+                .withModelVersionProperties(row.getModelVersionProperties())
+                .withModelVersionUriName(row.getModelVersionUriName())
+                .withModelVersionUri(row.getModelVersionUri())
+                .withAuditInfo(row.getAuditInfo())
+                .withDeletedAt(row.getDeletedAt())
+                .build());
+      } else if (row.getAliasVersion() != null) {
+        aliases.add(
+            ModelVersionAliasRelPO.builder()
+                .withModelId(row.getModelId())
+                .withModelVersion(row.getAliasVersion())
+                .withModelVersionAlias(row.getAliasName())
+                .withDeletedAt(row.getAliasDeletedAt())
+                .build());
+      }
+      // A model-ID-only row represents an existing model with no matching version.
+    }
+    return new ModelVersionSnapshot(modelVersions, aliases);
   }
 
-  /**
-   * Runs a read of a model's version and alias rows and returns it only if the model did not change
-   * while the rows were read.
-   *
-   * <p>The version rows and the alias rows are read by separate statements, so a concurrent link,
-   * alter or delete could otherwise be seen half applied, for example with the old URIs and the new
-   * aliases. Every such write advances the model row's {@code current_version} in its own
-   * transaction, so an unchanged version after the read proves the rows belong to one committed
-   * state. A changed version re-runs the read, up to {@link #MAX_STABLE_READ_ATTEMPTS} times.
-   *
-   * <p>{@code current_version} is the model's aggregate concurrency token, so model-level writes
-   * such as a comment or property change through {@code alterModel} also advance it. Those writes
-   * cannot tear the version and alias rows, but they still make a concurrent read retry, and a
-   * model altered on every attempt fails the read with {@link OptimisticLockException}.
-   *
-   * @param modelIdent the identifier of the model whose rows are read
-   * @param read the read to run against the observed model row
-   * @return the result of a read that saw no concurrent model change
-   * @throws NoSuchEntityException if the model does not exist, or was dropped during the read
-   * @throws OptimisticLockException if the model kept changing
-   */
-  @VisibleForTesting
-  <T> T readWithStableModel(NameIdentifier modelIdent, Function<ModelPO, T> read) {
-    for (int attempt = 1; ; attempt++) {
-      // Will throw a NoSuchEntityException if the model does not exist.
-      ModelPO observedModelPO = ModelMetaService.getInstance().getModelPOByIdentifier(modelIdent);
-      T result = read.apply(observedModelPO);
+  private static final class ModelVersionSnapshot {
+    private final List<ModelVersionPO> modelVersions;
+    private final List<ModelVersionAliasRelPO> aliases;
 
-      ModelPO currentModelPO =
-          SessionUtils.getWithoutCommit(
-              ModelMetaMapper.class,
-              mapper -> mapper.selectModelMetaByModelId(observedModelPO.getModelId()));
-      if (currentModelPO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
-            modelIdent.toString());
-      }
-      if (Objects.equals(currentModelPO.getCurrentVersion(), observedModelPO.getCurrentVersion())) {
-        return result;
-      }
-      if (attempt >= MAX_STABLE_READ_ATTEMPTS) {
-        throw ExceptionUtils.concurrentModification(Entity.EntityType.MODEL, modelIdent);
-      }
-      // Re-read immediately: a read through the entity cache holds its cache segment lock here,
-      // so pausing would also stall unrelated entities hashed to the same segment. Spacing the
-      // attempts needs the retry loop lifted above that lock, or a single-statement read that
-      // cannot tear; both are left to #13181, so do not add a sleep inside this loop.
-      LOG.debug(
-          "Model {} changed during attempt {} of a model-version read, reading it again",
-          modelIdent,
-          attempt);
+    private ModelVersionSnapshot(
+        List<ModelVersionPO> modelVersions, List<ModelVersionAliasRelPO> aliases) {
+      this.modelVersions = modelVersions;
+      this.aliases = aliases;
     }
   }
 
