@@ -28,8 +28,10 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
@@ -60,6 +62,7 @@ public class TestGravitinoAdminClient extends TestBase {
             .withComment("comment")
             .withAudit(
                 AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .withOwner(OwnerDTO.builder().withName("alice").withType(Owner.Type.USER).build())
             .build();
     MetalakeDTO mockMetalake1 =
         MetalakeDTO.builder()
@@ -78,10 +81,13 @@ public class TestGravitinoAdminClient extends TestBase {
     Assertions.assertEquals("mock", metaLakes[0].name());
     Assertions.assertEquals("comment", metaLakes[0].comment());
     Assertions.assertEquals("creator", metaLakes[0].auditInfo().creator());
+    Assertions.assertEquals("alice", metaLakes[0].owner().name());
+    Assertions.assertEquals(Owner.Type.USER, metaLakes[0].owner().type());
 
     Assertions.assertEquals("mock1", metaLakes[1].name());
     Assertions.assertEquals("comment1", metaLakes[1].comment());
     Assertions.assertEquals("creator1", metaLakes[1].auditInfo().creator());
+    Assertions.assertNull(metaLakes[1].owner());
 
     // Test return empty metalake list
     MetalakeListResponse resp1 = new MetalakeListResponse(new MetalakeDTO[] {});
