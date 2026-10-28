@@ -47,6 +47,7 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    * @return Metric identifiers from one consistent statement or read snapshot.
    * @throws NoSuchEntityException If the schema does not exist.
    * @throws IOException If the read fails.
+   * @throws UnsupportedOperationException If metric discovery is not supported.
    */
   default List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
     throw new UnsupportedOperationException("Metric listing is not supported");
@@ -60,6 +61,7 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    *     filtering.
    * @throws NoSuchEntityException If the schema does not exist.
    * @throws IOException If the read fails.
+   * @throws UnsupportedOperationException If metric discovery is not supported.
    */
   default List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
       throws IOException {
