@@ -100,6 +100,7 @@ public class IcebergCatalogOperations
   @VisibleForTesting @Nullable String catalogUuid;
   @VisibleForTesting IcebergCatalogWrapperProvider wrapperProvider;
   @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
+  private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper;
   private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
   /**
@@ -128,9 +129,11 @@ public class IcebergCatalogOperations
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.wrapperProvider = IcebergCatalogWrapperProvider.create(info.name(), icebergConfig);
-    // Resolve once: create-time REST validation + stable field for catalog/view ops.
+    // Resolve once: create-time REST validation + stable fields for catalog/view ops.
     // Provider.get() maps NoSuchWarehouse / unreachable REST into Gravitino's exception taxonomy.
     this.icebergCatalogWrapper = wrapperProvider.get();
+    this.icebergCatalogWrapperHelper =
+        new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
     this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
   }
 
@@ -470,9 +473,8 @@ public class IcebergCatalogOperations
     try {
       String[] levels = tableIdent.namespace().levels();
       IcebergTableChange icebergTableChange =
-          new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog())
-              .buildIcebergTableChanges(
-                  NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
+          icebergCatalogWrapperHelper.buildIcebergTableChanges(
+              NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
       LoadTableResponse loadTableResponse = icebergCatalogWrapper.updateTable(icebergTableChange);
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
