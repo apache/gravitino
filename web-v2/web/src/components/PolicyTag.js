@@ -129,7 +129,9 @@ export default function PolicyTag({ ...props }) {
 
   const handleClose = async removedPolicy => {
     if (isTag) {
-      await dispatch(removePolicyFromTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: removedPolicy }))
+      await dispatch(
+        removePolicyFromTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: removedPolicy })
+      )
     } else {
       await dispatch(
         associatePolicy({
