@@ -34,14 +34,12 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.auxiliary.IcebergAuxCatalogHooks;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
-import org.apache.gravitino.connector.CatalogCacheDeadline;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -98,7 +96,6 @@ public class IcebergCatalogOperations
         TableCatalog,
         ViewCatalog,
         CatalogDropAware,
-        CatalogCacheDeadline,
         IcebergAuxCatalogHooks.ResolvedInitializer {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
@@ -108,8 +105,6 @@ public class IcebergCatalogOperations
   @VisibleForTesting IcebergBackend backend;
 
   @VisibleForTesting @Nullable String catalogUuid;
-
-  @Nullable private NameIdentifier catalogIdent;
 
   /**
    * Operations created on the auxiliary IRC class loader. Method calls on this object run against
@@ -193,39 +188,7 @@ public class IcebergCatalogOperations
         info.namespace() != null && info.namespace().length() > 0
             ? info.namespace().level(0)
             : null;
-    this.catalogIdent = metalake == null ? null : NameIdentifier.of(metalake, info.name());
-    this.backend =
-        IcebergBackend.create(info.name(), metalake, resultConf, this::touchCatalogCache);
-  }
-
-  /**
-   * Epoch millis when this catalog should leave the catalog cache because its GCS token is near
-   * expiry. {@link Long#MAX_VALUE} means no token deadline is known yet.
-   *
-   * @return deadline epoch millis, or {@link Long#MAX_VALUE} when only the idle interval applies
-   */
-  @Override
-  public long cacheDeadlineEpochMs() {
-    if (delegate instanceof CatalogCacheDeadline) {
-      return IcebergAuxCatalogHooks.call(
-          () -> ((CatalogCacheDeadline) delegate).cacheDeadlineEpochMs());
-    }
-    if (delegate != null) {
-      return Long.MAX_VALUE;
-    }
-    return backend == null ? Long.MAX_VALUE : backend.cacheDeadlineEpochMs();
-  }
-
-  /** Re-reads this catalog in the catalog cache so a known GCS deadline shortens its lifetime. */
-  private void touchCatalogCache() {
-    if (catalogIdent == null) {
-      return;
-    }
-    try {
-      GravitinoEnv.getInstance().catalogManager().touchCatalogCache(catalogIdent);
-    } catch (IllegalArgumentException | IllegalStateException e) {
-      LOG.debug("Catalog cache is not available to apply the GCS token deadline", e);
-    }
+    this.backend = IcebergBackend.create(info.name(), metalake, resultConf);
   }
 
   @Override

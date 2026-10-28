@@ -28,7 +28,6 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -82,7 +81,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.CatalogCacheDeadline;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -225,32 +223,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     public BaseCatalog catalog() {
       return catalog;
-    }
-
-    /**
-     * Absolute cache deadline for this catalog, or {@link Long#MAX_VALUE} when only the idle
-     * interval applies.
-     *
-     * @return deadline epoch millis
-     */
-    long cacheDeadlineEpochMs() {
-      BaseCatalog current = catalog;
-      if (current == null) {
-        return Long.MAX_VALUE;
-      }
-      try {
-        return classLoader.withClassLoader(
-            cl -> {
-              CatalogOperations operations = current.ops();
-              if (operations instanceof CatalogCacheDeadline) {
-                return ((CatalogCacheDeadline) operations).cacheDeadlineEpochMs();
-              }
-              return Long.MAX_VALUE;
-            });
-      } catch (Exception e) {
-        LOG.debug("Cannot read catalog cache deadline", e);
-        return Long.MAX_VALUE;
-      }
     }
 
     /**
@@ -583,15 +555,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
     this.catalogCache =
         Caffeine.newBuilder()
-            .expireAfter(
-                new CatalogCacheExpiry(TimeUnit.MILLISECONDS.toNanos(cacheEvictionIntervalInMs)))
+            .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
                   LOG.debug("Removed catalog cache entry, identifier={}, cause={}", k, c);
                   try {
                     for (Consumer<NameIdentifier> listener : removalListeners) {
                       if (k != null) {
-                        listener.accept(k);
+                        listener.accept((NameIdentifier) k);
                       }
                     }
                   } finally {
@@ -599,7 +570,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     // keeps it alive, and the actual catalog/ClassLoader cleanup runs when the
                     // last lease is released. Keep this in finally so a faulty external listener
                     // cannot skip resource cleanup.
-                    v.retire();
+                    ((CatalogWrapper) v).retire();
                   }
                 })
             .scheduler(
@@ -693,17 +664,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
     removalListeners.add(listener);
-  }
-
-  /**
-   * Re-reads a cached catalog so its expiry is recomputed from the current deadline. No-op when the
-   * catalog is not cached. Callers that learn a deadline after the entry was inserted (for example
-   * a GCS token observed on first use) use this to shorten that entry's lifetime.
-   *
-   * @param ident catalog identifier
-   */
-  public void touchCatalogCache(NameIdentifier ident) {
-    catalogCache.getIfPresent(ident);
   }
 
   /**
@@ -2306,60 +2266,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       store.delete(ident, EntityType.CATALOG, true);
     } catch (IOException e) {
       LOG.error("Failed to clean up catalog {}", ident, e);
-    }
-  }
-
-  /**
-   * How long a catalog cache entry may live. Uses the idle interval, capped by {@code
-   * deadlineEpochMs} when that deadline is finite.
-   *
-   * @param idleNanos configured expire-after-access interval in nanoseconds
-   * @param deadlineEpochMs absolute deadline, or {@link Long#MAX_VALUE} when none
-   * @param nowEpochMs current wall-clock time
-   * @return cache duration in nanoseconds; {@code 0} expires the entry immediately
-   */
-  @VisibleForTesting
-  static long cacheDurationNanos(long idleNanos, long deadlineEpochMs, long nowEpochMs) {
-    if (deadlineEpochMs == Long.MAX_VALUE) {
-      return idleNanos;
-    }
-    long remainingMs = deadlineEpochMs - nowEpochMs;
-    if (remainingMs <= 0) {
-      return 0L;
-    }
-    return Math.min(idleNanos, TimeUnit.MILLISECONDS.toNanos(remainingMs));
-  }
-
-  /**
-   * Idle eviction, shortened when the catalog reports an absolute deadline such as a GCS token
-   * refresh time.
-   */
-  private static final class CatalogCacheExpiry implements Expiry<NameIdentifier, CatalogWrapper> {
-
-    private final long idleNanos;
-
-    private CatalogCacheExpiry(long idleNanos) {
-      this.idleNanos = idleNanos;
-    }
-
-    @Override
-    public long expireAfterCreate(NameIdentifier key, CatalogWrapper value, long currentTime) {
-      return cacheDurationNanos(
-          idleNanos, value.cacheDeadlineEpochMs(), System.currentTimeMillis());
-    }
-
-    @Override
-    public long expireAfterUpdate(
-        NameIdentifier key, CatalogWrapper value, long currentTime, long currentDuration) {
-      return cacheDurationNanos(
-          idleNanos, value.cacheDeadlineEpochMs(), System.currentTimeMillis());
-    }
-
-    @Override
-    public long expireAfterRead(
-        NameIdentifier key, CatalogWrapper value, long currentTime, long currentDuration) {
-      return cacheDurationNanos(
-          idleNanos, value.cacheDeadlineEpochMs(), System.currentTimeMillis());
     }
   }
 }

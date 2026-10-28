@@ -59,13 +59,7 @@ final class IcebergBackend implements AutoCloseable {
   /** When true, the first use resolves IRC1's wrapper. Set only in auxiliary mode. */
   private final boolean useIrc;
 
-  @Nullable private final Runnable onCacheDeadline;
-
   private boolean ownsWrapper;
-  /**
-   * Epoch millis when the owning catalog cache entry should expire; {@link Long#MAX_VALUE} if none.
-   */
-  private volatile long cacheDeadlineEpochMs = Long.MAX_VALUE;
 
   private IcebergCatalogWrapper wrapper;
   private IcebergCatalogWrapperHelper helper;
@@ -76,14 +70,12 @@ final class IcebergBackend implements AutoCloseable {
       boolean ownsWrapper,
       @Nullable String catalogName,
       @Nullable String metalake,
-      boolean useIrc,
-      @Nullable Runnable onCacheDeadline) {
+      boolean useIrc) {
     this.catalogConf = catalogConf;
     this.ownsWrapper = ownsWrapper;
     this.catalogName = catalogName;
     this.metalake = metalake;
     this.useIrc = useIrc;
-    this.onCacheDeadline = onCacheDeadline;
   }
 
   /**
@@ -99,39 +91,15 @@ final class IcebergBackend implements AutoCloseable {
    */
   static IcebergBackend create(
       String catalogName, String metalake, Map<String, String> catalogConf) {
-    return create(catalogName, metalake, catalogConf, null);
-  }
-
-  /**
-   * Same as {@link #create(String, String, Map)} and runs {@code onCacheDeadline} once the GCS
-   * token deadline is known so the catalog cache can shorten this entry's lifetime.
-   *
-   * @param catalogName metalake catalog name
-   * @param metalake metalake name
-   * @param catalogConf resolved Iceberg catalog configuration
-   * @param onCacheDeadline notified once when a GCS token deadline is recorded, may be null
-   * @return backend
-   */
-  static IcebergBackend create(
-      String catalogName,
-      String metalake,
-      Map<String, String> catalogConf,
-      @Nullable Runnable onCacheDeadline) {
     if (IcebergAuxCatalogBridge.isRegistered() && StringUtils.isNotBlank(catalogName)) {
-      return new IcebergBackend(catalogConf, false, catalogName, metalake, true, onCacheDeadline);
+      return new IcebergBackend(catalogConf, false, catalogName, metalake, true);
     }
-    return createOwned(catalogConf, onCacheDeadline);
+    return createOwned(catalogConf);
   }
 
   /** Owned client that remints GCS tokens. Used when auxiliary IRC is not bound. */
   static IcebergBackend createOwned(Map<String, String> catalogConf) {
-    return createOwned(catalogConf, null);
-  }
-
-  private static IcebergBackend createOwned(
-      Map<String, String> catalogConf, @Nullable Runnable onCacheDeadline) {
-    IcebergBackend backend =
-        new IcebergBackend(catalogConf, true, null, null, false, onCacheDeadline);
+    IcebergBackend backend = new IcebergBackend(catalogConf, true, null, null, false);
     backend.reload();
     return backend;
   }
@@ -140,9 +108,8 @@ final class IcebergBackend implements AutoCloseable {
   @VisibleForTesting
   static IcebergBackend fixed(IcebergCatalogWrapper wrapper) {
     Preconditions.checkNotNull(wrapper, "wrapper");
-    IcebergBackend backend = new IcebergBackend(null, false, null, null, false, null);
+    IcebergBackend backend = new IcebergBackend(null, false, null, null, false);
     backend.wrapper = wrapper;
-    backend.noteGcsDeadline(wrapper);
     return backend;
   }
 
@@ -188,7 +155,6 @@ final class IcebergBackend implements AutoCloseable {
           wrapper = current;
           helper = null;
           views = null;
-          noteGcsDeadline(current);
         }
         return;
       }
@@ -241,7 +207,6 @@ final class IcebergBackend implements AutoCloseable {
               : rawWrapper;
       this.helper = new IcebergCatalogWrapperHelper(wrapper.getCatalog());
       this.views = new IcebergViewCatalogOperations(wrapper);
-      noteGcsDeadline(wrapper);
     } catch (NoSuchWarehouseException e) {
       throw new IllegalArgumentException(
           String.format(
@@ -253,36 +218,6 @@ final class IcebergBackend implements AutoCloseable {
           e);
     } catch (RESTException e) {
       throw IcebergCatalogOperations.handleRestException(e);
-    }
-  }
-
-  long cacheDeadlineEpochMs() {
-    return cacheDeadlineEpochMs;
-  }
-
-  /** Records the first GCS token deadline and does not extend it for this catalog generation. */
-  private void noteGcsDeadline(IcebergCatalogWrapper current) {
-    if (cacheDeadlineEpochMs != Long.MAX_VALUE || current == null) {
-      return;
-    }
-    String expiresAt =
-        current
-            .getIcebergConfig()
-            .getAllConfig()
-            .get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT);
-    if (StringUtils.isBlank(expiresAt)) {
-      return;
-    }
-    long deadline;
-    try {
-      deadline = Long.parseLong(expiresAt) - GCS_TOKEN_REFRESH_BUFFER_MS;
-    } catch (NumberFormatException e) {
-      LOG.warn("Invalid {}: {}", IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT, expiresAt);
-      return;
-    }
-    cacheDeadlineEpochMs = deadline;
-    if (onCacheDeadline != null) {
-      onCacheDeadline.run();
     }
   }
 
