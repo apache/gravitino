@@ -28,6 +28,7 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
@@ -83,7 +84,7 @@ public final class MaintenanceCommitSubmitPipeline {
    * @param spec enqueue-time payload; required
    */
   public void submit(String instanceId, @Nullable MaintenanceJobSpec spec) {
-    Optional<Long> parsed = CommitJobIds.parseTable(instanceId);
+    Optional<Long> parsed = MaintenanceTaskIds.parseCommitTable(instanceId);
     if (parsed.isEmpty()) {
       LOG.warn("Skipping commit-job submit for unparseable instance id {}", instanceId);
       return;

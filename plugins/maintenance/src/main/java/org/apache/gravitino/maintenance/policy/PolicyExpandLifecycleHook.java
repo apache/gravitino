@@ -23,7 +23,7 @@ import com.github.kagkarlsson.scheduler.task.ExecutionOperations;
 import java.time.Instant;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandIds;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -129,7 +129,7 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
    */
   public static void completePick(
       String instanceId, ExecutionComplete complete, ExecutionOperations<Void> operations) {
-    Optional<Long> parsed = PolicyExpandIds.parsePolicy(instanceId);
+    Optional<Long> parsed = MaintenanceTaskIds.parseExpandPolicy(instanceId);
     if (parsed.isEmpty()) {
       operations.remove();
       return;

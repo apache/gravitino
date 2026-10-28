@@ -45,7 +45,6 @@ import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceSparkSubmi
 import org.apache.gravitino.maintenance.scheduler.job.cron.PendingCronExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandIds;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandPipeline;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
@@ -225,7 +224,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     return Tasks.custom(POLICY_EXPAND, Void.class)
         .execute(
             (taskInstance, executionContext) -> {
-              Optional<Long> policyId = PolicyExpandIds.parsePolicy(taskInstance.getId());
+              Optional<Long> policyId = MaintenanceTaskIds.parseExpandPolicy(taskInstance.getId());
               if (policyId.isEmpty()) {
                 LOG.warn(
                     "Removing policy-expand with unparseable instance id {}", taskInstance.getId());

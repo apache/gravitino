@@ -42,8 +42,8 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandIds;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,7 +171,8 @@ public final class PolicyExpandRegistrar {
             TableMaintenanceSchedulerPools.POLICY_EXPAND,
             Void.class,
             execution -> {
-              PolicyExpandIds.parsePolicy(execution.getTaskInstance().getId()).ifPresent(ids::add);
+              MaintenanceTaskIds.parseExpandPolicy(execution.getTaskInstance().getId())
+                  .ifPresent(ids::add);
             });
     return ids;
   }
@@ -193,7 +194,7 @@ public final class PolicyExpandRegistrar {
 
   private static TaskInstanceId instanceId(long policyId) {
     return TaskInstanceId.of(
-        TableMaintenanceSchedulerPools.POLICY_EXPAND, PolicyExpandIds.forPolicy(policyId));
+        TableMaintenanceSchedulerPools.POLICY_EXPAND, MaintenanceTaskIds.forExpandPolicy(policyId));
   }
 
   private void scheduleOnce(long policyId, Instant due) {

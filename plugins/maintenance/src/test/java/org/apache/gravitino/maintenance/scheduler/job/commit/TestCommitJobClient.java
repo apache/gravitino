@@ -31,6 +31,7 @@ import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.AuditInfo;
@@ -63,7 +64,8 @@ class TestCommitJobClient extends TestJDBCBackend {
         CommitJobClient.schedulerClient(dataSource())
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.COMMIT_JOB, CommitJobIds.forTable(TABLE_ID)))
+                    TableMaintenanceSchedulerPools.COMMIT_JOB,
+                    MaintenanceTaskIds.forCommitTable(TABLE_ID)))
             .isEmpty());
   }
 
@@ -85,7 +87,8 @@ class TestCommitJobClient extends TestJDBCBackend {
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.COMMIT_JOB, CommitJobIds.forTable(TABLE_ID)))
+                        TableMaintenanceSchedulerPools.COMMIT_JOB,
+                        MaintenanceTaskIds.forCommitTable(TABLE_ID)))
                 .get()
                 .getData();
     Assertions.assertTrue(spec.isValid());

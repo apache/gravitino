@@ -42,6 +42,7 @@ import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
@@ -512,7 +513,7 @@ public class CronJobClient {
     if (spec.isEmpty()) {
       return false;
     }
-    String id = CronJobIds.forTable(tableId, policy.id());
+    String id = MaintenanceTaskIds.forCronTable(tableId, policy.id());
     return client.scheduleIfNotExists(
         new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec.get()), due);
   }
@@ -524,7 +525,7 @@ public class CronJobClient {
       return false;
     }
     long batchId = nextBatchId(client, policy.id());
-    String id = CronJobIds.forBatch(batchId, policy.id());
+    String id = MaintenanceTaskIds.forCronBatch(batchId, policy.id());
     return client.scheduleIfNotExists(
         new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec.get()), due);
   }
@@ -570,7 +571,8 @@ public class CronJobClient {
       }
       String instanceId = execution.getTaskInstance().getId();
       String catalog = data.getTables().isEmpty() ? null : data.getTables().get(0).catalogName();
-      Optional<CronJobIds.BatchPolicyIds> batch = CronJobIds.parseBatch(instanceId);
+      Optional<MaintenanceTaskIds.BatchPolicyIds> batch =
+          MaintenanceTaskIds.parseCronBatch(instanceId);
       if (batch.isPresent()) {
         open.add(
             new QueuedExpireJob(
@@ -584,7 +586,8 @@ public class CronJobClient {
                 execution.isPicked()));
         continue;
       }
-      Optional<CronJobIds.TablePolicyIds> table = CronJobIds.parseTable(instanceId);
+      Optional<MaintenanceTaskIds.TablePolicyIds> table =
+          MaintenanceTaskIds.parseCronTable(instanceId);
       if (table.isPresent()) {
         open.add(
             new QueuedExpireJob(
@@ -627,7 +630,8 @@ public class CronJobClient {
     if (client
         .getScheduledExecution(
             TaskInstanceId.of(
-                TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(tableId, policyId)))
+                TableMaintenanceSchedulerPools.CRON_JOB,
+                MaintenanceTaskIds.forCronTable(tableId, policyId)))
         .isPresent()) {
       return true;
     }
@@ -639,8 +643,8 @@ public class CronJobClient {
     for (ScheduledExecution<MaintenanceJobSpec> execution :
         client.getScheduledExecutionsForTask(
             TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)) {
-      Optional<CronJobIds.BatchPolicyIds> parsed =
-          CronJobIds.parseBatch(execution.getTaskInstance().getId());
+      Optional<MaintenanceTaskIds.BatchPolicyIds> parsed =
+          MaintenanceTaskIds.parseCronBatch(execution.getTaskInstance().getId());
       if (parsed.isEmpty() || parsed.get().policyId() != policyId) {
         continue;
       }

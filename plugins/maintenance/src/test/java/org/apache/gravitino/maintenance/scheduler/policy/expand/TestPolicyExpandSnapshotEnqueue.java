@@ -30,9 +30,9 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
-import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -92,16 +92,19 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(21L, 9L)))
+                    TableMaintenanceSchedulerPools.CRON_JOB,
+                    MaintenanceTaskIds.forCronTable(21L, 9L)))
             .isEmpty());
     Assertions.assertTrue(
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(22L, 10L)))
+                    TableMaintenanceSchedulerPools.CRON_JOB,
+                    MaintenanceTaskIds.forCronTable(22L, 10L)))
             .isEmpty());
     TaskInstanceId batch =
-        TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forBatch(0L, 10L));
+        TaskInstanceId.of(
+            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 10L));
     Assertions.assertTrue(client.getScheduledExecution(batch).isPresent());
     MaintenanceJobSpec data =
         (MaintenanceJobSpec) client.getScheduledExecution(batch).get().getData();
@@ -143,14 +146,16 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forTable(99L, 9L)))
+                    TableMaintenanceSchedulerPools.CRON_JOB,
+                    MaintenanceTaskIds.forCronTable(99L, 9L)))
             .isEmpty());
     MaintenanceJobSpec data =
         (MaintenanceJobSpec)
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.CRON_JOB, CronJobIds.forBatch(0L, 9L)))
+                        TableMaintenanceSchedulerPools.CRON_JOB,
+                        MaintenanceTaskIds.forCronBatch(0L, 9L)))
                 .get()
                 .getData();
     Assertions.assertEquals(List.of(10L, 11L, 99L), data.tableIds());

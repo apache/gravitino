@@ -38,6 +38,7 @@ import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -110,7 +111,7 @@ public class CommitJobClient {
   public CommitJobEnqueueResult enqueueNow(long tableId) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
     SchedulerClient client = schedulerClient(dataSource);
-    String id = CommitJobIds.forTable(tableId);
+    String id = MaintenanceTaskIds.forCommitTable(tableId);
     // Coalesce without rebuilding task_data: keep the first enqueue-time spec.
     if (client
         .getScheduledExecution(TaskInstanceId.of(TableMaintenanceSchedulerPools.COMMIT_JOB, id))

@@ -26,6 +26,7 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
@@ -86,8 +87,10 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
 
-    Optional<CronJobIds.TablePolicyIds> tableIds = CronJobIds.parseTable(instanceId);
-    Optional<CronJobIds.BatchPolicyIds> batchIds = CronJobIds.parseBatch(instanceId);
+    Optional<MaintenanceTaskIds.TablePolicyIds> tableIds =
+        MaintenanceTaskIds.parseCronTable(instanceId);
+    Optional<MaintenanceTaskIds.BatchPolicyIds> batchIds =
+        MaintenanceTaskIds.parseCronBatch(instanceId);
     if (tableIds.isEmpty() && batchIds.isEmpty()) {
       LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
       return;
