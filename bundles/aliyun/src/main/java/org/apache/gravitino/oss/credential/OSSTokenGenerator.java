@@ -37,6 +37,7 @@ import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialGenerator;
 import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.credential.RoleSessionNameUtils;
 import org.apache.gravitino.credential.config.OSSCredentialConfig;
 import org.apache.gravitino.oss.credential.policy.Condition;
 import org.apache.gravitino.oss.credential.policy.Effect;
@@ -103,8 +104,7 @@ public class OSSTokenGenerator implements CredentialGenerator<OSSTokenCredential
     return client.getCredential();
   }
 
-  private String createPolicy(
-      Set<String> readLocations, Set<String> writeLocations, String region) {
+  String createPolicy(Set<String> readLocations, Set<String> writeLocations, String region) {
     Policy.Builder policyBuilder = Policy.builder().version("1");
 
     Statement.Builder allowGetObjectStatementBuilder =
@@ -113,7 +113,7 @@ public class OSSTokenGenerator implements CredentialGenerator<OSSTokenCredential
             .addAction("oss:GetObject")
             .addAction("oss:GetObjectVersion");
 
-    Map<String, Statement.Builder> bucketListStatementBuilder = new HashMap<>();
+    Map<String, StringLike.Builder> bucketListPrefixes = new HashMap<>();
     Map<String, Statement.Builder> bucketMetadataStatementBuilder = new HashMap<>();
 
     String arnPrefix = getArnPrefix(region);
@@ -124,14 +124,9 @@ public class OSSTokenGenerator implements CredentialGenerator<OSSTokenCredential
               URI uri = URI.create(location);
               allowGetObjectStatementBuilder.addResource(getOssUriWithArn(arnPrefix, uri));
               String bucketArn = arnPrefix + getBucketName(uri);
-              bucketListStatementBuilder.computeIfAbsent(
-                  bucketArn,
-                  key ->
-                      Statement.builder()
-                          .effect(Effect.ALLOW)
-                          .addAction("oss:ListObjects")
-                          .addResource(key)
-                          .condition(getCondition(uri)));
+              bucketListPrefixes
+                  .computeIfAbsent(bucketArn, key -> StringLike.builder())
+                  .addPrefix(concatPathWithSep(trimLeadingSlash(uri.getPath()), "*", "/"));
               bucketMetadataStatementBuilder.computeIfAbsent(
                   bucketArn,
                   key ->
@@ -156,10 +151,16 @@ public class OSSTokenGenerator implements CredentialGenerator<OSSTokenCredential
       policyBuilder.addStatement(allowPutObjectStatementBuilder.build());
     }
 
-    if (!bucketListStatementBuilder.isEmpty()) {
-      bucketListStatementBuilder
-          .values()
-          .forEach(statementBuilder -> policyBuilder.addStatement(statementBuilder.build()));
+    if (!bucketListPrefixes.isEmpty()) {
+      bucketListPrefixes.forEach(
+          (bucketArn, prefixes) ->
+              policyBuilder.addStatement(
+                  Statement.builder()
+                      .effect(Effect.ALLOW)
+                      .addAction("oss:ListObjects")
+                      .addResource(bucketArn)
+                      .condition(Condition.builder().stringLike(prefixes.build()).build())
+                      .build()));
     } else {
       policyBuilder.addStatement(
           Statement.builder().effect(Effect.ALLOW).addAction("oss:ListBucket").build());
@@ -174,15 +175,6 @@ public class OSSTokenGenerator implements CredentialGenerator<OSSTokenCredential
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private Condition getCondition(URI uri) {
-    return Condition.builder()
-        .stringLike(
-            StringLike.builder()
-                .addPrefix(concatPathWithSep(trimLeadingSlash(uri.getPath()), "*", "/"))
-                .build())
-        .build();
   }
 
   private String getArnPrefix(String region) {
@@ -222,7 +214,7 @@ public class OSSTokenGenerator implements CredentialGenerator<OSSTokenCredential
   }
 
   private String getRoleName(String userName) {
-    return "gravitino_" + userName;
+    return RoleSessionNameUtils.create("gravitino_", userName);
   }
 
   @Override

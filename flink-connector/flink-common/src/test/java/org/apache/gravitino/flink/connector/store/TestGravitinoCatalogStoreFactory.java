@@ -72,10 +72,11 @@ public class TestGravitinoCatalogStoreFactory {
    * Flink configuration by the factory's option helper.
    */
   @Test
+  @SuppressWarnings("deprecation")
   void testOptionParsing_enableSessionCatalogSupportTrue_isReadFromConfig() {
     Configuration configuration = baseConfiguration();
-    configuration.setBoolean(
-        "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", true);
+    configuration.setString(
+        "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", "true");
 
     boolean parsed = parseEnableSessionCatalogSupport(configuration);
 
@@ -99,10 +100,11 @@ public class TestGravitinoCatalogStoreFactory {
    * GravitinoCatalogStoreFactory#createCatalogStore()}.
    */
   @Test
+  @SuppressWarnings("deprecation")
   void testEndToEnd_sessionCatalogEnabled_returnsGravitinoSessionCatalogStore() throws Exception {
     Configuration configuration = baseConfiguration();
-    configuration.setBoolean(
-        "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", true);
+    configuration.setString(
+        "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", "true");
 
     boolean enableSessionCatalogSupport = parseEnableSessionCatalogSupport(configuration);
     GravitinoCatalogStoreFactory factory = factoryWith(enableSessionCatalogSupport);

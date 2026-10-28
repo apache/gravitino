@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.authorization;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -135,12 +134,22 @@ public class FutureGrantManager {
 
       for (Map.Entry<UserEntity, Set<RoleEntity>> entry : userGrantRoles.entrySet()) {
         authorizationPlugin.onGrantedRolesToUser(
-            Lists.newArrayList(entry.getValue()), entry.getKey());
+            entry.getValue().stream()
+                .map(
+                    role ->
+                        AuthorizationUtils.filterSecurableObjects(role, metalake, catalog.name()))
+                .collect(Collectors.toList()),
+            entry.getKey());
       }
 
       for (Map.Entry<GroupEntity, Set<RoleEntity>> entry : groupGrantRoles.entrySet()) {
         authorizationPlugin.onGrantedRolesToGroup(
-            Lists.newArrayList(entry.getValue()), entry.getKey());
+            entry.getValue().stream()
+                .map(
+                    role ->
+                        AuthorizationUtils.filterSecurableObjects(role, metalake, catalog.name()))
+                .collect(Collectors.toList()),
+            entry.getKey());
       }
     } catch (IOException e) {
       throw new RuntimeException(e);

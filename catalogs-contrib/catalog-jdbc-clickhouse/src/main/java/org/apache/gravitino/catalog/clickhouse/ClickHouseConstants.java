@@ -84,6 +84,64 @@ public class ClickHouseConstants {
     /** The name of the data skipping index type for tokenbf_v1 in ClickHouse. */
     public static final String DATA_SKIPPING_TOKENBFV1 = "tokenbf_v1";
 
+    /** The current name of ClickHouse's full-text data skipping index. */
+    public static final String DATA_SKIPPING_TEXT = "text";
+
+    /** Historical name of ClickHouse's full-text data skipping index. */
+    public static final String DATA_SKIPPING_GIN = "gin";
+
+    /** Historical name of ClickHouse's full-text data skipping index. */
+    public static final String DATA_SKIPPING_FULL_TEXT = "full_text";
+
+    /** Historical name of ClickHouse's full-text data skipping index. */
+    public static final String DATA_SKIPPING_INVERTED = "inverted";
+
+    /** Property key for the ClickHouse full-text tokenizer mode. */
+    public static final String TOKENIZER = "tokenizer";
+
+    /** The name of the vector similarity data skipping index type in ClickHouse. */
+    public static final String DATA_SKIPPING_VECTOR_SIMILARITY = "vector_similarity";
+
+    /** The property key for the algorithm used by vector similarity indexes. */
+    public static final String VECTOR_SIMILARITY_TYPE = "type";
+
+    /** The property key for the distance function used by vector similarity indexes. */
+    public static final String VECTOR_SIMILARITY_DISTANCE_FUNCTION = "distance_function";
+
+    /** The property key for the vector dimension used by vector similarity indexes. */
+    public static final String VECTOR_SIMILARITY_DIMENSIONS = "dimensions";
+
+    /** The property key for HNSW vector quantization. */
+    public static final String VECTOR_SIMILARITY_QUANTIZATION = "quantization";
+
+    /** The property key for the HNSW maximum connections per layer. */
+    public static final String HNSW_MAX_CONNECTIONS_PER_LAYER = "hnsw_max_connections_per_layer";
+
+    /** The property key for the HNSW candidate list size used during construction. */
+    public static final String HNSW_CANDIDATE_LIST_SIZE_FOR_CONSTRUCTION =
+        "hnsw_candidate_list_size_for_construction";
+
+    /** The name of the legacy Annoy data-skipping index type in ClickHouse. */
+    public static final String DATA_SKIPPING_ANNOY = "annoy";
+
+    /** The name of the legacy USearch data-skipping index type in ClickHouse. */
+    public static final String DATA_SKIPPING_USEARCH = "usearch";
+
+    /** Property key for the number of trees in a legacy Annoy index. */
+    public static final String ANNOY_TREES = "annoy_trees";
+
+    /** Property key for the distance function in a legacy Annoy index. */
+    public static final String ANNOY_DISTANCE_FUNCTION = "annoy_distance_function";
+
+    /** Property key for the distance function in a legacy USearch index. */
+    public static final String USEARCH_DISTANCE_FUNCTION = "usearch_distance_function";
+
+    /** Property key for the scalar kind in a legacy USearch index. */
+    public static final String USEARCH_SCALAR_KIND = "usearch_scalar_kind";
+
+    /** Property key for ClickHouse's complete index type expression. */
+    public static final String CLICKHOUSE_TYPE_FULL = "clickhouse_type_full";
+
     /** Property key for bloom filter size in ngrambf_v1 and tokenbf_v1 index properties. */
     public static final String BLOOM_FILTER_SIZE = "bloom_filter_size";
 
@@ -95,5 +153,11 @@ public class ClickHouseConstants {
 
     /** Property key for the n-gram size in ngrambf_v1 index properties. */
     public static final String NGRAM_SIZE = "ngram_size";
+
+    /** Gravitino tokenizer property value for ClickHouse word-token mode. */
+    public static final String TEXT_INDEX_TOKENS = "tokens";
+
+    /** Gravitino tokenizer property value for ClickHouse n-gram mode. */
+    public static final String TEXT_INDEX_NGRAMS = "ngrams";
   }
 }

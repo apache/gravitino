@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS fileset_meta (
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
+    occ_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (fileset_id),
     UNIQUE (schema_id, fileset_name, deleted_at)
@@ -212,6 +213,7 @@ COMMENT ON COLUMN fileset_meta.type IS 'fileset type';
 COMMENT ON COLUMN fileset_meta.audit_info IS 'fileset audit info';
 COMMENT ON COLUMN fileset_meta.current_version IS 'fileset current version';
 COMMENT ON COLUMN fileset_meta.last_version IS 'fileset last version';
+COMMENT ON COLUMN fileset_meta.occ_version IS 'fileset optimistic concurrency version';
 COMMENT ON COLUMN fileset_meta.deleted_at IS 'fileset deleted at';
 
 
@@ -688,6 +690,7 @@ CREATE TABLE IF NOT EXISTS policy_meta (
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
+    occ_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (policy_id),
     UNIQUE (metalake_id, policy_name, deleted_at)
@@ -701,6 +704,7 @@ COMMENT ON COLUMN policy_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN policy_meta.audit_info IS 'policy audit info';
 COMMENT ON COLUMN policy_meta.current_version IS 'policy current version';
 COMMENT ON COLUMN policy_meta.last_version IS 'policy last version';
+COMMENT ON COLUMN policy_meta.occ_version IS 'policy optimistic concurrency version';
 COMMENT ON COLUMN policy_meta.deleted_at IS 'policy deleted at';
 
 
@@ -1032,7 +1036,11 @@ CREATE TABLE IF NOT EXISTS semantic_model_version_info (
     version INT NOT NULL,
     semantic_model_name VARCHAR(128) NOT NULL,
     semantic_model_comment TEXT DEFAULT NULL,
-    semantic_model_definition TEXT NOT NULL,
+    datasets TEXT NOT NULL,
+    relationships TEXT DEFAULT NULL,
+    metrics TEXT DEFAULT NULL,
+    ai_context TEXT DEFAULT NULL,
+    custom_extensions TEXT DEFAULT NULL,
     properties TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -1053,10 +1061,37 @@ COMMENT ON COLUMN semantic_model_version_info.semantic_model_id IS 'semantic mod
 COMMENT ON COLUMN semantic_model_version_info.version IS 'semantic model version';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_name IS 'semantic model name snapshot';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_comment IS 'semantic model comment snapshot';
-COMMENT ON COLUMN semantic_model_version_info.semantic_model_definition IS 'structured definition snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.datasets IS 'dataset definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.relationships IS 'relationship definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.metrics IS 'metric definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.ai_context IS 'model AI context snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.custom_extensions IS 'model custom extensions snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model properties snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
+
+CREATE TABLE IF NOT EXISTS semantic_model_metric_meta (
+    metric_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    semantic_model_id BIGINT NOT NULL,
+    metric_name TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (metric_id)
+);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_model_live ON semantic_model_metric_meta (semantic_model_id, deleted_at);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_metalake_id ON semantic_model_metric_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_catalog_id ON semantic_model_metric_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_schema_id ON semantic_model_metric_meta (schema_id);
+COMMENT ON TABLE semantic_model_metric_meta IS 'semantic model metric identities';
+COMMENT ON COLUMN semantic_model_metric_meta.metric_id IS 'stable internal metric id';
+COMMENT ON COLUMN semantic_model_metric_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN semantic_model_metric_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN semantic_model_metric_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN semantic_model_metric_meta.semantic_model_id IS 'containing semantic model id';
+COMMENT ON COLUMN semantic_model_metric_meta.metric_name IS 'metric name';
+COMMENT ON COLUMN semantic_model_metric_meta.deleted_at IS 'metric retired at';
 
 -- This schema extends version 1.1.0 with partition statistics storage support
 -- The partition_statistic_meta table stores partition-level statistics for tables
@@ -1171,3 +1206,134 @@ COMMENT ON COLUMN iceberg_cleanup_job.last_error IS 'truncated reason for the mo
 COMMENT ON COLUMN iceberg_cleanup_job.heartbeat_at IS 'last heartbeat from the worker, 0 when not running';
 COMMENT ON COLUMN iceberg_cleanup_job.created_by IS 'principal that requested the drop (audit)';
 COMMENT ON COLUMN iceberg_cleanup_job.updated_at IS 'last state change, drives poll ordering and old finished-job cleanup';
+
+CREATE TABLE IF NOT EXISTS scheduled_expand_tasks (
+    task_name VARCHAR(100) NOT NULL,
+    task_instance VARCHAR(100) NOT NULL,
+    task_data BYTEA,
+    execution_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    picked BOOLEAN NOT NULL,
+    picked_by VARCHAR(50),
+    last_heartbeat TIMESTAMP WITH TIME ZONE,
+    version BIGINT NOT NULL,
+    consecutive_failures INT,
+    last_success TIMESTAMP WITH TIME ZONE,
+    last_failure TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (task_name, task_instance)
+);
+CREATE INDEX IF NOT EXISTS scheduled_expand_tasks_execution_time_idx ON scheduled_expand_tasks (execution_time);
+CREATE INDEX IF NOT EXISTS scheduled_expand_tasks_last_heartbeat_idx ON scheduled_expand_tasks (last_heartbeat);
+COMMENT ON TABLE scheduled_expand_tasks IS 'table maintenance expand schedule metadata';
+COMMENT ON COLUMN scheduled_expand_tasks.task_name IS 'task name';
+COMMENT ON COLUMN scheduled_expand_tasks.task_instance IS 'task instance';
+COMMENT ON COLUMN scheduled_expand_tasks.task_data IS 'serialized task data';
+COMMENT ON COLUMN scheduled_expand_tasks.execution_time IS 'next execution time';
+COMMENT ON COLUMN scheduled_expand_tasks.picked IS 'whether the task is currently picked';
+COMMENT ON COLUMN scheduled_expand_tasks.picked_by IS 'scheduler instance that picked the task';
+COMMENT ON COLUMN scheduled_expand_tasks.last_heartbeat IS 'last heartbeat from the picker';
+COMMENT ON COLUMN scheduled_expand_tasks.version IS 'optimistic lock version';
+COMMENT ON COLUMN scheduled_expand_tasks.consecutive_failures IS 'consecutive failure count';
+COMMENT ON COLUMN scheduled_expand_tasks.last_success IS 'last successful execution time';
+COMMENT ON COLUMN scheduled_expand_tasks.last_failure IS 'last failed execution time';
+
+CREATE TABLE IF NOT EXISTS scheduled_cron_tasks (
+    task_name VARCHAR(100) NOT NULL,
+    task_instance VARCHAR(100) NOT NULL,
+    task_data BYTEA,
+    execution_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    picked BOOLEAN NOT NULL,
+    picked_by VARCHAR(50),
+    last_heartbeat TIMESTAMP WITH TIME ZONE,
+    version BIGINT NOT NULL,
+    consecutive_failures INT,
+    last_success TIMESTAMP WITH TIME ZONE,
+    last_failure TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (task_name, task_instance)
+);
+CREATE INDEX IF NOT EXISTS scheduled_cron_tasks_execution_time_idx ON scheduled_cron_tasks (execution_time);
+CREATE INDEX IF NOT EXISTS scheduled_cron_tasks_last_heartbeat_idx ON scheduled_cron_tasks (last_heartbeat);
+COMMENT ON TABLE scheduled_cron_tasks IS 'table maintenance cron schedule metadata';
+COMMENT ON COLUMN scheduled_cron_tasks.task_name IS 'task name';
+COMMENT ON COLUMN scheduled_cron_tasks.task_instance IS 'task instance';
+COMMENT ON COLUMN scheduled_cron_tasks.task_data IS 'serialized task data';
+COMMENT ON COLUMN scheduled_cron_tasks.execution_time IS 'next execution time';
+COMMENT ON COLUMN scheduled_cron_tasks.picked IS 'whether the task is currently picked';
+COMMENT ON COLUMN scheduled_cron_tasks.picked_by IS 'scheduler instance that picked the task';
+COMMENT ON COLUMN scheduled_cron_tasks.last_heartbeat IS 'last heartbeat from the picker';
+COMMENT ON COLUMN scheduled_cron_tasks.version IS 'optimistic lock version';
+COMMENT ON COLUMN scheduled_cron_tasks.consecutive_failures IS 'consecutive failure count';
+COMMENT ON COLUMN scheduled_cron_tasks.last_success IS 'last successful execution time';
+COMMENT ON COLUMN scheduled_cron_tasks.last_failure IS 'last failed execution time';
+
+CREATE TABLE IF NOT EXISTS scheduled_commit_tasks (
+    task_name VARCHAR(100) NOT NULL,
+    task_instance VARCHAR(100) NOT NULL,
+    task_data BYTEA,
+    execution_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    picked BOOLEAN NOT NULL,
+    picked_by VARCHAR(50),
+    last_heartbeat TIMESTAMP WITH TIME ZONE,
+    version BIGINT NOT NULL,
+    consecutive_failures INT,
+    last_success TIMESTAMP WITH TIME ZONE,
+    last_failure TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (task_name, task_instance)
+);
+CREATE INDEX IF NOT EXISTS scheduled_commit_tasks_execution_time_idx ON scheduled_commit_tasks (execution_time);
+CREATE INDEX IF NOT EXISTS scheduled_commit_tasks_last_heartbeat_idx ON scheduled_commit_tasks (last_heartbeat);
+COMMENT ON TABLE scheduled_commit_tasks IS 'table maintenance commit schedule metadata';
+COMMENT ON COLUMN scheduled_commit_tasks.task_name IS 'task name';
+COMMENT ON COLUMN scheduled_commit_tasks.task_instance IS 'task instance';
+COMMENT ON COLUMN scheduled_commit_tasks.task_data IS 'serialized task data';
+COMMENT ON COLUMN scheduled_commit_tasks.execution_time IS 'next execution time';
+COMMENT ON COLUMN scheduled_commit_tasks.picked IS 'whether the task is currently picked';
+COMMENT ON COLUMN scheduled_commit_tasks.picked_by IS 'scheduler instance that picked the task';
+COMMENT ON COLUMN scheduled_commit_tasks.last_heartbeat IS 'last heartbeat from the picker';
+COMMENT ON COLUMN scheduled_commit_tasks.version IS 'optimistic lock version';
+COMMENT ON COLUMN scheduled_commit_tasks.consecutive_failures IS 'consecutive failure count';
+COMMENT ON COLUMN scheduled_commit_tasks.last_success IS 'last successful execution time';
+COMMENT ON COLUMN scheduled_commit_tasks.last_failure IS 'last failed execution time';
+
+CREATE TABLE IF NOT EXISTS table_maintenance_action (
+    id BIGSERIAL PRIMARY KEY,
+    job_id BIGINT,
+    table_id BIGINT NOT NULL,
+    policy_id BIGINT NOT NULL,
+    before_snapshot_id BIGINT,
+    after_snapshot_id BIGINT,
+    finished_at BIGINT NOT NULL DEFAULT 0,
+    created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tma_job_id ON table_maintenance_action (job_id);
+-- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
+CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tma_created_at ON table_maintenance_action (created_at);
+COMMENT ON TABLE table_maintenance_action IS 'table maintenance action metadata';
+COMMENT ON COLUMN table_maintenance_action.id IS 'auto increment id';
+COMMENT ON COLUMN table_maintenance_action.job_id IS 'job run id, maps to job_run_meta.job_run_id';
+COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
+COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
+COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
+COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis, 0 = soft in-flight slot (one per table/policy)';
+COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation timestamp in milliseconds';
+
+CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    table_id BIGINT NOT NULL,
+    policy_id BIGINT NOT NULL,
+    snapshot_id BIGINT NOT NULL,
+    metrics_value TEXT NOT NULL,
+    created_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);
+COMMENT ON TABLE table_snapshot_metrics IS 'table snapshot metrics metadata';
+COMMENT ON COLUMN table_snapshot_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN table_snapshot_metrics.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_meta';
+COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
+COMMENT ON COLUMN table_snapshot_metrics.metrics_value IS 'metrics value as JSON';
+COMMENT ON COLUMN table_snapshot_metrics.created_at IS 'creation timestamp in milliseconds';

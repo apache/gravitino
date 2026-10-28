@@ -75,8 +75,11 @@ import org.slf4j.LoggerFactory;
  * catalogLoader}). Without this, the {@code AddPartitionCommitCallback} that syncs new partitions
  * to Hive Metastore is never registered, causing {@code SHOW PARTITIONS} to return empty results
  * even when {@code metastore.partitioned-table=true}.
+ *
+ * <p>Abstract because {@link #catalogCompat()} differs per Flink version; every concrete,
+ * version-specific catalog overrides it.
  */
-public class GravitinoPaimonCatalog extends BaseCatalog {
+public abstract class GravitinoPaimonCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoPaimonCatalog.class);
   private static final String PAIMON_S3_ACCESS_KEY_ALIAS = "s3.access.key";

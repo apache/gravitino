@@ -52,7 +52,7 @@ A topic name is unique within its schema, and matches the topic name in the clus
 
 Two properties are settable at creation. `partition-count` sets the number of partitions and can be
 changed afterward. `replication-factor` sets the replication and is immutable once the topic exists.
-Leaving either unset takes the broker's own default, from `num.partition` and
+Leaving either unset takes the broker's own default, from `num.partitions` and
 `default.replication.factor` respectively.
 
 ### What Gravitino Stores and What It Does Not
@@ -77,7 +77,7 @@ the UI today. Attaching a tag to a topic goes through the API.
 
 | Privilege       | Grantable on                        | What it allows        |
 |-----------------|-------------------------------------|-----------------------|
-| `CREATE_TOPIC`  | Metalake, catalog, schema, or topic | Creating topics       |
+| `CREATE_TOPIC`  | Metalake, catalog, or schema        | Creating topics       |
 | `PRODUCE_TOPIC` | Metalake, catalog, schema, or topic | Writing to a topic    |
 | `CONSUME_TOPIC` | Metalake, catalog, schema, or topic | Reading from a topic  |
 

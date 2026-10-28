@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -55,6 +56,9 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -64,7 +68,9 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -270,9 +276,25 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSchema")
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
+    deleteSchemaAndGet(identifier, cascade, false);
+    return true;
+  }
+
+  /**
+   * Deletes a schema and returns the exact entity snapshot protected by the delete CAS.
+   *
+   * @param identifier the schema identifier
+   * @param cascade whether to delete child entities
+   * @param cascadeFunctions whether a non-cascading delete should remove functions before checking
+   *     for remaining children
+   * @return the schema snapshot that was deleted
+   */
+  public SchemaEntity deleteSchemaAndGet(
+      NameIdentifier identifier, boolean cascade, boolean cascadeFunctions) {
     NameIdentifierUtil.checkSchema(identifier);
 
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
+    SchemaEntity deletedSchema = POConverters.fromSchemaPO(schemaPO, identifier.namespace());
     Long schemaId = schemaPO.getSchemaId();
 
     if (cascade) {
@@ -359,7 +381,19 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ViewVersionInfoMapper.class,
-                  mapper -> mapper.softDeleteViewVersionsBySchemaIds(schemaIds.get())));
+                  mapper -> mapper.softDeleteViewVersionsBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelMetaMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelMetasBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelVersionInfoMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelVersionsBySchemaIds(schemaIds.get())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SemanticModelMetricMapper.class,
+                  mapper -> mapper.softDeleteSemanticModelMetricsBySchemaIds(schemaIds.get())));
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -370,6 +404,11 @@ public class SchemaMetaService {
             // to appear in between. A non-empty result throws, which rolls the delete back.
             lockCatalogForSchemaDelete(identifier, schemaPO);
             deleteSchemaWithVersion(identifier, schemaPO);
+            if (cascadeFunctions) {
+              // The schema row lock excludes new children. Delete functions in this transaction
+              // so a remaining fileset or a later cleanup failure restores them with the schema.
+              deleteSchemaFunctions(identifier, schemaId);
+            }
             checkSchemaIsEmpty(identifier, schemaPO);
           },
           () ->
@@ -395,7 +434,7 @@ public class SchemaMetaService {
                   StatisticMetaMapper.class,
                   mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)));
     }
-    return true;
+    return deletedSchema;
   }
 
   /**
@@ -603,6 +642,30 @@ public class SchemaMetaService {
             SessionUtils.getWithoutCommit(
                 SchemaMetaMapper.class,
                 mapper -> mapper.softDeleteSchemaMetasWithVersion(children)));
+  }
+
+  private void deleteSchemaFunctions(NameIdentifier schemaIdentifier, Long schemaId) {
+    try {
+      // Resolve by ID because the schema row has already been soft-deleted in this transaction.
+      List<FunctionPO> functions =
+          SessionUtils.getWithoutCommit(
+              FunctionMetaMapper.class, mapper -> mapper.listFunctionPOsBySchemaId(schemaId));
+      Namespace namespace =
+          NamespaceUtil.ofFunction(
+              schemaIdentifier.namespace().level(0),
+              schemaIdentifier.namespace().level(1),
+              schemaIdentifier.name());
+      for (FunctionPO function : functions) {
+        NameIdentifier functionIdentifier = NameIdentifier.of(namespace, function.functionName());
+        FunctionMetaService.getInstance().deleteFunctionWithVersion(functionIdentifier, function);
+        EntityChangeLogWriter.append(
+            functionIdentifier, Entity.EntityType.FUNCTION, OperateType.DROP);
+      }
+    } catch (NoSuchEntityException e) {
+      // A missing function must not be reported as a missing schema. Other failures, including
+      // optimistic conflicts, retain their original exception type.
+      throw new RuntimeException("Failed to delete functions under schema " + schemaIdentifier, e);
+    }
   }
 
   /** Checks that no active schema or metadata object is left below the schema. */

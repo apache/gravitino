@@ -54,6 +54,7 @@ import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.apache.gravitino.iceberg.service.provider.StaticIcebergConfigProvider;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.iceberg.catalog.Namespace;
@@ -185,6 +186,7 @@ public class IcebergRestTestUtil {
               icebergNamespaceOperationExecutor, eventBus, configProvider.getMetalakeName());
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
+      IcebergReadRestrictionLoader readRestrictionLoader = IcebergReadRestrictionLoader.load();
       resourceConfig.register(
           new AbstractBinder() {
             @Override
@@ -192,6 +194,7 @@ public class IcebergRestTestUtil {
               bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(2);
               bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
               bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(2);
+              bind(readRestrictionLoader).to(IcebergReadRestrictionLoader.class).ranked(2);
               bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(2);
               bind(icebergNamespaceEventDispatcher)
                   .to(IcebergNamespaceOperationDispatcher.class)
@@ -204,7 +207,7 @@ public class IcebergRestTestUtil {
 
   static HttpServletRequest createMockHttpRequest() {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
-    when(mockRequest.getRemoteHost()).thenReturn("localhost");
+    when(mockRequest.getRemoteAddr()).thenReturn("127.0.0.1");
     when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
     return mockRequest;
   }

@@ -176,7 +176,12 @@ paths:
           required: true
           schema:
             type: string
-          description: The sub path to the file or directory
+          description: >-
+            The sub path to the file or directory within the selected storage location.
+            Leading and trailing whitespace is trimmed. An empty path or `/` refers to
+            that location, and a leading slash is relative to it. Complete `..` path
+            segments and NUL characters (U+0000) are not allowed.
+            The normalized path must remain within the selected storage location.
         - name: location_name
           in: query
           required: false
@@ -187,6 +192,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/FileLocationResponse"
+        "400":
+          $ref: "#/components/responses/InvalidSubPathErrorResponse"
         "404":
           description: Not Found - The target fileset does not exist
           content:
@@ -225,7 +232,13 @@ paths:
           schema:
             type: string
             default: "/"
-          description: The sub path within the fileset to list files and directories from
+          description: >-
+            The sub path within the selected storage location to list files and directories
+            from. Leading and trailing whitespace is trimmed. An empty path or `/` refers
+            to that location, and a leading slash is relative to it. Complete `..` path
+            segments and NUL characters (U+0000) are not allowed.
+            The normalized path must remain within the selected storage location.
+            The path must exist; otherwise, this operation returns HTTP 400.
         - name: location_name
           in: query
           required: false
@@ -235,8 +248,10 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/FileInfoListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidSubPathErrorResponse"
         "404":
-          description: Not Found – the target fileset or subPath or locationName does not exist
+          description: Not Found – the target fileset or locationName does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -378,6 +393,7 @@ components:
         - $ref: "#/components/schemas/RenameFilesetRequest"
         - $ref: "#/components/schemas/SetFilesetPropertyRequest"
         - $ref: "#/components/schemas/UpdateFilesetCommentRequest"
+        - $ref: "#/components/schemas/UpdateFilesetTypeRequest"
         - $ref: "#/components/schemas/RemoveFilesetPropertyRequest"
         - $ref: "#/components/schemas/SetFilesetSecretBindingRequest"
         - $ref: "#/components/schemas/SetFilesetSecretReferenceRequest"
@@ -387,6 +403,7 @@ components:
           rename: "#/components/schemas/RenameFilesetRequest"
           setProperty: "#/components/schemas/SetFilesetPropertyRequest"
           updateComment: "#/components/schemas/UpdateFilesetCommentRequest"
+          updateType: "#/components/schemas/UpdateFilesetTypeRequest"
           removeProperty: "#/components/schemas/RemoveFilesetPropertyRequest"
           setSecretBinding: "#/components/schemas/SetFilesetSecretBindingRequest"
           setSecretReference: "#/components/schemas/SetFilesetSecretReferenceRequest"
@@ -451,6 +468,32 @@ components:
       example: {
         "@type": "updateComment",
         "newComment": "new comment"
+      }
+
+    UpdateFilesetTypeRequest:
+      type: object
+      description: >-
+        Changes the fileset type without changing its identity, storage locations, or files.
+        Changing to external retains data on drop. Changing to managed accepts management
+        of the data, including deleting it on drop. Setting the current type is allowed.
+      required:
+        - "@type"
+        - newType
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - updateType
+        newType:
+          type: string
+          description: The new type of the fileset
+          enum:
+            - managed
+            - external
+      example: {
+        "@type": "updateType",
+        "newType": "external"
       }
 
     RemoveFilesetPropertyRequest:
@@ -550,6 +593,18 @@ components:
       }
 
   responses:
+    InvalidSubPathErrorResponse:
+      description: >-
+        The sub path does not satisfy the fileset path requirements.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1001
+            type: IllegalArgumentException
+            message: subPath must not contain parent directory segments
+
     FilesetResponse:
       description: The response of fileset object
       content:

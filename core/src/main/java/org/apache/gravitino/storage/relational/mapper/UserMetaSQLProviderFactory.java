@@ -136,4 +136,15 @@ public class UserMetaSQLProviderFactory {
       @Param("groupNames") List<String> groupNames) {
     return getProvider().batchGetAuthSubjectsForUser(metalakeName, userName, groupNames);
   }
+  /**
+   * Returns SQL for a principal and membership snapshot.
+   *
+   * @param metalakeId the parent metalake ID
+   * @param userName the principal name
+   * @return the aggregate select SQL
+   */
+  public static String selectUserWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("userName") String userName) {
+    return getProvider().selectUserWithRolesByMetalakeIdAndName(metalakeId, userName);
+  }
 }

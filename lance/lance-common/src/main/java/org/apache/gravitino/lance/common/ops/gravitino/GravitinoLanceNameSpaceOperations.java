@@ -361,20 +361,23 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
   private DropNamespaceResponse dropCatalog(
       String catalogName, DropMode mode, DropBehavior behavior) {
+    // Only a lakehouse catalog is a Lance namespace. Check the scope before the drop, as describe
+    // and exists do, so that a Lance request can never drop (or start dropping) another catalog.
+    Catalog catalog;
+    try {
+      catalog = namespaceWrapper.loadCatalog(catalogName);
+    } catch (NoSuchCatalogException e) {
+      return catalogNotFound(catalogName, mode);
+    }
+    namespaceWrapper.validateLakehouseCatalog(catalogName, catalog);
+
     try {
       boolean dropped = namespaceWrapper.dropCatalog(catalogName, behavior == DropBehavior.CASCADE);
       if (dropped) {
         return new DropNamespaceResponse();
-      } else {
-        // Catalog did not exist
-        if (mode == DropMode.FAIL) {
-          throw new NamespaceNotFoundException(
-              "Catalog not found: " + catalogName,
-              CommonUtil.formatCurrentStackTrace(),
-              catalogName);
-        }
-        return new DropNamespaceResponse(); // SKIP mode
       }
+      // Catalog did not exist
+      return catalogNotFound(catalogName, mode);
     } catch (NonEmptyCatalogException e) {
       throw new InvalidInputException(
           String.format("Catalog %s is not empty", catalogName),
@@ -391,6 +394,14 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
           CommonUtil.formatCurrentStackTrace(),
           catalogName);
     }
+  }
+
+  private DropNamespaceResponse catalogNotFound(String catalogName, DropMode mode) {
+    if (mode == DropMode.FAIL) {
+      throw new NamespaceNotFoundException(
+          "Catalog not found: " + catalogName, CommonUtil.formatCurrentStackTrace(), catalogName);
+    }
+    return new DropNamespaceResponse(); // SKIP mode
   }
 
   private DropNamespaceResponse dropSchema(

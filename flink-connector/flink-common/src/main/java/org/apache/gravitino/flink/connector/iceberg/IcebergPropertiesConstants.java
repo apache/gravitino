@@ -52,4 +52,13 @@ public class IcebergPropertiesConstants {
 
   @VisibleForTesting
   public static final String ICEBERG_CATALOG_BACKEND_REST = CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
+
+  /** Gravitino Iceberg catalog property that selects how clients access table data. */
+  public static final String GRAVITINO_ICEBERG_DATA_ACCESS = IcebergConstants.DATA_ACCESS;
+
+  /** Iceberg catalog property that the data access mode is passed to the REST backend as. */
+  public static final String ICEBERG_ACCESS_DELEGATION = IcebergConstants.ICEBERG_ACCESS_DELEGATION;
+
+  /** Data access mode in which the REST backend vends per-table storage credentials. */
+  public static final String ICEBERG_DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
 }
