@@ -137,8 +137,9 @@ public class TestSQLScripts extends TestJDBCBackend {
   /**
    * Verifies every MySQL upgrade script from 0.5.0 onward can be re-run as a whole after a
    * completed upgrade: guarded DDL (ADD COLUMN, DROP INDEX, CREATE INDEX, ...) must skip instead of
-   * failing. The retried upgrade must provide every column and index a fresh install of the target
-   * schema has; extra legacy columns and tables may remain because upgrades never drop user data.
+   * failing. The retried upgrade must keep the columns and indexes of the first upgrade, and match
+   * a fresh install of the target schema apart from the legacy tables and columns that upgrades
+   * intentionally retain.
    */
   @TestTemplate
   public void testMySqlUpgradeScriptsRetryable() throws SQLException, IOException {
@@ -172,6 +173,8 @@ public class TestSQLScripts extends TestJDBCBackend {
     for (File upgrade : upgrades) {
       executeScript(upgrade);
     }
+    Map<String, Set<String>> upgradedColumns = readSchemaColumns();
+    List<String> upgradedIndexes = readSchemaIndexes(upgradedColumns.keySet());
     for (File upgrade : upgrades) {
       executeScript(upgrade);
     }
@@ -180,48 +183,49 @@ public class TestSQLScripts extends TestJDBCBackend {
     String latestVersion = lastMatcher.group(2);
     Map<String, Set<String>> retriedColumns = readSchemaColumns();
     List<String> retriedIndexes = readSchemaIndexes(retriedColumns.keySet());
+    Assertions.assertEquals(
+        upgradedColumns, retriedColumns, "Retried upgrades must not change upgraded columns");
+    Assertions.assertEquals(
+        upgradedIndexes, retriedIndexes, "Retried upgrades must not change upgraded indexes");
 
-    // Compare with a fresh install of the latest schema: the retried chain must provide every
-    // fresh column and index, but it may keep extra legacy columns and tables, because upgrades
-    // never drop user data (e.g. the deprecated role_meta securable object columns remain in the
-    // upgraded schema while fresh schemas no longer declare them).
+    // Compare with a fresh install of the latest schema. Tables missing from it were
+    // intentionally retained by the upgrades (e.g. the legacy policy_relation_meta table), so
+    // they are excluded from the comparison. So are the role_meta columns that the 0.6.0 upgrade
+    // only marked as deprecated and never dropped.
     dropAllTables();
     executeScript(scriptDir.resolve("schema-" + latestVersion + "-mysql.sql").toFile());
     Map<String, Set<String>> freshColumns = readSchemaColumns();
-    Map<String, Set<String>> missingColumns = new TreeMap<>();
-    freshColumns.forEach(
+    Map<String, Set<String>> retainedColumns =
+        Map.of(
+            "role_meta",
+            Set.of(
+                "securable_object_full_name",
+                "securable_object_type",
+                "privileges",
+                "privilege_conditions"));
+    Map<String, Set<String>> retriedComparableColumns = new TreeMap<>();
+    retriedColumns.forEach(
         (table, columns) -> {
-          Set<String> upgradedColumns = retriedColumns.get(table);
-          if (upgradedColumns == null) {
-            missingColumns.put(table, columns);
-          } else {
-            Set<String> missing = new TreeSet<>(columns);
-            missing.removeAll(upgradedColumns);
-            if (!missing.isEmpty()) {
-              missingColumns.put(table, missing);
-            }
+          if (freshColumns.containsKey(table)) {
+            Set<String> comparableColumns = new TreeSet<>(columns);
+            comparableColumns.removeAll(retainedColumns.getOrDefault(table, Set.of()));
+            retriedComparableColumns.put(table, comparableColumns);
           }
         });
-    Assertions.assertTrue(
-        missingColumns.isEmpty(),
-        "Retried upgrades must provide all fresh "
-            + latestVersion
-            + " columns, missing: "
-            + missingColumns);
-
-    Set<String> retriedIndexSet = new TreeSet<>(retriedIndexes);
-    List<String> missingIndexes = new ArrayList<>();
-    for (String freshIndex : readSchemaIndexes(freshColumns.keySet())) {
-      if (!retriedIndexSet.contains(freshIndex)) {
-        missingIndexes.add(freshIndex);
-      }
-    }
-    Assertions.assertTrue(
-        missingIndexes.isEmpty(),
-        "Retried upgrades must provide all fresh "
-            + latestVersion
-            + " indexes, missing: "
-            + missingIndexes);
+    Assertions.assertEquals(
+        freshColumns,
+        retriedComparableColumns,
+        "Retried upgrades must match fresh " + latestVersion + " columns");
+    // The 0.6.0 upgrade created tag_meta's unique key as uk_mn_tn_del, while every fresh schema
+    // names the same key uk_mi_tn_del.
+    Assertions.assertEquals(
+        readSchemaIndexes(freshColumns.keySet()),
+        retriedIndexes.stream()
+            .filter(index -> freshColumns.containsKey(index.split(":")[0]))
+            .map(index -> index.replaceFirst("^tag_meta:uk_mn_tn_del:", "tag_meta:uk_mi_tn_del:"))
+            .sorted()
+            .toList(),
+        "Retried upgrades must match fresh " + latestVersion + " indexes");
   }
 
   /**
