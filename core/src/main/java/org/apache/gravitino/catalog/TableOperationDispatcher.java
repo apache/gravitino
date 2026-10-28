@@ -1064,8 +1064,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     //
     // A tree lock cannot close this, because tree locks are local to one server. Closing it needs
     // the alter to record in the store that it is in progress before it calls the catalog, and
-    // the load to read the stored version and that mark before it reads the catalog, then write
-    // only if both are unchanged. That needs a new EntityStore API and is tracked in #14279.
+    // the load to read the stored version, operation epoch and in-progress mark before it reads
+    // the catalog, skipping the store write while the mark is set. The load may write only if the
+    // version and epoch are unchanged and no in-progress mark is set. That needs a new EntityStore
+    // API and is tracked in #14279.
     Table tableFromCatalog = combinedTable.tableFromCatalog();
     return TreeLockUtils.doWithTreeLock(
         tableIdent,
