@@ -200,7 +200,7 @@ public class CatalogHive2IT extends BaseIT {
       Assertions.assertEquals(
           "<derived from deserializer>",
           metastore
-              .getTable(metastoreDatabaseName(), csvTableName)
+              .getTable(metastoreDatabaseName(hmsCatalog, schemaName), csvTableName)
               .getSd()
               .getCols()
               .get(0)
@@ -219,7 +219,7 @@ public class CatalogHive2IT extends BaseIT {
           .asTableCatalog()
           .alterTable(identifier, TableChange.setProperty("serde_test", "value"));
       catalog.asTableCatalog().alterTable(identifier, TableChange.updateComment("updated"));
-      var stored = metastore.getTable(metastoreDatabaseName(), csvTableName);
+      var stored = metastore.getTable(metastoreDatabaseName(hmsCatalog, schemaName), csvTableName);
       Assertions.assertEquals(
           "<derived from deserializer>", stored.getSd().getCols().get(0).getType());
       Assertions.assertEquals("value", stored.getParameters().get("serde_test"));
@@ -236,12 +236,21 @@ public class CatalogHive2IT extends BaseIT {
                           Types.StringType.get(),
                           TableChange.ColumnPosition.defaultPos())));
       Assertions.assertEquals(
-          1, metastore.getTable(metastoreDatabaseName(), csvTableName).getSd().getColsSize());
+          1,
+          metastore
+              .getTable(metastoreDatabaseName(hmsCatalog, schemaName), csvTableName)
+              .getSd()
+              .getColsSize());
       String renamed = GravitinoITUtils.genRandomName("serde_renamed");
       catalog.asTableCatalog().alterTable(identifier, TableChange.rename(renamed));
       Assertions.assertEquals(
           "<derived from deserializer>",
-          metastore.getTable(metastoreDatabaseName(), renamed).getSd().getCols().get(0).getType());
+          metastore
+              .getTable(metastoreDatabaseName(hmsCatalog, schemaName), renamed)
+              .getSd()
+              .getCols()
+              .get(0)
+              .getType());
       catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, renamed));
     }
   }
@@ -1476,7 +1485,8 @@ public class CatalogHive2IT extends BaseIT {
 
     checkColumnConstraintsOnAlter(tableCatalog, id);
 
-    // test updateColumnPosition exception
+    // The SerDe fixtures disable HMS's incompatible column type check so metadata-only alters
+    // can preserve the stored marker. Ordinary tables therefore also allow this reorder.
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
     Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
@@ -1498,15 +1508,20 @@ public class CatalogHive2IT extends BaseIT {
     TableChange updatePos =
         TableChange.updateColumnPosition(
             new String[] {"date_of_birth"}, TableChange.ColumnPosition.first());
-    exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> tableCatalog.alterTable(tableIdentifier, updatePos));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "please ensure that the type of the new column position is compatible with the old one"));
+    Table reordered = tableCatalog.alterTable(tableIdentifier, updatePos);
+    Column[] expectedColumns = new Column[] {col3, col1, col2};
+    Column[] storedColumns = loadHiveTable(schemaName, tableIdentifier.name()).columns();
+    Assertions.assertEquals(expectedColumns.length, reordered.columns().length);
+    Assertions.assertEquals(expectedColumns.length, storedColumns.length);
+    for (int index = 0; index < expectedColumns.length; index++) {
+      Column expected = expectedColumns[index];
+      Assertions.assertEquals(expected.name(), reordered.columns()[index].name());
+      Assertions.assertEquals(expected.dataType(), reordered.columns()[index].dataType());
+      Assertions.assertEquals(expected.comment(), reordered.columns()[index].comment());
+      Assertions.assertEquals(expected.name(), storedColumns[index].name());
+      Assertions.assertEquals(expected.dataType(), storedColumns[index].dataType());
+      Assertions.assertEquals(expected.comment(), storedColumns[index].comment());
+    }
   }
 
   @Test
@@ -2115,7 +2130,9 @@ public class CatalogHive2IT extends BaseIT {
         .get();
   }
 
-  private String metastoreDatabaseName() {
-    return "hive".equals(hmsCatalog) ? schemaName : "@" + hmsCatalog + "#" + schemaName;
+  static String metastoreDatabaseName(String hmsCatalog, String schemaName) {
+    return hmsCatalog == null || hmsCatalog.isEmpty() || "hive".equals(hmsCatalog)
+        ? schemaName
+        : "@" + hmsCatalog + "#" + schemaName;
   }
 }
