@@ -129,6 +129,22 @@ public class TestIcebergCatalogWrapperResolve {
     Assertions.assertNotNull(viewOps);
   }
 
+  @Test
+  void nonAuxProviderUsesLocalManagerAndReusesWrapper() {
+    // No aux IRC context → LocalCatalogWrapperManager path.
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    IcebergCatalogWrapperProvider provider =
+        IcebergCatalogWrapperProvider.create("local-cat", config);
+    try {
+      IcebergCatalogWrapper first = provider.get();
+      IcebergCatalogWrapper second = provider.get();
+      Assertions.assertSame(first, second);
+    } finally {
+      provider.close();
+    }
+  }
+
   private static void resetIcebergRESTServerContext() throws Exception {
     Class<?> holder =
         Arrays.stream(IcebergRESTServerContext.class.getDeclaredClasses())

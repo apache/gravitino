@@ -23,8 +23,15 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 /**
  * Resolves {@link IcebergCatalogWrapper} instances by catalog name.
  *
- * <p>Implemented by IRC {@code IcebergCatalogWrapperManager} (get-or-create + {@link
- * IcebergCatalogWrapperCache}). Symmetric to {@code CatalogManager} used by {@code
+ * <p>Implementations share {@link IcebergCatalogWrapperCache} eviction/token policy:
+ *
+ * <ul>
+ *   <li>IRC {@code IcebergCatalogWrapperManager} — config provider + {@code CatalogWrapperForREST}
+ *   <li>{@link LocalCatalogWrapperManager} — lakehouse non-aux, creates via {@link
+ *       IcebergCatalogWrapper#create(IcebergConfig)}
+ * </ul>
+ *
+ * <p>Symmetric to {@code CatalogManager} used by {@code
  * DynamicIcebergConfigProvider.InternalCatalogFetcher}.
  */
 public interface CatalogWrapperManager {

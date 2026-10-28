@@ -36,9 +36,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Shared get-or-create cache for {@link IcebergCatalogWrapper} instances.
  *
- * <p>Used by IRC {@code IcebergCatalogWrapperManager} and by lakehouse catalog operations when IRC
- * is not embedded. Eviction follows expire-after-access, capped so minted GCS OAuth2 tokens are
- * refreshed before {@code gcs.oauth2.token-expires-at}.
+ * <p>Used by IRC {@code IcebergCatalogWrapperManager} and by lakehouse {@link
+ * LocalCatalogWrapperManager} when IRC is not embedded. Eviction follows expire-after-access,
+ * capped so minted GCS OAuth2 tokens are refreshed before {@code gcs.oauth2.token-expires-at}.
  */
 public final class IcebergCatalogWrapperCache implements AutoCloseable {
 
