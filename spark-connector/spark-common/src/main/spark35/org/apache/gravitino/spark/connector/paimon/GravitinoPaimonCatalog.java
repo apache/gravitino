@@ -22,7 +22,6 @@ package org.apache.gravitino.spark.connector.paimon;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -59,9 +58,11 @@ import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
+import org.apache.spark.sql.connector.expressions.Expressions;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -82,7 +83,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
   @Override
   protected org.apache.gravitino.rel.Table createGravitinoTable(
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties) {
-    Set<String> partitionColumns = new HashSet<>();
     List<Transform> partitions = new ArrayList<>();
     BucketTransform bucketTransform = null;
     if (transforms != null) {
@@ -102,11 +102,9 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
         }
         String[] fields = ((IdentityTransform) transform).reference().fieldNames();
         Preconditions.checkArgument(
-            fields.length == 1 && Arrays.asList(schema.fieldNames()).contains(fields[0]),
-            "Paimon partitions must reference existing top-level columns.");
-        Preconditions.checkArgument(
-            partitionColumns.add(fields[0]), "Duplicate partition column %s.", fields[0]);
-        partitions.add(transform);
+            fields.length == 1, "Paimon partitions must reference top-level columns.");
+        String column = resolveColumns("partition", fields, schema)[0];
+        partitions.add(Expressions.identity("`" + column.replace("`", "``") + "`"));
       }
     }
 
@@ -114,7 +112,8 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
         && !properties.containsKey(PaimonConstants.BUCKET_NUM)
         && !properties.containsKey(PaimonConstants.BUCKET_KEY)
         && bucketTransform == null) {
-      return super.createGravitinoTable(ident, schema, transforms, properties);
+      return super.createGravitinoTable(
+          ident, schema, partitions.toArray(new Transform[0]), properties);
     }
 
     String[] primaryKeys =
@@ -132,11 +131,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
                       .toArray(String[][]::new))
             };
     Set<String> primaryKeyColumns = new HashSet<>(Arrays.asList(primaryKeys));
-    Preconditions.checkArgument(
-        primaryKeyColumns.isEmpty() || !partitionColumns.containsAll(primaryKeyColumns),
-        "Paimon primary keys must contain at least one non-partition column.");
-    Distribution distribution =
-        toDistribution(properties, schema, primaryKeys, partitionColumns, bucketTransform);
+    Distribution distribution = toDistribution(properties, schema, bucketTransform);
     Column[] columns =
         Arrays.stream(schema.fields())
             .map(
@@ -237,27 +232,34 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
     String value = properties.get(option);
     Preconditions.checkArgument(StringUtils.isNotBlank(value), "%s must not be empty.", option);
     String[] columns = Arrays.stream(value.split(",", -1)).map(String::trim).toArray(String[]::new);
-    validateColumns(option, columns, schema);
-    return columns;
+    return resolveColumns(option, columns, schema);
   }
 
-  private static void validateColumns(String option, String[] columns, StructType schema) {
-    Set<String> schemaColumns = new HashSet<>(Arrays.asList(schema.fieldNames()));
-    Set<String> seen = new HashSet<>();
-    for (String column : columns) {
-      Preconditions.checkArgument(
-          !column.isEmpty(), "%s must contain non-empty, top-level column names.", option);
-      Preconditions.checkArgument(
-          schemaColumns.contains(column), "Column %s in %s does not exist.", column, option);
-      Preconditions.checkArgument(seen.add(column), "Duplicate column %s in %s.", column, option);
-    }
+  private static String[] resolveColumns(String option, String[] columns, StructType schema) {
+    boolean caseSensitive = SQLConf.get().caseSensitiveAnalysis();
+    return Arrays.stream(columns)
+        .map(
+            column -> {
+              Preconditions.checkArgument(
+                  !column.isEmpty(), "%s must contain non-empty, top-level column names.", option);
+              String[] matches =
+                  Arrays.stream(schema.fieldNames())
+                      .filter(
+                          name ->
+                              caseSensitive ? name.equals(column) : name.equalsIgnoreCase(column))
+                      .toArray(String[]::new);
+              Preconditions.checkArgument(
+                  matches.length > 0, "Column %s in %s does not exist.", column, option);
+              Preconditions.checkArgument(
+                  matches.length == 1, "Column %s in %s is ambiguous.", column, option);
+              return matches[0];
+            })
+        .toArray(String[]::new);
   }
 
   private static Distribution toDistribution(
       Map<String, String> properties,
       StructType schema,
-      String[] primaryKeys,
-      Set<String> partitionColumns,
       @Nullable BucketTransform bucketTransform) {
     boolean hasBucket = properties.containsKey(PaimonConstants.BUCKET_NUM);
     boolean hasBucketKey = properties.containsKey(PaimonConstants.BUCKET_KEY);
@@ -276,9 +278,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException("Paimon bucket must be a valid integer: " + value, e);
       }
-      Preconditions.checkArgument(
-          buckets == Distributions.AUTO || buckets > 0,
-          "Paimon bucket must be positive or -1 for dynamic buckets.");
     }
     if (bucketTransform != null) {
       int clusteredBuckets = (Integer) bucketTransform.numBuckets().value();
@@ -287,7 +286,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
       Preconditions.checkArgument(
           !hasBucket || buckets == clusteredBuckets,
           "CLUSTERED BY conflicts with the Paimon bucket property.");
-      String[] clusteredKeys =
+      String[] clusteredColumns =
           Arrays.stream(bucketTransform.references())
               .map(
                   reference -> {
@@ -297,35 +296,17 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
                     return fields[0];
                   })
               .toArray(String[]::new);
-      Preconditions.checkArgument(clusteredKeys.length > 0, "CLUSTERED BY requires bucket keys.");
-      validateColumns(PaimonConstants.BUCKET_KEY, clusteredKeys, schema);
+      Preconditions.checkArgument(
+          clusteredColumns.length > 0, "CLUSTERED BY requires bucket keys.");
+      String[] clusteredKeys = resolveColumns(PaimonConstants.BUCKET_KEY, clusteredColumns, schema);
       Preconditions.checkArgument(
           !hasBucketKey || Arrays.equals(bucketKeys, clusteredKeys),
           "CLUSTERED BY conflicts with the Paimon bucket-key property.");
       buckets = clusteredBuckets;
       bucketKeys = clusteredKeys;
     }
-    if (primaryKeys.length > 0) {
-      Preconditions.checkArgument(
-          Arrays.asList(primaryKeys).containsAll(Arrays.asList(bucketKeys)),
-          "Paimon bucket keys must be a subset of primary key columns for primary key tables.");
-    }
     Expression[] expressions =
         Arrays.stream(bucketKeys).map(NamedReference::field).toArray(Expression[]::new);
-    Preconditions.checkArgument(
-        bucketKeys.length == 0 || buckets > 0,
-        "Explicit Paimon bucket keys require a positive bucket number.");
-    Preconditions.checkArgument(
-        buckets == Distributions.AUTO || primaryKeys.length > 0 || bucketKeys.length > 0,
-        "Paimon bucketed append tables require explicit bucket keys.");
-    Preconditions.checkArgument(
-        Collections.disjoint(partitionColumns, Arrays.asList(bucketKeys)),
-        "Paimon bucket keys must not contain partition columns.");
-    Preconditions.checkArgument(
-        buckets == Distributions.AUTO
-            || primaryKeys.length == 0
-            || Arrays.asList(primaryKeys).containsAll(partitionColumns),
-        "Paimon primary keys must include all partition columns for fixed buckets.");
     return buckets == Distributions.AUTO
         ? Distributions.auto(Strategy.HASH, expressions)
         : Distributions.hash(buckets, expressions);

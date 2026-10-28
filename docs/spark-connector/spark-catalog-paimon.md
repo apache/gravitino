@@ -108,9 +108,9 @@ TBLPROPERTIES (
 );
 ```
 
-Primary-key column order is preserved, and primary-key columns become non-nullable, matching Paimon's behavior. Other column definitions are preserved. Use `bucket = '-1'` for dynamic buckets without an explicit `bucket-key`. For fixed buckets, specify a positive bucket count. An optional `bucket-key` specifies comma-separated top-level bucket columns. Append tables with fixed buckets require explicit bucket keys.
+Primary-key column order is preserved, and primary-key columns become non-nullable, matching Paimon's behavior. Other column definitions are preserved. Use `bucket = '-1'` for dynamic buckets without an explicit `bucket-key`. For fixed buckets, specify a positive bucket count. An optional `bucket-key` specifies comma-separated top-level bucket columns.
 
-Column names must exist and must not be repeated. Bucket keys must not include partition columns. For primary-key tables, explicit bucket keys must be a subset of the primary-key columns, and fixed buckets require the primary key to include all partition columns.
+Column references are resolved to the schema's actual names according to `spark.sql.caseSensitive`. Ambiguous or missing names are rejected. The connector checks property parsing and conflicting bucket declarations; Paimon validates primary-key, bucket and partition combinations when the server creates the table.
 
 Use `PARTITIONED BY` for identity partitions. Fixed buckets can also be specified with `CLUSTERED BY`:
 

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
@@ -34,6 +35,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
@@ -44,7 +46,9 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -59,6 +63,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.Expressions;
+import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.StructField;
@@ -101,9 +106,12 @@ public class TestGravitinoPaimonCatalog {
   private Distribution distribution;
   private SortOrder[] sortOrders;
   private Index[] indexes;
+  private boolean previousCaseSensitive;
 
   @BeforeEach
   void setUp() {
+    previousCaseSensitive = SQLConf.get().caseSensitiveAnalysis();
+    SQLConf.get().setConfString("spark.sql.caseSensitive", "false");
     GravitinoClient client = mock(GravitinoClient.class);
     Catalog gravitinoCatalog = mock(Catalog.class);
     tableCatalog = mock(org.apache.gravitino.rel.TableCatalog.class, CALLS_REAL_METHODS);
@@ -141,7 +149,147 @@ public class TestGravitinoPaimonCatalog {
 
   @AfterEach
   void tearDown() {
+    SQLConf.get().setConfString("spark.sql.caseSensitive", String.valueOf(previousCaseSensitive));
     GravitinoCatalogManager.get().close();
+  }
+
+  @Test
+  void testResolveCaseInsensitivePrimaryKeyBucketAndPartitionNames() {
+    StructType schema =
+        new StructType().add("Id", DataTypes.IntegerType).add("Dt", DataTypes.StringType);
+    catalog.create(
+        schema,
+        new org.apache.spark.sql.connector.expressions.Transform[] {
+          Expressions.identity("DT"), Expressions.bucket(4, "id")
+        },
+        Map.of("primary-key", "ID,dt", "bucket", "4", "bucket-key", "ID"));
+
+    assertArrayEquals(new String[][] {{"Id"}, {"Dt"}}, indexes[0].fieldNames());
+    assertArrayEquals(
+        new String[] {"Id"},
+        ((NamedReference.FieldReference) distribution.expressions()[0]).fieldName());
+    assertEquals("Dt", partitioning[0].references()[0].fieldName()[0]);
+    assertFalse(columns[0].nullable());
+    assertFalse(columns[1].nullable());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"primary-key", "bucket-key"})
+  void testRejectCaseMismatchWhenSparkIsCaseSensitive(String option) {
+    SQLConf.get().setConfString("spark.sql.caseSensitive", "true");
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog.create(
+                new StructType().add("id", DataTypes.IntegerType),
+                new org.apache.spark.sql.connector.expressions.Transform[0],
+                Map.of(option, "ID", "bucket", "4")));
+    verifyNoInteractions(tableCatalog);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"primary-key", "bucket-key"})
+  void testRejectAmbiguousCaseInsensitiveColumnNames(String option) {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.create(
+                    new StructType()
+                        .add("id", DataTypes.IntegerType)
+                        .add("ID", DataTypes.IntegerType),
+                    new org.apache.spark.sql.connector.expressions.Transform[0],
+                    Map.of(option, "Id", "bucket", "4")));
+    assertTrue(error.getMessage().contains("ambiguous"));
+    verifyNoInteractions(tableCatalog);
+  }
+
+  @Test
+  void testKeepDistinctCaseSensitiveColumnNames() {
+    SQLConf.get().setConfString("spark.sql.caseSensitive", "true");
+    catalog.create(
+        new StructType().add("id", DataTypes.IntegerType).add("ID", DataTypes.IntegerType),
+        new org.apache.spark.sql.connector.expressions.Transform[0],
+        Map.of("primary-key", "ID,id", "bucket", "4", "bucket-key", "ID"));
+    assertArrayEquals(new String[][] {{"ID"}, {"id"}}, indexes[0].fieldNames());
+    assertArrayEquals(
+        new String[] {"ID"},
+        ((NamedReference.FieldReference) distribution.expressions()[0]).fieldName());
+  }
+
+  @Test
+  void testResolveCaseInsensitiveLiteralDotColumns() {
+    catalog.create(
+        new StructType().add("Literal.Dot", DataTypes.IntegerType),
+        new org.apache.spark.sql.connector.expressions.Transform[0],
+        Map.of("primary-key", "literal.dot", "bucket", "4", "bucket-key", "LITERAL.DOT"));
+    assertArrayEquals(new String[][] {{"Literal.Dot"}}, indexes[0].fieldNames());
+    assertArrayEquals(
+        new String[] {"Literal.Dot"},
+        ((NamedReference.FieldReference) distribution.expressions()[0]).fieldName());
+  }
+
+  @Test
+  void testResolvePartitionNamesWithoutPrimaryKeyOrBuckets() {
+    catalog.create(
+        new StructType().add("Id", DataTypes.IntegerType).add("Part.Date", DataTypes.StringType),
+        new org.apache.spark.sql.connector.expressions.Transform[] {
+          Expressions.identity("`PART.DATE`")
+        },
+        Map.of("custom.option", "value"));
+    assertArrayEquals(new String[] {"Part.Date"}, partitioning[0].references()[0].fieldName());
+    assertEquals(Map.of("custom.option", "value"), properties);
+  }
+
+  @Test
+  void testRejectNonFieldDistributionExpressionWithClearMessage() {
+    SparkPaimonTable table =
+        sparkTableWithDistribution(Distributions.hash(4, Literals.integerLiteral(1)));
+    IllegalArgumentException error =
+        assertThrows(IllegalArgumentException.class, table::properties);
+    assertTrue(error.getMessage().contains("plain column references"));
+  }
+
+  @Test
+  void testRejectNestedDistributionReferenceWithClearMessage() {
+    SparkPaimonTable table =
+        sparkTableWithDistribution(
+            Distributions.hash(4, NamedReference.field(new String[] {"payload", "nested"})));
+    IllegalArgumentException error =
+        assertThrows(IllegalArgumentException.class, table::properties);
+    assertTrue(error.getMessage().contains("top-level columns"));
+  }
+
+  @Test
+  void testNativePaimonRejectsBucketKeyOutsidePrimaryKey(@TempDir Path warehouse) throws Exception {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[0],
+        Map.of("primary-key", PRIMARY_KEY, "bucket", "4", "bucket-key", "payload"));
+    GravitinoPaimonTable table =
+        GravitinoPaimonTable.builder()
+            .withName("invalid_events")
+            .withColumns(columns)
+            .withProperties(properties)
+            .withPartitioning(partitioning)
+            .withDistribution(distribution)
+            .withIndexes(indexes)
+            .build();
+    try (org.apache.paimon.catalog.Catalog nativeCatalog =
+        CatalogFactory.createCatalog(
+            CatalogContext.create(
+                Options.fromMap(Map.of("warehouse", warehouse.toUri().toString()))))) {
+      nativeCatalog.createDatabase("default", true);
+      RuntimeException error =
+          assertThrows(
+              RuntimeException.class,
+              () ->
+                  nativeCatalog.createTable(
+                      org.apache.paimon.catalog.Identifier.create("default", "invalid_events"),
+                      table.toPaimonTableSchema(),
+                      false));
+      assertTrue(error.getMessage().toLowerCase(Locale.ROOT).contains("bucket"));
+    }
   }
 
   @Test
@@ -364,15 +512,13 @@ public class TestGravitinoPaimonCatalog {
   }
 
   @Test
-  void testRejectBucketKeysWithoutExplicitBucketCount() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            catalog.create(
-                SCHEMA,
-                new org.apache.spark.sql.connector.expressions.Transform[0],
-                Map.of("primary-key", PRIMARY_KEY, "bucket-key", "source_topic")));
-    verifyNoInteractions(tableCatalog);
+  void testDelegateBucketKeysWithoutExplicitBucketCount() {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[0],
+        Map.of("primary-key", PRIMARY_KEY, "bucket-key", "source_topic"));
+    assertEquals(-1, distribution.number());
+    assertEquals(1, distribution.expressions().length);
   }
 
   @Test
@@ -479,15 +625,7 @@ public class TestGravitinoPaimonCatalog {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        "",
-        " ",
-        "missing",
-        "payload.nested",
-        "source_topic,source_topic",
-        "source_topic,"
-      })
+  @ValueSource(strings = {"", " ", "missing", "payload.nested", "source_topic,"})
   void testRejectInvalidPrimaryKeys(String primaryKey) {
     assertThrows(
         IllegalArgumentException.class,
@@ -500,7 +638,7 @@ public class TestGravitinoPaimonCatalog {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", " ", "abc", "0", "-2", "2147483648"})
+  @ValueSource(strings = {"", " ", "abc", "2147483648"})
   void testRejectInvalidBucketNumbers(String bucket) {
     assertThrows(
         IllegalArgumentException.class,
@@ -513,8 +651,7 @@ public class TestGravitinoPaimonCatalog {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {"", "missing", "payload.nested", "source_topic,source_topic", "source_topic,"})
+  @ValueSource(strings = {"", "missing", "payload.nested", "source_topic,"})
   void testRejectInvalidBucketKeys(String bucketKey) {
     assertThrows(
         IllegalArgumentException.class,
@@ -527,81 +664,58 @@ public class TestGravitinoPaimonCatalog {
   }
 
   @Test
-  void testRejectBucketKeyOutsidePrimaryKey() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            catalog.create(
-                SCHEMA,
-                new org.apache.spark.sql.connector.expressions.Transform[0],
-                Map.of("primary-key", PRIMARY_KEY, "bucket", "4", "bucket-key", "payload")));
-    verifyNoInteractions(tableCatalog);
+  void testDelegateBucketKeyOutsidePrimaryKey() {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[0],
+        Map.of("primary-key", PRIMARY_KEY, "bucket", "4", "bucket-key", "payload"));
+    assertEquals("payload", distribution.expressions()[0].references()[0].fieldName()[0]);
   }
 
   @Test
-  void testRejectDynamicBucketsWithExplicitKeys() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            catalog.create(
-                SCHEMA,
-                new org.apache.spark.sql.connector.expressions.Transform[0],
-                Map.of("primary-key", PRIMARY_KEY, "bucket", "-1", "bucket-key", "source_topic")));
-    verifyNoInteractions(tableCatalog);
+  void testDelegateDynamicBucketsWithExplicitKeys() {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[0],
+        Map.of("primary-key", PRIMARY_KEY, "bucket", "-1", "bucket-key", "source_topic"));
+    assertEquals(-1, distribution.number());
+    assertEquals(1, distribution.expressions().length);
   }
 
   @Test
-  void testRejectBucketedAppendWithoutKeys() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            catalog.create(
-                SCHEMA,
-                new org.apache.spark.sql.connector.expressions.Transform[0],
-                Map.of("bucket", "4")));
-    verifyNoInteractions(tableCatalog);
+  void testDelegateBucketedAppendWithoutKeys() {
+    catalog.create(
+        SCHEMA, new org.apache.spark.sql.connector.expressions.Transform[0], Map.of("bucket", "4"));
+    assertEquals(4, distribution.number());
+    assertEquals(0, distribution.expressions().length);
   }
 
   @Test
-  void testRejectPartitionColumnsAsBucketKeys() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            catalog.create(
-                SCHEMA,
-                new org.apache.spark.sql.connector.expressions.Transform[] {
-                  Expressions.identity("dt")
-                },
-                Map.of("primary-key", "source_topic,dt", "bucket", "4", "bucket-key", "dt")));
-    verifyNoInteractions(tableCatalog);
+  void testDelegatePartitionColumnsAsBucketKeys() {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[] {Expressions.identity("dt")},
+        Map.of("primary-key", "source_topic,dt", "bucket", "4", "bucket-key", "dt"));
+    assertEquals("dt", distribution.expressions()[0].references()[0].fieldName()[0]);
   }
 
   @Test
-  void testRejectFixedBucketsForCrossPartitionPrimaryKeys() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            catalog.create(
-                SCHEMA,
-                new org.apache.spark.sql.connector.expressions.Transform[] {
-                  Expressions.identity("dt")
-                },
-                Map.of("primary-key", PRIMARY_KEY, "bucket", "4")));
-    verifyNoInteractions(tableCatalog);
+  void testDelegateFixedBucketsForCrossPartitionPrimaryKeys() {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[] {Expressions.identity("dt")},
+        Map.of("primary-key", PRIMARY_KEY, "bucket", "4"));
+    assertEquals(4, distribution.number());
+    assertArrayEquals(new String[] {"source_namespace"}, indexes[0].fieldNames()[0]);
   }
 
   @Test
-  void testRejectPrimaryKeyOnlyPartitionColumns() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            catalog.create(
-                SCHEMA,
-                new org.apache.spark.sql.connector.expressions.Transform[] {
-                  Expressions.identity("dt")
-                },
-                Map.of("primary-key", "dt", "bucket", "-1")));
-    verifyNoInteractions(tableCatalog);
+  void testDelegatePrimaryKeyOnlyPartitionColumns() {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[] {Expressions.identity("dt")},
+        Map.of("primary-key", "dt", "bucket", "-1"));
+    assertArrayEquals(new String[][] {{"dt"}}, indexes[0].fieldNames());
   }
 
   @ParameterizedTest
@@ -620,17 +734,14 @@ public class TestGravitinoPaimonCatalog {
   }
 
   @Test
-  void testRejectDuplicatePartitionColumns() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            catalog.create(
-                SCHEMA,
-                new org.apache.spark.sql.connector.expressions.Transform[] {
-                  Expressions.identity("dt"), Expressions.identity("dt")
-                },
-                Map.of("primary-key", PRIMARY_KEY, "bucket", "-1")));
-    verifyNoInteractions(tableCatalog);
+  void testDelegateDuplicatePartitionColumns() {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[] {
+          Expressions.identity("dt"), Expressions.identity("dt")
+        },
+        Map.of("primary-key", PRIMARY_KEY, "bucket", "-1"));
+    assertEquals(2, partitioning.length);
   }
 
   @Test
@@ -666,6 +777,28 @@ public class TestGravitinoPaimonCatalog {
                 new org.apache.spark.sql.connector.expressions.Transform[] {Expressions.days("dt")},
                 Map.of("primary-key", PRIMARY_KEY, "bucket", "-1")));
     verifyNoInteractions(tableCatalog);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "-2"})
+  void testDelegatePaimonBucketModes(String bucket) {
+    catalog.create(
+        SCHEMA,
+        new org.apache.spark.sql.connector.expressions.Transform[0],
+        Map.of("bucket", bucket));
+    assertEquals(Integer.parseInt(bucket), distribution.number());
+  }
+
+  private SparkPaimonTable sparkTableWithDistribution(Distribution value) {
+    Table metadata = mock(Table.class);
+    when(metadata.distribution()).thenReturn(value);
+    return new SparkPaimonTable(
+        Identifier.of(new String[] {"default"}, "events"),
+        metadata,
+        new SparkTable(mock(org.apache.paimon.table.Table.class)),
+        PaimonPropertiesConverter.getInstance(),
+        catalog.getSparkTransformConverter(),
+        new SparkTypeConverter());
   }
 
   private static class TestCatalog extends GravitinoPaimonCatalog {

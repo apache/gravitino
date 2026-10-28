@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.paimon;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -100,7 +101,17 @@ public class SparkPaimonTable extends SparkTable {
         properties.put(
             PaimonConstants.BUCKET_KEY,
             Arrays.stream(distribution.expressions())
-                .map(expression -> ((NamedReference.FieldReference) expression).fieldName()[0])
+                .map(
+                    expression -> {
+                      Preconditions.checkArgument(
+                          expression instanceof NamedReference.FieldReference,
+                          "Paimon bucket keys must be plain column references.");
+                      String[] fields = ((NamedReference.FieldReference) expression).fieldName();
+                      Preconditions.checkArgument(
+                          fields.length == 1,
+                          "Paimon bucket keys must reference top-level columns.");
+                      return fields[0];
+                    })
                 .collect(Collectors.joining(",")));
       }
     }
