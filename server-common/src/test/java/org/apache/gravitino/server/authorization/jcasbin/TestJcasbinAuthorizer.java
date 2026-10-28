@@ -70,6 +70,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1345,7 +1346,7 @@ public class TestJcasbinAuthorizer {
     }
   }
 
-  /** Concurrent stale observations must share the entity read, including delayed owners. */
+  /** Concurrent stale observations must share the entity read. */
   @Test
   public void testConcurrentRoleReloadReadsEntityOnce() throws Exception {
     long roleId = 9101L;
@@ -1408,6 +1409,85 @@ public class TestJcasbinAuthorizer {
           getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, String.valueOf(roleId)).size(),
           "the shared read must still publish the role's actual policy");
     } finally {
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+      loadedRolesField.set(jcasbinAuthorizer, loadedRoles);
+      Mockito.doReturn(Collections.emptyList())
+          .when(entityStore)
+          .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+    }
+  }
+
+  /** A request that observed a stale marker before the previous load finished must not reload. */
+  @Test
+  public void testDelayedOwnerRechecksMarkerAfterPreviousLoadFinished() throws Exception {
+    long roleId = 9103L;
+    String roleName = "delayedOwnerRole";
+    RoleEntity role =
+        mockRoleInStore(roleId, roleName, ImmutableList.of(getAllowSecurableObject()));
+    RoleUpdatedAt version = mockedRoleVersions.get(roleId);
+    List<NameIdentifier> roleIdents =
+        ImmutableList.of(NameIdentifierUtil.ofRole(METALAKE, roleName));
+    AtomicInteger entityReads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              entityReads.incrementAndGet();
+              return ImmutableList.of(role);
+            })
+        .when(entityStore)
+        .batchGet(eq(roleIdents), eq(Entity.EntityType.ROLE), eq(RoleEntity.class));
+
+    CountDownLatch observedStale = new CountDownLatch(1);
+    CountDownLatch previousLoadFinished = new CountDownLatch(1);
+    AtomicReference<Thread> delayedThread = new AtomicReference<>();
+    AtomicBoolean firstDelayedRead = new AtomicBoolean(true);
+    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Long> gatedLoadedRoles = Mockito.spy(loadedRoles);
+    doAnswer(
+            invocation -> {
+              Optional<Long> snapshot = loadedRoles.getIfPresent(roleId);
+              if (Thread.currentThread() == delayedThread.get()
+                  && firstDelayedRead.compareAndSet(true, false)) {
+                // Observe the missing marker, then stall until another request has loaded the
+                // role and removed its flight, so this request becomes a new owner.
+                observedStale.countDown();
+                assertTrue(previousLoadFinished.await(10, TimeUnit.SECONDS));
+              }
+              return snapshot;
+            })
+        .when(gatedLoadedRoles)
+        .getIfPresent(roleId);
+    Field loadedRolesField = JcasbinAuthorizer.class.getDeclaredField("loadedRoles");
+    loadedRolesField.setAccessible(true);
+    loadedRolesField.set(jcasbinAuthorizer, gatedLoadedRoles);
+
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Set<Long>> delayed =
+          workers.submit(
+              () -> {
+                delayedThread.set(Thread.currentThread());
+                return reloadRolesInWorker(
+                    ImmutableList.of(roleId), ImmutableMap.of(roleId, version));
+              });
+      assertTrue(observedStale.await(10, TimeUnit.SECONDS));
+      assertTrue(
+          workers
+              .submit(
+                  () ->
+                      reloadRolesInWorker(
+                          ImmutableList.of(roleId), ImmutableMap.of(roleId, version)))
+              .get(10, TimeUnit.SECONDS)
+              .isEmpty());
+      assertEquals(1, entityReads.get());
+      previousLoadFinished.countDown();
+
+      assertTrue(delayed.get(10, TimeUnit.SECONDS).isEmpty());
+      assertEquals(1, entityReads.get(), "a delayed owner must recheck the loaded marker");
+      assertEquals(version.getUpdatedAt(), loadedRoles.getIfPresent(roleId).orElse(null));
+      assertNoRolePolicyLoadStates();
+    } finally {
+      previousLoadFinished.countDown();
       workers.shutdownNow();
       assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
       loadedRolesField.set(jcasbinAuthorizer, loadedRoles);
@@ -2133,8 +2213,13 @@ public class TestJcasbinAuthorizer {
     Map<Long, Long> generations = (Map<Long, Long>) generationsField.get(jcasbinAuthorizer);
     Field watermarkField = JcasbinAuthorizer.class.getDeclaredField("prunedRoleClearGeneration");
     watermarkField.setAccessible(true);
-    Method capture = JcasbinAuthorizer.class.getDeclaredMethod("roleClearGeneration", long.class);
+    Method capture =
+        JcasbinAuthorizer.class.getDeclaredMethod(
+            "retainRolePolicyLoadStates", List.class, List.class);
     capture.setAccessible(true);
+    Method release =
+        JcasbinAuthorizer.class.getDeclaredMethod("releaseRolePolicyLoadStates", List.class);
+    release.setAccessible(true);
     ReentrantReadWriteLock policyLock = getRolePolicyLock(jcasbinAuthorizer);
     CountDownLatch started = new CountDownLatch(1);
     AtomicReference<Long> captured = new AtomicReference<>();
@@ -2144,7 +2229,17 @@ public class TestJcasbinAuthorizer {
             () -> {
               started.countDown();
               try {
-                captured.set((Long) capture.invoke(jcasbinAuthorizer, roleId));
+                List<Long> leased = new ArrayList<>();
+                List<?> keys =
+                    (List<?>)
+                        capture.invoke(
+                            jcasbinAuthorizer,
+                            ImmutableList.of(new RoleUpdatedAt(roleId, "pruningRole", 1L)),
+                            leased);
+                Field generation = keys.get(0).getClass().getDeclaredField("clearGeneration");
+                generation.setAccessible(true);
+                captured.set(generation.getLong(keys.get(0)));
+                release.invoke(jcasbinAuthorizer, leased);
               } catch (Throwable e) {
                 failure.set(e);
               }
@@ -2171,6 +2266,7 @@ public class TestJcasbinAuthorizer {
     assertFalse(reader.isAlive());
     assertNull(failure.get());
     assertEquals(20L, captured.get());
+    assertNoRolePolicyLoadStates();
   }
 
   /** Loaded-role cache probes must permit removal callbacks to acquire the policy write lock. */
@@ -3211,7 +3307,7 @@ public class TestJcasbinAuthorizer {
               .anyMatch(
                   frame ->
                       frame.getClassName().equals(JcasbinAuthorizer.class.getName())
-                          && frame.getMethodName().equals("roleClearGeneration"))) {
+                          && frame.getMethodName().equals("retainRolePolicyLoadStates"))) {
         return true;
       }
       Thread.yield();

@@ -1461,10 +1461,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     Map<RolePolicyLoadKey, CompletableFuture<Boolean>> requestLoads = new LinkedHashMap<>();
     List<RolePolicyLoadKey> ownedLoads = new ArrayList<>();
     try {
-      for (RoleUpdatedAt rv : staleRoleVersions) {
-        RolePolicyLoadKey key = new RolePolicyLoadKey(rv, roleClearGeneration(rv.getRoleId()));
-        retainRolePolicyLoadState(key);
-        leasedRoles.add(key.roleVersion.getRoleId());
+      for (RolePolicyLoadKey key : retainRolePolicyLoadStates(staleRoleVersions, leasedRoles)) {
         CompletableFuture<Boolean> result = new CompletableFuture<>();
         CompletableFuture<Boolean> existing = rolePolicyLoads.putIfAbsent(key, result);
         requestLoads.put(key, existing == null ? result : existing);
@@ -1506,20 +1503,34 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return unreadableRoleIds;
   }
 
-  private void retainRolePolicyLoadState(RolePolicyLoadKey key) {
+  /**
+   * Captures the clear generation of every stale role and retains its version floor, all in one
+   * critical section. The write lock is shared with every enforce() call, so it is taken once per
+   * request rather than once per role. Pruning removes map entries before publishing its watermark
+   * under the same lock, so a captured generation never observes the gap between the two.
+   */
+  private List<RolePolicyLoadKey> retainRolePolicyLoadStates(
+      List<RoleUpdatedAt> staleRoleVersions, List<Long> leasedRoles) {
+    List<RolePolicyLoadKey> keys = new ArrayList<>(staleRoleVersions.size());
     rolePolicyLock.writeLock().lock();
     try {
-      long roleId = key.roleVersion.getRoleId();
-      RolePolicyLoadState state = rolePolicyLoadStates.get(roleId);
-      if (state == null) {
-        rolePolicyLoadStates.put(roleId, new RolePolicyLoadState(key.roleVersion.getUpdatedAt()));
-      } else {
-        state.highestVersion = Math.max(state.highestVersion, key.roleVersion.getUpdatedAt());
-        state.references++;
+      for (RoleUpdatedAt rv : staleRoleVersions) {
+        long roleId = rv.getRoleId();
+        RolePolicyLoadKey key = new RolePolicyLoadKey(rv, roleClearGenerationWithoutLock(roleId));
+        RolePolicyLoadState state = rolePolicyLoadStates.get(roleId);
+        if (state == null) {
+          rolePolicyLoadStates.put(roleId, new RolePolicyLoadState(rv.getUpdatedAt()));
+        } else {
+          state.highestVersion = Math.max(state.highestVersion, rv.getUpdatedAt());
+          state.references++;
+        }
+        leasedRoles.add(roleId);
+        keys.add(key);
       }
     } finally {
       rolePolicyLock.writeLock().unlock();
     }
+    return keys;
   }
 
   private void releaseRolePolicyLoadStates(List<Long> leasedRoles) {
@@ -1675,17 +1686,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return true;
   }
 
-  private long roleClearGeneration(long roleId) {
-    // Pruning removes map entries before publishing its watermark under the write lock. Capture
-    // both together so a flight cannot observe the temporary gap between those two mutations.
-    rolePolicyLock.readLock().lock();
-    try {
-      return roleClearGenerationWithoutLock(roleId);
-    } finally {
-      rolePolicyLock.readLock().unlock();
-    }
-  }
-
   private long roleClearGenerationWithoutLock(long roleId) {
     return Math.max(roleClearGenerations.getOrDefault(roleId, 0L), prunedRoleClearGeneration);
   }
@@ -1705,6 +1705,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           // A newer partial load (or failed read) may have no loaded marker. Do not overwrite it
           // with an old snapshot. Unlike an epoch change, this has no generation repair signal,
           // so explicitly fail this load and every waiter closed.
+          LOG.warn(
+              "Discarded the policies of role {} loaded at version {}, as version {} was observed"
+                  + " concurrently without a complete load; failing closed",
+              roleId,
+              key.roleVersion.getUpdatedAt(),
+              state.highestVersion);
           unreadableRoleIds.add(roleId);
         }
         // A complete newer version already satisfies the request. Do not delegate an obsolete
@@ -1932,7 +1938,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, AuthorizationRequestContext requestContext, BooleanSupplier evaluation) {
     if (!requestContext.getUnreadableRoleIds().isEmpty()) {
       LOG.warn(
-          "Failed to read roles {} during the initial role load; failing closed",
+          "Roles {} could not be read or were superseded by a newer version during the initial"
+              + " role load; failing closed",
           requestContext.getUnreadableRoleIds());
       return Optional.empty();
     }
@@ -1974,7 +1981,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       // the same one any request would see.
       if (!unreadableRoleIds.isEmpty()) {
         LOG.warn(
-            "Failed to read roles {} to reload their cleared policies; failing closed",
+            "Roles {} could not be read or were superseded by a newer version while reloading"
+                + " their cleared policies; failing closed",
             unreadableRoleIds);
         return Optional.empty();
       }
