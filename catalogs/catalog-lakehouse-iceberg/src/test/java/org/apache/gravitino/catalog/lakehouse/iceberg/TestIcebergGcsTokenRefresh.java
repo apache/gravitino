@@ -28,16 +28,16 @@ import org.junit.jupiter.api.Test;
 public class TestIcebergGcsTokenRefresh {
 
   @Test
-  void catalogWrapperReusesInstanceWhenTokenHasNoExpiry() {
+  void ensureGcsTokenFreshNoopsWithoutExpiry() {
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
     IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(memoryConfig());
     ops.icebergCatalogWrapper = wrapper;
-    Assertions.assertSame(wrapper, ops.catalogWrapper());
-    Assertions.assertSame(wrapper, ops.catalogWrapper());
+    ops.ensureGcsTokenFresh();
+    Assertions.assertSame(wrapper, ops.icebergCatalogWrapper);
   }
 
   @Test
-  void catalogWrapperKeepsInstanceWhenTokenFarFromExpiry() {
+  void ensureGcsTokenFreshNoopsWhenTokenFarFromExpiry() {
     long expiresAt = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1);
     IcebergConfig config =
         new IcebergConfig(
@@ -51,7 +51,8 @@ public class TestIcebergGcsTokenRefresh {
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
     IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(config);
     ops.icebergCatalogWrapper = wrapper;
-    Assertions.assertSame(wrapper, ops.catalogWrapper());
+    ops.ensureGcsTokenFresh();
+    Assertions.assertSame(wrapper, ops.icebergCatalogWrapper);
   }
 
   private static IcebergConfig memoryConfig() {
