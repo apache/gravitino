@@ -26,22 +26,21 @@ import org.junit.jupiter.api.Test;
 
 public class TestStandaloneCatalogWrapperManager {
 
+  private static final IcebergConfig MEMORY =
+      new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+
   @Test
   void getWithConfigReusesCachedWrapper() {
-    IcebergConfig config =
-        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(config)) {
-      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("c1", config);
-      IcebergCatalogWrapper second = manager.getOrCreateCatalogWrapper("c1", config);
-      Assertions.assertSame(first, second);
+    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(MEMORY)) {
+      Assertions.assertSame(
+          manager.getOrCreateCatalogWrapper("c1", MEMORY),
+          manager.getOrCreateCatalogWrapper("c1", MEMORY));
     }
   }
 
   @Test
   void getWithoutConfigUnsupported() {
-    IcebergConfig config =
-        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(config)) {
+    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(MEMORY)) {
       Assertions.assertThrows(
           UnsupportedOperationException.class, () -> manager.getCatalogWrapper("c1"));
     }
@@ -49,13 +48,10 @@ public class TestStandaloneCatalogWrapperManager {
 
   @Test
   void invalidateDropsCachedWrapper() {
-    IcebergConfig config =
-        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(config)) {
-      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("c1", config);
+    try (StandaloneCatalogWrapperManager manager = new StandaloneCatalogWrapperManager(MEMORY)) {
+      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("c1", MEMORY);
       manager.invalidateCatalogWrapper("c1");
-      IcebergCatalogWrapper second = manager.getOrCreateCatalogWrapper("c1", config);
-      Assertions.assertNotSame(first, second);
+      Assertions.assertNotSame(first, manager.getOrCreateCatalogWrapper("c1", MEMORY));
     }
   }
 }

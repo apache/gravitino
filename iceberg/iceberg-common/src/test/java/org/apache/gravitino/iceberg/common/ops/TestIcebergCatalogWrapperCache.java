@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.common.ops;
 import com.google.common.collect.ImmutableMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.junit.jupiter.api.Assertions;
@@ -28,35 +29,38 @@ import org.junit.jupiter.api.Test;
 
 public class TestIcebergCatalogWrapperCache {
 
+  private static final long HOUR_MS = TimeUnit.HOURS.toMillis(1);
+  private static final long HOUR_NS = TimeUnit.HOURS.toNanos(1);
+  private static final long NOW = 1_700_000_000_000L;
+
   @Test
   void getReusesCachedWrapper() {
-    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
-    AtomicInteger creates = new AtomicInteger();
-    IcebergCatalogWrapper first = cache.get("c1", name -> newMemoryWrapper(creates));
-    IcebergCatalogWrapper second = cache.get("c1", name -> newMemoryWrapper(creates));
-    Assertions.assertSame(first, second);
-    Assertions.assertEquals(1, creates.get());
-    cache.close();
+    withCache(
+        cache -> {
+          AtomicInteger creates = new AtomicInteger();
+          IcebergCatalogWrapper first = cache.get("c1", name -> wrapper(creates));
+          Assertions.assertSame(first, cache.get("c1", name -> wrapper(creates)));
+          Assertions.assertEquals(1, creates.get());
+        });
   }
 
   @Test
   void sameCatalogVersionReusesWrapper() {
-    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
-    AtomicInteger creates = new AtomicInteger();
-    IcebergCatalogWrapper first = cache.get("c1", 1L, name -> newMemoryWrapper(creates));
-    IcebergCatalogWrapper second = cache.get("c1", 1L, name -> newMemoryWrapper(creates));
-    Assertions.assertSame(first, second);
-    Assertions.assertEquals(1, creates.get());
-    cache.close();
+    withCache(
+        cache -> {
+          AtomicInteger creates = new AtomicInteger();
+          IcebergCatalogWrapper first = cache.get("c1", 1L, name -> wrapper(creates));
+          Assertions.assertSame(first, cache.get("c1", 1L, name -> wrapper(creates)));
+          Assertions.assertEquals(1, creates.get());
+        });
   }
 
   @Test
   void newerCatalogVersionKeepsPreviousEntryUntilClosed() {
-    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
+    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(HOUR_MS);
     AtomicInteger creates = new AtomicInteger();
-    IcebergCatalogWrapper first = cache.get("c1", 1L, name -> newMemoryWrapper(creates));
-    IcebergCatalogWrapper second = cache.get("c1", 2L, name -> newMemoryWrapper(creates));
-
+    IcebergCatalogWrapper first = cache.get("c1", 1L, name -> wrapper(creates));
+    IcebergCatalogWrapper second = cache.get("c1", 2L, name -> wrapper(creates));
     Assertions.assertNotSame(first, second);
     Assertions.assertEquals(2, creates.get());
     Assertions.assertFalse(first.isClosed());
@@ -68,82 +72,75 @@ public class TestIcebergCatalogWrapperCache {
 
   @Test
   void invalidateRemovesAllVersionsForCatalogName() {
-    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
-    IcebergCatalogWrapper v1 = cache.get("c1", 1L, name -> newMemoryWrapper(new AtomicInteger()));
-    IcebergCatalogWrapper v2 = cache.get("c1", 2L, name -> newMemoryWrapper(new AtomicInteger()));
-    cache.invalidate("c1");
-    Assertions.assertTrue(v1.isClosed());
-    Assertions.assertTrue(v2.isClosed());
-    cache.close();
+    withCache(
+        cache -> {
+          IcebergCatalogWrapper v1 = cache.get("c1", 1L, name -> wrapper(new AtomicInteger()));
+          IcebergCatalogWrapper v2 = cache.get("c1", 2L, name -> wrapper(new AtomicInteger()));
+          cache.invalidate("c1");
+          Assertions.assertTrue(v1.isClosed());
+          Assertions.assertTrue(v2.isClosed());
+        });
   }
 
   @Test
   void computeCacheDurationNanosWithoutTokenExpiryUsesAccessEviction() {
-    IcebergConfig config =
-        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    long accessEvictionNanos = TimeUnit.HOURS.toNanos(1);
     Assertions.assertEquals(
-        accessEvictionNanos,
-        IcebergCatalogWrapperCache.computeCacheDurationNanos(
-            config, accessEvictionNanos, System.currentTimeMillis()));
+        HOUR_NS, IcebergCatalogWrapperCache.computeCacheDurationNanos(memory(), HOUR_NS, NOW));
   }
 
   @Test
   void computeCacheDurationNanosCapsByGcsTokenExpiry() {
-    long now = 1_700_000_000_000L;
-    long expiresAt = now + TimeUnit.HOURS.toMillis(1);
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
-                String.valueOf(expiresAt)));
-    long accessEvictionNanos = TimeUnit.HOURS.toNanos(2);
+    long expiresAt = NOW + HOUR_MS;
     long expected =
         TimeUnit.MILLISECONDS.toNanos(
-            TimeUnit.HOURS.toMillis(1) - IcebergCatalogWrapperCache.GCS_TOKEN_REFRESH_BUFFER_MS);
+            HOUR_MS - IcebergCatalogWrapperCache.GCS_TOKEN_REFRESH_BUFFER_MS);
     Assertions.assertEquals(
         expected,
-        IcebergCatalogWrapperCache.computeCacheDurationNanos(config, accessEvictionNanos, now));
+        IcebergCatalogWrapperCache.computeCacheDurationNanos(
+            memoryWithExpires(String.valueOf(expiresAt)), TimeUnit.HOURS.toNanos(2), NOW));
   }
 
   @Test
   void computeCacheDurationNanosExpiresImmediatelyWhenPastRefreshDeadline() {
-    long now = 1_700_000_000_000L;
-    long expiresAt = now + TimeUnit.MINUTES.toMillis(2);
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
-                String.valueOf(expiresAt)));
     Assertions.assertEquals(
         0L,
         IcebergCatalogWrapperCache.computeCacheDurationNanos(
-            config, TimeUnit.HOURS.toNanos(1), now));
+            memoryWithExpires(String.valueOf(NOW + TimeUnit.MINUTES.toMillis(2))), HOUR_NS, NOW));
   }
 
   @Test
   void computeCacheDurationNanosIgnoresInvalidExpiresAt() {
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
-                "not-a-number"));
-    long accessEvictionNanos = TimeUnit.MINUTES.toNanos(30);
+    long accessNs = TimeUnit.MINUTES.toNanos(30);
     Assertions.assertEquals(
-        accessEvictionNanos,
+        accessNs,
         IcebergCatalogWrapperCache.computeCacheDurationNanos(
-            config, accessEvictionNanos, System.currentTimeMillis()));
+            memoryWithExpires("not-a-number"), accessNs, NOW));
   }
 
-  private static IcebergCatalogWrapper newMemoryWrapper(AtomicInteger creates) {
+  private static void withCache(Consumer<IcebergCatalogWrapperCache> body) {
+    IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(HOUR_MS);
+    try {
+      body.accept(cache);
+    } finally {
+      cache.close();
+    }
+  }
+
+  private static IcebergCatalogWrapper wrapper(AtomicInteger creates) {
     creates.incrementAndGet();
-    return new IcebergCatalogWrapper(
-        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory")));
+    return new IcebergCatalogWrapper(memory());
+  }
+
+  private static IcebergConfig memory() {
+    return new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+  }
+
+  private static IcebergConfig memoryWithExpires(String expiresAt) {
+    return new IcebergConfig(
+        ImmutableMap.of(
+            IcebergConstants.CATALOG_BACKEND,
+            "memory",
+            IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+            expiresAt));
   }
 }

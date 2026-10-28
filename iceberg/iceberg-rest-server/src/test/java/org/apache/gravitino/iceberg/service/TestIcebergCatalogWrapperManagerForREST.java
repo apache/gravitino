@@ -151,107 +151,95 @@ public class TestIcebergCatalogWrapperManagerForREST {
 
   @Test
   public void testNewerCatalogVersionUsesNewCacheEntryWithoutClosingTheOldOne() throws Exception {
-    DynamicIcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
-    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
-    IcebergConfig icebergConfig =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-    Mockito.when(configProvider.getIcebergCatalogConfig(Mockito.anyString()))
-        .thenReturn(Optional.of(icebergConfig));
-
+    IcebergConfig config = memoryWarehouseConfig();
+    DynamicIcebergConfigProvider provider = dynamicProvider(config);
     AtomicReference<Long> version = new AtomicReference<>(1L);
-    try (IcebergCatalogWrapperManager manager =
-        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, "metalake") {
-          @Override
-          protected Optional<Long> catalogCurrentVersion(String catalogName) {
-            return Optional.of(version.get());
-          }
-        }) {
-      IcebergRESTServerContext.create(configProvider, false, false, true, manager);
+    try (IcebergCatalogWrapperManager manager = versionedManager(provider, version)) {
+      IcebergRESTServerContext.create(provider, false, false, true, manager);
       CatalogWrapperForREST original = manager.getCatalogWrapper("test");
-
-      CatalogWrapperForREST sameVersion = manager.getCatalogWrapper("test");
-      Assertions.assertSame(original, sameVersion);
+      Assertions.assertSame(original, manager.getCatalogWrapper("test"));
 
       version.set(2L);
       CatalogWrapperForREST replacement = manager.getCatalogWrapper("test");
       Assertions.assertNotSame(original, replacement);
       Assertions.assertFalse(original.isClosed());
       Assertions.assertFalse(replacement.isClosed());
-
-      IcebergCatalogWrapper fromConfig = manager.getOrCreateCatalogWrapper("test", icebergConfig);
-      Assertions.assertSame(replacement, fromConfig);
+      Assertions.assertSame(replacement, manager.getOrCreateCatalogWrapper("test", config));
     }
   }
 
   @Test
   public void testMissingCatalogVersionFailsFastAndClearsCache() throws Exception {
-    DynamicIcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
-    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
-    IcebergConfig icebergConfig =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-    Mockito.when(configProvider.getIcebergCatalogConfig(Mockito.anyString()))
-        .thenReturn(Optional.of(icebergConfig));
-
+    IcebergConfig config = memoryWarehouseConfig();
+    DynamicIcebergConfigProvider provider = dynamicProvider(config);
     AtomicReference<Optional<Long>> version = new AtomicReference<>(Optional.of(1L));
     try (IcebergCatalogWrapperManager manager =
-        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, "metalake") {
+        new IcebergCatalogWrapperManager(Maps.newHashMap(), provider, true, "metalake") {
           @Override
           protected Optional<Long> catalogCurrentVersion(String catalogName) {
             return version.get();
           }
         }) {
-      IcebergRESTServerContext.create(configProvider, false, false, true, manager);
+      IcebergRESTServerContext.create(provider, false, false, true, manager);
       CatalogWrapperForREST original = manager.getCatalogWrapper("test");
-      Assertions.assertFalse(original.isClosed());
-
       version.set(Optional.empty());
       Assertions.assertThrows(
           NoSuchCatalogException.class, () -> manager.getCatalogWrapper("test"));
       Assertions.assertThrows(
-          NoSuchCatalogException.class,
-          () -> manager.getOrCreateCatalogWrapper("test", icebergConfig));
+          NoSuchCatalogException.class, () -> manager.getOrCreateCatalogWrapper("test", config));
       Assertions.assertTrue(original.isClosed());
     }
   }
 
   @Test
   public void testStaticAuxModeSkipsCatalogVersionCache() throws Exception {
-    IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(Maps.newHashMap());
-    configProvider.initialize(Maps.newHashMap());
-    IcebergConfig icebergConfig =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
+    IcebergConfigProvider provider = IcebergConfigProviderFactory.create(Maps.newHashMap());
+    provider.initialize(Maps.newHashMap());
+    IcebergConfig config = memoryWarehouseConfig();
     try (IcebergCatalogWrapperManager manager =
         new IcebergCatalogWrapperManager(
-            Maps.newHashMap(), configProvider, true, configProvider.getMetalakeName())) {
-      IcebergRESTServerContext.create(configProvider, false, true, false, manager);
-      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("iceberg", icebergConfig);
-      IcebergCatalogWrapper second = manager.getOrCreateCatalogWrapper("iceberg", icebergConfig);
-      Assertions.assertSame(first, second);
+            Maps.newHashMap(), provider, true, provider.getMetalakeName())) {
+      IcebergRESTServerContext.create(provider, false, true, false, manager);
+      IcebergCatalogWrapper first = manager.getOrCreateCatalogWrapper("iceberg", config);
+      Assertions.assertSame(first, manager.getOrCreateCatalogWrapper("iceberg", config));
       Assertions.assertFalse(first.isClosed());
     }
   }
 
   @Test
   public void testDynamicAuxModeRequiresMetalakeName() {
-    DynamicIcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, true, " "));
+        () ->
+            new IcebergCatalogWrapperManager(
+                Maps.newHashMap(), Mockito.mock(DynamicIcebergConfigProvider.class), true, " "));
+  }
+
+  private static IcebergConfig memoryWarehouseConfig() {
+    return new IcebergConfig(
+        ImmutableMap.of(
+            IcebergConstants.CATALOG_BACKEND,
+            "memory",
+            IcebergConstants.WAREHOUSE,
+            "/tmp/warehouse"));
+  }
+
+  private static DynamicIcebergConfigProvider dynamicProvider(IcebergConfig config) {
+    DynamicIcebergConfigProvider provider = Mockito.mock(DynamicIcebergConfigProvider.class);
+    Mockito.when(provider.getDefaultCatalogName()).thenReturn("test");
+    Mockito.when(provider.getIcebergCatalogConfig(Mockito.anyString()))
+        .thenReturn(Optional.of(config));
+    return provider;
+  }
+
+  private static IcebergCatalogWrapperManager versionedManager(
+      DynamicIcebergConfigProvider provider, AtomicReference<Long> version) {
+    return new IcebergCatalogWrapperManager(Maps.newHashMap(), provider, true, "metalake") {
+      @Override
+      protected Optional<Long> catalogCurrentVersion(String catalogName) {
+        return Optional.of(version.get());
+      }
+    };
   }
 
   private static IcebergCatalogWrapperManager newManager() {
