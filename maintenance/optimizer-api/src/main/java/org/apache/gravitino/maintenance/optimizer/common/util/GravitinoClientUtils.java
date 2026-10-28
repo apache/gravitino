@@ -20,10 +20,12 @@
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
@@ -63,6 +65,12 @@ public final class GravitinoClientUtils {
     String uri = config.get(OptimizerConfig.GRAVITINO_URI_CONFIG);
     String metalake = config.get(OptimizerConfig.GRAVITINO_METALAKE_CONFIG);
     GravitinoClient.ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
+
+    String retryTimes = config.getRawString(GravitinoClientConfiguration.CLIENT_RETRY_TIMES);
+    if (retryTimes != null) {
+      builder.withClientConfig(
+          Collections.singletonMap(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, retryTimes));
+    }
 
     OptimizerConfig authConfig = config;
     if (authFromUpdaterOptions != null && !authFromUpdaterOptions.isEmpty()) {

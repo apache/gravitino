@@ -280,6 +280,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // at the same time.
     // 2. if the TableChange.RenameTable only change the table name, we need to acquire write lock
     // to on the schema.
+    //
+    // The read lock on the table does not order this alter against a concurrent load or another
+    // alter of the same table, and no tree lock orders them across servers. Either of them can
+    // write a stale column list over this alter and turn a column rename into a drop plus an add,
+    // which removes the renamed column's tags. See updateColumnsIfNecessaryWhenLoad and #14279.
     NameIdentifier nameIdentifierForLock = ident;
     String schemaName = ident.namespace().level(2);
     Arrays.stream(changes).forEach(TableOperationDispatcher::validateColumnChange);
@@ -365,7 +370,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                             // Update the columns
                             Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
                                 updateColumnsIfNecessary(
-                                    alteredTable, tableEntity, catalogResult.columnNameChanges);
+                                    alteredTable,
+                                    tableEntity,
+                                    alignNameChangesWithStoredColumns(
+                                        catalogResult.columnNameChanges, tableEntity.columns()));
 
                             return TableEntity.builder()
                                 .withId(tableEntity.id())
@@ -588,6 +596,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       // must win. The plain insert then conflicts, and loadTable reloads that row.
       store.put(tableEntity, stringId != null);
     } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
@@ -902,6 +913,45 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return originalToCurrent;
   }
 
+  /**
+   * Keys the column renames and drops by the names of the stored columns.
+   *
+   * <p>Some catalogs, such as MySQL, match column names case-insensitively while reporting
+   * case-sensitive names, so they accept a change whose column name differs in case from the stored
+   * one. Such a name is mapped to the stored column it matches when exactly one does, so a rename
+   * keeps the column id instead of being stored as a drop plus an add.
+   *
+   * @param nameChanges the renames and drops returned by {@link #resolveColumnNameChanges}
+   * @param storedColumns the columns of the stored table entity, or {@code null} if it has none
+   * @return the renames and drops keyed by the stored column names
+   */
+  @VisibleForTesting
+  static Map<String, String> alignNameChangesWithStoredColumns(
+      Map<String, String> nameChanges, @Nullable List<ColumnEntity> storedColumns) {
+    if (nameChanges.isEmpty() || storedColumns == null) {
+      return nameChanges;
+    }
+
+    Set<String> storedNames =
+        storedColumns.stream().map(ColumnEntity::name).collect(Collectors.toSet());
+    Map<String, String> aligned = new HashMap<>();
+    for (Map.Entry<String, String> change : nameChanges.entrySet()) {
+      String name = change.getKey();
+      if (!storedNames.contains(name)) {
+        List<String> matches =
+            storedNames.stream()
+                .filter(stored -> stored.equalsIgnoreCase(change.getKey()))
+                .filter(stored -> !nameChanges.containsKey(stored))
+                .collect(Collectors.toList());
+        if (matches.size() == 1 && !aligned.containsKey(matches.get(0))) {
+          name = matches.get(0);
+        }
+      }
+      aligned.put(name, change.getValue());
+    }
+    return aligned;
+  }
+
   /** Returns the original name of the pre-existing column currently called {@code name}. */
   @Nullable
   private static String originalColumnNamed(
@@ -1051,8 +1101,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // stored columns since, e.g. renamed a column while keeping its id. So the columns are matched
     // again against the entity being updated, which is the latest stored one. This narrows the
     // load/alter race but does not close it: if this load read the catalog before a concurrent
-    // alter and the store after it, the catalog snapshot is the stale side. Closing that needs
-    // alterTable and loadTable to exclude each other, which is tracked separately.
+    // alter and the store after it, the catalog snapshot is the stale side, and a column that the
+    // alter renamed is stored as dropped plus added, so it loses its id and its tags.
+    //
+    // A tree lock cannot close this, because tree locks are local to one server. Closing it needs
+    // the alter to record in the store that it is in progress before it calls the catalog, and
+    // the load to read the stored version, operation epoch and in-progress mark before it reads
+    // the catalog, skipping the store write while the mark is set. The load may write only if the
+    // version and epoch are unchanged and no in-progress mark is set. That needs a new EntityStore
+    // API and is tracked in #14279.
     Table tableFromCatalog = combinedTable.tableFromCatalog();
     return TreeLockUtils.doWithTreeLock(
         tableIdent,

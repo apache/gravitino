@@ -1,3 +1,4 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import net.ltgt.gradle.errorprone.errorprone
 
 /*
@@ -22,12 +23,21 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
+  antlr
   alias(libs.plugins.jcstress)
   alias(libs.plugins.jmh)
   alias(libs.plugins.aspectj.post.compile.weaving)
+  alias(libs.plugins.shadow)
+}
+
+val shadedAntlr by configurations.creating {
+  isCanBeConsumed = false
 }
 
 dependencies {
+  antlr(libs.antlr.tool)
+  shadedAntlr(libs.antlr.runtime)
+  compileOnly(libs.antlr.runtime)
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
@@ -43,6 +53,8 @@ dependencies {
   implementation(libs.concurrent.trees)
   implementation(libs.guava)
   implementation(libs.h2db)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.dataformat.yaml)
   implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
@@ -76,8 +88,10 @@ dependencies {
   testImplementation(project(":server-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(libs.awaitility)
+  testImplementation(libs.antlr.runtime)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.junit.platform.testkit)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
@@ -103,7 +117,119 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
+// Core's tests run in four lanes: coreUnitTest, plus coreH2Test/coreMySQLTest/corePostgreSQLTest.
+// A class joins a backend lane through its @CoreBackend.* annotation; see CoreBackend.java.
+// Backend name -> the JUnit tag that admits a class to that lane. Keep in sync with CoreBackend.
+val coreBackendTestTags =
+  linkedMapOf(
+    "h2" to "gravitino-core-h2-test",
+    "mysql" to "gravitino-core-mysql-test",
+    "postgresql" to "gravitino-core-postgresql-test"
+  )
+val coreTestBackendProperty = "gravitino.core.test.backend"
+
+fun registerCoreTestTask(
+  taskName: String,
+  backend: String? = null
+) = tasks.register<Test>(taskName) {
+  group = "verification"
+  description =
+    if (backend == null) {
+      "Runs core unit tests."
+    } else {
+      "Runs core database tests against $backend."
+    }
+
+  testClassesDirs = sourceSets["test"].output.classesDirs
+  classpath = sourceSets["test"].runtimeClasspath
+
+  reports.html.outputLocation.set(
+    rootProject.layout.buildDirectory.dir("reports/tests/core/$taskName")
+  )
+
+  useJUnitPlatform {
+    if (backend == null) {
+      // Whatever carries no backend tag (and no Docker tag) is the unit suite.
+      excludeTags(*coreBackendTestTags.values.toTypedArray(), "gravitino-docker-test")
+    } else {
+      val ownBackendTag =
+        coreBackendTestTags[backend]
+          ?: throw GradleException("Unsupported core test backend: $backend")
+      // Plain tag include, applied by JUnit at discovery time, so classes not tagged for this
+      // backend never show up in this lane's JUnit XML. A class tagged for several backends
+      // runs under each of them.
+      includeTags(ownBackendTag)
+    }
+  }
+
+  if (backend != null) {
+    systemProperty(coreTestBackendProperty, backend)
+    // Read by the root setTestEnvironment inside doFirst, i.e. at execution time, after every
+    // configuration action has run - so it doesn't depend on register/configureEach ordering.
+    extensions.extraProperties["includeDockerTaggedTests"] = true
+
+    // Database tests mutate process-wide state and must remain sequential within each lane.
+    maxParallelForks = 1
+    systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+
+    if (backend != "h2") {
+      // The test databases are thrown away, so their containers can skip durability work.
+      // Read by DatabaseContainer.Durability.fromSystemProperty(); keep the name in sync.
+      systemProperty("gravitino.test.db.disposableData", "true")
+      doFirst {
+        if (rootProject.extra["dockerTest"] != true) {
+          throw GradleException(
+            "$path requires Docker; use -PskipDockerTests=false with Docker running."
+          )
+        }
+      }
+    }
+  }
+}
+
+// Nested fixture classes TestBackendTestExtension runs through EngineTestKit; Gradle's class scan
+// would run them directly too. Keep in sync with TestBackendTestExtension.FIXTURE.
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform { excludeTags("gravitino-test-fixture") }
+}
+
+registerCoreTestTask("coreUnitTest")
+registerCoreTestTask("coreH2Test", "h2")
+registerCoreTestTask("coreMySQLTest", "mysql")
+registerCoreTestTask("corePostgreSQLTest", "postgresql")
+
+val coreSuiteCoverage =
+  providers.gradleProperty("coreSuiteCoverage").map(String::toBoolean).orElse(false)
+val coreSuiteTaskNames =
+  listOf("coreUnitTest", "coreH2Test", "coreMySQLTest", "corePostgreSQLTest")
+val coreSuiteExecutionData =
+  coreSuiteTaskNames.map { layout.buildDirectory.file("jacoco/$it.exec") }
+tasks.named<JacocoReport>("jacocoTestReport") {
+  if (coreSuiteCoverage.get()) {
+    dependsOn(tasks.named("classes"))
+    executionData.setFrom(coreSuiteExecutionData)
+  }
+}
+
+// :core:test is kept for IDEs and local habit, and is deprecated: run a lane instead. CI skips it
+// (`build` passes `-x :core:test`) and runs each lane in its own `core-test` job.
+// TestRestrictedSqlGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
+// the legacy :core:test run it; the database lanes don't need the input.
+listOf("coreUnitTest", "test").forEach {
+  tasks.named<Test>(it) {
+    inputs.file(rootProject.file("docs/policies.md"))
+    inputs.property("updateRestrictedSqlGolden", providers.environmentVariable("GRAVITINO_UPDATE_RESTRICTED_SQL_GOLDEN").orElse("false"))
+    systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
+  }
+}
+
 tasks.test {
+  doFirst {
+    logger.warn(
+      "WARNING: :core:test is deprecated and does not correspond to any CI lane. Use " +
+        "coreUnitTest, coreH2Test, coreMySQLTest, or corePostgreSQLTest instead."
+    )
+  }
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode == "embedded") {
     environment("GRAVITINO_HOME", project.rootDir.path)
@@ -113,9 +239,50 @@ tasks.test {
 }
 
 tasks.withType<JavaCompile>().configureEach {
+  options.errorprone.excludedPaths.set(".*/generated-src/antlr/.*")
   if (name.contains("jcstress", ignoreCase = true)) {
-    options.errorprone.excludedPaths.set(".*/generated/.*")
+    options.errorprone.excludedPaths.set(".*/(generated|generated-src/antlr)/.*")
   }
+}
+
+// The generator is build tooling; only antlr4-runtime belongs on the server classpath.
+configurations.matching { it.name in setOf("api", "implementation") }.configureEach {
+  setExtendsFrom(extendsFrom.filterNot { it.name == "antlr" })
+}
+
+tasks.generateGrammarSource {
+  arguments = arguments + listOf("-visitor", "-no-listener", "-package", "org.apache.gravitino.policy.sql.antlr")
+}
+
+tasks.named<Jar>("sourcesJar") {
+  dependsOn(tasks.generateGrammarSource)
+}
+
+val shadedCoreJar = tasks.named<ShadowJar>("shadowJar") {
+  configurations = listOf(shadedAntlr)
+  archiveClassifier.set("")
+  relocate("org.antlr.v4.runtime", "org.apache.gravitino.shaded.org.antlr.v4.runtime")
+}
+
+tasks.jar {
+  enabled = false
+  dependsOn(shadedCoreJar)
+}
+
+// Every runtime consumer, including Spark test fixtures, must use the relocated parser classes.
+listOf("apiElements", "runtimeElements").forEach { name ->
+  configurations.named(name) {
+    outgoing.artifacts.clear()
+    outgoing.artifact(shadedCoreJar)
+  }
+}
+
+components.named<AdhocComponentWithVariants>("java") {
+  withVariantsFromConfiguration(configurations["shadowRuntimeElements"]) { skip() }
+}
+
+tasks.javadoc {
+  exclude("**/policy/sql/antlr/**")
 }
 
 tasks.named<JavaCompile>("jmhCompileGeneratedClasses").configure {

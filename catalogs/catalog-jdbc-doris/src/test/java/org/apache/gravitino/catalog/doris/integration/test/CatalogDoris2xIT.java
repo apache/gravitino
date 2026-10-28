@@ -45,6 +45,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterAll;
@@ -135,6 +136,49 @@ public class CatalogDoris2xIT extends BaseIT {
       try (ResultSet result = statement.executeQuery("SHOW CREATE TABLE `comment_with_nereids`")) {
         assertTrue(result.next());
         assertTrue(result.getString(2).contains("gravitino.v1.uid"));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "O'Brien",
+        "quote\\' and \\new\\path; \"double\"",
+        "owner's a\"\"b \"value\"\\path",
+        "ends with \\"
+      })
+  void testCreateTableStringDefaultIsStoredVerbatim(String defaultValue) throws Exception {
+    TableCatalog tables = catalog.asTableCatalog();
+    NameIdentifier identifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("create_default"));
+    tables.createTable(
+        identifier,
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), null, false, false, null),
+          Column.of(
+              "col1",
+              Types.VarCharType.of(255),
+              null,
+              true,
+              false,
+              Literals.varcharLiteral(255, defaultValue))
+        },
+        null,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.hash(1, NamedReference.field("id")),
+        null);
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO `%s` (id) VALUES (1)", identifier.name()));
+      try (ResultSet result =
+          statement.executeQuery(String.format("SELECT col1 FROM `%s`", identifier.name()))) {
+        assertTrue(result.next());
+        assertEquals(defaultValue, result.getString(1));
       }
     }
   }

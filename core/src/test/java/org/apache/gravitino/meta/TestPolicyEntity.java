@@ -158,8 +158,8 @@ public class TestPolicyEntity {
 
   @Test
   public void testReadRestrictionPolicyContentTypes() {
-    PolicyContent rowFilter = PolicyContents.rowFilter("filter := true");
-    PolicyContent columnMask = PolicyContents.columnMask("mask := action(\"replace-with-null\")");
+    PolicyContent rowFilter = PolicyContents.rowFilter("() RETURNS BOOLEAN -> TRUE");
+    PolicyContent columnMask = PolicyContents.columnMask("(value STRING) RETURNS STRING -> NULL");
 
     Assertions.assertDoesNotThrow(
         () -> readRestrictionPolicy(Policy.BuiltInType.ROW_FILTER, rowFilter));
@@ -171,6 +171,12 @@ public class TestPolicyEntity {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> readRestrictionPolicy(Policy.BuiltInType.COLUMN_MASK, rowFilter));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            readRestrictionPolicy(
+                Policy.BuiltInType.ROW_FILTER,
+                PolicyContents.rowFilter("previously-stored-expression")));
   }
 
   private static PolicyEntity readRestrictionPolicy(

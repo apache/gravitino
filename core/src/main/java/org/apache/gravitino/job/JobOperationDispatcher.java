@@ -81,11 +81,14 @@ public interface JobOperationDispatcher extends Closeable {
    * @param changes the changes to apply to the job template
    * @return the updated job template entity after applying the changes
    * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   * @throws JobTemplateAlreadyExistsException if the job template is renamed to a name that already
+   *     exists
    * @throws IllegalArgumentException if any of the changes cannot be applied to the job template.
    */
   JobTemplateEntity alterJobTemplate(
       String metalake, String jobTemplateName, JobTemplateChange... changes)
-      throws NoSuchJobTemplateException, IllegalArgumentException;
+      throws NoSuchJobTemplateException, JobTemplateAlreadyExistsException,
+          IllegalArgumentException;
 
   /**
    * List all the jobs. If the jobTemplateName is provided, it will list the jobs associated with
@@ -135,7 +138,7 @@ public interface JobOperationDispatcher extends Closeable {
    * @param includeOutput whether to also fetch and attach the job's stdout/stderr output
    * @param maxLines the maximum number of (most recent) output lines to return, or {@code null} to
    *     use the global default
-   * @param maxBytes the maximum number of (most recent) output bytes to read, or {@code null} to
+   * @param maxBytes the maximum number of (most recent) output bytes to return, or {@code null} to
    *     use the global default
    * @return the job entity associated with the specified ID
    * @throws NoSuchJobException if no job with the specified ID exists

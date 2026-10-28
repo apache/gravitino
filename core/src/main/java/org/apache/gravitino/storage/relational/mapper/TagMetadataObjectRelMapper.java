@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
+import org.apache.gravitino.storage.relational.po.TagRelationTagPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -35,6 +36,20 @@ public interface TagMetadataObjectRelMapper {
       method = "listTagPOsByMetadataObjectIdAndType")
   List<TagPO> listTagPOsByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  /**
+   * Selects tag assignment rows for multiple objects of one type.
+   *
+   * @param metadataObjectIds the source object IDs
+   * @param metadataObjectType the source object type
+   * @return the tag rows with source IDs
+   */
+  @SelectProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "listTagPOsByMetadataObjectIdsAndType")
+  List<TagRelationTagPO> listTagPOsByMetadataObjectIdsAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType);
 
   @SelectProvider(

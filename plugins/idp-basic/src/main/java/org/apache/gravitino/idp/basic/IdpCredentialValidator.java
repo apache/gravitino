@@ -67,8 +67,20 @@ public final class IdpCredentialValidator {
   }
 
   public static void validatePassword(String password) {
+    validatePassword(password, "password");
+  }
+
+  /**
+   * Validates a password field.
+   *
+   * @param password the password value
+   * @param fieldName the JSON/request field name used in error messages
+   */
+  public static void validatePassword(String password, String fieldName) {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(password), "\"password\" field is required and cannot be empty");
+        StringUtils.isNotBlank(password),
+        "\"%s\" field is required and cannot be empty",
+        fieldName);
     Preconditions.checkArgument(
         password.length() >= MIN_PASSWORD_LENGTH && password.length() <= MAX_PASSWORD_LENGTH,
         "Password must be at least %s characters long and at most %s characters long",

@@ -52,7 +52,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
 | `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned; takes precedence over `gravitino.bypass.maxWaitMillis`.                                                    | `30000`       | No       |
 
 Before using the StarRocks Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-starrocks/libs` directory.
 Gravitino doesn't package the JDBC driver for StarRocks due to licensing issues.
@@ -153,7 +153,15 @@ Unsupported for now.
 
 ### Table Indexes
 
-Unsupported
+Creating a table with non-empty index definitions is rejected before the table is created.
+
+When loading a table, Gravitino reports StarRocks secondary indexes with the following type mapping. Indexes of other types (e.g. `NGRAMBF`) are not reported, and table keys are not reported as indexes.
+
+| StarRocks Index Type | Gravitino Index Type |
+|----------------------|----------------------|
+| `BITMAP`             | `BITMAP`             |
+| `GIN`                | `INVERTED`           |
+| `VECTOR`             | `VECTOR`             |
 
 ### Table Partitioning
 
@@ -180,6 +188,13 @@ For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent i
 ### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+
+#### Drop and Purge Table
+
+- Dropping a table runs `DROP TABLE` in StarRocks. Whether StarRocks keeps the dropped table in its
+  recycle bin depends on the StarRocks configuration.
+- Purging a table is not supported. A purge request fails with an unsupported-operation error, and
+  the table and its data stay unchanged. Use drop instead.
 
 #### Alter Table Operations
 

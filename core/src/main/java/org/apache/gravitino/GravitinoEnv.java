@@ -91,6 +91,7 @@ import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.SemanticModelEventDispatcher;
 import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
@@ -813,6 +814,21 @@ public class GravitinoEnv {
   public void shutdown() {
     LOG.info("Shutting down Gravitino Environment...");
 
+    // Stop the auxiliary services first, since they share the event bus. Then stop the event
+    // listeners, so the async listeners finish the queued events, such as audit logs and built-in
+    // job template registration, before the entity store and the catalogs are closed.
+    if (auxServiceManager != null) {
+      try {
+        auxServiceManager.serviceStop();
+      } catch (Exception e) {
+        LOG.warn("Failed to stop AuxServiceManager", e);
+      }
+    }
+
+    if (eventListenerManager != null) {
+      eventListenerManager.stop();
+    }
+
     if (entityStore != null) {
       try {
         entityStore.close();
@@ -825,20 +841,8 @@ public class GravitinoEnv {
       catalogManager.close();
     }
 
-    if (auxServiceManager != null) {
-      try {
-        auxServiceManager.serviceStop();
-      } catch (Exception e) {
-        LOG.warn("Failed to stop AuxServiceManager", e);
-      }
-    }
-
     if (metricsSystem != null) {
       metricsSystem.close();
-    }
-
-    if (eventListenerManager != null) {
-      eventListenerManager.stop();
     }
 
     if (metalakeManager != null) {
@@ -1145,8 +1149,7 @@ public class GravitinoEnv {
         new ViewNormalizeDispatcher(viewHookDispatcher, catalogManager);
     this.viewDispatcher = new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
 
-    // Semantic Model operation chain: Normalize -> Hook -> Operation.
-    // TODO(#12595): Add an outer SemanticModelEventDispatcher.
+    // Semantic Model operation chain: Event -> Normalize -> Hook -> Operation.
     SemanticModelOperationDispatcher semanticModelOperationDispatcher =
         new SemanticModelOperationDispatcher(
             catalogManager,
@@ -1157,8 +1160,10 @@ public class GravitinoEnv {
     SemanticModelHookDispatcher semanticModelHookDispatcher =
         new SemanticModelHookDispatcher(
             semanticModelOperationDispatcher, this::internalOwnerDispatcher);
-    this.semanticModelDispatcher =
+    SemanticModelNormalizeDispatcher semanticModelNormalizeDispatcher =
         new SemanticModelNormalizeDispatcher(semanticModelHookDispatcher, catalogManager);
+    this.semanticModelDispatcher =
+        new SemanticModelEventDispatcher(eventBus, semanticModelNormalizeDispatcher);
 
     this.statisticDispatcher = new StatisticEventDispatcher(eventBus, internalStatisticDispatcher);
 
