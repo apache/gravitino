@@ -69,8 +69,6 @@ dependencies {
   testImplementation(libs.mockito.core)
   testCompileOnly(libs.jsr305)
   testRuntimeOnly(libs.junit.jupiter.engine)
-  // The hosting server supplies core's runtime; isolated module tests need its SQL parser runtime.
-  testRuntimeOnly(libs.antlr.runtime)
 }
 
 tasks {

@@ -1,3 +1,4 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import net.ltgt.gradle.errorprone.errorprone
 
 /*
@@ -26,11 +27,17 @@ plugins {
   alias(libs.plugins.jcstress)
   alias(libs.plugins.jmh)
   alias(libs.plugins.aspectj.post.compile.weaving)
+  alias(libs.plugins.shadow)
+}
+
+val shadedAntlr by configurations.creating {
+  isCanBeConsumed = false
 }
 
 dependencies {
   antlr(libs.antlr.tool)
-  implementation(libs.antlr.runtime)
+  shadedAntlr(libs.antlr.runtime)
+  compileOnly(libs.antlr.runtime)
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
@@ -81,6 +88,7 @@ dependencies {
   testImplementation(project(":server-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(libs.awaitility)
+  testImplementation(libs.antlr.runtime)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.junit.platform.testkit)
@@ -248,6 +256,29 @@ tasks.generateGrammarSource {
 
 tasks.named<Jar>("sourcesJar") {
   dependsOn(tasks.generateGrammarSource)
+}
+
+val shadedCoreJar = tasks.named<ShadowJar>("shadowJar") {
+  configurations = listOf(shadedAntlr)
+  archiveClassifier.set("")
+  relocate("org.antlr.v4.runtime", "org.apache.gravitino.shaded.org.antlr.v4.runtime")
+}
+
+tasks.jar {
+  enabled = false
+  dependsOn(shadedCoreJar)
+}
+
+// Every runtime consumer, including Spark test fixtures, must use the relocated parser classes.
+listOf("apiElements", "runtimeElements").forEach { name ->
+  configurations.named(name) {
+    outgoing.artifacts.clear()
+    outgoing.artifact(shadedCoreJar)
+  }
+}
+
+components.named<AdhocComponentWithVariants>("java") {
+  withVariantsFromConfiguration(configurations["shadowRuntimeElements"]) { skip() }
 }
 
 tasks.javadoc {
