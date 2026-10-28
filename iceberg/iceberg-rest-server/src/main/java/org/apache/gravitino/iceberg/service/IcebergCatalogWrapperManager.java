@@ -18,18 +18,10 @@
  */
 package org.apache.gravitino.iceberg.service;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Expiry;
-import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -39,6 +31,7 @@ import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperCache;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -51,13 +44,7 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapperManager.class);
 
-  /**
-   * Evict a cached catalog this long before its minted GCS OAuth2 token expires, so the next
-   * request recreates the catalog and refreshes the token.
-   */
-  @VisibleForTesting static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
-
-  private final Cache<String, CatalogWrapperForREST> catalogWrapperCache;
+  private final IcebergCatalogWrapperCache catalogWrapperCache;
 
   private final IcebergConfigProvider configProvider;
 
@@ -67,30 +54,10 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
       boolean auxMode,
       String metalakeName) {
     this.configProvider = configProvider;
-    long accessEvictionNanos =
-        TimeUnit.MILLISECONDS.toNanos(
-            new IcebergConfig(properties)
-                .get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL));
-    this.catalogWrapperCache =
-        Caffeine.newBuilder()
-            .expireAfter(new CatalogWrapperExpiry(accessEvictionNanos))
-            .removalListener(
-                (catalogName, catalogWrapper, cause) -> {
-                  LOG.debug(
-                      "Removing IcebergCatalogWrapper from cache: catalog={}, cause={}",
-                      catalogName,
-                      cause);
-                  closeIcebergCatalogWrapper(catalogWrapper);
-                })
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1,
-                        new ThreadFactoryBuilder()
-                            .setDaemon(true)
-                            .setNameFormat("iceberg-catalog-wrapper-cleaner-%d")
-                            .build())))
-            .build();
+    long accessEvictionMs =
+        new IcebergConfig(properties)
+            .get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL);
+    this.catalogWrapperCache = new IcebergCatalogWrapperCache(accessEvictionMs);
     if (auxMode) {
       GravitinoEnv.getInstance()
           .catalogManager()
@@ -122,15 +89,24 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
       boolean cacheHit = catalogWrapperCache.getIfPresent(catalogName) != null;
       LOG.debug("getCatalogWrapper catalogName={} cacheHit={}", catalogName, cacheHit);
     }
-    CatalogWrapperForREST catalogWrapperForREST =
-        catalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
-    // Reload conf to reset UserGroupInformation or icebergTableOps will always use
-    // Simple auth.
-    catalogWrapperForREST.reloadHadoopConf();
-    return catalogWrapperForREST;
+    return catalogWrapperCache.get(catalogName, this::createCatalogWrapperFromProvider);
   }
 
-  private CatalogWrapperForREST createCatalogWrapper(String catalogName) {
+  @Override
+  public IcebergCatalogWrapper getCatalogWrapper(String catalogName, IcebergConfig icebergConfig) {
+    if (LOG.isDebugEnabled()) {
+      boolean cacheHit = catalogWrapperCache.getIfPresent(catalogName) != null;
+      LOG.debug("getCatalogWrapper(name,config) catalogName={} cacheHit={}", catalogName, cacheHit);
+    }
+    return catalogWrapperCache.get(catalogName, name -> createCatalogWrapper(name, icebergConfig));
+  }
+
+  @Override
+  public void invalidateCatalogWrapper(String catalogName) {
+    catalogWrapperCache.invalidate(catalogName);
+  }
+
+  private CatalogWrapperForREST createCatalogWrapperFromProvider(String catalogName) {
     IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
     if (serverContext.isAuthorizationEnabled()
         && !(configProvider instanceof DynamicIcebergConfigProvider)) {
@@ -176,81 +152,8 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
     return rest;
   }
 
-  private void closeIcebergCatalogWrapper(IcebergCatalogWrapper catalogWrapper) {
-    try {
-      catalogWrapper.close();
-    } catch (Exception ex) {
-      LOG.warn("Close Iceberg table catalog wrapper fail: {}, {}", catalogWrapper, ex);
-    }
-  }
-
-  /**
-   * Computes how long a catalog wrapper may stay in the IRC cache.
-   *
-   * <p>Uses the configured access-based eviction interval, capped by the time until a minted GCS
-   * OAuth2 token should be refreshed ({@code gcs.oauth2.token-expires-at} minus {@link
-   * #GCS_TOKEN_REFRESH_BUFFER_MS}). When no token expiry is present, returns {@code
-   * accessEvictionNanos}.
-   *
-   * @param config catalog config that may contain {@code gcs.oauth2.token-expires-at}
-   * @param accessEvictionNanos default expire-after-access duration in nanoseconds
-   * @param nowEpochMillis current wall-clock time
-   * @return cache duration in nanoseconds; {@code 0} means expire immediately
-   */
-  @VisibleForTesting
-  static long computeCacheDurationNanos(
-      IcebergConfig config, long accessEvictionNanos, long nowEpochMillis) {
-    String expiresAt =
-        config.getAllConfig().get(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT);
-    if (StringUtils.isBlank(expiresAt)) {
-      return accessEvictionNanos;
-    }
-
-    long expiresAtMs;
-    try {
-      expiresAtMs = Long.parseLong(expiresAt);
-    } catch (NumberFormatException e) {
-      LOG.warn("Invalid {}: {}", IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT, expiresAt);
-      return accessEvictionNanos;
-    }
-
-    long remainingMs = expiresAtMs - GCS_TOKEN_REFRESH_BUFFER_MS - nowEpochMillis;
-    if (remainingMs <= 0) {
-      return 0L;
-    }
-    return Math.min(accessEvictionNanos, TimeUnit.MILLISECONDS.toNanos(remainingMs));
-  }
-
   @Override
   public void close() throws Exception {
-    catalogWrapperCache.invalidateAll();
-  }
-
-  private static final class CatalogWrapperExpiry implements Expiry<String, CatalogWrapperForREST> {
-
-    private final long accessEvictionNanos;
-
-    CatalogWrapperExpiry(long accessEvictionNanos) {
-      this.accessEvictionNanos = accessEvictionNanos;
-    }
-
-    @Override
-    public long expireAfterCreate(String key, CatalogWrapperForREST value, long currentTime) {
-      return computeCacheDurationNanos(
-          value.getIcebergConfig(), accessEvictionNanos, System.currentTimeMillis());
-    }
-
-    @Override
-    public long expireAfterUpdate(
-        String key, CatalogWrapperForREST value, long currentTime, long currentDuration) {
-      return expireAfterCreate(key, value, currentTime);
-    }
-
-    @Override
-    public long expireAfterRead(
-        String key, CatalogWrapperForREST value, long currentTime, long currentDuration) {
-      // Preserve expire-after-access, but never extend past the GCS token refresh deadline.
-      return expireAfterCreate(key, value, currentTime);
-    }
+    catalogWrapperCache.close();
   }
 }

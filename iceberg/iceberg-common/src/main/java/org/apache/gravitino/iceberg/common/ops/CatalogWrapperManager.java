@@ -18,19 +18,41 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+
 /**
  * Resolves {@link IcebergCatalogWrapper} instances by catalog name.
  *
- * <p>Implemented by IRC {@code IcebergCatalogWrapperManager} (get-or-create + cache). Symmetric to
- * {@code CatalogManager} used by {@code DynamicIcebergConfigProvider.InternalCatalogFetcher}.
+ * <p>Implemented by IRC {@code IcebergCatalogWrapperManager} (get-or-create + {@link
+ * IcebergCatalogWrapperCache}). Symmetric to {@code CatalogManager} used by {@code
+ * DynamicIcebergConfigProvider.InternalCatalogFetcher}.
  */
 public interface CatalogWrapperManager {
 
   /**
-   * Returns the catalog wrapper for {@code catalogName}, creating and caching it when absent.
+   * Returns the catalog wrapper for {@code catalogName}, creating and caching it from the IRC
+   * config provider when absent.
    *
    * @param catalogName catalog name
    * @return catalog wrapper
    */
   IcebergCatalogWrapper getCatalogWrapper(String catalogName);
+
+  /**
+   * Returns the catalog wrapper for {@code catalogName}, creating and caching it from {@code
+   * icebergConfig} when absent. Used by metalake lakehouse when the IRC provider may not know the
+   * catalog name (static-config-provider).
+   *
+   * @param catalogName catalog name
+   * @param icebergConfig catalog configuration used on cache miss
+   * @return catalog wrapper
+   */
+  IcebergCatalogWrapper getCatalogWrapper(String catalogName, IcebergConfig icebergConfig);
+
+  /**
+   * Invalidates a cached wrapper for {@code catalogName}.
+   *
+   * @param catalogName catalog name
+   */
+  void invalidateCatalogWrapper(String catalogName);
 }

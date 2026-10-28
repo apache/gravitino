@@ -32,7 +32,6 @@ public class IcebergRESTServerContext {
   private boolean isAuthorizationEnabled;
   private boolean auxMode;
   private boolean skipAuthorizationForRestBackend;
-  private boolean catalogConfigsFromMetalake;
   private String metalakeName;
   private String defaultCatalogName;
   private CatalogWrapperManager catalogWrapperManager;
@@ -41,14 +40,12 @@ public class IcebergRESTServerContext {
       Boolean isAuthorizationEnabled,
       Boolean auxMode,
       Boolean skipAuthorizationForRestBackend,
-      Boolean catalogConfigsFromMetalake,
       String metalakeName,
       String defaultCatalogName,
       CatalogWrapperManager catalogWrapperManager) {
     this.isAuthorizationEnabled = isAuthorizationEnabled;
     this.auxMode = auxMode;
     this.skipAuthorizationForRestBackend = skipAuthorizationForRestBackend;
-    this.catalogConfigsFromMetalake = Boolean.TRUE.equals(catalogConfigsFromMetalake);
     this.metalakeName = metalakeName;
     this.defaultCatalogName = defaultCatalogName;
     this.catalogWrapperManager = catalogWrapperManager;
@@ -69,7 +66,6 @@ public class IcebergRESTServerContext {
             enableAuth,
             auxMode,
             skipAuthorizationForRestBackend,
-            configProvider.catalogConfigsFromMetalake(),
             configProvider.getMetalakeName(),
             configProvider.getDefaultCatalogName(),
             catalogWrapperManager);
@@ -91,15 +87,6 @@ public class IcebergRESTServerContext {
 
   public boolean skipAuthorizationForRestBackend() {
     return skipAuthorizationForRestBackend;
-  }
-
-  /**
-   * Whether IRC catalog configs are loaded from metalake (dynamic-config-provider).
-   *
-   * @return true when lakehouse catalog names align with IRC managed catalogs
-   */
-  public boolean catalogConfigsFromMetalake() {
-    return catalogConfigsFromMetalake;
   }
 
   public String metalakeName() {

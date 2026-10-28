@@ -58,6 +58,7 @@ import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperCache;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -107,7 +108,9 @@ public class IcebergCatalogOperations
 
   @VisibleForTesting @Nullable String catalogUuid;
   private String catalogName;
+  private IcebergConfig icebergConfig;
   private boolean useIrcCatalogWrapper;
+  private IcebergCatalogWrapperCache wrapperCache;
   private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
   /**
@@ -133,45 +136,41 @@ public class IcebergCatalogOperations
     resultConf.putAll(gravitinoConfig);
     this.catalogUuid = info.id().toString();
     resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
-    IcebergConfig icebergConfig = new IcebergConfig(resultConf);
+    this.icebergConfig = new IcebergConfig(resultConf);
 
     this.catalogName = info.name();
-    // Aux: resolve via IRC Manager on each use (same get-or-create cache as IRC). Do not call
-    // getCatalogWrapper during initialize — that re-enters catalog load. Non-aux: local wrapper.
+    // Do not resolve wrappers during initialize — provider-based IRC create can re-enter catalog
+    // load. Wrappers are created on first use via shared cache (IRC Manager when aux, otherwise a
+    // lakehouse-owned IcebergCatalogWrapperCache with the same eviction/token policy).
     this.useIrcCatalogWrapper = shouldUseIrcCatalogWrapper();
+    if (!useIrcCatalogWrapper) {
+      long accessEvictionMs =
+          icebergConfig.get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL);
+      this.wrapperCache = new IcebergCatalogWrapperCache(accessEvictionMs);
+      // Create eagerly into the shared cache (same eviction/token policy as IRC). Safe: does not
+      // call IRC provider / CatalogManager.
+      try {
+        this.icebergCatalogWrapper =
+            wrapperCache.get(catalogName, name -> createLocalWrapper(icebergConfig));
+      } catch (NoSuchWarehouseException e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
+                    + "the REST backend 'warehouse' selects a catalog by name on the remote server "
+                    + "and is not a storage location; remove 'warehouse' to use the server's default "
+                    + "catalog, or set it to a catalog name/identifier that the server recognizes.",
+                icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
+            e);
+      } catch (RESTException e) {
+        throw handleRestException(e);
+      }
+    }
     this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(this::catalogWrapper);
-
-    if (useIrcCatalogWrapper) {
-      return;
-    }
-
-    IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
-    try {
-      AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
-      this.icebergCatalogWrapper =
-          authenticationConfig.isKerberosAuth()
-                  && rawWrapper.getCatalog() instanceof SupportsKerberos
-              ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
-              : rawWrapper;
-    } catch (NoSuchWarehouseException e) {
-      // A reachable server rejecting the `warehouse` selector is a user error. See issue #11943.
-      throw new IllegalArgumentException(
-          String.format(
-              "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
-                  + "the REST backend 'warehouse' selects a catalog by name on the remote server "
-                  + "and is not a storage location; remove 'warehouse' to use the server's default "
-                  + "catalog, or set it to a catalog name/identifier that the server recognizes.",
-              icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
-          e);
-    } catch (RESTException e) {
-      throw handleRestException(e);
-    }
   }
 
   /**
-   * Returns the Iceberg catalog wrapper. When aux IRC uses dynamic-config-provider, this is IRC
-   * {@link CatalogWrapperManager} get-or-create (shared cache, refresh on eviction). Otherwise the
-   * lakehouse-owned wrapper.
+   * Returns the Iceberg catalog wrapper from the shared get-or-create cache (IRC Manager when aux,
+   * otherwise {@link IcebergCatalogWrapperCache}), creating with this catalog's config on miss.
    */
   @VisibleForTesting
   IcebergCatalogWrapper catalogWrapper() {
@@ -182,25 +181,52 @@ public class IcebergCatalogOperations
           manager != null,
           "Internal CatalogWrapperManager is not available. "
               + "Aux lakehouse catalog requires Iceberg REST embedded in Gravitino server.");
-      return manager.getCatalogWrapper(catalogName);
+      // Pass metalake config so static IRC can still create+cache when the provider has no name.
+      IcebergCatalogWrapper wrapper = manager.getCatalogWrapper(catalogName, icebergConfig);
+      this.icebergCatalogWrapper = wrapper;
+      return wrapper;
+    }
+    if (wrapperCache != null) {
+      try {
+        IcebergCatalogWrapper wrapper =
+            wrapperCache.get(catalogName, name -> createLocalWrapper(icebergConfig));
+        this.icebergCatalogWrapper = wrapper;
+        return wrapper;
+      } catch (NoSuchWarehouseException e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
+                    + "the REST backend 'warehouse' selects a catalog by name on the remote server "
+                    + "and is not a storage location; remove 'warehouse' to use the server's default "
+                    + "catalog, or set it to a catalog name/identifier that the server recognizes.",
+                icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
+            e);
+      } catch (RESTException e) {
+        throw handleRestException(e);
+      }
     }
     return icebergCatalogWrapper;
+  }
+
+  private static IcebergCatalogWrapper createLocalWrapper(IcebergConfig config) {
+    IcebergConfig enriched = IcebergCatalogUtil.withGcsServiceAccountCredentials(config);
+    IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(enriched);
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(enriched.getAllConfig());
+    if (authenticationConfig.isKerberosAuth()
+        && rawWrapper.getCatalog() instanceof SupportsKerberos) {
+      return new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(enriched);
+    }
+    return rawWrapper;
   }
 
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper() {
     return new IcebergCatalogWrapperHelper(catalogWrapper().getCatalog());
   }
 
-  /**
-   * Reuse IRC wrappers only when aux IRC catalogs are metalake-backed (dynamic-config-provider).
-   * Static IRC configs do not necessarily include every lakehouse catalog name.
-   */
   private static boolean shouldUseIrcCatalogWrapper() {
     try {
       IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
-      return serverContext.isAuxMode()
-          && serverContext.catalogConfigsFromMetalake()
-          && serverContext.catalogWrapperManager() != null;
+      return serverContext.isAuxMode() && serverContext.catalogWrapperManager() != null;
     } catch (IllegalStateException e) {
       return false;
     }
@@ -210,6 +236,19 @@ public class IcebergCatalogOperations
   public void onCatalogDropped() {
     if (catalogUuid != null) {
       IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
+    }
+    if (useIrcCatalogWrapper) {
+      try {
+        CatalogWrapperManager manager =
+            IcebergRESTServerContext.getInstance().catalogWrapperManager();
+        if (manager != null) {
+          manager.invalidateCatalogWrapper(catalogName);
+        }
+      } catch (IllegalStateException e) {
+        // IRC already shut down
+      }
+    } else if (wrapperCache != null && catalogName != null) {
+      wrapperCache.invalidate(catalogName);
     }
   }
 
@@ -229,8 +268,15 @@ public class IcebergCatalogOperations
   /** Closes the Iceberg catalog and releases the associated client pool. */
   @Override
   public void close() {
-    // IRC-cached wrappers are closed by IcebergCatalogWrapperManager eviction — do not close them
-    // here. Only close the lakehouse-owned local wrapper.
+    // Cached wrappers are closed by IcebergCatalogWrapperCache / IRC Manager eviction.
+    if (wrapperCache != null) {
+      try {
+        wrapperCache.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close Iceberg catalog wrapper cache", e);
+      }
+      return;
+    }
     if (!useIrcCatalogWrapper && null != icebergCatalogWrapper) {
       try {
         icebergCatalogWrapper.close();
