@@ -625,6 +625,7 @@ subprojects {
     ":catalogs:hadoop-auth",
     ":catalogs:hadoop-common",
     ":maintenance:jobs",
+    ":maintenance:maintenance-common",
     ":maintenance:optimizer-api",
     ":maintenance:updaters",
     ":clients",
@@ -1187,7 +1188,7 @@ tasks {
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
         ":plugins:idp-basic:copyLibAndConfigs",
-        ":plugins:tms:copyLibAndConfigs",
+        ":plugins:maintenance:copyLibAndConfigs",
         ":plugins:k8s-job-executor:copyLibAndConfigs"
       )
     if (!skipWeb) {

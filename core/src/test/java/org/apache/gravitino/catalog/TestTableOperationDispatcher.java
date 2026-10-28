@@ -90,6 +90,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -1533,6 +1534,74 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(ids.get("z"), afterRename.get("b"));
     Assertions.assertEquals(ids.get("c"), afterRename.get("c"));
     Assertions.assertEquals(2, afterRename.size());
+  }
+
+  @Test
+  public void testAlterTableKeepsColumnIdWhenRenameDiffersInCase() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_column_rename_case");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_column_rename_case");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    // A catalog that matches column names case-insensitively, such as MySQL, accepts "col" for a
+    // column stored as "Col".
+    entityStore.update(
+        tableIdent,
+        TableEntity.class,
+        TABLE,
+        (TableEntity old) -> renameStoredColumn(old, "col", "Col"));
+    long colId = columnIds(tableIdent).get("Col");
+
+    tableOperationDispatcher.alterTable(
+        tableIdent, TableChange.renameColumn(new String[] {"col"}, "renamed"));
+
+    Map<String, Long> ids = columnIds(tableIdent);
+    Assertions.assertEquals(ImmutableMap.of("renamed", colId), ids);
+  }
+
+  @Test
+  public void testAlignNameChangesWithStoredColumns() {
+    List<ColumnEntity> stored =
+        Arrays.asList(storedColumn("Col"), storedColumn("Other"), storedColumn("dup"));
+
+    Map<String, String> changes = new HashMap<>();
+    changes.put("col", "renamed");
+    changes.put("OTHER", null);
+    Map<String, String> expected = new HashMap<>();
+    expected.put("Col", "renamed");
+    expected.put("Other", null);
+    Assertions.assertEquals(
+        expected, TableOperationDispatcher.alignNameChangesWithStoredColumns(changes, stored));
+
+    // An exact match wins, and a name matching several stored columns is left as it is.
+    List<ColumnEntity> ambiguous =
+        Arrays.asList(
+            storedColumn("a"), storedColumn("A"), storedColumn("Dup"), storedColumn("DUP"));
+    Map<String, String> exactAndAmbiguous = ImmutableMap.of("a", "b", "dup", "c");
+    Assertions.assertEquals(
+        exactAndAmbiguous,
+        TableOperationDispatcher.alignNameChangesWithStoredColumns(exactAndAmbiguous, ambiguous));
+  }
+
+  private static ColumnEntity storedColumn(String name) {
+    return ColumnEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withPosition(0)
+        .withDataType(Types.IntegerType.get())
+        .withNullable(true)
+        .withAutoIncrement(false)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
   }
 
   @Test

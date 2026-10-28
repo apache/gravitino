@@ -51,11 +51,29 @@ configurations.configureEach {
 }
 
 dependencies {
+  implementation(project(":api"))
+  implementation(project(":common")) {
+    exclude("*")
+  }
+  implementation(project(":core")) {
+    exclude("*")
+  }
+  implementation(project(":iceberg:iceberg-common")) {
+    exclude("*")
+  }
   implementation(project(":iceberg:iceberg-rest-server"))
   implementation(libs.bundles.iceberg)
+
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
+  compileJava {
+    dependsOn(":iceberg:iceberg-rest-server:copyDepends")
+  }
+
   val copyDepends by registering(Sync::class) {
     dependsOn(":iceberg:iceberg-rest-server:copyDepends")
     from(configurations.runtimeClasspath)

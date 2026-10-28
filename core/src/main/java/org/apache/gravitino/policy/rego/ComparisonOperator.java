@@ -21,7 +21,7 @@ package org.apache.gravitino.policy.rego;
 import com.google.common.base.Preconditions;
 
 /** Comparison operators supported by {@code restricted-rego-v1}. */
-enum ComparisonOperator {
+public enum ComparisonOperator {
   /** Equality comparison. */
   EQ("=="),
   /** Inequality comparison. */

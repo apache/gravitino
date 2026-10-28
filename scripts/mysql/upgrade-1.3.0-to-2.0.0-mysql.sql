@@ -538,7 +538,11 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
     `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
     `semantic_model_comment` TEXT DEFAULT NULL COMMENT 'semantic model comment snapshot',
-    `semantic_model_definition` MEDIUMTEXT NOT NULL COMMENT 'structured definition snapshot (JSON)',
+    `datasets` MEDIUMTEXT NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
+    `relationships` MEDIUMTEXT DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
+    `metrics` MEDIUMTEXT DEFAULT NULL COMMENT 'metric definitions snapshot (JSON)',
+    `ai_context` MEDIUMTEXT DEFAULT NULL COMMENT 'model AI context snapshot (JSON)',
+    `custom_extensions` MEDIUMTEXT DEFAULT NULL COMMENT 'model custom extensions snapshot (JSON)',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'semantic model properties snapshot (JSON)',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
@@ -548,6 +552,21 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_cid` (`catalog_id`),
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_metric_meta` (
+    `metric_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'stable internal metric id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
+    `metric_name` MEDIUMTEXT NOT NULL COMMENT 'metric name',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'metric retired at',
+    PRIMARY KEY (`metric_id`),
+    KEY `idx_smmm_model_live` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smmm_mid` (`metalake_id`),
+    KEY `idx_smmm_cid` (`catalog_id`),
+    KEY `idx_smmm_sid` (`schema_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model metric identities';
 
 CREATE TABLE IF NOT EXISTS `scheduled_expand_tasks` (
     `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
@@ -610,7 +629,7 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
     `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tma_job_id` (`job_id`),
+    KEY `idx_tma_job_id` (`job_id`),
     -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
     UNIQUE KEY `uk_tma_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
     KEY `idx_tma_before_sid` (`table_id`, `before_snapshot_id`),
