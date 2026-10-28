@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.policy;
 
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
@@ -81,6 +82,34 @@ class TestOrphanFileRemovalPolicyDTO {
     PolicyDTO restored =
         JsonUtils.objectMapper()
             .readValue(JsonUtils.objectMapper().writeValueAsString(dto), PolicyDTO.class);
+    Assertions.assertEquals(dto, restored);
+    Assertions.assertEquals(domain, DTOConverters.fromDTO(restored.content()));
+  }
+
+  @Test
+  void responseRoundTripWithExecutionPeers() throws Exception {
+    PolicyContent domain =
+        PolicyContents.icebergOrphanFileRemoval(
+            7L,
+            "s3://bucket/table/data",
+            true,
+            "0 0 3 * * ?",
+            null,
+            1_800_000L,
+            ImmutableMap.of("spark.executor.cores", "2"),
+            ImmutableMap.of("metalake", "ml"));
+    PolicyDTO dto =
+        PolicyDTO.builder()
+            .withName("cleanup")
+            .withPolicyType("system_iceberg_orphan_file_removal")
+            .withEnabled(true)
+            .withContent(DTOConverters.toDTO(domain))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
+            .build();
+    String json = JsonUtils.objectMapper().writeValueAsString(dto);
+    Assertions.assertTrue(json.contains("\"timeTrigger\""));
+    Assertions.assertFalse(json.contains("\"executionSpec\""));
+    PolicyDTO restored = JsonUtils.objectMapper().readValue(json, PolicyDTO.class);
     Assertions.assertEquals(dto, restored);
     Assertions.assertEquals(domain, DTOConverters.fromDTO(restored.content()));
   }

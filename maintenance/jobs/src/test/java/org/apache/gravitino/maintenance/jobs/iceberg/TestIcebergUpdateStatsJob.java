@@ -42,7 +42,7 @@ public class TestIcebergUpdateStatsJob {
     assertNotNull(template);
     assertEquals("builtin-iceberg-update-stats", template.name());
     assertTrue(template.name().matches(JobTemplateProvider.BUILTIN_NAME_PATTERN));
-    assertEquals("v2", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
+    assertEquals("v3", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
   }
 
   @Test

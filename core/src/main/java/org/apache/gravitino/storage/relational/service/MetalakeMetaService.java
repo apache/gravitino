@@ -55,6 +55,7 @@ import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
@@ -276,22 +277,24 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     GroupMetaMapper.class,
                     mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    RoleMetaMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            // Securable objects and tag relations find their rows through a live role or tag, so
+            // they are removed before the roles and tags themselves.
             () ->
                 SessionUtils.doWithoutCommit(
                     SecurableObjectMapper.class,
                     mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
-                    TagMetaMapper.class,
-                    mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
+                    RoleMetaMapper.class,
+                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TagMetaMapper.class,
+                    mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
@@ -346,7 +349,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SemanticModelVersionInfoMapper.class,
-                    mapper -> mapper.softDeleteSemanticModelVersionsByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteSemanticModelVersionsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SemanticModelMetricMapper.class,
+                    mapper -> mapper.softDeleteSemanticModelMetricsByMetalakeId(metalakeId)));
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {
@@ -382,25 +389,35 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     GroupMetaMapper.class,
                     mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    RoleMetaMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            // Securable objects and tag relations find their rows through a live role or tag, so
+            // they are removed before the roles and tags themselves.
             () ->
                 SessionUtils.doWithoutCommit(
                     SecurableObjectMapper.class,
                     mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
-                    TagMetaMapper.class,
-                    mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
+                    RoleMetaMapper.class,
+                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    TagMetaMapper.class,
+                    mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    PolicyMetaMapper.class,
+                    mapper -> mapper.softDeletePolicyMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    PolicyVersionMapper.class,
+                    mapper -> mapper.softDeletePolicyVersionsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     OwnerMetaMapper.class,

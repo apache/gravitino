@@ -362,6 +362,27 @@ public class TestManagedTableOperations {
         Arrays.stream(renamedMiddle.columns()).map(Column::name).toArray(String[]::new));
   }
 
+  @Test
+  public void testAlterTableRejectsNestedColumnChanges() {
+    NameIdentifier tableIdent = createThreeColumnTable("nested_changes");
+    List<TableChange> nestedChanges =
+        List.of(
+            TableChange.addColumn(new String[] {"col1", "nested"}, Types.StringType.get()),
+            TableChange.renameColumn(new String[] {"col1", "nested"}, "renamed"),
+            TableChange.deleteColumn(new String[] {"col1", "nested"}, true),
+            TableChange.updateColumnComment(new String[] {"col1", "nested"}, "comment"));
+
+    for (TableChange change : nestedChanges) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> tableOperations.alterTable(tableIdent, change));
+    }
+    Assertions.assertArrayEquals(
+        new String[] {"col1", "col2", "col3"},
+        Arrays.stream(tableOperations.loadTable(tableIdent).columns())
+            .map(Column::name)
+            .toArray(String[]::new));
+  }
+
   private NameIdentifier createThreeColumnTable(String tableName) {
     NameIdentifier tableIdent =
         NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, tableName);

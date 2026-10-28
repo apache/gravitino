@@ -24,7 +24,8 @@ from typing import List, Optional
 class Index(ABC):
     """The Index interface defines methods for implementing table index columns.
 
-    Catalogs may provide key and connector-specific index types.
+    Catalogs may provide generic key and connector-specific index types; supported operations
+    depend on the catalog.
     """
 
     @unique
@@ -52,24 +53,33 @@ class Index(ABC):
         columns that are not designated as the primary key. The uniqueness constraint imposed by
         UNIQUE KEY helps in avoiding redundancy and ensuring data accuracy in the database."""
 
+        BITMAP = "BITMAP"
+        """Bitmap index, which uses bit arrays to represent the presence of values in a column."""
+
+        INVERTED = "INVERTED"
+        """Inverted index, which maps terms to their locations to speed up full-text searches."""
+
+        VECTOR = "VECTOR"
+        """Vector index, which speeds up similarity searches in high-dimensional vector spaces."""
+
         DATA_SKIPPING_ANNOY = "DATA_SKIPPING_ANNOY"
         """Legacy ClickHouse Annoy index metadata. This type is metadata-only."""
 
         DATA_SKIPPING_USEARCH = "DATA_SKIPPING_USEARCH"
         """Legacy ClickHouse USearch index metadata. This type is metadata-only."""
 
+        DATA_SKIPPING_TEXT = "DATA_SKIPPING_TEXT"
+        """ClickHouse full-text data-skipping index loaded from native table metadata."""
+
         DATA_SKIPPING_VECTOR_SIMILARITY = "DATA_SKIPPING_VECTOR_SIMILARITY"
         """ClickHouse vector similarity data skipping index."""
 
-        DATA_SKIPPING_TEXT = "DATA_SKIPPING_TEXT"
-        """A native ClickHouse text data-skipping index."""
-
     @abstractmethod
     def type(self) -> IndexType:
-        """Returns the type of the index.
+        """Returns the type of the index. eg: `PRIMARY_KEY` and `UNIQUE_KEY`.
 
         Returns:
-            IndexType: The index type.
+            IndexType: The type of the index. eg: `PRIMARY_KEY` and `UNIQUE_KEY`.
         """
         pass  # pragma: no cover
 
@@ -95,5 +105,5 @@ class Index(ABC):
         pass  # pragma: no cover
 
     def properties(self) -> dict[str, str]:
-        """Returns the index properties, or an empty map when none are defined."""
+        """Returns optional index properties, empty when none are defined."""
         return {}

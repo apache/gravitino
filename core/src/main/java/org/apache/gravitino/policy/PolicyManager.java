@@ -263,7 +263,8 @@ public class PolicyManager implements PolicyDispatcher {
           policyEntity -> {
             PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
             builder.withEnabled(expectedEnabledState);
-            return builder.build();
+            // Enable/disable must not re-validate legacy stored content.
+            return builder.buildSkippingContentValidation();
           });
     } catch (NoSuchEntityException e) {
       // The policy was dropped between the state check above and this update.
@@ -314,6 +315,7 @@ public class PolicyManager implements PolicyDispatcher {
     String newName = policyEntity.name();
     String newComment = policyEntity.comment();
     PolicyContent newContent = policyEntity.content();
+    boolean contentUpdated = false;
 
     for (PolicyChange change : changes) {
       if (change instanceof PolicyChange.RenamePolicy) {
@@ -343,20 +345,24 @@ public class PolicyManager implements PolicyDispatcher {
         }
 
         newContent = updateContent.getContent();
+        contentUpdated = true;
         validateReadRestrictionContent(policyType, newContent);
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
     }
 
-    newContent.validate();
+    // Rename/comment must not re-validate legacy stored content that would fail new checks.
+    if (contentUpdated) {
+      newContent.validate();
+    }
 
     PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
     builder.withName(newName);
     builder.withComment(newComment);
     builder.withContent(newContent);
 
-    return builder.build();
+    return contentUpdated ? builder.build() : builder.buildSkippingContentValidation();
   }
 
   private static void validateReadRestrictionContent(

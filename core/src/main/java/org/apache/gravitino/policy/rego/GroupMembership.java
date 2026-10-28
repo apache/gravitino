@@ -22,14 +22,19 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 
 /** A request-context group-membership predicate. */
-final class GroupMembership implements CanonicalExpression {
+public final class GroupMembership implements CanonicalExpression {
   private final String group;
 
   GroupMembership(String group) {
     this.group = group;
   }
 
-  String group() {
+  /**
+   * Returns the exact group name.
+   *
+   * @return group name
+   */
+  public String group() {
     return group;
   }
 

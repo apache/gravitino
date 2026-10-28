@@ -157,6 +157,31 @@ public class TestDorisTableOperationsSqlGeneration {
     }
   }
 
+  /** Verifies a nullable column cannot be changed to not null. */
+  @Test
+  public void testUpdateColumnNullabilityRejectsNullableToNotNull() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    ops.setTableForAlter(
+        JdbcTable.builder().withName("test_table").withColumns(new JdbcColumn[] {column}).build());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.updateColumnNullability(new String[] {"col1"}, false)));
+    Assertions.assertEquals(
+        "Doris does not support changing nullable column col1 to not null", exception.getMessage());
+  }
+
   /** Verifies string defaults and unchanged column attributes are preserved. */
   @Test
   public void testUpdateColumnTypePreservesStringDefaultAndColumnAttributes() {
@@ -243,7 +268,7 @@ public class TestDorisTableOperationsSqlGeneration {
           JdbcColumn.builder()
               .withName("col1")
               .withType(Types.VarCharType.of(64))
-              .withNullable(true)
+              .withNullable(false)
               .withComment("column comment")
               .withDefaultValue(Literals.varcharLiteral(64, value))
               .build();
@@ -256,7 +281,7 @@ public class TestDorisTableOperationsSqlGeneration {
       String sql =
           ops.alterTableSql(
               "test_table",
-              TableChange.updateColumnNullability(new String[] {"col1"}, false),
+              TableChange.updateColumnNullability(new String[] {"col1"}, true),
               TableChange.updateColumnPosition(
                   new String[] {"col1"}, TableChange.ColumnPosition.first()),
               TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(128)));
@@ -267,13 +292,13 @@ public class TestDorisTableOperationsSqlGeneration {
               .fromGravitinoForModifyColumn(column.defaultValue(), isDoris3x, isDoris3x);
       Assertions.assertEquals(
           "ALTER TABLE `test_table`\n"
-              + "MODIFY COLUMN `col1` varchar(64) NOT NULL DEFAULT "
-              + expectedDefault
-              + " COMMENT 'column comment' ,\n"
               + "MODIFY COLUMN `col1` varchar(64) NULL DEFAULT "
               + expectedDefault
+              + " COMMENT 'column comment' ,\n"
+              + "MODIFY COLUMN `col1` varchar(64) NOT NULL DEFAULT "
+              + expectedDefault
               + " COMMENT 'column comment' FIRST,\n"
-              + "MODIFY COLUMN `col1` varchar(128) NULL DEFAULT "
+              + "MODIFY COLUMN `col1` varchar(128) NOT NULL DEFAULT "
               + expectedDefault
               + " COMMENT 'column comment' ;",
           sql);

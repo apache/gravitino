@@ -25,7 +25,7 @@ package org.apache.gravitino.policy.rego;
  * Column and context references remain symbolic until the effective-policy resolver binds them to a
  * table schema and request context.
  */
-interface CanonicalExpression {
+public interface CanonicalExpression {
 
   /**
    * Validates this expression node and all of its children.

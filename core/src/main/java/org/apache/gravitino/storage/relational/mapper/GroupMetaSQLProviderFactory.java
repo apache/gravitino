@@ -132,4 +132,15 @@ public class GroupMetaSQLProviderFactory {
       @Param("metalakeName") String metalakeName, @Param("groupName") String groupName) {
     return getProvider().getGroupUpdatedAt(metalakeName, groupName);
   }
+  /**
+   * Returns SQL for a principal and membership snapshot.
+   *
+   * @param metalakeId the parent metalake ID
+   * @param groupName the principal name
+   * @return the aggregate select SQL
+   */
+  public static String selectGroupWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("groupName") String groupName) {
+    return getProvider().selectGroupWithRolesByMetalakeIdAndName(metalakeId, groupName);
+  }
 }

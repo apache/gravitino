@@ -14,13 +14,15 @@ Gravitino credential vending is used to generate temporary or static credentials
 | Catalog type | Vends                           |
 |--------------|---------------------------------|
 | Fileset      | S3, OSS, GCS, ADLS, COS         |
-| Hive         | S3, OSS, GCS, ADLS              |
+| Hive         | S3, OSS, ADLS                   |
 | Iceberg      | S3, OSS, GCS, ADLS              |
 | Glue         | S3                              |
 | JDBC         | JDBC user and password          |
 | Paimon       | S3, OSS, JDBC user and password |
 
-S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
+S3 is Amazon S3, OSS is Alibaba Cloud OSS, GCS is Google Cloud Storage, ADLS is Azure Data Lake Storage, and COS is Tencent Cloud COS. The Gravitino Spark, Flink, and Trino connectors consume vended credentials automatically for these catalogs, except that the Trino Hive connector does not consume OSS credentials. For Iceberg catalogs without a `REST` backend that vends credentials, the Flink connector receives only static credentials, see [Flink Iceberg credential vending](../flink-connector/flink-catalog-iceberg.md#credential-vending).
+
+Token providers (`s3-token`, `oss-token`, `gcs-token`, `adls-token`, and `cos-token`) and `aws-irsa` scope credentials to a path, so only Fileset and Iceberg catalogs support them. Other catalogs vend static keys only, such as `s3-secret-key`, `oss-secret-key`, and `azure-account-key`. Creating or altering such a catalog with one of these providers fails.
 
 ## Quick Start
 
@@ -131,7 +133,7 @@ If a catalog does not set `credential-providers`, Gravitino infers providers fro
 | `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
 | `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
 | `cos-access-key-id` and `cos-secret-access-key`              | `cos-secret-key`    |
-| `gcs-service-account-file`                                   | `gcs-token`         |
+| `gcs-service-account-file` (Fileset and Iceberg only)        | `gcs-token`         |
 | `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
 | `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
 
@@ -156,7 +158,8 @@ can retrieve the same static AK/SK or JDBC password that Gravitino uses server-s
 
 - Prefer short-lived token providers (`s3-token`, `oss-token`, `adls-token`, `gcs-token`,
   `cos-token`, `aws-irsa`) over static `*-secret-key` / `azure-account-key` / `jdbc-user-password`
-  whenever possible.
+  whenever possible. These providers are only accepted on
+  Fileset and Iceberg catalogs.
 - When static providers are unavoidable, grant load / use privileges only to trusted principals
   (connectors and operators that must recover credentials).
 - Do not treat `getCredentials` as a secrets-protected API for static keys; use `USE_SECRETS` /
@@ -475,7 +478,7 @@ For a catalog, `{type}` is `catalog` and `{full_name}` is the catalog name:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
-The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed. These credentials are catalog-level and are not refreshed: token providers such as `s3-token` vend nothing at catalog level, and `aws-irsa` credentials expire after `s3-token-expire-in-secs`.
+The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed. These credentials are catalog-level and are not refreshed. Path-based providers such as `s3-token` and `aws-irsa` vend nothing at catalog level.
 
 ### Read or Write Scope
 

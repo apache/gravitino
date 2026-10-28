@@ -108,6 +108,9 @@ public final class SparkApplicationStatusUtils {
   private static final Set<String> STOPPED_STATES =
       ImmutableSet.of("ResourceReleased", "TerminatedWithoutReleaseResources");
 
+  // The terminal phases of a pod. fabric8 has no public constants for the pod phases.
+  private static final Set<String> POD_TERMINATED_PHASES = ImmutableSet.of("Succeeded", "Failed");
+
   private SparkApplicationStatusUtils() {}
 
   /**
@@ -251,21 +254,22 @@ public final class SparkApplicationStatusUtils {
   }
 
   /**
-   * Returns whether the driver of a SparkApplication is still pending or running. It is decided by
-   * the driver container, as a sidecar can keep the pod running after the driver exited, and by the
-   * pod only if the driver container can't be told.
+   * Returns whether the driver of a SparkApplication is still pending or running. A pod that has
+   * terminated runs nothing, even if its container status still says running, for example after its
+   * node was lost. Otherwise it is decided by the driver container, as a sidecar can keep the pod
+   * running after the driver exited, and the driver runs if its container can't be told.
    *
    * @param app the SparkApplication
    * @param driver the driver pod
    * @return true if the driver hasn't terminated
    */
   public static boolean isDriverRunning(GenericKubernetesResource app, Pod driver) {
-    ContainerState state = driverContainerState(driver, getDriverContainerName(app));
-    if (state != null) {
-      return state.getTerminated() == null;
-    }
     String phase = driver.getStatus() == null ? null : driver.getStatus().getPhase();
-    return !"Succeeded".equals(phase) && !"Failed".equals(phase);
+    if (POD_TERMINATED_PHASES.contains(phase)) {
+      return false;
+    }
+    ContainerState state = driverContainerState(driver, getDriverContainerName(app));
+    return state == null || state.getTerminated() == null;
   }
 
   /**

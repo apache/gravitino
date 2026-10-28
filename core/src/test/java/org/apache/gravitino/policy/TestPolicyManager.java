@@ -589,6 +589,44 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testRenameDoesNotRevalidateLegacyCompactionRewriteOptions() throws IOException {
+    String policyName = "legacy_compaction_" + UUID.randomUUID().toString().replace("-", "");
+    // Constructed without content validate(); would fail rewriteOptions allowlist on create.
+    PolicyContent legacyContent =
+        PolicyContents.icebergDataCompaction(1000L, 1L, ImmutableMap.of("no-such-option", "x"));
+    PolicyEntity legacyPolicy =
+        PolicyEntity.builder()
+            .withId(new RandomIdGenerator().nextId())
+            .withName(policyName)
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(legacyContent)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .buildSkippingContentValidation();
+    entityStore.put(legacyPolicy, false /* overwritten */);
+
+    String newName = "renamed_" + policyName;
+    PolicyEntity renamed =
+        Assertions.assertDoesNotThrow(
+            () -> policyManager.alterPolicy(METALAKE, policyName, PolicyChange.rename(newName)));
+    Assertions.assertEquals(newName, renamed.name());
+    Assertions.assertEquals(legacyContent, renamed.content());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            policyManager.alterPolicy(
+                METALAKE,
+                newName,
+                PolicyChange.updateContent(
+                    "system_iceberg_compaction",
+                    PolicyContents.icebergDataCompaction(
+                        1000L, 1L, ImmutableMap.of("no-such-option", "y")))));
+  }
+
+  @Test
   public void testCreateUpdateAndGetColumnMaskPolicy() {
     String policyName = "column_mask_" + UUID.randomUUID().toString().replace("-", "");
     PolicyContent originalContent = PolicyContents.columnMask("mask := action(\"show-last-4\")");
