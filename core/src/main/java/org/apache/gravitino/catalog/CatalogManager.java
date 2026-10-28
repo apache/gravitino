@@ -28,7 +28,6 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -84,7 +83,6 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
-import org.apache.gravitino.connector.GcsOAuthTokenAware;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
@@ -207,12 +205,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     /** Set by the thread that claims the (exactly-once) resource cleanup. */
     private boolean cleanupStarted = false;
-
-    /**
-     * Optional wall-clock time to refresh this entry so a minted GCS OAuth2 token is renewed before
-     * expiry. Null means default expire-after-access only.
-     */
-    @Nullable private Long gcsTokenRefreshAtEpochMs;
 
     /** Non-pooled constructor: each catalog owns its ClassLoader exclusively. */
     CatalogWrapper(IsolatedClassLoader classLoader) {
@@ -552,12 +544,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param idGenerator The id generator to use.
    * @param secretManager The secret manager to use for create-time secret bindings/references.
    */
-  /**
-   * Refresh a catalogCache entry this long before its minted GCS OAuth2 token expires, matching
-   * IRC's GCS token refresh buffer so lakehouse rebuilds with a fresh token.
-   */
-  @VisibleForTesting static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
-
   public CatalogManager(
       Config config, EntityStore store, IdGenerator idGenerator, SecretManager secretManager) {
     this.config = config;
@@ -569,14 +555,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
     this.catalogCache =
         Caffeine.newBuilder()
-            .expireAfter(new CatalogCacheExpiry(cacheEvictionIntervalInMs))
+            .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
                   LOG.debug("Removed catalog cache entry, identifier={}, cause={}", k, c);
                   try {
                     for (Consumer<NameIdentifier> listener : removalListeners) {
                       if (k != null) {
-                        listener.accept(k);
+                        listener.accept((NameIdentifier) k);
                       }
                     }
                   } finally {
@@ -584,9 +570,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     // keeps it alive, and the actual catalog/ClassLoader cleanup runs when the
                     // last lease is released. Keep this in finally so a faulty external listener
                     // cannot skip resource cleanup.
-                    if (v != null) {
-                      v.retire();
-                    }
+                    ((CatalogWrapper) v).retire();
                   }
                 })
             .scheduler(
@@ -1890,19 +1874,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             if (validateBackend && propsToValidate != null && catalog.shouldValidateOnCreate()) {
               catalog.validateOnCreate();
             }
-
-            // Catalogs that mint GCS OAuth tokens (lakehouse-iceberg) report expiry so catalogCache
-            // can refresh before the token dies. Other providers stay lazy.
-            if ("lakehouse-iceberg".equals(entity.getProvider())) {
-              CatalogOperations ops = catalog.ops();
-              if (ops instanceof GcsOAuthTokenAware) {
-                wrapper.gcsTokenRefreshAtEpochMs =
-                    ((GcsOAuthTokenAware) ops)
-                        .expiresAtMs()
-                        .map(expiresAt -> expiresAt - GCS_TOKEN_REFRESH_BUFFER_MS)
-                        .orElse(null);
-              }
-            }
             return null;
           },
           IllegalArgumentException.class,
@@ -2295,50 +2266,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       store.delete(ident, EntityType.CATALOG, true);
     } catch (IOException e) {
       LOG.error("Failed to clean up catalog {}", ident, e);
-    }
-  }
-
-  /**
-   * Expire-after-access capped by an optional GCS OAuth2 token refresh deadline from {@link
-   * GcsOAuthTokenAware}.
-   */
-  private static final class CatalogCacheExpiry implements Expiry<NameIdentifier, CatalogWrapper> {
-
-    private final long accessEvictionMs;
-
-    CatalogCacheExpiry(long accessEvictionMs) {
-      this.accessEvictionMs = accessEvictionMs;
-    }
-
-    @Override
-    public long expireAfterCreate(NameIdentifier key, CatalogWrapper value, long currentTime) {
-      return durationNanos(value);
-    }
-
-    @Override
-    public long expireAfterUpdate(
-        NameIdentifier key, CatalogWrapper value, long currentTime, long currentDuration) {
-      return durationNanos(value);
-    }
-
-    @Override
-    public long expireAfterRead(
-        NameIdentifier key, CatalogWrapper value, long currentTime, long currentDuration) {
-      return durationNanos(value);
-    }
-
-    /** Caffeine {@link Expiry} durations are nanoseconds. */
-    private long durationNanos(CatalogWrapper value) {
-      long durationMs = accessEvictionMs;
-      Long refreshAt = value == null ? null : value.gcsTokenRefreshAtEpochMs;
-      if (refreshAt != null) {
-        long remainingMs = refreshAt - System.currentTimeMillis();
-        if (remainingMs <= 0) {
-          return 0L;
-        }
-        durationMs = Math.min(accessEvictionMs, remainingMs);
-      }
-      return TimeUnit.MILLISECONDS.toNanos(durationMs);
     }
   }
 }
