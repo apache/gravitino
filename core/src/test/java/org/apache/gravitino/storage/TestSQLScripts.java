@@ -135,6 +135,96 @@ public class TestSQLScripts extends TestJDBCBackend {
   }
 
   /**
+   * Verifies every MySQL upgrade script from 0.5.0 onward can be re-run as a whole after a
+   * completed upgrade: guarded DDL (ADD COLUMN, DROP INDEX, CREATE INDEX, ...) must skip instead of
+   * failing. The retried upgrade must provide every column and index a fresh install of the target
+   * schema has; extra legacy columns and tables may remain because upgrades never drop user data.
+   */
+  @TestTemplate
+  public void testMySqlUpgradeScriptsRetryable() throws SQLException, IOException {
+    if (!"mysql".equals(backendType)) {
+      return;
+    }
+
+    Path scriptDir = upgradeScriptDirectory();
+    File[] scriptFiles = scriptDir.toFile().listFiles();
+    Assertions.assertNotNull(scriptFiles, "No script files found in " + scriptDir);
+    Arrays.sort(scriptFiles, Comparator.comparing(File::getName));
+
+    Pattern upgradePattern = Pattern.compile("upgrade-([\\d.]+)-to-([\\d.]+)-mysql\\.sql");
+    List<File> upgrades = new ArrayList<>();
+    String fromVersion = null;
+    for (File scriptFile : scriptFiles) {
+      Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
+      if (!upgradeMatcher.matches()) {
+        continue;
+      }
+      if (fromVersion == null) {
+        fromVersion = upgradeMatcher.group(1);
+      }
+      upgrades.add(scriptFile);
+    }
+    Assertions.assertFalse(upgrades.isEmpty(), "No MySQL upgrade scripts found in " + scriptDir);
+
+    // Upgrade step by step from the oldest schema, then re-run every upgrade script.
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-" + fromVersion + "-mysql.sql").toFile());
+    for (File upgrade : upgrades) {
+      executeScript(upgrade);
+    }
+    for (File upgrade : upgrades) {
+      executeScript(upgrade);
+    }
+    Matcher lastMatcher = upgradePattern.matcher(upgrades.get(upgrades.size() - 1).getName());
+    Assertions.assertTrue(lastMatcher.matches());
+    String latestVersion = lastMatcher.group(2);
+    Map<String, Set<String>> retriedColumns = readSchemaColumns();
+    List<String> retriedIndexes = readSchemaIndexes(retriedColumns.keySet());
+
+    // Compare with a fresh install of the latest schema: the retried chain must provide every
+    // fresh column and index, but it may keep extra legacy columns and tables, because upgrades
+    // never drop user data (e.g. the deprecated role_meta securable object columns remain in the
+    // upgraded schema while fresh schemas no longer declare them).
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-" + latestVersion + "-mysql.sql").toFile());
+    Map<String, Set<String>> freshColumns = readSchemaColumns();
+    Map<String, Set<String>> missingColumns = new TreeMap<>();
+    freshColumns.forEach(
+        (table, columns) -> {
+          Set<String> upgradedColumns = retriedColumns.get(table);
+          if (upgradedColumns == null) {
+            missingColumns.put(table, columns);
+          } else {
+            Set<String> missing = new TreeSet<>(columns);
+            missing.removeAll(upgradedColumns);
+            if (!missing.isEmpty()) {
+              missingColumns.put(table, missing);
+            }
+          }
+        });
+    Assertions.assertTrue(
+        missingColumns.isEmpty(),
+        "Retried upgrades must provide all fresh "
+            + latestVersion
+            + " columns, missing: "
+            + missingColumns);
+
+    Set<String> retriedIndexSet = new TreeSet<>(retriedIndexes);
+    List<String> missingIndexes = new ArrayList<>();
+    for (String freshIndex : readSchemaIndexes(freshColumns.keySet())) {
+      if (!retriedIndexSet.contains(freshIndex)) {
+        missingIndexes.add(freshIndex);
+      }
+    }
+    Assertions.assertTrue(
+        missingIndexes.isEmpty(),
+        "Retried upgrades must provide all fresh "
+            + latestVersion
+            + " indexes, missing: "
+            + missingIndexes);
+  }
+
+  /**
    * The owner unique key allows one live row per (owner, object). Rows left by concurrent
    * assignments are merged during the upgrade: the newest live row (largest id) stays, while older
    * ones are soft-deleted.
