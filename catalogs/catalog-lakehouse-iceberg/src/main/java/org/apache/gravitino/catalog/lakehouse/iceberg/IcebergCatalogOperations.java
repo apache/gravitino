@@ -34,10 +34,14 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.auxiliary.IcebergAuxCatalogHooks;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
+import org.apache.gravitino.connector.CatalogCacheDeadline;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -89,7 +93,13 @@ import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalogOperations
-    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog, CatalogDropAware {
+    implements CatalogOperations,
+        SupportsSchemas,
+        TableCatalog,
+        ViewCatalog,
+        CatalogDropAware,
+        CatalogCacheDeadline,
+        IcebergAuxCatalogHooks.ResolvedInitializer {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
@@ -98,6 +108,35 @@ public class IcebergCatalogOperations
   @VisibleForTesting IcebergBackend backend;
 
   @VisibleForTesting @Nullable String catalogUuid;
+
+  @Nullable private NameIdentifier catalogIdent;
+
+  /**
+   * Operations created on the auxiliary IRC class loader. Method calls on this object run against
+   * that loader's IRC catalog wrapper, not an HTTP client.
+   */
+  @Nullable private Object delegate;
+
+  /** When false, this instance is the auxiliary-loader owner and must not delegate again. */
+  private final boolean adoptAuxIrc;
+
+  /** Catalog plugin instance. Delegates to auxiliary IRC when that service is running. */
+  public IcebergCatalogOperations() {
+    this(true);
+  }
+
+  private IcebergCatalogOperations(boolean adoptAuxIrc) {
+    this.adoptAuxIrc = adoptAuxIrc;
+  }
+
+  /**
+   * Operations that live on the auxiliary IRC class loader and call its catalog wrapper directly.
+   *
+   * @return operations that must not delegate further
+   */
+  public static IcebergCatalogOperations createForLocalIrc() {
+    return new IcebergCatalogOperations(false);
+  }
 
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
@@ -110,6 +149,30 @@ public class IcebergCatalogOperations
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
+    if (adoptAuxIrc) {
+      CatalogOperations created = IcebergAuxCatalogHooks.createOperations();
+      if (created != null) {
+        this.delegate = created;
+        Map<String, String> resolved = toIcebergConf(conf, info, propertiesMetadata);
+        IcebergAuxCatalogHooks.call(
+            () -> {
+              ((IcebergAuxCatalogHooks.ResolvedInitializer) created)
+                  .initializeResolved(resolved, info);
+              return null;
+            });
+        return;
+      }
+    }
+    initFromResolvedConf(toIcebergConf(conf, info, propertiesMetadata), info);
+  }
+
+  @Override
+  public void initializeResolved(Map<String, String> properties, CatalogInfo info) {
+    initFromResolvedConf(properties, info);
+  }
+
+  private Map<String, String> toIcebergConf(
+      Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata) {
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
@@ -120,17 +183,61 @@ public class IcebergCatalogOperations
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
+    resultConf.put(IcebergConstants.CATALOG_UUID, info.id().toString());
+    return resultConf;
+  }
+
+  private void initFromResolvedConf(Map<String, String> resultConf, CatalogInfo info) {
     this.catalogUuid = info.id().toString();
-    resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
     String metalake =
         info.namespace() != null && info.namespace().length() > 0
             ? info.namespace().level(0)
             : null;
-    this.backend = IcebergBackend.create(info.name(), metalake, resultConf);
+    this.catalogIdent = metalake == null ? null : NameIdentifier.of(metalake, info.name());
+    this.backend =
+        IcebergBackend.create(info.name(), metalake, resultConf, this::touchCatalogCache);
+  }
+
+  /**
+   * Epoch millis when this catalog should leave the catalog cache because its GCS token is near
+   * expiry. {@link Long#MAX_VALUE} means no token deadline is known yet.
+   *
+   * @return deadline epoch millis, or {@link Long#MAX_VALUE} when only the idle interval applies
+   */
+  @Override
+  public long cacheDeadlineEpochMs() {
+    if (delegate instanceof CatalogCacheDeadline) {
+      return IcebergAuxCatalogHooks.call(
+          () -> ((CatalogCacheDeadline) delegate).cacheDeadlineEpochMs());
+    }
+    if (delegate != null) {
+      return Long.MAX_VALUE;
+    }
+    return backend == null ? Long.MAX_VALUE : backend.cacheDeadlineEpochMs();
+  }
+
+  /** Re-reads this catalog in the catalog cache so a known GCS deadline shortens its lifetime. */
+  private void touchCatalogCache() {
+    if (catalogIdent == null) {
+      return;
+    }
+    try {
+      GravitinoEnv.getInstance().catalogManager().touchCatalogCache(catalogIdent);
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      LOG.debug("Catalog cache is not available to apply the GCS token deadline", e);
+    }
   }
 
   @Override
   public void onCatalogDropped() {
+    if (delegate instanceof CatalogDropAware) {
+      IcebergAuxCatalogHooks.call(
+          () -> {
+            ((CatalogDropAware) delegate).onCatalogDropped();
+            return null;
+          });
+      return;
+    }
     if (catalogUuid != null) {
       IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
     }
@@ -152,6 +259,14 @@ public class IcebergCatalogOperations
   /** Closes the Iceberg catalog and releases the associated client pool. */
   @Override
   public void close() {
+    if (delegate != null) {
+      IcebergAuxCatalogHooks.call(
+          () -> {
+            ((CatalogOperations) delegate).close();
+            return null;
+          });
+      return;
+    }
     if (backend != null) {
       backend.close();
     }
@@ -166,6 +281,9 @@ public class IcebergCatalogOperations
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((SupportsSchemas) delegate).listSchemas(namespace));
+    }
     try {
       String separator = HierarchicalSchemaUtil.schemaSeparator();
       org.apache.iceberg.catalog.Namespace icebergParent;
@@ -213,6 +331,12 @@ public class IcebergCatalogOperations
   public IcebergSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    if (delegate != null) {
+      Schema created =
+          IcebergAuxCatalogHooks.call(
+              () -> ((SupportsSchemas) delegate).createSchema(ident, comment, properties));
+      return toLocalSchema(created);
+    }
     try {
       String currentUser = currentUser();
       IcebergSchema createdSchema =
@@ -260,6 +384,10 @@ public class IcebergCatalogOperations
    */
   @Override
   public IcebergSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
+    if (delegate != null) {
+      return toLocalSchema(
+          IcebergAuxCatalogHooks.call(() -> ((SupportsSchemas) delegate).loadSchema(ident)));
+    }
     try {
       GetNamespaceResponse response =
           backend
@@ -295,6 +423,11 @@ public class IcebergCatalogOperations
   @Override
   public IcebergSchema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
+    if (delegate != null) {
+      return toLocalSchema(
+          IcebergAuxCatalogHooks.call(
+              () -> ((SupportsSchemas) delegate).alterSchema(ident, changes)));
+    }
     try {
       GetNamespaceResponse response =
           backend
@@ -361,6 +494,10 @@ public class IcebergCatalogOperations
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(
+          () -> ((SupportsSchemas) delegate).dropSchema(ident, cascade));
+    }
     Preconditions.checkArgument(!cascade, "Iceberg does not support cascading delete operations.");
     try {
       backend
@@ -388,6 +525,9 @@ public class IcebergCatalogOperations
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((TableCatalog) delegate).listTables(namespace));
+    }
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
     if (!schemaExists(schemaIdent)) {
       throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
@@ -415,6 +555,9 @@ public class IcebergCatalogOperations
    */
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((TableCatalog) delegate).loadTable(tableIdent));
+    }
     try {
 
       LoadTableResponse tableResponse =
@@ -443,6 +586,10 @@ public class IcebergCatalogOperations
   @Override
   public Table alterTable(NameIdentifier tableIdent, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(
+          () -> ((TableCatalog) delegate).alterTable(tableIdent, changes));
+    }
     Optional<TableChange> renameTableOptional =
         Arrays.stream(changes)
             .filter(tableChange -> tableChange instanceof TableChange.RenameTable)
@@ -528,6 +675,9 @@ public class IcebergCatalogOperations
    */
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((TableCatalog) delegate).dropTable(tableIdent));
+    }
     try {
       backend
           .wrapper()
@@ -564,6 +714,21 @@ public class IcebergCatalogOperations
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    if (delegate != null) {
+      Distribution tableDistribution = distribution;
+      return IcebergAuxCatalogHooks.call(
+          () ->
+              ((TableCatalog) delegate)
+                  .createTable(
+                      tableIdent,
+                      columns,
+                      comment,
+                      properties,
+                      partitioning,
+                      tableDistribution,
+                      sortOrders,
+                      indexes));
+    }
     Preconditions.checkArgument(indexes.length == 0, "Iceberg-catalog does not support indexes");
     try {
       NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
@@ -630,6 +795,9 @@ public class IcebergCatalogOperations
    */
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((TableCatalog) delegate).purgeTable(tableIdent));
+    }
     try {
       String schema = NameIdentifier.of(tableIdent.namespace().levels()).name();
       backend.wrapper().purgeTable(TableIdentifier.of(schema, tableIdent.name()));
@@ -650,6 +818,14 @@ public class IcebergCatalogOperations
    */
   @Override
   public void testConnection(NameIdentifier catalogIdent) {
+    if (delegate != null) {
+      IcebergAuxCatalogHooks.call(
+          () -> {
+            ((CatalogOperations) delegate).testConnection(catalogIdent);
+            return null;
+          });
+      return;
+    }
     try {
       backend.wrapper().listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace());
     } catch (Exception e) {
@@ -669,6 +845,9 @@ public class IcebergCatalogOperations
    */
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((ViewCatalog) delegate).loadView(ident));
+    }
     return backend.views().loadView(ident);
   }
 
@@ -680,6 +859,9 @@ public class IcebergCatalogOperations
    */
   @Override
   public boolean viewExists(NameIdentifier ident) {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((ViewCatalog) delegate).viewExists(ident));
+    }
     return backend.views().viewExists(ident);
   }
 
@@ -692,6 +874,9 @@ public class IcebergCatalogOperations
    */
   @Override
   public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((ViewCatalog) delegate).listViews(namespace));
+    }
     return backend.views().listViews(namespace);
   }
 
@@ -722,6 +907,19 @@ public class IcebergCatalogOperations
       String defaultSchema,
       Map<String, String> properties)
       throws NoSuchSchemaException, ViewAlreadyExistsException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(
+          () ->
+              ((ViewCatalog) delegate)
+                  .createView(
+                      ident,
+                      comment,
+                      columns,
+                      representations,
+                      defaultCatalog,
+                      defaultSchema,
+                      properties));
+    }
     return backend
         .views()
         .createView(
@@ -741,6 +939,9 @@ public class IcebergCatalogOperations
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((ViewCatalog) delegate).alterView(ident, changes));
+    }
     return backend.views().alterView(ident, changes);
   }
 
@@ -752,7 +953,22 @@ public class IcebergCatalogOperations
    */
   @Override
   public boolean dropView(NameIdentifier ident) {
+    if (delegate != null) {
+      return IcebergAuxCatalogHooks.call(() -> ((ViewCatalog) delegate).dropView(ident));
+    }
     return backend.views().dropView(ident);
+  }
+
+  private static IcebergSchema toLocalSchema(Schema schema) {
+    return IcebergSchema.builder()
+        .withName(schema.name())
+        .withComment(schema.comment())
+        .withProperties(schema.properties() == null ? null : new HashMap<>(schema.properties()))
+        .withAuditInfo(
+            schema.auditInfo() instanceof AuditInfo
+                ? (AuditInfo) schema.auditInfo()
+                : AuditInfo.EMPTY)
+        .build();
   }
 
   private static Distribution getIcebergDefaultDistribution(

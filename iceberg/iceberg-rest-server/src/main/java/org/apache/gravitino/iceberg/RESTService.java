@@ -28,6 +28,8 @@ import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
+import org.apache.gravitino.auxiliary.IcebergAuxCatalogHooks;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogOperations;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergAuxCatalogBridge;
 import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
@@ -140,6 +142,8 @@ public class RESTService implements GravitinoAuxiliaryService {
     if (auxMode) {
       // Lakehouse catalogs loaded from catalogCache use this IRC's wrappers in-process.
       IcebergAuxCatalogBridge.register(icebergCatalogWrapperManager::getCatalogWrapper, null);
+      // Metalake catalogs delegate here so they call this IRC's wrapper in-process.
+      IcebergAuxCatalogHooks.registerOperationsFactory(IcebergCatalogOperations::createForLocalIrc);
     }
     IcebergRESTServerContext authorizationContext =
         IcebergRESTServerContext.create(
@@ -308,6 +312,7 @@ public class RESTService implements GravitinoAuxiliaryService {
   public void serviceStop() throws Exception {
     if (auxMode) {
       IcebergAuxCatalogBridge.clear();
+      IcebergAuxCatalogHooks.registerOperationsFactory(null);
     }
     if (server != null) {
       server.stop();
