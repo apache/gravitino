@@ -67,6 +67,8 @@ class TestNearestPolicyTableEnumerator {
   private SchemaMetaService schemaMetaService;
   private TableMetaService tableMetaService;
   private NearestMaintenancePolicyResolver nearest;
+  private SchemaDispatcher schemaDispatcher;
+  private TableDispatcher tableDispatcher;
   private NearestPolicyTableEnumerator enumerator;
 
   @BeforeEach
@@ -76,9 +78,22 @@ class TestNearestPolicyTableEnumerator {
     schemaMetaService = mock(SchemaMetaService.class);
     tableMetaService = mock(TableMetaService.class);
     nearest = mock(NearestMaintenancePolicyResolver.class);
+    // Force meta fallback for tests that only stub SchemaMetaService / TableMetaService.
+    schemaDispatcher = mock(SchemaDispatcher.class);
+    tableDispatcher = mock(TableDispatcher.class);
+    when(schemaDispatcher.listSchemas(any()))
+        .thenThrow(new RuntimeException("use meta listing in unit test"));
+    when(tableDispatcher.listTables(any()))
+        .thenThrow(new RuntimeException("use meta listing in unit test"));
     enumerator =
         new NearestPolicyTableEnumerator(
-            policyTagRelService, tagMetaService, schemaMetaService, tableMetaService, nearest);
+            policyTagRelService,
+            tagMetaService,
+            schemaMetaService,
+            tableMetaService,
+            nearest,
+            schemaDispatcher,
+            tableDispatcher);
     when(schemaMetaService.listSchemasByNamespace(any())).thenReturn(List.of());
   }
 
