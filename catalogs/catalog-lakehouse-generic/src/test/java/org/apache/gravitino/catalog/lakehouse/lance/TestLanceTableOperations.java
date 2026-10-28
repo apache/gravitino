@@ -1663,8 +1663,9 @@ public class TestLanceTableOperations {
   //  Location validation before storage I/O (issue #13696)
   // ---------------------------------------------------------------------------
 
-  @Test
-  public void testRegisterRejectsLocationWithoutValidLanceDataset() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"Not a Lance dataset", "Storage connection timed out"})
+  public void testRegisterRejectsLocationWithoutValidLanceDataset(String reason) throws Exception {
     // Registering a table adopts an existing dataset at the caller-supplied location. A location
     // that does not resolve to a valid Lance dataset must be rejected before any metadata is
     // written, otherwise a later explicit purge could delete the unrelated directory.
@@ -1674,9 +1675,8 @@ public class TestLanceTableOperations {
     properties.put(Table.PROPERTY_LOCATION, location);
     properties.put(LANCE_TABLE_REGISTER, "true");
 
-    Mockito.doThrow(new RuntimeException("Not a Lance dataset"))
-        .when(lanceTableOps)
-        .openDataset(eq(location), any());
+    RuntimeException storageFailure = new RuntimeException(reason);
+    Mockito.doThrow(storageFailure).when(lanceTableOps).openDataset(eq(location), any());
 
     IllegalArgumentException failure =
         Assertions.assertThrows(
@@ -1692,8 +1692,12 @@ public class TestLanceTableOperations {
                     new SortOrder[0],
                     new Index[0]));
     Assertions.assertTrue(
-        failure.getMessage().contains("does not resolve to a valid Lance dataset"),
-        "Error must state the location is not a valid Lance dataset, got: " + failure.getMessage());
+        failure.getMessage().contains("Could not validate location"),
+        "Error must describe a validation failure, got: " + failure.getMessage());
+    Assertions.assertTrue(failure.getMessage().contains(location));
+    Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
+    Assertions.assertTrue(failure.getMessage().contains("storage connectivity"));
+    Assertions.assertSame(storageFailure, failure.getCause());
     verify(store, never()).put(any(), Mockito.anyBoolean());
   }
 

@@ -1235,8 +1235,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
                         Transforms.EMPTY_TRANSFORM,
                         Distributions.NONE,
                         new SortOrder[0]));
-    Assertions.assertTrue(
-        failure.getMessage().contains("does not resolve to a valid Lance dataset"));
+    Assertions.assertTrue(failure.getMessage().contains("Could not validate location"));
     Assertions.assertFalse(new File(newLocation).exists());
     Assertions.assertThrows(
         NoSuchTableException.class, () -> catalog.asTableCatalog().loadTable(newTableIdentifier));

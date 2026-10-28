@@ -986,7 +986,7 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @param ident the table being registered, used only for the error message
    * @param location the caller-supplied dataset location
    * @param properties the table properties, used to resolve storage options
-   * @throws IllegalArgumentException if the location does not resolve to a valid Lance dataset
+   * @throws IllegalArgumentException if dataset validation cannot complete successfully
    */
   private void validateExistingDatasetLocation(
       NameIdentifier ident, String location, Map<String, String> properties) {
@@ -998,7 +998,8 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw new IllegalArgumentException(
           String.format(
-              "Location %s for Lance table %s does not resolve to a valid Lance dataset",
+              "Could not validate location %s for Lance table %s as a readable Lance dataset; "
+                  + "check dataset existence, access permissions, and storage connectivity",
               location, ident),
           e);
     }
