@@ -248,6 +248,12 @@ term's owner knows which data implements the term. Either may write it, per term
 
 - A `MANAGE_DEFINITIONS` holder on any of the term's domains or on the metalake sets the status
   directly with `PATCH`. Edits apply at once in any status and are audited.
+- **Visibility is the same on every surface** (REST, clients, MCP). A term the caller cannot see is
+  omitted from lists, and get returns 404. The same filter applies inside responses: a term's
+  `broader`, `narrower` and `related` lists, an object's terms and a domain's terms omit terms the
+  caller cannot see, so a hidden draft or a term in a denied domain never shows up as a relation.
+- **Known channels**: hiding a term is not confidentiality. Its existence can show through a 409 on
+  creating a term with the same name, and a 400 on adding a synonym equal to its name.
 - **Versioned changes**: name, definition, synonyms, properties, relations, domains and bindings.
   Owner and status changes are audited only.
 - **Snapshot**: each version row stores the whole term as JSON (fields, synonyms, broader and
@@ -263,7 +269,9 @@ term's owner knows which data implements the term. Either may write it, per term
   The default implementation applies it at once as above. An approval workflow can replace it to
   write a `PENDING` row without touching the live tables, then apply the snapshot and promote the
   row to `CURRENT` on approval.
-- Dropping a term soft-deletes its version rows.
+- Dropping a term soft-deletes its synonyms, relations, domain links, bindings and version rows in
+  the same transaction. Dropping a metalake soft-deletes all of its glossary rows in
+  `MetalakeMetaService#deleteMetalake`, next to the tag cleanup.
 
 ### Access control
 
@@ -275,14 +283,18 @@ term's owner knows which data implements the term. Either may write it, per term
 
 - `MANAGE_DEFINITIONS` includes `CREATE_DEFINITION`, which includes `VIEW_DEFINITION`. The names
   are generic so that other business-definition objects can share them.
+- **Registration**: three new `Privilege.Name` values whose `canBindTo` accepts `METALAKE` and
+  `DOMAIN` only; granting them on any other securable, or granting anything on `GLOSSARY_TERM`,
+  fails with 400 in the role APIs.
 - **Levels of a term**: the metalake, each of its domains, and each domain's current parent. A
   privilege holds when it is allowed on at least one level and denied on none. If Finance allows
   `VIEW_DEFINITION` and Sales denies it, a role cannot see a term in both. The metalake owner
   always passes.
 - **Bindings** are written on the object, by the object's curator (`APPROVED` terms only) or by the
   term's editor; see Bindings.
-- **Owner** (user or group) through `/owners/glossary_term/{term}`. Changing it needs the current
-  owner, or `MANAGE_GRANTS` on the metalake or one of the term's domains.
+- **Owner** (user or group) through `/owners/glossary_term/{term}`. When a group owns a term, its
+  members count as the owner. Changing the owner needs the current owner, or `MANAGE_GRANTS` on the
+  metalake or one of the term's domains.
 - **Create** needs `CREATE_DEFINITION` on every listed domain, or on the metalake when none is
   listed; the creator becomes the owner.
 - **Implementation**: a `TermScopeResolver` returns a term's levels from its domains and the Domain
@@ -360,6 +372,9 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
   409 `TermAlreadyExistsException` (name or source reference) and `NonEmptyDomainException`; 400 for
   a cycle, a self-edge, a synonym equal to another term's name, deleting an `APPROVED` term, or an
   object curator binding a term that is not `APPROVED`; 403 `ForbiddenException`.
+- **Concurrency**: changes apply to the current state and the last write wins, as for other
+  Gravitino metadata; there is no version check on write. Responses carry `version`, so a client
+  can tell that a term changed since it read it.
 - **Encoding**: term names may contain `/`, URL-encoded as `%2F` in `{term}`, as for domain and tag
   names.
 - **Clients** (Java, Python):
@@ -404,6 +419,16 @@ domain to its terms to the data.
 3. **Terms as tags on assets.** `APPLY_TAG` does not match the definition privileges, tags have no
    definition, relations or status, and tags carry policies while bindings must not affect access.
 
+## Prior Art
+
+- **DataHub** glossary terms carry a definition, owners and a source reference, are grouped in
+  nested term groups, relate through typed relations (Inherits From, Contains), and attach to
+  datasets and columns. Term groups map to domains and parent terms here; Contains maps to
+  `RELATED` and Inherits From to `BROADER`.
+- **Unity Catalog** pages define a term inside a domain, with draft and published states and
+  related assets; access is inherited from the domain, with no grants on a page. This design
+  likewise grants on domains, never on a single term.
+
 ## Open Questions
 
 1. **Domain membership of terms**: Option A (proposed) or Option B; to be agreed with the Domain
@@ -416,6 +441,11 @@ domain to its terms to the data.
 
 ## Task Breakdown
 
+### Phase 0: Prerequisites
+
+- [ ] Domain design (#13867) merged: domain storage, the parent resolver and domain authorization
+- [ ] Decision on default read access (Open Question 3)
+
 ### Phase 1: Terms, storage and authorization
 
 - [ ] `GlossaryTerm` API and `MetadataObject.Type.GLOSSARY_TERM` in `api/`; definition privileges on metalake and domain
@@ -423,10 +453,11 @@ domain to its terms to the data.
 - [ ] `GlossaryManager`: CRUD, name and synonym rules, relations with the cycle check, domain membership, status, version rows, `TermChangeHandler`, locking
 - [ ] Authorization: `TermScopeResolver`, the `GLOSSARY_TERM` case in `JcasbinAuthorizer`, draft visibility, owner-only edits for `CREATE_DEFINITION`
 - [ ] REST endpoints for terms, status and hierarchy; `GlossaryEventDispatcher`; the domain drop check
+- [ ] Tests on H2, MySQL and PostgreSQL: name and synonym rules, cycle check under concurrent edits, deny across domains, draft visibility in relation lists, and a multi-node test (edit or move on one server, read on another)
 
 ### Phase 2: Bindings and lookup
 
-- [ ] Binding storage; term-side and object-side endpoints with their privilege checks; cleanup on object drop, column drop and metric removal
+- [ ] Binding storage; bind and unbind endpoints on objects and metrics with both privilege paths; cleanup on object drop, column drop and metric removal
 - [ ] `domain` and `match` filters on the list endpoint
 
 ### Phase 3: Clients, MCP and docs
