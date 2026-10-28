@@ -23,9 +23,10 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 /**
  * Resolves {@link IcebergCatalogWrapper} instances by catalog name.
  *
- * <p>{@link StandaloneCatalogWrapperManager} backs metalake lakehouse with {@link
- * IcebergCatalogWrapperCache} (access eviction and GCS token refresh) and creates wrappers via
- * {@link IcebergCatalogWrapper#create(IcebergConfig)}.
+ * <p>{@link StandaloneCatalogWrapperManager} takes a caller-supplied {@link IcebergConfig} (single
+ * lakehouse catalog). {@link MetalakeCatalogWrapperManager} resolves configs from {@code
+ * CatalogManager} by catalog name (in-process, IRC-like, without borrowing the embedded IRC
+ * manager). Both use {@link IcebergCatalogWrapperCache} for access eviction and GCS token refresh.
  */
 public interface CatalogWrapperManager {
 

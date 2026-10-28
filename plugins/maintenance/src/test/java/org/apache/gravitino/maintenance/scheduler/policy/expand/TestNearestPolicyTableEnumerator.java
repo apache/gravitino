@@ -34,6 +34,8 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -51,6 +53,10 @@ import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -354,6 +360,134 @@ class TestNearestPolicyTableEnumerator {
     Assertions.assertEquals(
         List.of(501L), tableIds(withCatalog.listTableIds(policy, 10, allowAll(), 0L)));
     Mockito.verify(tableDispatcher).loadTable(tableIdent);
+  }
+
+  @Test
+  void testSchemaExpansionListsViaMetalakeCatalogWrapperManager() throws Exception {
+    PolicyEntity policy = policy(10L, "compaction");
+    TagEntity tag = tag(1L, "maint");
+    when(policyTagRelService.listRelations(
+            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
+            eq(Entity.EntityType.POLICY)))
+        .thenReturn(List.of(policyTagEdge(policy, tag)));
+    when(tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier()))
+        .thenReturn(
+            List.of(
+                GenericEntity.builder()
+                    .withId(1L)
+                    .withName("catalog.schema")
+                    .withEntityType(Entity.EntityType.SCHEMA)
+                    .build()));
+
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+    CatalogWrapperManager wrapperManager = mock(CatalogWrapperManager.class);
+    IcebergCatalogWrapper wrapper = mock(IcebergCatalogWrapper.class);
+    when(wrapperManager.getCatalogWrapper("catalog")).thenReturn(wrapper);
+    when(wrapper.listTable(eq(Namespace.of("schema"))))
+        .thenReturn(ListTablesResponse.builder().add(TableIdentifier.of("schema", "ice")).build());
+
+    NameIdentifier tableIdent = NameIdentifierUtil.ofTable(METALAKE, "catalog", "schema", "ice");
+    TableEntity imported =
+        TableEntity.builder()
+            .withId(601L)
+            .withName("ice")
+            .withNamespace(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))
+            .withAuditInfo(audit())
+            .build();
+    Table loaded = EntityCombinedTable.of(Mockito.mock(Table.class), imported).withImported(true);
+    when(tableDispatcher.loadTable(eq(tableIdent))).thenReturn(loaded);
+    when(tableMetaService.listTablesByNamespace(
+            eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
+        .thenReturn(List.of());
+
+    MetadataObject tableObj =
+        MetadataObjects.of(
+            java.util.Arrays.asList("catalog", "schema", "ice"), MetadataObject.Type.TABLE);
+    MetadataObject schemaObj =
+        MetadataObjects.of(
+            java.util.Arrays.asList("catalog", "schema"), MetadataObject.Type.SCHEMA);
+    when(nearest.resolve(METALAKE, tableObj, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, schemaObj));
+
+    NearestPolicyTableEnumerator withIceberg =
+        new NearestPolicyTableEnumerator(
+            policyTagRelService,
+            tagMetaService,
+            schemaMetaService,
+            tableMetaService,
+            nearest,
+            schemaDispatcher,
+            tableDispatcher,
+            metalake -> wrapperManager);
+
+    Assertions.assertEquals(
+        List.of(601L), tableIds(withIceberg.listTableIds(policy, 10, allowAll(), 0L)));
+    Mockito.verify(wrapper).listTable(eq(Namespace.of("schema")));
+    Mockito.verify(tableDispatcher).loadTable(tableIdent);
+    Mockito.verify(tableDispatcher, Mockito.never()).listTables(any());
+  }
+
+  @Test
+  void testCatalogExpansionListsNamespacesViaMetalakeCatalogWrapperManager() throws Exception {
+    PolicyEntity policy = policy(10L, "compaction");
+    TagEntity tag = tag(1L, "maint");
+    when(policyTagRelService.listRelations(
+            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
+            eq(Entity.EntityType.POLICY)))
+        .thenReturn(List.of(policyTagEdge(policy, tag)));
+    when(tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier()))
+        .thenReturn(
+            List.of(
+                GenericEntity.builder()
+                    .withId(1L)
+                    .withName("catalog")
+                    .withEntityType(Entity.EntityType.CATALOG)
+                    .build()));
+
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+    CatalogWrapperManager wrapperManager = mock(CatalogWrapperManager.class);
+    IcebergCatalogWrapper wrapper = mock(IcebergCatalogWrapper.class);
+    when(wrapperManager.getCatalogWrapper("catalog")).thenReturn(wrapper);
+    when(wrapper.listNamespace(eq(Namespace.empty())))
+        .thenReturn(ListNamespacesResponse.builder().add(Namespace.of("schema")).build());
+    when(wrapper.listTable(eq(Namespace.of("schema"))))
+        .thenReturn(ListTablesResponse.builder().add(TableIdentifier.of("schema", "ice")).build());
+
+    NameIdentifier tableIdent = NameIdentifierUtil.ofTable(METALAKE, "catalog", "schema", "ice");
+    TableEntity imported =
+        TableEntity.builder()
+            .withId(701L)
+            .withName("ice")
+            .withNamespace(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))
+            .withAuditInfo(audit())
+            .build();
+    when(tableDispatcher.loadTable(eq(tableIdent)))
+        .thenReturn(EntityCombinedTable.of(Mockito.mock(Table.class), imported).withImported(true));
+
+    MetadataObject tableObj =
+        MetadataObjects.of(
+            java.util.Arrays.asList("catalog", "schema", "ice"), MetadataObject.Type.TABLE);
+    MetadataObject catalogObj = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
+    when(nearest.resolve(METALAKE, tableObj, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, catalogObj));
+
+    NearestPolicyTableEnumerator withIceberg =
+        new NearestPolicyTableEnumerator(
+            policyTagRelService,
+            tagMetaService,
+            schemaMetaService,
+            tableMetaService,
+            nearest,
+            schemaDispatcher,
+            tableDispatcher,
+            metalake -> wrapperManager);
+
+    Assertions.assertEquals(
+        List.of(701L), tableIds(withIceberg.listTableIds(policy, 10, allowAll(), 0L)));
+    Mockito.verify(wrapper).listNamespace(eq(Namespace.empty()));
+    Mockito.verify(schemaDispatcher, Mockito.never()).listSchemas(any());
   }
 
   private static List<Long> tableIds(List<ExpandTableCandidate> candidates) {

@@ -26,6 +26,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -40,6 +42,10 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogListings;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.MetalakeCatalogWrapperManager;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -66,10 +72,11 @@ import org.slf4j.LoggerFactory;
  * enqueue. Scanning continues until {@code limit} enqueueable tables are found (cooldown /
  * in-flight winners do not consume the batch budget).
  *
- * <p>For catalog/schema attachments, prefers {@link SchemaDispatcher}/{@link TableDispatcher}
- * {@code list*} + {@code load*} so Iceberg-backed tables missing from the entity store are
- * imported. Falls back to relational meta listing when dispatchers are unavailable or listing
- * fails. Direct table-tagged objects still use the stored table id.
+ * <p>For catalog/schema attachments on lakehouse-iceberg, prefers an in-process {@link
+ * CatalogWrapperManager} ({@link MetalakeCatalogWrapperManager}) to {@code listNamespace}/{@code
+ * listTable}, then {@link TableDispatcher#loadTable} to import into the entity store. Falls back to
+ * {@link SchemaDispatcher}/{@link TableDispatcher} list+load, then relational meta listing. Direct
+ * table-tagged objects still use the stored table id.
  */
 public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator {
 
@@ -82,8 +89,9 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   private final NearestMaintenancePolicyResolver nearestResolver;
   @Nullable private final SchemaDispatcher schemaDispatcher;
   @Nullable private final TableDispatcher tableDispatcher;
+  @Nullable private final Function<String, CatalogWrapperManager> icebergCatalogWrappers;
 
-  /** Uses relational singletons and {@link GravitinoEnv} dispatchers / entity store. */
+  /** Uses relational singletons, dispatchers, and per-metalake metalake wrapper managers. */
   public NearestPolicyTableEnumerator() {
     this(
         PolicyTagRelService.getInstance(),
@@ -92,7 +100,8 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         TableMetaService.getInstance(),
         new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore()),
         GravitinoEnv.getInstance().internalSchemaDispatcher(),
-        GravitinoEnv.getInstance().internalTableDispatcher());
+        GravitinoEnv.getInstance().internalTableDispatcher(),
+        defaultIcebergCatalogWrappers());
   }
 
   /**
@@ -117,6 +126,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         tableMetaService,
         nearestResolver,
         null,
+        null,
         null);
   }
 
@@ -126,7 +136,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
    * @param schemaMetaService schema listing
    * @param tableMetaService table listing
    * @param nearestResolver nearest maintenance-policy resolver
-   * @param schemaDispatcher optional schema dispatcher for Iceberg list/import
+   * @param schemaDispatcher optional schema dispatcher for import / non-Iceberg list
    * @param tableDispatcher optional table dispatcher for Iceberg list/import
    */
   public NearestPolicyTableEnumerator(
@@ -137,6 +147,37 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       NearestMaintenancePolicyResolver nearestResolver,
       @Nullable SchemaDispatcher schemaDispatcher,
       @Nullable TableDispatcher tableDispatcher) {
+    this(
+        policyTagRelService,
+        tagMetaService,
+        schemaMetaService,
+        tableMetaService,
+        nearestResolver,
+        schemaDispatcher,
+        tableDispatcher,
+        null);
+  }
+
+  /**
+   * @param policyTagRelService policy-tag relations
+   * @param tagMetaService tag metadata
+   * @param schemaMetaService schema listing
+   * @param tableMetaService table listing
+   * @param nearestResolver nearest maintenance-policy resolver
+   * @param schemaDispatcher optional schema dispatcher for import / non-Iceberg list
+   * @param tableDispatcher optional table dispatcher for import after Iceberg list
+   * @param icebergCatalogWrappers optional metalake → in-process Iceberg {@link
+   *     CatalogWrapperManager}
+   */
+  public NearestPolicyTableEnumerator(
+      PolicyTagRelService policyTagRelService,
+      TagMetaService tagMetaService,
+      SchemaMetaService schemaMetaService,
+      TableMetaService tableMetaService,
+      NearestMaintenancePolicyResolver nearestResolver,
+      @Nullable SchemaDispatcher schemaDispatcher,
+      @Nullable TableDispatcher tableDispatcher,
+      @Nullable Function<String, CatalogWrapperManager> icebergCatalogWrappers) {
     this.policyTagRelService = policyTagRelService;
     this.tagMetaService = tagMetaService;
     this.schemaMetaService = schemaMetaService;
@@ -144,6 +185,12 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     this.nearestResolver = nearestResolver;
     this.schemaDispatcher = schemaDispatcher;
     this.tableDispatcher = tableDispatcher;
+    this.icebergCatalogWrappers = icebergCatalogWrappers;
+  }
+
+  private static Function<String, CatalogWrapperManager> defaultIcebergCatalogWrappers() {
+    ConcurrentHashMap<String, MetalakeCatalogWrapperManager> byMetalake = new ConcurrentHashMap<>();
+    return metalake -> byMetalake.computeIfAbsent(metalake, MetalakeCatalogWrapperManager::new);
   }
 
   @Override
@@ -233,6 +280,9 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   private void expandCatalog(MetadataObject catalog, ScanContext ctx) {
+    if (tryExpandCatalogViaIceberg(catalog, ctx)) {
+      return;
+    }
     if (schemaDispatcher != null) {
       try {
         Namespace catalogNs = NamespaceUtil.ofSchema(ctx.metalake, catalog.name());
@@ -282,6 +332,32 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     }
   }
 
+  private boolean tryExpandCatalogViaIceberg(MetadataObject catalog, ScanContext ctx) {
+    IcebergCatalogWrapper wrapper = icebergWrapperOrNull(ctx.metalake, catalog.name());
+    if (wrapper == null) {
+      return false;
+    }
+    try {
+      String separator = HierarchicalSchemaUtil.schemaSeparator();
+      for (String logicalSchema : IcebergCatalogListings.listLogicalSchemas(wrapper, separator)) {
+        if (ctx.enqueueable.size() >= ctx.limit) {
+          return true;
+        }
+        maybeLoadSchema(ctx.metalake, catalog.name(), logicalSchema);
+        MetadataObject schemaObject =
+            MetadataObjects.of(catalog.name(), logicalSchema, MetadataObject.Type.SCHEMA);
+        expandSchema(schemaObject, ctx, false);
+      }
+      return true;
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to list schemas via MetalakeCatalogWrapperManager for {}; falling back: {}",
+          catalog.fullName(),
+          e.toString());
+      return false;
+    }
+  }
+
   private void expandSchema(MetadataObject schema, ScanContext ctx, boolean includeDescendants) {
     String catalogName = schema.parent();
     if (catalogName == null || schema.name() == null || schema.name().isBlank()) {
@@ -293,6 +369,10 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     }
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     String descendantPrefix = schema.name() + separator;
+
+    if (tryExpandDescendantsViaIceberg(catalogName, descendantPrefix, schema.fullName(), ctx)) {
+      return;
+    }
 
     if (this.schemaDispatcher != null) {
       try {
@@ -338,7 +418,39 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     }
   }
 
+  private boolean tryExpandDescendantsViaIceberg(
+      String catalogName, String descendantPrefix, String schemaFullName, ScanContext ctx) {
+    IcebergCatalogWrapper wrapper = icebergWrapperOrNull(ctx.metalake, catalogName);
+    if (wrapper == null) {
+      return false;
+    }
+    try {
+      String separator = HierarchicalSchemaUtil.schemaSeparator();
+      for (String logicalSchema : IcebergCatalogListings.listLogicalSchemas(wrapper, separator)) {
+        if (ctx.enqueueable.size() >= ctx.limit) {
+          return true;
+        }
+        if (!logicalSchema.startsWith(descendantPrefix)) {
+          continue;
+        }
+        maybeLoadSchema(ctx.metalake, catalogName, logicalSchema);
+        expandTables(catalogName, logicalSchema, ctx);
+      }
+      return true;
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to list descendant schemas under {} via MetalakeCatalogWrapperManager;"
+              + " falling back: {}",
+          schemaFullName,
+          e.toString());
+      return false;
+    }
+  }
+
   private void expandTables(String catalogName, String schemaName, ScanContext ctx) {
+    if (tryExpandTablesViaIceberg(catalogName, schemaName, ctx)) {
+      return;
+    }
     if (this.tableDispatcher != null && this.schemaDispatcher != null) {
       try {
         NameIdentifier schemaIdent =
@@ -394,6 +506,91 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       MetadataObject tableObject =
           NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE);
       considerTable(table.id(), tableObject, ctx);
+    }
+  }
+
+  private boolean tryExpandTablesViaIceberg(
+      String catalogName, String schemaName, ScanContext ctx) {
+    if (tableDispatcher == null) {
+      return false;
+    }
+    IcebergCatalogWrapper wrapper = icebergWrapperOrNull(ctx.metalake, catalogName);
+    if (wrapper == null) {
+      return false;
+    }
+    try {
+      maybeLoadSchema(ctx.metalake, catalogName, schemaName);
+      String separator = HierarchicalSchemaUtil.schemaSeparator();
+      List<NameIdentifier> tables =
+          IcebergCatalogListings.listTables(
+              wrapper, ctx.metalake, catalogName, schemaName, separator);
+      for (NameIdentifier tableIdent : tables) {
+        if (ctx.enqueueable.size() >= ctx.limit) {
+          return true;
+        }
+        try {
+          Table table = tableDispatcher.loadTable(tableIdent);
+          Long tableId = resolveTableId(table, tableIdent);
+          if (tableId == null) {
+            LOG.warn("Skip table {} after load: missing entity id", tableIdent);
+            continue;
+          }
+          MetadataObject tableObject =
+              NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
+          considerTable(tableId, tableObject, ctx);
+        } catch (NoSuchTableException e) {
+          LOG.debug("Table {} disappeared during expand: {}", tableIdent, e.toString());
+        } catch (RuntimeException e) {
+          LOG.warn("Skip table {} during Iceberg expand: {}", tableIdent, e.toString());
+        }
+      }
+      return true;
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to list/load tables via MetalakeCatalogWrapperManager for {}.{}.{};"
+              + " falling back: {}",
+          ctx.metalake,
+          catalogName,
+          schemaName,
+          e.toString());
+      return false;
+    }
+  }
+
+  @Nullable
+  private IcebergCatalogWrapper icebergWrapperOrNull(String metalake, String catalogName) {
+    if (icebergCatalogWrappers == null) {
+      return null;
+    }
+    try {
+      CatalogWrapperManager manager = icebergCatalogWrappers.apply(metalake);
+      if (manager == null) {
+        return null;
+      }
+      return manager.getCatalogWrapper(catalogName);
+    } catch (NoSuchCatalogException | IllegalArgumentException e) {
+      LOG.debug(
+          "No in-process Iceberg wrapper for {}::{}: {}", metalake, catalogName, e.toString());
+      return null;
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to resolve in-process Iceberg wrapper for {}::{}: {}",
+          metalake,
+          catalogName,
+          e.toString());
+      return null;
+    }
+  }
+
+  private void maybeLoadSchema(String metalake, String catalogName, String schemaName) {
+    if (schemaDispatcher == null) {
+      return;
+    }
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalogName, schemaName);
+    try {
+      schemaDispatcher.loadSchema(schemaIdent);
+    } catch (RuntimeException e) {
+      LOG.warn("Skip schema import for {} during policy expand: {}", schemaIdent, e.toString());
     }
   }
 
