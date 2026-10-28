@@ -227,8 +227,8 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
       nodeB.pullAndUpdateJobStatus();
       Assertions.assertEquals(pending, getJob(pending.name()));
 
-      // Beyond it, the job is reconciled with the job executor, which has no execution of it on
-      // node B, so it's marked as FAILED.
+      // Beyond it, node B attempts lookup, but its local executor cannot establish whether
+      // another node submitted an execution. Unsupported lookup leaves the registration intact.
       moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
       nodeB.pullAndUpdateJobStatus();
       Assertions.assertEquals(JobHandle.Status.QUEUED, getJob(pending.name()).status());

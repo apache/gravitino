@@ -473,10 +473,13 @@ only tracks the jobs it runs itself:
   `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
   `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
   directory.
-- To clear such a job sooner, cancel it. If the job is still `CANCELLING` more than three times
-  `gravitino.job.statusPullIntervalInMs` after the cancel request, the server running it is
-  considered gone, and another server marks the job as `CANCELLED` when it pulls job statuses. Its
-  job template can then be deleted.
+- For a job whose execution id was recorded, cancelling it can clear it sooner. If it is still
+  `CANCELLING` more than three times `gravitino.job.statusPullIntervalInMs` after the cancel request,
+  the server running it is considered gone, and another server marks it as `CANCELLED` when it
+  pulls job statuses. Its job template can then be deleted.
+- This shortcut does not apply to a pending submission whose execution id was never recorded.
+  The local executor cannot look it up, so cancelling it retains `CANCELLING` until the retention
+  policy expires it or an operator resolves it. Its job template remains in use until then.
 
 :::caution
 The local job executor can't tell a job left behind by an exited server from a job that is still
@@ -495,10 +498,11 @@ jobs are only marked as `FAILED` once they expire as described above, which can 
 every tenth of that time. Until then, they are still reported as queued, started or cancelling, and
 they keep their job templates from being deleted.
 
-To clear these jobs sooner, cancel them. A cancelled job is marked as `CANCELLED` within about four
-times `gravitino.job.statusPullIntervalInMs`, as described above. Lowering
-`gravitino.job.stagingDirKeepTimeInMs` also shortens the time, but finished jobs are then kept for
-a shorter time, and a job that runs longer than that without changing its status is marked as
+For jobs whose execution id was recorded, cancelling them settles them as `CANCELLED` within about
+four times `gravitino.job.statusPullIntervalInMs`, as described above. A pending submission with
+unsupported lookup cannot use this shortcut and waits for retention or operator intervention.
+Lowering `gravitino.job.stagingDirKeepTimeInMs` shortens retention, but finished jobs are then kept
+for a shorter time, and a job that runs longer than that without changing its status is marked as
 `FAILED`.
 :::
 
