@@ -349,6 +349,7 @@ public class TestEntityStoreConcurrency extends TestJDBCBackend {
       E initial, Function<E, E> update) throws Exception {
     backend.insert(initial, false);
     CountDownLatch staleRead = new CountDownLatch(1);
+    AtomicBoolean observedSnapshot = new AtomicBoolean();
     CountDownLatch deleted = new CountDownLatch(1);
     ExecutorService worker = Executors.newSingleThreadExecutor();
     try {
@@ -360,6 +361,8 @@ public class TestEntityStoreConcurrency extends TestJDBCBackend {
                       initial.nameIdentifier(),
                       initial.type(),
                       current -> {
+                        assertEquals(initial.id(), current.id());
+                        observedSnapshot.set(true);
                         staleRead.countDown();
                         await(deleted);
                         return update.apply(current);
@@ -371,6 +374,7 @@ public class TestEntityStoreConcurrency extends TestJDBCBackend {
                 }
               });
       await(staleRead);
+      requireObservedSnapshot(observedSnapshot, updateResult);
       assertTrue(backend.delete(initial.nameIdentifier(), initial.type(), false));
       deleted.countDown();
       Throwable failure = updateResult.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -412,6 +416,7 @@ public class TestEntityStoreConcurrency extends TestJDBCBackend {
     E initial = testCase.factory.create(RandomIdGenerator.INSTANCE.nextId(), "entity", "0");
     backend.insert(initial, false);
     CountDownLatch staleRead = new CountDownLatch(1);
+    AtomicBoolean observedSnapshot = new AtomicBoolean();
     CountDownLatch winnerCommitted = new CountDownLatch(1);
     ExecutorService worker = Executors.newSingleThreadExecutor();
     try {
@@ -423,7 +428,9 @@ public class TestEntityStoreConcurrency extends TestJDBCBackend {
                       initial.nameIdentifier(),
                       initial.type(),
                       current -> {
+                        assertEquals(initial.id(), current.id());
                         assertEquals("0", testCase.comment.apply(current));
+                        observedSnapshot.set(true);
                         staleRead.countDown();
                         await(winnerCommitted);
                         return testCase.factory.create(current.id(), current.name(), "1");
@@ -435,6 +442,7 @@ public class TestEntityStoreConcurrency extends TestJDBCBackend {
                 }
               });
       await(staleRead);
+      requireObservedSnapshot(observedSnapshot, staleWriter);
       backend.<E>update(
           initial.nameIdentifier(),
           initial.type(),
@@ -675,6 +683,15 @@ public class TestEntityStoreConcurrency extends TestJDBCBackend {
         .withProperties(Map.of("generation", marker))
         .withAuditInfo(AUDIT_INFO)
         .build();
+  }
+
+  private static void requireObservedSnapshot(AtomicBoolean observed, Future<Throwable> writer)
+      throws Exception {
+    if (!observed.get()) {
+      throw new AssertionError(
+          "The updater must observe its initial snapshot before the competing write",
+          writer.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+    }
   }
 
   private static void await(CountDownLatch signal) {
