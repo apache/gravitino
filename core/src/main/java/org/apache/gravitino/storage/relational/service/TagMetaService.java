@@ -108,15 +108,7 @@ public class TagMetaService {
     String metalakeName = ns.level(0);
 
     try {
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
-      }
+      MetalakePO metalakePO = MetalakeMetaService.getInstance().requireMetalakeByName(metalakeName);
 
       TagPO.Builder builder = TagPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       TagPO tagPO = POConverters.initializeTagPOWithVersion(tagEntity, builder);

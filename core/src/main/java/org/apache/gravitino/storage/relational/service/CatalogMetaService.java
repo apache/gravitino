@@ -188,15 +188,7 @@ public class CatalogMetaService {
       // This read runs before the transaction below, so it only tells us the metalake ID and name
       // we start from. The metalake may still be dropped or renamed right after it. That is why
       // lockMetalakeForCatalogCreate checks the row again inside the transaction.
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
-      }
+      MetalakePO metalakePO = MetalakeMetaService.getInstance().requireMetalakeByName(metalakeName);
 
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForCatalogCreate(metalakePO),
