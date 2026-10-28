@@ -505,6 +505,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   public T withCatalogEntity(CatalogEntity entity) {
     this.entity = entity;
+    this.ownedSecretPlaintext = readOwnedSecrets();
     return (T) this;
   }
 
@@ -520,7 +521,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
-   * Sets the {@link SecretManager} used to resolve secret URNs for this catalog.
+   * Sets the {@link SecretManager} used to resolve secret URNs for this catalog, and reads the
+   * write-through secrets that the catalog entity owns.
    *
    * @param secretManager The SecretManager instance; may be null when secrets are not configured.
    * @return The instance of the concrete subclass of BaseCatalog.

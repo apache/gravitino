@@ -480,11 +480,11 @@ map[URN] = Base64(plaintext)
 
 | SPI method     | Behavior                                                                                                                                                                                                           |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `writeSecret`  | Base64-encode plaintext. Allocate URN `urn:gravitino-secret:<provider_name>:<entityType>:<entityId>:<propertyKey>` from `SecretWriteContext`. Store Base64 under that URN (overwrite if same key). Return the URN. |
+| `writeSecret`  | Base64-encode plaintext. Allocate URN `urn:gravitino-secret:<provider_name>:<entityType>:<entityId>[:<writeId>]:<propertyKey>` from `SecretWriteContext`. Store Base64 under that URN. Return the URN. |
 | `readSecret`   | Look up map by URN; Base64-decode; return plaintext. Missing URN → treat as gone (impl-defined: null / error). Provider name in URN must match this instance.                                                      |
 | `deleteSecret` | `map.remove(urn)` — best-effort; used by create rollback, entity drop, and alter `removeProperty` for **managed** (write-through) secrets (§5.5.2 C).                                                              |
 
-**Type-specific identifier:** `<entityType>:<entityId>:<propertyKey>` — see §5.1.1 (catalog / schema / fileset).
+**Type-specific identifier:** `<entityType>:<entityId>[:<writeId>]:<propertyKey>` — see §5.1.1 (catalog / schema / fileset).
 
 **External `secretReferences`:** **`InMemorySecretsProvider` rejects them** (write-through only).
 Use `secretBindings` / `setSecretBinding` with this provider.
@@ -676,7 +676,7 @@ sibling maps). Existing **`setProperty`** stays a **string** `value` (plaintext 
 | `provider` unknown                                                                 | **Reject**                                                                                                                                                                                                                                         |
 | `setProperty` `value` is `******`                                                  | **Reject**                                                                                                                                                                                                                                         |
 | `setProperty` `value` is `urn:gravitino-secret:...`                                | **Reject** in v1 — use `setSecretReference` or `setSecretBinding`                                                                                                                                                                                  |
-| `removeProperty` on a secret key                                                   | Remove from properties; if the **current** value is write-through-shaped for this entity (§5.5.2 C), best-effort `deleteSecret(urn)` (same rule as entity drop). External-ref / other URN shapes: remove property only — **do not** `deleteSecret` |
+| `removeProperty` on a secret key                                                   | Remove from properties; if the **current** value is write-through-shaped for this entity (§5.5.2 C), best-effort `deleteSecret(urn)` after the alter commits (same rule as entity drop). External-ref / other URN shapes: remove property only — **do not** `deleteSecret` |
 | Other `@type`s (`rename` / `updateComment` / …)                                    | Unchanged                                                                                                                                                                                                                                          |
 
 OpenAPI: add `SetSecretBindingRequest` / `SetSecretReferenceRequest` (and schema/fileset
@@ -881,7 +881,7 @@ urn:gravitino-secret:<provider_name>:<type-specific-identifier>
 
 - **Syntax** is shared (scheme + `provider_name` + colon-separated identifier segments).
 - **`<type-specific-identifier>`** is the secret's address for that SPI `type`. For in-memory
-  write-through: `<entityType>:<entityId>:<propertyKey>` (§5.1.1).
+  write-through: `<entityType>:<entityId>[:<writeId>]:<propertyKey>` (§5.1.1).
 - On write/resolve: route by `<provider_name>` only; `className` selects the implementation at factory time.
 - Renaming a provider in configuration requires operator migration of catalog URNs (or keeping the
   old name in conf).
@@ -945,7 +945,7 @@ Config change requires edit + **restart**.
 | Registry      | **File config** to register, **cluster scope**, no `metalake_id`, no DB table; **list** via `GET /configs/secrets/providers`                         |
 | Providers     | Named conf entries; refs use `provider_name` in URN; v1 ships **in-memory** only                                                                     |
 | Resolution    | Value starts with `urn:gravitino-secret` and ends with property key → `readSecret`; else plaintext                                                   |
-| URN           | `urn:gravitino-secret:<name>:<identifier>`; write-through id = `entityType:entityId:propertyKey`; route by `provider_name`                           |
+| URN           | `urn:gravitino-secret:<name>:<identifier>`; write-through id = `entityType:entityId[:writeId]:propertyKey`; route by `provider_name`                           |
 | Configuration | `gravitino.secret.providers` + `provider.<name>.className` (+ settings); edit + restart                                                              |
 | GET / list    | Keys whose values match the URN recognition rule **omitted**                                                                                         |
 | REST API      | Create: `secretReferences` / `secretBindings`; alter: `setSecretBinding` / `setSecretReference` (§5.9.4); list providers (§5.9.6); server builds URN |

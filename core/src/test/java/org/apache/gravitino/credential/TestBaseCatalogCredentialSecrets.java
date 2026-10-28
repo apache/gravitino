@@ -19,6 +19,7 @@
 package org.apache.gravitino.credential;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -124,7 +125,7 @@ public class TestBaseCatalogCredentialSecrets {
                   "3",
                   SecretConstants.ATTR_PROPERTY_KEY,
                   JdbcCredential.GRAVITINO_JDBC_PASSWORD));
-      secretManager.writeSecrets(java.util.List.of(new SecretMaterial(urn, "old-pass")));
+      secretManager.writeSecrets(List.of(new SecretMaterial(urn, "old-pass")));
       Map<String, String> entityProps =
           Map.of(
               JdbcCredential.GRAVITINO_JDBC_USER,
@@ -149,7 +150,7 @@ public class TestBaseCatalogCredentialSecrets {
               .withSecretManager(secretManager);
 
       // A rotation committed elsewhere deletes the old URN while this catalog is still in use.
-      secretManager.deleteSecrets(java.util.List.of(urn));
+      secretManager.deleteSecrets(List.of(urn));
 
       Assertions.assertEquals(
           "old-pass",
@@ -170,7 +171,7 @@ public class TestBaseCatalogCredentialSecrets {
                   "1",
                   SecretConstants.ATTR_PROPERTY_KEY,
                   "jdbc-password"));
-      secretManager.writeSecrets(java.util.List.of(new SecretMaterial(urn, "plain-jdbc-pass")));
+      secretManager.writeSecrets(List.of(new SecretMaterial(urn, "plain-jdbc-pass")));
 
       Map<String, String> entityProps =
           Map.of(
