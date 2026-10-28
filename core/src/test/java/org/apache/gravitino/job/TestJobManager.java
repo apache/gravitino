@@ -362,6 +362,48 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobKeepsExecutionIdWithCancellationAfterRecordingConflicts() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    when(jobExecutor.submitJob(any(), any())).thenReturn("submitted_conflict");
+    AtomicInteger attempts = new AtomicInteger();
+    AtomicReference<JobHandle.Status> latestStatus =
+        new AtomicReference<>(JobHandle.Status.CANCELLING);
+    AtomicReference<JobEntity> written = new AtomicReference<>();
+    when(entityStore.update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenAnswer(
+            invocation -> {
+              if (attempts.incrementAndGet() <= 3) {
+                throw new OptimisticLockException("job changed");
+              }
+              Function<JobEntity, JobEntity> updater = invocation.getArgument(3);
+              written.set(updater.apply(withStatus(lastRegisteredJob(), latestStatus.get())));
+              return written.get();
+            });
+
+    // The job was cancelled while its execution id was being recorded. The execution id is kept
+    // with the cancellation, so the status pull retries cancelling that execution.
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertEquals("submitted_conflict", written.get().jobExecutionId());
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, written.get().status());
+    verify(jobExecutor, times(1)).cancelJob("submitted_conflict");
+
+    // Another server settled the job meanwhile, which is left as is.
+    attempts.set(0);
+    latestStatus.set(JobHandle.Status.FAILED);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertEquals(JobHandle.Status.FAILED, written.get().status());
+    Assertions.assertEquals(
+        JobManager.pendingSubmissionExecutionId(written.get().id()),
+        written.get().jobExecutionId());
+    verify(jobExecutor, times(2)).cancelJob("submitted_conflict");
+  }
+
+  @Test
   public void testRunJobCancelsExecutionOfJobSettledDuringSubmission() throws Exception {
     JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
     doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());

@@ -768,6 +768,24 @@ public class TestK8sJobExecutor {
   }
 
   @Test
+  public void testConflictWithResourceGoneIsNotRejected() {
+    // A retried request conflicts with the SparkApplication it created, which is deleted before
+    // it is read back.
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(409, new StatusBuilder().withCode(409).build())
+        .once();
+
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    Assertions.assertFalse(e instanceof JobSubmissionRejectedException, e.toString());
+    Assertions.assertFalse(e instanceof IllegalArgumentException, e.toString());
+  }
+
+  @Test
   public void testSubmitWithoutResponse() {
     // Whether the SparkApplication was created can't be told, the submission fails anyway.
     try (KubernetesClient unreachable =

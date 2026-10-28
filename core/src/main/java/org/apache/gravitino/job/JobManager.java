@@ -724,6 +724,10 @@ public class JobManager implements JobOperationDispatcher {
   private void markFailedSubmissionForCancellation(
       String metalake, JobEntity job, @Nullable String jobExecutionId, Exception failure) {
     NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
+    String execution =
+        jobExecutionId == null
+            ? "an execution of job id " + job.id()
+            : "execution " + jobExecutionId;
     for (int attempt = 1; attempt <= SUBMISSION_WRITE_MAX_ATTEMPTS; attempt++) {
       try {
         TreeLockUtils.doWithTreeLock(
@@ -745,12 +749,11 @@ public class JobManager implements JobOperationDispatcher {
       } catch (NoSuchEntityException e) {
         // E.g. its metalake was dropped. Nothing is left to recover the execution with.
         LOG.error(
-            "Job {} under metalake {} has an unknown submission outcome and no longer exists, so"
-                + " an execution of it can't be found and cancelled. Check the job executor for"
-                + " an execution of job id {}",
+            "Job {} under metalake {} failed to be submitted or recorded and no longer exists, so"
+                + " its cancellation can't be retried. Check the job executor for {}",
             job.name(),
             metalake,
-            job.id(),
+            execution,
             failure);
         return;
       } catch (Exception e) {
@@ -761,10 +764,12 @@ public class JobManager implements JobOperationDispatcher {
     // The registration is still retained if the store cannot record the cancellation. Recovery
     // can at least track a found execution instead of leaving it unknown to Gravitino.
     LOG.error(
-        "Job {} under metalake {} has an unknown submission outcome and its cancellation could"
-            + " not be recorded. The job registration is retained; check the job before retrying",
+        "Job {} under metalake {} failed to be submitted or recorded and its cancellation could"
+            + " not be recorded. The job registration is retained; check the job and {} before"
+            + " retrying",
         job.name(),
         metalake,
+        execution,
         failure);
   }
 

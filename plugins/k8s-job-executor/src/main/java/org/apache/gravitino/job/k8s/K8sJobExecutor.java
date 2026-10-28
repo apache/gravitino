@@ -201,18 +201,7 @@ public class K8sJobExecutor implements JobExecutor {
       // that is being deleted.
       GenericKubernetesResource existing =
           getSparkApplicationClient(namespace).withName(name).get();
-      if (existing != null
-          && K8sJobResourceUtils.isOfJob(existing, context.jobId())
-          && existing.getMetadata().getDeletionTimestamp() != null) {
-        // The pods of this job may still run until the deletion finishes, so the outcome is
-        // unknown rather than rejected. Recovery finds the resource until it is gone.
-        throw new IllegalStateException(
-            String.format(
-                "SparkApplication %s/%s of job %s is being deleted and can't be submitted again",
-                namespace, name, context.jobId()),
-            e);
-      }
-      if (existing == null || !K8sJobResourceUtils.isOfJob(existing, context.jobId())) {
+      if (existing != null && !K8sJobResourceUtils.isOfJob(existing, context.jobId())) {
         // Nothing was created for this job, so the submission is rejected for sure.
         throw new JobSubmissionRejectedException(
             String.format(
@@ -220,6 +209,17 @@ public class K8sJobExecutor implements JobExecutor {
                     + " to another Gravitino deployment sharing the namespace, use a different %s"
                     + " for each of them",
                 namespace, name, context.jobId(), K8sJobExecutorConfigs.NAME_PREFIX),
+            e);
+      }
+      if (existing == null || existing.getMetadata().getDeletionTimestamp() != null) {
+        // A retried request may have created it before it was deleted, and its pods may still
+        // run until the deletion finishes, so the outcome is unknown rather than rejected.
+        // Recovery finds the resource until it is gone.
+        throw new IllegalStateException(
+            String.format(
+                "SparkApplication %s/%s conflicted with job %s but is being deleted or already"
+                    + " gone, so it can't be submitted again",
+                namespace, name, context.jobId()),
             e);
       }
     }
