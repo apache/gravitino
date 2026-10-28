@@ -341,8 +341,8 @@ public class TestJobManager {
     Assertions.assertSame(conflict, failure.getCause());
     Assertions.assertTrue(failure.getMessage().contains("submitted_conflict"));
     Assertions.assertTrue(failure.getMessage().contains("Check the execution before retrying"));
-    // The retries are bounded.
-    verify(entityStore, times(3))
+    // Three recording attempts and three attempts to retain cancellation intent are bounded.
+    verify(entityStore, times(6))
         .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
     verify(jobExecutor, times(1)).cancelJob("submitted_conflict");
 

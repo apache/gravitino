@@ -141,7 +141,7 @@ public class JobManager implements JobOperationDispatcher {
   // submitting it, and is reconciled with the job executor.
   private static final int SUBMISSION_TIMEOUT_IN_PULL_INTERVALS = 3;
 
-  private static final int RECORD_SUBMISSION_MAX_ATTEMPTS = 3;
+  private static final int SUBMISSION_WRITE_MAX_ATTEMPTS = 3;
 
   private final EntityStore entityStore;
 
@@ -700,7 +700,7 @@ public class JobManager implements JobOperationDispatcher {
 
   private void markFailedSubmissionForCancellation(
       String metalake, JobEntity job, Exception failure) {
-    for (int attempt = 1; attempt <= RECORD_SUBMISSION_MAX_ATTEMPTS; attempt++) {
+    for (int attempt = 1; attempt <= SUBMISSION_WRITE_MAX_ATTEMPTS; attempt++) {
       try {
         if (updateJobEntity(metalake, job, this::toCancellingJobEntity).isPresent()) {
           return;
@@ -728,7 +728,7 @@ public class JobManager implements JobOperationDispatcher {
     // entityStore.update() re-reads the job, so a conflict with a concurrent write, e.g. a
     // cancellation, succeeds when retried. The retries are bounded, a job that still can't be
     // recorded is settled by the status pull.
-    for (int attempt = 1; attempt <= RECORD_SUBMISSION_MAX_ATTEMPTS; attempt++) {
+    for (int attempt = 1; attempt <= SUBMISSION_WRITE_MAX_ATTEMPTS; attempt++) {
       try {
         recorded =
             TreeLockUtils.doWithTreeLock(
@@ -799,6 +799,11 @@ public class JobManager implements JobOperationDispatcher {
         jobExecutionId,
         reason,
         failure);
+    if (recorded == null && !(failure instanceof NoSuchEntityException)) {
+      // The registration still anchors recovery even when recording the id conflicted. Persist
+      // the cancellation intent too, so a failed immediate cancellation is retried after lookup.
+      markFailedSubmissionForCancellation(metalake, pendingJobEntity, registrationFailure);
+    }
     cancelSubmittedExecution(pendingJobEntity, jobExecutionId, registrationFailure);
     throw registrationFailure;
   }
