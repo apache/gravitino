@@ -18,15 +18,13 @@
  */
 package org.apache.gravitino.maintenance.scheduler;
 
-import java.util.Objects;
 import java.util.Optional;
-import javax.annotation.Nullable;
 
 /**
- * Builds and parses db-scheduler {@code task_instance} ids for TMS expand / cron / commit pools
- * (§5.2).
+ * Builds and parses db-scheduler {@code task_instance} id strings for TMS expand / cron / commit
+ * pools (§5.2).
  *
- * <p>Two separators (see {@link #KV_SEP} and {@link #PAIR_SEP}):
+ * <p>Two separators:
  *
  * <ul>
  *   <li>{@link #KV_SEP} {@code ':'} — separates a <em>key</em> from its <em>value</em> inside one
@@ -34,14 +32,8 @@ import javax.annotation.Nullable;
  *   <li>{@link #PAIR_SEP} {@code ';'} — separates adjacent pairs ({@code table:10;policy:20})
  * </ul>
  *
- * <p>Formats:
- *
- * <ul>
- *   <li>policy-expand: {@code policy:{policy_id}}
- *   <li>cron-job (table): {@code table:{table_id};policy:{policy_id}}
- *   <li>cron-job (batch): {@code batch:{batch_id};policy:{policy_id}}
- *   <li>commit-job: {@code table:{table_id}}
- * </ul>
+ * <p>Formats: {@code policy:{policy_id}} (expand); {@code table:{table_id};policy:{policy_id}} /
+ * {@code batch:{batch_id};policy:{policy_id}} (cron); {@code table:{table_id}} (commit).
  */
 public final class MaintenanceTaskIds {
 
@@ -71,90 +63,75 @@ public final class MaintenanceTaskIds {
 
   /**
    * @param policyId policy entity id
-   * @return policy-expand instance id {@code policy:{policy_id}}
+   * @return {@code policy:{policy_id}}
    */
   public static String forExpandPolicy(long policyId) {
-    return pair(POLICY_KEY, policyId);
+    return POLICY_PAIR_PREFIX + policyId;
   }
 
   /**
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @return cron-job instance id {@code table:{table_id};policy:{policy_id}}
+   * @return {@code table:{table_id};policy:{policy_id}}
    */
   public static String forCronTable(long tableId, long policyId) {
-    return pair(TABLE_KEY, tableId) + POLICY_PAIR_SUFFIX + policyId;
+    return TABLE_PAIR_PREFIX + tableId + POLICY_PAIR_SUFFIX + policyId;
   }
 
   /**
    * @param batchId per-policy batch sequence id ({@code 0}, {@code 1}, …)
    * @param policyId policy entity id
-   * @return cron-job instance id {@code batch:{batch_id};policy:{policy_id}}
+   * @return {@code batch:{batch_id};policy:{policy_id}}
    */
   public static String forCronBatch(long batchId, long policyId) {
-    return pair(BATCH_KEY, batchId) + POLICY_PAIR_SUFFIX + policyId;
+    return BATCH_PAIR_PREFIX + batchId + POLICY_PAIR_SUFFIX + policyId;
   }
 
   /**
    * @param tableId table entity id
-   * @return commit-job instance id {@code table:{table_id}}
+   * @return {@code table:{table_id}}
    */
   public static String forCommitTable(long tableId) {
-    return pair(TABLE_KEY, tableId);
+    return TABLE_PAIR_PREFIX + tableId;
   }
 
   /**
-   * Parses a policy-expand instance id.
-   *
    * @param instanceId db-scheduler task instance id
-   * @return policy id when the id is a single {@code policy:{policyId}} pair
+   * @return policy id when {@code policy:{policyId}}
    */
   public static Optional<Long> parseExpandPolicy(String instanceId) {
-    return parseSinglePair(instanceId, POLICY_PAIR_PREFIX);
+    return parseSingleValue(instanceId, POLICY_PAIR_PREFIX);
   }
 
   /**
-   * Parses a single-table cron-job instance id.
-   *
    * @param instanceId db-scheduler task instance id
-   * @return table and policy ids when the id matches {@code table:{tableId};policy:{policyId}}
+   * @return {@code [tableId, policyId]} when {@code table:{tableId};policy:{policyId}}
    */
-  public static Optional<TablePolicyIds> parseCronTable(String instanceId) {
-    return parseLeftThenPolicy(instanceId, TABLE_PAIR_PREFIX)
-        .map(parts -> new TablePolicyIds(parts[0], parts[1]));
+  public static Optional<long[]> parseCronTable(String instanceId) {
+    return parseLeftThenPolicy(instanceId, TABLE_PAIR_PREFIX);
   }
 
   /**
-   * Parses a batched snapshot-expiry cron-job instance id.
-   *
    * @param instanceId db-scheduler task instance id
-   * @return batch and policy ids when the id matches {@code batch:{batchId};policy:{policyId}}
+   * @return {@code [batchId, policyId]} when {@code batch:{batchId};policy:{policyId}}
    */
-  public static Optional<BatchPolicyIds> parseCronBatch(String instanceId) {
-    return parseLeftThenPolicy(instanceId, BATCH_PAIR_PREFIX)
-        .map(parts -> new BatchPolicyIds(parts[0], parts[1]));
+  public static Optional<long[]> parseCronBatch(String instanceId) {
+    return parseLeftThenPolicy(instanceId, BATCH_PAIR_PREFIX);
   }
 
   /**
-   * Parses a commit-job instance id.
-   *
    * @param instanceId db-scheduler task instance id
-   * @return table id when the id is a single {@code table:{tableId}} pair (no {@link #PAIR_SEP})
+   * @return table id when {@code table:{tableId}} (no {@link #PAIR_SEP})
    */
   public static Optional<Long> parseCommitTable(String instanceId) {
-    return parseSinglePair(instanceId, TABLE_PAIR_PREFIX);
+    return parseSingleValue(instanceId, TABLE_PAIR_PREFIX);
   }
 
-  private static String pair(String key, long value) {
-    return key + KV_SEP + value;
-  }
-
-  private static Optional<Long> parseSinglePair(String instanceId, String pairPrefix) {
+  private static Optional<Long> parseSingleValue(String instanceId, String pairPrefix) {
     if (instanceId == null || !instanceId.startsWith(pairPrefix)) {
       return Optional.empty();
     }
     String value = instanceId.substring(pairPrefix.length());
-    // A single pair must not contain KV_SEP or PAIR_SEP inside the value.
     if (value.isEmpty() || value.indexOf(KV_SEP) >= 0 || value.indexOf(PAIR_SEP) >= 0) {
       return Optional.empty();
     }
@@ -186,108 +163,6 @@ public final class MaintenanceTaskIds {
       return Optional.of(new long[] {Long.parseLong(leftValue), Long.parseLong(policyValue)});
     } catch (NumberFormatException e) {
       return Optional.empty();
-    }
-  }
-
-  /** Parsed {@code table:{tableId};policy:{policyId}} ids. */
-  public static final class TablePolicyIds {
-    private final long tableId;
-    private final long policyId;
-
-    /**
-     * @param tableId table entity id
-     * @param policyId policy entity id
-     */
-    public TablePolicyIds(long tableId, long policyId) {
-      this.tableId = tableId;
-      this.policyId = policyId;
-    }
-
-    /**
-     * @return table entity id
-     */
-    public long tableId() {
-      return tableId;
-    }
-
-    /**
-     * @return policy entity id
-     */
-    public long policyId() {
-      return policyId;
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof TablePolicyIds)) {
-        return false;
-      }
-      TablePolicyIds that = (TablePolicyIds) o;
-      return tableId == that.tableId && policyId == that.policyId;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(tableId, policyId);
-    }
-
-    @Override
-    public String toString() {
-      return forCronTable(tableId, policyId);
-    }
-  }
-
-  /** Parsed {@code batch:{batchId};policy:{policyId}} ids. */
-  public static final class BatchPolicyIds {
-    private final long batchId;
-    private final long policyId;
-
-    /**
-     * @param batchId per-policy batch sequence id
-     * @param policyId policy entity id
-     */
-    public BatchPolicyIds(long batchId, long policyId) {
-      this.batchId = batchId;
-      this.policyId = policyId;
-    }
-
-    /**
-     * @return batch sequence id
-     */
-    public long batchId() {
-      return batchId;
-    }
-
-    /**
-     * @return policy entity id
-     */
-    public long policyId() {
-      return policyId;
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof BatchPolicyIds)) {
-        return false;
-      }
-      BatchPolicyIds that = (BatchPolicyIds) o;
-      return batchId == that.batchId && policyId == that.policyId;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(batchId, policyId);
-    }
-
-    @Override
-    public String toString() {
-      return forCronBatch(batchId, policyId);
     }
   }
 }

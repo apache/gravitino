@@ -571,30 +571,30 @@ public class CronJobClient {
       }
       String instanceId = execution.getTaskInstance().getId();
       String catalog = data.getTables().isEmpty() ? null : data.getTables().get(0).catalogName();
-      Optional<MaintenanceTaskIds.BatchPolicyIds> batch =
-          MaintenanceTaskIds.parseCronBatch(instanceId);
+      Optional<long[]> batch = MaintenanceTaskIds.parseCronBatch(instanceId);
       if (batch.isPresent()) {
+        // [batchId, policyId]
         open.add(
             new QueuedExpireJob(
                 TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, instanceId),
                 true,
-                batch.get().batchId(),
-                batch.get().policyId(),
+                batch.get()[0],
+                batch.get()[1],
                 execution.getExecutionTime(),
                 data,
                 catalog,
                 execution.isPicked()));
         continue;
       }
-      Optional<MaintenanceTaskIds.TablePolicyIds> table =
-          MaintenanceTaskIds.parseCronTable(instanceId);
+      Optional<long[]> table = MaintenanceTaskIds.parseCronTable(instanceId);
       if (table.isPresent()) {
+        // [tableId, policyId]
         open.add(
             new QueuedExpireJob(
                 TaskInstanceId.of(TableMaintenanceSchedulerPools.CRON_JOB, instanceId),
                 false,
                 -1L,
-                table.get().policyId(),
+                table.get()[1],
                 execution.getExecutionTime(),
                 data,
                 catalog,
@@ -643,9 +643,10 @@ public class CronJobClient {
     for (ScheduledExecution<MaintenanceJobSpec> execution :
         client.getScheduledExecutionsForTask(
             TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)) {
-      Optional<MaintenanceTaskIds.BatchPolicyIds> parsed =
+      Optional<long[]> parsed =
           MaintenanceTaskIds.parseCronBatch(execution.getTaskInstance().getId());
-      if (parsed.isEmpty() || parsed.get().policyId() != policyId) {
+      // [batchId, policyId]
+      if (parsed.isEmpty() || parsed.get()[1] != policyId) {
         continue;
       }
       MaintenanceJobSpec data = execution.getData();

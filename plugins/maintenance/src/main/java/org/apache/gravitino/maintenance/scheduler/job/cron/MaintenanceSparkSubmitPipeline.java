@@ -87,10 +87,8 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
 
-    Optional<MaintenanceTaskIds.TablePolicyIds> tableIds =
-        MaintenanceTaskIds.parseCronTable(instanceId);
-    Optional<MaintenanceTaskIds.BatchPolicyIds> batchIds =
-        MaintenanceTaskIds.parseCronBatch(instanceId);
+    Optional<long[]> tableIds = MaintenanceTaskIds.parseCronTable(instanceId);
+    Optional<long[]> batchIds = MaintenanceTaskIds.parseCronBatch(instanceId);
     if (tableIds.isEmpty() && batchIds.isEmpty()) {
       LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
       return;
@@ -98,8 +96,8 @@ public final class MaintenanceSparkSubmitPipeline {
 
     Operation step = spec.getOperations().get(0);
     long policyId = step.getPolicyId();
-    long expectedPolicyId =
-        tableIds.isPresent() ? tableIds.get().policyId() : batchIds.get().policyId();
+    // parseCron* returns [leftId, policyId]
+    long expectedPolicyId = tableIds.isPresent() ? tableIds.get()[1] : batchIds.get()[1];
     if (policyId != expectedPolicyId) {
       LOG.warn(
           "Skipping cron-job submit for {}: spec policyId {} != instance policyId {}",
@@ -109,7 +107,7 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
     if (tableIds.isPresent()) {
-      long expectedTableId = tableIds.get().tableId();
+      long expectedTableId = tableIds.get()[0];
       if (spec.getTables().size() != 1 || spec.getTables().get(0).getTableId() != expectedTableId) {
         LOG.warn(
             "Skipping cron-job submit for {}: spec tables {} do not match instance tableId {}",

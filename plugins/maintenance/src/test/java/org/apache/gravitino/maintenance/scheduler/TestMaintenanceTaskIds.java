@@ -40,21 +40,18 @@ class TestMaintenanceTaskIds {
   void testCronTableRoundTrip() {
     String id = MaintenanceTaskIds.forCronTable(10L, 20L);
     Assertions.assertEquals("table:10;policy:20", id);
-    Optional<MaintenanceTaskIds.TablePolicyIds> parsed = MaintenanceTaskIds.parseCronTable(id);
+    Optional<long[]> parsed = MaintenanceTaskIds.parseCronTable(id);
     Assertions.assertTrue(parsed.isPresent());
-    Assertions.assertEquals(10L, parsed.get().tableId());
-    Assertions.assertEquals(20L, parsed.get().policyId());
+    Assertions.assertArrayEquals(new long[] {10L, 20L}, parsed.get());
   }
 
   @Test
   void testCronBatchRoundTrip() {
     Assertions.assertEquals("batch:0;policy:9", MaintenanceTaskIds.forCronBatch(0L, 9L));
     Assertions.assertEquals("batch:12;policy:9", MaintenanceTaskIds.forCronBatch(12L, 9L));
-    Optional<MaintenanceTaskIds.BatchPolicyIds> parsed =
-        MaintenanceTaskIds.parseCronBatch("batch:12;policy:9");
+    Optional<long[]> parsed = MaintenanceTaskIds.parseCronBatch("batch:12;policy:9");
     Assertions.assertTrue(parsed.isPresent());
-    Assertions.assertEquals(12L, parsed.get().batchId());
-    Assertions.assertEquals(9L, parsed.get().policyId());
+    Assertions.assertArrayEquals(new long[] {12L, 9L}, parsed.get());
   }
 
   @Test
