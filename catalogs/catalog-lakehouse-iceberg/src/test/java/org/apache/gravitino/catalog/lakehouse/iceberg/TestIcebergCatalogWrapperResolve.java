@@ -1,0 +1,108 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.catalog.lakehouse.iceberg;
+
+import com.google.common.collect.ImmutableMap;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.iceberg.exceptions.NoSuchWarehouseException;
+import org.apache.iceberg.exceptions.RESTException;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+public class TestIcebergCatalogWrapperResolve {
+
+  @Test
+  void providerReusesStandaloneWrapper() {
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    IcebergCatalogWrapperProvider provider =
+        IcebergCatalogWrapperProvider.create("local-cat", config);
+    try {
+      IcebergCatalogWrapper first = provider.get();
+      IcebergCatalogWrapper second = provider.get();
+      Assertions.assertSame(first, second);
+    } finally {
+      provider.close();
+    }
+  }
+
+  @Test
+  void providerMapsNoSuchWarehouseToIllegalArgument() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.WAREHOUSE,
+                "s3://not-a-real-catalog/"));
+    IcebergCatalogWrapper broken = Mockito.mock(IcebergCatalogWrapper.class);
+    Mockito.when(broken.getCatalog())
+        .thenThrow(
+            new NoSuchWarehouseException("Warehouse not found: %s", "s3://not-a-real-catalog/"));
+
+    CatalogWrapperManager manager = Mockito.mock(CatalogWrapperManager.class);
+    Mockito.when(manager.getOrCreateCatalogWrapper("c1", config)).thenReturn(broken);
+
+    IcebergCatalogWrapperProvider provider =
+        new IcebergCatalogWrapperProvider("c1", config, manager);
+    IllegalArgumentException ex =
+        Assertions.assertThrows(IllegalArgumentException.class, provider::get);
+    Assertions.assertTrue(ex.getMessage().contains("selects a catalog by name"));
+    Assertions.assertTrue(ex.getMessage().contains("s3://not-a-real-catalog/"));
+    Mockito.verify(manager).invalidateCatalogWrapper("c1");
+  }
+
+  @Test
+  void providerMapsUnreachableRestToConnectionFailed() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.URI,
+                "http://127.0.0.1:1/iceberg/"));
+    IcebergCatalogWrapper broken = Mockito.mock(IcebergCatalogWrapper.class);
+    Mockito.when(broken.getCatalog())
+        .thenThrow(new RESTException("Error occurred while processing GET request"));
+
+    CatalogWrapperManager manager = Mockito.mock(CatalogWrapperManager.class);
+    Mockito.when(manager.getOrCreateCatalogWrapper("c1", config)).thenReturn(broken);
+
+    IcebergCatalogWrapperProvider provider =
+        new IcebergCatalogWrapperProvider("c1", config, manager);
+    Assertions.assertThrows(ConnectionFailedException.class, provider::get);
+    Mockito.verify(manager).invalidateCatalogWrapper("c1");
+  }
+
+  @Test
+  void catalogAndViewOpsShareSameWrapper() {
+    IcebergCatalogWrapper shared = new IcebergCatalogWrapper(new IcebergConfig());
+
+    IcebergCatalogOperations catalogOps = new IcebergCatalogOperations();
+    catalogOps.icebergCatalogWrapper = shared;
+    IcebergViewCatalogOperations viewOps = new IcebergViewCatalogOperations(shared);
+
+    Assertions.assertSame(shared, catalogOps.icebergCatalogWrapper);
+    Assertions.assertNotNull(viewOps);
+  }
+}

@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +31,8 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
@@ -85,6 +89,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
 
   private final Object initializationLock = new Object();
+  private final AtomicBoolean closed = new AtomicBoolean();
   private volatile Catalog catalog;
   private volatile SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
@@ -106,6 +111,38 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
     Map<String, String> catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
     this.configuration = FileSystemUtils.createConfiguration(null, catalogPropertiesMap);
+  }
+
+  /**
+   * Creates a wrapper with GCS OAuth2 token minting (for cache expiry) and optional Kerberos proxy.
+   * Shared by lakehouse and IRC cache loaders.
+   *
+   * @param icebergConfig catalog configuration
+   * @return wrapper ready to cache
+   */
+  public static IcebergCatalogWrapper create(IcebergConfig icebergConfig) {
+    IcebergConfig enriched = IcebergCatalogUtil.withGcsServiceAccountCredentials(icebergConfig);
+    return applyKerberos(new IcebergCatalogWrapper(enriched), null, enriched);
+  }
+
+  /**
+   * Wraps {@code wrapper} with a Kerberos proxy when configured.
+   *
+   * @param wrapper base wrapper
+   * @param catalogName catalog name for REST wrappers that take {@code (name, config)}; {@code
+   *     null} for the config-only constructor
+   * @param config Iceberg configuration (typically after GCS enrichment)
+   * @return kerberos proxy or the original wrapper
+   */
+  public static IcebergCatalogWrapper applyKerberos(
+      IcebergCatalogWrapper wrapper, @Nullable String catalogName, IcebergConfig config) {
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(config.getAllConfig());
+    if (!authenticationConfig.isKerberosAuth()
+        || !(wrapper.getCatalog() instanceof SupportsKerberos)) {
+      return wrapper;
+    }
+    KerberosAwareIcebergCatalogProxy proxy = new KerberosAwareIcebergCatalogProxy(wrapper);
+    return catalogName == null ? proxy.getProxy(config) : proxy.getProxy(catalogName, config);
   }
 
   public Catalog getCatalog() {
@@ -437,8 +474,39 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return true;
   }
 
+  /**
+   * Claims the single close of this wrapper.
+   *
+   * @return {@code true} when this caller should run cleanup, {@code false} when it already ran
+   */
+  protected final boolean beginClose() {
+    return closed.compareAndSet(false, true);
+  }
+
+  /**
+   * Returns whether {@link #close()} has already claimed this wrapper.
+   *
+   * @return {@code true} after the first close
+   */
+  public boolean isClosed() {
+    return closed.get();
+  }
+
   @Override
   public void close() throws Exception {
+    if (!beginClose()) {
+      return;
+    }
+    closeResources();
+  }
+
+  /**
+   * Releases the catalog and metadata cache. Callers that override {@link #close()} must claim
+   * {@link #beginClose()} themselves and then call this method.
+   *
+   * @throws Exception if closing the underlying catalog fails
+   */
+  protected void closeResources() throws Exception {
     Catalog loadedCatalog = catalog;
     if (loadedCatalog != null) {
       LOG.info("Closing IcebergCatalogWrapper for catalog: {}", loadedCatalog.name());
