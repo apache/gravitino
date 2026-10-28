@@ -21,12 +21,15 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
+import org.apache.gravitino.iceberg.common.ops.IcebergAuxCatalogBridge;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
@@ -38,6 +41,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Owns the Iceberg client for one lakehouse catalog and remints minted GCS OAuth2 tokens before
  * use. {@link IcebergCatalogOperations} stays focused on Gravitino API mapping.
+ *
+ * <p>{@code IcebergCatalogOperations} is the value reached through {@code
+ * CatalogManager#catalogCache}. When the embedded Iceberg REST service is running in auxiliary
+ * mode, this backend uses that service's catalog wrapper in-process (same catalog name) instead of
+ * opening another client. IRC owns that wrapper's lifecycle and GCS token refresh.
  */
 final class IcebergBackend implements AutoCloseable {
 
@@ -45,36 +53,73 @@ final class IcebergBackend implements AutoCloseable {
 
   private static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
 
-  private final Map<String, String> catalogConf;
+  @Nullable private final Map<String, String> catalogConf;
+  @Nullable private final String catalogName;
+  @Nullable private final String metalake;
+  /** When true, the first use resolves IRC1's wrapper. Set only in auxiliary mode. */
+  private final boolean useIrc;
+
+  private boolean ownsWrapper;
   private IcebergCatalogWrapper wrapper;
   private IcebergCatalogWrapperHelper helper;
   private IcebergViewCatalogOperations views;
 
-  private IcebergBackend(Map<String, String> catalogConf) {
+  private IcebergBackend(
+      @Nullable Map<String, String> catalogConf,
+      boolean ownsWrapper,
+      @Nullable String catalogName,
+      @Nullable String metalake,
+      boolean useIrc) {
     this.catalogConf = catalogConf;
+    this.ownsWrapper = ownsWrapper;
+    this.catalogName = catalogName;
+    this.metalake = metalake;
+    this.useIrc = useIrc;
   }
 
-  static IcebergBackend create(Map<String, String> catalogConf) {
-    IcebergBackend backend = new IcebergBackend(catalogConf);
+  /**
+   * Creates a backend for the lakehouse catalog already loaded from the catalog cache.
+   *
+   * <p>In auxiliary mode the client is IRC1's wrapper for {@code catalogName}, resolved on first
+   * use so catalog loading does not re-enter IRC. Otherwise the backend owns its own client.
+   *
+   * @param catalogName metalake catalog name
+   * @param metalake metalake name
+   * @param catalogConf resolved Iceberg catalog configuration
+   * @return backend
+   */
+  static IcebergBackend create(
+      String catalogName, String metalake, Map<String, String> catalogConf) {
+    if (IcebergAuxCatalogBridge.isRegistered() && StringUtils.isNotBlank(catalogName)) {
+      return new IcebergBackend(catalogConf, false, catalogName, metalake, true);
+    }
+    return createOwned(catalogConf);
+  }
+
+  /** Owned client that remints GCS tokens. Used when auxiliary IRC is not bound. */
+  static IcebergBackend createOwned(Map<String, String> catalogConf) {
+    IcebergBackend backend = new IcebergBackend(catalogConf, true, null, null, false);
     backend.reload();
     return backend;
   }
 
-  /** Fixed client for tests; skips GCS reminting. */
+  /** Fixed client for tests; skips GCS reminting and does not close the wrapper. */
   @VisibleForTesting
   static IcebergBackend fixed(IcebergCatalogWrapper wrapper) {
     Preconditions.checkNotNull(wrapper, "wrapper");
-    IcebergBackend backend = new IcebergBackend(null);
+    IcebergBackend backend = new IcebergBackend(null, false, null, null, false);
     backend.wrapper = wrapper;
     return backend;
   }
 
   synchronized IcebergCatalogWrapper wrapper() {
+    ensureClient();
     refreshGcsTokenIfNeeded();
     return wrapper;
   }
 
   synchronized IcebergCatalogWrapperHelper helper() {
+    ensureClient();
     refreshGcsTokenIfNeeded();
     if (helper == null) {
       helper = new IcebergCatalogWrapperHelper(wrapper.getCatalog());
@@ -83,6 +128,7 @@ final class IcebergBackend implements AutoCloseable {
   }
 
   synchronized IcebergViewCatalogOperations views() {
+    ensureClient();
     refreshGcsTokenIfNeeded();
     if (views == null) {
       views = new IcebergViewCatalogOperations(wrapper);
@@ -90,8 +136,40 @@ final class IcebergBackend implements AutoCloseable {
     return views;
   }
 
+  /**
+   * Auxiliary mode: take IRC1's wrapper for this catalog name. IRC1's dynamic provider reads the
+   * catalog from the catalog cache. Resolution is deferred until first use so loading this catalog
+   * does not re-enter IRC.
+   */
+  private void ensureClient() {
+    if (useIrc) {
+      Optional<IcebergCatalogWrapper> shared = IcebergAuxCatalogBridge.resolve(catalogName);
+      if (shared.isPresent()) {
+        IcebergCatalogWrapper current = shared.get();
+        if (wrapper != current) {
+          LOG.info(
+              "Using in-process IRC1 wrapper for catalogCache catalog '{}' in metalake '{}'",
+              catalogName,
+              metalake);
+          wrapper = current;
+          helper = null;
+          views = null;
+        }
+        return;
+      }
+      if (wrapper != null) {
+        return;
+      }
+      LOG.debug("Aux IRC has no wrapper for catalog '{}'; lakehouse owns the client", catalogName);
+      ownsWrapper = true;
+    } else if (wrapper != null) {
+      return;
+    }
+    reload();
+  }
+
   private void refreshGcsTokenIfNeeded() {
-    if (catalogConf == null || wrapper == null) {
+    if (!ownsWrapper || catalogConf == null || wrapper == null) {
       return;
     }
     String expiresAt =
@@ -144,7 +222,9 @@ final class IcebergBackend implements AutoCloseable {
 
   @Override
   public synchronized void close() {
-    closeQuietly(wrapper);
+    if (ownsWrapper) {
+      closeQuietly(wrapper);
+    }
     wrapper = null;
     helper = null;
     views = null;

@@ -29,6 +29,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.IcebergAuxCatalogBridge;
 import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
@@ -136,6 +137,10 @@ public class RESTService implements GravitinoAuxiliaryService {
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
+    if (auxMode) {
+      // Lakehouse catalogs loaded from catalogCache use this IRC's wrappers in-process.
+      IcebergAuxCatalogBridge.register(icebergCatalogWrapperManager::getCatalogWrapper, null);
+    }
     IcebergRESTServerContext authorizationContext =
         IcebergRESTServerContext.create(
             configProvider,
@@ -301,6 +306,9 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceStop() throws Exception {
+    if (auxMode) {
+      IcebergAuxCatalogBridge.clear();
+    }
     if (server != null) {
       server.stop();
       LOG.info("Iceberg REST service stopped");
