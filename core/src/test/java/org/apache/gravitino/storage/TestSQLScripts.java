@@ -135,6 +135,100 @@ public class TestSQLScripts extends TestJDBCBackend {
   }
 
   /**
+   * Verifies every MySQL upgrade script from 0.5.0 onward can be re-run as a whole after a
+   * completed upgrade: guarded DDL (ADD COLUMN, DROP INDEX, CREATE INDEX, ...) must skip instead of
+   * failing. The retried upgrade must keep the columns and indexes of the first upgrade, and match
+   * a fresh install of the target schema apart from the legacy tables and columns that upgrades
+   * intentionally retain.
+   */
+  @TestTemplate
+  public void testMySqlUpgradeScriptsRetryable() throws SQLException, IOException {
+    if (!"mysql".equals(backendType)) {
+      return;
+    }
+
+    Path scriptDir = upgradeScriptDirectory();
+    File[] scriptFiles = scriptDir.toFile().listFiles();
+    Assertions.assertNotNull(scriptFiles, "No script files found in " + scriptDir);
+    Arrays.sort(scriptFiles, Comparator.comparing(File::getName));
+
+    Pattern upgradePattern = Pattern.compile("upgrade-([\\d.]+)-to-([\\d.]+)-mysql\\.sql");
+    List<File> upgrades = new ArrayList<>();
+    String fromVersion = null;
+    for (File scriptFile : scriptFiles) {
+      Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
+      if (!upgradeMatcher.matches()) {
+        continue;
+      }
+      if (fromVersion == null) {
+        fromVersion = upgradeMatcher.group(1);
+      }
+      upgrades.add(scriptFile);
+    }
+    Assertions.assertFalse(upgrades.isEmpty(), "No MySQL upgrade scripts found in " + scriptDir);
+
+    // Upgrade step by step from the oldest schema, then re-run every upgrade script.
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-" + fromVersion + "-mysql.sql").toFile());
+    for (File upgrade : upgrades) {
+      executeScript(upgrade);
+    }
+    Map<String, Set<String>> upgradedColumns = readSchemaColumns();
+    List<String> upgradedIndexes = readSchemaIndexes(upgradedColumns.keySet());
+    for (File upgrade : upgrades) {
+      executeScript(upgrade);
+    }
+    Matcher lastMatcher = upgradePattern.matcher(upgrades.get(upgrades.size() - 1).getName());
+    Assertions.assertTrue(lastMatcher.matches());
+    String latestVersion = lastMatcher.group(2);
+    Map<String, Set<String>> retriedColumns = readSchemaColumns();
+    List<String> retriedIndexes = readSchemaIndexes(retriedColumns.keySet());
+    Assertions.assertEquals(
+        upgradedColumns, retriedColumns, "Retried upgrades must not change upgraded columns");
+    Assertions.assertEquals(
+        upgradedIndexes, retriedIndexes, "Retried upgrades must not change upgraded indexes");
+
+    // Compare with a fresh install of the latest schema. Tables missing from it were
+    // intentionally retained by the upgrades (e.g. the legacy policy_relation_meta table), so
+    // they are excluded from the comparison. So are the role_meta columns that the 0.6.0 upgrade
+    // only marked as deprecated and never dropped.
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-" + latestVersion + "-mysql.sql").toFile());
+    Map<String, Set<String>> freshColumns = readSchemaColumns();
+    Map<String, Set<String>> retainedColumns =
+        Map.of(
+            "role_meta",
+            Set.of(
+                "securable_object_full_name",
+                "securable_object_type",
+                "privileges",
+                "privilege_conditions"));
+    Map<String, Set<String>> retriedComparableColumns = new TreeMap<>();
+    retriedColumns.forEach(
+        (table, columns) -> {
+          if (freshColumns.containsKey(table)) {
+            Set<String> comparableColumns = new TreeSet<>(columns);
+            comparableColumns.removeAll(retainedColumns.getOrDefault(table, Set.of()));
+            retriedComparableColumns.put(table, comparableColumns);
+          }
+        });
+    Assertions.assertEquals(
+        freshColumns,
+        retriedComparableColumns,
+        "Retried upgrades must match fresh " + latestVersion + " columns");
+    // The 0.6.0 upgrade created tag_meta's unique key as uk_mn_tn_del, while every fresh schema
+    // names the same key uk_mi_tn_del.
+    Assertions.assertEquals(
+        readSchemaIndexes(freshColumns.keySet()),
+        retriedIndexes.stream()
+            .filter(index -> freshColumns.containsKey(index.split(":")[0]))
+            .map(index -> index.replaceFirst("^tag_meta:uk_mn_tn_del:", "tag_meta:uk_mi_tn_del:"))
+            .sorted()
+            .toList(),
+        "Retried upgrades must match fresh " + latestVersion + " indexes");
+  }
+
+  /**
    * The owner unique key allows one live row per (owner, object). Rows left by concurrent
    * assignments are merged during the upgrade: the newest live row (largest id) stays, while older
    * ones are soft-deleted.
