@@ -26,7 +26,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -80,9 +79,9 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   private final TagMetaService tagMetaService;
   private final SchemaMetaService schemaMetaService;
   private final TableMetaService tableMetaService;
-  private final Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier;
-  @Nullable private final Supplier<SchemaDispatcher> schemaDispatcherSupplier;
-  @Nullable private final Supplier<TableDispatcher> tableDispatcherSupplier;
+  private final NearestMaintenancePolicyResolver nearestResolver;
+  @Nullable private final SchemaDispatcher schemaDispatcher;
+  @Nullable private final TableDispatcher tableDispatcher;
 
   /** Uses relational singletons and {@link GravitinoEnv} dispatchers / entity store. */
   public NearestPolicyTableEnumerator() {
@@ -91,9 +90,9 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         TagMetaService.getInstance(),
         SchemaMetaService.getInstance(),
         TableMetaService.getInstance(),
-        () -> new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore()),
-        () -> GravitinoEnv.getInstance().internalSchemaDispatcher(),
-        () -> GravitinoEnv.getInstance().internalTableDispatcher());
+        new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore()),
+        GravitinoEnv.getInstance().internalSchemaDispatcher(),
+        GravitinoEnv.getInstance().internalTableDispatcher());
   }
 
   /**
@@ -103,20 +102,20 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
    * @param tagMetaService tag metadata
    * @param schemaMetaService schema listing
    * @param tableMetaService table listing
-   * @param nearestResolverSupplier nearest maintenance-policy resolver
+   * @param nearestResolver nearest maintenance-policy resolver
    */
   public NearestPolicyTableEnumerator(
       PolicyTagRelService policyTagRelService,
       TagMetaService tagMetaService,
       SchemaMetaService schemaMetaService,
       TableMetaService tableMetaService,
-      Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier) {
+      NearestMaintenancePolicyResolver nearestResolver) {
     this(
         policyTagRelService,
         tagMetaService,
         schemaMetaService,
         tableMetaService,
-        nearestResolverSupplier,
+        nearestResolver,
         null,
         null);
   }
@@ -126,25 +125,25 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
    * @param tagMetaService tag metadata
    * @param schemaMetaService schema listing
    * @param tableMetaService table listing
-   * @param nearestResolverSupplier nearest maintenance-policy resolver
-   * @param schemaDispatcherSupplier optional schema dispatcher for Iceberg list/import
-   * @param tableDispatcherSupplier optional table dispatcher for Iceberg list/import
+   * @param nearestResolver nearest maintenance-policy resolver
+   * @param schemaDispatcher optional schema dispatcher for Iceberg list/import
+   * @param tableDispatcher optional table dispatcher for Iceberg list/import
    */
   public NearestPolicyTableEnumerator(
       PolicyTagRelService policyTagRelService,
       TagMetaService tagMetaService,
       SchemaMetaService schemaMetaService,
       TableMetaService tableMetaService,
-      Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier,
-      @Nullable Supplier<SchemaDispatcher> schemaDispatcherSupplier,
-      @Nullable Supplier<TableDispatcher> tableDispatcherSupplier) {
+      NearestMaintenancePolicyResolver nearestResolver,
+      @Nullable SchemaDispatcher schemaDispatcher,
+      @Nullable TableDispatcher tableDispatcher) {
     this.policyTagRelService = policyTagRelService;
     this.tagMetaService = tagMetaService;
     this.schemaMetaService = schemaMetaService;
     this.tableMetaService = tableMetaService;
-    this.nearestResolverSupplier = nearestResolverSupplier;
-    this.schemaDispatcherSupplier = schemaDispatcherSupplier;
-    this.tableDispatcherSupplier = tableDispatcherSupplier;
+    this.nearestResolver = nearestResolver;
+    this.schemaDispatcher = schemaDispatcher;
+    this.tableDispatcher = tableDispatcher;
   }
 
   @Override
@@ -159,7 +158,6 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     List<RelationalEntity<?>> tagEdges =
         policyTagRelService.listRelations(List.of(policyIdent), Entity.EntityType.POLICY);
 
-    NearestMaintenancePolicyResolver nearest = nearestResolverSupplier.get();
     Set<Long> seenTables = new LinkedHashSet<>();
     Map<Long, ExpandTableCandidate> enqueueable = new LinkedHashMap<>();
     long nowMs = System.currentTimeMillis();
@@ -168,7 +166,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
             metalake,
             policy.id(),
             policyType,
-            nearest,
+            nearestResolver,
             occupancyGate,
             minIntervalMs,
             nowMs,
@@ -235,7 +233,6 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   private void expandCatalog(MetadataObject catalog, ScanContext ctx) {
-    SchemaDispatcher schemaDispatcher = schemaDispatcherOrNull();
     if (schemaDispatcher != null) {
       try {
         Namespace catalogNs = NamespaceUtil.ofSchema(ctx.metalake, catalog.name());
@@ -297,8 +294,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     String descendantPrefix = schema.name() + separator;
 
-    SchemaDispatcher schemaDispatcher = schemaDispatcherOrNull();
-    if (schemaDispatcher != null) {
+    if (this.schemaDispatcher != null) {
       try {
         NameIdentifier[] schemas =
             schemaDispatcher.listSchemas(NamespaceUtil.ofSchema(ctx.metalake, catalogName));
@@ -343,21 +339,19 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   }
 
   private void expandTables(String catalogName, String schemaName, ScanContext ctx) {
-    TableDispatcher tableDispatcher = tableDispatcherOrNull();
-    SchemaDispatcher schemaDispatcher = schemaDispatcherOrNull();
-    if (tableDispatcher != null && schemaDispatcher != null) {
+    if (this.tableDispatcher != null && this.schemaDispatcher != null) {
       try {
         NameIdentifier schemaIdent =
             NameIdentifierUtil.ofSchema(ctx.metalake, catalogName, schemaName);
-        schemaDispatcher.loadSchema(schemaIdent);
+        this.schemaDispatcher.loadSchema(schemaIdent);
         Namespace tableNs = NamespaceUtil.ofTable(ctx.metalake, catalogName, schemaName);
-        NameIdentifier[] tables = tableDispatcher.listTables(tableNs);
+        NameIdentifier[] tables = this.tableDispatcher.listTables(tableNs);
         for (NameIdentifier tableIdent : tables) {
           if (ctx.enqueueable.size() >= ctx.limit) {
             return;
           }
           try {
-            Table table = tableDispatcher.loadTable(tableIdent);
+            Table table = this.tableDispatcher.loadTable(tableIdent);
             Long tableId = resolveTableId(table, tableIdent);
             if (tableId == null) {
               LOG.warn("Skip table {} after load: missing entity id", tableIdent);
@@ -422,32 +416,6 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       LOG.warn("Failed to resolve table id for {}: {}", tableIdent, e.toString());
     }
     return null;
-  }
-
-  @Nullable
-  private SchemaDispatcher schemaDispatcherOrNull() {
-    if (schemaDispatcherSupplier == null) {
-      return null;
-    }
-    try {
-      return schemaDispatcherSupplier.get();
-    } catch (RuntimeException e) {
-      LOG.debug("Schema dispatcher unavailable for policy expand: {}", e.toString());
-      return null;
-    }
-  }
-
-  @Nullable
-  private TableDispatcher tableDispatcherOrNull() {
-    if (tableDispatcherSupplier == null) {
-      return null;
-    }
-    try {
-      return tableDispatcherSupplier.get();
-    } catch (RuntimeException e) {
-      LOG.debug("Table dispatcher unavailable for policy expand: {}", e.toString());
-      return null;
-    }
   }
 
   private static void considerTable(long tableId, MetadataObject tableObject, ScanContext ctx) {
