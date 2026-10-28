@@ -113,6 +113,58 @@ public class TestIcebergReadRestrictionConverter {
   }
 
   @Test
+  void testUnicodeStringOrderingMatchesBoundPredicates() {
+    String bmp = "\uE000";
+    String supplementary = "\uD800\uDC00";
+    Assertions.assertTrue(
+        eval(filter("region STRING", "region < '" + supplementary + "'"), row(2, bmp)));
+    String[][] pairs = {
+      {bmp, supplementary},
+      {supplementary, bmp},
+      {bmp, bmp},
+      {"prefix" + bmp, "prefix" + supplementary},
+      {supplementary, supplementary + "suffix"}
+    };
+    for (String[] pair : pairs) {
+      for (String operator : Arrays.asList("=", "<>", "<", "<=", ">", ">=")) {
+        String comparison = "'" + pair[0] + "' " + operator + " '" + pair[1] + "'";
+        boolean columnResult =
+            eval(
+                filter("region STRING", "region " + operator + " '" + pair[1] + "'"),
+                row(2, pair[0]));
+        Assertions.assertEquals(columnResult, eval(filter("", comparison), row()), comparison);
+        Assertions.assertEquals(
+            columnResult,
+            eval(filter("", "CASE WHEN " + comparison + " THEN TRUE ELSE FALSE END"), row()),
+            comparison);
+      }
+    }
+    String range = " BETWEEN '\uD7FF' AND '" + supplementary + "'";
+    Assertions.assertTrue(eval(filter("region STRING", "region" + range), row(2, bmp)));
+    Assertions.assertTrue(eval(filter("", "'" + bmp + "'" + range), row()));
+    Assertions.assertFalse(eval(filter("", "'" + bmp + "' NOT" + range), row()));
+  }
+
+  @Test
+  void testUnicodeContextComparisonSelectsConsistentMask() {
+    String bmp = "\uE000";
+    String supplementary = "\uD800\uDC00";
+    ReadRestrictions result =
+        IcebergReadRestrictionConverter.convert(
+            Optional.empty(),
+            Collections.singletonMap(
+                2,
+                mask(
+                    "STRING",
+                    "CASE WHEN CURRENT_USER() < '"
+                        + supplementary
+                        + "' THEN show_last_4(value) ELSE show_first_4(value) END")),
+            SCHEMA,
+            context(bmp));
+    Assertions.assertEquals("show-last-4", result.columnProjections().get(0).name());
+  }
+
+  @Test
   void testBooleanThreeValuedTruthTables() {
     for (Boolean a : new Boolean[] {true, false, null}) {
       for (Boolean b : new Boolean[] {true, false, null}) {
@@ -467,6 +519,60 @@ public class TestIcebergReadRestrictionConverter {
   }
 
   @Test
+  void testNonNullableBooleanMaskOperations() {
+    for (String body :
+        Arrays.asList(
+            "value IS NULL",
+            "NULL IS NOT NULL",
+            "NOT TRUE",
+            "NOT (value IS NOT NULL)",
+            "1 = 2",
+            "FALSE AND value",
+            "value IS NULL OR FALSE",
+            "TRUE IN (FALSE)",
+            "2 BETWEEN 3 AND 4",
+            "'abc' LIKE 'z%'",
+            "CASE WHEN TRUE THEN value IS NULL ELSE FALSE END")) {
+      ReadRestrictions result = requiredBooleanMask(body);
+      Assertions.assertEquals(
+          "mask-to-fixed-value", result.columnProjections().get(0).name(), body);
+      Assertions.assertEquals(
+          false, result.columnProjections().get(0).bind(Types.BooleanType.get()).apply(null), body);
+    }
+  }
+
+  @Test
+  void testNullableBooleanMasksStillFailForRequiredColumns() {
+    for (String body :
+        Arrays.asList(
+            "NULL",
+            "NOT NULL",
+            "value = NULL",
+            "value AND NULL",
+            "value OR NULL",
+            "value IN (TRUE, NULL)",
+            "NULL BETWEEN 1 AND 2",
+            "NULL LIKE 'a%'",
+            "CASE WHEN TRUE THEN FALSE ELSE NULL END",
+            "CASE WHEN TRUE THEN value IS NULL END")) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> requiredBooleanMask(body), body);
+      Assertions.assertTrue(error.getMessage().contains("Nullable SQL mask result"), body);
+    }
+  }
+
+  @Test
+  void testNonNullableBooleanMasksStillRequireSupportedProjection() {
+    for (String body : Arrays.asList("value IS NOT NULL", "NOT value")) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> requiredBooleanMask(body), body);
+      Assertions.assertTrue(error.getMessage().contains("cannot represent"), error.getMessage());
+    }
+  }
+
+  @Test
   void testUnsupportedTargetExpressionsFailClosed() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -547,11 +653,21 @@ public class TestIcebergReadRestrictionConverter {
         Optional.empty(), Collections.singletonMap(field, mask), SCHEMA, context());
   }
 
+  private static ReadRestrictions requiredBooleanMask(String body) {
+    Schema schema = new Schema(Types.NestedField.required(51, "flag", Types.BooleanType.get()));
+    return IcebergReadRestrictionConverter.convert(
+        Optional.empty(), Collections.singletonMap(51, mask("BOOLEAN", body)), schema, context());
+  }
+
   private static BindingContext context() {
+    return context("alice");
+  }
+
+  private static BindingContext context(String user) {
     return new BindingContext() {
       @Override
       public String sessionUser() {
-        return "alice";
+        return user;
       }
 
       @Override

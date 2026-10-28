@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.policy.sql.Literal;
 import org.apache.gravitino.policy.sql.LiteralType;
 import org.apache.gravitino.policy.sql.SqlType;
+import org.apache.iceberg.types.Comparators;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
@@ -173,6 +174,9 @@ final class SqlRestrictionLiterals {
 
   @SuppressWarnings("unchecked")
   static int compare(Object left, Object right) {
+    if (left instanceof CharSequence) {
+      return Comparators.charSequences().compare((CharSequence) left, (CharSequence) right);
+    }
     if (left instanceof BigDecimal) {
       return ((BigDecimal) left).compareTo((BigDecimal) right);
     }

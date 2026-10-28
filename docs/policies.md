@@ -195,7 +195,8 @@ ranges. Temporal literals require matching type keywords, valid calendar/clock v
 six fractional digits; timestamp-with-timezone literals require an explicit offset. Integer
 literals must fit the signed range and be mathematical integers. Decimals must fit without
 rounding. Floating-point literals retain negative zero and reject overflow, infinity and NaN.
-Strings compare case-sensitively without Unicode normalization.
+Strings compare lexicographically by Unicode code point, case-sensitively and without Unicode
+normalization. Constant/context comparisons and bound STRING column predicates use the same order.
 
 #### CASE and SQL NULL Semantics
 

@@ -21,12 +21,19 @@ package org.apache.gravitino.iceberg.service.restriction;
 import java.math.BigDecimal;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.gravitino.policy.sql.Between;
 import org.apache.gravitino.policy.sql.CaseBranch;
 import org.apache.gravitino.policy.sql.CaseExpression;
+import org.apache.gravitino.policy.sql.Comparison;
 import org.apache.gravitino.policy.sql.FunctionCall;
+import org.apache.gravitino.policy.sql.In;
 import org.apache.gravitino.policy.sql.InputReference;
+import org.apache.gravitino.policy.sql.IsNull;
+import org.apache.gravitino.policy.sql.Like;
 import org.apache.gravitino.policy.sql.Literal;
 import org.apache.gravitino.policy.sql.LiteralType;
+import org.apache.gravitino.policy.sql.LogicalExpression;
+import org.apache.gravitino.policy.sql.Not;
 import org.apache.gravitino.policy.sql.SqlExpression;
 import org.apache.gravitino.policy.sql.SqlFunction;
 import org.apache.iceberg.expressions.Expression;
@@ -146,6 +153,18 @@ final class SqlRestrictionMasks {
     }
     if (expression instanceof InputReference) {
       return field.isOptional();
+    }
+    if (expression instanceof IsNull) {
+      // IS NULL and IS NOT NULL return a non-null Boolean, even for a nullable operand.
+      return false;
+    }
+    if (expression instanceof Not
+        || expression instanceof LogicalExpression
+        || expression instanceof Comparison
+        || expression instanceof In
+        || expression instanceof Between
+        || expression instanceof Like) {
+      return expression.children().stream().anyMatch(this::nullable);
     }
     if (expression instanceof CaseExpression) {
       CaseExpression choice = (CaseExpression) expression;
