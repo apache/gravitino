@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -369,7 +370,128 @@ public class TestJobManager {
             RuntimeException.class,
             () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
     Assertions.assertTrue(failure.getMessage().contains("submitted_late"));
+    // The message tells why the job was settled and how to avoid it.
+    Assertions.assertTrue(failure.getMessage().contains("marked it as FAILED"));
+    Assertions.assertTrue(failure.getMessage().contains("gravitino.job.statusPullIntervalInMs"));
     verify(jobExecutor, times(1)).cancelJob("submitted_late");
+
+    // Another server found another execution for the job and recorded it meanwhile.
+    Mockito.reset(jobExecutor);
+    when(jobExecutor.submitJob(any(), any())).thenReturn("submitted_late_2");
+    when(entityStore.update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenAnswer(
+            invocation -> {
+              Function<JobEntity, JobEntity> updater = invocation.getArgument(3);
+              return updater.apply(withExecutionId(lastRegisteredJob(), "found_execution"));
+            });
+    RuntimeException recordedElsewhere =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertTrue(
+        recordedElsewhere.getMessage().contains("recorded execution found_execution for it"));
+    verify(jobExecutor, times(1)).cancelJob("submitted_late_2");
+    verify(jobExecutor, never()).cancelJob("found_execution");
+  }
+
+  @Test
+  public void testRunJobCancelsExecutionOfJobGoneBeforeRecording() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    when(jobExecutor.submitJob(any(), any())).thenReturn("submitted_orphan");
+    // The job is gone by the time its submission is recorded, e.g. its metalake was dropped.
+    NoSuchEntityException gone = new NoSuchEntityException("Job was deleted");
+    when(entityStore.update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenThrow(gone);
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertSame(gone, failure.getCause());
+    Assertions.assertTrue(failure.getMessage().contains("submitted_orphan"));
+    Assertions.assertTrue(failure.getMessage().contains("could not be recorded"));
+    // Only a conflict is retried.
+    verify(entityStore, times(1))
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    verify(jobExecutor, times(1)).cancelJob("submitted_orphan");
+  }
+
+  @Test
+  public void testRunJobDeletesJobWhoseSubmissionFails() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    RuntimeException executorFailure = new RuntimeException("executor unavailable");
+    when(jobExecutor.submitJob(any(), any())).thenThrow(executorFailure);
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertSame(executorFailure, failure.getCause());
+    JobEntity registered = lastRegisteredJob();
+    verify(entityStore, times(1))
+        .delete(NameIdentifierUtil.ofJob(metalake, registered.name()), Entity.EntityType.JOB);
+    assertNoJobStagingDir();
+
+    // A job that can't be deleted is left for the status pull, which marks it as FAILED once its
+    // submission times out, and the failure to delete it is kept for diagnosis.
+    IOException deleteFailure = new IOException("store unavailable");
+    doThrow(deleteFailure).when(entityStore).delete(any(), eq(Entity.EntityType.JOB));
+    RuntimeException second =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertSame(executorFailure, second.getCause());
+    Assertions.assertTrue(List.of(second.getSuppressed()).contains(deleteFailure));
+    assertNoJobStagingDir();
+    verify(jobExecutor, never()).cancelJob(any());
+  }
+
+  @Test
+  public void testPullJobStatusLeavesSlowSubmissionToThisServer() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    long timeoutInMs = 3 * config.get(Configs.JOB_STATUS_PULL_INTERVAL_IN_MS);
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+    // The registered job, as if its submission took longer than the timeout.
+    doAnswer(
+            invocation ->
+                ImmutableList.of(
+                    copyOf(lastRegisteredJob())
+                        .withAuditInfo(
+                            AuditInfo.builder()
+                                .withCreator("test")
+                                .withCreateTime(
+                                    Instant.now().minusMillis(timeoutInMs).minusSeconds(10))
+                                .build())
+                        .build()))
+        .when(jobManager)
+        .listJobs(metalake, Optional.empty());
+    when(jobExecutor.submitJob(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              // This server's own status pull runs while it is still submitting the job.
+              jobManager.pullAndUpdateJobStatus();
+              return "slow_execution";
+            });
+
+    JobEntity job = jobManager.runJob(metalake, template.name(), Collections.emptyMap());
+
+    // The status pull left the job to its submission, which recorded it.
+    Assertions.assertEquals("slow_execution", job.jobExecutionId());
+    verify(jobExecutor, never()).findSubmittedJob(any(), any());
+    verify(jobExecutor, never()).cancelJob(any());
+    verify(entityStore, times(1))
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+
+    // Once the submission is over, a job left pending, e.g. as it couldn't be recorded, is settled
+    // by the status pull of this server too.
+    doReturn(Optional.empty()).when(jobExecutor).findSubmittedJob(any(), any());
+    jobManager.pullAndUpdateJobStatus();
+    verify(jobExecutor, times(1)).findSubmittedJob(any(), any());
   }
 
   @Test
@@ -985,10 +1107,13 @@ public class TestJobManager {
     doThrow(new IOException("Entity store error"))
         .when(entityStore)
         .put(any(JobEntity.class), anyBoolean());
+    Mockito.clearInvocations(jobExecutor);
 
     Assertions.assertThrows(
         RuntimeException.class,
         () -> jobManager.runJob(metalake, "shell_job", Collections.emptyMap()));
+    // A job that can't be registered is never submitted.
+    verify(jobExecutor, never()).submitJob(any(), any());
   }
 
   @Test
@@ -2267,6 +2392,21 @@ public class TestJobManager {
     Assertions.assertEquals(JobHandle.Status.CANCELLING, cancelling.status());
     Assertions.assertEquals("submitted_execution", cancelling.jobExecutionId());
     verify(jobExecutor, times(1)).cancelJob("submitted_execution");
+
+    // An execution that is already gone is settled by the status pull.
+    doThrow(new NoSuchJobException("gone")).when(jobExecutor).cancelJob("submitted_execution");
+    Assertions.assertEquals(
+        JobHandle.Status.CANCELLING, jobManager.cancelJob(metalake, job.name()).status());
+
+    // Nobody would cancel the execution again, so a failure to cancel it is reported.
+    RuntimeException cancelFailure = new RuntimeException("executor unavailable");
+    doThrow(cancelFailure).when(jobExecutor).cancelJob("submitted_execution");
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> jobManager.cancelJob(metalake, job.name()));
+    Assertions.assertSame(cancelFailure, failure.getCause());
+    Assertions.assertTrue(failure.getMessage().contains("submitted_execution"));
+    Assertions.assertTrue(failure.getMessage().contains("Cancel the execution"));
   }
 
   @Test

@@ -61,9 +61,19 @@ has started, keep reporting its start time in every later state, including the f
 Gravitino registers a job before it calls `submitJob`, and records the returned execution id
 afterwards. If the execution id is not recorded within three `gravitino.job.statusPullIntervalInMs`,
 for example because the Gravitino server submitting the job exited right after the submission,
-another server calls `findSubmittedJob(JobContext, JobTemplate)` with the same context and runtime
-job template. A returned execution id is recorded, and the job is tracked from then on. Otherwise
-the job is marked as `FAILED`.
+another server calls `findSubmittedJob(JobContext, JobTemplate)` with the job id, metalake and
+runtime job template of the submission, and settles the job by the result:
+
+- A returned execution id is recorded, and the job is tracked from then on. It must be the same
+  string that `submitJob` returns for the job.
+- An empty result marks the job as `FAILED`, or `CANCELLED` if it is being cancelled. Return it also
+  when your job runner can't look up the job, rather than throw `UnsupportedOperationException`.
+- An exception leaves the job as it is, and the lookup is retried in the next status pull.
+
+The submission may still be running when this happens, so make `submitJob` return within three
+status pull intervals. Otherwise the job may be marked as `FAILED`, and the server submitting it
+cancels the execution once `submitJob` returns and fails the request. An execution id must not
+start with `pending-submission:`, which Gravitino reserves for a job being submitted.
 
 The default implementation finds nothing. Implement it if your job runner can look up a job by the
 Gravitino job id, for example when the execution is named after `JobContext#jobId()`, so that such

@@ -254,6 +254,22 @@ job = client.run_job(
 </TabItem>
 </Tabs>
 
+Gravitino records a job as `QUEUED` before it hands the job to the job executor, so a job is never
+left running unknown to Gravitino, for example when the server exits right after the submission.
+If the submission isn't recorded within three times `gravitino.job.statusPullIntervalInMs`, another
+server, or the same server after a restart, looks the job up in the job executor when it pulls job
+statuses. A job found there is tracked as usual. Otherwise, it is marked as `FAILED`, or as
+`CANCELLED` if it was being cancelled. Not every job executor can look jobs up: the `k8s` one can,
+the local one can't.
+
+:::caution
+With several Gravitino servers, this requires all servers to use the same
+`gravitino.job.statusPullIntervalInMs` and to have their clocks in sync. A submission that takes
+longer than three pull intervals, for example because the job executor is slow, may be settled by
+another server meanwhile. The server submitting the job then cancels the execution and fails the
+run request.
+:::
+
 ### List Jobs, Get a Job, and Cancel
 
 Listing can be filtered to one template. A job is identified by its id, and cancelling is a `POST`

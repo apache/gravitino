@@ -38,6 +38,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -153,6 +155,10 @@ public class JobManager implements JobOperationDispatcher {
   private final long cancellationTimeoutInMs;
 
   private final long submissionTimeoutInMs;
+
+  // The ids of the jobs this server is submitting. The status pull of this server leaves them to
+  // their submission however long it takes, only the other servers settle them once it times out.
+  private final Set<Long> jobsBeingSubmitted = ConcurrentHashMap.newKeySet();
 
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
@@ -612,6 +618,18 @@ public class JobManager implements JobOperationDispatcher {
             .withRuntimeJobTemplate(runtimeJobTemplateJson)
             .build();
 
+    jobsBeingSubmitted.add(jobId);
+    try {
+      return registerAndSubmit(metalake, pendingJobEntity, jobTemplate, jobStagingDir);
+    } finally {
+      jobsBeingSubmitted.remove(jobId);
+    }
+  }
+
+  private JobEntity registerAndSubmit(
+      String metalake, JobEntity pendingJobEntity, JobTemplate jobTemplate, File jobStagingDir) {
+    long jobId = pendingJobEntity.id();
+    String jobTemplateName = pendingJobEntity.jobTemplateName();
     try {
       entityStore.put(pendingJobEntity, false /* overwrite */);
     } catch (NoSuchEntityException e) {
@@ -700,22 +718,38 @@ public class JobManager implements JobOperationDispatcher {
       return recorded;
     }
 
-    // The submission could not be recorded, or the status pull settled the job as its submission
+    // The submission could not be recorded, or another server settled the job as its submission
     // took too long. Cancellation is asynchronous and cannot undo work that already finished, so
     // request it best-effort, but do not expose a retryable conflict after submitting an execution.
+    String reason;
+    if (recorded == null) {
+      reason = "the submission could not be recorded";
+    } else {
+      String settledAs =
+          isPendingSubmission(recorded)
+              ? "marked it as " + recorded.status()
+              : "recorded execution " + recorded.jobExecutionId() + " for it";
+      reason =
+          String.format(
+              "another Gravitino server %s, as its submission took longer than %d ms. Make sure"
+                  + " the job executor submits a job within three"
+                  + " gravitino.job.statusPullIntervalInMs, and that all servers use the same"
+                  + " interval and have their clocks in sync",
+              settledAs, submissionTimeoutInMs);
+    }
     RuntimeException registrationFailure =
         new RuntimeException(
             String.format(
-                "Failed to register job %s after submitting execution %s; cancellation was "
-                    + "attempted but the execution may already have run. Check the execution "
-                    + "before retrying",
-                pendingJobEntity.name(), jobExecutionId),
+                "Failed to register job %s after submitting execution %s: %s. Cancellation was"
+                    + " attempted but the execution may already have run. Check the execution"
+                    + " before retrying",
+                pendingJobEntity.name(), jobExecutionId, reason),
             failure);
     LOG.warn(
-        "Job {} was submitted as execution {} but the submission could not be recorded, "
-            + "cancelling the execution",
+        "Job {} was submitted as execution {} but {}, cancelling the execution",
         pendingJobEntity.name(),
         jobExecutionId,
+        reason,
         failure);
     cancelSubmittedExecution(pendingJobEntity, jobExecutionId, registrationFailure);
     throw registrationFailure;
@@ -747,6 +781,9 @@ public class JobManager implements JobOperationDispatcher {
       JobEntity job, String jobExecutionId, @Nullable Exception failure) {
     try {
       jobExecutor.cancelJob(jobExecutionId);
+    } catch (NoSuchJobException e) {
+      // Both the server submitting the job and the one reconciling it may cancel the execution.
+      LOG.info("The execution {} of job {} is already gone", jobExecutionId, job.name());
     } catch (Exception cancelFailure) {
       LOG.error(
           "Failed to cancel the execution {} of job {}", jobExecutionId, job.name(), cancelFailure);
@@ -872,8 +909,25 @@ public class JobManager implements JobOperationDispatcher {
         && !isPendingSubmission(cancellingJobEntity)
         && cancellingJobEntity.status() == JobHandle.Status.CANCELLING
         && jobExecutor.ownsJob(cancellingJobEntity.jobExecutionId())) {
-      cancelSubmittedExecution(
-          cancellingJobEntity, cancellingJobEntity.jobExecutionId(), /* failure */ null);
+      try {
+        jobExecutor.cancelJob(cancellingJobEntity.jobExecutionId());
+      } catch (NoSuchJobException e) {
+        // The status pull settles it as CANCELLED.
+        LOG.info(
+            "The execution {} of job {} is already gone",
+            cancellingJobEntity.jobExecutionId(),
+            jobId);
+      } catch (Exception e) {
+        // Only node local job state gets the cancellation again from the status pull, so tell the
+        // caller rather than leave the execution running while the job is CANCELLING.
+        throw new RuntimeException(
+            String.format(
+                "Job %s under metalake %s is marked as CANCELLING, but failed to cancel its"
+                    + " execution %s, which was submitted meanwhile. Cancel the execution in the"
+                    + " job executor",
+                jobId, metalake, cancellingJobEntity.jobExecutionId()),
+            e);
+      }
     }
     return cancellingJobEntity;
   }
@@ -1204,9 +1258,10 @@ public class JobManager implements JobOperationDispatcher {
       // A failure on one job must never stop the status pull of the others.
       try {
         // A job whose submission is not recorded yet has no execution to query. It is left to the
-        // server submitting it, unless the submission takes too long.
+        // server submitting it, unless another server is submitting it and doesn't record it in
+        // time, e.g. because that server has exited.
         if (isPendingSubmission(job)) {
-          if (isSubmissionUnanswered(job, now)) {
+          if (!jobsBeingSubmitted.contains(job.id()) && isSubmissionUnanswered(job, now)) {
             reconcilePendingSubmission(metalake, job, now);
           }
           continue;

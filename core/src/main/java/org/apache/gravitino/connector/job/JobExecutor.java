@@ -49,7 +49,14 @@ public interface JobExecutor extends Closeable {
    * Submit a job to the external job runner.
    *
    * <p>The returned job identifier is unique in the external job runner, and can be used to track
-   * the job status or cancel it later.
+   * the job status or cancel it later. It must not start with {@code pending-submission:}, which
+   * Gravitino reserves for a job being submitted.
+   *
+   * <p>Gravitino registers the job before calling this method. On a deployment with several
+   * Gravitino servers, this method should return within three {@code
+   * gravitino.job.statusPullIntervalInMs}: otherwise another server may settle the job, see {@link
+   * #findSubmittedJob(JobContext, JobTemplate)}, and the server submitting it then cancels the
+   * returned execution and fails the request.
    *
    * <p>The placeholders in the job template have already been replaced with the actual values, but
    * its resources, that is its executable, scripts, jars, files and archives, are still the URIs
@@ -96,17 +103,37 @@ public interface JobExecutor extends Closeable {
    * after the submission.
    *
    * <p>Gravitino registers a job before submitting it, and records the execution id that {@link
-   * #submitJob(JobContext, JobTemplate)} returns afterwards. If the execution id isn't recorded in
-   * time, Gravitino calls this method with the same context and runtime job template as the
-   * submission, and tracks the returned execution like any other one. If no execution is found, the
-   * job is marked as {@link JobHandle.Status#FAILED}.
+   * #submitJob(JobContext, JobTemplate)} returns afterwards. If another Gravitino server doesn't
+   * record it within three {@code gravitino.job.statusPullIntervalInMs}, Gravitino calls this
+   * method and settles the job by the result:
+   *
+   * <ul>
+   *   <li>An execution id is recorded, and the job is tracked like any other one. It must be the
+   *       same string as {@link #submitJob(JobContext, JobTemplate)} returns for the job: if that
+   *       submission returns later with another one, the server submitting the job cancels that
+   *       execution as an unrecorded one.
+   *   <li>Empty means that the job has no execution. The job is marked as {@link
+   *       JobHandle.Status#FAILED}, or {@link JobHandle.Status#CANCELLED} if it is being cancelled.
+   *       Return empty also when the execution can't be looked up, rather than throw {@link
+   *       UnsupportedOperationException}.
+   *   <li>An exception means that the lookup failed. The job stays as it is, and the lookup is
+   *       retried in the next status pull.
+   * </ul>
+   *
+   * <p>The submission may still be running on the server submitting the job, for example when it
+   * takes longer than expected, so this method may be called while {@link #submitJob(JobContext,
+   * JobTemplate)} is running for the same job, possibly in another process. If no execution is
+   * found then, the job is marked as failed, and the execution that the submission returns is
+   * cancelled.
    *
    * <p>The default implementation returns an empty result, which fits a job executor that can't
    * look up a job by its Gravitino job id. A job executor that can, for example one that names the
    * execution after {@link JobContext#jobId()}, should implement it, so that such a job is tracked
    * rather than left running unknown to Gravitino.
    *
-   * @param context The context the job was submitted with.
+   * @param context The context of the job, with the same job id and metalake as the submission. Its
+   *     staging directory is the one of the calling server, which may not exist, rather than the
+   *     one the job was submitted with.
    * @param jobTemplate The runtime job template the job was submitted with, whose resources are
    *     URIs.
    * @return The unique identifier of the execution of the job, or empty if there is none.

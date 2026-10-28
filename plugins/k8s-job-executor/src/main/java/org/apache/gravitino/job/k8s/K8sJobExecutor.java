@@ -224,12 +224,13 @@ public class K8sJobExecutor implements JobExecutor {
     }
 
     // The SparkApplication of a job is named after the job id, in the namespace that the job
-    // template selects, so it's found the same way submitJob() names it.
-    GenericKubernetesResource app;
+    // template selects, so it's found the same way submitJob() names it. Only the name and the
+    // namespace are derived, not the whole SparkApplication, whose checks may fail on the current
+    // configurations although the job was submitted. A job is not found if the name prefix or the
+    // default namespace of the job executor changed since it was submitted.
+    String namespace;
     try {
-      app =
-          SparkApplicationUtils.buildSparkApplication(
-              context, (SparkJobTemplate) jobTemplate, configs);
+      namespace = SparkApplicationUtils.namespaceOf((SparkJobTemplate) jobTemplate, configs);
     } catch (IllegalArgumentException e) {
       // submitJob() rejects such a job before creating anything.
       return Optional.empty();
@@ -238,8 +239,8 @@ public class K8sJobExecutor implements JobExecutor {
         K8sJobExecutionId.of(
             configs.cluster(),
             K8sJobExecutionId.Kind.SPARK_APPLICATION,
-            app.getMetadata().getNamespace(),
-            app.getMetadata().getName());
+            namespace,
+            K8sJobResourceUtils.resourceName(configs, context.jobId()));
     checkApiServerReachable();
     try {
       return getSparkApplication(jobExecutionId)

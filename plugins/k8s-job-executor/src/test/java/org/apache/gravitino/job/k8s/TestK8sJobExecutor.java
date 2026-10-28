@@ -232,6 +232,66 @@ public class TestK8sJobExecutor {
   }
 
   @Test
+  public void testFindSubmittedJobByNameAndNamespaceOnly() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+
+    // Only the name and the namespace of the SparkApplication are derived, so a job is still found
+    // when the checks of a submission would reject it now, e.g. as the configurations changed.
+    SparkJobTemplate rejectedNow =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("local:///opt/spark/examples/jars/spark-examples.jar")
+            .withClassName("org.apache.spark.examples.SparkPi")
+            .withConfigs(ImmutableMap.of("spark.master", "local[*]"))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> executor.submitJob(context(2L), rejectedNow));
+    Assertions.assertEquals(
+        Optional.of(jobExecutionId), executor.findSubmittedJob(context(1L), rejectedNow));
+
+    // A job whose namespace is invalid is never submitted.
+    SparkJobTemplate invalidNamespace =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("local:///opt/spark/examples/jars/spark-examples.jar")
+            .withClassName("org.apache.spark.examples.SparkPi")
+            .withConfigs(ImmutableMap.of(SparkApplicationUtils.SPARK_NAMESPACE, "Not_A_Namespace"))
+            .build();
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), invalidNamespace));
+  }
+
+  @Test
+  public void testFindSubmittedJobWhileApiServerUnreachable() {
+    try (KubernetesClient unreachable =
+        new KubernetesClientBuilder()
+            .withConfig(
+                new ConfigBuilder(Config.empty())
+                    .withMasterUrl("http://127.0.0.1:1")
+                    .withRequestRetryBackoffLimit(0)
+                    .build())
+            .build()) {
+      executor.initialize(
+          TestSparkApplicationUtils.newConfigs(
+              ImmutableMap.of(K8sJobExecutorConfigs.STATUS_CACHE_TTL_MS, "0")),
+          unreachable);
+
+      // The lookup fails rather than finds nothing, so the job isn't marked as FAILED.
+      KubernetesClientException first =
+          Assertions.assertThrows(
+              KubernetesClientException.class,
+              () -> executor.findSubmittedJob(context(1L), sparkTemplate()));
+      Assertions.assertTrue(K8sJobExecutor.isUnreachable(first), first.toString());
+      // The other queries fail right away without another request.
+      KubernetesClientException next =
+          Assertions.assertThrows(
+              KubernetesClientException.class,
+              () -> executor.findSubmittedJob(context(2L), sparkTemplate()));
+      Assertions.assertSame(first, next.getCause());
+    }
+  }
+
+  @Test
   public void testFindSubmittedJobAfterCancellation() {
     String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
     executor.cancelJob(jobExecutionId);
