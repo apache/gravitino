@@ -78,11 +78,7 @@ class TestNearestPolicyTableEnumerator {
     nearest = mock(NearestMaintenancePolicyResolver.class);
     enumerator =
         new NearestPolicyTableEnumerator(
-            policyTagRelService,
-            tagMetaService,
-            schemaMetaService,
-            tableMetaService,
-            () -> nearest);
+            policyTagRelService, tagMetaService, schemaMetaService, tableMetaService, nearest);
     when(schemaMetaService.listSchemasByNamespace(any())).thenReturn(List.of());
   }
 
@@ -363,7 +359,7 @@ class TestNearestPolicyTableEnumerator {
             tagMetaService,
             schemaMetaService,
             tableMetaService,
-            () -> nearest,
+            nearest,
             schemaDispatcher,
             tableDispatcher);
 
@@ -413,7 +409,7 @@ class TestNearestPolicyTableEnumerator {
             tagMetaService,
             schemaMetaService,
             tableMetaService,
-            () -> nearest,
+            nearest,
             schemaDispatcher,
             tableDispatcher);
 
