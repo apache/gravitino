@@ -89,10 +89,8 @@ public class TestIcebergCatalogOperations {
     when(mockWrapper.getIcebergConfig()).thenReturn(config);
     when(mockWrapper.listNamespace(any())).thenThrow(new RuntimeException("boom"));
 
-    IcebergCatalogWrapperProvider provider = mock(IcebergCatalogWrapperProvider.class);
-    when(provider.get()).thenReturn(mockWrapper);
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.wrapperProvider = provider;
+    catalogOperations.icebergCatalogWrapper = mockWrapper;
 
     Exception exception =
         Assertions.assertThrows(
@@ -114,10 +112,8 @@ public class TestIcebergCatalogOperations {
   @Test
   public void testListSchemasConvertsMultiLevelNamespacesToLogicalNames() {
     IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
-    IcebergCatalogWrapperProvider provider = mock(IcebergCatalogWrapperProvider.class);
-    when(provider.get()).thenReturn(mockWrapper);
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.wrapperProvider = provider;
+    catalogOperations.icebergCatalogWrapper = mockWrapper;
 
     org.apache.iceberg.catalog.Namespace flatNs = org.apache.iceberg.catalog.Namespace.of("mydb");
     org.apache.iceberg.catalog.Namespace hierarchicalNs =
@@ -138,10 +134,8 @@ public class TestIcebergCatalogOperations {
   @Test
   public void testListSchemasFlatOnlyReturnsUnchangedNames() {
     IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
-    IcebergCatalogWrapperProvider provider = mock(IcebergCatalogWrapperProvider.class);
-    when(provider.get()).thenReturn(mockWrapper);
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.wrapperProvider = provider;
+    catalogOperations.icebergCatalogWrapper = mockWrapper;
 
     org.apache.iceberg.catalog.Namespace ns1 = org.apache.iceberg.catalog.Namespace.of("db1");
     org.apache.iceberg.catalog.Namespace ns2 = org.apache.iceberg.catalog.Namespace.of("db2");

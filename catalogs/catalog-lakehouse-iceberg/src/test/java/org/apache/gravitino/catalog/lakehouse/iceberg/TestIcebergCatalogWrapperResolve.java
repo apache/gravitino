@@ -117,15 +117,12 @@ public class TestIcebergCatalogWrapperResolve {
   @Test
   void catalogAndViewOpsShareSameWrapper() {
     IcebergCatalogWrapper shared = new IcebergCatalogWrapper(new IcebergConfig());
-    IcebergCatalogWrapperProvider provider = Mockito.mock(IcebergCatalogWrapperProvider.class);
-    Mockito.when(provider.get()).thenReturn(shared);
 
     IcebergCatalogOperations catalogOps = new IcebergCatalogOperations();
-    catalogOps.wrapperProvider = provider;
+    catalogOps.icebergCatalogWrapper = shared;
     IcebergViewCatalogOperations viewOps = new IcebergViewCatalogOperations(shared);
 
-    Assertions.assertSame(shared, catalogOps.wrapperProvider.get());
-    Assertions.assertSame(shared, provider.get());
+    Assertions.assertSame(shared, catalogOps.icebergCatalogWrapper);
     Assertions.assertNotNull(viewOps);
   }
 
