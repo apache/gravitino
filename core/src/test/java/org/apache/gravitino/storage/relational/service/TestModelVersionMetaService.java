@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -34,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -1866,121 +1868,95 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testGetModelVersionByNumberRereadsConcurrentUpdate() throws IOException {
-    assertModelVersionReadRereads(
+  void testGetByNumberReturnsSnapshotDuringVersionUpdate() throws IOException {
+    assertSnapshotRead(
         version ->
             List.of(
                 ModelVersionMetaService.getInstance()
-                    .getModelVersionByIdentifier(version.nameIdentifier())));
+                    .getModelVersionByIdentifier(version.nameIdentifier())),
+        SnapshotWrite.VERSION_UPDATE);
   }
 
   @TestTemplate
-  public void testGetModelVersionByAliasRereadsConcurrentUpdate() throws IOException {
-    assertModelVersionReadRereads(
+  void testGetByAliasReturnsSnapshotDuringVersionUpdate() throws IOException {
+    assertSnapshotRead(
         version ->
             List.of(
                 ModelVersionMetaService.getInstance()
                     .getModelVersionByIdentifier(
-                        NameIdentifier.of(version.namespace(), "stable_read_alias"))));
+                        NameIdentifier.of(version.namespace(), "snapshot_alias"))),
+        SnapshotWrite.VERSION_UPDATE);
   }
 
   @TestTemplate
-  public void testListModelVersionsRereadsConcurrentUpdate() throws IOException {
-    assertModelVersionReadRereads(
+  void testListReturnsSnapshotDuringVersionUpdate() throws IOException {
+    assertSnapshotRead(
         version ->
-            ModelVersionMetaService.getInstance()
-                .listModelVersionsByNamespace(version.namespace()));
+            ModelVersionMetaService.getInstance().listModelVersionsByNamespace(version.namespace()),
+        SnapshotWrite.VERSION_UPDATE);
   }
 
   @TestTemplate
-  public void testReadWithStableModelRereadsAfterConcurrentVersionChange() throws IOException {
-    ModelVersionEntity version = insertModelWithVersion("stable_read_alias");
-    AtomicInteger reads = new AtomicInteger();
-
-    String result =
-        ModelVersionMetaService.getInstance()
-            .readWithStableModel(
-                version.modelIdentifier(),
-                modelPO -> {
-                  if (reads.incrementAndGet() == 1) {
-                    // A writer commits between the version-row and alias-row reads of the first
-                    // attempt, so that attempt may have combined two states.
-                    updateModelVersionUnchecked(
-                        version.nameIdentifier(), current -> copyModelVersion(current, "changed"));
-                    return "torn";
-                  }
-                  return "stable";
-                });
-
-    Assertions.assertEquals("stable", result);
-    Assertions.assertEquals(2, reads.get());
+  void testGetByNumberDoesNotRetryModelAlter() throws IOException {
+    assertSnapshotRead(
+        version ->
+            List.of(
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(version.nameIdentifier())),
+        SnapshotWrite.MODEL_ALTER);
   }
 
   @TestTemplate
-  public void testReadWithStableModelRereadsAfterConcurrentModelAlter() throws IOException {
-    ModelVersionEntity version = insertModelWithVersion("model_alter_read_alias");
-    AtomicInteger reads = new AtomicInteger();
-
-    String result =
-        ModelVersionMetaService.getInstance()
-            .readWithStableModel(
-                version.modelIdentifier(),
-                modelPO -> {
-                  if (reads.incrementAndGet() == 1) {
-                    // A comment-only alter cannot tear the version rows, but it advances the
-                    // model's aggregate token, so the read is re-run.
-                    updateModelUnchecked(version.modelIdentifier(), "altered model comment");
-                    return "before alter";
-                  }
-                  return "after alter";
-                });
-
-    Assertions.assertEquals("after alter", result);
-    Assertions.assertEquals(2, reads.get());
+  void testGetByAliasDoesNotRetryModelAlter() throws IOException {
+    assertSnapshotRead(
+        version ->
+            List.of(
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(
+                        NameIdentifier.of(version.namespace(), "snapshot_alias"))),
+        SnapshotWrite.MODEL_ALTER);
   }
 
   @TestTemplate
-  public void testReadWithStableModelGivesUpWhenModelKeepsChanging() throws IOException {
-    ModelVersionEntity version = insertModelWithVersion("busy_read_alias");
-    AtomicInteger reads = new AtomicInteger();
-
-    Assertions.assertThrows(
-        OptimisticLockException.class,
-        () ->
-            ModelVersionMetaService.getInstance()
-                .readWithStableModel(
-                    version.modelIdentifier(),
-                    modelPO -> {
-                      updateModelVersionUnchecked(
-                          version.nameIdentifier(),
-                          current ->
-                              copyModelVersion(current, "change " + reads.incrementAndGet()));
-                      return null;
-                    }));
-    Assertions.assertEquals(ModelVersionMetaService.MAX_STABLE_READ_ATTEMPTS, reads.get());
+  void testListDoesNotRetryModelAlter() throws IOException {
+    assertSnapshotRead(
+        version ->
+            ModelVersionMetaService.getInstance().listModelVersionsByNamespace(version.namespace()),
+        SnapshotWrite.MODEL_ALTER);
   }
 
   @TestTemplate
-  public void testReadWithStableModelReportsModelDroppedDuringRead() throws IOException {
-    ModelVersionEntity version = insertModelWithVersion("dropped_read_alias");
-
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            ModelVersionMetaService.getInstance()
-                .readWithStableModel(
-                    version.modelIdentifier(),
-                    modelPO -> {
-                      Assertions.assertTrue(
-                          ModelMetaService.getInstance().deleteModel(version.modelIdentifier()));
-                      return null;
-                    }));
+  void testGetByNumberDoesNotRetryVersionLink() throws IOException {
+    assertSnapshotRead(
+        version ->
+            List.of(
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(version.nameIdentifier())),
+        SnapshotWrite.VERSION_LINK);
   }
 
-  private void assertModelVersionReadRereads(
-      Function<ModelVersionEntity, List<ModelVersionEntity>> read) throws IOException {
-    ModelVersionEntity version = insertModelWithVersion("stable_read_alias");
-    AtomicInteger versionReads = new AtomicInteger();
+  @TestTemplate
+  void testGetByAliasDoesNotRetryVersionLink() throws IOException {
+    assertSnapshotRead(
+        version ->
+            List.of(
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(
+                        NameIdentifier.of(version.namespace(), "snapshot_alias"))),
+        SnapshotWrite.VERSION_LINK);
+  }
+
+  @TestTemplate
+  void testListDoesNotRetryVersionLink() throws IOException {
+    assertSnapshotRead(
+        version ->
+            ModelVersionMetaService.getInstance().listModelVersionsByNamespace(version.namespace()),
+        SnapshotWrite.VERSION_LINK);
+  }
+
+  @TestTemplate
+  void testSnapshotRejectsModelRenamedAfterLookup() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("snapshot_alias");
     try (MockedStatic<SessionUtils> sessions =
         Mockito.mockStatic(SessionUtils.class, Mockito.CALLS_REAL_METHODS)) {
       sessions
@@ -1990,30 +1966,228 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                       Mockito.eq(ModelVersionMetaMapper.class), Mockito.any()))
           .thenAnswer(
               invocation -> {
-                Object rows = invocation.callRealMethod();
-                if (versionReads.incrementAndGet() == 1) {
-                  // Commit after the first version-row query, before its alias query. Without
-                  // the stable-read check the caller would see the old URI and the new alias.
-                  updateModelVersionUnchecked(
-                      version.nameIdentifier(),
-                      current ->
-                          ModelVersionEntity.builder()
-                              .withModelIdentifier(current.modelIdentifier())
-                              .withVersion(current.version())
-                              .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "new_path"))
-                              .withAliases(ImmutableList.of("stable_read_alias", "new_alias"))
-                              .withComment(current.comment())
-                              .withProperties(current.properties())
-                              .withAuditInfo(current.auditInfo())
-                              .build());
-                }
-                return rows;
+                Function<ModelEntity, ModelEntity> rename =
+                    current ->
+                        createModelEntity(
+                            current.id(),
+                            current.namespace(),
+                            "renamed_model",
+                            current.comment(),
+                            current.latestVersion(),
+                            current.properties(),
+                            current.auditInfo());
+                ModelMetaService.getInstance().updateModel(version.modelIdentifier(), rename);
+                return invocation.callRealMethod();
               });
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              ModelVersionMetaService.getInstance()
+                  .getModelVersionByIdentifier(version.nameIdentifier()));
+    }
+    ModelVersionEntity renamed =
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(
+                NameIdentifier.of(
+                    METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "renamed_model", "snapshot_alias"));
+    Assertions.assertEquals(version.uris(), renamed.uris());
+  }
 
+  @TestTemplate
+  void testSnapshotDistinguishesEmptyModelFromMissingVersion() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("snapshot_alias");
+    Assertions.assertTrue(
+        ModelVersionMetaService.getInstance().deleteModelVersion(version.nameIdentifier()));
+    Assertions.assertTrue(
+        ModelVersionMetaService.getInstance()
+            .listModelVersionsByNamespace(version.namespace())
+            .isEmpty());
+    NoSuchEntityException missing =
+        Assertions.assertThrows(
+            NoSuchEntityException.class,
+            () ->
+                ModelVersionMetaService.getInstance()
+                    .getModelVersionByIdentifier(version.nameIdentifier()));
+    Assertions.assertTrue(missing.getMessage().contains("model_version"));
+  }
+
+  @TestTemplate
+  void testSnapshotRejectsModelDroppedAfterLookup() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("snapshot_alias");
+    try (MockedStatic<SessionUtils> sessions =
+        Mockito.mockStatic(SessionUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      sessions
+          .when(
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      Mockito.eq(ModelVersionMetaMapper.class), Mockito.any()))
+          .thenAnswer(
+              invocation -> {
+                Assertions.assertTrue(
+                    ModelMetaService.getInstance().deleteModel(version.modelIdentifier()));
+                return invocation.callRealMethod();
+              });
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              ModelVersionMetaService.getInstance()
+                  .listModelVersionsByNamespace(version.namespace()));
+    }
+  }
+
+  @TestTemplate
+  void testSnapshotDoesNotFollowReplacementModel() throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("snapshot_alias");
+    AtomicBoolean replaced = new AtomicBoolean();
+    try (MockedStatic<SessionUtils> sessions =
+        Mockito.mockStatic(SessionUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      sessions
+          .when(
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      Mockito.eq(ModelVersionMetaMapper.class), Mockito.any()))
+          .thenAnswer(
+              invocation -> {
+                if (replaced.compareAndSet(false, true)) {
+                  Assertions.assertTrue(
+                      ModelMetaService.getInstance().deleteModel(version.modelIdentifier()));
+                  ModelEntity replacement =
+                      createModelEntity(
+                          RandomIdGenerator.INSTANCE.nextId(),
+                          MODEL_NS,
+                          version.modelIdentifier().name(),
+                          "replacement",
+                          0,
+                          properties,
+                          AUDIT_INFO);
+                  ModelMetaService.getInstance().insertModel(replacement, false);
+                }
+                return invocation.callRealMethod();
+              });
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              ModelVersionMetaService.getInstance()
+                  .getModelVersionByIdentifier(version.nameIdentifier()));
+    }
+    Assertions.assertTrue(replaced.get());
+    Assertions.assertTrue(
+        ModelVersionMetaService.getInstance()
+            .listModelVersionsByNamespace(version.namespace())
+            .isEmpty());
+  }
+
+  @TestTemplate
+  void testSnapshotKeepsAllUrisAndAliasesAcrossVersions() throws IOException {
+    ModelVersionEntity first = insertModelWithVersion("first_alias");
+    Map<String, String> uris = ImmutableMap.of("uri_a", "path_a", "uri_b", "path_b");
+    updateModelVersionUnchecked(
+        first.nameIdentifier(),
+        current ->
+            createModelVersionEntity(
+                current.modelIdentifier(),
+                current.version(),
+                uris,
+                List.of("first_alias", "other_alias"),
+                current.comment(),
+                current.properties(),
+                current.auditInfo()));
+    ModelVersionEntity second =
+        createModelVersionEntity(
+            first.modelIdentifier(),
+            1,
+            ImmutableMap.of("uri_c", "path_c"),
+            Collections.emptyList(),
+            "no aliases",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(second);
+
+    List<ModelVersionEntity> versions =
+        ModelVersionMetaService.getInstance().listModelVersionsByNamespace(first.namespace());
+    Assertions.assertEquals(2, versions.size());
+    Map<Integer, ModelVersionEntity> byNumber =
+        versions.stream()
+            .collect(Collectors.toMap(ModelVersionEntity::version, Function.identity()));
+    Assertions.assertEquals(uris, byNumber.get(0).uris());
+    Assertions.assertEquals(
+        Set.of("first_alias", "other_alias"), Set.copyOf(byNumber.get(0).aliases()));
+    Assertions.assertEquals(2, byNumber.get(0).aliases().size());
+    Assertions.assertEquals(second.uris(), byNumber.get(1).uris());
+    Assertions.assertTrue(byNumber.get(1).aliases().isEmpty());
+    ModelVersionEntity selected =
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(NameIdentifier.of(first.namespace(), "other_alias"));
+    Assertions.assertEquals(uris, selected.uris());
+    Assertions.assertEquals(Set.of("first_alias", "other_alias"), Set.copyOf(selected.aliases()));
+  }
+
+  private enum SnapshotWrite {
+    VERSION_UPDATE,
+    MODEL_ALTER,
+    VERSION_LINK
+  }
+
+  private void assertSnapshotRead(
+      Function<ModelVersionEntity, List<ModelVersionEntity>> read, SnapshotWrite write)
+      throws IOException {
+    ModelVersionEntity version = insertModelWithVersion("snapshot_alias");
+    AtomicInteger reads = new AtomicInteger();
+    AtomicBoolean writing = new AtomicBoolean();
+    try (MockedStatic<SessionUtils> sessions =
+        Mockito.mockStatic(SessionUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      sessions
+          .when(
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      Mockito.eq(ModelVersionMetaMapper.class), Mockito.any()))
+          .thenAnswer(
+              invocation -> {
+                Object snapshot = invocation.callRealMethod();
+                if (writing.compareAndSet(false, true)) {
+                  try {
+                    reads.incrementAndGet();
+                    // Commit after every version read. The old split-read path exhausts its
+                    // retry budget; a statement snapshot remains complete and can be returned.
+                    if (write == SnapshotWrite.MODEL_ALTER) {
+                      updateModelUnchecked(version.modelIdentifier(), "changed " + reads.get());
+                    } else if (write == SnapshotWrite.VERSION_LINK) {
+                      ModelVersionMetaService.getInstance()
+                          .insertModelVersion(
+                              createModelVersionEntity(
+                                  version.modelIdentifier(),
+                                  reads.get(),
+                                  ImmutableMap.of(
+                                      ModelVersion.URI_NAME_UNKNOWN, "linked_path_" + reads.get()),
+                                  Collections.emptyList(),
+                                  "linked",
+                                  properties,
+                                  AUDIT_INFO));
+                    } else {
+                      updateModelVersionUnchecked(
+                          version.nameIdentifier(),
+                          current ->
+                              createModelVersionEntity(
+                                  current.modelIdentifier(),
+                                  current.version(),
+                                  ImmutableMap.of(
+                                      ModelVersion.URI_NAME_UNKNOWN, "new_path_" + reads.get()),
+                                  List.of("snapshot_alias", "new_alias"),
+                                  current.comment(),
+                                  current.properties(),
+                                  current.auditInfo()));
+                    }
+                  } finally {
+                    writing.set(false);
+                  }
+                }
+                return snapshot;
+              });
       List<ModelVersionEntity> result = read.apply(version);
       Assertions.assertEquals(1, result.size());
-      Assertions.assertEquals("new_path", result.get(0).uris().get(ModelVersion.URI_NAME_UNKNOWN));
-      Assertions.assertTrue(result.get(0).aliases().contains("new_alias"));
+      Assertions.assertEquals(version.uris(), result.get(0).uris());
+      Assertions.assertEquals(version.aliases(), result.get(0).aliases());
+      Assertions.assertEquals(1, reads.get());
     }
   }
 

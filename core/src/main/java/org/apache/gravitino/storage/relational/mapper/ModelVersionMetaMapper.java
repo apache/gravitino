@@ -19,7 +19,9 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionSnapshotPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -29,6 +31,25 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface ModelVersionMetaMapper {
 
   String TABLE_NAME = "model_version_info";
+
+  /**
+   * Reads active version and alias rows together, validating the observed model identity.
+   *
+   * @param modelId the observed model ID
+   * @param schemaId the observed parent schema ID
+   * @param modelName the model name
+   * @param version the version number, or null when selecting an alias or listing all versions
+   * @param alias the alias, or null when selecting a number or listing all versions
+   * @return the snapshot, including empty collections for a model with no matching version, or null
+   *     when the model was dropped, renamed, or moved; version and alias must not both be set
+   */
+  @Nullable
+  ModelVersionSnapshotPO selectModelVersionSnapshot(
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName,
+      @Nullable @Param("version") Integer version,
+      @Nullable @Param("alias") String alias);
 
   @InsertProvider(
       type = ModelVersionMetaSQLProviderFactory.class,
