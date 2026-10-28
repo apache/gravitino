@@ -85,7 +85,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.SupportsCatalogCacheExpiry;
+import org.apache.gravitino.connector.CatalogCacheRefreshAware;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -209,7 +209,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     private boolean cleanupStarted = false;
 
     /**
-     * Optional wall-clock refresh deadline from {@link SupportsCatalogCacheExpiry} (for example GCS
+     * Optional wall-clock refresh deadline from {@link CatalogCacheRefreshAware} (for example GCS
      * OAuth token refresh). Null means default expire-after-access only.
      */
     @Nullable private Long cacheRefreshAtEpochMs;
@@ -1890,9 +1890,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // deadline for catalogCache Expiry. Other providers stay lazy.
             if ("lakehouse-iceberg".equals(entity.getProvider())) {
               CatalogOperations ops = catalog.ops();
-              if (ops instanceof SupportsCatalogCacheExpiry) {
+              if (ops instanceof CatalogCacheRefreshAware) {
                 wrapper.cacheRefreshAtEpochMs =
-                    ((SupportsCatalogCacheExpiry) ops).catalogCacheRefreshAtEpochMs().orElse(null);
+                    ((CatalogCacheRefreshAware) ops).catalogCacheRefreshAtEpochMs().orElse(null);
               }
             }
             return null;
@@ -2292,7 +2292,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   /**
    * Expire-after-access capped by an optional per-entry refresh deadline from {@link
-   * SupportsCatalogCacheExpiry}.
+   * CatalogCacheRefreshAware}.
    */
   private static final class CatalogCacheExpiry implements Expiry<NameIdentifier, CatalogWrapper> {
 

@@ -43,7 +43,7 @@ import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.SupportsCatalogCacheExpiry;
+import org.apache.gravitino.connector.CatalogCacheRefreshAware;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -102,7 +102,7 @@ public class IcebergCatalogOperations
         TableCatalog,
         ViewCatalog,
         CatalogDropAware,
-        SupportsCatalogCacheExpiry {
+        CatalogCacheRefreshAware {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 

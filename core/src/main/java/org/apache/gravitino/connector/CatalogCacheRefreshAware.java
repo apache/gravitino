@@ -22,16 +22,16 @@ import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * Optional hook for catalogs whose {@link org.apache.gravitino.catalog.CatalogManager} cache entry
- * should refresh earlier than the default expire-after-access interval (for example when a minted
- * cloud OAuth token is about to expire).
+ * Optional hook for catalogs that need {@link org.apache.gravitino.catalog.CatalogManager}'s
+ * catalog cache entry refreshed earlier than the default expire-after-access interval (for example
+ * when a minted cloud OAuth token is about to expire).
  */
 @Evolving
-public interface SupportsCatalogCacheExpiry {
+public interface CatalogCacheRefreshAware {
 
   /**
    * Wall-clock epoch millis when the catalog cache entry should be refreshed. Empty means the
-   * default {@code catalog cache eviction interval} alone applies.
+   * default catalog-cache eviction interval alone applies.
    *
    * @return refresh deadline, or empty
    */
