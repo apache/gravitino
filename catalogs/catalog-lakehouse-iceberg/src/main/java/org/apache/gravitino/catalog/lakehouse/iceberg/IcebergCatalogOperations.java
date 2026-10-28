@@ -136,7 +136,7 @@ public class IcebergCatalogOperations
     // Fail-fast for warehouse / unreachable REST; do not pin the wrapper for the ops lifetime so
     // shared IRC/Standalone cache can refresh after GCS token eviction.
     this.wrapperProvider.get();
-    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(this::catalogWrapper);
+    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(this.wrapperProvider);
   }
 
   /**
