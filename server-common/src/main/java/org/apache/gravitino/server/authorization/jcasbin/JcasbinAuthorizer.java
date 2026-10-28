@@ -1397,9 +1397,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /**
    * Reloads every role in {@code roleIds} whose loaded version is missing or older than the DB.
    *
-   * @return ids of stale roles whose policies could not be read or were superseded by a newer
-   *     observed version without a complete replacement. A role that no longer exists is not
-   *     included: having no policies is correct for it.
+   * @return ids of stale roles whose policies could not be read, were superseded by a newer
+   *     observed version without a complete replacement, or were recreated under the same name
+   *     after the version probe. A role that no longer exists is not included: having no policies
+   *     is correct for it.
    */
   private Set<Long> versionCheckAndLoadRoles(
       String metalake, List<Long> roleIds, AuthorizationRequestContext requestContext) {
@@ -1984,7 +1985,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             e);
         return Optional.empty();
       }
-      // A role whose entity could not be read has lost its policies without a replacement. Its
+      // A role whose entity could not be read, was superseded or was recreated under the same name
+      // has lost its policies without a replacement. Its
       // missing rows prove neither the absence of a deny nor of an allow, so the check cannot be
       // evaluated. Partially loaded and dropped roles are evaluated as usual: their policy state is
       // the same one any request would see.
