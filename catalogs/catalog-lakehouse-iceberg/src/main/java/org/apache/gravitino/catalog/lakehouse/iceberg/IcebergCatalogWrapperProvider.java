@@ -44,7 +44,8 @@ class IcebergCatalogWrapperProvider {
   private final String catalogName;
   private final IcebergConfig icebergConfig;
   private final CatalogWrapperManager manager;
-  private IcebergCatalogWrapper held;
+  /** Wrapper this provider has acquired from the shared cache; released in {@link #close()}. */
+  private IcebergCatalogWrapper acquiredWrapper;
 
   private IcebergCatalogWrapperProvider(
       String catalogName, IcebergConfig icebergConfig, CatalogWrapperManager manager) {
@@ -91,12 +92,12 @@ class IcebergCatalogWrapperProvider {
       invalidate();
       throw IcebergCatalogOperations.handleRestException(e);
     }
-    if (held != wrapper) {
-      if (held != null) {
-        manager.releaseCatalogWrapper(held);
+    if (acquiredWrapper != wrapper) {
+      if (acquiredWrapper != null) {
+        manager.releaseCatalogWrapper(acquiredWrapper);
       }
       manager.acquireCatalogWrapper(wrapper);
-      held = wrapper;
+      acquiredWrapper = wrapper;
     }
     return wrapper;
   }
@@ -119,9 +120,9 @@ class IcebergCatalogWrapperProvider {
       }
       return;
     }
-    if (held != null) {
-      manager.releaseCatalogWrapper(held);
-      held = null;
+    if (acquiredWrapper != null) {
+      manager.releaseCatalogWrapper(acquiredWrapper);
+      acquiredWrapper = null;
     }
   }
 }
