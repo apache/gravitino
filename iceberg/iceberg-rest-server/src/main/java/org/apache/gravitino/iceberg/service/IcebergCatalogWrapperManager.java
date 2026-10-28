@@ -81,7 +81,7 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
     }
     Optional<Long> version = catalogCurrentVersion(catalogName);
     if (!version.isPresent()) {
-      catalogWrapperCache.invalidate(catalogName);
+      // Catalog row is gone; do not reuse a versioned cache entry.
       return createCatalogWrapperFromProvider(catalogName);
     }
     return catalogWrapperCache.get(
@@ -114,16 +114,6 @@ public class IcebergCatalogWrapperManager implements CatalogWrapperManager, Auto
         && !IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(catalogName)) {
       catalogWrapperCache.invalidate(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
     }
-  }
-
-  @Override
-  public void acquireCatalogWrapper(IcebergCatalogWrapper wrapper) {
-    catalogWrapperCache.acquire(wrapper);
-  }
-
-  @Override
-  public void releaseCatalogWrapper(IcebergCatalogWrapper wrapper) {
-    catalogWrapperCache.release(wrapper);
   }
 
   /**

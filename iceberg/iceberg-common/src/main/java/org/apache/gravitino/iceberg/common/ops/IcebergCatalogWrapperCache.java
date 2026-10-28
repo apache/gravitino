@@ -21,17 +21,14 @@ package org.apache.gravitino.iceberg.common.ops;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Expiry;
-import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Objects;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -44,11 +41,11 @@ import org.slf4j.LoggerFactory;
  * Shared get-or-create cache for {@link IcebergCatalogWrapper} instances.
  *
  * <p>Used by IRC {@code IcebergCatalogWrapperManager} and by {@link
- * StandaloneCatalogWrapperManager} when IRC runs standalone (not embedded). A caller that knows the
- * catalog's {@code current_version} passes it in: a cached wrapper is reused only while its version
- * is still current. Replacing a stale wrapper does not close it while a catalog lease still holds
- * it. Eviction follows expire-after-access, capped so minted GCS OAuth2 tokens are refreshed before
- * {@code gcs.oauth2.token-expires-at}.
+ * StandaloneCatalogWrapperManager} when IRC runs standalone (not embedded). The cache key is {@link
+ * Key}({@code catalogName}, {@code current_version}): a catalog alter that bumps {@code
+ * catalog_meta.current_version} stores a new entry and leaves the previous one until
+ * expire-after-access removes it. Eviction is also capped so minted GCS OAuth2 tokens are refreshed
+ * before {@code gcs.oauth2.token-expires-at}.
  */
 public final class IcebergCatalogWrapperCache implements AutoCloseable {
 
@@ -60,10 +57,7 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
    */
   @VisibleForTesting static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
 
-  private final Cache<String, CachedCatalog> cache;
-  private final ConcurrentHashMap<String, Object> keyLocks = new ConcurrentHashMap<>();
-  private final Map<IcebergCatalogWrapper, CachedCatalog> byWrapper =
-      Collections.synchronizedMap(new IdentityHashMap<>());
+  private final Cache<Key, IcebergCatalogWrapper> cache;
 
   /**
    * Creates a cache using {@link IcebergConfig#ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL}.
@@ -88,21 +82,10 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
         Caffeine.newBuilder()
             .expireAfter(new CatalogWrapperExpiry(accessEvictionNanos))
             .removalListener(
-                (catalogName, cachedCatalog, cause) -> {
+                (key, catalogWrapper, cause) -> {
                   LOG.debug(
-                      "Removing IcebergCatalogWrapper from cache: catalog={}, cause={}",
-                      catalogName,
-                      cause);
-                  if (cachedCatalog == null) {
-                    return;
-                  }
-                  if (cause == RemovalCause.REPLACED) {
-                    // The catalog lease that loaded this wrapper still uses it. Drop only the
-                    // cache's reference; the lease closes the wrapper when it finishes.
-                    cachedCatalog.release();
-                  } else {
-                    cachedCatalog.forceClose();
-                  }
+                      "Removing IcebergCatalogWrapper from cache: key={}, cause={}", key, cause);
+                  closeQuietly(catalogWrapper);
                 })
             .scheduler(
                 Scheduler.forScheduledExecutorService(
@@ -116,8 +99,7 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
   }
 
   /**
-   * Returns a cached wrapper, creating it with {@code loader} when absent. The cached value is
-   * reused without comparing a catalog version.
+   * Returns a cached wrapper, creating it with {@code loader} when absent. Uses an unversioned key.
    *
    * @param catalogName catalog name
    * @param loader creates the wrapper on cache miss
@@ -129,80 +111,52 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
   }
 
   /**
-   * Returns the cached wrapper when it was built for {@code catalogVersion} or a newer one.
-   * Otherwise {@code loader} builds a replacement. The previous wrapper stays open until every
-   * lease that {@link #acquire acquired} it has {@link #release released} it.
+   * Returns the wrapper cached for {@code catalogName} at {@code catalogVersion}, creating it with
+   * {@code loader} when absent. A different version is a different cache entry; the previous entry
+   * stays until it expires.
    *
    * @param catalogName catalog name
-   * @param catalogVersion {@code catalog_meta.current_version}; {@code null} skips the version
-   *     check and reuses only an unversioned entry
-   * @param loader creates the wrapper on cache miss or when the cached version is older
+   * @param catalogVersion {@code catalog_meta.current_version}; {@code null} for an unversioned
+   *     entry
+   * @param loader creates the wrapper on cache miss
    * @param <T> wrapper type
    * @return cached or newly created wrapper
    */
   @SuppressWarnings("unchecked")
   public <T extends IcebergCatalogWrapper> T get(
       String catalogName, @Nullable Long catalogVersion, Function<String, T> loader) {
-    synchronized (lock(catalogName)) {
-      CachedCatalog cached = cache.getIfPresent(catalogName);
-      if (cached != null && versionMatches(cached, catalogVersion)) {
-        cached.wrapper.reloadHadoopConf();
-        return (T) cached.wrapper;
-      }
-      T created = loader.apply(catalogName);
-      CachedCatalog entry = new CachedCatalog(catalogVersion, created);
-      byWrapper.put(created, entry);
-      cache.put(catalogName, entry);
-      created.reloadHadoopConf();
-      return created;
-    }
+    Key key = new Key(catalogName, catalogVersion);
+    T wrapper = (T) cache.get(key, k -> loader.apply(k.catalogName()));
+    wrapper.reloadHadoopConf();
+    return wrapper;
   }
 
   /**
-   * Keeps {@code wrapper} open across a catalog-version replacement. The cache already holds one
-   * reference; each lease adds another.
-   *
-   * @param wrapper wrapper returned by {@link #get(String, Long, Function)}
-   */
-  public void acquire(IcebergCatalogWrapper wrapper) {
-    CachedCatalog cached = byWrapper.get(wrapper);
-    if (cached != null) {
-      cached.acquire();
-    }
-  }
-
-  /**
-   * Drops one lease reference. The wrapper is closed once the cache and every lease have released
-   * it.
-   *
-   * @param wrapper wrapper previously passed to {@link #acquire}
-   */
-  public void release(IcebergCatalogWrapper wrapper) {
-    CachedCatalog cached = byWrapper.get(wrapper);
-    if (cached != null) {
-      cached.release();
-    }
-  }
-
-  /**
-   * Invalidates a cached wrapper. An explicit removal closes it even if a lease still holds it.
-   * Closing is done on this thread; Caffeine's removal listener can run later and is idempotent.
+   * Removes every cached wrapper for {@code catalogName}, including all versions. Closing runs on
+   * this thread; Caffeine's removal listener may also run later and is idempotent.
    *
    * @param catalogName catalog name
    */
   public void invalidate(String catalogName) {
-    CachedCatalog removed = cache.asMap().remove(catalogName);
-    if (removed != null) {
-      removed.forceClose();
+    List<Key> keys = new ArrayList<>();
+    for (Key key : cache.asMap().keySet()) {
+      if (key.catalogName().equals(catalogName)) {
+        keys.add(key);
+      }
+    }
+    for (Key key : keys) {
+      IcebergCatalogWrapper removed = cache.asMap().remove(key);
+      closeQuietly(removed);
     }
   }
 
   @Override
   public void close() {
-    for (CachedCatalog cached : cache.asMap().values()) {
-      cached.forceClose();
-    }
+    List<IcebergCatalogWrapper> wrappers = new ArrayList<>(cache.asMap().values());
     cache.invalidateAll();
+    for (IcebergCatalogWrapper wrapper : wrappers) {
+      closeQuietly(wrapper);
+    }
   }
 
   /**
@@ -242,21 +196,6 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
     return Math.min(accessEvictionNanos, TimeUnit.MILLISECONDS.toNanos(remainingMs));
   }
 
-  private Object lock(String catalogName) {
-    return keyLocks.computeIfAbsent(catalogName, key -> new Object());
-  }
-
-  private static boolean versionMatches(CachedCatalog cached, @Nullable Long catalogVersion) {
-    if (catalogVersion == null) {
-      return cached.version == null;
-    }
-    return cached.version != null && cached.version >= catalogVersion;
-  }
-
-  private void forget(CachedCatalog cached) {
-    byWrapper.remove(cached.wrapper);
-  }
-
   private static void closeQuietly(IcebergCatalogWrapper catalogWrapper) {
     if (catalogWrapper == null) {
       return;
@@ -268,36 +207,65 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
     }
   }
 
-  private final class CachedCatalog {
+  /**
+   * Cache key for one catalog at one {@code catalog_meta.current_version}.
+   *
+   * <p>{@code catalogVersion} may be {@code null} for callers that do not version the entry
+   * (standalone / non-aux).
+   */
+  public static final class Key {
+    private final String catalogName;
+    @Nullable private final Long catalogVersion;
 
-    private final Long version;
-    private final IcebergCatalogWrapper wrapper;
-    private final AtomicInteger refs = new AtomicInteger(1);
-
-    CachedCatalog(@Nullable Long version, IcebergCatalogWrapper wrapper) {
-      this.version = version;
-      this.wrapper = wrapper;
+    /**
+     * @param catalogName catalog name
+     * @param catalogVersion {@code catalog_meta.current_version}, or {@code null}
+     */
+    public Key(String catalogName, @Nullable Long catalogVersion) {
+      this.catalogName = catalogName;
+      this.catalogVersion = catalogVersion;
     }
 
-    void acquire() {
-      refs.incrementAndGet();
+    /**
+     * @return catalog name
+     */
+    public String catalogName() {
+      return catalogName;
     }
 
-    void release() {
-      if (refs.decrementAndGet() == 0) {
-        forget(this);
-        closeQuietly(wrapper);
+    /**
+     * @return catalog version, or {@code null}
+     */
+    @Nullable
+    public Long catalogVersion() {
+      return catalogVersion;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
       }
+      if (!(o instanceof Key)) {
+        return false;
+      }
+      Key key = (Key) o;
+      return Objects.equal(catalogName, key.catalogName)
+          && Objects.equal(catalogVersion, key.catalogVersion);
     }
 
-    void forceClose() {
-      forget(this);
-      refs.set(0);
-      closeQuietly(wrapper);
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(catalogName, catalogVersion);
+    }
+
+    @Override
+    public String toString() {
+      return "Key{catalogName='" + catalogName + "', catalogVersion=" + catalogVersion + '}';
     }
   }
 
-  private static final class CatalogWrapperExpiry implements Expiry<String, CachedCatalog> {
+  private static final class CatalogWrapperExpiry implements Expiry<Key, IcebergCatalogWrapper> {
 
     private final long accessEvictionNanos;
 
@@ -306,20 +274,20 @@ public final class IcebergCatalogWrapperCache implements AutoCloseable {
     }
 
     @Override
-    public long expireAfterCreate(String key, CachedCatalog value, long currentTime) {
+    public long expireAfterCreate(Key key, IcebergCatalogWrapper value, long currentTime) {
       return computeCacheDurationNanos(
-          value.wrapper.getIcebergConfig(), accessEvictionNanos, System.currentTimeMillis());
+          value.getIcebergConfig(), accessEvictionNanos, System.currentTimeMillis());
     }
 
     @Override
     public long expireAfterUpdate(
-        String key, CachedCatalog value, long currentTime, long currentDuration) {
+        Key key, IcebergCatalogWrapper value, long currentTime, long currentDuration) {
       return expireAfterCreate(key, value, currentTime);
     }
 
     @Override
     public long expireAfterRead(
-        String key, CachedCatalog value, long currentTime, long currentDuration) {
+        Key key, IcebergCatalogWrapper value, long currentTime, long currentDuration) {
       return expireAfterCreate(key, value, currentTime);
     }
   }

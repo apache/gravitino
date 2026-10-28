@@ -57,25 +57,9 @@ public interface CatalogWrapperManager {
   IcebergCatalogWrapper getOrCreateCatalogWrapper(String catalogName, IcebergConfig icebergConfig);
 
   /**
-   * Invalidates a cached wrapper for {@code catalogName}.
+   * Invalidates cached wrappers for {@code catalogName}.
    *
    * @param catalogName catalog name
    */
   void invalidateCatalogWrapper(String catalogName);
-
-  /**
-   * Holds {@code wrapper} open until {@link #releaseCatalogWrapper} when a newer catalog version
-   * replaces the cache entry.
-   *
-   * @param wrapper wrapper this catalog lease will keep using
-   */
-  default void acquireCatalogWrapper(IcebergCatalogWrapper wrapper) {}
-
-  /**
-   * Drops the lease taken by {@link #acquireCatalogWrapper}. The wrapper is closed once the cache
-   * and every lease have released it.
-   *
-   * @param wrapper wrapper previously passed to {@link #acquireCatalogWrapper}
-   */
-  default void releaseCatalogWrapper(IcebergCatalogWrapper wrapper) {}
 }

@@ -149,7 +149,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
   }
 
   @Test
-  public void testNewerCatalogVersionReplacesWrapperWithoutClosingTheHeldOne() throws Exception {
+  public void testNewerCatalogVersionUsesNewCacheEntryWithoutClosingTheOldOne() throws Exception {
     IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(configProvider.getDefaultCatalogName()).thenReturn("test");
     IcebergConfig icebergConfig =
@@ -172,7 +172,6 @@ public class TestIcebergCatalogWrapperManagerForREST {
         }) {
       IcebergRESTServerContext.create(configProvider, false, false, true, manager);
       CatalogWrapperForREST original = manager.getCatalogWrapper("test");
-      manager.acquireCatalogWrapper(original);
 
       CatalogWrapperForREST sameVersion = manager.getCatalogWrapper("test");
       Assertions.assertSame(original, sameVersion);
@@ -181,9 +180,6 @@ public class TestIcebergCatalogWrapperManagerForREST {
       CatalogWrapperForREST replacement = manager.getCatalogWrapper("test");
       Assertions.assertNotSame(original, replacement);
       Assertions.assertFalse(original.isClosed());
-
-      manager.releaseCatalogWrapper(original);
-      Assertions.assertTrue(original.isClosed());
       Assertions.assertFalse(replacement.isClosed());
     }
   }

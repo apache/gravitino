@@ -32,22 +32,8 @@ public class TestIcebergCatalogWrapperCache {
   void getReusesCachedWrapper() {
     IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
     AtomicInteger creates = new AtomicInteger();
-    IcebergCatalogWrapper first =
-        cache.get(
-            "c1",
-            name -> {
-              creates.incrementAndGet();
-              return new IcebergCatalogWrapper(
-                  new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory")));
-            });
-    IcebergCatalogWrapper second =
-        cache.get(
-            "c1",
-            name -> {
-              creates.incrementAndGet();
-              return new IcebergCatalogWrapper(
-                  new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory")));
-            });
+    IcebergCatalogWrapper first = cache.get("c1", name -> newMemoryWrapper(creates));
+    IcebergCatalogWrapper second = cache.get("c1", name -> newMemoryWrapper(creates));
     Assertions.assertSame(first, second);
     Assertions.assertEquals(1, creates.get());
     cache.close();
@@ -65,31 +51,29 @@ public class TestIcebergCatalogWrapperCache {
   }
 
   @Test
-  void newerCatalogVersionReplacesWrapperAndHeldLeaseKeepsTheOldOneOpen() {
+  void newerCatalogVersionKeepsPreviousEntryUntilClosed() {
     IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
     AtomicInteger creates = new AtomicInteger();
     IcebergCatalogWrapper first = cache.get("c1", 1L, name -> newMemoryWrapper(creates));
-    cache.acquire(first);
-
     IcebergCatalogWrapper second = cache.get("c1", 2L, name -> newMemoryWrapper(creates));
 
     Assertions.assertNotSame(first, second);
     Assertions.assertEquals(2, creates.get());
     Assertions.assertFalse(first.isClosed());
-    cache.release(first);
-    Assertions.assertTrue(first.isClosed());
     Assertions.assertFalse(second.isClosed());
     cache.close();
+    Assertions.assertTrue(first.isClosed());
     Assertions.assertTrue(second.isClosed());
   }
 
   @Test
-  void newerCatalogVersionClosesUnheldWrapper() {
+  void invalidateRemovesAllVersionsForCatalogName() {
     IcebergCatalogWrapperCache cache = new IcebergCatalogWrapperCache(TimeUnit.HOURS.toMillis(1));
-    IcebergCatalogWrapper first =
-        cache.get("c1", 1L, name -> newMemoryWrapper(new AtomicInteger()));
-    cache.get("c1", 2L, name -> newMemoryWrapper(new AtomicInteger()));
-    Assertions.assertTrue(first.isClosed());
+    IcebergCatalogWrapper v1 = cache.get("c1", 1L, name -> newMemoryWrapper(new AtomicInteger()));
+    IcebergCatalogWrapper v2 = cache.get("c1", 2L, name -> newMemoryWrapper(new AtomicInteger()));
+    cache.invalidate("c1");
+    Assertions.assertTrue(v1.isClosed());
+    Assertions.assertTrue(v2.isClosed());
     cache.close();
   }
 
