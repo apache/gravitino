@@ -124,7 +124,7 @@ public class TestIcebergCatalogWrapperResolve {
     catalogOps.wrapperProvider = provider;
     IcebergViewCatalogOperations viewOps = new IcebergViewCatalogOperations(shared);
 
-    Assertions.assertSame(shared, catalogOps.catalogWrapper());
+    Assertions.assertSame(shared, catalogOps.wrapperProvider.get());
     Assertions.assertSame(shared, provider.get());
     Assertions.assertNotNull(viewOps);
   }
