@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.CatalogWrapperManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -27,7 +26,6 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperCache;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.exceptions.NoSuchWarehouseException;
 import org.apache.iceberg.exceptions.RESTException;
-import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +36,10 @@ import org.slf4j.LoggerFactory;
  * <p>Aux mode: IRC {@link CatalogWrapperManager} (pass metalake config so static IRC can still
  * create). Non-aux: lakehouse-owned {@link IcebergCatalogWrapperCache} with the same eviction/token
  * policy.
+ *
+ * <p>{@link #get()} loads the Iceberg backend catalog and maps {@link NoSuchWarehouseException} /
+ * unreachable {@link RESTException} into Gravitino's create-time taxonomy (same as the pre-cache
+ * eager {@code initialize} path).
  */
 class IcebergCatalogWrapperProvider {
 
@@ -61,7 +63,9 @@ class IcebergCatalogWrapperProvider {
 
   /**
    * Creates a provider for the given catalog. Aux defers IRC resolution to first {@link #get()} to
-   * avoid re-entering catalog load during initialize.
+   * avoid re-entering catalog load during provider construction; callers that need create-time
+   * validation (for example {@link IcebergCatalogOperations#initialize}) should invoke {@link
+   * #get()} explicitly.
    *
    * @param catalogName catalog name
    * @param icebergConfig catalog configuration
@@ -76,22 +80,25 @@ class IcebergCatalogWrapperProvider {
   }
 
   /**
-   * Returns the current catalog wrapper (IRC or local cache get-or-create).
+   * Returns the current catalog wrapper (IRC or local cache get-or-create) after loading the
+   * Iceberg backend so warehouse / connectivity errors surface with the correct exception types.
    *
    * @return catalog wrapper
    */
   IcebergCatalogWrapper get() {
-    if (useIrc) {
-      CatalogWrapperManager manager =
-          IcebergRESTServerContext.getInstance().catalogWrapperManager();
-      Preconditions.checkState(
-          manager != null,
-          "Internal CatalogWrapperManager is not available. "
-              + "Aux lakehouse catalog requires Iceberg REST embedded in Gravitino server.");
-      return manager.getCatalogWrapper(catalogName, icebergConfig);
+    try {
+      IcebergCatalogWrapper wrapper = resolveWrapper();
+      // Force backend load: REST warehouse resolution and connectivity fail here, not at wrapper
+      // construction. Matches the pre-lazy-cache initialize() behavior.
+      wrapper.getCatalog();
+      return wrapper;
+    } catch (NoSuchWarehouseException e) {
+      invalidate();
+      throw new IllegalArgumentException(unresolvableWarehouseMessage(), e);
+    } catch (RESTException e) {
+      invalidate();
+      throw IcebergCatalogOperations.handleRestException(e);
     }
-    Preconditions.checkState(localCache != null, "Local catalog wrapper cache is not initialized");
-    return loadFromLocalCache();
   }
 
   void invalidate() {
@@ -122,29 +129,27 @@ class IcebergCatalogWrapperProvider {
     }
   }
 
-  private IcebergCatalogWrapper loadFromLocalCache() {
-    try {
-      return localCache.get(catalogName, name -> IcebergCatalogWrapper.create(icebergConfig));
-    } catch (NoSuchWarehouseException e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
-                  + "the REST backend 'warehouse' selects a catalog by name on the remote server "
-                  + "and is not a storage location; remove 'warehouse' to use the server's default "
-                  + "catalog, or set it to a catalog name/identifier that the server recognizes.",
-              icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
-          e);
-    } catch (RESTException e) {
-      throw translateRestException(e);
+  private IcebergCatalogWrapper resolveWrapper() {
+    if (useIrc) {
+      CatalogWrapperManager manager =
+          IcebergRESTServerContext.getInstance().catalogWrapperManager();
+      Preconditions.checkState(
+          manager != null,
+          "Internal CatalogWrapperManager is not available. "
+              + "Aux lakehouse catalog requires Iceberg REST embedded in Gravitino server.");
+      return manager.getCatalogWrapper(catalogName, icebergConfig);
     }
+    Preconditions.checkState(localCache != null, "Local catalog wrapper cache is not initialized");
+    return localCache.get(catalogName, name -> IcebergCatalogWrapper.create(icebergConfig));
   }
 
-  private static RuntimeException translateRestException(RESTException e) {
-    if (e.getClass() == RESTException.class || e instanceof ServiceUnavailableException) {
-      return new ConnectionFailedException(
-          e, "The Iceberg REST backend is unavailable: %s", e.getMessage());
-    }
-    return e;
+  private String unresolvableWarehouseMessage() {
+    return String.format(
+        "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
+            + "the REST backend 'warehouse' selects a catalog by name on the remote server "
+            + "and is not a storage location; remove 'warehouse' to use the server's default "
+            + "catalog, or set it to a catalog name/identifier that the server recognizes.",
+        icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE));
   }
 
   private static boolean auxIrcAvailable() {
