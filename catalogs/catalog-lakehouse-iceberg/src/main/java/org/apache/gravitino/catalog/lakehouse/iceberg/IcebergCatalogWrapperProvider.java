@@ -100,14 +100,13 @@ class IcebergCatalogWrapperProvider {
   }
 
   void close() {
-    // Only close managers this provider created (standalone); borrowed IRC managers stay open.
-    if (!(manager instanceof StandaloneCatalogWrapperManager)) {
-      return;
-    }
-    try {
-      ((StandaloneCatalogWrapperManager) manager).close();
-    } catch (Exception e) {
-      LOG.warn("Failed to close standalone catalog wrapper manager", e);
+    // Standalone manager is owned by this provider; IRC manager is shared and must stay open.
+    if (manager instanceof StandaloneCatalogWrapperManager) {
+      try {
+        ((StandaloneCatalogWrapperManager) manager).close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close standalone catalog wrapper manager", e);
+      }
     }
   }
 }
