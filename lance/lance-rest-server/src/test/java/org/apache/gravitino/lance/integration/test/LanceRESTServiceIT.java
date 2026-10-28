@@ -800,6 +800,16 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertTrue(loadTable.getMetadata().containsKey("key1"));
 
+    // An existing name must report a conflict without trying to open the new location.
+    String missingLocation = tempDir + "/register-missing/";
+    registerTableRequest.setLocation(missingLocation);
+    RuntimeException conflict =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> ns.registerTable(registerTableRequest));
+    assertLanceErrorCode(conflict, ErrorCode.TABLE_ALREADY_EXISTS);
+    Assertions.assertFalse(new File(missingLocation).exists());
+    Assertions.assertEquals(location, ns.describeTable(describeTableRequest).getLocation());
+
     // Test register again with OVERWRITE mode
     String newLocation = tempDir + "/" + "register_new/";
     LanceDatasetTestUtils.createDataset(newLocation);
