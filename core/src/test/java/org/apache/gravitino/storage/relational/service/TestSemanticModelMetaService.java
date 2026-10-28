@@ -52,6 +52,9 @@ import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.CustomExtension;
 import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.DialectExpression;
+import org.apache.gravitino.semantic.Expression;
+import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
@@ -59,6 +62,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
@@ -183,10 +187,10 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     assertEquals(2, versions.size());
     assertEquals(oldName, versions.get(1).name);
     assertEquals("v1 comment", versions.get(1).comment);
-    assertTrue(versions.get(1).definition.contains("orders_v1"));
+    assertTrue(versions.get(1).datasets.contains("orders_v1"));
     assertEquals(newName, versions.get(2).name);
     assertEquals("v2 comment", versions.get(2).comment);
-    assertTrue(versions.get(2).definition.contains("orders_v2"));
+    assertTrue(versions.get(2).datasets.contains("orders_v2"));
     assertEquals(0L, versions.get(1).deletedAt);
     assertEquals(0L, versions.get(2).deletedAt);
 
@@ -306,6 +310,11 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
 
     assertEquals(0, countSemanticModelIdentities(semanticModel.id()));
     assertTrue(listSemanticModelVersions(semanticModel.id()).isEmpty());
+    assertTrue(
+        SessionUtils.getWithoutCommit(
+                SemanticModelMetricMapper.class,
+                mapper -> mapper.selectSemanticModelMetricsByModelIdForUpdate(semanticModel.id()))
+            .isEmpty());
   }
 
   @TestTemplate
@@ -362,6 +371,11 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     Map<Integer, VersionState> versions = listSemanticModelVersions(original.id());
     assertEquals(1, versions.size());
     assertTrue(versions.get(1).deletedAt > 0L);
+    assertTrue(
+        SessionUtils.getWithoutCommit(
+                SemanticModelMetricMapper.class,
+                mapper -> mapper.selectSemanticModelMetricsByModelIdForUpdate(original.id()))
+            .isEmpty());
   }
 
   @TestTemplate
@@ -496,7 +510,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     int deleted =
         SemanticModelMetaService.getInstance()
             .deleteSemanticModelMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 100);
-    assertEquals(4, deleted);
+    assertEquals(7, deleted);
     assertEquals(0, listSemanticModelVersions(finalCurrent.id()).size());
     assertEquals(0, countSemanticModelIdentities(finalCurrent.id()));
   }
@@ -516,6 +530,22 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
                       Dataset.builder()
                           .withName(datasetName)
                           .withSource(NameIdentifier.of("sales", "mart", datasetName))
+                          .build()
+                    })
+                .withMetrics(
+                    new Metric[] {
+                      Metric.builder()
+                          .withName("metric_" + datasetName)
+                          .withExpression(
+                              Expression.builder()
+                                  .withDialects(
+                                      new DialectExpression[] {
+                                        DialectExpression.builder()
+                                            .withDialect("ansi")
+                                            .withExpression("COUNT(*)")
+                                            .build()
+                                      })
+                                  .build())
                           .build()
                     })
                 .withCustomExtensions(
@@ -576,6 +606,12 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
                         SemanticModelVersionInfoMapper.class,
                         mapper ->
                             mapper.softDeleteSemanticModelVersionsBySchemaIds(
+                                List.of(observedSchemaPO.getSchemaId()))),
+                () ->
+                    SessionUtils.doWithoutCommit(
+                        SemanticModelMetricMapper.class,
+                        mapper ->
+                            mapper.softDeleteSemanticModelMetricsBySchemaIds(
                                 List.of(observedSchemaPO.getSchemaId()))));
             return null;
           } catch (Throwable throwable) {
@@ -594,7 +630,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
             statement.executeQuery(
                 String.format(
                     "SELECT version, semantic_model_name, semantic_model_comment,"
-                        + " semantic_model_definition, deleted_at"
+                        + " datasets, deleted_at"
                         + " FROM semantic_model_version_info WHERE semantic_model_id = %d",
                     semanticModelId))) {
       while (resultSet.next()) {
@@ -603,7 +639,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
             new VersionState(
                 resultSet.getString("semantic_model_name"),
                 resultSet.getString("semantic_model_comment"),
-                resultSet.getString("semantic_model_definition"),
+                resultSet.getString("datasets"),
                 resultSet.getLong("deleted_at")));
       }
       return versions;
@@ -674,13 +710,13 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
   private static class VersionState {
     private final String name;
     private final String comment;
-    private final String definition;
+    private final String datasets;
     private final long deletedAt;
 
-    private VersionState(String name, String comment, String definition, long deletedAt) {
+    private VersionState(String name, String comment, String datasets, long deletedAt) {
       this.name = name;
       this.comment = comment;
-      this.definition = definition;
+      this.datasets = datasets;
       this.deletedAt = deletedAt;
     }
   }

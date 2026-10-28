@@ -22,14 +22,19 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 
 /** A symbolic top-level column reference. */
-final class Column implements CanonicalExpression {
+public final class Column implements CanonicalExpression {
   private final String name;
 
   Column(String name) {
     this.name = name;
   }
 
-  String name() {
+  /**
+   * Returns the symbolic top-level column name.
+   *
+   * @return column name
+   */
+  public String name() {
     return name;
   }
 

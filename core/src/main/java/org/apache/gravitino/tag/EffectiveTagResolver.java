@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -65,12 +66,28 @@ public class EffectiveTagResolver {
    * @return Effective tags in deterministic nearest-assignment order.
    */
   public TagEntity[] resolve(String metalake, MetadataObject metadataObject) {
+    ResolvedTag[] resolved = resolveWithSources(metalake, metadataObject);
+    TagEntity[] tags = new TagEntity[resolved.length];
+    for (int i = 0; i < resolved.length; i++) {
+      tags[i] = resolved[i].tag();
+    }
+    return tags;
+  }
+
+  /**
+   * Resolves effective tags and the metadata object that contributed each assignment.
+   *
+   * @param metalake The metalake name.
+   * @param metadataObject The metadata object.
+   * @return Effective tags with sources in deterministic nearest-assignment order.
+   */
+  public ResolvedTag[] resolveWithSources(String metalake, MetadataObject metadataObject) {
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     List<MetadataObject> resolutionOrder = new ArrayList<>();
     resolutionOrder.add(metadataObject);
     resolutionOrder.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
 
-    Map<String, TagEntity> effectiveTags = new LinkedHashMap<>();
+    Map<String, ResolvedTag> effectiveTags = new LinkedHashMap<>();
     for (int index = 0; index < resolutionOrder.size(); index++) {
       MetadataObject object = resolutionOrder.get(index);
       boolean inherited = index > 0;
@@ -84,8 +101,10 @@ public class EffectiveTagResolver {
                     SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
                     identifier,
                     entityType);
-        tags.forEach(
-            tag -> effectiveTags.putIfAbsent(tag.name(), tag.copyWithInherited(inherited)));
+        for (TagEntity tag : tags) {
+          effectiveTags.putIfAbsent(
+              tag.name(), new ResolvedTag(tag.copyWithInherited(inherited), object));
+        }
       } catch (NoSuchEntityException e) {
         throw new NoSuchMetadataObjectException(
             e, "Failed to resolve effective tags for metadata object %s due to not found", object);
@@ -94,6 +113,68 @@ public class EffectiveTagResolver {
         throw new RuntimeException(e);
       }
     }
-    return effectiveTags.values().toArray(new TagEntity[0]);
+    return effectiveTags.values().toArray(new ResolvedTag[0]);
+  }
+
+  /**
+   * An effective tag assignment together with the metadata object that contributed it.
+   *
+   * <p>The source is the nearest object in the inheritance chain that assigned the tag name.
+   */
+  public static final class ResolvedTag {
+
+    private final TagEntity tag;
+    private final MetadataObject source;
+
+    /**
+     * Creates a resolved tag.
+     *
+     * @param tag The effective tag entity, including assignment and inherited flag.
+     * @param source The metadata object that contributed this assignment.
+     */
+    public ResolvedTag(TagEntity tag, MetadataObject source) {
+      this.tag = Objects.requireNonNull(tag, "tag");
+      this.source = Objects.requireNonNull(source, "source");
+    }
+
+    /**
+     * Returns the effective tag entity.
+     *
+     * @return The effective tag entity.
+     */
+    public TagEntity tag() {
+      return tag;
+    }
+
+    /**
+     * Returns the metadata object that contributed this assignment.
+     *
+     * @return The contributing metadata object.
+     */
+    public MetadataObject source() {
+      return source;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ResolvedTag)) {
+        return false;
+      }
+      ResolvedTag that = (ResolvedTag) o;
+      return Objects.equals(tag, that.tag) && Objects.equals(source, that.source);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(tag, source);
+    }
+
+    @Override
+    public String toString() {
+      return "ResolvedTag{tag=" + tag + ", source=" + source + '}';
+    }
   }
 }

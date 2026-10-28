@@ -59,7 +59,7 @@ public final class RestrictedRegoExpressionParserFacade {
    * @return validated unresolved program
    * @throws IllegalArgumentException if syntax or semantics are invalid
    */
-  static RestrictedRegoProgram parse(String source) {
+  public static RestrictedRegoProgram parse(String source) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(source), "restricted-rego-v1 program cannot be blank");
     Preconditions.checkArgument(
@@ -81,7 +81,7 @@ public final class RestrictedRegoExpressionParserFacade {
    * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
    *     {@code filter}
    */
-  static RowFilter parseRowFilter(String source) {
+  public static RowFilter parseRowFilter(String source) {
     RestrictedRegoProgram program = parse(source);
     Preconditions.checkArgument(
         program instanceof RowFilter, "row-filter program must declare a filter rule");
@@ -96,7 +96,7 @@ public final class RestrictedRegoExpressionParserFacade {
    * @throws IllegalArgumentException if syntax or semantics are invalid or the rule head is not
    *     {@code mask}
    */
-  static ColumnMask parseColumnMask(String source) {
+  public static ColumnMask parseColumnMask(String source) {
     RestrictedRegoProgram program = parse(source);
     Preconditions.checkArgument(
         program instanceof ColumnMask, "column-mask program must declare a mask rule");
