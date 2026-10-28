@@ -122,4 +122,15 @@ public class TestJobExecutor {
         IllegalArgumentException.class, () -> new JobContext(1L, " ", stagingDir));
     Assertions.assertThrows(IllegalArgumentException.class, () -> new JobContext(1L, "m", null));
   }
+
+  @Test
+  public void testUnsupportedSubmissionLookupDoesNotReportAbsence() {
+    JobExecutor executor = new UriJobExecutor();
+    ShellJobTemplate template =
+        ShellJobTemplate.builder().withName("shell_job").withExecutable("/bin/echo").build();
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            executor.findSubmittedJob(new JobContext(1L, "metalake", tempDir.toFile()), template));
+  }
 }

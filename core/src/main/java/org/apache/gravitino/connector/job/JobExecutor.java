@@ -52,14 +52,15 @@ public interface JobExecutor extends Closeable {
    * the job status or cancel it later. It must not start with {@code pending-submission:}, which
    * Gravitino reserves for a job being submitted.
    *
-   * <p>If this method throws, the request fails and Gravitino removes the job rather than look it
-   * up with {@link #findSubmittedJob(JobContext, JobTemplate)}, unless the job can't be removed, in
-   * which case it is looked up later. So before throwing, remove what may have been created for the
-   * job, for example when the job runner couldn't be reached or answered with an error, otherwise
-   * it may run unknown to Gravitino.
+   * <p>Throw {@link IllegalArgumentException} for invalid input, or {@link
+   * JobSubmissionRejectedException} for a confirmed rejection that left no execution. Gravitino
+   * removes the registration for these failures. For any other exception the outcome is unknown:
+   * Gravitino retains the registration, requests cancellation, and uses {@link
+   * #findSubmittedJob(JobContext, JobTemplate)} to recover and cancel any execution after the
+   * runner becomes available. Do not classify a lost response as a confirmed rejection.
    *
    * <p>Gravitino registers the job before calling this method. On a deployment with several
-   * Gravitino servers, this method should return within three {@code
+   * Gravitino servers, the registration-to-recording phase should finish within three {@code
    * gravitino.job.statusPullIntervalInMs}: otherwise another server may settle the job, see {@link
    * #findSubmittedJob(JobContext, JobTemplate)}, and the server submitting it then cancels the
    * returned execution and fails the request.
@@ -79,7 +80,15 @@ public interface JobExecutor extends Closeable {
    * @return A unique identifier for the submitted job.
    */
   default String submitJob(JobContext context, JobTemplate jobTemplate) {
-    return submitJob(JobResourceUtils.localizeJobTemplate(jobTemplate, context.stagingDir()));
+    JobTemplate localized;
+    try {
+      localized = JobResourceUtils.localizeJobTemplate(jobTemplate, context.stagingDir());
+    } catch (IllegalArgumentException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw new JobSubmissionRejectedException("Failed to localize the job before submission", e);
+    }
+    return submitJob(localized);
   }
 
   /**
@@ -120,8 +129,9 @@ public interface JobExecutor extends Closeable {
    *       execution as an unrecorded one.
    *   <li>Empty means that the job has no execution. The job is marked as {@link
    *       JobHandle.Status#FAILED}, or {@link JobHandle.Status#CANCELLED} if it is being cancelled.
-   *       Return empty also when the execution can't be looked up, rather than throw {@link
-   *       UnsupportedOperationException}.
+   *       Only return empty when absence can be established for this job runner; unsupported lookup
+   *       must throw {@link UnsupportedOperationException}, so an unknown execution is not mistaken
+   *       for an absent one.
    *   <li>An exception means that the lookup failed. The job stays as it is, and the lookup is
    *       retried in the next status pull.
    * </ul>
@@ -132,10 +142,10 @@ public interface JobExecutor extends Closeable {
    * found then, the job is marked as failed, and the execution that the submission returns is
    * cancelled.
    *
-   * <p>The default implementation returns an empty result, which fits a job executor that can't
-   * look up a job by its Gravitino job id. A job executor that can, for example one that names the
-   * execution after {@link JobContext#jobId()}, should implement it, so that such a job is tracked
-   * rather than left running unknown to Gravitino.
+   * <p>The default implementation throws {@link UnsupportedOperationException}. An unsupported
+   * lookup retains the pending registration for operator intervention, just like a failed lookup;
+   * it does not prove the absence of an execution. A job executor that can look up an execution by
+   * {@link JobContext#jobId()} should implement this method to support recovery.
    *
    * @param context The context of the job, with the same job id and metalake as the submission. Its
    *     staging directory is the one of the calling server, which may not exist, rather than the
@@ -143,9 +153,11 @@ public interface JobExecutor extends Closeable {
    * @param jobTemplate The runtime job template the job was submitted with, whose resources are
    *     URIs.
    * @return The unique identifier of the execution of the job, or empty if there is none.
+   * @throws UnsupportedOperationException if the runner cannot establish whether it has this job
    */
   default Optional<String> findSubmittedJob(JobContext context, JobTemplate jobTemplate) {
-    return Optional.empty();
+    throw new UnsupportedOperationException(
+        getClass().getName() + " cannot look up submitted jobs");
   }
 
   /**
@@ -196,6 +208,11 @@ public interface JobExecutor extends Closeable {
    *
    * <p>This method should not be blocked on the job cancellation, it should return immediately, and
    * Gravitino can further query the job status to check if the job is cancelled successfully.
+   *
+   * <p>Gravitino may repeat this call after a failure, or while the runner still reports {@link
+   * JobHandle.Status#QUEUED} or {@link JobHandle.Status#STARTED}. Cancellation must be idempotent.
+   * Report {@link JobHandle.Status#CANCELLING} once asynchronous cancellation is acknowledged, so
+   * Gravitino can monitor it without reissuing the request.
    *
    * @param jobId The unique identifier of the job to cancel.
    * @throws NoSuchJobException If the job with the given identifier does not exist.

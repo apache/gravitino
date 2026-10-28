@@ -1641,4 +1641,50 @@ public class TestK8sJobExecutor {
         .withArguments(ImmutableList.of("10"))
         .build();
   }
+
+  @Test
+  public void testFailedCleanupLeavesAcceptedExecution() {
+    GenericKubernetesResource accepted =
+        SparkApplicationUtils.buildSparkApplication(
+            context(1L), sparkTemplate(), TestSparkApplicationUtils.newConfigs(ImmutableMap.of()));
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(accepted)
+        .create();
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(500, new StatusBuilder().withCode(500).withMessage("etcd timeout").build())
+        .always();
+    server
+        .expect()
+        .get()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(403, new StatusBuilder().withCode(403).build())
+        .once();
+    try (KubernetesClient noRetries = clientWithoutRetries(client.getConfiguration())) {
+      executor.initialize(TestSparkApplicationUtils.newConfigs(ImmutableMap.of()), noRetries);
+      KubernetesClientException failure =
+          Assertions.assertThrows(
+              KubernetesClientException.class,
+              () -> executor.submitJob(context(1L), sparkTemplate()));
+      Assertions.assertEquals(500, failure.getCode());
+    }
+    // The accepted execution survives the failed submission and can run when the operator recovers.
+    Assertions.assertNotNull(sparkApplication("gravitino-job-1"));
+  }
+
+  @Test
+  public void testRecoveryTracksDeletingApplication() {
+    String execution = executor.submitJob(context(1L), sparkTemplate());
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    app.getMetadata().setDeletionTimestamp(Instant.now().toString());
+    // The mock CRUD dispatcher removes a resource once deletionTimestamp is set. Return a
+    // foreground deletion that is still waiting for its pods instead.
+    server.expect().get().withPath(APPS_PATH + "/gravitino-job-1").andReturn(200, app).always();
+    Assertions.assertEquals(
+        Optional.of(execution), executor.findSubmittedJob(context(1L), sparkTemplate()));
+  }
 }

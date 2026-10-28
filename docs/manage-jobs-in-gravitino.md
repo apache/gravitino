@@ -254,33 +254,36 @@ job = client.run_job(
 </TabItem>
 </Tabs>
 
-Gravitino records a job as `QUEUED` before it hands the job to the job executor, so that a job
-submitted right before the server exits isn't left running unknown to Gravitino. If the submission
-isn't recorded within three times `gravitino.job.statusPullIntervalInMs`, another server, or the
-same server after a restart, looks the job up in the job executor when it pulls job statuses. A job
-found there is tracked as usual. Otherwise, it is marked as `FAILED`, or as `CANCELLED` if it was
-being cancelled. Not every job executor can look jobs up: the `k8s` one can, as long as its name
-prefix and default namespace are unchanged since the submission, the local one can't.
+Gravitino records a job as `QUEUED` and sets its initial owner before handing it to the job executor.
+A recovered job therefore keeps the permissions of its original submitter. If the execution id is
+not recorded within three times `gravitino.job.statusPullIntervalInMs`, another server, or the same
+server after a restart, looks the job up in the runner. A found execution is tracked, or cancelled
+if the job is `CANCELLING`. Confirmed absence settles it as `FAILED` or `CANCELLED`. Failed or
+unsupported lookup leaves the registration for a later pull or operator intervention. The `k8s`
+executor supports lookup while its name prefix and namespace configuration remain unchanged. The
+local executor cannot look up an execution after losing its node-local state; its existing retention
+policy still applies.
 
-A run request whose submission fails removes its job, or leaves it to be looked up as above if it
-can't be removed. If the job executor may have started the job anyway, for example because it
-couldn't be reached, it removes what it created. If that fails too, the `k8s` job executor logs how
-to delete the SparkApplication by hand. A run request that fails after the submission, as described
-in the caution below, cancels the execution and leaves the job as it was settled, e.g. `FAILED`.
+Invalid input and confirmed rejection remove the job. A failed submission with an unknown outcome,
+such as a lost response after the runner accepted it, keeps the registration and requests
+cancellation. If the store cannot persist cancellation, the job is still retained for recovery and
+may be tracked as running. The error identifies the job: check it before retrying, since retrying a
+run request creates a new job. The `k8s` executor also attempts immediate cleanup, and logs a manual
+`kubectl` remedy if that fails.
 
-A job cancelled while it is being submitted is marked as `CANCELLING`, and its execution is
-cancelled once the submission is recorded. If cancelling it fails then, for example because the job
-executor can't be reached, the failure is logged, or returned by the cancel request, and cancelling
-the job again in Gravitino doesn't retry it: cancel the execution in the job executor instead.
-Only a job executor that keeps its job state on the Gravitino server, such as the local one, has it
-cancelled again when job statuses are pulled.
+Cancelling a job during submission persists `CANCELLING`. Once an execution is recorded, Gravitino
+cancels it and retries temporary cancellation failures during status pulls. Repeating the cancel
+request also retries cancellation without resetting its timeout. An executor that has acknowledged
+an asynchronous cancellation by reporting `CANCELLING` is monitored until it finishes.
 
 :::caution
-With several Gravitino servers, this requires all servers to use the same
-`gravitino.job.statusPullIntervalInMs` and to have their clocks in sync. A submission that takes
-longer than three pull intervals, for example because the job executor is slow, may be settled by
-another server meanwhile. The server submitting the job then cancels the execution and fails the
-run request.
+With several Gravitino servers, use the same `gravitino.job.statusPullIntervalInMs` and keep their
+clocks in sync. The entire registration-to-recording phase must fit within three pull intervals.
+Otherwise another server may settle the job, and cancellation of a late submission is attempted
+before its run request fails. Cancellation cannot undo completed work. If the job was already
+settled and this late cancellation fails, check the execution in the runner before retrying. The local executor's staging retention must also exceed resource preparation, submission,
+queueing and execution time; the in-flight guard protects status reconciliation, not the existing
+retention cleanup.
 :::
 
 ### List Jobs, Get a Job, and Cancel

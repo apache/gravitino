@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,11 +56,15 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.InUseException;
@@ -648,12 +653,29 @@ public class JobManager implements JobOperationDispatcher {
       throw new RuntimeException("Failed to register the job entity " + pendingJobEntity, e);
     }
 
+    // Ownership must be durable before the external submission: recovery does not run the
+    // original request's post hook. A failure here has no external side effect to recover.
+    try {
+      OwnerDispatcher owners = GravitinoEnv.getInstance().internalOwnerDispatcher();
+      if (owners != null) {
+        owners.setOwner(
+            metalake,
+            NameIdentifierUtil.toMetadataObject(
+                pendingJobEntity.nameIdentifier(), Entity.EntityType.JOB),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (RuntimeException e) {
+      deleteUnsubmittedJob(metalake, pendingJobEntity, jobStagingDir, e);
+      throw e;
+    }
+
     // Submit the job template to the job executor
     String jobExecutionId;
     try {
       jobExecutionId =
           jobExecutor.submitJob(new JobContext(jobId, metalake, jobStagingDir), jobTemplate);
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException | JobSubmissionRejectedException e) {
       // The job executor rejects the job because it cannot be launched, for example, a required
       // configuration is missing. Rethrow it as is so the caller gets the original reason.
       deleteUnsubmittedJob(metalake, pendingJobEntity, jobStagingDir, e);
@@ -662,14 +684,40 @@ public class JobManager implements JobOperationDispatcher {
       RuntimeException failure =
           new RuntimeException(
               String.format(
-                  "Failed to submit job %s of job template %s for execution: %s",
-                  jobId, jobTemplateName, e.getMessage()),
+                  "Failed to submit job %s of job template %s for execution: %s. The outcome is"
+                      + " unknown; the registration"
+                      + " is retained for recovery. Check the job before retrying",
+                  pendingJobEntity.name(), jobTemplateName, e.getMessage()),
               e);
-      deleteUnsubmittedJob(metalake, pendingJobEntity, jobStagingDir, failure);
+      // A failed request is not proof that nothing was submitted. Keep the recovery anchor
+      // and persist cancellation before returning the failure. Never replay the submission.
+      markFailedSubmissionForCancellation(metalake, pendingJobEntity, failure);
       throw failure;
     }
 
     return recordSubmission(metalake, pendingJobEntity, jobExecutionId);
+  }
+
+  private void markFailedSubmissionForCancellation(
+      String metalake, JobEntity job, Exception failure) {
+    for (int attempt = 1; attempt <= RECORD_SUBMISSION_MAX_ATTEMPTS; attempt++) {
+      try {
+        if (updateJobEntity(metalake, job, this::toCancellingJobEntity).isPresent()) {
+          return;
+        }
+      } catch (RuntimeException e) {
+        failure.addSuppressed(e);
+        break;
+      }
+    }
+    // The registration is still retained if the store cannot record the cancellation. Recovery
+    // can at least track a found execution instead of leaving it unknown to Gravitino.
+    LOG.error(
+        "Job {} under metalake {} has an unknown submission outcome and its cancellation could"
+            + " not be recorded. The job registration is retained; check the job before retrying",
+        job.name(),
+        metalake,
+        failure);
   }
 
   private JobEntity recordSubmission(
@@ -793,19 +841,32 @@ public class JobManager implements JobOperationDispatcher {
     }
   }
 
-  // Removes a job that was registered but never reached the job executor. If the job can't be
-  // removed, the status pull settles it as FAILED once its submission times out.
+  // Only used when no execution was submitted, including owner-registration failure. Never
+  // remove this recovery anchor for a transport error whose submission outcome is unknown.
   private void deleteUnsubmittedJob(
       String metalake, JobEntity pendingJobEntity, File jobStagingDir, Exception failure) {
     try {
       entityStore.delete(
           NameIdentifierUtil.ofJob(metalake, pendingJobEntity.name()), Entity.EntityType.JOB);
     } catch (Exception e) {
+      failure.addSuppressed(e);
       LOG.warn(
-          "Failed to delete job {} whose submission failed, it will be marked as FAILED later",
+          "Failed to delete rejected job {}, settling its registration as FAILED",
           pendingJobEntity.name(),
           e);
-      failure.addSuppressed(e);
+      try {
+        updateJobEntity(
+            metalake,
+            pendingJobEntity,
+            latest ->
+                toUpdatedStatusJobEntity(latest, JobExecutionInfo.of(JobHandle.Status.FAILED)));
+      } catch (RuntimeException settleFailure) {
+        failure.addSuppressed(settleFailure);
+        LOG.warn(
+            "Failed to settle rejected job {}; its registration is retained",
+            pendingJobEntity.name(),
+            settleFailure);
+      }
     }
     deleteStagingDirOfUnsubmittedJob(jobStagingDir, pendingJobEntity.id());
   }
@@ -827,12 +888,10 @@ public class JobManager implements JobOperationDispatcher {
     // Retrieve the job entity, will throw NoSuchJobException if the job does not exist.
     JobEntity jobEntity = getJob(metalake, jobId, false);
 
-    if (jobEntity.status() == JobHandle.Status.CANCELLING
-        || jobEntity.status() == JobHandle.Status.CANCELLED
+    if (jobEntity.status() == JobHandle.Status.CANCELLED
         || jobEntity.status() == JobHandle.Status.SUCCEEDED
         || jobEntity.status() == JobHandle.Status.FAILED) {
-      // If the job is already cancelling, cancelled, succeeded, or failed, we do not need to cancel
-      // it again.
+      // Never change a terminal job or request its cancellation again.
       return jobEntity;
     }
 
@@ -869,6 +928,11 @@ public class JobManager implements JobOperationDispatcher {
           jobId,
           jobEntity.jobExecutionId(),
           metalake);
+    }
+
+    if (jobEntity.status() == JobHandle.Status.CANCELLING) {
+      // The cancellation above is retried, but its durable intent and timeout must not be reset.
+      return jobEntity;
     }
 
     // Update the job status to CANCELING
@@ -917,15 +981,12 @@ public class JobManager implements JobOperationDispatcher {
             cancellingJobEntity.jobExecutionId(),
             jobId);
       } catch (Exception e) {
-        // Only node local job state gets the cancellation again from the status pull, so tell the
-        // caller rather than leave the execution running while the job is CANCELLING.
+        // The intent is durable, so the status pull retries this cancellation after a failure.
         throw new RuntimeException(
             String.format(
                 "Job %s under metalake %s is marked as CANCELLING, but failed to cancel its"
-                    + " execution %s, which was submitted meanwhile. Retrying the cancellation in"
-                    + " Gravitino won't cancel it, cancel the execution in the job executor,"
-                    + " unless the job executor keeps its job state on the Gravitino server,"
-                    + " which cancels it again when it pulls job statuses",
+                    + " execution %s, which was submitted meanwhile. The status pull will retry"
+                    + " the cancellation; the cancel request can also be retried",
                 jobId, metalake, cancellingJobEntity.jobExecutionId()),
             e);
       }
@@ -1306,12 +1367,10 @@ public class JobManager implements JobOperationDispatcher {
     JobExecutionInfo observed;
     try {
       observed = jobExecutor.getJobExecutionInfo(job.jobExecutionId());
-      // The job was marked as CANCELLING by another server, which can't cancel it itself, so
-      // cancel it here as the owner. This only applies to node local job state, other job
-      // executors are cancelled directly by the server handling the request, and they may keep
-      // reporting the job as running while cancelling it asynchronously.
-      if (jobExecutor.isJobStateNodeLocal()
-          && job.status() == JobHandle.Status.CANCELLING
+      // CANCELLING is a durable intent, including for shared runners. Retry until the runner
+      // acknowledges cancellation or reports a terminal result. An acknowledged asynchronous
+      // cancellation is left alone while it reports CANCELLING.
+      if (job.status() == JobHandle.Status.CANCELLING
           && (observed.status() == JobHandle.Status.QUEUED
               || observed.status() == JobHandle.Status.STARTED)) {
         observed = cancelOwnedJob(metalake, job);
@@ -1780,7 +1839,7 @@ public class JobManager implements JobOperationDispatcher {
     Optional<String> found =
         jobExecutor.findSubmittedJob(
             new JobContext(job.id(), metalake, jobStagingDir(job.id())), jobTemplate);
-    return found == null ? Optional.empty() : found;
+    return Objects.requireNonNull(found, "findSubmittedJob must return an Optional");
   }
 
   private boolean isSubmissionUnanswered(JobEntity job, long now) {

@@ -69,9 +69,11 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -111,6 +113,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.invocation.Invocation;
@@ -148,8 +151,12 @@ public class TestJobManager {
 
   private IdGenerator idGenerator;
 
+  private OwnerDispatcher savedOwnerDispatcher;
+
   @BeforeEach
   public void setUp() throws IllegalAccessException, IOException {
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", null, true);
     config = new Config(false) {};
     testStagingDir = "test_staging_dir_" + UUID.randomUUID().toString();
     config.set(Configs.JOB_STAGING_DIR, testStagingDir);
@@ -205,6 +212,8 @@ public class TestJobManager {
     Mockito.reset(entityStore, jobManager);
     // Clean up resources if necessary
     jobManager.close();
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FileUtils.deleteDirectory(new File(testStagingDir));
     if (mockedMetalake != null) {
       mockedMetalake.close();
@@ -421,28 +430,29 @@ public class TestJobManager {
   public void testRunJobDeletesJobWhoseSubmissionFails() throws Exception {
     JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
     doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
-    RuntimeException executorFailure = new RuntimeException("executor unavailable");
+    RuntimeException executorFailure =
+        new JobSubmissionRejectedException("executor rejected the job");
     when(jobExecutor.submitJob(any(), any())).thenThrow(executorFailure);
 
     RuntimeException failure =
         Assertions.assertThrows(
             RuntimeException.class,
             () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
-    Assertions.assertSame(executorFailure, failure.getCause());
+    Assertions.assertSame(executorFailure, failure);
     JobEntity registered = lastRegisteredJob();
     verify(entityStore, times(1))
         .delete(NameIdentifierUtil.ofJob(metalake, registered.name()), Entity.EntityType.JOB);
     assertNoJobStagingDir();
 
-    // A job that can't be deleted is left for the status pull, which marks it as FAILED once its
-    // submission times out, and the failure to delete it is kept for diagnosis.
+    // A failed deletion keeps its original cause, and metadata can still settle the known
+    // rejection without consulting a runner that may not support lookup.
     IOException deleteFailure = new IOException("store unavailable");
     doThrow(deleteFailure).when(entityStore).delete(any(), eq(Entity.EntityType.JOB));
     RuntimeException second =
         Assertions.assertThrows(
             RuntimeException.class,
             () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
-    Assertions.assertSame(executorFailure, second.getCause());
+    Assertions.assertSame(executorFailure, second);
     Assertions.assertTrue(List.of(second.getSuppressed()).contains(deleteFailure));
     assertNoJobStagingDir();
     verify(jobExecutor, never()).cancelJob(any());
@@ -2300,21 +2310,20 @@ public class TestJobManager {
   }
 
   @Test
-  public void testPullJobStatusDoesNotRecancelJobOfNonNodeLocalExecutor() throws IOException {
-    // An external job executor is cancelled directly by the server handling the cancel request,
-    // and may keep reporting the job as running while cancelling it asynchronously. The status
-    // pull must not cancel it again on every poll.
+  public void testPullJobStatusDoesNotRepeatAcknowledgedCancellation() throws IOException {
+    // Once the runner acknowledges the intent, monitor its asynchronous cancellation instead
+    // of issuing the same request on every pull.
     JobEntity job =
         newJobEntity("external-job-1", JobHandle.Status.CANCELLING, Instant.now(), null);
     mockListActiveJobs(job);
     when(jobExecutor.getJobExecutionInfo(job.jobExecutionId()))
-        .thenReturn(JobExecutionInfo.of(JobHandle.Status.STARTED));
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.CANCELLING));
     stubEntityStoreUpdateToApply(job);
 
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
 
     verify(jobExecutor, never()).cancelJob(any());
-    // The observed STARTED status never regresses the CANCELLING job, so nothing is written.
+    // The acknowledged CANCELLING status is unchanged, so nothing is written.
     verify(entityStore, never())
         .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
   }
@@ -2406,16 +2415,15 @@ public class TestJobManager {
             RuntimeException.class, () -> jobManager.cancelJob(metalake, job.name()));
     Assertions.assertSame(cancelFailure, failure.getCause());
     Assertions.assertTrue(failure.getMessage().contains("submitted_execution"));
-    Assertions.assertTrue(
-        failure.getMessage().contains("Retrying the cancellation in Gravitino won't cancel it"));
+    Assertions.assertTrue(failure.getMessage().contains("The status pull will retry"));
 
-    // The job is CANCELLING by then, so cancelling it again doesn't retry, as the message says.
+    // A repeated request retries the durable cancellation without resetting its metadata.
     Mockito.clearInvocations(jobExecutor);
     when(jobManager.getJob(metalake, job.name(), false))
         .thenReturn(withStatus(submitted, JobHandle.Status.CANCELLING));
-    Assertions.assertEquals(
-        JobHandle.Status.CANCELLING, jobManager.cancelJob(metalake, job.name()).status());
-    verify(jobExecutor, never()).cancelJob(any());
+    Assertions.assertThrows(
+        RuntimeException.class, () -> jobManager.cancelJob(metalake, job.name()));
+    verify(jobExecutor, times(1)).cancelJob("submitted_execution");
   }
 
   @Test
@@ -4103,5 +4111,116 @@ public class TestJobManager {
       manager.statusPullExecutor.shutdownNow();
       manager.cleanUpExecutor.shutdownNow();
     }
+  }
+
+  @Test
+  public void testUnknownSubmissionOutcomeKeepsRecoveryRecord() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    when(jobExecutor.submitJob(any(), any()))
+        .thenThrow(
+            new RuntimeException("runner accepted execution but response and cleanup failed"));
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    verify(entityStore, never()).delete(any(), eq(Entity.EntityType.JOB));
+  }
+
+  @Test
+  public void testPendingCancellationRecoversAfterTransientFailure() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    when(jobExecutor.submitJob(any(), any())).thenReturn("shared_execution");
+    when(entityStore.update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenAnswer(
+            invocation -> {
+              Function<JobEntity, JobEntity> updater = invocation.getArgument(3);
+              return updater.apply(withStatus(lastRegisteredJob(), JobHandle.Status.CANCELLING));
+            });
+    doThrow(new RuntimeException("transient runner outage"))
+        .doNothing()
+        .when(jobExecutor)
+        .cancelJob("shared_execution");
+    JobEntity recorded = jobManager.runJob(metalake, template.name(), Collections.emptyMap());
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, recorded.status());
+    mockListActiveJobs(recorded);
+    when(jobExecutor.isJobStateNodeLocal()).thenReturn(false);
+    when(jobExecutor.getJobExecutionInfo("shared_execution"))
+        .thenReturn(JobExecutionInfo.of(JobHandle.Status.STARTED));
+    jobManager.pullAndUpdateJobStatus();
+    jobManager.pullAndUpdateJobStatus();
+    verify(jobExecutor, Mockito.atLeast(2)).cancelJob("shared_execution");
+  }
+
+  @Test
+  public void testRunJobPersistsOwnerBeforeExecutorSubmission() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    OwnerDispatcher owners = Mockito.mock(OwnerDispatcher.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", owners, true);
+    when(jobExecutor.submitJob(any(), any())).thenReturn("execution-with-owner");
+    jobManager.runJob(metalake, template.name(), Collections.emptyMap());
+    InOrder order = Mockito.inOrder(entityStore, owners, jobExecutor);
+    order.verify(entityStore).put(any(JobEntity.class), eq(false));
+    order.verify(owners).setOwner(eq(metalake), any(), any(), any());
+    order.verify(jobExecutor).submitJob(any(), any());
+  }
+
+  @Test
+  public void testOwnerRegistrationFailureNeverSubmitsJob() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    OwnerDispatcher owners = Mockito.mock(OwnerDispatcher.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", owners, true);
+    RuntimeException failure = new RuntimeException("owner write failed");
+    doThrow(failure).when(owners).setOwner(any(), any(), any(), any());
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap())));
+    verify(jobExecutor, never()).submitJob(any(), any());
+    verify(entityStore).delete(any(), eq(Entity.EntityType.JOB));
+    assertNoJobStagingDir();
+  }
+
+  @Test
+  public void testUnknownSubmissionRetainsRegistrationWhenCancellationWriteConflicts()
+      throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    RuntimeException submitFailure = new RuntimeException("response lost");
+    when(jobExecutor.submitJob(any(), any())).thenThrow(submitFailure);
+    when(entityStore.update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenThrow(new OptimisticLockException("concurrent metadata update"));
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertSame(submitFailure, failure.getCause());
+    verify(entityStore, times(3))
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    verify(entityStore, never()).delete(any(), eq(Entity.EntityType.JOB));
+    Assertions.assertTrue(jobManager.jobStagingDir(lastRegisteredJob().id()).isDirectory());
+  }
+
+  @Test
+  public void testUnknownSubmissionRetainsOriginalFailureWhenStoreIsUnavailable() throws Exception {
+    JobTemplateEntity template = newShellJobTemplateEntity("shell_job", "A shell job template");
+    doReturn(template).when(jobManager).getJobTemplate(metalake, template.name());
+    RuntimeException submitFailure = new RuntimeException("response lost");
+    IOException storeFailure = new IOException("store unavailable");
+    when(jobExecutor.submitJob(any(), any())).thenThrow(submitFailure);
+    when(entityStore.update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any()))
+        .thenThrow(storeFailure);
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> jobManager.runJob(metalake, template.name(), Collections.emptyMap()));
+    Assertions.assertSame(submitFailure, failure.getCause());
+    Assertions.assertSame(storeFailure, failure.getSuppressed()[0].getCause());
+    verify(entityStore, times(1))
+        .update(any(), eq(JobEntity.class), eq(Entity.EntityType.JOB), any());
+    verify(entityStore, never()).delete(any(), eq(Entity.EntityType.JOB));
   }
 }

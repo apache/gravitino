@@ -58,31 +58,33 @@ has started, keep reporting its start time in every later state, including the f
 
 ### Recover Unrecorded Submissions
 
-Gravitino registers a job before it calls `submitJob`, and records the returned execution id
-afterwards. If the execution id is not recorded within three `gravitino.job.statusPullIntervalInMs`,
-for example because the Gravitino server submitting the job exited right after the submission,
-another server calls `findSubmittedJob(JobContext, JobTemplate)` with the job id, metalake and
-runtime job template of the submission, and settles the job by the result:
+Gravitino registers a job and its initial owner before it calls `submitJob`, and records the returned
+execution id afterwards. If that id is not recorded within three
+`gravitino.job.statusPullIntervalInMs`, another server, or the same server after a restart, calls
+`findSubmittedJob(JobContext, JobTemplate)` with the original job id, metalake and runtime template:
 
-- A returned execution id is recorded, and the job is tracked from then on. It must be the same
-  string that `submitJob` returns for the job.
-- An empty result marks the job as `FAILED`, or `CANCELLED` if it is being cancelled. Return it also
-  when your job runner can't look up the job, rather than throw `UnsupportedOperationException`.
-- An exception leaves the job as it is, and the lookup is retried in the next status pull.
+- A returned execution id is recorded. It must be the same string that `submitJob` returns.
+- An empty result confirms that the runner has no execution. The job becomes `FAILED`, or
+  `CANCELLED` if cancellation was requested.
+- An exception retains the registration for a later lookup. The default implementation throws
+  `UnsupportedOperationException`: inability to look up a job is not evidence that it is absent.
+  Implement the lookup if the runner can identify an execution by `JobContext#jobId()`.
 
-The submission may still be running when this happens, so make `submitJob` return within three
-status pull intervals. Otherwise the job may be marked as `FAILED`, and the server submitting it
-cancels the execution once `submitJob` returns and fails the request. An execution id must not
-start with `pending-submission:`, which Gravitino reserves for a job being submitted.
+The lookup may run concurrently with a slow submission. Keep the registration-to-recording phase
+within three pull intervals; a submission that returns after another server settled the job is
+cancelled and its run request fails. An execution id must not start with `pending-submission:`.
 
-If `submitJob` throws, the request fails and Gravitino removes the job rather than look it up,
-unless the job can't be removed, in which case it is looked up later. So before throwing, remove
-what may have been created for the job, for example when your job runner couldn't be reached or
-answered with an error, otherwise it may run unknown to Gravitino.
+Throw `IllegalArgumentException` for invalid input, or `JobSubmissionRejectedException` when no
+execution was created or its removal is confirmed. Gravitino can then remove the registration.
+Other failures, including a lost response, have an unknown outcome: Gravitino retains the job and
+requests cancellation rather than replaying submission. If the metadata store cannot record that
+intent, the registration is still retained, but a found execution may be tracked as running; check
+that job before retrying the run request.
 
-The default implementation finds nothing. Implement it if your job runner can look up a job by the
-Gravitino job id, for example when the execution is named after `JobContext#jobId()`, so that such
-a job is tracked rather than left running unknown to Gravitino. The `k8s` job executor does this.
+`cancelJob` must be safe to repeat. A persisted `CANCELLING` job is retried while the runner reports
+`QUEUED` or `STARTED`, including for shared runners. Report `CANCELLING` once an asynchronous
+cancellation is accepted, or a terminal state when it finishes. A temporary failure must not erase
+the cancellation intent.
 
 ### Register the Job Executor
 
