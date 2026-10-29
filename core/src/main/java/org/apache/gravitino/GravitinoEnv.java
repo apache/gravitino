@@ -60,6 +60,8 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.domain.DomainDispatcher;
+import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.encryption.kms.KmsClientRegistry;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
@@ -184,6 +186,9 @@ public class GravitinoEnv {
 
   private PolicyDispatcher policyDispatcher;
   private PolicyDispatcher internalPolicyDispatcher;
+
+  private DomainDispatcher domainDispatcher;
+  private DomainDispatcher internalDomainDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
   private AccessControlDispatcher internalAccessControlDispatcher;
@@ -702,6 +707,25 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the DomainDispatcher associated with the Gravitino environment.
+   *
+   * @return The DomainDispatcher instance.
+   */
+  public DomainDispatcher domainDispatcher() {
+    return domainDispatcher;
+  }
+
+  /**
+   * Get the internal DomainDispatcher associated with the Gravitino environment. The internal
+   * dispatcher is the domain manager itself.
+   *
+   * @return The internal DomainDispatcher instance.
+   */
+  public DomainDispatcher internalDomainDispatcher() {
+    return internalDomainDispatcher;
+  }
+
+  /**
    * Get the Owner dispatcher associated with the Gravitino environment.
    *
    * @return The OwnerManager instance.
@@ -935,6 +959,7 @@ public class GravitinoEnv {
 
     this.internalTagDispatcher = new TagManager(idGenerator, entityStore);
     this.internalPolicyDispatcher = new PolicyManager(idGenerator, entityStore);
+    this.internalDomainDispatcher = new DomainManager(idGenerator, entityStore);
 
     return new MetadataOperations(
         filesetOperationDispatcher,
@@ -1185,6 +1210,9 @@ public class GravitinoEnv {
 
     PolicyHookDispatcher policyHookDispatcher = new PolicyHookDispatcher(internalPolicyDispatcher);
     this.policyDispatcher = new PolicyEventDispatcher(eventBus, policyHookDispatcher);
+
+    // Domain hooks and events are added with domain authorization and auditing.
+    this.domainDispatcher = internalDomainDispatcher;
   }
 
   private static final class MetadataOperations {

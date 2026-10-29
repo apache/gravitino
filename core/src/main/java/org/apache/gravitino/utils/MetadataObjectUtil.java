@@ -37,6 +37,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -346,6 +347,15 @@ public class MetadataObjectUtil {
         try {
           env.internalJobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
+          throw exceptionToThrowSupplier.get();
+        }
+        break;
+
+      case DOMAIN:
+        NameIdentifierUtil.checkDomain(identifier);
+        try {
+          env.internalDomainDispatcher().getDomain(metalake, object.fullName());
+        } catch (NoSuchDomainException e) {
           throw exceptionToThrowSupplier.get();
         }
         break;
