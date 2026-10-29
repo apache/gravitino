@@ -35,11 +35,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.MaintenanceJobSubmitService;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
@@ -56,7 +56,7 @@ class TestMaintenanceCommitSubmitPipeline {
 
   @Test
   void testUnparseableInstanceSkipsSubmit() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(allowAllGate(), actions, submitter).submit("not-a-table-id", spec());
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
@@ -64,7 +64,7 @@ class TestMaintenanceCommitSubmitPipeline {
 
   @Test
   void testNullSpecSkipsSubmit() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(allowAllGate(), actions, submitter)
         .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), null);
@@ -74,7 +74,7 @@ class TestMaintenanceCommitSubmitPipeline {
 
   @Test
   void testInFlightRemainingMemberSkipsSubmit() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(inFlightGate(POLICY_ID), actions, submitter)
         .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), spec());
@@ -84,7 +84,7 @@ class TestMaintenanceCommitSubmitPipeline {
 
   @Test
   void testSubmitClaimsEveryChainPolicyAndUsesSpecJobConf() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     when(submitter.runJob(anyString(), anyString(), anyMap())).thenReturn(999L);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     List<OccupancyClaim> claims = List.of(new OccupancyClaim(1L, 2L), new OccupancyClaim(3L, 4L));
@@ -132,7 +132,7 @@ class TestMaintenanceCommitSubmitPipeline {
   private static MaintenanceCommitSubmitPipeline pipeline(
       CommitOccupancyGate gate,
       TableMaintenanceActionMetaService actions,
-      MaintenanceJobSubmitter submitter) {
+      MaintenanceJobSubmitService submitter) {
     return new MaintenanceCommitSubmitPipeline(
         gate,
         actions,

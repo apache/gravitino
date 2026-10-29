@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.MaintenanceJobSubmitService;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
@@ -53,7 +54,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testUnparseableInstanceSkipsSubmit() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(mockGate(false), actions, submitter).submit("not-a-cron-id", spec());
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
@@ -62,7 +63,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testNullSpecSkipsSubmit() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(mockGate(false), actions, submitter).submit(INSTANCE, null);
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
@@ -70,7 +71,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testInFlightDoesNotClaimOrSubmit() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(mockGate(true), actions, submitter).submit(INSTANCE, spec());
     verify(actions, never()).tryAcquireInFlight(anyLong(), anyLong(), anyLong());
@@ -79,7 +80,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testBatchInFlightAbortsEntirePick() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     CronSubmitGate gate = (tableId, policyId) -> tableId == 11L;
 
@@ -94,7 +95,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testLostClaimRaceSkipsSubmit() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.empty());
@@ -106,7 +107,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testSuccessfulSubmitBindsJobId() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     when(submitter.runJob(
             eq("metalake"), eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
         .thenReturn(999L);
@@ -123,7 +124,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testSubmitFailureReleasesClaim() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     when(submitter.runJob(anyString(), anyString(), anyMap()))
         .thenThrow(new RuntimeException("submit failed"));
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
@@ -142,7 +143,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testBindFailureCancelsJobAndReleasesClaim() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     when(submitter.runJob(
             eq("metalake"), eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
         .thenReturn(777L);
@@ -162,7 +163,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testBindFailureSkipsReleaseWhenClaimAlreadyReclaimed() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     when(submitter.runJob(
             eq("metalake"), eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
         .thenReturn(778L);
@@ -184,7 +185,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testBatchSubmitOneSparkJobPerTable() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     when(submitter.runJob(
             eq("metalake"), eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
         .thenReturn(555L, 556L);
@@ -227,7 +228,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testConsumesSpecJobConfWithoutRebuild() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     when(submitter.runJob(anyString(), anyString(), anyMap())).thenReturn(1L);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
@@ -264,7 +265,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testPolicyIdMismatchSkipsSubmit() {
-    MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
+    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(mockGate(false), actions, submitter)
         .submit(MaintenanceTaskIds.forCronTable(TABLE_ID, POLICY_ID + 1), spec());
@@ -274,7 +275,7 @@ class TestMaintenanceSparkSubmitPipeline {
   private static MaintenanceSparkSubmitPipeline pipeline(
       CronSubmitGate gate,
       TableMaintenanceActionMetaService actions,
-      MaintenanceJobSubmitter submitter) {
+      MaintenanceJobSubmitService submitter) {
     return new MaintenanceSparkSubmitPipeline(
         gate,
         actions,
