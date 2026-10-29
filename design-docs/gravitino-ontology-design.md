@@ -110,8 +110,8 @@ TermConceptRef  { termId, ontologyId, conceptId, iri?, audit_info }
 definition      { aiContext?, requires?, prefixes?, concepts[Concept] }
 Concept         { conceptId, concept, type, description?, extends[], derivedBy?,
                   identifyBy[], requires[], relationships[Relationship], iri? }
-Relationship    { name, description?, verbalizes[], roles[Role], multiplicity?,
-                  derivedBy?, requires[], iri? }
+Relationship    { relationshipId, name, description?, verbalizes[], roles[Role],
+                  multiplicity?, derivedBy?, requires[], iri? }
 ```
 
 `conceptId` is the one field an Ossie document never contains because the specification names a concept
@@ -122,9 +122,10 @@ concept that version declared. Export strips it, so an exported document is exac
 specification describes; a term reference and a mapping bind it, so a rename in a later version leaves
 them intact.
 
-A relationship has no id yet: mapping documents name a relationship the same way they name a concept,
-so the question repeats one level down. Phase 2 answers it, when a rename first has to survive a stored
-mapping rather than a term reference.
+A relationship carries a `relationshipId` for the same reason: a mapping document names a relationship
+the way it names a concept, so renaming one would otherwise break every stored `LinkMapping` and
+`ReferentMapping`. Both ids are minted, stored and stripped together, and a mapping binds the ids, not
+the names it was written with.
 
 `GlossaryTerm`, `TermRelation`, `TermDomain`, `TermBinding`, `TermVersion` and their tables are
 specified in the [Business Glossary design](https://github.com/apache/gravitino/pull/14239) and are not repeated here.
@@ -226,6 +227,11 @@ describes a business, and one vocabulary is routinely mapped onto several models
 catalogs and schemas; making the mapping a child of one model would force a copy per model and let the
 copies drift. It also matches the scope the other business objects already have: `Domain`, `Ontology`
 and the term object are metalake-level for the same reason.
+
+A stored mapping binds the `conceptId` and `relationshipId` values it was written against, not the names
+in the document it came from, so renaming a concept or a relationship in the ontology leaves a mapping
+readable. The document keeps names because Ossie has no ids; the ids are recovered on import and
+attached on export, exactly as for the ontology document itself.
 
 **Visibility follows both sides.** A mapping is returned only to a caller who can read the ontology and
 the Semantic Model it binds. It is never more visible than the less visible of the two.
@@ -496,10 +502,14 @@ should follow it rather than contradict it.
 5. **Placement of `OntologyMapping`.** A metalake-level object, as the Mappings section argues. A
    vocabulary is mapped onto several models across catalogs, and the embedded `semantic_model` is a
    document reference rather than ownership, so a child placement would force one copy per model.
-6. **Stable identity of a concept.** Gravitino mints a `conceptId` per concept and keeps it in the
-   internal definition; a term reference and a mapping bind the id rather than the name, so a rename
-   updates every reference without a migration. Export strips the id, because Ossie names a concept by
-   its `concept` string alone and an exported document has to stay conformant.
+6. **Stable identity of a concept, and of a relationship.** Gravitino mints a `conceptId` per concept
+   and a `relationshipId` per relationship, and keeps both in the internal definition; a term
+   reference and a mapping bind the ids rather than the names, so a rename updates every reference
+   without a migration. Export strips them, because Ossie names a concept by its `concept` string and a
+   relationship by its `name` alone, and an exported document has to stay conformant. Relationships get
+   ids for the same reason concepts do rather than a phase later: a mapping is the first object a
+   relationship rename would break, and adding the id afterwards would mean migrating stored mapping
+   documents.
 7. **Specification version.** Pinned, as Semantic Models are, while the specification is
    pre-release. Migration on write becomes possible once Ossie ships a stable version, and the
    `OntologyVersion` snapshots are the basis it will run on; a silent migration today would break an
@@ -538,8 +548,9 @@ events, and no Ossie import or export.
 - [ ] Ontology entity and metadata storage: `EntityType.ONTOLOGY`, the relational tables and upgrade
       scripts for H2, MySQL and PostgreSQL, version snapshots, garbage collection and metalake delete
 - [ ] Ontology REST resource, Java and Python clients, OpenAPI definitions and user documentation
-- [ ] Concept identity: mint a `conceptId` per concept, carry it in the internal codec across versions,
-      strip it from exported documents, and keep it across an explicit rename
+- [ ] Concept and relationship identity: mint a `conceptId` and a `relationshipId`, carry them in the
+      internal codec across versions, strip them from exported documents, and keep them across an
+      explicit rename
 
 ### Phase 1b: Ontology governance
 
