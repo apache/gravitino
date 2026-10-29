@@ -176,6 +176,14 @@ public class DomainMetaService {
    * current domain and concurrent alters apply one after another instead of failing on each other.
    * The write still compares the locked version as a backstop.
    *
+   * <p>The updater runs inside this transaction, after the metalake is locked in shared mode and
+   * while the domain row is locked. Any lock the updater takes, such as on the backing tag, must
+   * follow the order metalake, then domains, then tags.
+   *
+   * <p>The name is resolved before the row is locked. If the domain is dropped and a new one is
+   * created with the same name in between, this call reports the domain as missing instead of
+   * changing the new domain; a later call with the name acts on the new domain.
+   *
    * <p>The returned domain is read back in the same transaction, so its backing tag name comes from
    * the tag it is now bound to rather than from the updater's entity.
    *
@@ -200,6 +208,9 @@ public class DomainMetaService {
       SessionUtils.doWithCommit(
           DomainMetaMapper.class,
           mapper -> {
+            // The metalake fence comes before the domain row, as in every domain write: the
+            // updater may lock tag rows, and dropping the metalake locks tags before domains.
+            lockMetalakeForDomainWrite(metalakeName, observedDomainPO.metalakeId());
             lockAndGetDomainPO(identifier, observedDomainPO);
             // The locking read cannot join the tag table, so the locked row is read again with the
             // name of its backing tag.
@@ -288,7 +299,8 @@ public class DomainMetaService {
    * Deletes the domain the caller observed. The domain row is locked first, so a domain that was
    * only altered since it was read is still deleted, and the dependent rows are cleaned up in the
    * same transaction as the domain row itself. If another transaction deletes or renames the
-   * observed domain first, this method returns {@code false}.
+   * observed domain first, this method returns {@code false}, also when a new domain has taken the
+   * name meanwhile.
    *
    * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
    * use {@link #deleteDomain(NameIdentifier)}, which reads it first.
@@ -328,10 +340,10 @@ public class DomainMetaService {
   }
 
   /**
-   * Holds the parent metalake row for the rest of the transaction, so a domain cannot be created or
-   * deleted while the metalake is being dropped. The lock is shared, so domains under the same
-   * metalake can be written at the same time, while dropping the metalake takes an exclusive lock
-   * on the row. A metalake that is gone or renamed is reported as missing.
+   * Holds the parent metalake row for the rest of the transaction, so a domain cannot be created,
+   * altered or deleted while the metalake is being dropped. The lock is shared, so domains under
+   * the same metalake can be written at the same time, while dropping the metalake takes an
+   * exclusive lock on the row. A metalake that is gone or renamed is reported as missing.
    */
   private void lockMetalakeForDomainWrite(String metalakeName, Long metalakeId) {
     OccWriteSupport.lockParentForChildWrite(

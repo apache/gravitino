@@ -41,6 +41,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
@@ -51,6 +52,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -647,6 +649,143 @@ public class TestDomainMetaService extends TestJDBCBackend {
       allowDropCommit.countDown();
       executor.shutdownNow();
     }
+  }
+
+  @TestTemplate
+  public void testAlterHoldsMetalakeFenceAgainstCascadeDrop() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    TagEntity tag = newTag("Finance");
+    backend.insert(tag, false);
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    domainMetaService.insertDomain(finance, false);
+
+    CountDownLatch domainLocked = new CountDownLatch(1);
+    CountDownLatch allowTagLock = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      // Like a backing tag change, the updater locks the tag row while the domain row is locked.
+      Future<DomainEntity> alter =
+          executor.submit(
+              () ->
+                  domainMetaService.updateDomain(
+                      finance.nameIdentifier(),
+                      entity -> {
+                        domainLocked.countDown();
+                        await(allowTagLock);
+                        SessionUtils.getWithoutCommit(
+                            TagMetaMapper.class,
+                            mapper -> mapper.selectTagByTagIdForUpdate(tag.id()));
+                        return ((DomainEntity) entity)
+                            .toBuilder().withBackingTagId(tag.id()).build();
+                      }));
+      Assertions.assertTrue(domainLocked.await(30, TimeUnit.SECONDS));
+
+      // A cascade drop locks tags before domains. It must wait at the metalake fence instead of
+      // taking the tag row the alter is about to lock.
+      Future<Boolean> drop =
+          executor.submit(
+              () ->
+                  MetalakeMetaService.getInstance()
+                      .deleteMetalake(NameIdentifierUtil.ofMetalake(METALAKE_NAME), true));
+      Assertions.assertThrows(TimeoutException.class, () -> drop.get(500, TimeUnit.MILLISECONDS));
+
+      allowTagLock.countDown();
+      Assertions.assertEquals(tag.id(), alter.get(30, TimeUnit.SECONDS).backingTagId());
+      Assertions.assertTrue(drop.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowTagLock.countDown();
+      executor.shutdownNow();
+    }
+    Assertions.assertFalse(backend.exists(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
+  }
+
+  @TestTemplate
+  public void testOverwriteRejectsIdOfDeletedDomain() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    domainMetaService.insertDomain(finance, false);
+    Assertions.assertTrue(domainMetaService.deleteDomain(finance.nameIdentifier()));
+
+    // The deleted row still holds the ID until garbage collection, so the ID cannot be reused.
+    EntityAlreadyExistsException exception =
+        Assertions.assertThrows(
+            EntityAlreadyExistsException.class,
+            () -> domainMetaService.insertDomain(finance, true));
+    Assertions.assertTrue(
+        exception.getMessage().contains(String.valueOf(finance.id())), exception.getMessage());
+    Assertions.assertFalse(backend.exists(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
+  }
+
+  @TestTemplate
+  public void testOverwriteRacingInsertOfSameName() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    DomainEntity first = newDomain(METALAKE_NAME, "Finance", "first");
+    DomainEntity second = newDomain(METALAKE_NAME, "Finance", "second");
+
+    CountDownLatch firstWritten = new CountDownLatch(1);
+    CountDownLatch allowFirstCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Throwable overwriteFailure;
+    try {
+      Future<Throwable> firstInsert =
+          executor.submit(
+              () -> {
+                try {
+                  SessionUtils.doMultipleWithCommit(
+                      () ->
+                          SessionUtils.doWithoutCommit(
+                              DomainMetaMapper.class,
+                              mapper ->
+                                  mapper.insertDomainMeta(
+                                      DomainPO.initializeDomainPO(first, metalake.id()))),
+                      () -> {
+                        firstWritten.countDown();
+                        await(allowFirstCommit);
+                      });
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      Assertions.assertTrue(firstWritten.await(30, TimeUnit.SECONDS));
+
+      Future<Throwable> overwrite =
+          executor.submit(
+              () -> {
+                try {
+                  domainMetaService.insertDomain(second, true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      Assertions.assertThrows(
+          TimeoutException.class, () -> overwrite.get(500, TimeUnit.MILLISECONDS));
+
+      allowFirstCommit.countDown();
+      Assertions.assertNull(firstInsert.get(30, TimeUnit.SECONDS));
+      overwriteFailure = overwrite.get(30, TimeUnit.SECONDS);
+    } finally {
+      allowFirstCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    // Where the locking read waits for the uncommitted row, the overwrite replaces it. Where the
+    // read misses it, the insert hits the unique key, and the overwrite is reported as a
+    // concurrent modification rather than as an existing domain.
+    DomainEntity stored = domainMetaService.getDomainByIdentifier(first.nameIdentifier());
+    if (overwriteFailure == null) {
+      Assertions.assertEquals("second", stored.comment());
+    } else {
+      Assertions.assertTrue(
+          overwriteFailure instanceof OptimisticLockException, String.valueOf(overwriteFailure));
+      Assertions.assertEquals(first, stored);
+    }
+    Assertions.assertEquals(
+        1, domainMetaService.listDomainsByNamespace(NamespaceUtil.ofDomain(METALAKE_NAME)).size());
   }
 
   @TestTemplate
