@@ -143,13 +143,6 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
             .getDriverClassName(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
   }
 
-  @Override
-  protected void stopCatalogEnv() throws Exception {
-    if (containerSuite != null) {
-      containerSuite.close();
-    }
-  }
-
   protected void initDefaultHiveCatalog() {
     Preconditions.checkArgument(metalake != null, "metalake should not be null");
     hiveCatalog =

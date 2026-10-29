@@ -17,7 +17,7 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -52,47 +52,47 @@ public class PermissionAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.revokeRolesFromUser(ImmutableList.of("role1"), NORMAL_USER);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
-        "Current user can not grant.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.grantRolesToUser(
               ImmutableList.of("role1"), NORMAL_USER);
-        });
+        },
+        "Current user can not grant.");
     assertThrows(
-        "Current user can not grant.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.grantRolesToGroup(ImmutableList.of("role2"), "group1");
-        });
+        },
+        "Current user can not grant.");
     assertThrows(
-        "Current user can not grant.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.grantRolesToGroup(ImmutableList.of("role2"), "group1");
-        });
+        },
+        "Current user can not grant.");
     assertThrows(
-        "Current user can not grant.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.revokePrivilegesFromRole(
               "role1",
               MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE),
               ImmutableSet.of(Privileges.ManageUsers.allow()));
-        });
+        },
+        "Current user can not grant.");
     assertThrows(
-        "Current user can not grant.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.revokeRolesFromGroup(
               ImmutableList.of("role2"), "group1");
-        });
+        },
+        "Current user can not grant.");
     assertThrows(
-        "Current user can not grant.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.revokeRolesFromUser(
               ImmutableList.of("role1"), NORMAL_USER);
-        });
+        },
+        "Current user can not grant.");
 
     gravitinoMetalake.grantRolesToUser(ImmutableList.of("role3"), NORMAL_USER);
     gravitinoMetalake.grantPrivilegesToRole(
