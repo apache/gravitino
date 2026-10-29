@@ -28,6 +28,18 @@ processes on the Gravitino server instead, see [Local Job Executor](./local-job-
 - Access from the Gravitino server to the API server of the cluster, with the permissions listed in
   [Kubernetes Permissions](#kubernetes-permissions).
 
+The versions that the job executor supports, and the ones it was tested with:
+
+| Component                        | Supported                                               | Tested                                     |
+|----------------------------------|---------------------------------------------------------|--------------------------------------------|
+| Apache Spark Kubernetes Operator | 0.9.x                                                   | 0.9.0, installed with the Helm chart 1.7.0 |
+| Spark                            | 3.5                                                     | 3.5.9 (`apache/spark:3.5.9-java17`)        |
+| Iceberg Spark runtime            | 1.11, which the built-in Iceberg jobs are built against | 1.11.0                                     |
+| Kubernetes                       | The versions that operator 0.9.x runs on                | 1.35.6 (OrbStack)                          |
+| Apache YuniKorn                  | Optional, see [YuniKorn](#yunikorn)                     | 1.10.0                                     |
+
+Only the versions in the Tested column were run with the job executor.
+
 The job executor is the `gravitino-k8s-job-executor-<version>.jar` file in the `libs` directory of
 the Gravitino distribution. Nothing else needs to be installed on the Gravitino server.
 
