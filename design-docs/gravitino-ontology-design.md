@@ -440,6 +440,11 @@ enough. The rule is governance model, not object category.
 
 ## Task Breakdown
 
+Each item below is one issue and one pull request. Issues are opened as the work starts rather than up
+front, as the Domain epic does, so this list is the plan and not a status board. The phases are ordered
+by dependency rather than by value; Phase 1a is the smallest slice that can be reviewed and merged on
+its own.
+
 ### Phase 0: Prerequisites
 
 - [x] Settle the scope, the status vocabulary and the privilege family on the Domain precedent, as
@@ -447,21 +452,33 @@ enough. The rule is governance model, not object category.
 - [ ] Decide whether the term-to-concept link belongs in this design or the glossary design
 - [ ] Land the Business Glossary design, which Phase 3 depends on
 
-### Phase 1: Ontology
+### Phase 1a: Ontology object and storage
 
-- [ ] `Ontology` identity, status, Java API, exceptions, change types and `OntologyEventDispatcher`
-- [ ] EntityStore persistence, relational tables and upgrade scripts, version snapshots
-- [ ] Ossie ontology validation: closed root, required `verbalizes`, closed concept `type`
-- [ ] Ossie import and export for ontology documents
-- [ ] Server services, REST resources and OpenAPI definitions
-- [ ] `MANAGE_ONTOLOGY` / `USE_ONTOLOGY` privileges, ownership and authorization filtering
+The object, its persistence and its API surface. This phase carries no governance: no privileges, no
+events, and no Ossie import or export.
 
-### Phase 2: Mappings
+- [ ] Ontology API and Ossie document conversion: the `Ontology` interface, the definition, concepts,
+      relationships, roles, change types, exceptions and the closed-root Ossie validation
+- [ ] Ontology entity and metadata storage: `EntityType.ONTOLOGY`, the relational tables and upgrade
+      scripts for H2, MySQL and PostgreSQL, version snapshots, garbage collection and metalake delete
+- [ ] Ontology REST resource, Java and Python clients, OpenAPI definitions and user documentation
 
-- [ ] `OntologyMapping` entity, storage and API
-- [ ] Mapping document validation against the Ossie mapping schema
-- [ ] Dual-side authorization and reference integrity on drop
-- [ ] REST endpoints and tests
+### Phase 1b: Ontology governance
+
+The governance Phase 1a defers. Each item changes behaviour an administrator depends on, so none of them
+is folded back into Phase 1a.
+
+- [ ] Ossie ontology import and export, both on the API and as REST endpoints
+- [ ] Events and audit: an `OntologyEventDispatcher` covering create, alter, status change, import,
+      export and drop
+- [ ] Privileges and authorization filtering: `MANAGE_ONTOLOGY` and `USE_ONTOLOGY`, ownership, and the
+      draft visibility rule that Phase 1a approximates with a metalake-level check
+
+### Phase 2: Mapping documents
+
+- [ ] `OntologyMapping` entity and storage
+- [ ] Ossie mapping document validation against the mapping schema
+- [ ] REST endpoints, dual-side authorization and reference integrity on drop
 
 ### Phase 3: Term-to-concept bridge
 
@@ -470,14 +487,9 @@ enough. The rule is governance model, not object category.
 - [ ] Visibility rules for references to draft ontologies
 - [ ] Tests, including reference integrity on ontology drop
 
-### Phase 4: Clients, MCP and documentation
+### Phase 4: MCP and query planning
 
-- [ ] Java and Python clients
 - [ ] MCP ontology tools and the two concept-lookup tools
-- [ ] OpenAPI specification and user documentation
-
-### Phase 5: Concept-aware query planning
-
 - [ ] A planner behind the #14308 `SemanticQueryPlanner` SPI that resolves concept names through
       `OntologyMapping` to semantic-model datasets and fields
 - [ ] Tests that plan the same query by metric name and by concept name and compare the generated SQL
