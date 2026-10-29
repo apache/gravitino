@@ -38,10 +38,13 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMeta
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.KerberosHdfs;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -60,12 +63,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@HiveFixture(auth = HiveAuth.KERBEROS)
 public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CatalogPaimonKerberosFilesystemIT.class);
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final String SDK_KERBEROS_PRINCIPAL_KEY = "client.kerberos.principal";
   private static final String SDK_KERBEROS_KEYTAB_KEY = "client.kerberos.keytab";
@@ -81,9 +83,11 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
 
   private static String TMP_DIR;
 
-  private static HiveContainer kerberosHiveContainer;
+  @FixtureContainer private static HiveContainer kerberosHive;
 
   private static GravitinoAdminClient adminClient;
+
+  private static KerberosHdfs hdfs;
 
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
   private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
@@ -98,14 +102,11 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
 
   @BeforeAll
   public void startIntegrationTest() {
-    containerSuite.startKerberosHiveContainer();
-    kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
-
     TYPE = "filesystem";
     WAREHOUSE =
         String.format(
             "hdfs://%s:%d/user/hive/paimon_catalog_warehouse/",
-            kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+            kerberosHive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     try {
       File baseDir = new File(System.getProperty("java.io.tmpdir"));
@@ -115,6 +116,7 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
 
       // Prepare kerberos related-config;
       prepareKerberosConfig();
+      hdfs = KerberosHdfs.of(kerberosHive, TMP_DIR + HDFS_CLIENT_KEYTAB);
 
       // Config kerberos configuration for Gravitino server
       addKerberosConfig();
@@ -141,26 +143,26 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
 
   private static void prepareKerberosConfig() throws Exception {
     // Keytab of the Gravitino SDK client
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
 
     // Keytab of the Gravitino server
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
 
     // Keytab of Gravitino server to connector to Hive
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HDFS_CLIENT_KEYTAB);
 
     String tmpKrb5Path = TMP_DIR + "/krb5.conf_tmp";
     String krb5Path = TMP_DIR + "/krb5.conf";
-    kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+    kerberosHive.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
-    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+    String ip = kerberosHive.getContainerIpAddress();
     String content = FileUtils.readFileToString(new File(tmpKrb5Path), StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
@@ -238,10 +240,8 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
     Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
 
     // Now try to permit the user to create the schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/paimon_catalog_warehouse");
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/paimon_catalog_warehouse");
+    hdfs.mkdirs("/user/hive/paimon_catalog_warehouse");
+    hdfs.setPermission("/user/hive/paimon_catalog_warehouse", "777", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -274,8 +274,7 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME, true));
 
     // Drop warehouse path
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-rm", "-r", "/user/hive/paimon_catalog_warehouse");
+    hdfs.delete("/user/hive/paimon_catalog_warehouse", true);
   }
 
   private static Column[] createColumns() {

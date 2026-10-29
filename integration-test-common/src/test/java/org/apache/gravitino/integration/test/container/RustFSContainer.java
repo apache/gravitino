@@ -23,17 +23,12 @@ import static org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
@@ -51,7 +46,7 @@ public class RustFSContainer extends BaseContainer {
   private static final Logger LOG = LoggerFactory.getLogger(RustFSContainer.class);
 
   /** The image pin consumed from the Docker Compose manifest tracked by image updates. */
-  public static final String DEFAULT_IMAGE = loadImage();
+  public static final String DEFAULT_IMAGE = TestImages.RUSTFS;
 
   /** The container hostname on the shared integration-test network. */
   public static final String HOST_NAME = "gravitino-ci-rustfs";
@@ -112,6 +107,7 @@ public class RustFSContainer extends BaseContainer {
     try (S3Client client = createS3Client()) {
       await()
           .atMost(60, TimeUnit.SECONDS)
+          .pollDelay(Duration.ZERO)
           .pollInterval(Math.max(1, 60 / retryLimit), TimeUnit.SECONDS)
           .until(
               () -> {
@@ -146,33 +142,6 @@ public class RustFSContainer extends BaseContainer {
    */
   public String getS3Endpoint() {
     return format("http://%s:%d", container.getHost(), getMappedPort(PORT));
-  }
-
-  static String imageFromCompose(String compose) {
-    // This single-service manifest is deliberately limited to one unquoted image reference.
-    // Fail closed if its structure changes, rather than silently using a different image pin.
-    Matcher matcher = Pattern.compile("(?m)^\\s+image: (\\S+)\\s*$").matcher(compose);
-    if (!matcher.find()) {
-      throw new IllegalArgumentException("RustFS Compose manifest must contain an image");
-    }
-    String image = matcher.group(1);
-    if (matcher.find() || !image.matches("rustfs/rustfs:[^@\\s]+@sha256:[0-9a-f]{64}")) {
-      throw new IllegalArgumentException(
-          "RustFS Compose manifest must contain one version and digest pin");
-    }
-    return image;
-  }
-
-  private static String loadImage() {
-    try (InputStream stream =
-        RustFSContainer.class.getResourceAsStream("/docker-compose-rustfs.yml")) {
-      if (stream == null) {
-        throw new IllegalStateException("Missing docker-compose-rustfs.yml test resource");
-      }
-      return imageFromCompose(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
-    } catch (IOException e) {
-      throw new IllegalStateException("Unable to read RustFS image pin", e);
-    }
   }
 
   private S3Client createS3Client() {

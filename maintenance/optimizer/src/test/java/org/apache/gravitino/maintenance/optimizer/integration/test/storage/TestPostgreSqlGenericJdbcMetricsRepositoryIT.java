@@ -25,17 +25,17 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestPostgreSqlGenericJdbcMetricsRepositoryIT extends BaseGenericJdbcMetricsRepositoryTest {
 
-  private PostgreSQLContainer<?> postgres;
+  private PostgreSQLContainer postgres;
 
   @BeforeAll
   void setUp() {
-    postgres = new PostgreSQLContainer<>("postgres:13");
+    postgres = new PostgreSQLContainer("postgres:13");
     postgres.start();
     JdbcMetricsRepositoryITUtils.initializeSchema(
         postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword(), "postgresql");

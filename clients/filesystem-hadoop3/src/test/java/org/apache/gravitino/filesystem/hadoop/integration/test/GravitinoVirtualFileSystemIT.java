@@ -39,8 +39,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -58,9 +59,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@HiveFixture
 public class GravitinoVirtualFileSystemIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemIT.class);
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer protected HiveContainer hive;
   protected String metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
   protected String catalogName = GravitinoITUtils.genRandomName("catalog");
   protected String schemaName = GravitinoITUtils.genRandomName("schema");
@@ -72,7 +74,6 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
   @BeforeAll
   public void startUp() throws Exception {
-    containerSuite.startHiveContainer();
     Assertions.assertFalse(client.metalakeExists(metalakeName));
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
     Assertions.assertTrue(client.metalakeExists(metalakeName));
@@ -554,10 +555,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
   private String baseHdfsPath() {
     return String.format(
         "hdfs://%s:%d/%s/%s",
-        containerSuite.getHiveContainer().getContainerIpAddress(),
-        HiveContainer.HDFS_DEFAULTFS_PORT,
-        catalogName,
-        schemaName);
+        hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT, catalogName, schemaName);
   }
 
   protected Path genGvfsPath(String fileset) {
