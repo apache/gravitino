@@ -1607,7 +1607,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         loadedRoles.put(roleId, dbUpdatedAt);
         partialRoleLoadBackoff.invalidate(roleId);
         // The installed rows are now the role's complete policy set, so the deny enforcer proves
-        // the absence of a DENY on these privileges again.
+        // the absence of a DENY on these privileges again. Defensive: a previous partial load
+        // leaves no loadedRoles marker, so clearRolePoliciesWithoutLock above has normally removed
+        // the entry already.
         incompleteRolePolicyIds.remove(String.valueOf(roleId));
       } else {
         partialRoleLoadBackoff.put(roleId, Boolean.TRUE);

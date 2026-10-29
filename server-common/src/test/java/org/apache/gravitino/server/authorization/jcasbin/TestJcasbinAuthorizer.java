@@ -1257,8 +1257,25 @@ public class TestJcasbinAuthorizer {
         getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
         "the complete load's policies must be installed");
 
-    // An explicit invalidation drops the rows, so the marker must not outlive them.
+    // An explicit invalidation drops the rows, so the marker must not outlive them. Re-arm the
+    // marker first with a newer partial load that still installs a row; otherwise the assertion
+    // below would pass even if clearing the rows left the marker behind.
+    ResolvedRolePolicies partialWithRow =
+        new ResolvedRolePolicies(
+            ImmutableList.<String[]>of(policyRow),
+            Collections.emptyList(),
+            ImmutableList.of("CATALOG:testCatalog"));
+    assertTrue(
+        invokeReplaceRolePolicies(
+            jcasbinAuthorizer, ALLOW_ROLE_ID, roleVersion + 1, partialWithRow));
+    assertTrue(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "a newer partial load must re-arm the incomplete marker");
+
     jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
+    assertTrue(
+        getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
+        "an explicit invalidation must drop the partial rows");
     assertFalse(
         getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
         "clearing a role's policies must also clear its incomplete marker");
