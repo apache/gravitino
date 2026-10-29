@@ -466,6 +466,23 @@ public class NameIdentifierUtil {
         namespace);
   }
 
+  /**
+   * Check the given {@link NameIdentifier} is an ontology identifier.
+   *
+   * <p>An ontology is metalake-scoped, so its namespace has exactly one level.
+   *
+   * @param ident The ontology identifier
+   * @throws IllegalArgumentException If the identifier is not an ontology identifier
+   */
+  public static void checkOntology(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Ontology identifier must not be null");
+    Namespace namespace = ident.namespace();
+    Namespace.check(
+        namespace != null && !namespace.isEmpty() && namespace.length() == 1,
+        "Ontology namespace must be 1 level, the input namespace is %s",
+        namespace);
+  }
+
   public static void checkPolicy(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Policy identifier must not be null");
     Namespace namespace = ident.namespace();
@@ -661,6 +678,10 @@ public class NameIdentifierUtil {
       case CATALOG:
         checkCatalog(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.CATALOG);
+
+      case ONTOLOGY:
+        checkOntology(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ONTOLOGY);
 
       case SCHEMA:
         checkSchema(ident);
@@ -966,6 +987,7 @@ public class NameIdentifierUtil {
       case TAG:
       case POLICY:
       case JOB:
+      case ONTOLOGY:
       case JOB_TEMPLATE:
         return Entity.EntityType.METALAKE;
 

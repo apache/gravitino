@@ -93,6 +93,10 @@ public class OwnerMetaSQLProviderFactory {
         table = SemanticModelMetaMapper.TABLE_NAME;
         idColumn = "semantic_model_id";
         break;
+      case ONTOLOGY:
+        table = OntologyMetaMapper.TABLE_NAME;
+        idColumn = "ontology_id";
+        break;
       case VIEW:
         table = ViewMetaMapper.TABLE_NAME;
         idColumn = "view_id";

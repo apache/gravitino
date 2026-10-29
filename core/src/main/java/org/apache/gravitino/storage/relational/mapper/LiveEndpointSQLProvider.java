@@ -56,6 +56,10 @@ public class LiveEndpointSQLProvider {
         table = SemanticModelMetaMapper.TABLE_NAME;
         idColumn = "semantic_model_id";
         break;
+      case ONTOLOGY:
+        table = OntologyMetaMapper.TABLE_NAME;
+        idColumn = "ontology_id";
+        break;
       case FILESET:
         table = FilesetMetaMapper.META_TABLE_NAME;
         idColumn = "fileset_id";

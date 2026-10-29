@@ -34,6 +34,7 @@ import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
+import org.apache.gravitino.storage.relational.service.OntologyMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
@@ -152,6 +153,12 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
             PolicyMetaService.getInstance()
                 .getPolicyIdByPolicyName(metalakeId, nameIdentifier.name());
         return new NamespacedEntityId(policyId, metalakeId);
+
+      case ONTOLOGY:
+        long ontologyId =
+            OntologyMetaService.getInstance()
+                .getOntologyIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
+        return new NamespacedEntityId(ontologyId, metalakeId);
 
       case JOB_TEMPLATE:
         long jobTemplateId =

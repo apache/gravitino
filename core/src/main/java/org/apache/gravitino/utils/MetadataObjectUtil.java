@@ -67,6 +67,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
+          .put(MetadataObject.Type.ONTOLOGY, Entity.EntityType.ONTOLOGY)
           .build();
 
   private MetadataObjectUtil() {}
@@ -140,6 +141,7 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
       case VIEW:
       case SEMANTIC_MODEL:
+      case ONTOLOGY:
       case CATALOG:
       case SCHEMA:
       case TABLE:
