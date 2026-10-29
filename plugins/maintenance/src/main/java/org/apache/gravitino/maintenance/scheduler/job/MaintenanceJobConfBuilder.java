@@ -216,7 +216,8 @@ public final class MaintenanceJobConfBuilder {
 
   /**
    * Folds flat session placeholders ({@code spark_executor_memory}, {@code catalog_type}, …) into
-   * nested {@code spark_conf} so enqueue {@code task_data} can keep only that JSON at the top level.
+   * nested {@code spark_conf} so enqueue {@code task_data} can keep only that JSON at the top
+   * level.
    *
    * @param jobConf mutable map from {@link #build}
    * @param catalogName Spark catalog alias for IRC property scoping

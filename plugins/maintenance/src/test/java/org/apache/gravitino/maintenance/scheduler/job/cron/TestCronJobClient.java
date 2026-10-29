@@ -326,6 +326,42 @@ class TestCronJobClient extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testSnapshotExpiryDoesNotMergeAuthMismatch() {
+    DataSource dataSource = dataSource();
+    CronJobClient scheduler = scheduler(dataSource);
+
+    Assertions.assertEquals(
+        1,
+        scheduler.enqueueNow(
+            expirePolicyWithAuth(9L, Map.of("auth_type", "none")),
+            List.of(candidate(21L, MetadataObject.Type.TABLE)),
+            10));
+    Assertions.assertEquals(
+        1,
+        scheduler.enqueueNow(
+            expirePolicyWithAuth(10L, Map.of("auth_type", "simple", "username", "u")),
+            List.of(candidate(22L, MetadataObject.Type.TABLE)),
+            10));
+
+    SchedulerClient client = CronJobClient.schedulerClient(dataSource);
+    Assertions.assertTrue(
+        client
+            .getScheduledExecution(
+                TaskInstanceId.of(
+                    TableMaintenanceSchedulerPools.CRON_JOB,
+                    MaintenanceTaskIds.forCronTable(21L, 9L)))
+            .isPresent(),
+        "auth-mismatched peer must not be cancelled");
+    Assertions.assertTrue(
+        client
+            .getScheduledExecution(
+                TaskInstanceId.of(
+                    TableMaintenanceSchedulerPools.CRON_JOB,
+                    MaintenanceTaskIds.forCronTable(22L, 10L)))
+            .isPresent());
+  }
+
+  @TestTemplate
   void testSnapshotExpiryDoesNotMergeDifferentCatalogs() {
     DataSource dataSource = dataSource();
     CronJobClient scheduler = multiCatalogScheduler(dataSource);
@@ -542,6 +578,20 @@ class TestCronJobClient extends TestJDBCBackend {
         .withPolicyType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
         .withEnabled(true)
         .withContent(PolicyContents.icebergSnapshotExpiration())
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
+        .build();
+  }
+
+  private static PolicyEntity expirePolicyWithAuth(long id, Map<String, String> updaterOptions) {
+    return PolicyEntity.builder()
+        .withId(id)
+        .withName("e-" + id)
+        .withNamespace(NamespaceUtil.ofPolicy("ml"))
+        .withPolicyType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
+        .withEnabled(true)
+        .withContent(
+            PolicyContents.icebergSnapshotExpiration(null, null, null, null, updaterOptions))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
         .build();

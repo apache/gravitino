@@ -35,12 +35,14 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
+import org.apache.gravitino.maintenance.policy.MaintenanceAuthConsistency;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.slf4j.Logger;
@@ -166,7 +168,11 @@ public class CommitJobClient {
     }
 
     try {
-      CommitAuthConsistency.requireConsistent(chain, gravitinoConfig);
+      List<PolicyEntity> policies = new ArrayList<>(chain.size());
+      for (CommitChainMember member : chain) {
+        policies.add(member.policy());
+      }
+      MaintenanceAuthConsistency.requirePoliciesConsistent(policies, gravitinoConfig);
     } catch (IllegalArgumentException e) {
       LOG.error("Skipping commit-job enqueue for table {}: {}", tableId, e.getMessage());
       return Optional.empty();

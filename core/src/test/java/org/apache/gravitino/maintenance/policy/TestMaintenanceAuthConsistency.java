@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.job.commit;
+package org.apache.gravitino.maintenance.policy;
 
 import java.time.Instant;
 import java.util.List;
@@ -31,26 +31,26 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestCommitAuthConsistency {
+class TestMaintenanceAuthConsistency {
 
   @Test
   void testAgreeingAuthPasses() {
     Config config = new Config(false) {};
-    CommitChainMember a = member(1L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none"));
-    CommitChainMember b = member(2L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none"));
+    PolicyEntity a = policy(1L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none"));
+    PolicyEntity b = policy(2L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none"));
     Assertions.assertDoesNotThrow(
-        () -> CommitAuthConsistency.requireConsistent(List.of(a, b), config));
+        () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
   }
 
   @Test
   void testMismatchingGravitinoAuthFails() {
     Config config = new Config(false) {};
-    CommitChainMember a = member(1L, Map.of(), Map.of("auth_type", "none"));
-    CommitChainMember b = member(2L, Map.of(), Map.of("auth_type", "simple", "username", "u"));
+    PolicyEntity a = policy(1L, Map.of(), Map.of("auth_type", "none"));
+    PolicyEntity b = policy(2L, Map.of(), Map.of("auth_type", "simple", "username", "u"));
     IllegalArgumentException ex =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> CommitAuthConsistency.requireConsistent(List.of(a, b), config));
+            () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
     String message = ex.getMessage();
     Assertions.assertTrue(message.contains("gravitinoAuth mismatch"));
     Assertions.assertTrue(message.contains("policy 1 vs policy 2"));
@@ -62,12 +62,12 @@ class TestCommitAuthConsistency {
   @Test
   void testMismatchingIrcAuthFails() {
     Config config = new Config(false) {};
-    CommitChainMember a = member(1L, Map.of("rest.auth.type", "none"), Map.of());
-    CommitChainMember b = member(2L, Map.of("rest.auth.type", "basic"), Map.of());
+    PolicyEntity a = policy(1L, Map.of("rest.auth.type", "none"), Map.of());
+    PolicyEntity b = policy(2L, Map.of("rest.auth.type", "basic"), Map.of());
     IllegalArgumentException ex =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> CommitAuthConsistency.requireConsistent(List.of(a, b), config));
+            () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
     String message = ex.getMessage();
     Assertions.assertTrue(message.contains("ircAuth mismatch"));
     Assertions.assertTrue(message.contains("policy 1 vs policy 2"));
@@ -79,20 +79,20 @@ class TestCommitAuthConsistency {
     Config config = new Config(false) {};
     String secretA = "SuperSecretPassword-A";
     String secretB = "SuperSecretPassword-B";
-    CommitChainMember a =
-        member(
+    PolicyEntity a =
+        policy(
             1L,
             Map.of("rest.auth.type", "basic", "rest.auth.basic.password", secretA),
             Map.of("auth_type", "basic", "password", secretA));
-    CommitChainMember b =
-        member(
+    PolicyEntity b =
+        policy(
             2L,
             Map.of("rest.auth.type", "basic", "rest.auth.basic.password", secretB),
             Map.of("auth_type", "basic", "password", secretB));
     IllegalArgumentException ex =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> CommitAuthConsistency.requireConsistent(List.of(a, b), config));
+            () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
     String message = ex.getMessage();
     Assertions.assertFalse(message.contains(secretA), message);
     Assertions.assertFalse(message.contains(secretB), message);
@@ -105,41 +105,53 @@ class TestCommitAuthConsistency {
   void testClusterIrcAuthOverlayMakesPoliciesAgree() {
     Config config = new Config(false) {};
     config.loadFromMap(Map.of("gravitino.maintenance.ircAuth.rest.auth.type", "basic"), t -> true);
-    // Policies disagree in content, but cluster ircAuth wins on overlay.
-    CommitChainMember a = member(1L, Map.of("rest.auth.type", "none"), Map.of());
-    CommitChainMember b = member(2L, Map.of("rest.auth.type", "oauth"), Map.of());
+    PolicyEntity a = policy(1L, Map.of("rest.auth.type", "none"), Map.of());
+    PolicyEntity b = policy(2L, Map.of("rest.auth.type", "oauth"), Map.of());
     Assertions.assertDoesNotThrow(
-        () -> CommitAuthConsistency.requireConsistent(List.of(a, b), config));
+        () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
   }
 
-  private static CommitChainMember member(
+  @Test
+  void testAgreesHelper() {
+    Config config = new Config(false) {};
+    MaintenanceAuthConsistency.AuthView left =
+        MaintenanceAuthConsistency.fromPolicy(
+            policy(1L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none")), config);
+    MaintenanceAuthConsistency.AuthView right =
+        MaintenanceAuthConsistency.fromPolicy(
+            policy(2L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none")), config);
+    MaintenanceAuthConsistency.AuthView mismatch =
+        MaintenanceAuthConsistency.fromPolicy(
+            policy(3L, Map.of("rest.auth.type", "basic"), Map.of("auth_type", "none")), config);
+    Assertions.assertTrue(MaintenanceAuthConsistency.agrees(config, left, right));
+    Assertions.assertFalse(MaintenanceAuthConsistency.agrees(config, left, mismatch));
+  }
+
+  private static PolicyEntity policy(
       long id, Map<String, String> jobOptions, Map<String, String> updaterOptions) {
-    PolicyEntity policy =
-        PolicyEntity.builder()
-            .withId(id)
-            .withName("p-" + id)
-            .withNamespace(NamespaceUtil.ofPolicy("ml"))
-            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
-            .withContent(
-                PolicyContents.icebergDataCompaction(
-                    IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
-                    IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
-                    IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
-                    IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
-                    IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
-                    "binpack",
-                    "",
-                    Map.of(),
-                    null,
-                    true,
-                    null,
-                    jobOptions,
-                    updaterOptions))
-            .withEnabled(true)
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
-            .build();
-    return new CommitChainMember(
-        Policy.BuiltInType.ICEBERG_COMPACTION, policy, "rewrite_data_files");
+    return PolicyEntity.builder()
+        .withId(id)
+        .withName("p-" + id)
+        .withNamespace(NamespaceUtil.ofPolicy("ml"))
+        .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+        .withContent(
+            PolicyContents.icebergDataCompaction(
+                IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+                IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+                IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+                IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+                IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+                "binpack",
+                "",
+                Map.of(),
+                null,
+                true,
+                null,
+                jobOptions,
+                updaterOptions))
+        .withEnabled(true)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
+        .build();
   }
 }

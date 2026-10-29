@@ -39,6 +39,9 @@ import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.policy.MaintenanceAuthConsistency;
+import org.apache.gravitino.maintenance.policy.MaintenanceAuthConsistency.AuthView;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
@@ -72,8 +75,10 @@ import org.slf4j.LoggerFactory;
  * (whole queued row at a time). Claim-first: {@code cancel} each unpicked source row, then {@code
  * reschedule} the target row's {@code task_data} (target {@code task_instance} unchanged) — never
  * allocate a new instance just to coalesce. {@code spark_conf} is max-merged across the target,
- * optional new enqueue spec, and successfully claimed sources. Policy id need not match;
- * each merged {@link Task} keeps its original {@code policyId}. Picked rows are never claimed.
+ * optional new enqueue spec, and successfully claimed sources. Policy id need not match; each
+ * merged {@link Task} keeps its original {@code policyId}. Peers (or an enqueue spec) whose
+ * effective Gravitino/IRC auth disagrees with the target are skipped — never cancelled. Picked rows
+ * are never claimed.
  *
  * <p>Enqueue builds a {@link MaintenanceJobSpec} once (policy → jobConf) into {@code task_data};
  * pick consumes that spec. The entity store disables JDBC autocommit; connections are wrapped via
@@ -92,6 +97,7 @@ public class CronJobClient {
   private static final int SNAPSHOT_EXPIRY_BATCH_CAPACITY = 10;
 
   private final DataSource dataSource;
+  private final Config gravitinoConfig;
   private final MaintenanceJobSpecFactory specFactory;
   private final Function<List<Long>, List<ResolvedTableRef>> tableRefResolver;
 
@@ -116,7 +122,8 @@ public class CronJobClient {
       Config gravitinoConfig,
       Function<List<Long>, List<ResolvedTableRef>> tableRefResolver) {
     this.dataSource = Preconditions.checkNotNull(dataSource);
-    this.specFactory = new MaintenanceJobSpecFactory(Preconditions.checkNotNull(gravitinoConfig));
+    this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
+    this.specFactory = new MaintenanceJobSpecFactory(this.gravitinoConfig);
     this.tableRefResolver = Preconditions.checkNotNull(tableRefResolver);
   }
 
@@ -153,8 +160,13 @@ public class CronJobClient {
     int limit = Math.min(candidates.size(), expandLimit);
     for (ExpandTableCandidate candidate : candidates.subList(0, limit)) {
       Optional<MaintenanceJobSpec> spec = buildSpec(policy, List.of(candidate.tableId()));
-      if (spec.isPresent()
-          && scheduleTableJob(client, policy, candidate.tableId(), spec.get(), due).isPresent()) {
+      if (spec.isEmpty()) {
+        continue;
+      }
+      // Compaction (and other non-expire) rows are not listed by findExpireJob — schedule directly.
+      String id = MaintenanceTaskIds.forCronTable(candidate.tableId(), policy.id());
+      if (client.scheduleIfNotExists(
+          new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec.get()), due)) {
         scheduled++;
       }
     }
@@ -430,11 +442,32 @@ public class CronJobClient {
       @Nullable MaintenanceJobSpec enqueueSpec,
       List<QueuedExpireJob> peersToClaim,
       int batchCapacity) {
+    AuthView targetAuth = authView(target.spec);
+    if (enqueueSpec != null
+        && !MaintenanceAuthConsistency.agrees(gravitinoConfig, targetAuth, authView(enqueueSpec))) {
+      LOG.debug(
+          "Skipping snapshot-expiry coalesce into {}: enqueue auth mismatch with target",
+          target.instanceId.getId());
+      return false;
+    }
+
+    List<QueuedExpireJob> claimable = new ArrayList<>();
+    for (QueuedExpireJob peer : peersToClaim) {
+      if (!MaintenanceAuthConsistency.agrees(gravitinoConfig, targetAuth, authView(peer.spec))) {
+        LOG.debug(
+            "Skipping claim of cron-job {} for snapshot-expiry coalesce: auth mismatch with target {}",
+            peer.instanceId.getId(),
+            target.instanceId.getId());
+        continue;
+      }
+      claimable.add(peer);
+    }
+
     Set<Long> plannedTableIds = new HashSet<>(target.spec.tableIds());
     for (Task task : enqueueTasks) {
       plannedTableIds.add(task.getTableId());
     }
-    for (QueuedExpireJob peer : peersToClaim) {
+    for (QueuedExpireJob peer : claimable) {
       plannedTableIds.addAll(peer.spec.tableIds());
     }
     if (plannedTableIds.size() > batchCapacity) {
@@ -447,7 +480,7 @@ public class CronJobClient {
     if (enqueueSpec != null) {
       sparkConfJsons.add(enqueueSpec.getSparkConf());
     }
-    for (QueuedExpireJob peer : peersToClaim) {
+    for (QueuedExpireJob peer : claimable) {
       Optional<MaintenanceJobSpec> claimedSpec = tryClaimQueuedJob(client, peer);
       if (claimedSpec.isEmpty()) {
         continue;
@@ -459,12 +492,28 @@ public class CronJobClient {
     List<Task> tasksToAdd = new ArrayList<>(enqueueTasks);
     tasksToAdd.addAll(claimedTasks);
     if (tasksToAdd.isEmpty()) {
-      // No enqueue tables and no successful claims (peers picked/gone) — not progress.
+      // No enqueue tables and no successful claims (peers picked/gone/auth-skipped) — not progress.
       return peersToClaim.isEmpty();
     }
     String mergedSparkConf =
         MaintenanceJobSpecFactory.mergeSparkConfJson(sparkConfJsons.toArray(new String[0]));
     return rescheduleMergedTaskData(client, target, tasksToAdd, mergedSparkConf, batchCapacity);
+  }
+
+  /**
+   * Builds an auth view from enqueue {@code task_data}. Spec maps are already cluster-overlaid at
+   * build time.
+   */
+  private static AuthView authView(MaintenanceJobSpec spec) {
+    long id = 0L;
+    if (spec.getTasks() != null && !spec.getTasks().isEmpty()) {
+      id = spec.getTasks().get(0).getPolicyId();
+    }
+    return new AuthView(
+        id,
+        IcebergSparkConfigUtils.parseFlatJsonMap(
+            spec.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY),
+        IcebergSparkConfigUtils.parseFlatJsonMap(spec.getSparkConf(), "spark_conf"));
   }
 
   /**
@@ -609,6 +658,10 @@ public class CronJobClient {
     }
   }
 
+  /**
+   * Schedules a snapshot-expiry {@code table:} row and returns the queued expire view used for
+   * coalesce. Empty when the instance already exists or the row is not an expire job.
+   */
   private Optional<QueuedExpireJob> scheduleTableJob(
       SchedulerClient client,
       PolicyEntity policy,
