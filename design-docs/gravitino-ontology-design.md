@@ -105,8 +105,12 @@ Ontology        { id, name, comment, ossieVersion, definition,
                   status: DRAFT | PUBLISHED, properties, audit_info }
 OntologyVersion { ontologyId, version, definition, audit_info }
 OntologyMapping { id, name, ontologyId, semanticModelRef, definition, audit_info }
-TermConceptRef  { termId, ontologyId, concept, iri?, audit_info }
+TermConceptRef  { termId, ontologyId, conceptId, iri?, audit_info }
 ```
+
+A concept inside `definition` carries a Gravitino-minted `conceptId`. The Ossie document never contains
+it: it is minted on write, kept in the internal codec, and stripped when a document is exported. It is
+what lets a name change in a later version leave every term reference and mapping intact.
 
 `GlossaryTerm`, `TermRelation`, `TermDomain`, `TermBinding`, `TermVersion` and their tables are
 specified in the [Business Glossary design](https://github.com/apache/gravitino/pull/14239) and are not repeated here.
@@ -117,7 +121,7 @@ specified in the [Business Glossary design](https://github.com/apache/gravitino/
 | :--- | :--- | :--- |
 | `Ontology` | Metalake | A business vocabulary spans catalogs and schemas, the same reasoning that puts `Domain` at the metalake. |
 | `OntologyMapping` | Metalake, referencing a schema-scoped Semantic Model | Ossie models a mapping as a standalone document; making it a child of the model would prevent one ontology from mapping several models. |
-| `TermConceptRef` | Metalake, between a `GlossaryTerm` and an ontology concept | Both endpoints are metalake-scoped. |
+| `TermConceptRef` | Metalake, between a `GlossaryTerm` and an ontology concept | Both endpoints are metalake-scoped, and the reference binds the concept's minted id rather than its name. |
 
 Ontologies are addressed by name alone within a metalake, follow the tag and domain name rules (unique
 per metalake, up to 128 characters, `/` allowed and URL-encoded in paths), and use the same
@@ -155,7 +159,19 @@ Three consequences follow, and they are validation rules rather than documentati
   is what `TermConceptRef` is.
 
 The specification version is pinned to `0.2.0.dev0`, matching `OssieVersion.DEFAULT_VERSION`, so an
-ontology and a Semantic Model agree on the version they were written against.
+ontology and a Semantic Model agree on the version they were written against. A stored ontology keeps
+the version it was written against and is not migrated in place: the specification is pre-release, and
+a silent migration under an agent's semantic parser is a worse failure than a rejected write. When Ossie
+reaches a stable version, migration becomes a write-time step over the `OntologyVersion` snapshots,
+which already hold every document the metalake has stored.
+
+**Concept identity is internal to Gravitino.** Ossie names a concept by its `concept` string and nothing
+else, so a document cannot carry a stable id without breaking conformance. Gravitino therefore mints a
+`conceptId` for each concept it stores, keeps it beside the document in `definition`, and strips it on
+export, so an exported document is exactly what the specification describes while a stored vocabulary
+keeps an identity that survives a rename. Importing a document mints ids only for concepts it has not
+seen; a concept whose name matches one in the current version keeps its id, and a rename is expressed as
+an explicit concept change that carries the id across.
 
 Ontologies are always managed by Gravitino and never persisted in an underlying catalog, and one Ossie
 document maps to one `Ontology`, as one Ossie core document maps to one Semantic Model. Import and
@@ -189,6 +205,14 @@ A mapping document contains:
 `OntologyMapping` stores such a document together with a stable reference to one `Ontology` and one
 Semantic Model. Because the document embeds the model identity, the mapping references the model by
 identifier and version at creation time rather than duplicating its definition.
+
+**A mapping is a metalake-level object, not a child of the model it names.** The embedded
+`semantic_model` is a document reference, not ownership: Ossie's model identity says which model the
+mapping describes, the same way `concept_mappings` name concepts without owning them. A vocabulary
+describes a business, and one vocabulary is routinely mapped onto several models that live in different
+catalogs and schemas; making the mapping a child of one model would force a copy per model and let the
+copies drift. It also matches the scope the other business objects already have: `Domain`, `Ontology`
+and the term object are metalake-level for the same reason.
 
 **Visibility follows both sides.** A mapping is returned only to a caller who can read the ontology and
 the Semantic Model it binds. It is never more visible than the less visible of the two.
@@ -227,15 +251,21 @@ concept is. It is the row in the data model above, with ids inside the store and
 | :--- | :--- |
 | `termName` | The term that says it means the concept; the reference is stored on the term side. |
 | `ontology` | The metalake-level ontology that declares the concept. |
-| `concept` | The concept name, unique inside one ontology version. |
+| `conceptId` | The concept's minted id, resolved to the concept name when the reference is read. |
 | `iri` | The concept IRI the document declared, copied for display; empty when the document had none. |
 
 - **Stored on the term side.** The reference list belongs to the term, so listing a term's concepts and
   the reverse lookup both start from the term; a mapping never holds term references.
 - **Unique per term, ontology and concept.** Re-adding a reference that already exists is a no-op
   rather than a duplicate, so a client can retry safely.
-- **No document position, no version.** The reference names a concept, not a place, so reordering the
-  document or publishing a new version of the ontology does not break it.
+- **No document position, no version.** The reference binds the concept's minted id, not its name and
+  not a place in the document, so reordering the document, renaming the concept or publishing a new
+  version does not break it. The name and the `iri` a reader sees come from the version being read.
+- **The API takes a name, the store keeps an id.** A caller adds a reference by naming the ontology and
+  the concept, and the server resolves the name to the id; reads return both, so a client can display
+  the current name without knowing that the concept was renamed.
+- **A rename is invisible to the reference.** Because the id travels with the concept across versions,
+  renaming a concept updates what every term reads without touching a single reference row.
 - **Validated at write time.** Adding a reference requires the ontology to exist and be visible to the
   caller, and the concept to be declared in the version the caller can read; a `DRAFT` ontology is
   allowed only for a caller who can see it. The `iri` is copied from the document, never supplied by
@@ -431,10 +461,11 @@ and its bindings.
 
 ## Resolved Questions
 
-Three of the questions this design first raised are settled by the Domain precedent, and a fourth by the
-glossary discussion. Domain is landing on the `branch-domain-dev` integration branch rather than on
-`main` yet, but it is the project's first object with a lifecycle at all — `SemanticModel` has no
-status, only create, alter and drop — and an ontology should follow it rather than contradict it.
+Three of the questions this design first raised are settled by the Domain precedent, a fourth by the
+glossary discussion, and the last three by the decisions recorded below. Domain is landing on the
+`branch-domain-dev` integration branch rather than on `main` yet, but it is the project's first object
+with a lifecycle at all — `SemanticModel` has no status, only create, alter and drop — and an ontology
+should follow it rather than contradict it.
 
 1. **Scope of `Ontology`.** Metalake, as argued here. A vocabulary describes a business, not a catalog,
    and Domain already establishes the metalake as the home for business-level objects.
@@ -449,6 +480,17 @@ status, only create, alter and drop — and an ontology should follow it rather 
    concept contract, which only this design defines, and the glossary design only carries the list on
    the term resource. The glossary author agreed to defer it here rather than specify it twice, so
    Phase 3 below lands after ontology and adds no second definition of a reference.
+5. **Placement of `OntologyMapping`.** A metalake-level object, as the Mappings section argues. A
+   vocabulary is mapped onto several models across catalogs, and the embedded `semantic_model` is a
+   document reference rather than ownership, so a child placement would force one copy per model.
+6. **Stable identity of a concept.** Gravitino mints a `conceptId` per concept and keeps it in the
+   internal definition; a term reference and a mapping bind the id rather than the name, so a rename
+   updates every reference without a migration. Export strips the id, because Ossie names a concept by
+   its `concept` string alone and an exported document has to stay conformant.
+7. **Specification version.** Pinned, as Semantic Models are, while the specification is
+   pre-release. Migration on write becomes possible once Ossie ships a stable version, and the
+   `OntologyVersion` snapshots are the basis it will run on; a silent migration today would break an
+   agent's parser on a syntax change nobody reviewed.
 
 The two privilege shapes used across these objects are not an inconsistency. A container that a few
 stewards maintain — a domain, a vocabulary — is governed coarsely by `MANAGE_*` / `USE_*`, because
@@ -458,17 +500,6 @@ ownership, which is also the shape `SemanticModel` already ships, so the family 
 invented here. `MANAGE_DOMAIN` cannot express "create a term without being able to approve one", so a
 term needs the finer shape; a vocabulary has no per-item reviewer to record, so the coarse shape is
 enough. The rule is governance model, not object category.
-
-## Open Questions
-
-1. **Placement of `OntologyMapping`.** A metalake object, or a child of the Semantic Model it maps? The
-   Ossie document embeds `semantic_model`, which argues for the child; reuse across models argues for the
-   object.
-2. **Stable identity of a concept.** A concept is identified by name, with an optional IRI. A rename
-   breaks every reference. Should Gravitino mint an internal concept id, and how would it appear in the
-   exported document?
-3. **Specification version.** `0.2.0.dev0` is pre-release. Does a stored ontology keep the version it was
-   written against and get migrated on write, or is it pinned as Semantic Models are?
 
 ## Task Breakdown
 
@@ -481,7 +512,7 @@ merged on its own.
 
 - [x] Settle the scope, the status vocabulary and the privilege family on the Domain precedent, as
       recorded in Resolved Questions
-- [ ] Decide whether the term-to-concept link belongs in this design or the glossary design
+- [x] Decide whether the term-to-concept link belongs in this design or the glossary design: it stays here
 - [ ] Land the Business Glossary design, which Phase 3 depends on
 
 ### Phase 1a: Ontology object and storage
@@ -494,6 +525,8 @@ events, and no Ossie import or export.
 - [ ] Ontology entity and metadata storage: `EntityType.ONTOLOGY`, the relational tables and upgrade
       scripts for H2, MySQL and PostgreSQL, version snapshots, garbage collection and metalake delete
 - [ ] Ontology REST resource, Java and Python clients, OpenAPI definitions and user documentation
+- [ ] Concept identity: mint a `conceptId` per concept, carry it in the internal codec across versions,
+      strip it from exported documents, and keep it across an explicit rename
 
 ### Phase 1b: Ontology governance
 
