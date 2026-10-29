@@ -87,14 +87,15 @@ find the approved term, and follow its links to the data.
 3. The admin sets both terms to `APPROVED`. Users with `VIEW_DEFINITION` can now see them.
 4. The owner of semantic model `dw.sales.sales_model` links its metric `active_customers` to
    `Active Customer`. The term now shows the metric under Used by.
-5. A user asks an agent for "revenue from active users last month". The agent calls
-   `resolve_business_term(["revenue", "active users"])` once:
-   - `active users` returns `Active Customer` (matched by synonym), with its column and metric. The
-     result only contains what the user can read.
-   - `revenue` has no match. The agent asks the user which revenue they mean. It does not guess a
-     column.
+5. A user asks an agent for "net revenue from VIP active users last month". The agent picks the
+   business words and calls `resolve_business_term(["net revenue", "VIP", "active user"])` once:
+   - `active user` returns `Active Customer` (matched by synonym), with its column and metric.
+     `net revenue` returns `Net revenue`, with its metric. The result only contains what the user
+     can read.
+   - `VIP` has no match. The agent asks the user what VIP means. It does not guess a column.
 
-   Then the agent loads the table or the semantic model with the existing tools.
+   Then the agent loads the table or the semantic model with the existing tools. The full flow is
+   in Agent integration.
 6. Later the term is replaced. The admin sets it to `DEPRECATED`, and agents stop seeing it. Then
    the admin deletes it.
 
@@ -460,8 +461,9 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 - **List** is used both to browse and to look up words:
   - `domain` returns the terms of the domain and of the subdomains the caller can see.
   - `nameContains` finds names that contain the text, ignoring case. It is for search boxes.
-  - `match` looks up business words. It can be repeated, up to 20 times. The server compares
-    `key(word)` with `name_key` and `synonym_key`. Each returned term has `matchedBy`. With
+  - `match` looks up business words: one `match` per word, up to 20. Each word is looked up on its
+    own, and a term is returned when it matches any word (OR). The server compares `key(word)`
+    with `name_key` and `synonym_key`. Each returned term has `matchedBy`. With
     `status=APPROVED`, a word that only matches `DEPRECATED` terms returns nothing.
   - `bindings=true` adds the bindings of each term, at most 20 per term. If there are more,
     `bindingsTruncated` is set. It only works together with `match` and `details=true`. A lookup
@@ -539,32 +541,127 @@ The `mcp-server/` gets a read-only `glossary` tool tag, added to `SUPPORTED_TOOL
 server forwards the caller's `Authorization` header. So an agent sees exactly what its user can
 see.
 
+**End-to-end flow**
+
+Example question: "net revenue from VIP active users last month".
+
 ```
-question ──▶ resolve_business_term(words) ──▶ terms + bindings
-                                                │
-               column / table binding ──────────┼──▶ get_table_metadata_details ──▶ SQL
-               metric binding ──────────────────┴──▶ load_semantic_model ─────────▶ metric query
+User question
+   │
+   ▼
+① Agent (LLM) picks the business words ──▶ ["net revenue", "VIP", "active user"]
+   │
+   ▼
+② resolve_business_term(words)                                  (MCP tool)
+   │
+   ▼
+③ GET /terms?match=net%20revenue&match=VIP&match=active%20user
+            &status=APPROVED&details=true&bindings=true          (Gravitino server)
+   │
+   ▼
+④ Result per word ──▶ "net revenue": term Net revenue,    metric dw.sales.sales_model/net_revenue
+   │                  "active user": term Active Customer, column dw.sales.customers.is_active,
+   │                                 metric dw.sales.sales_model/active_customers
+   │                  unmatched:     ["VIP"]
+   ▼
+⑤ Agent decides per word
+   ├── column or table ──▶ get_table_metadata_details ──▶ write SQL
+   ├── metric ───────────▶ load_semantic_model ─────────▶ metric query
+   └── unmatched ────────▶ ask the user: "What do you mean by VIP?"
+
+⑥ Agent runs the query with the user's own privileges and answers
 ```
 
-**`resolve_business_term`** is the first tool an agent calls:
+| Step                   | Who                    | What happens                                                                                                                                                                                                                                                                                            |
+| ---------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ① Pick business words  | Agent (LLM)            | Gravitino does not parse the question; the agent does. The tool description tells it how: keep a phrase whole ("active user", not "active" and "user"); use the singular form; leave out time ranges, numbers and query words ("last month", "total", "top 10"). A question usually gives 1 to 5 words. |
+| ② Call the tool        | Agent → MCP server     | One call with all the words. Add `domain` when the user or the context names one.                                                                                                                                                                                                                       |
+| ③ Look up              | MCP server → Gravitino | One REST call, with one `match` per word. The server compares `key(word)` with term names and synonyms, and keeps only `APPROVED` terms the caller can see (and in `domain`, if given). It adds the bindings of each term.                                                                              |
+| ④ Group                | MCP server             | Groups the terms by the word they matched (`matchedBy`), and lists the words with no match in `unmatched`.                                                                                                                                                                                              |
+| ⑤ Decide               | Agent                  | One term for a word: use it. Several terms: pick one by domain, or ask the user. No term: ask the user, and do not guess a column. Then follow the bindings with the existing tools.                                                                                                                    |
+| ⑥ Read data and answer | Agent → existing tools | The query runs with the user's own privileges. The answer names the terms and definitions it used.                                                                                                                                                                                                      |
 
-- Input: `words` (the business phrases in the question, up to 20), and an optional `domain`.
-- It makes one REST call:
-  `GET /terms?match=w1&match=w2&status=APPROVED&details=true&bindings=true[&domain=]`.
-- Output, for each word:
-  - `matches`: the term, definition, `matched_by`, domains, broader and related names, and the
-    bindings as `{kind, type, catalog, schema, name, column?, metric?}`, plus `bindings_truncated`;
-  - `unmatched`: the words with no match, so the agent knows these words have no agreed meaning.
+**How `match` works**
+
+- **One `match` per word.** One word gives one `match`, three words give three. The number is not
+  fixed.
+- **OR, not AND.** A term is returned when it matches any of the words. Each word is looked up on
+  its own. The server never combines words: "VIP" and "active user" are two lookups, and combining
+  their meanings in the query is the agent's job.
+- **`matchedBy`** says which word matched which field (`NAME` or `SYNONYM`). So the MCP tool can
+  put each term under the right word. If one term matches two words, it is returned once, with two
+  `matchedBy` entries.
+- **At most 20 words per call.** If the agent passes more than 20 words, the MCP tool splits them
+  into calls of 20 and merges the results, so the agent never sees the limit. A direct REST caller
+  gets 400 and must split the words itself.
+- **Exact match only** (ignoring case and extra spaces). "customers" does not find `Customer`.
+  That is why step ① uses the singular form, and why admins write names and synonyms in the
+  singular form.
+
+**`resolve_business_term`**
+
+- Input: `words` (the business phrases from step ①), and an optional `domain`.
+- Output for the example above:
+
+```json
+{
+  "results": [
+    {
+      "word": "net revenue",
+      "matches": [
+        {
+          "term": "Net revenue",
+          "definition": "Revenue after refunds and discounts.",
+          "matched_by": "NAME",
+          "domains": ["Sales"],
+          "broader": ["Revenue"],
+          "related": ["Order"],
+          "bindings": [
+            {"kind": "USED_BY", "type": "SEMANTIC_MODEL", "catalog": "dw", "schema": "sales",
+             "name": "sales_model", "metric": "net_revenue"}
+          ],
+          "bindings_truncated": false
+        }
+      ]
+    },
+    {
+      "word": "active user",
+      "matches": [
+        {
+          "term": "Active Customer",
+          "definition": "A customer with at least one order in the last 90 days.",
+          "matched_by": "SYNONYM",
+          "domains": ["Sales"],
+          "broader": ["Customer"],
+          "related": [],
+          "bindings": [
+            {"kind": "IMPLEMENTED_BY", "type": "COLUMN", "catalog": "dw", "schema": "sales",
+             "name": "customers", "column": "is_active"},
+            {"kind": "USED_BY", "type": "SEMANTIC_MODEL", "catalog": "dw", "schema": "sales",
+             "name": "sales_model", "metric": "active_customers"}
+          ],
+          "bindings_truncated": false
+        }
+      ]
+    }
+  ],
+  "unmatched": ["VIP"]
+}
+```
+
 - The binding fields are the same arguments that `get_table_metadata_details` and
   `load_semantic_model` take. The agent can make the next call directly, with no parsing and no
   extra lookup.
+- If `bindings_truncated` is true, the agent calls `list_metadata_by_term` for the full list.
 
 **Rules in the tool descriptions**, so all agents use the result the same way:
 
-1. Only `APPROVED` terms are returned. A word in `unmatched` has no agreed meaning. Tell the user,
+1. Pass each business phrase whole and in the singular form. Leave out time ranges, numbers and
+   query words.
+2. Only `APPROVED` terms are returned. A word in `unmatched` has no agreed meaning. Tell the user,
    and do not guess a column.
-2. If a word matches several terms, use the domains to pick one, or ask the user.
-3. A binding shows where a meaning is stored. It never gives access. Reading the data still needs
+3. If a word matches several terms, use the domains to pick one, or ask the user.
+4. A binding shows where a meaning is stored. It never gives access. Reading the data still needs
    the normal privileges.
 
 | Tool                      | REST calls                                                              | Use                                                              |
