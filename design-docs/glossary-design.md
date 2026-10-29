@@ -82,8 +82,8 @@ find the approved term, and follow its links to the data.
    starts as `DRAFT`. Only users with `CREATE_DEFINITION` or `MANAGE_DEFINITIONS` can see it.
 2. An analyst with `CREATE_DEFINITION` on Sales creates `Active Customer`. Its broader term is
    `Customer` and its synonym is `active user`. The analyst links it to column
-   `dw.sales.customers.is_active` (Implemented by). The analyst owns this term and can edit it, but
-   cannot edit `Customer`.
+   `dw.sales.customers.is_active` (Implemented by). The analyst owns this term and can edit it
+   while it is `DRAFT`, but cannot edit `Customer` or approve any term.
 3. The admin sets both terms to `APPROVED`. Users with `VIEW_DEFINITION` can now see them.
 4. The owner of semantic model `dw.sales.sales_model` links its metric `active_customers` to
    `Active Customer`. The term now shows the metric under Used by.
@@ -299,7 +299,8 @@ Both can write bindings. The server checks each term in the request separately:
 | `DEPRECATED`      | `VIEW_DEFINITION`; not MCP                  | `MANAGE_DEFINITIONS` | `MANAGE_DEFINITIONS`                                    |
 
 - A user with `MANAGE_DEFINITIONS` on the metalake or on one of the term's domains sets the status
-  with `PATCH`. Edits take effect at once in any status, and are audited.
+  with `PATCH`. Edits take effect at once and are audited. Once a term is `APPROVED`, only
+  `MANAGE_DEFINITIONS` can edit it (see Access control).
 - **Why three states**: each term is reviewed on its own, so `APPROVED` records that a reviewer
   accepted it. Bindings and people keep using a term after it is replaced, so `DEPRECATED` keeps it
   readable, which a delete cannot do. A domain or an ontology (#14310) is published as a whole and
@@ -333,14 +334,26 @@ Both can write bindings. The server checks each term in the request separately:
 
 ### Access control
 
-| Privilege            | Granted on the metalake or a domain; allows                                   |
-| -------------------- | ----------------------------------------------------------------------------- |
-| `VIEW_DEFINITION`    | Read `APPROVED` and `DEPRECATED` terms, relations and bindings; look up words |
-| `CREATE_DEFINITION`  | Create terms; see `DRAFT` terms; edit and bind own terms; delete own drafts   |
-| `MANAGE_DEFINITIONS` | Edit and bind any term; set status; delete deprecated terms                   |
+The three privileges are granted on the metalake or a domain:
+
+| Action                                                | `VIEW_DEFINITION` | `CREATE_DEFINITION` | `MANAGE_DEFINITIONS` |
+| ----------------------------------------------------- | ----------------- | ------------------- | -------------------- |
+| Read `APPROVED` and `DEPRECATED` terms; look up words | ✓                 | ✓                   | ✓                    |
+| Create a term (the creator becomes the owner)         |                   | ✓                   | ✓                    |
+| See `DRAFT` terms                                     |                   | ✓                   | ✓                    |
+| Edit and bind own terms while they are `DRAFT`        |                   | ✓                   | ✓                    |
+| Edit and bind any term, in any status                 |                   |                     | ✓                    |
+| Set status (approve, deprecate)                       |                   |                     | ✓                    |
+| Delete own `DRAFT` terms                              |                   | ✓                   | ✓                    |
+| Delete `DEPRECATED` terms                             |                   |                     | ✓                    |
 
 - `MANAGE_DEFINITIONS` includes `CREATE_DEFINITION`, and `CREATE_DEFINITION` includes
   `VIEW_DEFINITION`. The names are general, so other business-definition objects can use them too.
+- **Create is not approve**: a user with `CREATE_DEFINITION` can propose terms, but only
+  `MANAGE_DEFINITIONS` makes them `APPROVED`. After approval, the owner can no longer change the
+  term alone, so a reviewed definition cannot change without review.
+- **Edit privilege on a term**, used by Relations, Domain membership and Bindings:
+  `MANAGE_DEFINITIONS`, or being the owner with `CREATE_DEFINITION` while the term is `DRAFT`.
 - **Registration**: three new `Privilege.Name` values. Their `canBindTo` accepts `METALAKE` and
   `DOMAIN` only. The role APIs return 400 when these privileges are granted on any other object,
   or when anything is granted on `GLOSSARY_TERM`.
