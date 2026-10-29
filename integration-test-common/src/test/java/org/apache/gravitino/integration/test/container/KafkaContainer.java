@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.net.Socket;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -94,6 +95,7 @@ public class KafkaContainer extends BaseContainer {
 
     await()
         .atMost(1, TimeUnit.MINUTES)
+        .pollDelay(Duration.ZERO)
         .pollInterval(60 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {

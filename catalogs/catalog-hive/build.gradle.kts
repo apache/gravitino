@@ -114,6 +114,25 @@ dependencies {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
   }
+  // Runs HiveQL against the container's HiveServer2 instead of a `hive -e` CLI per statement.
+  testImplementation(libs.hive2.jdbc) {
+    exclude("org.apache.hadoop")
+    // hive-service pulls in the LLAP server and its HBase, Tephra, Twill and Slider stack, which
+    // a JDBC client never loads.
+    exclude("org.apache.hive", "hive-llap-server")
+    exclude("org.apache.hive", "hive-llap-tez")
+    exclude("org.apache.tez")
+    exclude("org.apache.hbase")
+    exclude("co.cask.tephra")
+    exclude("org.apache.twill")
+    exclude("org.apache.slider")
+    exclude("org.mortbay.jetty")
+    exclude("org.apache.tomcat")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
+  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
