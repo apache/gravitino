@@ -24,19 +24,20 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -77,28 +78,105 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   /**
-   * Applies a policy to an object through its hidden tag in the caller's metadata transaction.
+   * Applies a policy to an object through its hidden tag using the entity store.
    *
-   * <p>This is an internal entry point for migration and server-side callers. It is idempotent and
-   * does not commit, roll back, or close the caller's connection.
+   * <p>This internal operation is idempotent. Migration callers can group it with legacy cleanup in
+   * their storage transaction. It is not exposed through the policy dispatcher or client APIs.
    *
-   * @param connection The caller-owned metadata connection with auto-commit disabled.
-   * @param policyId The policy ID.
-   * @param objectId The metadata object ID.
-   * @param objectType The metadata object type.
-   * @param auditInfo The serialized audit information to preserve on the association.
+   * @param metalake The policy and object's metalake.
+   * @param policyName The policy name.
+   * @param object The metadata object to associate.
+   * @param auditInfo The audit information to preserve on newly created relations.
    * @return The policy's hidden tag ID.
-   * @throws SQLException If an endpoint or hidden tag is invalid, or persistence fails.
+   * @throws IOException If an entity or relation cannot be persisted.
    */
-  public static long addPolicyToObject(
-      Connection connection,
-      long policyId,
-      long objectId,
-      MetadataObject.Type objectType,
-      String auditInfo)
-      throws SQLException {
-    return new PolicyObjectBindingService(connection)
-        .addPolicyToObject(policyId, objectId, objectType, auditInfo);
+  public long addPolicyToObject(
+      String metalake, String policyName, MetadataObject object, Audit auditInfo)
+      throws IOException {
+    Preconditions.checkNotNull(auditInfo, "Policy binding audit information is required");
+    switch (object.type()) {
+      case CATALOG:
+      case SCHEMA:
+      case TABLE:
+      case VIEW:
+      case FILESET:
+      case TOPIC:
+      case MODEL:
+      case FUNCTION:
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported policy binding object type: " + object.type());
+    }
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    PolicyEntity policy =
+        entityStore.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class);
+    NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, object);
+    Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object);
+    if (!entityStore.exists(objectIdent, objectType)) {
+      throw new NoSuchEntityException("Metadata object does not exist: %s", objectIdent);
+    }
+    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag;
+    try {
+      tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+    } catch (NoSuchEntityException e) {
+      tag = HiddenPolicyTag.create(policy, idGenerator.nextId());
+      try {
+        entityStore.put(tag, false);
+      } catch (EntityAlreadyExistsException concurrentCreate) {
+        tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+      }
+    }
+    Preconditions.checkArgument(
+        tag.hidden()
+            && tag.valueConstraint().allowedValues() != null
+            && tag.valueConstraint().allowedValues().length == 0
+            && HiddenPolicyTag.create(policy, tag.id()).properties().equals(tag.properties()),
+        "Reserved tag name collision for policy %s",
+        policy.id());
+    List<RelationalEntity<?>> policies =
+        entityStore
+            .relationOperations()
+            .batchListEntitiesByRelation(
+                SupportsRelationOperations.Type.POLICY_TAG_REL,
+                Collections.singletonList(tagIdent),
+                Entity.EntityType.TAG);
+    if (policies.isEmpty()) {
+      entityStore
+          .relationOperations()
+          .updateEntityRelations(
+              RelationUpdate.of(
+                      SupportsRelationOperations.Type.POLICY_TAG_REL,
+                      tagIdent,
+                      Entity.EntityType.TAG,
+                      new RelationEdgeTarget[] {
+                        RelationEdgeTarget.of(policyIdent, Entity.EntityType.POLICY, null)
+                      },
+                      null)
+                  .withAuditInfo(auditInfo));
+    } else {
+      Preconditions.checkArgument(
+          policies.size() == 1
+              && policies.get(0).targetEntity().nameIdentifier().equals(policyIdent)
+              && !policies.get(0).relationValue().isPresent(),
+          "Invalid policy relation for hidden tag %s",
+          tagIdent);
+    }
+    entityStore
+        .relationOperations()
+        .updateEntityRelations(
+            RelationUpdate.of(
+                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                    objectIdent,
+                    objectType,
+                    new RelationEdgeTarget[] {
+                      RelationEdgeTarget.of(tagIdent, Entity.EntityType.TAG, null)
+                    },
+                    null)
+                .withAuditInfo(auditInfo));
+    return tag.id();
   }
 
   @Override

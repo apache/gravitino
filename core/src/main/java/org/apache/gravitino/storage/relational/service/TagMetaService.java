@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -392,7 +393,8 @@ public class TagMetaService {
         objectType,
         toValuelessTagValues(tagsToAdd),
         toValuelessTagValues(tagsToRemove),
-        true /* failOnDuplicateValuelessAssignment */);
+        true /* failOnDuplicateValuelessAssignment */,
+        null);
   }
 
   @Monitored(
@@ -409,7 +411,30 @@ public class TagMetaService {
         objectType,
         tagsToAdd,
         tagsToRemove,
-        false /* failOnDuplicateValuelessAssignment */);
+        false /* failOnDuplicateValuelessAssignment */,
+        null);
+  }
+
+  /**
+   * Associates tag values while preserving explicit relation creation audit metadata.
+   *
+   * @param objectIdent The metadata object identifier.
+   * @param objectType The metadata object entity type.
+   * @param tagsToAdd Assignments to add.
+   * @param tagsToRemove Assignments to remove.
+   * @param auditInfo Explicit audit metadata, or null to use the current principal and time.
+   * @return The resulting tag assignments.
+   * @throws IOException If storage or serialization fails.
+   */
+  public List<TagEntity> associateTagValuesWithMetadataObject(
+      NameIdentifier objectIdent,
+      Entity.EntityType objectType,
+      TagValue[] tagsToAdd,
+      TagValue[] tagsToRemove,
+      @Nullable Audit auditInfo)
+      throws IOException {
+    return associateTagValuesWithMetadataObject(
+        objectIdent, objectType, tagsToAdd, tagsToRemove, false, auditInfo);
   }
 
   /**
@@ -425,7 +450,8 @@ public class TagMetaService {
       Entity.EntityType objectType,
       TagValue[] tagsToAdd,
       TagValue[] tagsToRemove,
-      boolean failOnDuplicateValuelessAssignment)
+      boolean failOnDuplicateValuelessAssignment,
+      @Nullable Audit auditInfo)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
     try {
       return SessionUtils.doWithCommitAndFetchResult(
@@ -437,7 +463,8 @@ public class TagMetaService {
                   objectType,
                   tagsToAdd,
                   tagsToRemove,
-                  failOnDuplicateValuelessAssignment);
+                  failOnDuplicateValuelessAssignment,
+                  auditInfo);
             } catch (IOException e) {
               // The callback cannot throw a checked exception, so the IOException raised while
               // reading a tag's allowed values is carried across the boundary and unwrapped below.
@@ -454,7 +481,8 @@ public class TagMetaService {
       Entity.EntityType objectType,
       TagValue[] tagsToAdd,
       TagValue[] tagsToRemove,
-      boolean failOnDuplicateValuelessAssignment)
+      boolean failOnDuplicateValuelessAssignment,
+      @Nullable Audit auditInfo)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
     String metalake = objectIdent.namespace().level(0);
@@ -571,7 +599,8 @@ public class TagMetaService {
                 tagPO.getTagId(),
                 metadataObjectId,
                 metadataObject.type().toString(),
-                tagValueToAdd.value().orElse(null)));
+                tagValueToAdd.value().orElse(null),
+                auditInfo));
       }
 
       if (!tagIdsToRemove.isEmpty()) {

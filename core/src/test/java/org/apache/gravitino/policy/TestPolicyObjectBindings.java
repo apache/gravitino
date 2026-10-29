@@ -20,165 +20,199 @@ package org.apache.gravitino.policy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Instant;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
-import org.apache.gravitino.storage.relational.service.TagMetaService;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
-/** Tests internal policy object bindings using caller-owned metadata transactions. */
+/** Tests internal policy bindings through the entity store and relation abstractions. */
 public class TestPolicyObjectBindings extends TestJDBCBackend {
-
+  private static final String METALAKE = "binding_test";
   private Connection connection;
+  private EntityStore store;
+  private PolicyManager manager;
   private PolicyEntity policy;
   private CatalogEntity catalog;
 
-  /** Creates a policy with no hidden tag to represent an existing policy. */
+  /** Creates a legacy policy without a hidden tag and opens the migration transaction. */
   @BeforeEach
   public void preparePolicy() throws Exception {
-    createAndInsertMakeLake("migration_test");
-    catalog = createAndInsertCatalog("migration_test", "catalog");
-    policy = createPolicy(20L, Namespace.of("migration_test"), "policy", AUDIT_INFO);
-    backend.insert(policy, false);
-    connection =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource()
-            .getConnection();
-    try (PreparedStatement relation =
-            connection.prepareStatement(
-                "DELETE FROM policy_tag_relation_meta WHERE policy_id = ?");
-        PreparedStatement tag =
-            connection.prepareStatement("DELETE FROM tag_meta WHERE tag_name = ?")) {
-      relation.setLong(1, policy.id());
-      relation.executeUpdate();
-      tag.setString(1, HiddenPolicyTag.name(policy.id()));
-      tag.executeUpdate();
-    }
-    connection.commit();
+    store = new RelationalEntityStore(backend, new Config(false) {});
+    manager = new PolicyManager(RandomIdGenerator.INSTANCE, store);
+    createAndInsertMakeLake(METALAKE);
+    catalog = createAndInsertCatalog(METALAKE, "catalog");
+    policy = createPolicy(20L, Namespace.of(METALAKE), "policy", AUDIT_INFO);
+    store.put(policy, false);
+    store.delete(
+        NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
+        Entity.EntityType.TAG);
+    SessionUtils.beginTransaction();
+    connection = SqlSessions.currentConnection();
   }
 
-  /** Releases the caller-owned transaction after each test. */
+  /** Rolls back the caller's transaction without closing the shared test backend. */
   @AfterEach
-  public void closeConnection() throws SQLException {
-    if (connection != null) {
-      connection.rollback();
-      connection.close();
+  public void rollbackTransaction() {
+    SessionUtils.rollbackTransaction();
+  }
+
+  /** New tags and both relations are idempotent and participate in the caller's transaction. */
+  @TestTemplate
+  public void testIdempotentBindingAndRollback() throws Exception {
+    long tagId = addPolicy(policy.name(), catalog.name(), AUDIT_INFO);
+    assertEquals(tagId, addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertEquals(1, count("tag_meta"));
+    assertEquals(1, count("policy_tag_relation_meta"));
+    assertEquals(1, count("tag_relation_meta"));
+    assertTrue(
+        store
+            .get(
+                NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
+                Entity.EntityType.TAG,
+                TagEntity.class)
+            .hidden());
+    SessionUtils.rollbackTransaction();
+    SessionUtils.beginTransaction();
+    connection = SqlSessions.currentConnection();
+    assertEquals(0, count("tag_meta"));
+    assertEquals(0, count("policy_tag_relation_meta"));
+    assertEquals(0, count("tag_relation_meta"));
+  }
+
+  /** Policy-created tags are reused and remain when only the new assignment rolls back. */
+  @TestTemplate
+  public void testReusesPolicyTag() throws Exception {
+    SessionUtils.rollbackTransaction();
+    PolicyEntity second = createPolicy(21L, policy.namespace(), "second_policy", AUDIT_INFO);
+    store.put(second, false);
+    TagEntity tag =
+        store.get(
+            NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(second.id())),
+            Entity.EntityType.TAG,
+            TagEntity.class);
+    SessionUtils.beginTransaction();
+    connection = SqlSessions.currentConnection();
+    assertEquals(tag.id(), addPolicy(second.name(), catalog.name(), AUDIT_INFO));
+    SessionUtils.rollbackTransaction();
+    SessionUtils.beginTransaction();
+    connection = SqlSessions.currentConnection();
+    assertEquals(1, count("tag_meta"));
+    assertEquals(1, count("policy_tag_relation_meta"));
+    assertEquals(0, count("tag_relation_meta"));
+  }
+
+  /** Missing endpoints, unsupported types and missing audit metadata fail before writes. */
+  @TestTemplate
+  public void testRejectsInvalidEndpoints() throws Exception {
+    assertThrows(
+        NoSuchEntityException.class, () -> addPolicy("missing", catalog.name(), AUDIT_INFO));
+    assertThrows(
+        NoSuchEntityException.class, () -> addPolicy(policy.name(), "missing", AUDIT_INFO));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            manager.addPolicyToObject(
+                METALAKE,
+                policy.name(),
+                MetadataObjects.parse("catalog.schema.table.column", MetadataObject.Type.COLUMN),
+                AUDIT_INFO));
+    assertThrows(NullPointerException.class, () -> addPolicy(policy.name(), catalog.name(), null));
+    assertEquals(0, count("tag_meta"));
+    assertEquals(0, count("tag_relation_meta"));
+  }
+
+  /** Reserved-name collisions are rejected through the persisted tag model. */
+  @TestTemplate
+  public void testRejectsVisibleTagCollision() throws Exception {
+    store.put(
+        TagEntity.builder()
+            .withId(100L)
+            .withNamespace(policy.namespace())
+            .withName(HiddenPolicyTag.name(policy.id()))
+            .withAuditInfo(AUDIT_INFO)
+            .build(),
+        false);
+    assertThrows(
+        IllegalArgumentException.class, () -> addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertEquals(0, count("tag_relation_meta"));
+  }
+
+  /** Explicit audit metadata passes through relation operations and is preserved on retries. */
+  @TestTemplate
+  public void testPreservesRelationAudit() throws Exception {
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator("original-user")
+            .withCreateTime(Instant.parse("2020-01-02T03:04:05Z"))
+            .build();
+    addPolicy(policy.name(), catalog.name(), audit);
+    addPolicy(policy.name(), catalog.name(), AUDIT_INFO);
+    for (String table : new String[] {"tag_relation_meta", "policy_tag_relation_meta"}) {
+      try (Statement statement = connection.createStatement();
+          ResultSet rows =
+              statement.executeQuery("SELECT audit_info FROM " + table + " WHERE deleted_at = 0")) {
+        assertTrue(rows.next());
+        assertEquals(JsonUtils.anyFieldMapper().writeValueAsString(audit), rows.getString(1));
+      }
     }
   }
 
-  /** Internal policy application creates both links idempotently without committing the caller. */
+  /** A hidden tag cannot silently select another policy. */
   @TestTemplate
-  public void testAddPolicyToObjectIsIdempotentAndCallerTransactional() throws Exception {
-    long tagId =
-        PolicyManager.addPolicyToObject(
-            connection, policy.id(), catalog.id(), MetadataObject.Type.CATALOG, "{}");
-    assertEquals(
-        tagId,
-        PolicyManager.addPolicyToObject(
-            connection, policy.id(), catalog.id(), MetadataObject.Type.CATALOG, "{}"));
-    assertEquals(1, count("tag_meta"));
-    assertEquals(1, count("policy_tag_relation_meta"));
-    assertEquals(1, count("tag_relation_meta"));
-    connection.rollback();
-    assertEquals(0, count("tag_meta"));
-    assertEquals(0, count("policy_tag_relation_meta"));
-    assertEquals(0, count("tag_relation_meta"));
-  }
-
-  /** Existing policy-created hidden tags are reused rather than replaced. */
-  @TestTemplate
-  public void testAddPolicyToObjectReusesPolicyTag() throws Exception {
+  public void testRejectsUnexpectedPolicyRelation() throws Exception {
+    addPolicy(policy.name(), catalog.name(), AUDIT_INFO);
     PolicyEntity second = createPolicy(21L, policy.namespace(), "second_policy", AUDIT_INFO);
-    backend.insert(second, false);
-    TagEntity tag =
-        TagMetaService.getInstance()
-            .getTagByIdentifier(
-                NameIdentifierUtil.ofTag("migration_test", HiddenPolicyTag.name(second.id())));
-    assertEquals(
-        tag.id(),
-        PolicyManager.addPolicyToObject(
-            connection, second.id(), catalog.id(), MetadataObject.Type.CATALOG, "{}"));
-    assertEquals(1, count("tag_meta"));
-    assertEquals(1, count("policy_tag_relation_meta"));
-    assertEquals(1, count("tag_relation_meta"));
-    connection.rollback();
-    assertEquals(1, count("tag_meta"));
-    assertEquals(1, count("policy_tag_relation_meta"));
-    assertEquals(0, count("tag_relation_meta"));
+    store.put(second, false);
+    store
+        .relationOperations()
+        .updateEntityRelations(
+            RelationUpdate.of(
+                SupportsRelationOperations.Type.POLICY_TAG_REL,
+                NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
+                Entity.EntityType.TAG,
+                new RelationEdgeTarget[] {
+                  RelationEdgeTarget.of(second.nameIdentifier(), Entity.EntityType.POLICY, null)
+                },
+                null));
+    assertThrows(
+        IllegalArgumentException.class, () -> addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
   }
 
-  /** The internal entry point rejects invalid endpoints before writing a tag or association. */
-  @TestTemplate
-  public void testAddPolicyToObjectRejectsInvalidEndpoints() throws Exception {
-    assertThrows(
-        SQLException.class,
-        () ->
-            PolicyManager.addPolicyToObject(
-                connection, Long.MAX_VALUE, catalog.id(), MetadataObject.Type.CATALOG, "{}"));
-    assertThrows(
-        SQLException.class,
-        () ->
-            PolicyManager.addPolicyToObject(
-                connection, policy.id(), Long.MAX_VALUE, MetadataObject.Type.CATALOG, "{}"));
-    assertThrows(
-        SQLException.class,
-        () ->
-            PolicyManager.addPolicyToObject(
-                connection, policy.id(), catalog.id(), MetadataObject.Type.COLUMN, "{}"));
-    createAndInsertMakeLake("other_metalake");
-    CatalogEntity foreign = createAndInsertCatalog("other_metalake", "foreign_catalog");
-    assertThrows(
-        SQLException.class,
-        () ->
-            PolicyManager.addPolicyToObject(
-                connection, policy.id(), foreign.id(), MetadataObject.Type.CATALOG, "{}"));
-    assertEquals(0, count("tag_meta"));
-    assertEquals(0, count("tag_relation_meta"));
+  private long addPolicy(String name, String object, AuditInfo audit) throws Exception {
+    return manager.addPolicyToObject(
+        METALAKE, name, MetadataObjects.parse(object, MetadataObject.Type.CATALOG), audit);
   }
 
-  /** Invalid audit data and auto-commit connections are rejected without writing. */
-  @TestTemplate
-  public void testRejectsInvalidTransactionAndAudit() throws Exception {
-    assertThrows(
-        SQLException.class,
-        () ->
-            PolicyManager.addPolicyToObject(
-                connection,
-                policy.id(),
-                catalog.id(),
-                MetadataObject.Type.CATALOG,
-                "invalid-json"));
-    connection.setAutoCommit(true);
-    assertThrows(
-        IllegalStateException.class,
-        () ->
-            PolicyManager.addPolicyToObject(
-                connection, policy.id(), catalog.id(), MetadataObject.Type.CATALOG, "{}"));
-    connection.setAutoCommit(false);
-    assertEquals(0, count("tag_meta"));
-    assertEquals(0, count("policy_tag_relation_meta"));
-    assertEquals(0, count("tag_relation_meta"));
-  }
-
-  private long count(String table) throws SQLException {
+  private long count(String table) throws Exception {
     try (Statement statement = connection.createStatement();
-        ResultSet rows = statement.executeQuery("SELECT COUNT(*) FROM " + table)) {
+        ResultSet rows =
+            statement.executeQuery("SELECT COUNT(*) FROM " + table + " WHERE deleted_at = 0")) {
       rows.next();
       return rows.getLong(1);
     }

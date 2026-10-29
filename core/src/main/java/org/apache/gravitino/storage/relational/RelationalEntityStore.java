@@ -105,6 +105,24 @@ public class RelationalEntityStore
   // caches have no per-node copy to invalidate, so no listener is registered.
   @Nullable private EntityCacheChangeLogListener entityCacheChangeLogListener;
 
+  /** Creates a store to be initialized through {@link #initialize(Config)}. */
+  public RelationalEntityStore() {}
+
+  /**
+   * Creates an uncached store around a backend initialized by the caller.
+   *
+   * <p>This constructor starts no background maintenance workers. Closing the store closes the
+   * supplied backend, so the caller must give it exclusive ownership.
+   *
+   * @param backend The initialized backend.
+   * @param config The cache configuration.
+   */
+  public RelationalEntityStore(RelationalBackend backend, Config config) {
+    this.backend = backend;
+    this.cache = new NoOpsCache(config);
+    EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+  }
+
   @VisibleForTesting
   public EntityCache getCache() {
     return cache;
