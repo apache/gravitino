@@ -403,6 +403,8 @@ create a missing hidden tag.
 
 Do not run old and new server versions together after internal policy tags have been created:
 old servers do not recognize the internal name prefix and can expose or modify these tags.
+Historical direct object policy associations must be converted with the offline migration tool
+before starting the new server. See [Migration Guide](./migration-guide.md#offline-policy-binding-migration).
 
 To add or remove an association, a user must own the metalake or have the required access to both
 the tag and the policy (`APPLY_TAG` and `APPLY_POLICY`, or ownership of each). Object policy
