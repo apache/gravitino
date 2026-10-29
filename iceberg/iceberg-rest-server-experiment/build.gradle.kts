@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import org.gradle.api.attributes.Attribute
+
 description = "iceberg-rest-server-experiment"
 
 plugins {
@@ -27,26 +29,86 @@ plugins {
 val datastratoIcebergVersion: String = libs.versions.datastrato.iceberg.get()
 val caffeineVersion: String = libs.versions.caffeine.get()
 val jacksonVersion: String = libs.versions.jackson.get()
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val experimentalScalaVersion = "2.13"
+val experimentalSparkVersion: String = libs.versions.spark41.get()
+val experimentalSparkMajorVersion: String = experimentalSparkVersion.substringBeforeLast(".")
+val datastratoIcebergGitCommit: String = libs.versions.experimental.iceberg.git.commit.get()
+val jerseyVersion: String = libs.versions.jersey.get()
+val javaxWsRsVersion: String = libs.versions.javax.ws.rs.api.get()
+val hk2Version = "2.6.1"
+val jakartaValidationVersion = "2.0.2"
 
 configurations.configureEach {
   resolutionStrategy {
-    force(
-      "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
-      "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion",
-      "com.fasterxml.jackson.core:jackson-core:$jacksonVersion",
-      "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
-      "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion",
-      "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
-    )
+    force("com.github.ben-manes.caffeine:caffeine:$caffeineVersion")
+    // Spark supplies matching Jackson modules on the test classpaths.
+    if (!name.contains("test", ignoreCase = true)) {
+      force(
+        "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion",
+        "com.fasterxml.jackson.core:jackson-core:$jacksonVersion",
+        "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
+        "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion",
+        "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+      )
+    }
     eachDependency {
-      if (
+      if (requested.group == "org.apache.spark") {
+        val experimentalSparkModule = requested.name.replace("_$scalaVersion", "_$experimentalScalaVersion")
+        useTarget("${requested.group}:$experimentalSparkModule:$experimentalSparkVersion")
+        because("The experimental Iceberg Spark runtime requires Spark 4.1 with Scala 2.13")
+      } else if (
+        requested.group == "org.scala-lang.modules" && requested.name.endsWith("_$scalaVersion")
+      ) {
+        val experimentalScalaModule = requested.name.replace("_$scalaVersion", "_$experimentalScalaVersion")
+        useTarget("${requested.group}:$experimentalScalaModule:${requested.version}")
+        because("Spark 4.1 uses Scala 2.13")
+      } else if (requested.name.startsWith("iceberg-spark-runtime-")) {
+        useTarget(
+          "com.datastrato:experimental-iceberg-spark-runtime-${experimentalSparkMajorVersion}_$experimentalScalaVersion:$datastratoIcebergVersion"
+        )
+        because("Run experimental Iceberg integration tests with the matching Spark runtime")
+      } else if (
         requested.name.startsWith("iceberg-") &&
         (requested.group == "org.apache.iceberg" || requested.group == "com.datastrato")
       ) {
         useTarget("com.datastrato:experimental-${requested.name}:$datastratoIcebergVersion")
-        because("Use the Datastrato Iceberg distribution in the experimental auxiliary service")
+        because("Run experimental Iceberg integration tests with the Datastrato distribution")
       }
     }
+  }
+}
+
+val testRuntimeClasspath = configurations.testRuntimeClasspath.get()
+val experimentalTestRuntimeClasspath by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+  extendsFrom(testRuntimeClasspath)
+  attributes {
+    testRuntimeClasspath.attributes.keySet().forEach { key ->
+      @Suppress("UNCHECKED_CAST")
+      val typedKey = key as Attribute<Any>
+      attribute(typedKey, testRuntimeClasspath.attributes.getAttribute(typedKey)!!)
+    }
+  }
+  resolutionStrategy {
+    force(
+      "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
+      "javax.ws.rs:javax.ws.rs-api:$javaxWsRsVersion",
+      "org.glassfish.jersey.core:jersey-server:$jerseyVersion",
+      "org.glassfish.jersey.core:jersey-common:$jerseyVersion",
+      "org.glassfish.jersey.core:jersey-client:$jerseyVersion",
+      "org.glassfish.jersey.containers:jersey-container-servlet:$jerseyVersion",
+      "org.glassfish.jersey.containers:jersey-container-servlet-core:$jerseyVersion",
+      "org.glassfish.jersey.containers:jersey-container-jetty-http:$jerseyVersion",
+      "org.glassfish.jersey.inject:jersey-hk2:$jerseyVersion",
+      "org.glassfish.hk2:hk2-api:$hk2Version",
+      "org.glassfish.hk2:hk2-locator:$hk2Version",
+      "org.glassfish.hk2:hk2-utils:$hk2Version",
+      "org.glassfish.hk2.external:aopalliance-repackaged:$hk2Version",
+      "org.glassfish.hk2.external:jakarta.inject:$hk2Version",
+      "jakarta.validation:jakarta.validation-api:$jakartaValidationVersion"
+    )
   }
 }
 
@@ -65,6 +127,7 @@ dependencies {
   implementation(project(":iceberg:iceberg-rest-server"))
   implementation(libs.bundles.iceberg)
 
+  testImplementation(project(":iceberg:iceberg-rest-server", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testCompileOnly(libs.jsr305)
@@ -110,4 +173,56 @@ tasks {
   register("copyLibAndConfigs") {
     dependsOn(copyLibs, copyConfigs)
   }
+}
+
+val readRestrictionAuthenticatorJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("read-restriction-test-authenticator")
+  destinationDirectory.set(layout.buildDirectory.dir("test-fixtures"))
+  from(sourceSets.test.get().output) {
+    include("org/apache/gravitino/server/authentication/ReadRestrictionGroupAuthenticator.class")
+  }
+}
+
+val experimentalTest by tasks.registering(Test::class) {
+  description = "Runs Iceberg REST tests that require the experimental Iceberg runtime"
+  group = "verification"
+  testClassesDirs = sourceSets.test.get().output.classesDirs
+  classpath =
+    sourceSets.main.get().output +
+    sourceSets.test.get().output +
+    experimentalTestRuntimeClasspath
+  systemProperty("datastratoIcebergGitCommit", datastratoIcebergGitCommit)
+  systemProperty("spark.ui.enabled", "false")
+  // Deploy mode starts a separate server process; expose only the test authenticator fixture.
+  environment(
+    "GRAVITINO_CLASSPATH",
+    readRestrictionAuthenticatorJar.flatMap { it.archiveFile }.get().asFile.absolutePath
+  )
+  setIncludes(
+    setOf(
+      "**/IcebergExperimentalAuthorizationIT.class",
+      "**/IcebergReadRestrictionIT.class"
+    )
+  )
+  filter {
+    includeTestsMatching(
+      "org.apache.gravitino.iceberg.integration.test.IcebergExperimentalAuthorizationIT"
+    )
+    includeTestsMatching(
+      "org.apache.gravitino.iceberg.integration.test.IcebergReadRestrictionIT"
+    )
+  }
+  mustRunAfter(tasks.test, ":iceberg:iceberg-rest-server:test")
+  dependsOn(
+    tasks.testClasses,
+    tasks.jar,
+    ":catalogs:catalog-lakehouse-iceberg:jar",
+    tasks.named("copyDepends"),
+    readRestrictionAuthenticatorJar
+  )
+}
+
+tasks.test {
+  exclude("**/IcebergExperimentalAuthorizationIT.class")
+  exclude("**/IcebergReadRestrictionIT.class")
 }
