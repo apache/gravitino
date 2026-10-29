@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableBiMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
@@ -98,6 +99,16 @@ public class MetadataObjectUtil {
 
     return Optional.ofNullable(TYPE_TO_TYPE_MAP.get(type))
         .orElseThrow(() -> new IllegalArgumentException("Unknown metadata object type: " + type));
+  }
+
+  /**
+   * Returns the entity types that metadata object types are mapped to. A metadata object type that
+   * is not backed by an entity yet has no entry here.
+   *
+   * @return The entity types of the metadata objects.
+   */
+  public static Set<Entity.EntityType> metadataObjectEntityTypes() {
+    return TYPE_TO_TYPE_MAP.values();
   }
 
   /**

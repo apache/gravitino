@@ -77,7 +77,13 @@ public interface MetadataObject {
     /** A job template represents a reusable template for creating jobs in Gravitino. */
     JOB_TEMPLATE,
     /** A function represents a user-defined function registered in Gravitino. */
-    FUNCTION;
+    FUNCTION,
+    /**
+     * A domain groups metadata objects from any catalog under a business name. A leaf object, such
+     * as a table, belongs to a domain when its effective tags, its own or those inherited from its
+     * schema and catalog, match the domain's backing tag. A domain cannot be tagged itself.
+     */
+    DOMAIN;
   }
 
   /**

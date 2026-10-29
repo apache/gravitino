@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Unstable;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 
@@ -132,6 +133,16 @@ public interface View extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("View does not support tag operations.");
+  }
+
+  /**
+   * Returns the domain operations for this view.
+   *
+   * @return The {@link SupportsDomains} if the view supports domain operations.
+   * @throws UnsupportedOperationException If the view does not support domain operations.
+   */
+  default SupportsDomains supportsDomains() {
+    throw new UnsupportedOperationException("View does not support domain operations.");
   }
 
   /**
