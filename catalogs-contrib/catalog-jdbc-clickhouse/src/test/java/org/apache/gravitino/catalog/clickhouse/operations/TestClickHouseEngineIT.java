@@ -40,7 +40,8 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.ClickHouseFixture;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.indexes.Index;
@@ -86,21 +87,18 @@ import org.testcontainers.DockerClientFactory;
  */
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_ENGINE_IT)
 public class TestClickHouseEngineIT {
 
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_ENGINE_IT;
 
-  private ClickHouseContainer clickHouseContainer;
+  @FixtureContainer private ClickHouseContainer clickHouseContainer;
   private ClickHouseDatabaseOperations databaseOperations;
   private ClickHouseTableOperations tableOperations;
   private String schemaName;
 
   @BeforeAll
   public void setup() throws Exception {
-    containerSuite.startClickHouseContainer(TEST_DB_NAME);
-    clickHouseContainer = containerSuite.getClickHouseContainer();
-
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), clickHouseContainer.getJdbcUrl());
     catalogProperties.put(
@@ -122,7 +120,7 @@ public class TestClickHouseEngineIT {
         new ClickHouseColumnDefaultValueConverter(),
         Collections.emptyMap());
 
-    schemaName = "engine_it_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    schemaName = "engine_it_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     databaseOperations.create(schemaName, null, Collections.emptyMap());
   }
 
@@ -139,7 +137,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testTinyLogEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "tinylog_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "tinylog_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.TINYLOG);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -160,7 +158,8 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testStripeLogEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "stripelog_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName =
+        "stripelog_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.STRIPELOG);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -181,7 +180,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testLogEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "log_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "log_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.LOG);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -204,7 +203,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testMemoryEngineIsVolatileAfterRestart() throws Exception {
-    String tableName = "memory_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "memory_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.MEMORY);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -233,7 +232,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testNullEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "null_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "null_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.NULL);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);
@@ -251,7 +250,7 @@ public class TestClickHouseEngineIT {
 
   @Test
   void testSetEngineCreateLoadAndPersistAfterRestart() throws Exception {
-    String tableName = "set_" + RandomStringUtils.randomAlphanumeric(6).toLowerCase();
+    String tableName = "set_" + RandomStringUtils.insecure().nextAlphanumeric(6).toLowerCase();
     createSimpleTable(schemaName, tableName, ENGINE.SET);
 
     JdbcTable before = tableOperations.load(schemaName, tableName);

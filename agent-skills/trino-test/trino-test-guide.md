@@ -544,16 +544,15 @@ Use 5-digit number prefix for easy sorting and reference:
 
 #### Issue 3: Docker container startup failure
 
-**Cause**: Port conflicts or insufficient resources
+**Cause**: Insufficient resources, or containers left from an earlier run
 
 **Solution**:
 ```bash
-# Cleanup old containers
-./integration-test-common/docker-script/shutdown.sh
+# Stop an environment started with --env_only
+./trino-connector/integration-test/trino-test-tools/trino_integration_test.sh --stop
 
-# Check port usage
-lsof -i :8080
-lsof -i :9083
+# List test containers; Testcontainers removes them once their test JVM is gone
+docker ps -a --filter label=org.testcontainers=true
 ```
 
 ## Summary

@@ -51,6 +51,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -66,7 +67,9 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.ClickHouseFixture;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -107,8 +110,8 @@ import org.junit.jupiter.api.condition.EnabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT)
 public class CatalogClickHouseIT extends BaseIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-clickhouse";
 
   public String metalakeName = GravitinoITUtils.genRandomName("clickhouse_it_metalake");
@@ -131,7 +134,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
   private ClickHouseService clickhouseService;
 
-  private ClickHouseContainer CLICKHOUSE_CONTAINER;
+  @FixtureContainer private ClickHouseContainer CLICKHOUSE_CONTAINER;
 
   private TestDatabaseName TEST_DB_NAME;
 
@@ -142,9 +145,6 @@ public class CatalogClickHouseIT extends BaseIT {
   @BeforeAll
   public void startup() throws IOException, SQLException {
     TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CATALOG_CLICKHOUSE_IT;
-
-    containerSuite.startClickHouseContainer(TEST_DB_NAME);
-    CLICKHOUSE_CONTAINER = containerSuite.getClickHouseContainer();
 
     clickhouseService = new ClickHouseService(CLICKHOUSE_CONTAINER, TEST_DB_NAME);
     createMetalake();
@@ -562,8 +562,7 @@ public class CatalogClickHouseIT extends BaseIT {
             String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, sourceTableName));
     String normalizedSourceCreateSql = sourceCreateSql.replace("`", "").replaceAll("\\s+", "");
     Assertions.assertTrue(
-        StringUtils.containsIgnoreCase(
-            normalizedSourceCreateSql, "INDEXidx_lowerlower(name)TYPEminmax"),
+        Strings.CI.contains(normalizedSourceCreateSql, "INDEXidx_lowerlower(name)TYPEminmax"),
         "Source table should retain its expression index: " + sourceCreateSql);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -595,10 +594,10 @@ public class CatalogClickHouseIT extends BaseIT {
     String normalizedRecreatedCreateSql =
         recreatedCreateSql.replace("`", "").replaceAll("\\s+", "");
     Assertions.assertTrue(
-        StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "INDEXidx_namenametypeMINMAX"),
+        Strings.CI.contains(normalizedRecreatedCreateSql, "INDEXidx_namenametypeMINMAX"),
         "Recreated table should retain the simple index: " + recreatedCreateSql);
     Assertions.assertFalse(
-        StringUtils.containsIgnoreCase(normalizedRecreatedCreateSql, "idx_lower"),
+        Strings.CI.contains(normalizedRecreatedCreateSql, "idx_lower"),
         "Recreated table must not contain a fabricated replacement index: " + recreatedCreateSql);
   }
 
@@ -700,8 +699,7 @@ public class CatalogClickHouseIT extends BaseIT {
               String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, createdTableName));
       String normalizedShowCreateSql = StringUtils.deleteWhitespace(showCreateSql).replace("`", "");
       Assertions.assertTrue(
-          StringUtils.containsIgnoreCase(
-              normalizedShowCreateSql, "PARTITIONBY" + expectedPartitionKey),
+          Strings.CI.contains(normalizedShowCreateSql, "PARTITIONBY" + expectedPartitionKey),
           "CREATE should emit the ClickHouse partition function: " + showCreateSql);
     }
   }
@@ -939,7 +937,7 @@ public class CatalogClickHouseIT extends BaseIT {
             .withHostName("gravitino-ci-clickhouse-legacy")
             .withEnvVars(Map.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
             .withExposePorts(Set.of(ClickHouseContainer.CLICKHOUSE_PORT))
-            .withNetwork(containerSuite.getNetwork())
+            .withNetwork(Fixtures.network())
             .build();
     Catalog legacyCatalog = null;
     try {
@@ -1037,7 +1035,7 @@ public class CatalogClickHouseIT extends BaseIT {
             .withHostName("gravitino-ci-clickhouse-legacy-annoy")
             .withEnvVars(Map.of("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD))
             .withExposePorts(Set.of(ClickHouseContainer.CLICKHOUSE_PORT))
-            .withNetwork(containerSuite.getNetwork())
+            .withNetwork(Fixtures.network())
             .build();
     Catalog legacyCatalog = null;
     try {
@@ -1096,7 +1094,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
       Assertions.assertEquals("annoy", nativeType);
       Assertions.assertTrue(
-          StringUtils.startsWithIgnoreCase(nativeTypeFull, "annoy"),
+          Strings.CI.startsWith(nativeTypeFull, "annoy"),
           "Expected ClickHouse to preserve the Annoy type expression, but got: " + nativeTypeFull);
       Assertions.assertTrue(nativeGranularity > 0);
 

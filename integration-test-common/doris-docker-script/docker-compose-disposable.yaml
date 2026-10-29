@@ -1,4 +1,3 @@
-#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -17,25 +16,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
-#
-cd "$(dirname "$0")"
 
-container_urls=$(docker inspect --format='{{.Name}}:{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q) | grep "/trino-ci-" | sed 's/\/trino-ci-//g')
+# Applied on top of docker-compose.yaml when the cluster's data is disposable
+# (DorisContainer with Durability.DISPOSABLE): no test reads it back after the cluster stops.
 
-while IFS=: read -r container_name address; do
-  case "$container_name" in
-    trino)
-      echo "trino_uri=http://$address:8080"
-      ;;
-    hive)
-      echo "hive_uri=thrift://$address:9083"
-      echo "hdfs_uri=hdfs://$address:9000"
-      ;;
-    mysql)
-      echo "mysql_uri=jdbc:mysql://$address:3306"
-      ;;
-    postgresql)
-      echo "postgresql_uri=jdbc:postgresql://$address"
-      ;;
-  esac
-done <<< "$container_urls"
+services:
+
+  doris-fe:
+    environment:
+      # start-fe.sh then turns off BDB JE syncs for the FE metadata.
+      GRAVITINO_DISPOSABLE_DATA: "true"
+
+  doris-be:
+    volumes:
+      # The BE's default storage_root_path (${DORIS_HOME}/storage, DORIS_HOME being the BE home).
+      # tmpfs only takes what is written; the size is well above the 2 GB the FE wants free on a
+      # disk (storage_min_left_capacity_bytes) before it places tablets there.
+      - type: tmpfs
+        target: /opt/apache-doris/be/storage
+        tmpfs:
+          size: 8g
