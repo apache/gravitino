@@ -43,6 +43,7 @@ public class CompatibilityUtils {
           .put(OperationType.LIST_CATALOG, Operation.LIST_CATALOG)
           .put(OperationType.ENABLE_CATALOG, Operation.ENABLE_CATALOG)
           .put(OperationType.DISABLE_CATALOG, Operation.DISABLE_CATALOG)
+          .put(OperationType.TEST_CONNECTION_CATALOG, Operation.TEST_CONNECTION_CATALOG)
           .put(OperationType.CREATE_SCHEMA, Operation.CREATE_SCHEMA)
           .put(OperationType.DROP_SCHEMA, Operation.DROP_SCHEMA)
           .put(OperationType.ALTER_SCHEMA, Operation.ALTER_SCHEMA)
@@ -200,6 +201,10 @@ public class CompatibilityUtils {
           .put(OperationType.DROP_SEMANTIC_MODEL, Operation.DROP_SEMANTIC_MODEL)
           .put(OperationType.LOAD_SEMANTIC_MODEL, Operation.LOAD_SEMANTIC_MODEL)
           .put(OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL)
+          .put(OperationType.LIST_SEMANTIC_MODEL_METRIC, Operation.LIST_SEMANTIC_MODEL_METRIC)
+          .put(
+              OperationType.LIST_SEMANTIC_MODEL_METRIC_INFOS,
+              Operation.LIST_SEMANTIC_MODEL_METRIC_INFOS)
           .put(OperationType.IMPORT_SEMANTIC_MODEL, Operation.IMPORT_SEMANTIC_MODEL)
           .put(OperationType.EXPORT_SEMANTIC_MODEL, Operation.EXPORT_SEMANTIC_MODEL)
           .put(OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION)

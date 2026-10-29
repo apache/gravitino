@@ -228,6 +228,19 @@ You can also build manually with:
 
 Import Gravitino into IntelliJ IDEA or Eclipse as a Gradle project.
 
+The SQL policy parser's ANTLR runtime is relocated into the packaged core JAR.
+Core's unrelocated module class output uses a `compileOnly` ANTLR dependency, so
+launching the server directly with IDE module outputs requires adding the ANTLR
+runtime version declared in `gradle/libs.versions.toml` to the launch classpath.
+Without it, SQL policy parsing can fail with `NoClassDefFoundError` for
+`org.antlr.v4.runtime` classes. Building the shaded JAR alone does not change the
+IDE's module classpath.
+
+To debug with the packaged runtime, build the distribution, enable
+`GRAVITINO_DEBUG_OPTS` in `conf/gravitino-env.sh`, start it with
+`bin/gravitino.sh start`, and attach an IDE remote JVM debugger as described in
+[the installation guide](docs/how-to-install.md).
+
 ## 💡 Tips for WSL Users
 
 If using WSL on Windows, install Java and dev tools inside WSL. Access files via `/mnt/c/...` paths.

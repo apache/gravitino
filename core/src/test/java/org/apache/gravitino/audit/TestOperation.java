@@ -112,6 +112,8 @@ import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
@@ -120,6 +122,10 @@ import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
@@ -574,6 +580,34 @@ public class TestOperation {
         AuditLog.Operation.LIST_PARTITION, AuditLog.Operation.fromEvent(listPartitionFailureEvent));
   }
 
+  /** Verifies audit operation mapping for successful and failed metric identifier listings. */
+  @Test
+  public void testListSemanticModelMetricOperation() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "schema");
+    Event event = new ListSemanticModelMetricEvent(USER, namespace, 2);
+    Assertions.assertEquals(
+        AuditLog.Operation.LIST_SEMANTIC_MODEL_METRIC, AuditLog.Operation.fromEvent(event));
+
+    Event failureEvent = new ListSemanticModelMetricFailureEvent(USER, namespace, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.LIST_SEMANTIC_MODEL_METRIC, AuditLog.Operation.fromEvent(failureEvent));
+  }
+
+  /** Verifies audit operation mapping for successful and failed complete metric listings. */
+  @Test
+  public void testListSemanticModelMetricInfosOperation() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "schema");
+    Event event = new ListSemanticModelMetricInfosEvent(USER, namespace, 2);
+    Assertions.assertEquals(
+        AuditLog.Operation.LIST_SEMANTIC_MODEL_METRIC_INFOS, AuditLog.Operation.fromEvent(event));
+
+    Event failureEvent =
+        new ListSemanticModelMetricInfosFailureEvent(USER, namespace, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.LIST_SEMANTIC_MODEL_METRIC_INFOS,
+        AuditLog.Operation.fromEvent(failureEvent));
+  }
+
   @Test
   public void testLoadOperation() {
     Event loadMetalakeEvent = new LoadMetalakeEvent(USER, metalakeIdentifier, metalakeInfo);
@@ -677,6 +711,16 @@ public class TestOperation {
     Assertions.assertEquals(
         AuditLog.Operation.DISABLE_CATALOG,
         AuditLog.Operation.fromEvent(disableCatalogFailureEvent));
+
+    Event testConnectionEvent = new TestConnectionEvent(USER, catalogIdentifier);
+    Assertions.assertEquals(
+        AuditLog.Operation.TEST_CONNECTION_CATALOG,
+        AuditLog.Operation.fromEvent(testConnectionEvent));
+    Event testConnectionFailureEvent =
+        new TestConnectionFailureEvent(USER, catalogIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.TEST_CONNECTION_CATALOG,
+        AuditLog.Operation.fromEvent(testConnectionFailureEvent));
   }
 
   @Test
