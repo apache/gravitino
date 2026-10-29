@@ -63,6 +63,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
+import org.apache.gravitino.TestTable;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
@@ -1490,6 +1491,43 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         .withIndexes(table.indexes())
         .withAuditInfo(table.auditInfo())
         .build();
+  }
+
+  @Test
+  public void testLoadKeepsStoredColumnsWhenCatalogReportsNoColumns() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_null_columns");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_columns");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("c1")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    Map<String, Long> ids = columnIds(tableIdent);
+
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) testCatalog.ops())
+        .replaceTable(
+            tableIdent,
+            TestTable.builder()
+                .withName(tableIdent.name())
+                .withComment("comment")
+                .withProperties(props)
+                .withAuditInfo(
+                    AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+                .build());
+
+    Table loaded = tableOperationDispatcher.loadTable(tableIdent);
+
+    Assertions.assertNull(loaded.columns());
+    Assertions.assertEquals(ids, columnIds(tableIdent));
   }
 
   @Test

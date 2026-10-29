@@ -299,7 +299,11 @@ public class DTOConverters {
         .withName(table.name())
         .withComment(table.comment())
         .withColumns(
-            Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
+            table.columns() == null
+                ? null
+                : Arrays.stream(table.columns())
+                    .map(DTOConverters::toDTO)
+                    .toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
         .withSortOrders(toDTOs(table.sortOrder()))
         .withDistribution(toDTO(table.distribution()))

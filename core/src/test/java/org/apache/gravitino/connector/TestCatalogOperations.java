@@ -173,6 +173,11 @@ public class TestCatalogOperations
         .toArray(NameIdentifier[]::new);
   }
 
+  /** Replaces a table, e.g. with one whose source reports no column list. */
+  public void replaceTable(NameIdentifier ident, TestTable table) {
+    tables.put(ident, table);
+  }
+
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     if (tables.containsKey(ident)) {

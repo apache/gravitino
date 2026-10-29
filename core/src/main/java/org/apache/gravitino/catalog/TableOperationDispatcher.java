@@ -977,12 +977,23 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       return Pair.of(false, Collections.emptyList());
     }
 
+    // A catalog that reports no column list says nothing about the columns, so keep the stored
+    // ones. Treating it as "all columns dropped" would delete their tags, policies and owners.
+    if (tableFromCatalog.columns() == null) {
+      LOG.warn(
+          "Table {} from the underlying source has no column list, keeping the stored columns",
+          tableFromCatalog.name());
+      return Pair.of(
+          false,
+          tableFromGravitino.columns() == null
+              ? Collections.emptyList()
+              : tableFromGravitino.columns());
+    }
+
     Map<String, Pair<Integer, Column>> columnsFromCatalogTable =
-        tableFromCatalog.columns() == null
-            ? Collections.emptyMap()
-            : IntStream.range(0, tableFromCatalog.columns().length)
-                .mapToObj(i -> Pair.of(i, tableFromCatalog.columns()[i]))
-                .collect(Collectors.toMap(p -> p.getRight().name(), Function.identity()));
+        IntStream.range(0, tableFromCatalog.columns().length)
+            .mapToObj(i -> Pair.of(i, tableFromCatalog.columns()[i]))
+            .collect(Collectors.toMap(p -> p.getRight().name(), Function.identity()));
     Map<String, ColumnEntity> columnsFromTableEntity =
         tableFromGravitino.columns() == null
             ? Collections.emptyMap()
