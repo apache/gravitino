@@ -368,4 +368,14 @@ public interface EntityStore extends Closeable {
   default SupportsRelationOperations relationOperations() {
     throw new UnsupportedOperationException("relation operations are not supported");
   }
+
+  /**
+   * Get the domain operations that are supported by the entity store.
+   *
+   * @return the domain operations that are supported by the entity store
+   * @throws UnsupportedOperationException if the domain operations are not supported
+   */
+  default SupportsDomainOperations domainOperations() {
+    throw new UnsupportedOperationException("domain operations are not supported");
+  }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,15 +44,18 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.AfterEach;
@@ -77,6 +81,8 @@ public class TestRelationalEntityStoreLockWaitTimeout {
 
   private static final NameIdentifier TABLE_IDENT =
       NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "t1");
+
+  private static final NameIdentifier DOMAIN_IDENT = NameIdentifierUtil.ofDomain(METALAKE, "d1");
 
   private RelationalEntityStore store;
   private String dbPath;
@@ -344,7 +350,33 @@ public class TestRelationalEntityStoreLockWaitTimeout {
         Pair.of(
             "batchDelete",
             () -> store.batchDelete(List.of(Pair.of(TABLE_IDENT, Entity.EntityType.TABLE)), false)),
-        Pair.of("batchPut", () -> store.batchPut(List.of(table), true)));
+        Pair.of("batchPut", () -> store.batchPut(List.of(table), true)),
+        Pair.of("insertDomain", () -> store.insertDomain(domain(), state -> {})),
+        Pair.of(
+            "setDomainParent",
+            () ->
+                store.setDomainParent(
+                    DOMAIN_IDENT,
+                    NameIdentifierUtil.ofDomain(METALAKE, "parent"),
+                    AUDIT_INFO,
+                    state -> {})),
+        Pair.of("removeDomainParent", () -> store.removeDomainParent(DOMAIN_IDENT)),
+        Pair.of(
+            "updateDomainStatus",
+            () ->
+                store.updateDomainStatus(
+                    DOMAIN_IDENT, Domain.Status.PUBLISHED, AUDIT_INFO, state -> {})));
+  }
+
+  private static DomainEntity domain() {
+    return DomainEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(DOMAIN_IDENT.name())
+        .withNamespace(DOMAIN_IDENT.namespace())
+        .withProperties(ImmutableMap.of())
+        .withStatus(Domain.Status.DRAFT)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
   }
 
   private List<TagEntity> associateTags(NameIdentifier[] tags) throws IOException {

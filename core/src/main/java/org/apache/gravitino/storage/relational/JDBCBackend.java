@@ -50,7 +50,9 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.DomainEntity;
@@ -77,6 +79,7 @@ import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.DomainMetaService;
+import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
@@ -747,6 +750,42 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
     }
+  }
+
+  @Override
+  public void insertDomain(DomainEntity domain, Consumer<LockedDomainState> check)
+      throws IOException {
+    DomainMetaService.getInstance().insertDomain(domain, check);
+  }
+
+  @Override
+  public DomainEntity setDomainParent(
+      NameIdentifier ident,
+      NameIdentifier parentIdent,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    return DomainRelService.getInstance().setDomainParent(ident, parentIdent, auditInfo, check);
+  }
+
+  @Override
+  public DomainEntity removeDomainParent(NameIdentifier ident) throws IOException {
+    return DomainRelService.getInstance().removeDomainParent(ident);
+  }
+
+  @Override
+  public DomainEntity updateDomainStatus(
+      NameIdentifier ident,
+      Domain.Status status,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    return DomainRelService.getInstance().updateDomainStatus(ident, status, auditInfo, check);
+  }
+
+  @Override
+  public List<DomainEntity> listSubDomains(NameIdentifier parentIdent) {
+    return DomainRelService.getInstance().listSubDomains(parentIdent);
   }
 
   @Override

@@ -48,6 +48,7 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
@@ -56,8 +57,11 @@ import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
@@ -81,7 +85,10 @@ import org.slf4j.LoggerFactory;
  * ExceptionUtils#isLockWaitTimeout}.
  */
 public class RelationalEntityStore
-    implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
+    implements EntityStore,
+        SupportsRelationOperations,
+        SupportsDomainOperations,
+        SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -407,6 +414,64 @@ public class RelationalEntityStore
   @Override
   public SupportsRelationOperations relationOperations() {
     return this;
+  }
+
+  @Override
+  public SupportsDomainOperations domainOperations() {
+    return this;
+  }
+
+  @Override
+  public void insertDomain(DomainEntity domain, Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      backend.insertDomain(domain, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re, Entity.EntityType.DOMAIN, domain.nameIdentifier());
+    }
+  }
+
+  @Override
+  public DomainEntity setDomainParent(
+      NameIdentifier ident,
+      NameIdentifier parentIdent,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      return backend.setDomainParent(ident, parentIdent, auditInfo, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    }
+  }
+
+  @Override
+  public DomainEntity removeDomainParent(NameIdentifier ident) throws IOException {
+    try {
+      return backend.removeDomainParent(ident);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    }
+  }
+
+  @Override
+  public DomainEntity updateDomainStatus(
+      NameIdentifier ident,
+      Domain.Status status,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      return backend.updateDomainStatus(ident, status, auditInfo, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    }
+  }
+
+  @Override
+  public List<DomainEntity> listSubDomains(NameIdentifier parentIdent) throws IOException {
+    return backend.listSubDomains(parentIdent);
   }
 
   @Override

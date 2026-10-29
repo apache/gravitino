@@ -226,14 +226,14 @@ public class TestDomainMetaService extends TestJDBCBackend {
     Assertions.assertTrue(batch.contains(finance));
     Assertions.assertTrue(batch.contains(markets));
 
-    DomainEntity published =
+    DomainEntity updated =
         backend.<DomainEntity>update(
             finance.nameIdentifier(),
             Entity.EntityType.DOMAIN,
-            entity -> entity.toBuilder().withStatus(Domain.Status.PUBLISHED).build());
-    Assertions.assertEquals(Domain.Status.PUBLISHED, published.status());
+            entity -> entity.toBuilder().withComment("updated").build());
+    Assertions.assertEquals("updated", updated.comment());
     Assertions.assertEquals(
-        published, backend.get(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
+        updated, backend.get(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
 
     Assertions.assertTrue(
         backend.delete(finance.nameIdentifier(), Entity.EntityType.DOMAIN, false));
@@ -305,7 +305,6 @@ public class TestDomainMetaService extends TestJDBCBackend {
                         .withName("Finance/Tax")
                         .withComment(null)
                         .withProperties(ImmutableMap.of("k2", "v2"))
-                        .withStatus(Domain.Status.PUBLISHED)
                         .withAuditInfo(updatedAudit)
                         .build());
 
@@ -319,8 +318,18 @@ public class TestDomainMetaService extends TestJDBCBackend {
     Assertions.assertEquals(finance.id(), loaded.id());
     Assertions.assertNull(loaded.comment());
     Assertions.assertEquals(ImmutableMap.of("k2", "v2"), loaded.properties());
-    Assertions.assertEquals(Domain.Status.PUBLISHED, loaded.status());
     Assertions.assertEquals("modifier", loaded.auditInfo().lastModifier());
+    Assertions.assertEquals(2L, selectDomainPO(finance.id()).currentVersion());
+
+    // The status is changed only with the status locks, not by an update.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.updateDomain(
+                loaded.nameIdentifier(),
+                entity ->
+                    ((DomainEntity) entity)
+                        .toBuilder().withStatus(Domain.Status.PUBLISHED).build()));
     Assertions.assertEquals(2L, selectDomainPO(finance.id()).currentVersion());
 
     // Renaming to a name in use fails.
