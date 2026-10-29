@@ -27,18 +27,18 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.OceanBaseContainer;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.gravitino.integration.test.container.OceanBaseFixture;
 import org.junit.jupiter.api.BeforeAll;
 
+@OceanBaseFixture
 public class TestOceanBase extends TestJdbc {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private static OceanBaseContainer oceanBase;
   protected static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
 
   @BeforeAll
   public static void startup() {
-    containerSuite.startOceanBaseContainer();
 
     DATA_SOURCE = DataSourceUtils.createDataSource(getOceanBaseCatalogProperties());
 
@@ -54,19 +54,10 @@ public class TestOceanBase extends TestJdbc {
         Collections.emptyMap());
   }
 
-  // Overwrite the stop method to close the data source and stop the container
-  @AfterAll
-  public static void stop() {
-    DataSourceUtils.closeDataSource(DATA_SOURCE);
-    if (null != CONTAINER) {
-      CONTAINER.stop();
-    }
-  }
-
   private static Map<String, String> getOceanBaseCatalogProperties() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    OceanBaseContainer oceanBaseContainer = containerSuite.getOceanBaseContainer();
+    OceanBaseContainer oceanBaseContainer = oceanBase;
 
     String jdbcUrl = oceanBaseContainer.getJdbcUrl();
 

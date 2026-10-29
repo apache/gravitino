@@ -57,7 +57,6 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

@@ -62,7 +62,7 @@ public class TestMysqlDatabaseOperations extends TestMysql {
     databaseName = RandomNameUtils.genRandomName("ct_db") + "--------end";
     DATABASE_OPERATIONS.create(databaseName, null, properties);
 
-    String tableName = RandomStringUtils.randomAlphabetic(16) + "_op_table";
+    String tableName = RandomStringUtils.insecure().nextAlphabetic(16) + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(

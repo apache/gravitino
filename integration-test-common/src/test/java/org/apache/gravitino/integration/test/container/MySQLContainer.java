@@ -32,17 +32,19 @@ import java.util.Set;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.utility.DockerImageName;
 
 public class MySQLContainer extends DatabaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(MySQLContainer.class);
 
-  public static final String DEFAULT_IMAGE = "mysql:8.0";
+  public static final String DEFAULT_IMAGE = TestImages.MYSQL;
   public static final String HOST_NAME = "gravitino-ci-mysql";
   public static final int MYSQL_PORT = 3306;
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
+
   private static final String DATA_DIR = "/var/lib/mysql";
   private static final String DEFAULT_CONFIG = "mysql-conf/default";
   private static final String DISPOSABLE_CONFIG = "mysql-conf/disposable";
@@ -53,23 +55,24 @@ public class MySQLContainer extends DatabaseContainer {
 
   protected MySQLContainer(
       String image,
-      Durability durability,
       String hostName,
       Set<Integer> ports,
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
-    super(
-        module(image, durability),
-        durability,
-        hostName,
-        ports,
-        extraHosts,
-        filesToMount,
-        envVars,
-        network);
-    applyDurability(DATA_DIR);
+    super(module(image), hostName, ports, extraHosts, filesToMount, envVars, network);
+  }
+
+  // Wraps a MySQL that runs outside this JVM's Testcontainers; see ExternalEndpoints.
+  private MySQLContainer(TestEndpoints.MySQL endpoints) {
+    super(endpoints, HOST_NAME);
+  }
+
+  @Override
+  protected void applyDisposableData(GenericContainer<?> container) {
+    keepDataInMemory(DATA_DIR);
+    ((org.testcontainers.mysql.MySQLContainer) db).withConfigurationOverride(DISPOSABLE_CONFIG);
   }
 
   @Override
@@ -83,13 +86,25 @@ public class MySQLContainer extends DatabaseContainer {
     super.start();
     logDurability(
         List.of("datadir", "innodb_flush_log_at_trx_commit", "log_bin", "innodb_doublewrite"),
-        "mysql",
-        "-u" + getUsername(),
-        "-p" + getPassword(),
-        "--batch",
-        "--skip-column-names",
-        "-e",
         "SELECT @@datadir, @@innodb_flush_log_at_trx_commit, @@log_bin, @@innodb_doublewrite");
+  }
+
+  /**
+   * Runs the statements as the root user, in order.
+   *
+   * @param statements the SQL statements
+   * @throws IllegalStateException if a statement fails
+   */
+  public void execute(List<String> statements) {
+    try (Connection connection =
+            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
+        Statement statement = connection.createStatement()) {
+      for (String sql : statements) {
+        statement.execute(sql);
+      }
+    } catch (SQLException e) {
+      throw new IllegalStateException("Failed to run SQL on MySQL", e);
+    }
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
@@ -99,7 +114,8 @@ public class MySQLContainer extends DatabaseContainer {
       throw new IllegalArgumentException("Invalid database name: " + databaseName);
     }
 
-    try (Connection connection = db.createConnection("");
+    try (Connection connection =
+            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
         Statement statement = connection.createStatement()) {
       String query = String.format("CREATE DATABASE IF NOT EXISTS `%s`;", databaseName);
       // FIXME: String, which is used in SQL, can be unsafe
@@ -122,32 +138,40 @@ public class MySQLContainer extends DatabaseContainer {
     return databaseName.matches("^[a-zA-Z0-9_$]+$");
   }
 
+  /**
+   * Returns the JDBC URL the test JVM connects to, without a database: the Docker host and mapped
+   * port for a managed container, or the endpoints file's {@code mysql.jdbc-url} for an external
+   * one.
+   *
+   * @return the URL
+   */
   public String getJdbcUrl() {
-    return format("jdbc:mysql://%s:%d", getContainerIpAddress(), MYSQL_PORT);
+    return isExternal()
+        ? endpoints(TestEndpoints.MySQL.class).jdbcUrl()
+        : format("jdbc:mysql://%s:%d", getHost(), getMappedPort(MYSQL_PORT));
   }
 
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
-    return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, testDatabaseName);
+    return getJdbcUrl() + "/" + testDatabaseName;
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
     return DriverManager.getDriver(getJdbcUrl(testDatabaseName)).getClass().getName();
   }
 
-  private static org.testcontainers.containers.MySQLContainer<?> module(
-      String image, Durability durability) {
+  private static org.testcontainers.mysql.MySQLContainer module(String image) {
     // The image may be a mirror or a custom tag; the module only needs a MySQL server.
-    return new org.testcontainers.containers.MySQLContainer<>(
+    return new org.testcontainers.mysql.MySQLContainer(
             DockerImageName.parse(image).asCompatibleSubstituteFor("mysql"))
         .withUsername(USER_NAME)
         .withPassword(PASSWORD)
         // The module always creates a database. Its default, "test", is also a schema name catalog
         // tests create, so name MySQL's own system database instead.
         .withDatabaseName("mysql")
-        // Our own config replaces the one Testcontainers 1.x bundles, so the server settings do not
-        // depend on the Testcontainers version; it carries the disposable settings too.
-        .withConfigurationOverride(
-            durability == Durability.DISPOSABLE ? DISPOSABLE_CONFIG : DEFAULT_CONFIG)
+        // The 2.x module mounts no default config, so the server runs on the image defaults plus
+        // ours, exactly as with 1.x, where this override replaced the bundled one. A disposable
+        // container swaps in DISPOSABLE_CONFIG at start.
+        .withConfigurationOverride(DEFAULT_CONFIG)
         // The module's readiness check queries the database and ignores BaseContainer's startup
         // timeout, so it gets the same budget here.
         .withStartupTimeoutSeconds(300);
@@ -164,8 +188,15 @@ public class MySQLContainer extends DatabaseContainer {
 
     @Override
     public MySQLContainer build() {
-      return new MySQLContainer(
-          image, durability, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+      Optional<TestEndpoints.MySQL> external = ExternalEndpoints.forService("mysql", "");
+      if (external.isPresent()) {
+        return new MySQLContainer(external.get());
+      }
+      MySQLContainer container =
+          new MySQLContainer(
+              image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+      container.setDurability(durability);
+      return container;
     }
   }
 }

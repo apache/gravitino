@@ -47,7 +47,6 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
-import org.opentest4j.AssertionFailedError;
 
 @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
 public class TestSQLScripts extends TestJDBCBackend {
@@ -432,8 +431,8 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeStatements(
           List.of("ALTER TABLE schema_meta DROP INDEX schema_meta_idx_mid"),
           "missing target index");
-      AssertionFailedError failure =
-          Assertions.assertThrows(AssertionFailedError.class, () -> executeScript(upgrade));
+      AssertionError failure =
+          Assertions.assertThrows(AssertionError.class, () -> executeScript(upgrade));
       Assertions.assertInstanceOf(SQLException.class, failure.getCause());
       Assertions.assertTrue(
           failure.getCause().getMessage().contains("'idx_mid'"), failure.getMessage());
@@ -549,9 +548,9 @@ public class TestSQLScripts extends TestJDBCBackend {
             List.of("ALTER TABLE table_version_info DROP INDEX uk_table_id_version_deleted_at"),
             "remove legacy index");
       }
-      AssertionFailedError failure =
+      AssertionError failure =
           Assertions.assertThrows(
-              AssertionFailedError.class,
+              AssertionError.class,
               () -> executeScript(scriptDir.resolve("upgrade-1.3.0-to-2.0.0-mysql.sql").toFile()));
       Assertions.assertInstanceOf(SQLException.class, failure.getCause());
       String expectedError = keepLegacyIndex ? "primary key" : "uk_table_id_version_deleted_at";

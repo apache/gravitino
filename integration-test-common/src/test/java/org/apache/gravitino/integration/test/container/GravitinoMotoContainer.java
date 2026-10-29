@@ -27,7 +27,7 @@ import org.testcontainers.containers.Network;
 /** Container wrapping {@code motoserver/moto} — a free AWS mock that supports Glue and more. */
 public class GravitinoMotoContainer extends BaseContainer {
 
-  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_MOTO_DOCKER_IMAGE");
+  public static final String DEFAULT_IMAGE = TestImages.MOTO;
   public static final String HOST_NAME = "gravitino-ci-moto";
   public static final int PORT = 5000;
 
@@ -62,11 +62,6 @@ public class GravitinoMotoContainer extends BaseContainer {
 
     @Override
     public GravitinoMotoContainer build() {
-      if (image == null || image.isBlank()) {
-        throw new IllegalStateException(
-            "GravitinoMotoContainer image must be set. "
-                + "Provide a non-blank image via withImage() or set the GRAVITINO_CI_MOTO_DOCKER_IMAGE environment variable.");
-      }
       return new GravitinoMotoContainer(
           image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }

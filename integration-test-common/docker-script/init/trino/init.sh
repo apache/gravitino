@@ -46,6 +46,8 @@ if [[ "${TRINO_ROLE}" == "coordinator" ]]; then
   fi
 else
   cp "$trino_conf_dir/config/config-worker.properties" /etc/trino/config.properties
+  # A private cluster's coordinator has a per-run host name, so it can share a network with others.
+  sed -i "s|^discovery.uri=.*|discovery.uri=http://${TRINO_COORDINATOR_HOST:-trino}:8080|" /etc/trino/config.properties
 fi
 
 # mkdir `node.data-dir` in the `/conf/node.properties`

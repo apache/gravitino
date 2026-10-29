@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=test-endpoints.schema.json
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Services that integration tests reach instead of starting Testcontainers. Copy this file, keep
+# the services you run elsewhere, and pass it to Gradle:
+#
+#   ./gradlew :catalogs:catalog-kafka:test -PskipDockerTests=false \
+#     -Pgravitino.test.endpoints.file=/path/to/endpoints.yaml
+#
+# or save it as dev/test-endpoints/<name>.yaml and pass -Pgravitino.test.profile=<name>.
+# A flat key (-Pgravitino.test.<service>.<key>=... or GRAVITINO_TEST_<SERVICE>_<KEY>) overrides a
+# value here. A key that TestEndpoints does not declare fails the run with the closest valid key;
+# see design-docs/testing/containers/external-endpoints.md.
+
+# "external" makes every service external, so the run needs no Docker at all. Without it, each
+# service below is external only when its own "external" is true.
+# containers: external
+
+hive:
+  external: true
+  metastore-uri: thrift://hive.example:9083
+  hdfs-uri: hdfs://hive.example:9000
+  hdfs-client-conf:
+    dfs.client.use.datanode.hostname: "true"
+  hadoop-user: root
+  # A test that asks for another instance by name reads its block whole; any other instance
+  # reads the keys above.
+  # instances:
+  #   secondary:
+  #     metastore-uri: thrift://hive-2.example:9083
+  #     hdfs-uri: hdfs://hive-2.example:9000
+
+kafka:
+  external: true
+  bootstrap-servers:
+    - kafka.example:9092
+
+mysql:
+  external: true
+  jdbc-url: jdbc:mysql://mysql.example:3306
+  user: root
+  password: root

@@ -29,18 +29,18 @@ import org.apache.gravitino.catalog.starrocks.converter.StarRocksExceptionConver
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksDatabaseOperations;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTableOperations;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.StarRocksContainer;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.gravitino.integration.test.container.StarRocksFixture;
 import org.junit.jupiter.api.BeforeAll;
 
+@StarRocksFixture
 public class TestStarRocks extends TestJdbc {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private static StarRocksContainer starRocks;
   protected static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
 
   @BeforeAll
   public static void startup() {
-    containerSuite.startStarRocksContainer();
 
     DATA_SOURCE = DataSourceUtils.createDataSource(getStarRocksCatalogProperties());
 
@@ -56,19 +56,10 @@ public class TestStarRocks extends TestJdbc {
         Collections.emptyMap());
   }
 
-  // Overwrite the stop method to close the data source and stop the container
-  @AfterAll
-  public static void stop() {
-    DataSourceUtils.closeDataSource(DATA_SOURCE);
-    if (null != CONTAINER) {
-      CONTAINER.stop();
-    }
-  }
-
   private static Map<String, String> getStarRocksCatalogProperties() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    StarRocksContainer starRocksContainer = containerSuite.getStarRocksContainer();
+    StarRocksContainer starRocksContainer = starRocks;
 
     String jdbcUrl =
         String.format(
