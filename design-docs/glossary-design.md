@@ -66,7 +66,11 @@ find the approved term, and follow its links to the data.
    added later through `TermChangeHandler` (see Status and versions).
 2. **Bulk import and export, connectors to other glossaries, SKOS export**: these tools can use the
    REST API and the source reference.
-3. **Ranked, fuzzy or semantic lookup**: lookup is an exact match on names and synonyms.
+3. **Ranked, fuzzy or semantic lookup in the first version**: the first version only matches names
+   and synonyms exactly (ignoring case and extra spaces). This is enough for words that the glossary
+   defines. Better matching can come later without an API change: `matchedBy` can get new values
+   (for example `FUZZY` or `SEMANTIC`) and a score, and `resolve_business_term` keeps the same input
+   and output.
 4. **Access through terms**: a term or a binding never gives or blocks access to data. Terms have
    no policies.
 5. **Agent writes and the UI itself**: the MCP tools are read-only. The UI uses the REST API. Web UI
