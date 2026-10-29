@@ -34,6 +34,7 @@ from gravitino.api.job.job_template_change import (
 from gravitino.api.job.shell_job_template import ShellJobTemplate
 from gravitino.api.job.spark_job_template import SparkJobTemplate
 from gravitino.api.metalake_change import MetalakeChange
+from gravitino.api.ontology.ontology_change import OntologyChange
 from gravitino.api.tag.tag_change import TagChange
 from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_model_catalog import GenericModelCatalog
@@ -55,6 +56,10 @@ from gravitino.dto.requests.job_template_update_request import (
     UpdateJobTemplateContentRequest,
 )
 from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
+from gravitino.dto.requests.ontology_update_request import (
+    OntologyUpdateRequest,
+    OntologyUpdateRequestBase,
+)
 from gravitino.dto.requests.tag_update_request import (
     TagUpdateRequest,
     TagUpdateRequestBase,
@@ -337,6 +342,48 @@ class DTOConverters:
             )
         if isinstance(change, TagChange.RemoveProperty):
             return TagUpdateRequest.RemoveTagPropertyRequest(change.removed_property)
+
+        raise IllegalArgumentException(f"Unknown change type: {type(change)}")
+
+    @staticmethod
+    def to_ontology_update_request(
+        change: OntologyChange,
+    ) -> OntologyUpdateRequestBase:
+        """
+        Converts an OntologyChange to an OntologyUpdateRequestBase.
+
+        Args:
+            change (OntologyChange): the OntologyChange to convert.
+
+        Raises:
+            IllegalArgumentException: if the change is not a valid OntologyChange.
+
+        Returns:
+            OntologyUpdateRequestBase: the OntologyUpdateRequestBase corresponding to the change.
+        """
+        if isinstance(change, OntologyChange.RenameOntology):
+            return OntologyUpdateRequest.RenameOntologyRequest(change.new_name)
+
+        if isinstance(change, OntologyChange.UpdateComment):
+            return OntologyUpdateRequest.UpdateOntologyCommentRequest(
+                change.new_comment
+            )
+
+        if isinstance(change, OntologyChange.SetProperty):
+            return OntologyUpdateRequest.SetOntologyPropertyRequest(
+                change.name,
+                change.value,
+            )
+        if isinstance(change, OntologyChange.RemoveProperty):
+            return OntologyUpdateRequest.RemoveOntologyPropertyRequest(
+                change.removed_property
+            )
+        if isinstance(change, OntologyChange.ReplaceDefinition):
+            return OntologyUpdateRequest.ReplaceOntologyDefinitionRequest(
+                change.definition
+            )
+        if isinstance(change, OntologyChange.UpdateStatus):
+            return OntologyUpdateRequest.UpdateOntologyStatusRequest(change.status)
 
         raise IllegalArgumentException(f"Unknown change type: {type(change)}")
 

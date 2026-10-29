@@ -303,3 +303,19 @@ class NoSuchGroupException(NotFoundException):
 
 class GroupAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a group already exists."""
+
+
+class NoSuchOntologyException(NotFoundException):
+    """An exception thrown when an ontology is not found."""
+
+
+class OntologyAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when an ontology already exists."""
+
+
+class IllegalOntologyException(IllegalArgumentException):
+    """An exception thrown when an ontology or its definition is invalid."""
+
+
+class NonEmptyOntologyException(NotEmptyException):
+    """An exception thrown when an ontology is still referenced and cannot be dropped."""

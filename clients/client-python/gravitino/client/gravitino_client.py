@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 from types import MappingProxyType
-from typing import Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Union
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
@@ -33,6 +33,10 @@ from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.ontology.ontology import Ontology
+from gravitino.api.ontology.ontology_change import OntologyChange
+from gravitino.api.ontology.ontology_definition import OntologyDefinition
+from gravitino.api.ontology.ontology_operations import OntologyOperations
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
@@ -45,7 +49,9 @@ _EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
 _EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
-class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
+class GravitinoClient(
+    GravitinoClientBase, SupportsJobs, TagOperations, OntologyOperations
+):
     """Gravitino Client for a user to interact with the Gravitino API, allowing the client to list,
     load, create, and alter Catalog.
 
@@ -360,6 +366,105 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().delete_tag(tag_name)
+
+    # Ontology operations
+    def list_ontologies(self) -> list[str]:
+        """List all the ontology names under a metalake.
+
+        Returns:
+            list[str]: The list of ontology names.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_ontologies()
+
+    def list_ontologies_info(self) -> list[Ontology]:
+        """List ontologies information under a metalake.
+
+        Returns:
+            list[Ontology]: The list of ontology information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_ontologies_info()
+
+    def get_ontology(self, ontology_name: str) -> Ontology:
+        """Get an ontology by its name under a metalake.
+
+        Args:
+            ontology_name (str): The name of the ontology.
+
+        Returns:
+            Ontology: The ontology information.
+
+        Raises:
+            NoSuchOntologyException: If the ontology does not exist.
+        """
+        return self.get_metalake().get_ontology(ontology_name)
+
+    def create_ontology(
+        self,
+        ontology_name: str,
+        comment: Optional[str],
+        properties: Optional[dict[str, str]],
+        definition: Union[OntologyDefinition, dict[str, Any]],
+    ) -> Ontology:
+        """Create a new ontology under a metalake.
+
+        Args:
+            ontology_name (str): The name of the ontology.
+            comment (Optional[str]): The comment of the ontology, or None.
+            properties (Optional[dict[str, str]]): The Gravitino-specific
+                properties of the ontology, or None.
+            definition (Union[OntologyDefinition, dict[str, Any]]): The concept
+                graph of the ontology.
+
+        Returns:
+            Ontology: The created ontology.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            OntologyAlreadyExistsException: If the ontology already exists.
+            IllegalOntologyException: If the definition is not a valid ontology.
+        """
+        return self.get_metalake().create_ontology(
+            ontology_name, comment, properties, definition
+        )
+
+    def alter_ontology(self, ontology_name: str, *changes: OntologyChange) -> Ontology:
+        """Alter an ontology under a metalake.
+
+        Args:
+            ontology_name (str): The name of the ontology.
+            changes (OntologyChange): The changes to apply to the ontology.
+
+        Returns:
+            Ontology: The altered ontology.
+
+        Raises:
+            NoSuchOntologyException: If the ontology does not exist.
+            OntologyAlreadyExistsException: If the ontology is renamed and an
+                ontology with the new name already exists.
+            IllegalOntologyException: If a replacement definition is invalid.
+        """
+        return self.get_metalake().alter_ontology(ontology_name, *changes)
+
+    def drop_ontology(self, ontology_name: str) -> bool:
+        """Drop an ontology under a metalake.
+
+        Args:
+            ontology_name (str): The name of the ontology.
+
+        Returns:
+            bool: True if the ontology was dropped, False otherwise.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            NonEmptyOntologyException: If the ontology is still referenced.
+        """
+        return self.get_metalake().drop_ontology(ontology_name)
 
     # Owner operations
     def get_owner(self, metadata_object: MetadataObject) -> Optional[Owner]:

@@ -17,7 +17,7 @@
 # pylint: disable=too-many-lines
 import logging
 from types import MappingProxyType
-from typing import Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Union
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
@@ -34,6 +34,10 @@ from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.ontology.ontology import Ontology
+from gravitino.api.ontology.ontology_change import OntologyChange
+from gravitino.api.ontology.ontology_definition import OntologyDefinition
+from gravitino.api.ontology.ontology_operations import OntologyOperations
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.tag import Tag
@@ -48,6 +52,7 @@ from gravitino.client.metadata_object_secret_operations import (
     MetadataObjectSecretOperations,
 )
 from gravitino.dto.metalake_dto import MetalakeDTO
+from gravitino.dto.ontology.ontology_definition_dto import to_ontology_definition_dto
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
 from gravitino.dto.requests.catalog_set_request import CatalogSetRequest
 from gravitino.dto.requests.catalog_updates_request import CatalogUpdatesRequest
@@ -59,6 +64,8 @@ from gravitino.dto.requests.job_template_updates_request import (
     JobTemplateUpdatesRequest,
 )
 from gravitino.dto.requests.owner_set_request import OwnerSetRequest
+from gravitino.dto.requests.ontology_create_request import OntologyCreateRequest
+from gravitino.dto.requests.ontology_updates_request import OntologyUpdatesRequest
 from gravitino.dto.requests.tag_create_request import TagCreateRequest
 from gravitino.dto.requests.tag_updates_request import TagUpdatesRequest
 from gravitino.dto.requests.user_add_request import UserAddRequest
@@ -79,6 +86,11 @@ from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
 from gravitino.dto.responses.job_template_response import JobTemplateResponse
 from gravitino.dto.responses.owner_response import OwnerResponse
+from gravitino.dto.responses.ontology_response import (
+    OntologyListResponse,
+    OntologyNamesListResponse,
+    OntologyResponse,
+)
 from gravitino.dto.responses.remove_response import RemoveResponse
 from gravitino.dto.responses.set_response import SetResponse
 from gravitino.dto.responses.tag_response import (
@@ -107,6 +119,7 @@ from gravitino.exceptions.handlers.permission_error_handler import (
 )
 from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
+from gravitino.exceptions.handlers.ontology_error_handler import ONTOLOGY_ERROR_HANDLER
 from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
@@ -126,6 +139,7 @@ class GravitinoMetalake(
     SupportsJobs,
     SupportsRoles,
     TagOperations,
+    OntologyOperations,
     SupportsSecrets,
 ):  # pylint: disable=too-many-ancestors
     """
@@ -139,6 +153,8 @@ class GravitinoMetalake(
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
     API_METALAKES_JOB_TEMPLATES_PATH = "api/metalakes/{}/jobs/templates"
     API_METALAKES_JOB_RUNS_PATH = "api/metalakes/{}/jobs/runs"
+    API_METALAKES_ONTOLOGIES_PATH = "api/metalakes/{}/ontologies"
+    API_METALAKES_ONTOLOGY_PATH = "api/metalakes/{}/ontologies/{}"
     API_METALAKES_OWNERS_PATH = "api/metalakes/{}/owners/{}"
     API_METALAKES_TAG_PATH = "api/metalakes/{}/tags/{}"
     API_METALAKES_TAGS_PATH = "api/metalakes/{}/tags"
@@ -840,6 +856,198 @@ class GravitinoMetalake(
         response = self.rest_client.delete(
             url,
             error_handler=TAG_ERROR_HANDLER,
+        )
+        drop_response = DropResponse.from_json(response.body, infer_missing=True)
+        drop_response.validate()
+
+        return drop_response.dropped()
+
+    #########
+    # Ontology operations
+    #########
+    def list_ontologies(self) -> list[str]:
+        """List all the ontology names under this metalake.
+
+        Returns:
+            list[str]: The list of ontology names.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        url = self.API_METALAKES_ONTOLOGIES_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(url, error_handler=ONTOLOGY_ERROR_HANDLER)
+        resp = OntologyNamesListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return resp.names()
+
+    def list_ontologies_info(self) -> List[Ontology]:
+        """List all the ontologies with their information under this metalake.
+
+        Returns:
+            List[Ontology]: The list of ontology information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        url = self.API_METALAKES_ONTOLOGIES_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(
+            url,
+            params={"details": "true"},
+            error_handler=ONTOLOGY_ERROR_HANDLER,
+        )
+        resp = OntologyListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return resp.ontologies()
+
+    def get_ontology(self, ontology_name: str) -> Ontology:
+        """Get an ontology by its name under this metalake.
+
+        Args:
+            ontology_name (str): The name of the ontology.
+
+        Returns:
+            Ontology: The ontology information.
+
+        Raises:
+            NoSuchOntologyException: If the ontology does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_argument(
+            StringUtils.is_not_blank(ontology_name),
+            "ontology name must not be null or empty",
+        )
+
+        url = self.API_METALAKES_ONTOLOGY_PATH.format(
+            encode_string(self.name()), encode_string(ontology_name)
+        )
+        response = self.rest_client.get(url, error_handler=ONTOLOGY_ERROR_HANDLER)
+
+        resp = OntologyResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return resp.ontology()
+
+    def create_ontology(
+        self,
+        ontology_name: str,
+        comment: Optional[str],
+        properties: Optional[dict[str, str]],
+        definition: Union[OntologyDefinition, dict[str, Any]],
+    ) -> Ontology:
+        """Create a new ontology under this metalake.
+
+        Args:
+            ontology_name (str): The name of the ontology.
+            comment (Optional[str]): The comment of the ontology, or None.
+            properties (Optional[dict[str, str]]): The Gravitino-specific
+                properties of the ontology, or None.
+            definition (Union[OntologyDefinition, dict[str, Any]]): The concept
+                graph of the ontology, either an `OntologyDefinitionDTO` or the
+                JSON object that carries it.
+
+        Returns:
+            Ontology: The created ontology.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            OntologyAlreadyExistsException: If the ontology already exists.
+            IllegalOntologyException: If the definition is not a valid ontology.
+            IllegalArgumentException: If the name is null or empty.
+        """
+        request = OntologyCreateRequest(
+            ontology_name,
+            comment,
+            properties,
+            to_ontology_definition_dto(definition),
+        )
+        request.validate()
+
+        url = self.API_METALAKES_ONTOLOGIES_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.post(
+            url,
+            json=request,
+            error_handler=ONTOLOGY_ERROR_HANDLER,
+        )
+        resp = OntologyResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return resp.ontology()
+
+    def alter_ontology(self, ontology_name: str, *changes: OntologyChange) -> Ontology:
+        """Alter an ontology under this metalake.
+
+        Args:
+            ontology_name (str): The name of the ontology.
+            changes (OntologyChange): The changes to apply to the ontology.
+
+        Returns:
+            Ontology: The altered ontology.
+
+        Raises:
+            NoSuchOntologyException: If the ontology does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+            OntologyAlreadyExistsException: If the ontology is renamed and an
+                ontology with the new name already exists.
+            IllegalOntologyException: If a replacement definition is invalid.
+            IllegalArgumentException: If the changes cannot be applied.
+        """
+        Precondition.check_argument(
+            StringUtils.is_not_blank(ontology_name),
+            "ontology name must not be null or empty",
+        )
+        Precondition.check_argument(
+            changes is not None and len(changes) > 0,
+            "at least one change is required",
+        )
+        updates = [
+            DTOConverters.to_ontology_update_request(change) for change in changes
+        ]
+        update_req = OntologyUpdatesRequest(updates)
+        update_req.validate()
+
+        url = self.API_METALAKES_ONTOLOGY_PATH.format(
+            encode_string(self.name()), encode_string(ontology_name)
+        )
+        response = self.rest_client.put(
+            url,
+            json=update_req,
+            error_handler=ONTOLOGY_ERROR_HANDLER,
+        )
+        resp = OntologyResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return resp.ontology()
+
+    def drop_ontology(self, ontology_name: str) -> bool:
+        """Drop an ontology under this metalake.
+
+        Args:
+            ontology_name (str): The name of the ontology.
+
+        Returns:
+            bool: True if the ontology was dropped, False otherwise.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            NonEmptyOntologyException: If a mapping or a term reference still
+                points at the ontology.
+        """
+        Precondition.check_argument(
+            StringUtils.is_not_blank(ontology_name),
+            "ontology name must not be null or empty",
+        )
+
+        url = self.API_METALAKES_ONTOLOGY_PATH.format(
+            encode_string(self.name()), encode_string(ontology_name)
+        )
+        response = self.rest_client.delete(
+            url,
+            error_handler=ONTOLOGY_ERROR_HANDLER,
         )
         drop_response = DropResponse.from_json(response.body, infer_missing=True)
         drop_response.validate()
