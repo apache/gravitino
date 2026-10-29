@@ -70,12 +70,12 @@ its bindings to the data.
 
 ## Usage Scenario
 
-1. A steward with `MANAGE_DEFINITIONS` on domain Sales creates term `Customer` in Sales. It starts
+1. An admin with `MANAGE_DEFINITIONS` on domain Sales creates term `Customer` in Sales. It starts
    as `DRAFT`, visible only to `CREATE_DEFINITION` and `MANAGE_DEFINITIONS` holders.
 2. An analyst with `CREATE_DEFINITION` on Sales creates `Active Customer` with broader term
    `Customer` and synonym `active user`, and binds it to column `dw.sales.customers.is_active`
    (Implemented by). The analyst owns this term and can edit it, but cannot edit `Customer`.
-3. The steward sets both terms to `APPROVED`; users with `VIEW_DEFINITION` now see them.
+3. The admin sets both terms to `APPROVED`; users with `VIEW_DEFINITION` now see them.
 4. The owner of semantic model `dw.sales.sales_model` links its metric `active_customers` to
    `Active Customer` from the metric side; the term now lists the metric under Used by.
 5. A user asks an agent for "revenue from active users last month". The agent calls
@@ -83,7 +83,7 @@ its bindings to the data.
    `Active Customer` (matched by synonym) with its column and metric, filtered to what the user can
    read, and `revenue` comes back unmatched, so the agent asks which revenue is meant instead of
    guessing a column. It then loads the table or semantic model with the existing tools.
-6. The term is later replaced. The steward sets it to `DEPRECATED`, so agents stop seeing it, and
+6. The term is later replaced. The admin sets it to `DEPRECATED`, so agents stop seeing it, and
    then deletes it.
 
 ## Design
@@ -146,7 +146,7 @@ TermVersion  { termId, version, state: PENDING | CURRENT | SUPERSEDED, snapshot,
 A term belongs to zero or more domains, and domain grants govern it; a term with no domain is
 governed by metalake grants only. There are two ways to record the membership.
 
-**Option A: explicit relation (proposed)**
+**Option A: explicit relation (recommended)**
 
 - `glossary_term_domain_rel (term_id, domain_id)`, changed only through the term API (`domains` on
   create, `addDomain`, `removeDomain`), and through `TermChangeHandler` like any term change.
@@ -174,22 +174,32 @@ governed by metalake grants only. There are two ways to record the membership.
 - Changing or deleting a domain's backing tag silently moves terms out of the domain, so who
   manages them changes with no term change. Dropping a domain works as for assets.
 
-**Comparison**
+**Recommendation: Option A.** The reasons:
 
-|                              | Option A: explicit relation                                             | Option B: backing tags                                                     |
-| ---------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Meaning                      | "Term T belongs to domain D" is stored as such                          | Derived: T carries tag X, and X backs D                                    |
-| Who can change it            | Term privileges + `CREATE_DEFINITION` on D, in one place                | `APPLY_TAG`, plus the two term-specific checks                             |
-| Approval workflow            | Same path as other term edits                                           | Needs a hook in the tag association API                                    |
-| Stable governance            | Changes only through the term API                                       | Also changes when a backing tag is replaced or deleted                     |
-| Authorization lookup         | One indexed read of the term's domains                                  | Term tags → reverse lookup of the domains they back                        |
-| Consistency with assets      | A second membership mechanism; terms are listed by `GET /terms?domain=` | One mechanism; terms appear in domain member listings                      |
-| Changes to the Domain design | Drop check only                                                         | Taggable `GLOSSARY_TERM`, a new member type, special cases in the tag code |
+1. **For a term, the domain decides who can read and manage it.** For an asset, being in a domain
+   gives nobody any permission. That is why the Domain design lets anyone with `APPLY_TAG` add an
+   asset, and why it refuses access grants on domains. Terms are the opposite case: the grants on
+   a term's domains decide who can see, edit and approve it. With Option B, adding a tag would
+   change those permissions.
+2. **Tag permissions go to other people.** In the Domain design, admins give `APPLY_TAG` on a
+   domain's tag to the owners of the tables in that domain. With Option B, any of those table
+   owners could move a term into the domain, which gives the domain's admins control of the term,
+   or hides it from a role the domain denies. One tag cannot allow this for tables and forbid it
+   for terms.
+3. **The benefits of tags do not apply to terms.** The Domain design uses tags for inheritance
+   from catalogs and schemas, for tag-based policies and for the existing tag checks. Terms are not
+   under a catalog or schema, carry no policies, and need stricter checks than `APPLY_TAG`.
+4. **Permissions do not change by accident.** With Option B, replacing or deleting a domain's tag
+   silently removes its terms, so who can see or edit them changes although nobody edited a term.
+   With Option A, membership changes only through the term API, and is checked, versioned and
+   audited like any other term edit.
+5. **Smaller change to the Domain design.** Option A adds one check when a domain is dropped.
+   Option B makes terms taggable, adds a member type and puts term-only rules in the shared tag
+   code.
 
-Option A is proposed. For a term, domain membership decides who governs it, so it should be stored
-explicitly and changed only by people who govern the term. Option B reuses one membership
-mechanism, but needs term-specific rules inside the generic tag code, which #13867 keeps free of
-special cases.
+The cost: a domain's terms are listed by `GET /terms?domain=` instead of
+`GET /domains/{domain}/objects`. Both follow the same rules: a term can be in several domains, and
+a domain includes its subdomains.
 
 ### Bindings
 
@@ -208,15 +218,15 @@ Used by). A binding is direct only: binding a schema does not bind the tables in
 
 Bindings are written on the object, like tags and policies: `POST /objects/{type}/{fullName}/terms`,
 or `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms` for a metric. Two different
-people know about a binding: the object's curator knows which terms the object represents, and the
+people know about a binding: the object's admin knows which terms the object represents, and the
 term's owner knows which data implements the term. Either may write it, per term in the request:
 
-| Caller         | Needs                                                             | Terms allowed                                            |
-| -------------- | ----------------------------------------------------------------- | -------------------------------------------------------- |
-| Object curator | Curate privilege on the object, and `VIEW_DEFINITION` on the term | `APPROVED` only                                          |
-| Term editor    | Edit privilege on the term, and read access to the object         | Any status, so a draft can be prepared with its bindings |
+| Caller       | Needs                                                            | Terms allowed                                            |
+| ------------ | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| Object admin | Admin privilege on the object, and `VIEW_DEFINITION` on the term | `APPROVED` only                                          |
+| Term editor  | Edit privilege on the term, and read access to the object        | Any status, so a draft can be prepared with its bindings |
 
-- **Curate privilege on an object**: for tables and columns, the existing
+- **Admin privilege on an object**: for tables and columns, the existing
   `MODIFY_TABLE_AUTHORIZATION_EXPRESSION` (an owner of the table or of an ancestor, or
   `MODIFY_TABLE` with `USE_CATALOG` and `USE_SCHEMA`); for metrics,
   `MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION`. The other types have no modify privilege, so
@@ -226,7 +236,7 @@ term's owner knows which data implements the term. Either may write it, per term
   privilege as adding it.
 - Each changed term records a version and goes through `TermChangeHandler`, so a workflow can hold
   a binding change like any other term change.
-- Binding a missing object or metric fails with 404; an object curator binding a term that is not
+- Binding a missing object or metric fails with 404; an object admin binding a term that is not
   `APPROVED` gets 400.
 - A term that is later deprecated keeps its bindings; it stops appearing in matches and MCP
   results.
@@ -305,7 +315,7 @@ term's owner knows which data implements the term. Either may write it, per term
   privilege holds when it is allowed on at least one level and denied on none. If Finance allows
   `VIEW_DEFINITION` and Sales denies it, a role cannot see a term in both. The metalake owner
   always passes.
-- **Bindings** are written on the object, by the object's curator (`APPROVED` terms only) or by the
+- **Bindings** are written on the object, by the object's admin (`APPROVED` terms only) or by the
   term's editor; see Bindings.
 - **Owner** (user or group) through `/owners/glossary_term/{term}`. When a group owns a term, its
   members count as the owner. Changing the owner needs the current owner, or `MANAGE_GRANTS` on the
@@ -400,7 +410,7 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 - **Errors**: 404 `NoSuchTermException` (missing or not visible) and `NoSuchMetadataObjectException`;
   409 `TermAlreadyExistsException` (name or source reference) and `NonEmptyDomainException`; 400 for
   a cycle, a self-edge, a synonym equal to another term's name, deleting an `APPROVED` term, an
-  object curator binding a term that is not `APPROVED`, or more than 20 `match` values; 403
+  object admin binding a term that is not `APPROVED`, or more than 20 `match` values; 403
   `ForbiddenException`.
 - **Concurrency**: changes apply to the current state and the last write wins, as for other
   Gravitino metadata; there is no version check on write. Responses carry `version`, so a client
@@ -447,7 +457,7 @@ Not covered by this design, so these parts need another source or stay hidden:
   approval workflow; `TermChangeHandler` and the version rows are where it plugs in.
 - **Counts that need an aggregate query**: terms without bindings, assets without a glossary term,
   and an object's "N restricted terms", which would also reveal hidden terms.
-- **Undefined lookups**, **Import**, **KB articles** and the **steward group** label.
+- **Undefined lookups**, **Import**, **KB articles** and the **managing group** label.
 - **Buttons by privilege**: Gravitino has no API that returns the actions a caller may take on an
   object, so the page shows the 403 message instead of disabling a button in advance.
 
@@ -521,7 +531,7 @@ Together with the `domain` tools of #13867, an agent can go from a domain to its
 
 ## Open Questions
 
-1. **Domain membership of terms**: Option A (proposed) or Option B; to be agreed with the Domain
+1. **Domain membership of terms**: Option A (recommended) or Option B; to be agreed with the Domain
    design.
 2. **One privilege set**: #13867 defines `MANAGE_DOMAIN` / `USE_DOMAIN` for domains. Should domains
    and terms share the definition privileges instead?
