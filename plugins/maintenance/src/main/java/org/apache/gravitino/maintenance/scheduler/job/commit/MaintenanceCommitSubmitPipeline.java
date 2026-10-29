@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
+import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
@@ -48,7 +49,7 @@ public final class MaintenanceCommitSubmitPipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceCommitSubmitPipeline.class);
 
-  private final CommitOccupancyGate occupancyGate;
+  private final OccupancyGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
   private final MaintenanceJobManager jobManager;
   private final MaintenanceJobConfBuilder jobConfBuilder;
@@ -62,7 +63,7 @@ public final class MaintenanceCommitSubmitPipeline {
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceCommitSubmitPipeline(
-      CommitOccupancyGate occupancyGate,
+      OccupancyGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
       MaintenanceJobManager jobManager,
       MaintenanceJobConfBuilder jobConfBuilder,

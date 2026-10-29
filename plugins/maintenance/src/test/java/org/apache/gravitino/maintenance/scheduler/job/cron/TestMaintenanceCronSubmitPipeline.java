@@ -34,9 +34,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
+import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
@@ -169,9 +171,24 @@ class TestMaintenanceCronSubmitPipeline {
   }
 
   private static MaintenanceCronSubmitPipeline pipeline(
-      CronSubmitGate gate, TableMaintenanceActionMetaService actions, MaintenanceJobManager mgr) {
+      BiPredicate<Long, Long> inFlight,
+      TableMaintenanceActionMetaService actions,
+      MaintenanceJobManager mgr) {
     return new MaintenanceCronSubmitPipeline(
-        gate, actions, mgr, new MaintenanceJobConfBuilder(new Config(false) {}), CLAIM_TIMEOUT_MS);
+        occupancyGate(inFlight),
+        actions,
+        mgr,
+        new MaintenanceJobConfBuilder(new Config(false) {}),
+        CLAIM_TIMEOUT_MS);
+  }
+
+  /** Real gate over a stub meta service — {@link OccupancyGate} is final and not mockable. */
+  private static OccupancyGate occupancyGate(BiPredicate<Long, Long> inFlight) {
+    TableMaintenanceActionMetaService meta = mock(TableMaintenanceActionMetaService.class);
+    when(meta.hasLiveUnboundClaim(anyLong(), anyLong(), anyLong()))
+        .thenAnswer(inv -> inFlight.test(inv.getArgument(0), inv.getArgument(1)));
+    when(meta.listInFlight(anyLong(), anyLong())).thenReturn(List.of());
+    return new OccupancyGate(meta, CLAIM_TIMEOUT_MS);
   }
 
   private static MaintenanceJobSpec spec() {

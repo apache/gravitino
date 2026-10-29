@@ -36,6 +36,7 @@ import java.util.Set;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
+import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
@@ -111,19 +112,12 @@ class TestMaintenanceCommitSubmitPipeline {
       Set<Long> inFlightPolicies,
       TableMaintenanceActionMetaService actions,
       MaintenanceJobManager mgr) {
-    CommitOccupancyGate gate =
-        new CommitOccupancyGate() {
-          @Override
-          public boolean isInFlight(long tableId, long policyId) {
-            return inFlightPolicies.contains(policyId);
-          }
-
-          @Override
-          public boolean withinMinInterval(
-              long tableId, long policyId, long minIntervalMs, long nowMs) {
-            return false;
-          }
-        };
+    TableMaintenanceActionMetaService gateMeta = mock(TableMaintenanceActionMetaService.class);
+    when(gateMeta.hasLiveUnboundClaim(anyLong(), anyLong(), anyLong()))
+        .thenAnswer(inv -> inFlightPolicies.contains((Long) inv.getArgument(1)));
+    when(gateMeta.listInFlight(anyLong(), anyLong())).thenReturn(List.of());
+    // OccupancyGate is final; drive isInFlight via a stub meta service.
+    OccupancyGate gate = new OccupancyGate(gateMeta, CLAIM_TIMEOUT_MS);
     return new MaintenanceCommitSubmitPipeline(
         gate, actions, mgr, new MaintenanceJobConfBuilder(new Config(false) {}), CLAIM_TIMEOUT_MS);
   }
