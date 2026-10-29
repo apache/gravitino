@@ -40,6 +40,7 @@ import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

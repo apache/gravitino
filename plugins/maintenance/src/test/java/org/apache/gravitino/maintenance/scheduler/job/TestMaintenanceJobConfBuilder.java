@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.job.cron;
+package org.apache.gravitino.maintenance.scheduler.job;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -24,7 +24,6 @@ import java.time.ZoneOffset;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
-import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;

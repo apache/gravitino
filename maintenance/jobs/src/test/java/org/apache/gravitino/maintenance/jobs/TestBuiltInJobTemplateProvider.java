@@ -73,15 +73,15 @@ public class TestBuiltInJobTemplateProvider {
   }
 
   @Test
-  public void testTemplateVersionsAreValidWhenPresent() {
+  public void testAllTemplatesHaveValidVersion() {
     BuiltInJobTemplateProvider provider = new BuiltInJobTemplateProvider();
     List<? extends JobTemplate> templates = provider.jobTemplates();
 
     for (JobTemplate template : templates) {
       Map<String, String> fields = template.customFields();
-      if (fields == null || !fields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY)) {
-        continue;
-      }
+      assertTrue(
+          fields != null && fields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY),
+          "Template missing version: " + template.name());
       String version = fields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
       assertTrue(
           version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN),
@@ -90,23 +90,14 @@ public class TestBuiltInJobTemplateProvider {
   }
 
   @Test
-  public void testIcebergMaintenanceTaskRegisteredWithoutVersion() {
-    assertEquals(
-        1L,
-        new BuiltInJobTemplateProvider()
-            .jobTemplates().stream()
-                .filter(template -> template.name().equals("builtin-iceberg-maintenance-task"))
-                .count());
+  public void testIcebergMaintenanceTaskHasVersion() {
     JobTemplate template =
         new BuiltInJobTemplateProvider()
             .jobTemplates().stream()
                 .filter(t -> t.name().equals("builtin-iceberg-maintenance-task"))
                 .findFirst()
                 .orElseThrow();
-    Map<String, String> fields = template.customFields();
-    assertTrue(
-        fields == null || !fields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY),
-        "TMS maintenance template should not require a version custom field");
+    assertEquals("v1", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
   }
 
   @Test
