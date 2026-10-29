@@ -96,7 +96,15 @@ class TestOrphanFileRemovalPolicyDTO {
             "0 0 3 * * ?",
             null,
             1_800_000L,
-            ImmutableMap.of("spark.executor.cores", "2"),
+            ImmutableMap.of(
+                "type",
+                "rest",
+                "uri",
+                "http://irc",
+                "warehouse_location",
+                "/tmp/iceberg-warehouse",
+                "spark.executor.cores",
+                "2"),
             ImmutableMap.of("metalake", "ml"));
     PolicyDTO dto =
         PolicyDTO.builder()

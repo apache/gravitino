@@ -57,7 +57,15 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
             "0 30 1 * * ?",
             true,
             900_000L,
-            ImmutableMap.of("spark.executor.memory", "2g"),
+            ImmutableMap.of(
+                "type",
+                "rest",
+                "uri",
+                "http://irc",
+                "warehouse_location",
+                "/tmp/iceberg-warehouse",
+                "spark.executor.memory",
+                "2g"),
             ImmutableMap.of("queue", "tms")));
   }
 
@@ -69,7 +77,15 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
             "0 0 4 * * ?",
             false,
             2_700_000L,
-            ImmutableMap.of("spark.driver.memory", "1g"),
+            ImmutableMap.of(
+                "type",
+                "rest",
+                "uri",
+                "http://irc",
+                "warehouse_location",
+                "/tmp/iceberg-warehouse",
+                "spark.driver.memory",
+                "1g"),
             ImmutableMap.of("metalake", "ml")));
   }
 

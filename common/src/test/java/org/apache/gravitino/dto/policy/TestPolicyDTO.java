@@ -251,7 +251,15 @@ public class TestPolicyDTO {
                     "0 0 2 * * ?",
                     true,
                     3_600_000L,
-                    ImmutableMap.of("spark.executor.memory", "4g"),
+                    ImmutableMap.of(
+                        "type",
+                        "rest",
+                        "uri",
+                        "http://irc",
+                        "warehouse_location",
+                        "/tmp/iceberg-warehouse",
+                        "spark.executor.memory",
+                        "4g"),
                     ImmutableMap.of("metalake", "ml")))
             .build();
 
@@ -315,9 +323,22 @@ public class TestPolicyDTO {
     Assertions.assertTrue(orphanEx.getMessage().contains("commitTrigger"));
 
     // Cron syntax is not validated on the policy API; scheduler registration parses it.
+    // Catalog jobOptions are still required whenever timeTrigger schedules Spark maintenance.
     PolicyContentDTO.IcebergCompactionContentDTO opaqueCron =
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
-            .withExecutionSpec(PolicyExecutionSpec.of("a a a a a a", null, null, null, null))
+            .withExecutionSpec(
+                PolicyExecutionSpec.of(
+                    "a a a a a a",
+                    null,
+                    null,
+                    ImmutableMap.of(
+                        "type",
+                        "rest",
+                        "uri",
+                        "http://irc",
+                        "warehouse_location",
+                        "/tmp/iceberg-warehouse"),
+                    null))
             .build();
     Assertions.assertDoesNotThrow(opaqueCron::validate);
   }
