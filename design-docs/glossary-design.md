@@ -25,66 +25,72 @@
 
 ## Background
 
-Gravitino records where data lives (catalogs, schemas, tables) and, with Domains
-(apache/gravitino#13867), which business area it belongs to. It does not record what a business
-word means. "Active Customer" or "Net Revenue" are defined in wikis and BI tools, so each user and
-each agent maps the word to tables and metrics on its own, and nobody owns the definition.
+Gravitino knows where data lives: catalogs, schemas and tables. With Domains
+(apache/gravitino#13867), it also knows the business area of the data. But it does not know what a
+business word means. Words like "Active Customer" or "Net Revenue" are defined in wikis and BI
+tools. Each user and each agent maps the word to tables and metrics in its own way. Nobody owns the
+definition.
 
-A business glossary fixes this: a governed set of **terms**, each with a definition, synonyms, an
-owner and a status, organized by domain and by a term hierarchy, and bound to the columns, tables
-and metrics that implement it. Agents resolve a word in a question to an approved term and follow
-its bindings to the data.
+A business glossary solves this. It is a managed list of **terms**. Each term has a definition,
+synonyms, an owner and a status. Terms are grouped by domain and by a parent-child hierarchy. A term
+is linked to the columns, tables and metrics behind it. An agent can look up a word from a question,
+find the approved term, and follow its links to the data.
 
 ## Goals
 
-1. **Term object**: a metalake-level `GlossaryTerm` with name, definition, synonyms, owner, status,
-   domains, documentation links, properties and an optional source reference. There is no glossary
-   container; terms are organized by domain and by the term hierarchy.
-2. **Hierarchy**: `BROADER` (a term can have several, in any domain; narrower is derived) and
-   `RELATED` (symmetric). The server rejects cycles.
-3. **Bindings**: a term binds to catalogs, schemas, tables, views, columns, filesets, topics,
-   models and semantic-model metrics, and lists them; an object lists its terms. A binding never
-   grants access.
-4. **Domains**: a term belongs to zero or more domains, and domain grants govern it.
-5. **Status**: `DRAFT`, `APPROVED`, `DEPRECATED`, set through the API. Agents see `APPROVED` terms
-   only.
-6. **Privileges**: `VIEW_DEFINITION`, `CREATE_DEFINITION` and `MANAGE_DEFINITIONS` on the metalake
-   or a domain, inherited by subdomains, deny over allow, the same on REST and MCP.
-7. **Versions**: every content change records a version snapshot, so an approval workflow or a
-   history API can be added without a schema change.
-8. **APIs**: REST, Java and Python clients, read-only MCP tools, events and audit. Every view of
-   the glossary page loads with one or two REST calls, and an agent resolves the business words of
-   a question to approved terms and their bindings in one call.
+1. **Term object**: a `GlossaryTerm` under the metalake. It has a name, definition, synonyms, owner,
+   status, domains, documentation links, properties and an optional source reference. There is no
+   glossary container. Domains and the term hierarchy group the terms.
+2. **Hierarchy**: a term can have several broader (parent) terms, in any domain. Narrower (child)
+   terms come from the other side. `RELATED` links two terms both ways. The server rejects cycles.
+3. **Bindings**: a term can be linked to catalogs, schemas, tables, views, columns, filesets,
+   topics, models and semantic-model metrics. A term lists its objects, and an object lists its
+   terms. A binding never gives access to data.
+4. **Domains**: a term belongs to zero or more domains. Grants on these domains control the term.
+5. **Status**: `DRAFT`, `APPROVED` or `DEPRECATED`, set through the API. Agents only see `APPROVED`
+   terms.
+6. **Privileges**: `VIEW_DEFINITION`, `CREATE_DEFINITION` and `MANAGE_DEFINITIONS`, granted on the
+   metalake or a domain. Subdomains inherit them. Deny wins over allow. REST and MCP use the same
+   rules.
+7. **Versions**: every content change saves a version snapshot. An approval workflow or a history
+   API can be added later without a schema change.
+8. **APIs**: REST, Java and Python clients, read-only MCP tools, events and audit. Each view of the
+   glossary page needs one or two REST calls. An agent can look up all business words of a question
+   in one call.
 
 ## Non-Goals
 
-1. **Approval workflow and version history API**: edits apply at once. A workflow can plug in
-   through `TermChangeHandler` (see Status and versions).
-2. **Bulk import and export, external glossary connectors, SKOS export**: they can build on the
+1. **Approval workflow and version history API**: edits take effect at once. A workflow can be
+   added later through `TermChangeHandler` (see Status and versions).
+2. **Bulk import and export, connectors to other glossaries, SKOS export**: these tools can use the
    REST API and the source reference.
 3. **Ranked, fuzzy or semantic lookup**: lookup is an exact match on names and synonyms.
-4. **Access through terms**: a term or binding never grants or denies data access, and terms carry
+4. **Access through terms**: a term or a binding never gives or blocks access to data. Terms have
    no policies.
-5. **Agent writes and the UI itself**: the MCP tools are read-only. The UI is built on the REST API;
-   Web UI support lists the calls behind each part of the page.
+5. **Agent writes and the UI itself**: the MCP tools are read-only. The UI uses the REST API. Web UI
+   support lists the calls for each part of the page.
 
 ## Usage Scenario
 
-1. An admin with `MANAGE_DEFINITIONS` on domain Sales creates term `Customer` in Sales. It starts
-   as `DRAFT`, visible only to `CREATE_DEFINITION` and `MANAGE_DEFINITIONS` holders.
-2. An analyst with `CREATE_DEFINITION` on Sales creates `Active Customer` with broader term
-   `Customer` and synonym `active user`, and binds it to column `dw.sales.customers.is_active`
-   (Implemented by). The analyst owns this term and can edit it, but cannot edit `Customer`.
-3. The admin sets both terms to `APPROVED`; users with `VIEW_DEFINITION` now see them.
+1. An admin with `MANAGE_DEFINITIONS` on domain Sales creates term `Customer` in Sales. The term
+   starts as `DRAFT`. Only users with `CREATE_DEFINITION` or `MANAGE_DEFINITIONS` can see it.
+2. An analyst with `CREATE_DEFINITION` on Sales creates `Active Customer`. Its broader term is
+   `Customer` and its synonym is `active user`. The analyst links it to column
+   `dw.sales.customers.is_active` (Implemented by). The analyst owns this term and can edit it, but
+   cannot edit `Customer`.
+3. The admin sets both terms to `APPROVED`. Users with `VIEW_DEFINITION` can now see them.
 4. The owner of semantic model `dw.sales.sales_model` links its metric `active_customers` to
-   `Active Customer` from the metric side; the term now lists the metric under Used by.
+   `Active Customer`. The term now shows the metric under Used by.
 5. A user asks an agent for "revenue from active users last month". The agent calls
-   `resolve_business_term(["revenue", "active users"])` once: `active users` returns
-   `Active Customer` (matched by synonym) with its column and metric, filtered to what the user can
-   read, and `revenue` comes back unmatched, so the agent asks which revenue is meant instead of
-   guessing a column. It then loads the table or semantic model with the existing tools.
-6. The term is later replaced. The admin sets it to `DEPRECATED`, so agents stop seeing it, and
-   then deletes it.
+   `resolve_business_term(["revenue", "active users"])` once:
+   - `active users` returns `Active Customer` (matched by synonym), with its column and metric. The
+     result only contains what the user can read.
+   - `revenue` has no match. The agent asks the user which revenue they mean. It does not guess a
+     column.
+
+   Then the agent loads the table or the semantic model with the existing tools.
+6. Later the term is replaced. The admin sets it to `DEPRECATED`, and agents stop seeing it. Then
+   the admin deletes it.
 
 ## Design
 
@@ -108,255 +114,282 @@ TermVersion  { termId, version, state: PENDING | CURRENT | SUPERSEDED, snapshot,
 | `glossary_term_binding`      | `(term_id, object_type, object_id, metric_name, deleted_at)`                   | `(object_type, object_id)`               |
 | `glossary_term_version_info` | `(term_id, version, deleted_at)`                                               | `(term_id, state)`                       |
 
-- Tables go into the H2, MySQL and PostgreSQL schemas and the `upgrade-1.3.0-to-2.0.0` scripts.
-- **Normalized key**: `key(s)` trims `s`, collapses runs of whitespace to one space and lower-cases
-  it (`Locale.ROOT`). Names, synonyms and lookups all use it, so they compare the same way.
-- **Names** are unique per metalake by `name_key = key(name)`, so `Churn` and `churn` collide on
-  every backend, and responses return the name as created.
-  Names follow the tag and domain name rules (up to 128 characters, `/` allowed and URL-encoded in
-  paths).
-- **Synonyms** are stored one per row with `synonym_key = key(synonym)`. Two terms may share a
-  synonym, but a synonym cannot equal another term's name; adding a synonym checks names, and
-  creating or renaming a term checks other terms' synonyms (400).
-- **Documentation links** (label and URL, shown on the term page) are stored as a JSON column of
-  `glossary_term_meta`; they are never queried.
-- **Source reference** is optional and unique per metalake when set. It records where an imported
-  term came from as `<system>:<id>` (for example `datahub:urn:li:glossaryTerm:Customer`), so a
-  re-import can update the term instead of duplicating it. A term without one was created in
-  Gravitino.
-- `MetadataObject.Type.GLOSSARY_TERM` is added for owners, events and audit. It is **not
-  grantable**: the role APIs reject privileges on a single term.
-- Terms, relations and bindings are not cached; every request reads the store, as for domains.
+- The tables are added to the H2, MySQL and PostgreSQL schemas and to the `upgrade-1.3.0-to-2.0.0`
+  scripts.
+- **Normalized key**: `key(s)` trims `s`, turns each run of spaces into one space, and lower-cases
+  it (`Locale.ROOT`). Names, synonyms and lookups all use `key()`, so they compare the same way.
+- **Names** are unique in a metalake by `name_key = key(name)`. So `Churn` and `churn` are the same
+  name on every database. Responses return the name as the user typed it. Names follow the tag and
+  domain rules: up to 128 characters, and `/` is allowed (URL-encoded in paths).
+- **Synonyms** are stored one per row, with `synonym_key = key(synonym)`. Two terms can share a
+  synonym. A synonym cannot be the name of another term. The server checks this in both
+  directions: when a synonym is added, and when a term is created or renamed (400).
+- **Documentation links** (a label and a URL) are shown on the term page. They are stored in a JSON
+  column of `glossary_term_meta`. No query reads inside them.
+- **Source reference** is optional. When set, it is unique in the metalake. It records where an
+  imported term came from, in the form `<system>:<id>`, for example
+  `datahub:urn:li:glossaryTerm:Customer`. A new import can then update the term instead of creating
+  a copy. A term without a source reference was created in Gravitino.
+- `MetadataObject.Type.GLOSSARY_TERM` is added for owners, events and audit. Privileges **cannot be
+  granted on a single term**: the role APIs reject them.
+- Terms, relations and bindings are not cached. Every request reads the store, the same as for
+  domains.
 
 ### Relations
 
-- `BROADER` is stored on the child (A → B means "A is a kind of B"); narrower is derived. `RELATED`
-  is stored once per pair with `from_term_id < to_term_id` and shown on both sides.
-- Setting A's broader or related term is a change to A only. It needs the edit privilege on A and
-  `VIEW_DEFINITION` on the other term.
-- **Cycle check**: adding A → B fails with 400 if A is reachable from B through `BROADER` edges.
-  The walk reads B's ancestors breadth-first under the hierarchy lock (see Locking). No self-edges.
-- A hierarchy read returns all ancestors or all descendants of a term; the graph is acyclic, so it ends.
-- Deprecating a term leaves its children unchanged. Deleting a term removes its edges; each child
-  that loses a broader term gets its own audit record, and keeps its other parents or becomes
-  top-level.
+- `BROADER` is stored on the child. A → B means "A is a kind of B". Narrower terms are not stored;
+  the server finds them from the `BROADER` rows. `RELATED` is stored once per pair (with
+  `from_term_id < to_term_id`) and shows on both terms.
+- Setting the broader or related term of A only changes A. The caller needs the edit privilege on A
+  and `VIEW_DEFINITION` on the other term.
+- **Cycle check**: adding A → B fails with 400 if B already reaches A through `BROADER` links. The
+  server walks up from B, level by level, under the hierarchy lock (see Locking). A term cannot be
+  its own parent.
+- A hierarchy read returns all ancestors or all descendants of a term. There are no cycles, so the
+  walk always ends.
+- Deprecating a term does not change its children. Deleting a term removes its links. Each child
+  that loses a parent gets its own audit record. The child keeps its other parents, or becomes a
+  top-level term.
 
 ### Domain membership
 
-A term belongs to zero or more domains, and domain grants govern it; a term with no domain is
-governed by metalake grants only. There are two ways to record the membership.
+A term belongs to zero or more domains. The grants on these domains control the term. A term
+without a domain is controlled by metalake grants only. There are two ways to store the membership.
 
 **Option A: explicit relation (recommended)**
 
-- `glossary_term_domain_rel (term_id, domain_id)`, changed only through the term API (`domains` on
-  create, `addDomain`, `removeDomain`), and through `TermChangeHandler` like any term change.
-- Adding a domain needs the edit privilege on the term and `CREATE_DEFINITION` on that domain, so
-  nobody can move a term into a domain they cannot write.
-- **Terms of a domain** (`GET /terms?domain=`) use the Domain design's scope: terms linked to the
-  domain or to a subdomain the caller can see.
-- Dropping a domain that still has terms fails with 409 `NonEmptyDomainException`, like a domain
-  with subdomains, since unlinking them would change who manages the terms. This is one added
-  check in `DomainManager#dropDomain`.
+- A table `glossary_term_domain_rel (term_id, domain_id)`. Only the term API changes it: `domains`
+  on create, `addDomain` and `removeDomain`. These changes go through `TermChangeHandler`, like any
+  term change.
+- To add a term to a domain, the caller needs the edit privilege on the term and
+  `CREATE_DEFINITION` on that domain. So nobody can move a term into a domain where they cannot
+  write.
+- **Terms of a domain** (`GET /terms?domain=`) use the same scope as the Domain design: terms in
+  the domain, and terms in its subdomains that the caller can see.
+- Dropping a domain that still has terms fails with 409 `NonEmptyDomainException`. This is the same
+  as a domain with subdomains. Removing the terms from the domain would change who manages them.
+  The change is one more check in `DomainManager#dropDomain`.
 
-**Option B: backing tags, as for assets in #13867**
+**Option B: backing tags, the same as assets in #13867**
 
 - `GLOSSARY_TERM` becomes taggable and is added to `DomainMember.SUPPORTED_TYPES`. A term is in
-  domain D when it carries D's backing (tag, value); terms appear in `GET /domains/{domain}/objects`
-  and in the domains of an object. No relation table.
-- Plain tag rules are not enough. For an asset, read access plus `APPLY_TAG` on a backing tag adds
-  it to a domain, and that grants nothing. For a term it decides who manages the term: a user with
-  only `VIEW_DEFINITION` and `APPLY_TAG` could add a term to Finance and hand it to Finance's
-  managers. The tag association path therefore needs two special cases for `GLOSSARY_TERM`:
-  1. besides `APPLY_TAG`, the edit privilege on the term and `CREATE_DEFINITION` on the domain the
-     (tag, value) backs, found through the Domain design's reverse lookup;
-  2. a backing-tag change on a term goes through `TermChangeHandler`, so a workflow can hold it
-     like any other term change.
-- Changing or deleting a domain's backing tag silently moves terms out of the domain, so who
-  manages them changes with no term change. Dropping a domain works as for assets.
+  domain D when it has D's backing (tag, value). Terms then show in `GET /domains/{domain}/objects`
+  and in the domains of an object. There is no relation table.
+- The normal tag rules are not enough here:
+  - For an asset, read access plus `APPLY_TAG` on a backing tag adds the asset to a domain. This
+    gives nobody any permission.
+  - For a term, the domain decides who manages the term. A user with only `VIEW_DEFINITION` and
+    `APPLY_TAG` could put a term into Finance, and the Finance admins would then control it.
+
+  So the tag code needs two special rules for `GLOSSARY_TERM`:
+  1. Besides `APPLY_TAG`, the caller also needs the edit privilege on the term and
+     `CREATE_DEFINITION` on the domain behind the (tag, value). The domain is found with the Domain
+     design's reverse lookup.
+  2. A backing-tag change on a term goes through `TermChangeHandler`, like any other term change.
+- If a domain's backing tag is changed or deleted, its terms silently leave the domain. Who manages
+  them changes, but nobody edited a term. Dropping a domain works the same as for assets.
 
 **Recommendation: Option A.** The reasons:
 
 1. **For a term, the domain decides who can read and manage it.** For an asset, being in a domain
    gives nobody any permission. That is why the Domain design lets anyone with `APPLY_TAG` add an
-   asset, and why it refuses access grants on domains. Terms are the opposite case: the grants on
-   a term's domains decide who can see, edit and approve it. With Option B, adding a tag would
-   change those permissions.
+   asset. It is also why the Domain design does not allow access grants on domains. Terms are the
+   opposite case: the grants on a term's domains decide who can see, edit and approve it. With
+   Option B, adding a tag would change these permissions.
 2. **Tag permissions go to other people.** In the Domain design, admins give `APPLY_TAG` on a
-   domain's tag to the owners of the tables in that domain. With Option B, any of those table
-   owners could move a term into the domain, which gives the domain's admins control of the term,
-   or hides it from a role the domain denies. One tag cannot allow this for tables and forbid it
-   for terms.
-3. **The benefits of tags do not apply to terms.** The Domain design uses tags for inheritance
-   from catalogs and schemas, for tag-based policies and for the existing tag checks. Terms are not
-   under a catalog or schema, carry no policies, and need stricter checks than `APPLY_TAG`.
+   domain's tag to the owners of the tables in that domain. With Option B, any of these table
+   owners could move a term into the domain. The domain admins would then control the term. Or the
+   term would be hidden from a role that the domain denies. One tag cannot allow this for tables
+   and forbid it for terms.
+3. **The benefits of tags do not apply to terms.** The Domain design uses tags for three things:
+   inheritance from catalogs and schemas, tag-based policies, and the existing tag checks. Terms
+   are not under a catalog or schema. Terms have no policies. And terms need stricter checks than
+   `APPLY_TAG`.
 4. **Permissions do not change by accident.** With Option B, replacing or deleting a domain's tag
-   silently removes its terms, so who can see or edit them changes although nobody edited a term.
-   With Option A, membership changes only through the term API, and is checked, versioned and
-   audited like any other term edit.
+   silently removes its terms. Who can see or edit them changes, but nobody edited a term. With
+   Option A, membership changes only through the term API. It is checked, versioned and audited
+   like any other term edit.
 5. **Smaller change to the Domain design.** Option A adds one check when a domain is dropped.
-   Option B makes terms taggable, adds a member type and puts term-only rules in the shared tag
+   Option B makes terms taggable, adds a member type, and adds term-only rules to the shared tag
    code.
 
-The cost: a domain's terms are listed by `GET /terms?domain=` instead of
-`GET /domains/{domain}/objects`. Both follow the same rules: a term can be in several domains, and
-a domain includes its subdomains.
+The cost: the terms of a domain are listed by `GET /terms?domain=`, not by
+`GET /domains/{domain}/objects`. Both use the same rules: a term can be in several domains, and a
+domain includes its subdomains.
 
 ### Bindings
 
-A binding links a term to the data behind it. A term page shows two kinds, and an object page
-shows the terms linked to it:
+A binding links a term to the data behind it. A term page shows two kinds of bindings. An object
+page shows the terms linked to the object.
 
-| Kind               | Meaning                                                 | Targets                                                                     | Example                                                                                        |
-| ------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Implemented by** | The object stores or computes the term                  | `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`, `MODEL` | `Customer` is implemented by table `sales.public.customers` and column `customers.customer_id` |
-| **Used by**        | A semantic-model metric is defined in terms of the term | a metric: (`SEMANTIC_MODEL`, `metricName`)                                  | metric `net_revenue` uses `Net revenue` and `Order`                                            |
+| Kind               | Meaning                                        | Targets                                                                     | Example                                                                                        |
+| ------------------ | ---------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Implemented by** | The object stores or computes the term         | `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`, `MODEL` | `Customer` is implemented by table `sales.public.customers` and column `customers.customer_id` |
+| **Used by**        | A semantic-model metric is built from the term | a metric: (`SEMANTIC_MODEL`, `metricName`)                                  | metric `net_revenue` uses `Net revenue` and `Order`                                            |
 
-Both kinds live in `glossary_term_binding`; the kind follows from `metric_name` (set only for
-Used by). A binding is direct only: binding a schema does not bind the tables in it.
+Both kinds are stored in `glossary_term_binding`. `metric_name` is set only for Used by, so it
+tells the two kinds apart. A binding is direct only: binding a schema does not bind its tables.
 
 **One write endpoint, two ways to be allowed**
 
-Bindings are written on the object, like tags and policies: `POST /objects/{type}/{fullName}/terms`,
-or `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms` for a metric. Two different
-people know about a binding: the object's admin knows which terms the object represents, and the
-term's owner knows which data implements the term. Either may write it, per term in the request:
+Bindings are written on the object, the same as tags and policies:
+`POST /objects/{type}/{fullName}/terms`, or `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`
+for a metric. Two kinds of people know about a binding:
 
-| Caller       | Needs                                                            | Terms allowed                                            |
-| ------------ | ---------------------------------------------------------------- | -------------------------------------------------------- |
-| Object admin | Admin privilege on the object, and `VIEW_DEFINITION` on the term | `APPROVED` only                                          |
-| Term editor  | Edit privilege on the term, and read access to the object        | Any status, so a draft can be prepared with its bindings |
+- the object admin knows what the object means;
+- the term owner knows which data implements the term.
 
-- **Admin privilege on an object**: for tables and columns, the existing
-  `MODIFY_TABLE_AUTHORIZATION_EXPRESSION` (an owner of the table or of an ancestor, or
-  `MODIFY_TABLE` with `USE_CATALOG` and `USE_SCHEMA`); for metrics,
-  `MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION`. The other types have no modify privilege, so
-  they need ownership of the object or of one of its ancestors (metalake, catalog, schema).
-- The endpoint checks the object once and each term in the body imperatively; if any term fails
-  both checks, the request fails with 403 and nothing changes. Removing a binding needs the same
-  privilege as adding it.
-- Each changed term records a version and goes through `TermChangeHandler`, so a workflow can hold
-  a binding change like any other term change.
-- Binding a missing object or metric fails with 404; an object admin binding a term that is not
-  `APPROVED` gets 400.
-- A term that is later deprecated keeps its bindings; it stops appearing in matches and MCP
+Both can write bindings. The server checks each term in the request separately:
+
+| Caller       | Needs                                                            | Terms allowed                                     |
+| ------------ | ---------------------------------------------------------------- | ------------------------------------------------- |
+| Object admin | Admin privilege on the object, and `VIEW_DEFINITION` on the term | `APPROVED` only                                   |
+| Term editor  | Edit privilege on the term, and read access to the object        | Any status, so a draft can get its bindings early |
+
+- **Admin privilege on an object**:
+  - tables and columns: the existing `MODIFY_TABLE_AUTHORIZATION_EXPRESSION` (owner of the table or
+    of a parent, or `MODIFY_TABLE` with `USE_CATALOG` and `USE_SCHEMA`);
+  - metrics: `MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION`;
+  - other types have no modify privilege, so the caller must own the object or one of its parents
+    (metalake, catalog, schema).
+- The endpoint checks the object once, and then checks each term in the request body in code. If
+  one term fails both checks, the whole request fails with 403 and nothing changes. Removing a
+  binding needs the same privilege as adding it.
+- Each changed term saves a version and goes through `TermChangeHandler`. So a workflow can hold a
+  binding change, like any other term change.
+- Binding a missing object or metric fails with 404. If an object admin binds a term that is not
+  `APPROVED`, the request fails with 400.
+- When a term is deprecated later, it keeps its bindings. It no longer shows in lookups or MCP
   results.
 
 **Reads**
 
-- `GET /terms/{term}/objects?kind=IMPLEMENTED_BY|USED_BY&types=` lists a term's bindings, keeping
-  only objects and metrics the caller can access (`filterMetadataObject`; a metric needs access to
-  its semantic model).
+- `GET /terms/{term}/objects?kind=IMPLEMENTED_BY|USED_BY&types=` lists the bindings of a term. It
+  only returns objects and metrics the caller can access (`filterMetadataObject`). For a metric,
+  the caller needs access to its semantic model.
 - `GET /objects/{type}/{fullName}/terms` and `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms`
-  list an object's or a metric's terms, keeping only terms the caller can see.
-- `?children=true` on a table, view or semantic model also returns the terms of each of its
-  columns or metrics, so a schema tab or a metrics table loads in one call instead of one per
-  column. It is one query on `glossary_term_binding` by the object and its column IDs (or by
+  list the terms of an object or a metric. They only return terms the caller can see.
+- `?children=true` on a table, view or semantic model also returns the terms of each column or
+  metric. A schema tab or a metric table then loads in one call, not one call per column. On the
+  server it is one query on `glossary_term_binding`, by the object and its column IDs (or by
   `object_id` for metrics).
 
 **Cleanup**
 
-- Dropping an object soft-deletes its bindings, in the same places that clean up
-  `tag_relation_meta` (by object, schema, catalog and metalake). Renames keep them, since bindings
-  refer to IDs.
-- Dropping a column in `alterTable` soft-deletes the column's bindings in the same transaction.
-- Metrics have no IDs: altering a semantic model soft-deletes the bindings of metrics that no
-  longer exist. A renamed metric loses its bindings and must be linked again.
+- Dropping an object soft-deletes its bindings. This happens in the same places that clean up
+  `tag_relation_meta` (by object, schema, catalog and metalake). Renames keep the bindings, because
+  bindings use IDs.
+- Dropping a column in `alterTable` soft-deletes the bindings of the column, in the same
+  transaction.
+- Metrics have no IDs. When a semantic model is altered, the bindings of removed metrics are
+  soft-deleted. A renamed metric loses its bindings and must be linked again.
 
 ### Status and versions
 
-| Status            | Visible to                                  | Set by               | Delete                                                  |
+| Status            | Who can see it                              | Set by               | Who can delete it                                       |
 | ----------------- | ------------------------------------------- | -------------------- | ------------------------------------------------------- |
 | `DRAFT` (initial) | `CREATE_DEFINITION` or `MANAGE_DEFINITIONS` | creation             | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS` |
-| `APPROVED`        | `VIEW_DEFINITION`; MCP                      | `MANAGE_DEFINITIONS` | not allowed; deprecate first                            |
+| `APPROVED`        | `VIEW_DEFINITION`; MCP                      | `MANAGE_DEFINITIONS` | nobody; deprecate it first                              |
 | `DEPRECATED`      | `VIEW_DEFINITION`; not MCP                  | `MANAGE_DEFINITIONS` | `MANAGE_DEFINITIONS`                                    |
 
-- A `MANAGE_DEFINITIONS` holder on any of the term's domains or on the metalake sets the status
-  directly with `PATCH`. Edits apply at once in any status and are audited.
-- **Visibility is the same on every surface** (REST, clients, MCP). A term the caller cannot see is
-  omitted from lists, and get returns 404. The same filter applies inside responses: a term's
-  `broader`, `narrower` and `related` lists, an object's terms and a domain's terms omit terms the
-  caller cannot see, so a hidden draft or a term in a denied domain never shows up as a relation.
-- **Known channels**: hiding a term is not confidentiality. Its existence can show through a 409 on
-  creating a term with the same name, and a 400 on adding a synonym equal to its name.
-- **Versioned changes**: name, definition, synonyms, links, properties, relations, domains and
-  bindings.
-  Owner and status changes are audited only.
-- **Snapshot**: each version row stores the whole term as JSON (fields, synonyms, broader and
-  related term IDs, domain IDs, bindings). The live tables hold only the current state, so the
-  snapshot is what lets a change be stored before it is applied. This follows the existing
-  `current_version` + `table_column_version_info` pattern.
-- **Write path**: in the transaction of the change, under the term's exclusive lock, increment
-  `current_version`, insert a `CURRENT` row and mark the previous one `SUPERSEDED`. Cost: one insert
-  and one update per edit; a snapshot grows with the term's bindings.
-- **Read path**: no version API in this design; adding `GET /terms/{term}/versions` later
-  needs no storage change.
-- **Workflow hook**: `GlossaryManager` sends every content change through a `TermChangeHandler`.
-  The default implementation applies it at once as above. An approval workflow can replace it to
-  write a `PENDING` row without touching the live tables, then apply the snapshot and promote the
-  row to `CURRENT` on approval.
-- Dropping a term soft-deletes its synonyms, relations, domain links, bindings and version rows in
-  the same transaction. Dropping a metalake soft-deletes all of its glossary rows in
+- A user with `MANAGE_DEFINITIONS` on the metalake or on one of the term's domains sets the status
+  with `PATCH`. Edits take effect at once in any status, and are audited.
+- **Every API shows the same terms** (REST, clients, MCP). If the caller cannot see a term, lists
+  leave it out and get returns 404. The same rule applies inside responses. The `broader`,
+  `narrower` and `related` lists of a term, the terms of an object, and the terms of a domain all
+  leave out terms the caller cannot see. So a hidden draft, or a term in a denied domain, never
+  shows up as a relation.
+- **Known leaks**: hiding a term does not make it secret. A user can still find out that it exists
+  in two ways: creating a term with the same name returns 409, and adding a synonym equal to its
+  name returns 400.
+- **Changes that create a version**: name, definition, synonyms, links, properties, relations,
+  domains and bindings. Owner and status changes are only audited.
+- **Snapshot**: each version row stores the whole term as JSON: fields, synonyms, broader and
+  related term IDs, domain IDs and bindings. The live tables only hold the current state. The
+  snapshot makes it possible to store a change before it is applied. This is the same pattern as
+  the existing `current_version` + `table_column_version_info`.
+- **Write path**: in the same transaction as the change, and under the exclusive lock of the term:
+  increase `current_version`, insert a `CURRENT` row, and mark the old row `SUPERSEDED`. Cost: one
+  insert and one update per edit. A snapshot gets bigger when the term has more bindings.
+- **Read path**: this design has no version API. `GET /terms/{term}/versions` can be added later
+  without a storage change.
+- **Workflow hook**: `GlossaryManager` sends every content change to a `TermChangeHandler`. The
+  default handler applies the change at once, as above. An approval workflow can replace it:
+  1. on a change, write a `PENDING` row and leave the live tables alone;
+  2. on approval, apply the snapshot and mark the row `CURRENT`.
+- Dropping a term soft-deletes its synonyms, relations, domain links, bindings and version rows, in
+  the same transaction. Dropping a metalake soft-deletes all its glossary rows in
   `MetalakeMetaService#deleteMetalake`, next to the tag cleanup.
 
 ### Access control
 
-| Privilege            | On the metalake or a domain                                                             |
-| -------------------- | --------------------------------------------------------------------------------------- |
-| `VIEW_DEFINITION`    | Read `APPROVED` and `DEPRECATED` terms, relations and bindings; match                   |
-| `CREATE_DEFINITION`  | Create terms; see `DRAFT` terms; edit and bind terms the caller owns; delete own drafts |
-| `MANAGE_DEFINITIONS` | Edit and bind any term; set status; delete deprecated terms                             |
+| Privilege            | Granted on the metalake or a domain; allows                                   |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `VIEW_DEFINITION`    | Read `APPROVED` and `DEPRECATED` terms, relations and bindings; look up words |
+| `CREATE_DEFINITION`  | Create terms; see `DRAFT` terms; edit and bind own terms; delete own drafts   |
+| `MANAGE_DEFINITIONS` | Edit and bind any term; set status; delete deprecated terms                   |
 
-- `MANAGE_DEFINITIONS` includes `CREATE_DEFINITION`, which includes `VIEW_DEFINITION`. The names
-  are generic so that other business-definition objects can share them.
-- **Registration**: three new `Privilege.Name` values whose `canBindTo` accepts `METALAKE` and
-  `DOMAIN` only; granting them on any other securable, or granting anything on `GLOSSARY_TERM`,
-  fails with 400 in the role APIs.
-- **Levels of a term**: the metalake, each of its domains, and each domain's current parent. A
-  privilege holds when it is allowed on at least one level and denied on none. If Finance allows
-  `VIEW_DEFINITION` and Sales denies it, a role cannot see a term in both. The metalake owner
-  always passes.
-- **Bindings** are written on the object, by the object's admin (`APPROVED` terms only) or by the
-  term's editor; see Bindings.
-- **Owner** (user or group) through `/owners/glossary_term/{term}`. When a group owns a term, its
-  members count as the owner. Changing the owner needs the current owner, or `MANAGE_GRANTS` on the
-  metalake or one of the term's domains.
-- **Create** needs `CREATE_DEFINITION` on every listed domain, or on the metalake when none is
-  listed; the creator becomes the owner.
-- **Implementation**: a `TermScopeResolver` returns a term's levels from its domains and the Domain
-  design's parent resolver, batched for list filtering. `JcasbinAuthorizer#hasMetadataPrivilegePermission`
-  uses it for `GLOSSARY_TERM` where it walks to the parent today, combining the levels in one check
-  as for catalog, schema and table. Domains and terms named in a request body are checked
-  imperatively.
+- `MANAGE_DEFINITIONS` includes `CREATE_DEFINITION`, and `CREATE_DEFINITION` includes
+  `VIEW_DEFINITION`. The names are general, so other business-definition objects can use them too.
+- **Registration**: three new `Privilege.Name` values. Their `canBindTo` accepts `METALAKE` and
+  `DOMAIN` only. The role APIs return 400 when these privileges are granted on any other object,
+  or when anything is granted on `GLOSSARY_TERM`.
+- **Levels of a term**: the metalake, each domain of the term, and the current parent of each
+  domain. A privilege holds when at least one level allows it and no level denies it. Example: if
+  Finance allows `VIEW_DEFINITION` and Sales denies it, a role cannot see a term that is in both.
+  The metalake owner always passes.
+- **Bindings** are written on the object, by the object admin (`APPROVED` terms only) or by the
+  term editor. See Bindings.
+- **Owner** (a user or a group), set through `/owners/glossary_term/{term}`. When a group owns a
+  term, all its members count as the owner. To change the owner, the caller must be the current
+  owner, or have `MANAGE_GRANTS` on the metalake or on one of the term's domains.
+- **Create** needs `CREATE_DEFINITION` on every domain in the request. With no domain, it needs
+  `CREATE_DEFINITION` on the metalake. The creator becomes the owner.
+- **Implementation**: `TermScopeResolver` returns the levels of a term, from its domains and the
+  Domain design's parent resolver. It works in batches for list filtering.
+  `JcasbinAuthorizer#hasMetadataPrivilegePermission` uses it for `GLOSSARY_TERM`, at the place where
+  it walks to the parent today. All levels are combined in one check, the same as for catalog,
+  schema and table. Domains and terms in a request body are checked in code.
 
 ### Locking
 
-Term operations use the store's existing primitives, in one order: the live-endpoint fence
-(`LiveEndpointService.lockLiveEndpoint`, shared: the metalake, plus the bound object's chain when
-binding), the per-metalake hierarchy lock if needed, term rows in ID order (exclusive), then domain
-rows (shared). Each row is locked once, in its final mode.
+Term operations use the existing lock tools of the store, always in this order:
 
-| Operation                       | Locks                                                                   | Conflict it excludes                 |
-| ------------------------------- | ----------------------------------------------------------------------- | ------------------------------------ |
-| Create                          | metalake (shared) → domains (shared)                                    | metalake or domain drop              |
-| Edit content, synonyms, domains | term (exclusive) → added domains (shared)                               | concurrent edits; domain drop        |
-| Add a `BROADER` edge            | metalake (shared) → hierarchy lock → child (exclusive)                  | two edges that together form a cycle |
-| Add a `RELATED` edge            | both terms (exclusive, ID order)                                        | the other term being deleted         |
-| Bind / unbind                   | object chain (`lockLiveEndpoint`, shared) → terms (exclusive, ID order) | object drop; concurrent term edits   |
-| Set status, delete              | term (exclusive)                                                        | concurrent edits                     |
+1. the live-endpoint fence (`LiveEndpointService.lockLiveEndpoint`, shared): the metalake, plus the
+   chain of the bound object when binding;
+2. the per-metalake hierarchy lock, if needed;
+3. term rows, in ID order (exclusive);
+4. domain rows (shared).
 
-- The **hierarchy lock** is a `SELECT … FOR UPDATE` on a per-metalake row in
-  `glossary_hierarchy_lock`, inserted on first use. Locking only the two terms is not enough: the
-  edges A → B and C → D can be added concurrently, then B → C and D → A, each passing its own
-  check. `BROADER` edits are rare, so serializing them per metalake is cheap.
-- Name-addressed operations resolve the name, lock the row, then re-check the name and
-  `deleted_at`; otherwise 404. The name unique key backs up concurrent creates (409).
+Each row is locked only once, in its final mode.
+
+| Operation                       | Locks                                                                   | Conflict it prevents                     |
+| ------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------- |
+| Create                          | metalake (shared) → domains (shared)                                    | metalake or domain drop                  |
+| Edit content, synonyms, domains | term (exclusive) → added domains (shared)                               | edits at the same time; domain drop      |
+| Add a `BROADER` link            | metalake (shared) → hierarchy lock → child (exclusive)                  | two links that together form a cycle     |
+| Add a `RELATED` link            | both terms (exclusive, ID order)                                        | the other term being deleted             |
+| Bind / unbind                   | object chain (`lockLiveEndpoint`, shared) → terms (exclusive, ID order) | object drop; term edits at the same time |
+| Set status, delete              | term (exclusive)                                                        | edits at the same time                   |
+
+- The **hierarchy lock** is a `SELECT … FOR UPDATE` on one row per metalake in
+  `glossary_hierarchy_lock`. The row is inserted on first use. Locking only the two terms is not
+  enough. Example: A → B and C → D are added at the same time, then B → C and D → A. Each link
+  passes its own check, but together they form a cycle. `BROADER` edits are rare, so running them
+  one at a time per metalake is cheap.
+- For operations by name, the server finds the row by name, locks it, and then checks the name and
+  `deleted_at` again. If they changed, it returns 404. The unique key on the name protects
+  concurrent creates (409).
 
 ### REST API
 
-Under `/api/metalakes/{metalake}`, following the Tag, Policy and Domain conventions: a top-level
-`/terms` collection (there is no glossary container, so no `/glossary` level), `?details=` on lists,
-`PUT` with updates to alter, `PATCH` to set status, `DropResponse` on delete, and associations
-written on the object.
+All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and Domain APIs:
+
+- a top-level `/terms` collection (there is no glossary container, so no `/glossary` level);
+- `?details=` on lists;
+- `PUT` with a list of updates to alter, and `PATCH` to set the status;
+- `DropResponse` on delete;
+- bindings are written on the object.
 
 | Operation              | Endpoint                                                                 | Request → response                                                      |
 | ---------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
@@ -389,82 +422,87 @@ ObjectTermsResponse   { terms: [TermDTO], children: [{ name, terms: [TermDTO] }]
 TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 ```
 
-- **List** serves both browsing and lookup:
-  - `domain` returns the terms in the domain's scope (the domain and the subdomains the caller can
-    see); `nameContains` is a case-insensitive substring match on the name, for search boxes.
-  - `match` (repeatable, up to 20) is the business-word lookup: `key(word)` is compared with
-    `name_key` and `synonym_key`, and each returned term carries `matchedBy`. With
-    `status=APPROVED`, a word that matches only `DEPRECATED` terms returns nothing.
-  - `bindings=true` (only with `match` and `details=true`) adds each term's bindings, at most 20 per
-    term, with `bindingsTruncated` when there are more. Lookup then takes one call; a word usually
-    matches one to three terms.
-  - A dedicated path such as `/terms/resolve` would collide with a term named `resolve`, so lookup
-    stays a filter of the list.
-- **Alter** applies all updates in one transaction and records one version. `narrower` is derived
-  and read-only; `version` is the current version; `updateLinks` replaces the whole link list.
-- **Terms of an object**: `children=true` is accepted on `table`, `view` and `semantic_model`, and
-  fills `children` with one entry per column or metric that has visible terms. A semantic model
-  itself has no terms, only its metrics do.
-- **Bind / unbind** follow the tag association request shape; the response is the object's terms
-  after the change.
-- **Errors**: 404 `NoSuchTermException` (missing or not visible) and `NoSuchMetadataObjectException`;
-  409 `TermAlreadyExistsException` (name or source reference) and `NonEmptyDomainException`; 400 for
-  a cycle, a self-edge, a synonym equal to another term's name, deleting an `APPROVED` term, an
-  object admin binding a term that is not `APPROVED`, or more than 20 `match` values; 403
-  `ForbiddenException`.
-- **Concurrency**: changes apply to the current state and the last write wins, as for other
-  Gravitino metadata; there is no version check on write. Responses carry `version`, so a client
-  can tell that a term changed since it read it.
-- **Paging**: none, like the other core list APIs; it can be added with the Domain design's paging.
-- **Encoding**: term names may contain `/`, URL-encoded as `%2F` in `{term}`, as for domain and tag
-  names.
+- **List** is used both to browse and to look up words:
+  - `domain` returns the terms of the domain and of the subdomains the caller can see.
+  - `nameContains` finds names that contain the text, ignoring case. It is for search boxes.
+  - `match` looks up business words. It can be repeated, up to 20 times. The server compares
+    `key(word)` with `name_key` and `synonym_key`. Each returned term has `matchedBy`. With
+    `status=APPROVED`, a word that only matches `DEPRECATED` terms returns nothing.
+  - `bindings=true` adds the bindings of each term, at most 20 per term. If there are more,
+    `bindingsTruncated` is set. It only works together with `match` and `details=true`. A lookup
+    then needs only one call. A word usually matches one to three terms.
+  - Why not a separate path like `/terms/resolve`? It would clash with a term named `resolve`. So
+    lookup is a filter of the list.
+- **Alter** applies all updates in one transaction and saves one version. `narrower` is computed
+  and cannot be set. `version` is the current version. `updateLinks` replaces the whole link list.
+- **Terms of an object**: `children=true` works on `table`, `view` and `semantic_model`. It adds
+  one entry to `children` for each column or metric with visible terms. A semantic model itself
+  has no terms; only its metrics do.
+- **Bind / unbind** use the same request format as tag association. The response is the object's
+  terms after the change.
+- **Errors**:
+  - 404: `NoSuchTermException` (missing, or the caller cannot see it), `NoSuchMetadataObjectException`;
+  - 409: `TermAlreadyExistsException` (same name or same source reference), `NonEmptyDomainException`;
+  - 400: a cycle, a term as its own parent, a synonym equal to another term's name, deleting an
+    `APPROVED` term, an object admin binding a term that is not `APPROVED`, or more than 20 `match`
+    values;
+  - 403: `ForbiddenException`.
+- **Concurrency**: changes apply to the current state, and the last write wins, the same as other
+  Gravitino metadata. Writes do not check the version. Responses include `version`, so a client
+  can see that a term changed after it read it.
+- **Paging**: none, the same as the other core list APIs. It can come later with the paging of the
+  Domain design.
+- **Encoding**: a term name can contain `/`. In `{term}` it must be URL-encoded as `%2F`, the same
+  as domain and tag names.
 - **Clients** (Java, Python):
   - `GlossaryOperations` on `GravitinoMetalake`: `listTerms`, `listTermsInfo`, `getTerm`,
-    `createTerm`, `alterTerm`, `setTermStatus`, `dropTerm`, and `matchTerms(words, domain)`, which
-    returns approved terms with their bindings for agents that do not use MCP.
+    `createTerm`, `alterTerm`, `setTermStatus`, `dropTerm`, and `matchTerms(words, domain)`.
+    `matchTerms` returns approved terms with their bindings. It is for agents that do not use MCP.
   - On a `Term`: `broader()`, `narrower()`, `listBindings(kind)`.
   - `SupportsTerms` (`listTerms()`, `associateTerms(add, remove)`) on catalogs, schemas, tables,
-    views, columns, filesets, topics and models, plus `listColumnTerms()` on tables and views, and
-    `listMetricTerms` / `associateMetricTerms` on `SemanticModel`.
+    views, columns, filesets, topics and models. Tables and views also have `listColumnTerms()`.
+    `SemanticModel` has `listMetricTerms` and `associateMetricTerms`.
 
 ### Web UI support
 
-Each part of the glossary page and of the pages that show terms maps to the calls below. Names,
-domains, status, version, owner, relations and links all come with the term, so the term page needs
-no per-field call.
+The table shows the REST calls behind each part of the glossary page, and of the other pages that
+show terms. A term comes with its name, domains, status, version, owner, relations and links. So
+the term page does not need a call per field.
 
-| Page                         | Part                                                                    | Calls                                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Glossary                     | Term tree (domain › subdomain › term, narrower terms nested, No domain) | `GET /terms?details=true` and `GET /domains?details=true`; built from `domains` and `broader`         |
-| Glossary                     | Search terms                                                            | `GET /terms?nameContains=`                                                                            |
-| Glossary, term               | Header, Definition, Details, Related terms                              | `GET /terms/{term}`; the source label comes from the `sourceRef` system, else "Gravitino"             |
-| Glossary, term               | Implemented by, Used by                                                 | `GET /terms/{term}/objects?kind=IMPLEMENTED_BY`, `?kind=USED_BY`                                      |
-| Glossary, term               | Approve, Deprecate                                                      | `PATCH /terms/{term}`                                                                                 |
-| Glossary, term               | Delete term (dialog counts relations and asset links)                   | `DELETE /terms/{term}`; counts from the term and its bindings                                         |
-| Glossary, Add or Edit term   | Name, Definition, Synonyms, Domain, Broader, Related, Documentation     | `POST /terms` or `PUT /terms/{term}` with the changed fields; pickers from `/domains` and `/terms`    |
-| Glossary, Add term           | Owner other than the creator                                            | `POST /terms`, then `PUT /owners/glossary_term/{term}` (the creator is the owner, so this is allowed) |
-| Explore, table or view       | Terms N, Update terms drawer, column chips and the term filter          | `GET /objects/{type}/{fullName}/terms?details=true&children=true`; `POST .../terms` per change        |
-| Explore, Update terms drawer | Term picker (approved, grouped by domain)                               | `GET /terms?details=true&status=APPROVED&nameContains=`                                               |
-| Semantic model               | Glossary terms of each metric                                           | `GET /objects/semantic_model/{fullName}/terms?details=true&children=true`                             |
-| Metric editor                | Terms (approved only)                                                   | the picker call above; `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`               |
-| Domain, Definitions tab      | Terms of the domain and its subdomains, name search                     | `GET /terms?details=true&domain=&nameContains=`                                                       |
-| Domain, create               | Readable by all users, Glossary editors                                 | existing role APIs: grant the definition privileges on the domain                                     |
-| Define, Overview             | Terms by domain, terms by status                                        | counted from `GET /terms?details=true`                                                                |
+| Page                         | Part                                                                    | Calls                                                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Glossary                     | Term tree (domain › subdomain › term, narrower terms nested, No domain) | `GET /terms?details=true` and `GET /domains?details=true`; the tree is built from `domains` and `broader` |
+| Glossary                     | Search terms                                                            | `GET /terms?nameContains=`                                                                                |
+| Glossary, term               | Header, Definition, Details, Related terms                              | `GET /terms/{term}`; the source label is the `sourceRef` system, or "Gravitino" if empty                  |
+| Glossary, term               | Implemented by, Used by                                                 | `GET /terms/{term}/objects?kind=IMPLEMENTED_BY`, `?kind=USED_BY`                                          |
+| Glossary, term               | Approve, Deprecate                                                      | `PATCH /terms/{term}`                                                                                     |
+| Glossary, term               | Delete term (the dialog counts relations and asset links)               | `DELETE /terms/{term}`; the counts come from the term and its bindings                                    |
+| Glossary, Add or Edit term   | Name, Definition, Synonyms, Domain, Broader, Related, Documentation     | `POST /terms` or `PUT /terms/{term}` with the changed fields; pickers use `/domains` and `/terms`         |
+| Glossary, Add term           | Owner other than the creator                                            | `POST /terms`, then `PUT /owners/glossary_term/{term}` (allowed, because the creator is the owner)        |
+| Explore, table or view       | Terms N, Update terms drawer, column chips and the term filter          | `GET /objects/{type}/{fullName}/terms?details=true&children=true`; `POST .../terms` per change            |
+| Explore, Update terms drawer | Term picker (approved, grouped by domain)                               | `GET /terms?details=true&status=APPROVED&nameContains=`                                                   |
+| Semantic model               | Glossary terms of each metric                                           | `GET /objects/semantic_model/{fullName}/terms?details=true&children=true`                                 |
+| Metric editor                | Terms (approved only)                                                   | the picker call above; `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`                   |
+| Domain, Definitions tab      | Terms of the domain and its subdomains, name search                     | `GET /terms?details=true&domain=&nameContains=`                                                           |
+| Domain, create               | Readable by all users, Glossary editors                                 | existing role APIs: grant the definition privileges on the domain                                         |
+| Define, Overview             | Terms by domain, terms by status                                        | counted from `GET /terms?details=true`                                                                    |
 
-Not covered by this design, so these parts need another source or stay hidden:
+This design does not cover the parts below. They need another source, or the page hides them:
 
-- **Review**: Submit for review, Reject, In review, the version diff and History belong to an
-  approval workflow; `TermChangeHandler` and the version rows are where it plugs in.
-- **Counts that need an aggregate query**: terms without bindings, assets without a glossary term,
-  and an object's "N restricted terms", which would also reveal hidden terms.
+- **Review**: Submit for review, Reject, In review, the version diff and History. They belong to an
+  approval workflow. The workflow can use `TermChangeHandler` and the version rows.
+- **Counts that need an aggregate query**: terms without bindings, and assets without a glossary
+  term. Also the "N restricted terms" count on an object, because it would show that hidden terms
+  exist.
 - **Undefined lookups**, **Import**, **KB articles** and the **managing group** label.
-- **Buttons by privilege**: Gravitino has no API that returns the actions a caller may take on an
-  object, so the page shows the 403 message instead of disabling a button in advance.
+- **Buttons by privilege**: Gravitino has no API that tells which actions a caller can take on an
+  object. So the page cannot disable a button in advance. It shows the 403 message instead.
 
 ### Agent integration
 
-A read-only `glossary` tool tag in `mcp-server/`, added to `SUPPORTED_TOOL_TAGS`. The MCP server
-forwards the caller's `Authorization` header, so agents see exactly what the caller can see.
+The `mcp-server/` gets a read-only `glossary` tool tag, added to `SUPPORTED_TOOL_TAGS`. The MCP
+server forwards the caller's `Authorization` header. So an agent sees exactly what its user can
+see.
 
 ```
 question ──▶ resolve_business_term(words) ──▶ terms + bindings
@@ -473,71 +511,74 @@ question ──▶ resolve_business_term(words) ──▶ terms + bindings
                metric binding ──────────────────┴──▶ load_semantic_model ─────────▶ metric query
 ```
 
-**`resolve_business_term`** is the tool an agent calls first:
+**`resolve_business_term`** is the first tool an agent calls:
 
-- Input: `words` (the business phrases of the question, up to 20) and an optional `domain`.
-- One REST call: `GET /terms?match=w1&match=w2&status=APPROVED&details=true&bindings=true[&domain=]`.
-- Output, per word: `matches` (term, definition, `matched_by`, domains, broader and related names,
-  and bindings as `{kind, type, catalog, schema, name, column?, metric?}`, plus
-  `bindings_truncated`), and an `unmatched` list, so the agent knows which words have no governed
-  meaning.
-- Bindings are split into the arguments that `get_table_metadata_details` and
-  `load_semantic_model` take, so the next call needs no parsing or extra lookup.
+- Input: `words` (the business phrases in the question, up to 20), and an optional `domain`.
+- It makes one REST call:
+  `GET /terms?match=w1&match=w2&status=APPROVED&details=true&bindings=true[&domain=]`.
+- Output, for each word:
+  - `matches`: the term, definition, `matched_by`, domains, broader and related names, and the
+    bindings as `{kind, type, catalog, schema, name, column?, metric?}`, plus `bindings_truncated`;
+  - `unmatched`: the words with no match, so the agent knows these words have no agreed meaning.
+- The binding fields are the same arguments that `get_table_metadata_details` and
+  `load_semantic_model` take. The agent can make the next call directly, with no parsing and no
+  extra lookup.
 
-**Rules in the tool descriptions**, so agents use the result the same way:
+**Rules in the tool descriptions**, so all agents use the result the same way:
 
-1. Only `APPROVED` terms are returned. A word in `unmatched` has no agreed meaning: say so, and do
-   not guess a column.
-2. When a word matches several terms, use the domains to pick one, or ask the user.
-3. A binding says where a meaning is implemented. It never grants access; reading the data goes
-   through the usual privileges.
+1. Only `APPROVED` terms are returned. A word in `unmatched` has no agreed meaning. Tell the user,
+   and do not guess a column.
+2. If a word matches several terms, use the domains to pick one, or ask the user.
+3. A binding shows where a meaning is stored. It never gives access. Reading the data still needs
+   the normal privileges.
 
 | Tool                      | REST calls                                                              | Use                                                              |
 | ------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `resolve_business_term`   | `GET /terms?match=&status=APPROVED&details=true&bindings=true`          | Map the words of a question to terms and the data behind them    |
+| `resolve_business_term`   | `GET /terms?match=&status=APPROVED&details=true&bindings=true`          | Map the words of a question to terms and their data              |
 | `get_term`                | `GET /terms/{term}`                                                     | Definition, synonyms, domains, relations                         |
-| `list_terms`              | `GET /terms?details=true&status=APPROVED` (+ `domain`, `name_contains`) | Browse a domain's vocabulary                                     |
-| `get_term_hierarchy`      | `GET /terms/{term}/hierarchy`                                           | Widen or narrow a concept                                        |
+| `list_terms`              | `GET /terms?details=true&status=APPROVED` (+ `domain`, `name_contains`) | Browse the terms of a domain                                     |
+| `get_term_hierarchy`      | `GET /terms/{term}/hierarchy`                                           | Find wider or narrower terms                                     |
 | `list_metadata_by_term`   | `GET /terms/{term}/objects`                                             | All objects and metrics of a term, when the lookup was truncated |
-| `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms?details=true&children=true`       | Explain what a table, its columns or a model's metrics mean      |
+| `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms?details=true&children=true`       | Explain a table, its columns or the metrics of a model           |
 
-The tools other than `resolve_business_term` drop terms that are not `APPROVED` from their output.
-Together with the `domain` tools of #13867, an agent can go from a domain to its terms to the data.
+The other tools also remove terms that are not `APPROVED` from their output. With the `domain`
+tools of #13867, an agent can go from a domain to its terms, and then to the data.
 
 ### Events and audit
 
-- Every operation emits pre, success and failure events through a `GlossaryEventDispatcher` and
-  reaches the audit log: create, alter, status, bind and unbind, drop. A drop also records one entry
-  for each child that lost a broader term.
+- Every operation sends pre, success and failure events through a `GlossaryEventDispatcher`, and
+  is written to the audit log: create, alter, status, bind and unbind, drop. When a term is
+  dropped, each child that lost a parent also gets its own audit entry.
 
 ## Alternatives Considered
 
-1. **A glossary container** (`metalake.glossary.term`). It adds a second grouping axis next to
-   Domain and raises the question of which one governs privileges; Domain plus the term hierarchy
-   is enough.
+1. **A glossary container** (`metalake.glossary.term`). It adds a second way to group terms, next
+   to domains. Then it is unclear which one controls privileges. Domains plus the term hierarchy
+   are enough.
 2. **Domain membership through backing tags**: see Option B in Domain membership.
-3. **Terms as tags on assets.** `APPLY_TAG` does not match the definition privileges, tags have no
-   definition, relations or status, and tags carry policies while bindings must not affect access.
+3. **Terms as tags on assets.** `APPLY_TAG` is a different privilege from the definition
+   privileges. Tags have no definition, relations or status. Tags can carry policies, but a binding
+   must never change access.
 
 ## Prior Art
 
-- **DataHub** glossary terms carry a definition, owners and a source reference, are grouped in
-  nested term groups, relate through typed relations (Inherits From, Contains), and attach to
-  datasets and columns. Term groups map to domains and parent terms here; Contains maps to
-  `RELATED` and Inherits From to `BROADER`.
-- **Unity Catalog** pages define a term inside a domain, with draft and published states and
-  related assets; access is inherited from the domain, with no grants on a page. This design
-  likewise grants on domains, never on a single term.
+- **DataHub**: a glossary term has a definition, owners and a source reference. Terms are grouped
+  in nested term groups. They have typed relations (Inherits From, Contains), and are attached to
+  datasets and columns. In this design, term groups become domains and parent terms. Contains
+  becomes `RELATED`, and Inherits From becomes `BROADER`.
+- **Unity Catalog**: a page defines a term inside a domain. It has draft and published states, and
+  related assets. Access comes from the domain; nobody grants access on a single page. This design
+  works the same way: grants are on domains, never on a single term.
 
 ## Open Questions
 
-1. **Domain membership of terms**: Option A (recommended) or Option B; to be agreed with the Domain
-   design.
-2. **One privilege set**: #13867 defines `MANAGE_DOMAIN` / `USE_DOMAIN` for domains. Should domains
-   and terms share the definition privileges instead?
-3. **Default read access**: terms should be readable by everyone by default, but Gravitino has no
-   built-in role that every user holds. Add one (for example `PUBLIC`) holding `VIEW_DEFINITION` on
-   the metalake, or ask admins to grant it?
+1. **Domain membership of terms**: Option A (recommended) or Option B? This needs agreement with
+   the Domain design.
+2. **One privilege set**: #13867 uses `MANAGE_DOMAIN` / `USE_DOMAIN` for domains. Should domains
+   and terms use the same definition privileges instead?
+3. **Default read access**: everyone should be able to read terms by default. But Gravitino has no
+   built-in role for all users. Should we add one (for example `PUBLIC`) with `VIEW_DEFINITION` on
+   the metalake, or should admins grant it?
 
 ## Task Breakdown
 
@@ -553,13 +594,13 @@ Together with the `domain` tools of #13867, an agent can go from a domain to its
 - [ ] `GlossaryManager`: CRUD, name and synonym rules, relations with the cycle check, domain membership, status, version rows, `TermChangeHandler`, locking
 - [ ] Authorization: `TermScopeResolver`, the `GLOSSARY_TERM` case in `JcasbinAuthorizer`, draft visibility, owner-only edits for `CREATE_DEFINITION`
 - [ ] REST endpoints for terms (including links), status and hierarchy; `GlossaryEventDispatcher`; the domain drop check
-- [ ] Tests on H2, MySQL and PostgreSQL: name and synonym rules, cycle check under concurrent edits, deny across domains, draft visibility in relation lists, and a multi-node test (edit or move on one server, read on another)
+- [ ] Tests on H2, MySQL and PostgreSQL: name and synonym rules, cycle check with concurrent edits, deny across domains, hidden drafts in relation lists, and a multi-node test (edit or move on one server, read on another)
 
 ### Phase 2: Bindings and lookup
 
 - [ ] Binding storage; bind and unbind endpoints on objects and metrics with both privilege paths; cleanup on object drop, column drop and metric removal
-- [ ] Binding reads: terms of a term's objects, of an object, of a metric, and `children=true` for tables, views and semantic models
-- [ ] `domain`, `nameContains` and `match` filters on the list endpoint, and `bindings=true` with the per-term cap
+- [ ] Binding reads: objects of a term, terms of an object or a metric, and `children=true` for tables, views and semantic models
+- [ ] `domain`, `nameContains` and `match` filters on the list endpoint, and `bindings=true` with the limit per term
 
 ### Phase 3: Clients, MCP and docs
 
