@@ -172,8 +172,9 @@ public class DomainMetaService {
   }
 
   /**
-   * Updates a domain. The update is a compare-and-set on the version of the domain that the updater
-   * was given, so a domain that changed in between is not overwritten.
+   * Updates a domain. The domain row is locked before the updater runs, so the updater is given the
+   * current domain and concurrent alters apply one after another instead of failing on each other.
+   * The write still compares the locked version as a backstop.
    *
    * <p>The returned domain is read back in the same transaction, so its backing tag name comes from
    * the tag it is now bound to rather than from the updater's entity.
@@ -194,22 +195,27 @@ public class DomainMetaService {
     String metalakeName = identifier.namespace().level(0);
 
     try {
-      DomainPO domainPO = getDomainPOByMetalakeAndName(metalakeName, identifier.name());
-      DomainEntity oldDomainEntity = DomainPO.fromDomainPO(domainPO, identifier.namespace());
-      DomainEntity updatedDomainEntity = (DomainEntity) updater.apply((E) oldDomainEntity);
-      Preconditions.checkArgument(
-          Objects.equals(oldDomainEntity.id(), updatedDomainEntity.id()),
-          "The updated domain entity id: %s must have the same id as the old entity id %s",
-          updatedDomainEntity.id(),
-          oldDomainEntity.id());
-
-      DomainPO newDomainPO = DomainPO.updateDomainPO(domainPO, updatedDomainEntity);
+      DomainPO observedDomainPO = getDomainPOByMetalakeAndName(metalakeName, identifier.name());
       DomainPO[] storedDomainPO = new DomainPO[1];
       SessionUtils.doWithCommit(
           DomainMetaMapper.class,
           mapper -> {
-            updateDomainWithVersion(identifier, mapper, domainPO, newDomainPO);
-            storedDomainPO[0] = mapper.selectDomainMetaById(domainPO.domainId());
+            lockAndGetDomainPO(identifier, observedDomainPO);
+            // The locking read cannot join the tag table, so the locked row is read again with the
+            // name of its backing tag.
+            DomainPO lockedDomainPO = mapper.selectDomainMetaById(observedDomainPO.domainId());
+            DomainEntity oldDomainEntity =
+                DomainPO.fromDomainPO(lockedDomainPO, identifier.namespace());
+            DomainEntity updatedDomainEntity = (DomainEntity) updater.apply((E) oldDomainEntity);
+            Preconditions.checkArgument(
+                Objects.equals(oldDomainEntity.id(), updatedDomainEntity.id()),
+                "The updated domain entity id: %s must have the same id as the old entity id %s",
+                updatedDomainEntity.id(),
+                oldDomainEntity.id());
+
+            DomainPO newDomainPO = DomainPO.updateDomainPO(lockedDomainPO, updatedDomainEntity);
+            updateDomainWithVersion(identifier, mapper, lockedDomainPO, newDomainPO);
+            storedDomainPO[0] = mapper.selectDomainMetaById(lockedDomainPO.domainId());
           });
 
       return DomainPO.fromDomainPO(storedDomainPO[0], identifier.namespace());
@@ -279,10 +285,10 @@ public class DomainMetaService {
   }
 
   /**
-   * Deletes the domain the caller observed. The delete is a compare-and-set on the observed
-   * version, so a domain that changed since it was read is rejected instead of being removed, and
-   * the dependent rows are cleaned up in the same transaction as the domain row itself. If another
-   * transaction deletes or renames the observed domain first, this method returns {@code false}.
+   * Deletes the domain the caller observed. The domain row is locked first, so a domain that was
+   * only altered since it was read is still deleted, and the dependent rows are cleaned up in the
+   * same transaction as the domain row itself. If another transaction deletes or renames the
+   * observed domain first, this method returns {@code false}.
    *
    * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
    * use {@link #deleteDomain(NameIdentifier)}, which reads it first.
@@ -293,15 +299,15 @@ public class DomainMetaService {
 
     // The metalake lock comes first. Dropping the metalake soft-deletes the privileges before the
     // domains, while this delete changes the domain row before its privileges; without the lock
-    // the two could deadlock on a domain with privileges. The version-checked delete of the domain
-    // row comes next: it decides whether this delete wins, and a losing delete throws there and
-    // rolls the transaction back before any dependent row is touched. The cleanups that follow are
-    // blanket soft deletes for this domain ID, so their row counts carry no information and are
-    // not checked.
+    // the two could deadlock on a domain with privileges. The domain row is locked next, and a row
+    // that is gone or renamed makes the delete report the domain as missing before any dependent
+    // row is touched. The version-checked delete keeps the version as a backstop. The cleanups that
+    // follow are blanket soft deletes for this domain ID, so their row counts carry no information
+    // and are not checked.
     try {
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForDomainWrite(identifier.namespace().level(0), domainPO.metalakeId()),
-          () -> deleteDomainWithVersion(identifier, domainPO),
+          () -> deleteDomainWithVersion(identifier, lockAndGetDomainPO(identifier, domainPO)),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -393,6 +399,25 @@ public class DomainMetaService {
                 DomainMetaMapper.class,
                 mapper -> mapper.selectDomainMetaByIdForUpdate(initializedDomainPO.domainId())),
         current -> Objects.equals(current.metalakeId(), initializedDomainPO.metalakeId()));
+  }
+
+  /**
+   * Locks the row of the domain the caller observed and returns it. The row is the same domain only
+   * if it still has the observed name and metalake; otherwise the domain is reported as missing.
+   * The returned row does not carry the backing tag name.
+   */
+  private DomainPO lockAndGetDomainPO(NameIdentifier identifier, DomainPO observedDomainPO) {
+    return OccWriteSupport.lockParentForChildWrite(
+        identifier.name(),
+        Entity.EntityType.DOMAIN,
+        () ->
+            SessionUtils.getWithoutCommit(
+                DomainMetaMapper.class,
+                mapper -> mapper.selectDomainMetaByIdForUpdate(observedDomainPO.domainId())),
+        null,
+        current ->
+            Objects.equals(current.domainName(), observedDomainPO.domainName())
+                && Objects.equals(current.metalakeId(), observedDomainPO.metalakeId()));
   }
 
   private void updateDomainWithVersion(

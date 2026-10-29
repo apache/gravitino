@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.service;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -42,7 +41,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
@@ -349,30 +347,80 @@ public class TestDomainMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDomainAlterReportsOptimisticLockConflict() throws IOException {
+  public void testAlterWaitsForConcurrentAlterAndKeepsItsChange() throws Exception {
     createAndInsertMakeLake(METALAKE_NAME);
     DomainMetaService domainMetaService = DomainMetaService.getInstance();
     DomainEntity finance = newDomain(METALAKE_NAME, "Finance", "initial");
     domainMetaService.insertDomain(finance, false);
 
-    Assertions.assertThrows(
-        OptimisticLockException.class,
-        () ->
-            domainMetaService.updateDomain(
-                finance.nameIdentifier(),
-                entity -> {
-                  DomainEntity current = (DomainEntity) entity;
-                  // Another writer changes the domain after this update read it.
-                  try {
-                    domainMetaService.insertDomain(
-                        current.toBuilder().withComment("competing").build(), true);
-                  } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                  }
-                  return current.toBuilder().withComment("requested").build();
-                }));
-    Assertions.assertEquals(
-        "competing", domainMetaService.getDomainByIdentifier(finance.nameIdentifier()).comment());
+    CountDownLatch alterWritten = new CountDownLatch(1);
+    CountDownLatch allowAlterCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> competingAlter =
+          alterCommentInOpenTransaction(
+              executor, finance.id(), "competing", alterWritten, allowAlterCommit);
+      Assertions.assertTrue(alterWritten.await(30, TimeUnit.SECONDS));
+
+      // This alter reads the domain before the competing alter commits, then waits for its lock.
+      DomainEntity[] givenToUpdater = new DomainEntity[1];
+      Future<DomainEntity> alter =
+          executor.submit(
+              () ->
+                  domainMetaService.updateDomain(
+                      finance.nameIdentifier(),
+                      entity -> {
+                        givenToUpdater[0] = (DomainEntity) entity;
+                        return givenToUpdater[0].toBuilder()
+                            .withProperties(ImmutableMap.of("k2", "v2"))
+                            .build();
+                      }));
+      Assertions.assertThrows(TimeoutException.class, () -> alter.get(500, TimeUnit.MILLISECONDS));
+
+      allowAlterCommit.countDown();
+      Assertions.assertNull(competingAlter.get(30, TimeUnit.SECONDS));
+      DomainEntity altered = alter.get(30, TimeUnit.SECONDS);
+      // The updater ran on the locked row, so both changes are kept.
+      Assertions.assertEquals("competing", givenToUpdater[0].comment());
+      Assertions.assertEquals("competing", altered.comment());
+      Assertions.assertEquals(ImmutableMap.of("k2", "v2"), altered.properties());
+      Assertions.assertEquals(
+          altered, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
+    } finally {
+      allowAlterCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  public void testDeleteWaitsForConcurrentAlterAndDeletes() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", "initial");
+    domainMetaService.insertDomain(finance, false);
+
+    CountDownLatch alterWritten = new CountDownLatch(1);
+    CountDownLatch allowAlterCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> competingAlter =
+          alterCommentInOpenTransaction(
+              executor, finance.id(), "competing", alterWritten, allowAlterCommit);
+      Assertions.assertTrue(alterWritten.await(30, TimeUnit.SECONDS));
+
+      // This delete reads the domain before the alter commits, then waits for its lock.
+      Future<Boolean> delete =
+          executor.submit(() -> domainMetaService.deleteDomain(finance.nameIdentifier()));
+      Assertions.assertThrows(TimeoutException.class, () -> delete.get(500, TimeUnit.MILLISECONDS));
+
+      allowAlterCommit.countDown();
+      Assertions.assertNull(competingAlter.get(30, TimeUnit.SECONDS));
+      Assertions.assertTrue(delete.get(30, TimeUnit.SECONDS));
+      Assertions.assertFalse(backend.exists(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
+    } finally {
+      allowAlterCommit.countDown();
+      executor.shutdownNow();
+    }
   }
 
   @TestTemplate
@@ -406,21 +454,26 @@ public class TestDomainMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         1, countActiveRows("role_meta_securable_object", domainAsSecurableObject));
 
-    // A delete that observed an older version is rejected and cleans nothing.
-    DomainPO stalePO = selectDomainPO(finance.id());
-    domainMetaService.updateDomain(
-        finance.nameIdentifier(),
-        entity -> ((DomainEntity) entity).toBuilder().withComment("updated").build());
-    Assertions.assertThrows(
-        OptimisticLockException.class,
-        () -> domainMetaService.deleteDomain(finance.nameIdentifier(), stalePO));
+    // A delete that observed the domain before a rename no longer names the row: it reports the
+    // domain as missing and cleans nothing.
+    DomainPO preRenamePO = selectDomainPO(finance.id());
+    DomainEntity treasury =
+        domainMetaService.updateDomain(
+            finance.nameIdentifier(),
+            entity -> ((DomainEntity) entity).toBuilder().withName("Treasury").build());
+    Assertions.assertFalse(domainMetaService.deleteDomain(finance.nameIdentifier(), preRenamePO));
     Assertions.assertEquals(1, countActiveRows("owner_meta", domainAsMetadataObject));
     Assertions.assertEquals(
         1, countActiveRows("role_meta_securable_object", domainAsSecurableObject));
 
-    Assertions.assertTrue(domainMetaService.deleteDomain(finance.nameIdentifier()));
-    Assertions.assertFalse(domainMetaService.deleteDomain(finance.nameIdentifier()));
-    Assertions.assertFalse(backend.exists(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
+    // A delete that observed an older version of the same domain locks the row and deletes it.
+    DomainPO stalePO = selectDomainPO(treasury.id());
+    domainMetaService.updateDomain(
+        treasury.nameIdentifier(),
+        entity -> ((DomainEntity) entity).toBuilder().withComment("updated").build());
+    Assertions.assertTrue(domainMetaService.deleteDomain(treasury.nameIdentifier(), stalePO));
+    Assertions.assertFalse(domainMetaService.deleteDomain(treasury.nameIdentifier()));
+    Assertions.assertFalse(backend.exists(treasury.nameIdentifier(), Entity.EntityType.DOMAIN));
     Assertions.assertEquals(0, countActiveRows("owner_meta", domainAsMetadataObject));
     Assertions.assertEquals(
         0, countActiveRows("role_meta_securable_object", domainAsSecurableObject));
@@ -428,7 +481,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
     Assertions.assertTrue(backend.exists(tag.nameIdentifier(), Entity.EntityType.TAG));
 
     // The deleted domain row is a stale observation now.
-    Assertions.assertFalse(domainMetaService.deleteDomain(finance.nameIdentifier(), stalePO));
+    Assertions.assertFalse(domainMetaService.deleteDomain(treasury.nameIdentifier(), stalePO));
   }
 
   @TestTemplate
@@ -677,6 +730,42 @@ public class TestDomainMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         MetadataObjects.of(null, "Finance", MetadataObject.Type.DOMAIN),
         NameIdentifierUtil.toMetadataObject(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
+  }
+
+  /**
+   * Alters the comment of a domain in a transaction that stays open, holding the row lock, until
+   * {@code allowCommit} is released.
+   */
+  private Future<Throwable> alterCommentInOpenTransaction(
+      ExecutorService executor,
+      long domainId,
+      String comment,
+      CountDownLatch written,
+      CountDownLatch allowCommit) {
+    DomainPO observedPO = selectDomainPO(domainId);
+    DomainEntity observed =
+        DomainPO.fromDomainPO(observedPO, NamespaceUtil.ofDomain(METALAKE_NAME));
+    DomainPO alteredPO =
+        DomainPO.updateDomainPO(observedPO, observed.toBuilder().withComment(comment).build());
+    return executor.submit(
+        () -> {
+          try {
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    Assertions.assertEquals(
+                        Integer.valueOf(1),
+                        SessionUtils.getWithoutCommit(
+                            DomainMetaMapper.class,
+                            mapper -> mapper.updateDomainMeta(alteredPO, observedPO))),
+                () -> {
+                  written.countDown();
+                  await(allowCommit);
+                });
+            return null;
+          } catch (Throwable throwable) {
+            return throwable;
+          }
+        });
   }
 
   private void await(CountDownLatch latch) {
