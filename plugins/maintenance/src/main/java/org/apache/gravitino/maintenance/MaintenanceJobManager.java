@@ -26,8 +26,8 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
 import org.slf4j.Logger;
@@ -36,17 +36,14 @@ import org.slf4j.LoggerFactory;
 /**
  * Submits TMS Spark jobs and binds the resulting job run id onto soft-slot claims.
  *
- * <p>Contract: {@link #submitAndBind} injects {@code action_ids}, calls {@code runJob}, then binds
- * {@code job_id}. If {@code runJob} succeeds but bind fails, the orphaned Spark job is cancelled
- * and unbound claims are released. Callers that fail before {@code runJob} must release claims
+ * <p>{@link #submitAndBind} injects {@code action_ids}, calls {@code runJob}, then binds {@code
+ * job_id}. If {@code runJob} succeeds but bind fails, the orphaned Spark job is cancelled and
+ * unbound claims are released. Callers that fail before {@code runJob} must release claims
  * themselves.
  */
-public class MaintenanceJobSubmitManager {
+public class MaintenanceJobManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceJobSubmitManager.class);
-
-  private static final TableMaintenanceActionMetaService ACTION_SERVICE =
-      TableMaintenanceActionMetaService.getInstance();
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceJobManager.class);
 
   private final JobOperationDispatcher jobOperationDispatcher;
   private final TableMaintenanceActionMetaService actionService;
@@ -57,9 +54,10 @@ public class MaintenanceJobSubmitManager {
    * @return manager bound to {@link GravitinoEnv#jobOperationDispatcher()} and the action meta
    *     singleton
    */
-  public static MaintenanceJobSubmitManager create() {
-    return new MaintenanceJobSubmitManager(
-        GravitinoEnv.getInstance().jobOperationDispatcher(), ACTION_SERVICE);
+  public static MaintenanceJobManager create() {
+    return new MaintenanceJobManager(
+        GravitinoEnv.getInstance().jobOperationDispatcher(),
+        TableMaintenanceActionMetaService.getInstance());
   }
 
   /**
@@ -68,7 +66,7 @@ public class MaintenanceJobSubmitManager {
    * @param jobOperationDispatcher Gravitino job run / cancel entry point
    * @param actionService soft-slot bind / release
    */
-  public MaintenanceJobSubmitManager(
+  public MaintenanceJobManager(
       JobOperationDispatcher jobOperationDispatcher,
       TableMaintenanceActionMetaService actionService) {
     this.jobOperationDispatcher = jobOperationDispatcher;
@@ -76,27 +74,12 @@ public class MaintenanceJobSubmitManager {
   }
 
   /**
-   * Injects {@code action_ids}, runs the TMS maintenance template, and binds {@code job_id} on one
-   * claim.
+   * Injects {@code action_ids}, runs the TMS maintenance template, and binds {@code job_id} on the
+   * claims (one claim for cron, several for a commit chain).
    *
    * @param metalake metalake name
    * @param jobConf mutable runtime jobConf (policy options already resolved)
-   * @param claim soft-slot claim from acquire
-   * @return job run id when run+bind succeeded; empty when submit or bind failed (claim released)
-   */
-  public Optional<Long> submitAndBind(
-      String metalake, Map<String, String> jobConf, OccupancyClaim claim) {
-    Preconditions.checkNotNull(claim, "claim");
-    return submitAndBind(metalake, jobConf, List.of(claim));
-  }
-
-  /**
-   * Injects {@code action_ids}, runs the TMS maintenance template, and binds the same {@code
-   * job_id} on every claim (commit chain).
-   *
-   * @param metalake metalake name
-   * @param jobConf mutable runtime jobConf (policy options already resolved)
-   * @param claims soft-slot claims from batch acquire (non-empty)
+   * @param claims soft-slot claims from acquire (non-empty)
    * @return job run id when run+bind succeeded; empty when submit or bind failed (claims released)
    */
   public Optional<Long> submitAndBind(
@@ -115,54 +98,30 @@ public class MaintenanceJobSubmitManager {
           jobOperationDispatcher.runJob(
               metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
       jobId = job.id();
-      if (claims.size() == 1) {
-        actionService.bindJobId(claims.get(0), jobId);
-      } else {
-        actionService.bindJobIds(claims, jobId);
-      }
+      actionService.bindJobIds(claims, jobId);
       return Optional.of(jobId);
     } catch (RuntimeException e) {
       if (jobId != null) {
-        // runJob already accepted the Spark application; bind lost the soft-slot fence — stop the
-        // orphan so it cannot keep running against a finished / replaced action_id.
-        cancelJobQuietly(metalake, jobId);
+        try {
+          jobOperationDispatcher.cancelJob(metalake, JobHandle.JOB_ID_PREFIX + jobId);
+        } catch (RuntimeException cancelError) {
+          LOG.warn(
+              "Failed to cancel orphaned TMS Spark job {} under metalake {} after bind failure",
+              jobId,
+              metalake,
+              cancelError);
+        }
       }
-      releaseClaimsQuietly(claims);
+      try {
+        actionService.deleteClaims(claims);
+      } catch (RuntimeException releaseError) {
+        LOG.warn("Failed to release occupancy claims after submit failure", releaseError);
+      }
       LOG.warn(
           "Failed TMS job submitAndBind for action_ids {}: {}",
           claims.stream().map(c -> Long.toString(c.actionId())).collect(Collectors.joining(",")),
           e.toString());
       return Optional.empty();
-    }
-  }
-
-  private void cancelJobQuietly(String metalake, long jobId) {
-    try {
-      jobOperationDispatcher.cancelJob(metalake, JobHandle.JOB_ID_PREFIX + jobId);
-    } catch (RuntimeException cancelError) {
-      LOG.warn(
-          "Failed to cancel orphaned TMS Spark job {} under metalake {} after bind failure",
-          jobId,
-          metalake,
-          cancelError);
-    }
-  }
-
-  private void releaseClaimsQuietly(List<OccupancyClaim> claims) {
-    try {
-      if (claims.size() == 1) {
-        OccupancyClaim claim = claims.get(0);
-        if (!actionService.deleteUnboundClaim(claim)) {
-          LOG.debug(
-              "Occupancy claim {} created_at={} was not released (reclaimed or already bound)",
-              claim.actionId(),
-              claim.createdAt());
-        }
-      } else {
-        actionService.deleteClaims(claims);
-      }
-    } catch (RuntimeException releaseError) {
-      LOG.warn("Failed to release occupancy claims after submit failure", releaseError);
     }
   }
 }

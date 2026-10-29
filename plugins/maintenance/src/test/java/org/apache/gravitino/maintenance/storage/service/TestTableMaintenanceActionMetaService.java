@@ -24,6 +24,7 @@ import static org.apache.gravitino.maintenance.storage.TableMaintenanceActionTes
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
