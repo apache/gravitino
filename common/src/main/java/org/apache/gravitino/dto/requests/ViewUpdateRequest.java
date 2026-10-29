@@ -34,6 +34,7 @@ import org.apache.gravitino.dto.rel.RepresentationDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Represents a request to update a view. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -222,6 +223,20 @@ public interface ViewUpdateRequest extends RESTRequest {
 
     @Override
     public void validate() throws IllegalArgumentException {
+      validateWithPrefix("");
+    }
+
+    @Override
+    public ViewChange viewChange() {
+      return ViewChange.replaceView(
+          columns == null ? new ColumnDTO[0] : columns,
+          DTOConverters.fromDTOs(representations),
+          defaultCatalog,
+          defaultSchema,
+          comment);
+    }
+
+    void validateWithPrefix(String fieldPrefix) {
       Preconditions.checkArgument(
           representations != null && representations.length > 0,
           "\"representations\" field is required and cannot be empty");
@@ -238,19 +253,10 @@ public interface ViewUpdateRequest extends RESTRequest {
                   Preconditions.checkArgument(column != null, "column must not be null");
                   column.validate();
                 });
+        WritableDataTypeValidator.validateColumns(columns, fieldPrefix + "columns");
       }
 
       ViewCreateRequest.validateNoDuplicateDialects(representations);
-    }
-
-    @Override
-    public ViewChange viewChange() {
-      return ViewChange.replaceView(
-          columns == null ? new ColumnDTO[0] : columns,
-          DTOConverters.fromDTOs(representations),
-          defaultCatalog,
-          defaultSchema,
-          comment);
     }
   }
 }

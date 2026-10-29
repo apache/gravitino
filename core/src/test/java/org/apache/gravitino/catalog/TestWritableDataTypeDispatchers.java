@@ -38,8 +38,12 @@ import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -71,8 +75,12 @@ public class TestWritableDataTypeDispatchers extends TestOperationDispatcher {
   private static final FunctionImpl[] IMPLS = {
     FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.UDF")
   };
+  private static final Representation[] REPRESENTATIONS = {
+    SQLRepresentation.builder().withDialect("trino").withSql("SELECT 1").build()
+  };
 
   private static TableOperationDispatcher tables;
+  private static ViewOperationDispatcher views;
   private static PartitionOperationDispatcher partitions;
   private static FunctionOperationDispatcher functions;
 
@@ -84,6 +92,9 @@ public class TestWritableDataTypeDispatchers extends TestOperationDispatcher {
     schemas.createSchema(SCHEMA, "comment", PROPERTIES);
     tables =
         new TableOperationDispatcher(
+            catalogManager, entityStore, idGenerator, () -> schemas, secretManager);
+    views =
+        new ViewOperationDispatcher(
             catalogManager, entityStore, idGenerator, () -> schemas, secretManager);
     partitions =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
@@ -230,6 +241,92 @@ public class TestWritableDataTypeDispatchers extends TestOperationDispatcher {
     Assertions.assertEquals("renamed", updated.columns()[0].name());
     Assertions.assertEquals(UNPARSED, updated.columns()[0].dataType());
     Assertions.assertTrue(tables.dropTable(ident));
+  }
+
+  @Test
+  public void testViewTypesRejectedBeforeCatalogAccess() {
+    for (Column column :
+        new Column[] {
+          Column.of("c", UNPARSED),
+          Column.of("c", Types.ListType.of(UNPARSED, true)),
+          Column.of("c", Types.ExternalType.of(" ")),
+          Column.of("c", Types.StringType.get(), null, Literals.of(null, UNPARSED))
+        }) {
+      assertRejected(
+          () ->
+              views.createView(
+                  ident("invalid_view"),
+                  null,
+                  new Column[] {column},
+                  REPRESENTATIONS,
+                  null,
+                  null,
+                  PROPERTIES),
+          "columns[0]");
+      assertRejected(
+          () ->
+              views.alterView(
+                  ident("invalid_view"),
+                  ViewChange.setProperty("k1", "changed"),
+                  ViewChange.replaceView(new Column[] {column}, REPRESENTATIONS, null, null, null)),
+          "updates[1].columns[0]");
+    }
+    verifyNoInteractions(entityStore);
+  }
+
+  @Test
+  public void testViewReplacementValidatesBeforeMutation() {
+    NameIdentifier ident = ident("view_types");
+    View created = views.createView(ident, null, null, REPRESENTATIONS, null, null, PROPERTIES);
+    Assertions.assertEquals(0, created.columns().length);
+    Type externalList = Types.ListType.of(EXTERNAL, true);
+    View replaced =
+        views.alterView(
+            ident,
+            ViewChange.replaceView(
+                new Column[] {Column.of("c", externalList)}, REPRESENTATIONS, null, null, null));
+    Assertions.assertEquals(externalList, replaced.columns()[0].dataType());
+
+    assertRejected(
+        () ->
+            views.alterView(
+                ident,
+                ViewChange.setProperty("k1", "changed"),
+                ViewChange.replaceView(
+                    new Column[] {Column.of("c", UNPARSED)}, REPRESENTATIONS, null, null, null)),
+        "updates[1].columns[0].type");
+    View unchanged = views.loadView(ident);
+    Assertions.assertEquals("v1", unchanged.properties().get("k1"));
+    Assertions.assertEquals(externalList, unchanged.columns()[0].dataType());
+    Assertions.assertTrue(views.dropView(ident));
+  }
+
+  @Test
+  public void testLegacyViewCanBeImportedAndManaged() {
+    NameIdentifier ident = ident("legacy_view");
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) testCatalog.ops())
+        .createView(
+            ident,
+            null,
+            new Column[] {Column.of("legacy", UNPARSED)},
+            REPRESENTATIONS,
+            null,
+            null,
+            PROPERTIES);
+    Assertions.assertEquals(UNPARSED, views.loadView(ident).columns()[0].dataType());
+    View updated =
+        views.alterView(
+            ident, ViewChange.setProperty("k1", "changed"), ViewChange.removeProperty("k2"));
+    Assertions.assertEquals("changed", updated.properties().get("k1"));
+    Assertions.assertFalse(updated.properties().containsKey("k2"));
+    Assertions.assertEquals(UNPARSED, updated.columns()[0].dataType());
+    View renamed = views.alterView(ident, ViewChange.rename("renamed_legacy_view"));
+    Assertions.assertEquals("renamed_legacy_view", renamed.name());
+    Assertions.assertEquals(UNPARSED, renamed.columns()[0].dataType());
+    Assertions.assertTrue(views.dropView(ident("renamed_legacy_view")));
   }
 
   @Test

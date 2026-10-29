@@ -58,6 +58,19 @@ public class TableUpdatesRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(updates != null, "updates must not be null");
     Preconditions.checkArgument(!updates.isEmpty(), "updates must not be empty");
-    updates.forEach(RESTRequest::validate);
+    for (int i = 0; i < updates.size(); i++) {
+      TableUpdateRequest update = updates.get(i);
+      String fieldPrefix = "updates[" + i + "].";
+      if (update instanceof TableUpdateRequest.AddTableColumnRequest) {
+        ((TableUpdateRequest.AddTableColumnRequest) update).validateWithPrefix(fieldPrefix);
+      } else if (update instanceof TableUpdateRequest.UpdateTableColumnTypeRequest) {
+        ((TableUpdateRequest.UpdateTableColumnTypeRequest) update).validateWithPrefix(fieldPrefix);
+      } else if (update instanceof TableUpdateRequest.UpdateTableColumnDefaultValueRequest) {
+        ((TableUpdateRequest.UpdateTableColumnDefaultValueRequest) update)
+            .validateWithPrefix(fieldPrefix);
+      } else {
+        update.validate();
+      }
+    }
   }
 }

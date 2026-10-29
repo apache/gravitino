@@ -53,6 +53,13 @@ public class ViewUpdatesRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(updates != null, "updates must not be null");
     Preconditions.checkArgument(!updates.isEmpty(), "updates must not be empty");
-    updates.forEach(RESTRequest::validate);
+    for (int i = 0; i < updates.size(); i++) {
+      ViewUpdateRequest update = updates.get(i);
+      if (update instanceof ViewUpdateRequest.ReplaceViewRequest) {
+        ((ViewUpdateRequest.ReplaceViewRequest) update).validateWithPrefix("updates[" + i + "].");
+      } else {
+        update.validate();
+      }
+    }
   }
 }

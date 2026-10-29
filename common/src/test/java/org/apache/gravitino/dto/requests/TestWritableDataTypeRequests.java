@@ -48,7 +48,7 @@ public class TestWritableDataTypeRequests {
                     + type
                     + "}]}",
                 TableUpdatesRequest.class);
-    assertRejected(add, "type" + path);
+    assertRejected(add, "updates[0].type" + path);
 
     TableUpdatesRequest update =
         JsonUtils.objectMapper()
@@ -57,7 +57,22 @@ public class TestWritableDataTypeRequests {
                     + type
                     + "}]}",
                 TableUpdatesRequest.class);
-    assertRejected(update, "newType" + path);
+    assertRejected(update, "updates[0].newType" + path);
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidTableUpdates")
+  public void testTableUpdateErrorPathsIncludeIndex(String update, String path) throws Exception {
+    TableUpdatesRequest request =
+        JsonUtils.objectMapper()
+            .readValue(
+                """
+                {"updates":[{"@type":"updateComment","newComment":"updated"},%s]}
+                """
+                    .formatted(update),
+                TableUpdatesRequest.class);
+    assertRejected(request, "updates[1]." + path);
+    assertRejected(request.getUpdates().get(1), path);
   }
 
   @Test
@@ -82,6 +97,75 @@ public class TestWritableDataTypeRequests {
                       + "}]}",
                   TableUpdatesRequest.class);
       Assertions.assertDoesNotThrow(update::validate);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidColumnTypes")
+  public void testRejectNewViewColumnTypes(String type, String path) throws Exception {
+    ViewCreateRequest create =
+        JsonUtils.objectMapper()
+            .readValue(
+                """
+                {"name":"v","columns":[{"name":"c","type":%s}],
+                 "representations":[{"type":"sql","dialect":"trino","sql":"SELECT 1"}]}
+                """
+                    .formatted(type),
+                ViewCreateRequest.class);
+    assertRejected(create, "columns[0].type" + path);
+
+    ViewUpdatesRequest replace =
+        JsonUtils.objectMapper()
+            .readValue(
+                """
+                {"updates":[{"@type":"setProperty","property":"k","value":"v"},
+                  {"@type":"replaceView","columns":[{"name":"c","type":%s}],
+                   "representations":[{"type":"sql","dialect":"trino","sql":"SELECT 1"}]}]}
+                """
+                    .formatted(type),
+                ViewUpdatesRequest.class);
+    assertRejected(replace, "updates[1].columns[0].type" + path);
+    assertRejected(replace.getUpdates().get(1), "columns[0].type" + path);
+  }
+
+  @Test
+  public void testAcceptOptionalAndWritableViewColumns() throws Exception {
+    for (String columns :
+        new String[] {
+          "null",
+          "[]",
+          """
+          [{"name":"c","type":"timestamp","defaultValue":{
+            "type":"unparsed","unparsedExpression":"CURRENT_TIMESTAMP"}}]
+          """,
+          """
+          [{"name":"c","type":{"type":"external","catalogString":"jsonb"}}]
+          """,
+          """
+          [{"name":"c","type":{"type":"list","elementType":{
+            "type":"external","catalogString":"jsonb"}}}]
+          """
+        }) {
+      ViewCreateRequest create =
+          JsonUtils.objectMapper()
+              .readValue(
+                  """
+                  {"name":"v","columns":%s,
+                   "representations":[{"type":"sql","dialect":"trino","sql":"SELECT 1"}]}
+                  """
+                      .formatted(columns),
+                  ViewCreateRequest.class);
+      Assertions.assertDoesNotThrow(create::validate);
+      ViewUpdatesRequest replace =
+          JsonUtils.objectMapper()
+              .readValue(
+                  """
+                  {"updates":[{"@type":"replaceView","columns":%s,
+                    "representations":[{"type":"sql","dialect":"trino","sql":"SELECT 1"}]}]}
+                  """
+                      .formatted(columns),
+                  ViewUpdatesRequest.class);
+      Assertions.assertDoesNotThrow(replace::validate);
     }
   }
 
@@ -169,13 +253,28 @@ public class TestWritableDataTypeRequests {
             "{\"name\":\"t\",\"columns\":[{\"name\":\"c\",\"type\":\"string\",\"defaultValue\":%s}]}",
             "columns[0].defaultValue.dataType"),
         Arguments.of(
+            ViewCreateRequest.class,
+            """
+            {"name":"v","columns":[{"name":"c","type":"string","defaultValue":%s}],
+             "representations":[{"type":"sql","dialect":"trino","sql":"SELECT 1"}]}
+            """,
+            "columns[0].defaultValue.dataType"),
+        Arguments.of(
+            ViewUpdatesRequest.class,
+            """
+            {"updates":[{"@type":"replaceView","columns":[
+              {"name":"c","type":"string","defaultValue":%s}],
+              "representations":[{"type":"sql","dialect":"trino","sql":"SELECT 1"}]}]}
+            """,
+            "updates[0].columns[0].defaultValue.dataType"),
+        Arguments.of(
             TableUpdatesRequest.class,
             "{\"updates\":[{\"@type\":\"addColumn\",\"fieldName\":[\"c\"],\"type\":\"string\",\"defaultValue\":%s}]}",
-            "defaultValue.dataType"),
+            "updates[0].defaultValue.dataType"),
         Arguments.of(
             TableUpdatesRequest.class,
             "{\"updates\":[{\"@type\":\"updateColumnDefaultValue\",\"fieldName\":[\"c\"],\"newDefaultValue\":{\"type\":\"function\",\"funcName\":\"f\",\"funcArgs\":[%s]}}]}",
-            "newDefaultValue.funcArgs[0].dataType"),
+            "updates[0].newDefaultValue.funcArgs[0].dataType"),
         Arguments.of(
             FunctionRegisterRequest.class,
             "{\"name\":\"f\",\"functionType\":\"SCALAR\",\"deterministic\":true,\"definitions\":[{\"parameters\":[{\"name\":\"x\",\"dataType\":\"string\",\"defaultValue\":%s}],\"returnType\":\"string\"}]}",
@@ -216,6 +315,36 @@ public class TestWritableDataTypeRequests {
             TableCreateRequest.class,
             "{\"name\":\"t\",\"columns\":[{\"name\":\"c\",\"type\":\"string\"}],\"sortOrders\":[{\"sortTerm\":%s,\"direction\":\"asc\",\"nullOrdering\":\"nulls_first\"}]}",
             "sortOrders[0].sortTerm.dataType"));
+  }
+
+  private static Stream<Arguments> invalidTableUpdates() {
+    return Stream.of(
+        Arguments.of(
+            """
+            {"@type":"addColumn","fieldName":["c"],
+             "type":{"type":"list","elementType":"future_type"}}
+            """,
+            "type.elementType"),
+        Arguments.of(
+            """
+            {"@type":"addColumn","fieldName":["c"],"type":"string",
+             "defaultValue":{"type":"function","funcName":"f","funcArgs":[
+               {"type":"literal","dataType":"future_type","value":null}]}}
+            """,
+            "defaultValue.funcArgs[0].dataType"),
+        Arguments.of(
+            """
+            {"@type":"updateColumnType","fieldName":["c"],
+             "newType":{"type":"struct","fields":[{"name":"nested","type":"future_type"}]}}
+            """,
+            "newType.fields[0].type"),
+        Arguments.of(
+            """
+            {"@type":"updateColumnDefaultValue","fieldName":["c"],
+             "newDefaultValue":{"type":"function","funcName":"f","funcArgs":[
+               {"type":"literal","dataType":{"type":"external","catalogString":" "},"value":null}]}}
+            """,
+            "newDefaultValue.funcArgs[0].dataType.catalogString"));
   }
 
   private static void assertRejected(RESTRequest request, String path) {

@@ -123,7 +123,8 @@ public final class WritableDataTypeValidator {
    *
    * @param expression The expression to validate, or null when absent.
    * @param fieldPath The request field path used in validation errors.
-   * @throws IllegalArgumentException If a literal contains a non-writable type.
+   * @throws IllegalArgumentException If a literal contains a non-writable type, a traversal array
+   *     is null, or a partition assignment is null or unsupported.
    */
   public static void validateExpression(@Nullable Expression expression, String fieldPath) {
     if (expression == null) {
@@ -134,6 +135,10 @@ public final class WritableDataTypeValidator {
     }
     if (expression instanceof Transform) {
       Partition[] assignments = ((Transform) expression).assignments();
+      Preconditions.checkArgument(
+          assignments != null,
+          "\"%s.assignments\" field is required and cannot be null",
+          fieldPath);
       for (int i = 0; i < assignments.length; i++) {
         validatePartition(assignments[i], fieldPath + ".assignments[" + i + "]");
       }
@@ -143,6 +148,8 @@ public final class WritableDataTypeValidator {
         expression instanceof FunctionExpression || expression instanceof Transform
             ? ".funcArgs"
             : ".children";
+    Preconditions.checkArgument(
+        children != null, "\"%s\" field is required and cannot be null", fieldPath + childField);
     for (int i = 0; i < children.length; i++) {
       validateExpression(children[i], fieldPath + childField + "[" + i + "]");
     }
@@ -153,17 +160,29 @@ public final class WritableDataTypeValidator {
    *
    * @param partition The partition to validate.
    * @param fieldPath The request field path used in validation errors.
-   * @throws IllegalArgumentException If a literal contains a non-writable type.
+   * @throws IllegalArgumentException If a literal contains a non-writable type, a traversal array
+   *     is null, or the partition is null or unsupported.
    */
   public static void validatePartition(Partition partition, String fieldPath) {
+    Preconditions.checkArgument(
+        partition != null, "\"%s\" field is required and cannot be null", fieldPath);
     if (partition instanceof IdentityPartition) {
       Literal<?>[] values = ((IdentityPartition) partition).values();
+      Preconditions.checkArgument(
+          values != null, "\"%s.values\" field is required and cannot be null", fieldPath);
       for (int i = 0; i < values.length; i++) {
         validateExpression(values[i], fieldPath + ".values[" + i + "]");
       }
     } else if (partition instanceof ListPartition) {
       Literal<?>[][] lists = ((ListPartition) partition).lists();
+      Preconditions.checkArgument(
+          lists != null, "\"%s.lists\" field is required and cannot be null", fieldPath);
       for (int i = 0; i < lists.length; i++) {
+        Preconditions.checkArgument(
+            lists[i] != null,
+            "\"%s.lists[%s]\" field is required and cannot be null",
+            fieldPath,
+            i);
         for (int j = 0; j < lists[i].length; j++) {
           validateExpression(lists[i][j], fieldPath + ".lists[" + i + "][" + j + "]");
         }
@@ -172,6 +191,25 @@ public final class WritableDataTypeValidator {
       RangePartition range = (RangePartition) partition;
       validateExpression(range.lower(), fieldPath + ".lower");
       validateExpression(range.upper(), fieldPath + ".upper");
+    } else {
+      throw new IllegalArgumentException(
+          String.format(
+              "\"%s\" must be an IdentityPartition, ListPartition or RangePartition", fieldPath));
+    }
+  }
+
+  /**
+   * Validates the types and defaults of newly supplied table or view columns.
+   *
+   * @param columns The new columns.
+   * @param fieldPath The request field path of the columns array.
+   * @throws IllegalArgumentException If a new type or literal type is not writable.
+   */
+  public static void validateColumns(Column[] columns, String fieldPath) {
+    for (int i = 0; i < columns.length; i++) {
+      String columnPath = fieldPath + "[" + i + "]";
+      validate(columns[i].dataType(), columnPath + ".type");
+      validateExpression(columns[i].defaultValue(), columnPath + ".defaultValue");
     }
   }
 
@@ -189,10 +227,7 @@ public final class WritableDataTypeValidator {
       @Nullable Transform[] partitioning,
       @Nullable Distribution distribution,
       @Nullable SortOrder[] sortOrders) {
-    for (int i = 0; i < columns.length; i++) {
-      validate(columns[i].dataType(), "columns[" + i + "].type");
-      validateExpression(columns[i].defaultValue(), "columns[" + i + "].defaultValue");
-    }
+    validateColumns(columns, "columns");
     if (partitioning != null) {
       for (int i = 0; i < partitioning.length; i++) {
         validateExpression(partitioning[i], "partitioning[" + i + "]");

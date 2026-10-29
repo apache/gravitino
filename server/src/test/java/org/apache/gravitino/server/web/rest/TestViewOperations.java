@@ -141,6 +141,54 @@ public class TestViewOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testRejectUnresolvedTypesBeforeDispatch() {
+    String[] columns = {
+      "{\"name\":\"c\",\"type\":\"future_type\"}",
+      "{\"name\":\"c\",\"type\":{\"type\":\"list\",\"elementType\":\"future_type\"}}",
+      "{\"name\":\"c\",\"type\":{\"type\":\"external\",\"catalogString\":\" \"}}",
+      "{\"name\":\"c\",\"type\":\"string\",\"defaultValue\":{\"type\":\"literal\",\"dataType\":\"future_type\",\"value\":null}}"
+    };
+    for (String column : columns) {
+      String create =
+          """
+          {"name":"v","columns":[%s],
+           "representations":[{"type":"sql","dialect":"trino","sql":"SELECT 1"}]}
+          """
+              .formatted(column);
+      try (Response response =
+          target(viewPath(metalake, catalog, schema))
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept(VND_V1_JSON)
+              .post(Entity.json(create))) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertTrue(
+            response.readEntity(ErrorResponse.class).getMessage().contains("columns[0]"));
+      }
+
+      String replace =
+          """
+          {"updates":[{"@type":"setProperty","property":"k","value":"v"},
+            {"@type":"replaceView","columns":[%s],
+             "representations":[{"type":"sql","dialect":"trino","sql":"SELECT 1"}]}]}
+          """
+              .formatted(column);
+      try (Response response =
+          target(viewPath(metalake, catalog, schema) + "/v")
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept(VND_V1_JSON)
+              .put(Entity.json(replace))) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertTrue(
+            response
+                .readEntity(ErrorResponse.class)
+                .getMessage()
+                .contains("updates[1].columns[0]"));
+      }
+    }
+    Mockito.verifyNoInteractions(dispatcher);
+  }
+
+  @Test
   public void testListViews() {
     NameIdentifier view1 = NameIdentifier.of(metalake, catalog, schema, "view1");
     NameIdentifier view2 = NameIdentifier.of(metalake, catalog, schema, "view2");

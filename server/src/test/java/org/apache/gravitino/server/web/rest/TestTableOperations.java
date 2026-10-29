@@ -189,7 +189,7 @@ public class TestTableOperations extends BaseOperationsTest {
           response
               .readEntity(ErrorResponse.class)
               .getMessage()
-              .contains("newDefaultValue.funcArgs[0].dataType"));
+              .contains("updates[0].newDefaultValue.funcArgs[0].dataType"));
     }
     Mockito.verifyNoInteractions(dispatcher);
   }

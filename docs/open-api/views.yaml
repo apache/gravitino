@@ -298,7 +298,7 @@ components:
           type: array
           description: The output columns of the view
           items:
-            $ref: "./tables.yaml#/components/schemas/Column"
+            $ref: "./tables.yaml#/components/schemas/WritableColumn"
         representations:
           type: array
           description: The representations of the view, at least one is required
@@ -422,7 +422,7 @@ components:
           type: array
           description: The new output columns of the view
           items:
-            $ref: "./tables.yaml#/components/schemas/Column"
+            $ref: "./tables.yaml#/components/schemas/WritableColumn"
         representations:
           type: array
           description: The new representations of the view, at least one is required
