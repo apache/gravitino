@@ -106,11 +106,25 @@ Ontology        { id, name, comment, ossieVersion, definition,
 OntologyVersion { ontologyId, version, definition, audit_info }
 OntologyMapping { id, name, ontologyId, semanticModelRef, definition, audit_info }
 TermConceptRef  { termId, ontologyId, conceptId, iri?, audit_info }
+
+definition      { aiContext?, requires?, prefixes?, concepts[Concept] }
+Concept         { conceptId, concept, type, description?, extends[], derivedBy?,
+                  identifyBy[], requires[], relationships[Relationship], iri? }
+Relationship    { name, description?, verbalizes[], roles[Role], multiplicity?,
+                  derivedBy?, requires[], iri? }
 ```
 
-A concept inside `definition` carries a Gravitino-minted `conceptId`. The Ossie document never contains
-it: it is minted on write, kept in the internal codec, and stripped when a document is exported. It is
-what lets a name change in a later version leave every term reference and mapping intact.
+`conceptId` is the one field an Ossie document never contains because the specification names a concept
+by its `concept` string alone. Gravitino mints it on write and keeps it inside `definition`, which is a
+JSON document rather than a new column, so no table shape changes: it travels with every
+`OntologyVersion` snapshot, which is why a reference resolved against an older version still names the
+concept that version declared. Export strips it, so an exported document is exactly what the
+specification describes; a term reference and a mapping bind it, so a rename in a later version leaves
+them intact.
+
+A relationship has no id yet: mapping documents name a relationship the same way they name a concept,
+so the question repeats one level down. Phase 2 answers it, when a rename first has to survive a stored
+mapping rather than a term reference.
 
 `GlossaryTerm`, `TermRelation`, `TermDomain`, `TermBinding`, `TermVersion` and their tables are
 specified in the [Business Glossary design](https://github.com/apache/gravitino/pull/14239) and are not repeated here.
@@ -165,13 +179,12 @@ a silent migration under an agent's semantic parser is a worse failure than a re
 reaches a stable version, migration becomes a write-time step over the `OntologyVersion` snapshots,
 which already hold every document the metalake has stored.
 
-**Concept identity is internal to Gravitino.** Ossie names a concept by its `concept` string and nothing
-else, so a document cannot carry a stable id without breaking conformance. Gravitino therefore mints a
-`conceptId` for each concept it stores, keeps it beside the document in `definition`, and strips it on
-export, so an exported document is exactly what the specification describes while a stored vocabulary
-keeps an identity that survives a rename. Importing a document mints ids only for concepts it has not
-seen; a concept whose name matches one in the current version keeps its id, and a rename is expressed as
-an explicit concept change that carries the id across.
+**Concept identity is internal to Gravitino.** The ids live in the internal form of the document only,
+so the converter is where they are decided: `toDefinitionJson` keeps them, `fromDefinitionJson` mints
+ids for concepts the stored version does not already have and keeps the ones it does, and
+`exportDocument` strips them. A rename is therefore the one change that names which concept it means
+rather than which name it had, and it carries the id across so nothing that references the concept
+notices.
 
 Ontologies are always managed by Gravitino and never persisted in an underlying catalog, and one Ossie
 document maps to one `Ontology`, as one Ossie core document maps to one Semantic Model. Import and
