@@ -67,7 +67,9 @@ dependencies {
   compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(libs.assertj.core)
   testImplementation(libs.awaitility)
+  testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation("io.trino:trino-memory:$trinoVersion") {

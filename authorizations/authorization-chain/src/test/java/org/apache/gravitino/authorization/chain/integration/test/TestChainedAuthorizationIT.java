@@ -326,67 +326,80 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
   }
 
   @Test
-  void testCreateTable() throws InterruptedException {
+  @Override
+  protected void testCreateTable() {
     // TODO
   }
 
   @Test
-  void testSelectModifyTableWithMetalakeLevelRole() throws InterruptedException {
+  @Override
+  protected void testSelectModifyTableWithMetalakeLevelRole() {
     // TODO
   }
 
   @Test
-  void testSelectModifyTableWithTableLevelRole() throws InterruptedException {
+  @Override
+  protected void testSelectModifyTableWithTableLevelRole() {
     // TODO
   }
 
   @Test
-  void testSelectOnlyTable() throws InterruptedException {
+  @Override
+  protected void testSelectOnlyTable() {
     // TODO
   }
 
   @Test
-  void testModifyOnlyTable() throws InterruptedException {
+  @Override
+  protected void testModifyOnlyTable() {
     // TODO
   }
 
   @Test
-  void testCreateAllPrivilegesRole() throws InterruptedException {
+  @Override
+  protected void testCreateAllPrivilegesRole() {
     // TODO
   }
 
   @Test
-  void testDeleteAndRecreateRole() throws InterruptedException {
+  @Override
+  protected void testDeleteAndRecreateRole() {
     // TODO
   }
 
   @Test
-  void testDeleteAndRecreateMetadataObject() throws InterruptedException {
+  @Override
+  protected void testDeleteAndRecreateMetadataObject() {
     // TODO
   }
 
   @Test
-  void testRenameMetadataObject() throws InterruptedException {
+  @Override
+  protected void testRenameMetadataObject() {
     // TODO
   }
 
   @Test
-  void testRenameMetadataObjectPrivilege() throws InterruptedException {
+  @Override
+  protected void testRenameMetadataObjectPrivilege() {
     // TODO
   }
 
   @Test
-  void testChangeOwner() throws InterruptedException {
+  @Override
+  protected void testChangeOwner() {
     // TODO
   }
 
   @Test
-  void testDenyPrivileges() throws InterruptedException {
+  @Override
+  protected void testDenyPrivileges() {
     // TODO
   }
 
   @Test
-  void testGrantPrivilegesForMetalake() throws InterruptedException {
+  @Override
+  protected void testGrantPrivilegesForMetalake() {
     // TODO
   }
 
