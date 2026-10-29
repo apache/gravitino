@@ -239,7 +239,8 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_gi_ri_del` (`group_id`, `role_id`, `deleted_at`),
-    KEY `group_role_rel_idx_rid` (`group_id`)
+    KEY `group_role_rel_idx_rid` (`group_id`),
+    KEY `group_role_rel_idx_role_id` (`role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group role relation';
 
 CREATE TABLE IF NOT EXISTS `idp_user_meta` (
