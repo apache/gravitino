@@ -298,6 +298,7 @@ CREATE TABLE IF NOT EXISTS `tag_meta` (
     `tag_comment` VARCHAR(256) DEFAULT '' COMMENT 'tag comment',
     `properties` CLOB DEFAULT NULL COMMENT 'tag properties',
     `allowed_values` CLOB DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value',
+    `hidden` BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'whether the tag is server-managed and hidden',
     `audit_info` CLOB NOT NULL COMMENT 'tag audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag last version',

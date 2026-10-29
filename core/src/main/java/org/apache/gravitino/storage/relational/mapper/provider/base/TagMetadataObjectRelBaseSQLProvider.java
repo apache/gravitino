@@ -42,7 +42,7 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("metadataObjectType") String metadataObjectType) {
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
-        + " tm.allowed_values as allowedValues,"
+        + " tm.allowed_values as allowedValues, tm.hidden as hidden,"
         + " NULLIF(te.tag_value, '') as assignmentValue,"
         + " tm.audit_info as auditInfo,"
         + " tm.current_version as currentVersion,"
@@ -64,7 +64,7 @@ public class TagMetadataObjectRelBaseSQLProvider {
     return "<script>SELECT te.metadata_object_id as metadataObjectId,"
         + " tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
-        + " tm.allowed_values as allowedValues, NULLIF(te.tag_value, '') as assignmentValue,"
+        + " tm.allowed_values as allowedValues, tm.hidden as hidden, NULLIF(te.tag_value, '') as assignmentValue,"
         + " tm.audit_info as auditInfo, tm.current_version as currentVersion,"
         + " tm.last_version as lastVersion, tm.deleted_at as deletedAt"
         + " FROM "
@@ -85,7 +85,7 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("tagName") String tagName) {
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
-        + " tm.allowed_values as allowedValues,"
+        + " tm.allowed_values as allowedValues, tm.hidden as hidden,"
         + " NULLIF(te.tag_value, '') as assignmentValue,"
         + " tm.audit_info as auditInfo,"
         + " tm.current_version as currentVersion,"

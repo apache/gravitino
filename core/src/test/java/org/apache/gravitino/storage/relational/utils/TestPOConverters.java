@@ -1200,6 +1200,28 @@ public class TestPOConverters {
     assertFalse(storedJson.contains("\"executionSpec\""));
   }
 
+  /** Tag persistence conversions retain the visibility flag on insert, read and update. */
+  @Test
+  public void testHiddenTagRoundTrip() {
+    Namespace namespace = Namespace.of("metalake");
+    TagEntity hidden =
+        TagEntity.builder()
+            .withId(1L)
+            .withName("internal")
+            .withNamespace(namespace)
+            .withProperties(ImmutableMap.of())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withHidden(true)
+            .build();
+    TagPO stored =
+        POConverters.initializeTagPOWithVersion(hidden, TagPO.builder().withMetalakeId(2L));
+    Assertions.assertTrue(stored.isHidden());
+    Assertions.assertEquals(hidden, POConverters.fromTagPO(stored, namespace));
+    TagPO updated = POConverters.updateTagPOWithVersion(stored, hidden);
+    Assertions.assertTrue(updated.isHidden());
+    Assertions.assertEquals(2L, updated.getCurrentVersion());
+  }
+
   @Test
   public void testFromTagPO() throws JsonProcessingException {
     TagPO tagPO = createTagPO(1L, "test", 1L, "this is test");
