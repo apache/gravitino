@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -38,6 +39,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.OntologyEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.ontology.Ontology;
+import org.apache.gravitino.ontology.OntologyDefinition;
+import org.apache.gravitino.ontology.OssieOntologyConverter;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OntologyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OntologyVersionInfoMapper;
@@ -180,12 +183,13 @@ public class OntologyMetaService {
     try {
       MetalakePO metalakePO =
           MetalakeMetaService.getInstance().requireMetalakeByName(namespace.level(0));
+      OntologyEntity stored = withAssignedIds(ontologyEntity, null);
       OntologyPO ontologyPO =
-          initializeOntologyPO(ontologyEntity, metalakePO.getMetalakeId(), OntologyPO.builder());
+          initializeOntologyPO(stored, metalakePO.getMetalakeId(), OntologyPO.builder());
 
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForOntologyCreate(metalakePO),
-          () -> insertOntologyWithoutCommit(ontologyEntity, ontologyPO, overwrite));
+          () -> insertOntologyWithoutCommit(stored, ontologyPO, overwrite));
     } catch (RuntimeException e) {
       try {
         ExceptionUtils.checkSQLException(
@@ -240,11 +244,12 @@ public class OntologyMetaService {
         newEntity.namespace(),
         oldEntity.namespace());
 
-    if (onlyStatusChanged(oldEntity, newEntity)) {
-      return updateOntologyStatus(identifier, oldPO, newEntity.status());
+    OntologyEntity stored = withAssignedIds(newEntity, oldEntity.definition());
+    if (onlyStatusChanged(oldEntity, stored)) {
+      return updateOntologyStatus(identifier, oldPO, stored.status());
     }
 
-    OntologyPO newPO = ontologyPOWithNewVersion(oldPO, newEntity);
+    OntologyPO newPO = ontologyPOWithNewVersion(oldPO, stored);
     try {
       SessionUtils.doMultipleWithCommit(
           () -> updateOntologyIdentityWithVersion(identifier, oldPO, newPO),
@@ -258,7 +263,31 @@ public class OntologyMetaService {
     }
 
     LOG.debug("Updated ontology {} to version {}", identifier.name(), newPO.getCurrentVersion());
-    return newEntity;
+    return stored;
+  }
+
+  /**
+   * Returns a copy of the entity whose definition carries an identifier on every concept and
+   * relationship, inheriting the identifiers of the stored version where the name is unchanged.
+   *
+   * <p>A caller sends names; the identifiers are Gravitino's own handle so that a term reference or
+   * a mapping survives a rename. Assigning them here, before anything is serialized, keeps the
+   * stored snapshot and the entity returned to the caller in agreement.
+   */
+  private static OntologyEntity withAssignedIds(
+      OntologyEntity ontologyEntity, @Nullable OntologyDefinition previous) {
+    OntologyDefinition definition =
+        OssieOntologyConverter.assignIds(ontologyEntity.definition(), previous);
+    return OntologyEntity.builder()
+        .withId(ontologyEntity.id())
+        .withName(ontologyEntity.name())
+        .withNamespace(ontologyEntity.namespace())
+        .withComment(ontologyEntity.comment())
+        .withStatus(ontologyEntity.status())
+        .withDefinition(definition)
+        .withProperties(ontologyEntity.properties())
+        .withAuditInfo(ontologyEntity.auditInfo())
+        .build();
   }
 
   /**

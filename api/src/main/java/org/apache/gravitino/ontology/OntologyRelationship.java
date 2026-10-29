@@ -28,6 +28,11 @@ import org.apache.gravitino.annotation.Evolving;
 /**
  * An immutable relationship between concepts in an {@link Ontology}.
  *
+ * <p>A relationship is named by its {@link #name()} within one ontology version. Gravitino mints an
+ * {@link #id()} for it and carries that identifier into every later version, so a stored mapping
+ * can bind the relationship and survive a rename. The identifier is internal: an Apache Ossie
+ * document names a relationship by its {@code name} alone, so it is stripped on export.
+ *
  * <p>{@link #verbalizes()} is required and must hold at least one natural-language phrasing. The
  * Apache Ossie ontology specification makes it a required field because a relationship an agent
  * cannot phrase is a relationship it cannot use to answer a question; Gravitino rejects such a
@@ -36,6 +41,7 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public final class OntologyRelationship {
 
+  @Nullable private final String id;
   private final String name;
   private final String[] verbalizes;
 
@@ -47,6 +53,7 @@ public final class OntologyRelationship {
   @Nullable private final String iri;
 
   private OntologyRelationship(Builder builder) {
+    this.id = builder.id;
     this.name = builder.name;
     this.verbalizes = Arrays.copyOf(builder.verbalizes, builder.verbalizes.length);
     this.description = builder.description;
@@ -64,6 +71,20 @@ public final class OntologyRelationship {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  /**
+   * Returns the stable identifier Gravitino minted for this relationship.
+   *
+   * <p>The identifier is internal to Gravitino and never appears in an Apache Ossie document. It is
+   * what a stored mapping binds, so renaming the relationship leaves the mapping intact. A
+   * definition built by a caller, before the server stores it, may leave it unset.
+   *
+   * @return The identifier, or {@code null} when none has been assigned yet.
+   */
+  @Nullable
+  public String id() {
+    return id;
   }
 
   /**
@@ -209,6 +230,7 @@ public final class OntologyRelationship {
   /** Builder for {@link OntologyRelationship}. */
   public static final class Builder {
 
+    @Nullable private String id;
     private String name;
     private String[] verbalizes;
 
@@ -220,6 +242,17 @@ public final class OntologyRelationship {
     @Nullable private String iri;
 
     private Builder() {}
+
+    /**
+     * Sets the identifier Gravitino minted for this relationship.
+     *
+     * @param id The identifier, or {@code null} to leave it unset and let the server assign one.
+     * @return This builder.
+     */
+    public Builder withId(@Nullable String id) {
+      this.id = id;
+      return this;
+    }
 
     /**
      * Sets the relationship name.
@@ -320,6 +353,10 @@ public final class OntologyRelationship {
     public OntologyRelationship build() {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(name), "Relationship name must not be null or blank");
+      Preconditions.checkArgument(
+          id == null || StringUtils.isNotBlank(id),
+          "Relationship '%s' has a blank id; omit it or set a non-blank one",
+          name);
       Preconditions.checkArgument(
           verbalizes != null && verbalizes.length > 0,
           "Relationship '%s' must have at least one verbalization",

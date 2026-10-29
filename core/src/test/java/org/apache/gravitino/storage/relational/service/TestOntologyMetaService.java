@@ -197,6 +197,55 @@ public class TestOntologyMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testStoredDefinitionCarriesIdsAndRenameKeepsThem() throws IOException {
+    String ontologyName = GravitinoITUtils.genRandomName("concept_ids");
+    OntologyEntity original =
+        ontology(RandomIdGenerator.INSTANCE.nextId(), ontologyName, "v1 comment", "Account", "v1");
+    OntologyMetaService.getInstance().insertOntology(original, false);
+
+    OntologyEntity stored =
+        OntologyMetaService.getInstance().getOntologyByIdentifier(original.nameIdentifier());
+    String accountId = stored.definition().concepts()[0].id();
+    String valueId = stored.definition().concepts()[1].id();
+    assertNotNull(accountId, "a stored concept must carry an id");
+    assertNotNull(valueId, "a stored concept must carry an id");
+    assertFalse(accountId.equals(valueId), "two concepts must not share an id");
+
+    OntologyConcept renamed =
+        OntologyConcept.builder()
+            .withId(accountId)
+            .withConcept("Customer")
+            .withType(ConceptType.ENTITY_TYPE)
+            .build();
+    OntologyDefinition renamedDefinition =
+        OntologyDefinition.builder()
+            .withConcepts(renamed, stored.definition().concepts()[1])
+            .build();
+    OntologyEntity next =
+        OntologyEntity.builder()
+            .withId(original.id())
+            .withName(ontologyName)
+            .withNamespace(namespace)
+            .withComment("v2 comment")
+            .withStatus(Ontology.Status.DRAFT)
+            .withDefinition(renamedDefinition)
+            .withProperties(Map.of("marker", "v2"))
+            .withAuditInfo(AUDIT)
+            .build();
+
+    OntologyEntity updated =
+        OntologyMetaService.getInstance()
+            .updateOntology(original.nameIdentifier(), ignored -> next);
+
+    assertEquals("Customer", updated.definition().concepts()[0].concept());
+    assertEquals(
+        accountId,
+        updated.definition().concepts()[0].id(),
+        "renaming a concept must keep the id a reference binds");
+    assertEquals(valueId, updated.definition().concepts()[1].id());
+  }
+
+  @TestTemplate
   public void testStatusFlipDoesNotAllocateVersion() throws IOException {
     String ontologyName = GravitinoITUtils.genRandomName("status_flip");
     OntologyEntity original =

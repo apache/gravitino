@@ -329,7 +329,9 @@ public class TestOssieOntologyConverter {
 
   @Test
   public void testDefinitionJsonIsDeterministic() {
-    String stored = OssieOntologyConverter.toDefinitionJson(definition());
+    String stored =
+        OssieOntologyConverter.toDefinitionJson(
+            OssieOntologyConverter.assignIds(definition(), null));
     String restored =
         OssieOntologyConverter.toDefinitionJson(OssieOntologyConverter.fromDefinitionJson(stored));
 
@@ -416,6 +418,108 @@ public class TestOssieOntologyConverter {
     assertThrows(
         IllegalOntologyException.class,
         () -> OssieOntologyConverter.fromDefinitionJson("{\"ontology\": []}"));
+  }
+
+  @Test
+  public void testExportDocumentStripsConceptAndRelationshipIds() throws Exception {
+    OntologyDefinition assigned = OssieOntologyConverter.assignIds(definition(), null);
+    String exported =
+        OssieOntologyConverter.exportDocument(
+                ontology(assigned, ImmutableMap.of()), OssieFormat.JSON)
+            .content();
+
+    JsonNode root = new ObjectMapper().readTree(exported);
+    for (JsonNode component : root.get("ontology")) {
+      assertFalse(component.has("id"), "an exported concept must not carry Gravitino's id");
+      for (JsonNode relationship : component.path("relationships")) {
+        assertFalse(relationship.has("id"), "an exported relationship must not carry an id");
+      }
+    }
+  }
+
+  @Test
+  public void testDefinitionJsonCarriesAssignedIds() throws Exception {
+    OntologyDefinition assigned = OssieOntologyConverter.assignIds(definition(), null);
+    JsonNode root = new ObjectMapper().readTree(OssieOntologyConverter.toDefinitionJson(assigned));
+
+    JsonNode account = root.get("ontology").get(0);
+    assertEquals(assigned.concepts()[0].id(), account.get("id").asText());
+    assertEquals(
+        assigned.concepts()[0].relationships()[0].id(),
+        account.get("relationships").get(0).get("id").asText());
+  }
+
+  @Test
+  public void testFromDefinitionJsonMintsIdsForStoredFormWithoutIds() {
+    String withoutIds = OssieOntologyConverter.toDefinitionJson(definition());
+
+    OntologyDefinition read = OssieOntologyConverter.fromDefinitionJson(withoutIds);
+
+    for (OntologyConcept concept : read.concepts()) {
+      assertTrue(concept.id() != null && !concept.id().isEmpty());
+      if (concept.relationships() != null) {
+        for (OntologyRelationship relationship : concept.relationships()) {
+          assertTrue(relationship.id() != null && !relationship.id().isEmpty());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testAssignIdsKeepsTheIdOfARenamedConcept() {
+    OntologyDefinition previous = OssieOntologyConverter.assignIds(definition(), null);
+    OntologyConcept account = previous.concepts()[0];
+    OntologyConcept renamed =
+        OntologyConcept.builder()
+            .withId(account.id())
+            .withConcept("Customer")
+            .withType(ConceptType.ENTITY_TYPE)
+            .withRelationships(account.relationships())
+            .build();
+    OntologyDefinition next =
+        OntologyDefinition.builder()
+            .withConcepts(
+                renamed,
+                OntologyConcept.builder()
+                    .withConcept("Balance")
+                    .withType(ConceptType.VALUE_TYPE)
+                    .build())
+            .build();
+
+    OntologyDefinition assigned = OssieOntologyConverter.assignIds(next, previous);
+
+    assertEquals(account.id(), assigned.concepts()[0].id());
+    assertEquals(account.relationships()[0].id(), assigned.concepts()[0].relationships()[0].id());
+  }
+
+  @Test
+  public void testAssignIdsInheritsByNameAndMintsForNewConcepts() {
+    OntologyDefinition previous = OssieOntologyConverter.assignIds(definition(), null);
+    OntologyDefinition sameNames =
+        OntologyDefinition.builder()
+            .withConcepts(
+                OntologyConcept.builder()
+                    .withConcept("Account")
+                    .withType(ConceptType.ENTITY_TYPE)
+                    .withRelationships(
+                        OntologyRelationship.builder()
+                            .withName("holds")
+                            .withVerbalizes("an account holds a balance")
+                            .build())
+                    .build(),
+                OntologyConcept.builder()
+                    .withConcept("Branch")
+                    .withType(ConceptType.ENTITY_TYPE)
+                    .build())
+            .build();
+
+    OntologyDefinition assigned = OssieOntologyConverter.assignIds(sameNames, previous);
+
+    assertEquals(previous.concepts()[0].id(), assigned.concepts()[0].id());
+    assertEquals(
+        previous.concepts()[0].relationships()[0].id(),
+        assigned.concepts()[0].relationships()[0].id());
+    assertFalse(assigned.concepts()[1].id().equals(previous.concepts()[0].id()));
   }
 
   private static OntologyDefinition definition() {

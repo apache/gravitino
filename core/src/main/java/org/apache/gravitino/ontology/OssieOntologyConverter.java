@@ -37,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -118,7 +119,7 @@ public final class OssieOntologyConverter {
    */
   public static ParsedOntology importDocument(OssieDocument document) {
     Objects.requireNonNull(document, "document must not be null");
-    return toParsedOntology(parseDocument(document));
+    return toParsedOntology(parseDocument(document), false);
   }
 
   /**
@@ -139,10 +140,10 @@ public final class OssieOntologyConverter {
     if (ontology.comment() != null) {
       root.put("description", ontology.comment());
     }
-    writeDefinition(root, ontology.definition());
+    writeDefinition(root, ontology.definition(), false);
 
     // Validate the generated document through the same conversion path used for imports.
-    toParsedOntology(root.deepCopy());
+    toParsedOntology(root.deepCopy(), false);
 
     try {
       if (format == OssieFormat.JSON) {
@@ -177,7 +178,7 @@ public final class OssieOntologyConverter {
     Objects.requireNonNull(definition, "definition must not be null");
 
     ObjectNode root = JSON_MAPPER.createObjectNode();
-    writeDefinition(root, definition);
+    writeDefinition(root, definition, true);
     try {
       return JSON_MAPPER.writeValueAsString(root);
     } catch (JsonProcessingException e) {
@@ -219,7 +220,7 @@ public final class OssieOntologyConverter {
     ObjectNode root = (ObjectNode) parsed;
     validateObject(root, "$", DEFINITION_PROPERTIES);
     try {
-      return readDefinition(root);
+      return readDefinition(root, true);
     } catch (IllegalOntologyException e) {
       throw e;
     } catch (IllegalArgumentException e) {
@@ -228,6 +229,112 @@ public final class OssieOntologyConverter {
           "Cannot convert stored JSON to a Gravitino Ontology definition: %s",
           originalMessage(e));
     }
+  }
+
+  /**
+   * Assigns an identifier to every concept and relationship that does not carry one, keeping the
+   * identifiers of the stored version where the name is unchanged.
+   *
+   * <p>The metadata store never keeps a definition without identifiers: a client names concepts and
+   * relationships, and this is where Gravitino decides which incoming name is which stored object.
+   * A value that already carries an identifier keeps it whatever its name, which is how a rename is
+   * expressed; a value without one inherits the identifier of the same name in {@code previous},
+   * and a value in neither gets a new one. A relationship is resolved inside its concept, because
+   * two concepts may name a relationship the same way.
+   *
+   * @param definition The definition to assign identifiers to.
+   * @param previous The stored definition this one replaces, or {@code null} when the ontology is
+   *     being created.
+   * @return A definition in which every concept and relationship carries an identifier.
+   */
+  public static OntologyDefinition assignIds(
+      OntologyDefinition definition, @Nullable OntologyDefinition previous) {
+    Objects.requireNonNull(definition, "definition must not be null");
+
+    Map<String, OntologyConcept> storedConcepts = new LinkedHashMap<>();
+    if (previous != null) {
+      for (OntologyConcept concept : previous.concepts()) {
+        storedConcepts.put(concept.concept(), concept);
+      }
+    }
+
+    OntologyConcept[] concepts = definition.concepts();
+    OntologyConcept[] assigned = new OntologyConcept[concepts.length];
+    for (int index = 0; index < concepts.length; index++) {
+      OntologyConcept concept = concepts[index];
+      OntologyConcept stored = storedConcepts.get(concept.concept());
+      String id = concept.id();
+      if (id == null && stored != null) {
+        id = stored.id();
+      }
+      assigned[index] =
+          copy(concept, id == null ? newId() : id, assignRelationshipIds(concept, stored));
+    }
+
+    return OntologyDefinition.builder()
+        .withAiContext(definition.aiContext())
+        .withRequires(definition.requires())
+        .withConcepts(assigned)
+        .withPrefixes(definition.prefixes())
+        .build();
+  }
+
+  @Nullable
+  private static OntologyRelationship[] assignRelationshipIds(
+      OntologyConcept concept, @Nullable OntologyConcept stored) {
+    OntologyRelationship[] relationships = concept.relationships();
+    if (relationships == null) {
+      return null;
+    }
+
+    Map<String, OntologyRelationship> storedRelationships = new LinkedHashMap<>();
+    if (stored != null && stored.relationships() != null) {
+      for (OntologyRelationship relationship : stored.relationships()) {
+        storedRelationships.put(relationship.name(), relationship);
+      }
+    }
+
+    OntologyRelationship[] assigned = new OntologyRelationship[relationships.length];
+    for (int index = 0; index < relationships.length; index++) {
+      OntologyRelationship relationship = relationships[index];
+      String id = relationship.id();
+      if (id == null) {
+        OntologyRelationship old = storedRelationships.get(relationship.name());
+        id = old == null ? null : old.id();
+      }
+      assigned[index] = copy(relationship, id == null ? newId() : id);
+    }
+    return assigned;
+  }
+
+  private static OntologyConcept copy(
+      OntologyConcept concept, String id, @Nullable OntologyRelationship[] relationships) {
+    return OntologyConcept.builder()
+        .withId(id)
+        .withConcept(concept.concept())
+        .withType(concept.type())
+        .withDescription(concept.description())
+        .withExtendsConcepts(concept.extendsConcepts())
+        .withDerivedBy(concept.derivedBy())
+        .withIdentifyBy(concept.identifyBy())
+        .withRequires(concept.requires())
+        .withRelationships(relationships)
+        .withIri(concept.iri())
+        .build();
+  }
+
+  private static OntologyRelationship copy(OntologyRelationship relationship, String id) {
+    return OntologyRelationship.builder()
+        .withId(id)
+        .withName(relationship.name())
+        .withDescription(relationship.description())
+        .withVerbalizes(relationship.verbalizes())
+        .withRoles(relationship.roles())
+        .withMultiplicity(relationship.multiplicity())
+        .withDerivedBy(relationship.derivedBy())
+        .withRequires(relationship.requires())
+        .withIri(relationship.iri())
+        .build();
   }
 
   /**
@@ -327,7 +434,7 @@ public final class OssieOntologyConverter {
     }
   }
 
-  private static ParsedOntology toParsedOntology(ObjectNode root) {
+  private static ParsedOntology toParsedOntology(ObjectNode root, boolean fromStore) {
     if (root.has("ontology_mappings")) {
       throw invalid(
           "$.ontology_mappings",
@@ -346,7 +453,7 @@ public final class OssieOntologyConverter {
       }
       Map<String, String> properties = new LinkedHashMap<>();
       properties.put(PROPERTY_OSSIE_VERSION, ossieVersion);
-      return new ParsedOntology(name, comment, readDefinition(root), properties);
+      return new ParsedOntology(name, comment, readDefinition(root, fromStore), properties);
     } catch (IllegalOntologyException e) {
       throw e;
     } catch (IllegalArgumentException e) {
@@ -373,13 +480,13 @@ public final class OssieOntologyConverter {
     return version;
   }
 
-  private static OntologyDefinition readDefinition(ObjectNode root) {
+  private static OntologyDefinition readDefinition(ObjectNode root, boolean fromStore) {
     Map<String, String> prefixes = readPrefixes(root.get("prefixes"), "$.prefixes");
     OntologyConcept[] concepts =
         readObjectArray(
             root.get("ontology"),
             "$.ontology",
-            (component, path) -> readComponent(component, path, prefixes),
+            (component, path) -> readComponent(component, path, prefixes, fromStore),
             OntologyConcept[]::new);
 
     return OntologyDefinition.builder()
@@ -391,10 +498,11 @@ public final class OssieOntologyConverter {
   }
 
   private static OntologyConcept readComponent(
-      ObjectNode component, String path, Map<String, String> prefixes) {
-    validateObject(component, path, COMPONENT_PROPERTIES);
+      ObjectNode component, String path, Map<String, String> prefixes, boolean fromStore) {
+    validateObject(component, path, COMPONENT_PROPERTIES, fromStore);
     String concept = readText(component, "concept", path);
     return OntologyConcept.builder()
+        .withId(fromStore ? readId(component, path) : null)
         .withConcept(concept)
         .withType(readConceptType(component.get("type"), path + ".type"))
         .withDescription(readText(component, "description", path))
@@ -407,16 +515,17 @@ public final class OssieOntologyConverter {
                 component.get("relationships"),
                 path + ".relationships",
                 (relationship, relationshipPath) ->
-                    readRelationship(relationship, relationshipPath, prefixes),
+                    readRelationship(relationship, relationshipPath, prefixes, fromStore),
                 OntologyRelationship[]::new))
         .withIri(readIri(component, path, prefixes))
         .build();
   }
 
   private static OntologyRelationship readRelationship(
-      ObjectNode relationship, String path, Map<String, String> prefixes) {
-    validateObject(relationship, path, RELATIONSHIP_PROPERTIES);
+      ObjectNode relationship, String path, Map<String, String> prefixes, boolean fromStore) {
+    validateObject(relationship, path, RELATIONSHIP_PROPERTIES, fromStore);
     return OntologyRelationship.builder()
+        .withId(fromStore ? readId(relationship, path) : null)
         .withName(readText(relationship, "name", path))
         .withDescription(readText(relationship, "description", path))
         .withVerbalizes(readStringArray(relationship, "verbalizes", path))
@@ -511,7 +620,8 @@ public final class OssieOntologyConverter {
     return prefixes;
   }
 
-  private static void writeDefinition(ObjectNode root, OntologyDefinition definition) {
+  private static void writeDefinition(
+      ObjectNode root, OntologyDefinition definition, boolean includeIds) {
     putOptional(root, "ai_context", writeAiContext(definition.aiContext()));
     if (definition.requires().length > 0) {
       putOptional(root, "requires", definition.requires());
@@ -519,7 +629,7 @@ public final class OssieOntologyConverter {
 
     ArrayNode ontology = root.putArray("ontology");
     for (OntologyConcept concept : definition.concepts()) {
-      ontology.add(writeComponent(concept));
+      ontology.add(writeComponent(concept, includeIds));
     }
 
     if (!definition.prefixes().isEmpty()) {
@@ -528,8 +638,9 @@ public final class OssieOntologyConverter {
     }
   }
 
-  private static ObjectNode writeComponent(OntologyConcept concept) {
+  private static ObjectNode writeComponent(OntologyConcept concept, boolean includeIds) {
     ObjectNode node = JSON_MAPPER.createObjectNode();
+    putOptional(node, "id", includeIds ? concept.id() : null);
     node.put("concept", concept.concept());
     node.put("type", conceptTypeName(concept.type()));
     putOptional(node, "description", concept.description());
@@ -541,15 +652,17 @@ public final class OssieOntologyConverter {
     if (relationships != null) {
       ArrayNode relationshipArray = node.putArray("relationships");
       for (OntologyRelationship relationship : relationships) {
-        relationshipArray.add(writeRelationship(relationship));
+        relationshipArray.add(writeRelationship(relationship, includeIds));
       }
     }
     putOptional(node, "iri", concept.iri());
     return node;
   }
 
-  private static ObjectNode writeRelationship(OntologyRelationship relationship) {
+  private static ObjectNode writeRelationship(
+      OntologyRelationship relationship, boolean includeIds) {
     ObjectNode node = JSON_MAPPER.createObjectNode();
+    putOptional(node, "id", includeIds ? relationship.id() : null);
     node.put("name", relationship.name());
     putOptional(node, "description", relationship.description());
     OntologyRole[] roles = relationship.roles();
@@ -643,10 +756,18 @@ public final class OssieOntologyConverter {
   }
 
   private static void validateObject(ObjectNode object, String path, Set<String> allowed) {
+    validateObject(object, path, allowed, false);
+  }
+
+  private static void validateObject(
+      ObjectNode object, String path, Set<String> allowed, boolean allowId) {
     object
         .fields()
         .forEachRemaining(
             entry -> {
+              if (allowId && "id".equals(entry.getKey())) {
+                return;
+              }
               if (!allowed.contains(entry.getKey())) {
                 throw invalid(
                     path + "." + entry.getKey(), "property is not defined by Apache Ossie");
@@ -677,6 +798,22 @@ public final class OssieOntologyConverter {
         throw invalid(path + "." + name + "[" + index + "]", "must be a string");
       }
     }
+  }
+
+  /**
+   * Reads the identifier of a stored component or relationship, minting one when the stored form
+   * predates identifiers. The value is never written to an Apache Ossie document.
+   */
+  private static String readId(ObjectNode object, String path) {
+    String id = readText(object, "id", path);
+    if (id != null && StringUtils.isBlank(id)) {
+      throw invalid(path + ".id", "must not be blank");
+    }
+    return id == null ? newId() : id;
+  }
+
+  private static String newId() {
+    return UUID.randomUUID().toString();
   }
 
   @Nullable

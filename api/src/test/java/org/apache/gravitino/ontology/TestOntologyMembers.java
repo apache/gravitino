@@ -154,6 +154,59 @@ public class TestOntologyMembers {
   }
 
   @Test
+  public void testConceptAndRelationshipIdsAreHandlesNotContent() {
+    OntologyRelationship identified =
+        OntologyRelationship.builder()
+            .withId("relationship-1")
+            .withName("holds")
+            .withVerbalizes("an account holds a balance")
+            .build();
+    OntologyRelationship anonymous =
+        OntologyRelationship.builder()
+            .withName("holds")
+            .withVerbalizes("an account holds a balance")
+            .build();
+
+    assertEquals("relationship-1", identified.id());
+    assertNull(anonymous.id());
+    // The identifier is a handle the server assigns, so it does not take part in value equality.
+    assertEquals(identified, anonymous);
+
+    OntologyConcept conceptWithId =
+        OntologyConcept.builder()
+            .withId("concept-1")
+            .withConcept("Account")
+            .withType(ConceptType.ENTITY_TYPE)
+            .build();
+    OntologyConcept conceptWithoutId =
+        OntologyConcept.builder().withConcept("Account").withType(ConceptType.ENTITY_TYPE).build();
+
+    assertEquals("concept-1", conceptWithId.id());
+    assertNull(conceptWithoutId.id());
+    assertEquals(conceptWithId, conceptWithoutId);
+  }
+
+  @Test
+  public void testBlankIdIsRejected() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            OntologyConcept.builder()
+                .withId(" ")
+                .withConcept("Account")
+                .withType(ConceptType.ENTITY_TYPE)
+                .build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            OntologyRelationship.builder()
+                .withId("")
+                .withName("holds")
+                .withVerbalizes("an account holds a balance")
+                .build());
+  }
+
+  @Test
   public void testConceptRequiresNameAndType() {
     assertThrows(IllegalArgumentException.class, () -> OntologyConcept.builder().build());
     assertThrows(

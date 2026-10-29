@@ -31,13 +31,17 @@ import org.apache.gravitino.annotation.Evolving;
  * An immutable component of an {@link Ontology}: one concept of an {@link ConceptType}, with the
  * relationships that are keyed primarily by it.
  *
- * <p>A concept is identified by its name within the ontology. The optional IRI gives it a global
- * identity that outlives Gravitino, and relationship and term references point at the concept by
- * name, so renaming a concept breaks the references that use the old name.
+ * <p>A concept is named by its {@link #concept()} within one ontology version. Gravitino mints a
+ * {@link #id()} for it and carries that identifier into every later version, so a term reference or
+ * a mapping can bind the concept and survive a rename. The identifier is internal: an Apache Ossie
+ * document names a concept by its {@code concept} string alone, so the identifier is stripped on
+ * export and never accepted from an import. The optional IRI still gives the concept a global name
+ * that outlives Gravitino.
  */
 @Evolving
 public final class OntologyConcept {
 
+  @Nullable private final String id;
   private final String concept;
   private final ConceptType type;
 
@@ -50,6 +54,7 @@ public final class OntologyConcept {
   @Nullable private final String iri;
 
   private OntologyConcept(Builder builder) {
+    this.id = builder.id;
     this.concept = builder.concept;
     this.type = builder.type;
     this.description = builder.description;
@@ -68,6 +73,20 @@ public final class OntologyConcept {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  /**
+   * Returns the stable identifier Gravitino minted for this concept.
+   *
+   * <p>The identifier is internal to Gravitino and never appears in an Apache Ossie document. It is
+   * what a term reference or a mapping binds, so renaming the concept leaves those references
+   * intact. A definition built by a caller, before the server stores it, may leave it unset.
+   *
+   * @return The identifier, or {@code null} when none has been assigned yet.
+   */
+  @Nullable
+  public String id() {
+    return id;
   }
 
   /**
@@ -209,7 +228,7 @@ public final class OntologyConcept {
    */
   @Override
   public String toString() {
-    return "OntologyConcept{concept='" + concept + "', type=" + type + '}';
+    return "OntologyConcept{id='" + id + "', concept='" + concept + "', type=" + type + '}';
   }
 
   @Nullable
@@ -220,6 +239,7 @@ public final class OntologyConcept {
   /** Builder for {@link OntologyConcept}. */
   public static final class Builder {
 
+    @Nullable private String id;
     private String concept;
     private ConceptType type;
 
@@ -232,6 +252,17 @@ public final class OntologyConcept {
     @Nullable private String iri;
 
     private Builder() {}
+
+    /**
+     * Sets the identifier Gravitino minted for this concept.
+     *
+     * @param id The identifier, or {@code null} to leave it unset and let the server assign one.
+     * @return This builder.
+     */
+    public Builder withId(@Nullable String id) {
+      this.id = id;
+      return this;
+    }
 
     /**
      * Sets the concept name.
@@ -343,6 +374,10 @@ public final class OntologyConcept {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(concept), "Concept name must not be null or blank");
       Preconditions.checkArgument(type != null, "Concept '%s' must have a type", concept);
+      Preconditions.checkArgument(
+          id == null || StringUtils.isNotBlank(id),
+          "Concept '%s' has a blank id; omit it or set a non-blank one",
+          concept);
 
       checkNoNullElements(extendsConcepts, "extends");
       checkNoNullElements(derivedBy, "derived_by");
