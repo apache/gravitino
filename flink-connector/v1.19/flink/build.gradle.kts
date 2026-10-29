@@ -127,7 +127,6 @@ dependencies {
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")

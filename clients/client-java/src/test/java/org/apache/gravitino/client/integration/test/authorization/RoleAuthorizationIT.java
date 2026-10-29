@@ -17,9 +17,9 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -63,13 +63,13 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     client.loadMetalake(METALAKE).createRole("role3", new HashMap<>(), Collections.emptyList());
     // normal user can not create role
     assertThrows(
-        "Current user can not create role.",
         ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
               .createRole("role4", new HashMap<>(), Collections.emptyList());
-        });
+        },
+        "Current user can not create role.");
     client.loadMetalake(METALAKE).grantRolesToUser(ImmutableList.of("role1"), NORMAL_USER);
     client
         .loadMetalake(METALAKE)
@@ -118,17 +118,17 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     normalUserClient.loadMetalake(METALAKE).getRole("role1");
     // normal user can not get role
     assertThrows(
-        "Current user can not create role.",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).getRole("role2");
-        });
+        },
+        "Current user can not create role.");
     assertThrows(
-        "Current user can not create role.",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).getRole("role3");
-        });
+        },
+        "Current user can not create role.");
   }
 
   @Test
@@ -136,36 +136,36 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testDeleteRole() {
     // normal user can not delete role
     assertThrows(
-        "Current user can not create role.",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role1");
-        });
+        },
+        "Current user can not create role.");
     assertThrows(
-        "Current user can not create role.",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role2");
-        });
+        },
+        "Current user can not create role.");
     assertThrows(
-        "Current user can not create role.",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role3");
-        });
+        },
+        "Current user can not create role.");
     // owner can delete role
     client.loadMetalake(METALAKE).deleteRole("role1");
     client.loadMetalake(METALAKE).deleteRole("role2");
     client.loadMetalake(METALAKE).deleteRole("role3");
     // normal user can not create role after delete role
     assertThrows(
-        "Current user can not create role.",
         ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
               .createRole("role2", new HashMap<>(), Collections.emptyList());
-        });
+        },
+        "Current user can not create role.");
   }
 
   @Test

@@ -35,14 +35,14 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.mysql.MySQLContainer;
 
 /** Exercises catalog switching and connection validation against a real MySQL server. */
 @Tag("gravitino-docker-test")
 public class TestMysqlDataSource {
   private static final String TARGET_DATABASE = "pool_target";
-  private static final MySQLContainer<?> MYSQL =
-      new MySQLContainer<>("mysql:8.0").withDatabaseName("pool_bootstrap");
+  private static final MySQLContainer MYSQL =
+      new MySQLContainer("mysql:8.0").withDatabaseName("pool_bootstrap");
 
   /** Starts MySQL and creates a target database distinct from the default database. */
   @BeforeAll
