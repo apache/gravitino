@@ -33,9 +33,9 @@ import org.apache.commons.lang3.StringUtils;
  * properties and the definition sections. The ontology status is deliberately absent, because a
  * status change is a lifecycle flag flip on the identity row and must not allocate a version.
  *
- * <p>The {@link #requires()} property maps to the {@code requires_sql} column. The SQL column
- * cannot be called {@code requires} because that word is reserved in some dialects, while the
- * property keeps the name the Apache Ossie definition uses.
+ * <p>The {@code requires()} property maps to the {@code requires_sql} column. The SQL column cannot
+ * be called {@code requires} because that word is reserved in some dialects, while the property
+ * keeps the name the Apache Ossie definition uses.
  */
 @EqualsAndHashCode
 @Getter
