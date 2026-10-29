@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.MaintenanceJobSubmitService;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
@@ -48,7 +49,7 @@ public final class MaintenanceSparkSubmitPipeline {
 
   private final CronSubmitGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
-  private final MaintenanceJobSubmitter jobSubmitter;
+  private final MaintenanceJobSubmitService jobSubmitter;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
@@ -62,7 +63,7 @@ public final class MaintenanceSparkSubmitPipeline {
   public MaintenanceSparkSubmitPipeline(
       CronSubmitGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
-      MaintenanceJobSubmitter jobSubmitter,
+      MaintenanceJobSubmitService jobSubmitter,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
     this.occupancyGate = Preconditions.checkNotNull(occupancyGate);

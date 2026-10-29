@@ -98,7 +98,7 @@ public class MaintenanceMetricsService {
                 request.getSnapshotId(),
                 request.getMetricsJson());
     actionMetaService.recordBeforeMetrics(actionId, metricsId);
-    maybeFinish(actionId, action, finish, "before", metalake, metricsId);
+    finishActionIfRequested(actionId, action, finish, "before", metalake, metricsId);
   }
 
   /**
@@ -121,7 +121,7 @@ public class MaintenanceMetricsService {
                 request.getSnapshotId(),
                 request.getMetricsJson());
     actionMetaService.recordAfterMetrics(actionId, metricsId);
-    maybeFinish(actionId, action, finish, "after", metalake, metricsId);
+    finishActionIfRequested(actionId, action, finish, "after", metalake, metricsId);
   }
 
   /**
@@ -148,7 +148,7 @@ public class MaintenanceMetricsService {
         action.policyId());
   }
 
-  private void maybeFinish(
+  private void finishActionIfRequested(
       long actionId,
       TableMaintenanceActionPO action,
       boolean finish,

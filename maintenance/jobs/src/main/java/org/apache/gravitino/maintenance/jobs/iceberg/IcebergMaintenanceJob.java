@@ -101,8 +101,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    */
   public static final String ACTION_IDS_KEY = "action_ids";
 
-  private static final String VERSION = "v1";
-
   /** Supported {@code maintenance_types} wire values. */
   public enum MaintenanceType {
     REWRITE_DATA_FILES("rewrite_data_files"),
@@ -157,7 +155,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         .withArguments(buildArguments())
         .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
-            Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
+            Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v1"))
         .build();
   }
 

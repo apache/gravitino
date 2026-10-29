@@ -24,12 +24,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.MaintenanceJobSubmitService;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
@@ -51,7 +51,7 @@ public final class MaintenanceCommitSubmitPipeline {
 
   private final CommitOccupancyGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
-  private final MaintenanceJobSubmitter jobSubmitter;
+  private final MaintenanceJobSubmitService jobSubmitter;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
@@ -65,7 +65,7 @@ public final class MaintenanceCommitSubmitPipeline {
   public MaintenanceCommitSubmitPipeline(
       CommitOccupancyGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
-      MaintenanceJobSubmitter jobSubmitter,
+      MaintenanceJobSubmitService jobSubmitter,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
     this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
