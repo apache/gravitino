@@ -144,7 +144,8 @@ A run is rejected, and its job is removed, when:
   invalid, see [Environment Variables](#environment-variables).
 - Kubernetes rejects the `SparkApplication`, for example because the namespace doesn't exist, the
   job executor lacks a permission, or the operator isn't installed. The error carries the reason
-  that Kubernetes gives.
+  that Kubernetes gives. If Kubernetes rejects a retried request after an earlier attempt created
+  the `SparkApplication`, the job runs instead.
 - A `SparkApplication` of the same name belongs to another job, for example of another Gravitino
   deployment that shares the namespace, see
   [Multiple Servers and Restarts](#multiple-servers-and-restarts).
@@ -158,6 +159,8 @@ is kept:
   rejections above, for example a server error or `401 Unauthorized`.
 - The `SparkApplication` of the job exists but is being deleted, or is gone before it can be read,
   for example after a retried request.
+- Kubernetes rejects a retried request, and the job executor can't read the `SparkApplication` to
+  tell whether an earlier attempt created it, for example because of a server error.
 
 The job executor tries to delete the `SparkApplication` right away, see
 [Cluster Connection](#cluster-connection). Gravitino marks the job as `CANCELLING`, and about three
