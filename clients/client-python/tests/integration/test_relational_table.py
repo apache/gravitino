@@ -28,10 +28,18 @@ from gravitino import (
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.types.types import Types
+from gravitino.api.stats.partition_range import PartitionRange
+from gravitino.api.stats.partition_statistics_drop import PartitionStatisticsDrop
+from gravitino.api.stats.partition_statistics_update import PartitionStatisticsUpdate
 from gravitino.api.stats.statistic_values import StatisticValues
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
+)
+from gravitino.exceptions.base import (
+    IllegalStatisticNameException,
+    NoSuchMetadataObjectException,
+    NoSuchTableException,
 )
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.integration_test_env import IntegrationTestEnv
@@ -186,3 +194,174 @@ class TestRelationalTable(IntegrationTestEnv):
         remaining_keys = [k for k in stats if k not in keys_to_drop]
         self.assertTrue(table_stats_ops.drop_statistics(remaining_keys))
         self.assertEqual(len(table_stats_ops.list_statistics()), 0)
+
+    def test_relational_table_partition_statistics_ops(self):
+        """Round-trip partition statistics without creating physical partitions."""
+        table = self.relational_catalog.load_table(self.TABLE_IDENT)
+        operations = table.supports_partition_statistics()
+        bound = PartitionRange.BoundType
+        names = [f"dt=2026-10-0{day}/country=cn" for day in (1, 2, 3)]
+        special_name = "dt=2026-10-04/country=中 +?#"
+        all_names = names + [special_name]
+        values = {
+            "custom-bool": StatisticValues.boolean_value(False),
+            "custom-long": StatisticValues.long_value(0),
+            "custom-double": StatisticValues.double_value(1.5),
+            "custom-string": StatisticValues.string_value(""),
+            "custom-list": StatisticValues.list_value([StatisticValues.long_value(2)]),
+            "custom-object": StatisticValues.object_value(
+                {"nested": StatisticValues.boolean_value(False)}
+            ),
+        }
+        self.assertEqual([], table.list_partition_names())
+        self.assertEqual(
+            [], operations.list_partition_statistics(PartitionRange.ALL_PARTITIONS)
+        )
+        try:
+            operations.update_partition_statistics(
+                [PartitionStatisticsUpdate(name, values) for name in all_names]
+            )
+            self._assert_partition_statistics_values(operations, all_names, values)
+            self._assert_partition_statistics_ranges(operations, names, special_name)
+
+            operations.update_partition_statistics(
+                [
+                    PartitionStatisticsUpdate(
+                        names[0], {"custom-long": StatisticValues.long_value(20)}
+                    )
+                ]
+            )
+            updated = operations.list_partition_statistics(
+                PartitionRange.between(names[0], bound.CLOSED, names[0], bound.CLOSED)
+            )[0]
+            self.assertEqual(
+                20,
+                next(
+                    stat.value().value()
+                    for stat in updated.statistics()
+                    if stat.name() == "custom-long"
+                ),
+            )
+            self.assertEqual(len(values), len(updated.statistics()))
+            drops = [
+                PartitionStatisticsDrop(name, ["custom-long"]) for name in names[:2]
+            ]
+            self.assertTrue(operations.drop_partition_statistics(drops))
+            self.assertFalse(operations.drop_partition_statistics(drops))
+            remaining = {
+                item.partition_name(): {stat.name() for stat in item.statistics()}
+                for item in operations.list_partition_statistics(
+                    PartitionRange.ALL_PARTITIONS
+                )
+            }
+            self.assertNotIn("custom-long", remaining[names[0]])
+            self.assertNotIn("custom-long", remaining[names[1]])
+            self.assertIn("custom-long", remaining[names[2]])
+            with self.assertRaises(IllegalStatisticNameException):
+                operations.update_partition_statistics(
+                    [
+                        PartitionStatisticsUpdate(
+                            names[0], {"invalid-name": StatisticValues.long_value(1)}
+                        )
+                    ]
+                )
+            self.assertEqual([], table.list_partition_names())
+        finally:
+            operations.drop_partition_statistics(
+                [PartitionStatisticsDrop(name, list(values)) for name in all_names]
+            )
+        self.assertEqual(
+            [], operations.list_partition_statistics(PartitionRange.ALL_PARTITIONS)
+        )
+
+    def test_partition_statistics_missing_table(self):
+        """A bound statistics operation still checks that its table exists."""
+        identifier = NameIdentifier.of(self.SCHEMA_NAME, "partition_statistics_deleted")
+        table = self.relational_catalog.create_table(
+            identifier=identifier,
+            columns=[
+                ColumnDTO.builder()
+                .with_name("id")
+                .with_data_type(Types.IntegerType.get())
+                .build()
+            ],
+        )
+        operations = table.supports_partition_statistics()
+        self.assertTrue(self.relational_catalog.drop_table(identifier))
+        for operation, argument in [
+            (operations.list_partition_statistics, PartitionRange.ALL_PARTITIONS),
+            (
+                operations.update_partition_statistics,
+                [
+                    PartitionStatisticsUpdate(
+                        "p1", {"custom-x": StatisticValues.long_value(1)}
+                    )
+                ],
+            ),
+            (
+                operations.drop_partition_statistics,
+                [PartitionStatisticsDrop("p1", ["custom-x"])],
+            ),
+        ]:
+            with self.subTest(operation=operation), self.assertRaises(
+                (NoSuchMetadataObjectException, NoSuchTableException)
+            ):
+                operation(argument)
+
+    def _assert_partition_statistics_values(self, operations, all_names, values):
+        results = operations.list_partition_statistics(PartitionRange.ALL_PARTITIONS)
+        self.assertEqual(set(all_names), {item.partition_name() for item in results})
+        for result in results:
+            actual = {stat.name(): stat for stat in result.statistics()}
+            self.assertEqual(set(values), set(actual))
+            for key, expected in values.items():
+                self.assertEqual(expected.data_type(), actual[key].value().data_type())
+                self.assertEqual(expected.value(), actual[key].value().value())
+                self.assertFalse(actual[key].reserved())
+                self.assertTrue(actual[key].modifiable())
+                self.assertIsNotNone(actual[key].audit_info().creator())
+
+    def _assert_partition_statistics_ranges(self, operations, names, special_name):
+        bound = PartitionRange.BoundType
+        for lower in bound:
+            for upper in bound:
+                with self.subTest(lower=lower, upper=upper):
+                    expected = {names[1]}
+                    if lower == bound.CLOSED:
+                        expected.add(names[0])
+                    if upper == bound.CLOSED:
+                        expected.add(names[2])
+                    actual = operations.list_partition_statistics(
+                        PartitionRange.between(names[0], lower, names[2], upper)
+                    )
+                    self.assertEqual(
+                        expected, {item.partition_name() for item in actual}
+                    )
+        for partition_range, expected in [
+            (
+                PartitionRange.down_to(names[1], bound.OPEN),
+                {names[2], special_name},
+            ),
+            (PartitionRange.up_to(names[1], bound.CLOSED), set(names[:2])),
+            (
+                PartitionRange.between(names[1], bound.CLOSED, names[1], bound.CLOSED),
+                {names[1]},
+            ),
+            (
+                PartitionRange.between(names[1], bound.OPEN, names[1], bound.CLOSED),
+                set(),
+            ),
+            (
+                PartitionRange.between(names[2], bound.CLOSED, names[0], bound.CLOSED),
+                set(),
+            ),
+            (
+                PartitionRange.between(
+                    special_name, bound.CLOSED, special_name, bound.CLOSED
+                ),
+                {special_name},
+            ),
+        ]:
+            with self.subTest(partition_range=partition_range):
+                actual = operations.list_partition_statistics(partition_range)
+                self.assertEqual(expected, {item.partition_name() for item in actual})

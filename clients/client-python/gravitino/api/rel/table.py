@@ -29,6 +29,9 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.stats.supports_partition_statistics import (
+    SupportsPartitionStatistics,
+)
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
@@ -133,6 +136,12 @@ class Table(Auditable):
     def supports_statistics(self) -> SupportsStatistics:
         raise UnsupportedOperationException(
             "Table does not support statistics operations."
+        )
+
+    def supports_partition_statistics(self) -> SupportsPartitionStatistics:
+        """Return operations for partition statistics held by Gravitino."""
+        raise UnsupportedOperationException(
+            "Table does not support partition statistics operations."
         )
 
     def support_secrets(self) -> SupportsSecrets:

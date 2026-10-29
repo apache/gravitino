@@ -29,13 +29,23 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
 from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.stats.partition_range import PartitionRange
+from gravitino.api.stats.partition_statistics import PartitionStatistics
+from gravitino.api.stats.partition_statistics_drop import PartitionStatisticsDrop
+from gravitino.api.stats.partition_statistics_update import PartitionStatisticsUpdate
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
+from gravitino.api.stats.supports_partition_statistics import (
+    SupportsPartitionStatistics,
+)
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
 from gravitino.client.generic_column import GenericColumn
+from gravitino.client.metadata_object_partition_statistics_operations import (
+    MetadataObjectPartitionStatisticsOperations,
+)
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
 )
@@ -68,9 +78,10 @@ class RelationalTable(
     Table,
     SupportsRoles,
     SupportsStatistics,
+    SupportsPartitionStatistics,
     SupportsTags,
     SupportsSecrets,
-):
+):  # pylint: disable=too-many-ancestors,too-many-instance-attributes
     """Represents a relational table."""
 
     def __init__(
@@ -91,6 +102,11 @@ class RelationalTable(
         )
         self._object_statistics_operations = MetadataObjectStatisticsOperations(
             namespace.level(0), table_object, rest_client
+        )
+        self._partition_statistics_operations = (
+            MetadataObjectPartitionStatisticsOperations(
+                namespace.level(0), table_object, rest_client
+            )
         )
         self._object_secret_operations = MetadataObjectSecretOperations(
             namespace.level(0), table_object, rest_client
@@ -307,6 +323,24 @@ class RelationalTable(
 
     def supports_statistics(self) -> SupportsStatistics:
         return self
+
+    def supports_partition_statistics(self) -> SupportsPartitionStatistics:
+        return self
+
+    def list_partition_statistics(
+        self, partition_range: PartitionRange
+    ) -> list[PartitionStatistics]:
+        return self._partition_statistics_operations.list_partition_statistics(
+            partition_range
+        )
+
+    def update_partition_statistics(
+        self, updates: list[PartitionStatisticsUpdate]
+    ) -> None:
+        self._partition_statistics_operations.update_partition_statistics(updates)
+
+    def drop_partition_statistics(self, drops: list[PartitionStatisticsDrop]) -> bool:
+        return self._partition_statistics_operations.drop_partition_statistics(drops)
 
     def support_secrets(self) -> SupportsSecrets:
         return self
