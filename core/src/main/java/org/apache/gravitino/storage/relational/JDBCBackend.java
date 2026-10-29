@@ -61,6 +61,7 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.OntologyEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -84,6 +85,7 @@ import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
+import org.apache.gravitino.storage.relational.service.OntologyMetaService;
 import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
@@ -157,6 +159,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case SEMANTIC_MODEL:
         return (List<E>)
             SemanticModelMetaService.getInstance().listSemanticModelsByNamespace(namespace);
+      case ONTOLOGY:
+        return (List<E>) OntologyMetaService.getInstance().listOntologiesByNamespace(namespace);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().listFilesetsByNamespace(namespace);
       case TOPIC:
@@ -300,6 +304,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) ViewMetaService.getInstance().getViewByIdentifier(ident);
       case SEMANTIC_MODEL:
         return (E) SemanticModelMetaService.getInstance().getSemanticModelByIdentifier(ident);
+      case ONTOLOGY:
+        return (E) OntologyMetaService.getInstance().getOntologyByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -390,6 +396,17 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
           }
         }
         return semanticModels;
+      case ONTOLOGY:
+        List<E> ontologies = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          try {
+            ontologies.add(
+                (E) OntologyMetaService.getInstance().getOntologyByIdentifier(identifier));
+          } catch (NoSuchEntityException e) {
+            LOG.debug("Skipping missing ontology during batch get: {}", identifier.name());
+          }
+        }
+        return ontologies;
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for batch get operation", entityType);
@@ -535,6 +552,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return SemanticModelMetaService.getInstance()
             .deleteSemanticModelMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case ONTOLOGY:
+        return OntologyMetaService.getInstance()
+            .deleteOntologyMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -578,6 +599,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case SEMANTIC_MODEL:
         return SemanticModelMetaService.getInstance()
             .deleteSemanticModelVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      case ONTOLOGY:
+        return OntologyMetaService.getInstance()
+            .deleteOntologyVersionsByRetentionCount(
                 versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       case FILESET:
@@ -1053,6 +1079,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     } else if (e instanceof SemanticModelEntity) {
       SemanticModelMetaService.getInstance()
           .insertSemanticModel((SemanticModelEntity) e, overwritten);
+    } else if (e instanceof OntologyEntity) {
+      OntologyMetaService.getInstance().insertOntology((OntologyEntity) e, overwritten);
     } else if (e instanceof GenericEntity) {
       GenericEntity genericEntity = (GenericEntity) e;
       throw new UnsupportedEntityTypeException(
@@ -1103,6 +1131,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) ViewMetaService.getInstance().updateView(ident, updater);
       case SEMANTIC_MODEL:
         return (E) SemanticModelMetaService.getInstance().updateSemanticModel(ident, updater);
+      case ONTOLOGY:
+        return (E) OntologyMetaService.getInstance().updateOntology(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -1148,6 +1178,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return ViewMetaService.getInstance().deleteView(ident);
       case SEMANTIC_MODEL:
         return SemanticModelMetaService.getInstance().deleteSemanticModel(ident);
+      case ONTOLOGY:
+        return OntologyMetaService.getInstance().deleteOntology(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);

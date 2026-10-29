@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Audit;
@@ -315,6 +317,105 @@ public class TestOssieOntologyConverter {
     assertThrows(
         IllegalOntologyException.class,
         () -> OssieOntologyConverter.exportDocument(broken, OssieFormat.JSON));
+  }
+
+  @Test
+  public void testDefinitionJsonRoundTrip() {
+    OntologyDefinition definition = definition();
+    String stored = OssieOntologyConverter.toDefinitionJson(definition);
+
+    assertEquals(definition, OssieOntologyConverter.fromDefinitionJson(stored));
+  }
+
+  @Test
+  public void testDefinitionJsonIsDeterministic() {
+    String stored = OssieOntologyConverter.toDefinitionJson(definition());
+    String restored =
+        OssieOntologyConverter.toDefinitionJson(OssieOntologyConverter.fromDefinitionJson(stored));
+
+    assertEquals(stored, restored);
+  }
+
+  @Test
+  public void testDefinitionJsonHasNoDocumentRoot() throws Exception {
+    String stored = OssieOntologyConverter.toDefinitionJson(definition());
+
+    JsonNode root = new ObjectMapper().readTree(stored);
+    assertTrue(root.has("ontology"));
+    assertTrue(root.has("prefixes"));
+    assertFalse(root.has("version"));
+    assertFalse(root.has("name"));
+    assertFalse(root.has("description"));
+  }
+
+  @Test
+  public void testDefinitionJsonRoundTripsMinimalDefinition() {
+    OntologyDefinition minimal =
+        OntologyDefinition.builder()
+            .withConcepts(
+                OntologyConcept.builder()
+                    .withConcept("Account")
+                    .withType(ConceptType.ENTITY_TYPE)
+                    .build())
+            .build();
+
+    String stored = OssieOntologyConverter.toDefinitionJson(minimal);
+    assertFalse(stored.contains("ai_context"));
+    assertFalse(stored.contains("requires"));
+    assertFalse(stored.contains("prefixes"));
+
+    assertEquals(minimal, OssieOntologyConverter.fromDefinitionJson(stored));
+  }
+
+  @Test
+  public void testDefinitionJsonPreservesConceptOrder() {
+    OntologyDefinition definition = definition();
+    String[] conceptNames = new String[definition.concepts().length];
+    for (int index = 0; index < conceptNames.length; index++) {
+      conceptNames[index] = definition.concepts()[index].concept();
+    }
+
+    OntologyDefinition restored =
+        OssieOntologyConverter.fromDefinitionJson(
+            OssieOntologyConverter.toDefinitionJson(definition));
+    String[] restoredNames = new String[restored.concepts().length];
+    for (int index = 0; index < restoredNames.length; index++) {
+      restoredNames[index] = restored.concepts()[index].concept();
+    }
+
+    assertArrayEquals(conceptNames, restoredNames);
+  }
+
+  @Test
+  public void testDefinitionJsonRejectsUnknownProperty() {
+    String stored =
+        OssieOntologyConverter.toDefinitionJson(definition())
+            .replaceFirst("\\{", "{\"name\": \"Finance\",");
+    IllegalOntologyException exception =
+        assertThrows(
+            IllegalOntologyException.class,
+            () -> OssieOntologyConverter.fromDefinitionJson(stored));
+    assertTrue(exception.getMessage().contains("$.name"));
+  }
+
+  @Test
+  public void testDefinitionJsonRejectsMalformedJson() {
+    assertThrows(
+        IllegalOntologyException.class,
+        () -> OssieOntologyConverter.fromDefinitionJson("{\"ontology\": ["));
+  }
+
+  @Test
+  public void testDefinitionJsonRejectsNonObjectRoot() {
+    assertThrows(
+        IllegalOntologyException.class, () -> OssieOntologyConverter.fromDefinitionJson("[]"));
+  }
+
+  @Test
+  public void testDefinitionJsonRejectsInvalidDefinition() {
+    assertThrows(
+        IllegalOntologyException.class,
+        () -> OssieOntologyConverter.fromDefinitionJson("{\"ontology\": []}"));
   }
 
   private static OntologyDefinition definition() {

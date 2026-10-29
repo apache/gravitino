@@ -60,11 +60,19 @@ import org.apache.gravitino.semantic.OssieFormat;
  * non-blank {@code verbalizes} phrasing, and every concept a component names in {@code extends} or
  * in a relationship role must be declared in the same document. The document has no place for
  * external references, so a dangling name is rejected rather than accepted and resolved later.
+ *
+ * <p>The converter also owns the internal metadata-store representation of a definition, through
+ * {@link #toDefinitionJson(OntologyDefinition)} and {@link #fromDefinitionJson(String)}. That
+ * representation holds the definition sections only and stays separate from the interchange
+ * document, so the metadata store never has to know the Apache Ossie component and relationship
+ * shapes.
  */
 public final class OssieOntologyConverter {
 
   private static final Set<String> ROOT_PROPERTIES =
       Set.of("version", "name", "description", "ai_context", "requires", "ontology", "prefixes");
+  private static final Set<String> DEFINITION_PROPERTIES =
+      Set.of("ai_context", "requires", "ontology", "prefixes");
   private static final Set<String> COMPONENT_PROPERTIES =
       Set.of(
           "concept",
@@ -145,6 +153,80 @@ public final class OssieOntologyConverter {
     } catch (JsonProcessingException e) {
       throw new IllegalOntologyException(
           e, "Cannot serialize Apache Ossie ontology document: %s", e.getOriginalMessage());
+    }
+  }
+
+  /**
+   * Serializes one ontology definition into the internal metadata-store representation.
+   *
+   * <p>This is a storage representation, not an Apache Ossie interchange document: it carries only
+   * the definition sections ({@code ai_context}, {@code requires}, {@code ontology} and {@code
+   * prefixes}) and has no {@code version}, {@code name} or {@code description}, because the
+   * metadata store keeps those on the ontology identity row and its version snapshot instead. Use
+   * {@link #importDocument(OssieDocument)} and {@link #exportDocument(Ontology, OssieFormat)} for
+   * interchange.
+   *
+   * <p>The output is deterministic: the object keys are written in a fixed order and the concepts
+   * stay in the order the definition declares them, so the same definition always serializes to the
+   * same text.
+   *
+   * @param definition The definition to serialize.
+   * @return The serialized definition, as a JSON object.
+   */
+  public static String toDefinitionJson(OntologyDefinition definition) {
+    Objects.requireNonNull(definition, "definition must not be null");
+
+    ObjectNode root = JSON_MAPPER.createObjectNode();
+    writeDefinition(root, definition);
+    try {
+      return JSON_MAPPER.writeValueAsString(root);
+    } catch (JsonProcessingException e) {
+      throw new IllegalOntologyException(
+          e, "Cannot serialize ontology definition: %s", e.getOriginalMessage());
+    }
+  }
+
+  /**
+   * Reads one ontology definition from the internal metadata-store representation written by {@link
+   * #toDefinitionJson(OntologyDefinition)}.
+   *
+   * <p>This is the exact inverse of {@link #toDefinitionJson(OntologyDefinition)}, so {@code
+   * fromDefinitionJson(toDefinitionJson(definition))} equals {@code definition}. It is a storage
+   * representation, not an Apache Ossie interchange document: it has no {@code version}, {@code
+   * name} or {@code description}, and those properties are rejected like any other property the
+   * definition sections do not declare.
+   *
+   * @param json The serialized definition.
+   * @return The definition.
+   * @throws IllegalOntologyException If the text is not a JSON object, declares a property outside
+   *     the definition sections, or describes an invalid ontology.
+   */
+  public static OntologyDefinition fromDefinitionJson(String json) {
+    Objects.requireNonNull(json, "json must not be null");
+
+    JsonNode parsed;
+    try {
+      parsed =
+          JSON_MAPPER.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(json);
+    } catch (IOException e) {
+      throw new IllegalOntologyException(
+          e, "Cannot parse stored ontology definition: %s", originalMessage(e));
+    }
+    if (!(parsed instanceof ObjectNode)) {
+      throw invalid("$", "stored ontology definition root must be an object");
+    }
+
+    ObjectNode root = (ObjectNode) parsed;
+    validateObject(root, "$", DEFINITION_PROPERTIES);
+    try {
+      return readDefinition(root);
+    } catch (IllegalOntologyException e) {
+      throw e;
+    } catch (IllegalArgumentException e) {
+      throw new IllegalOntologyException(
+          e,
+          "Cannot convert stored JSON to a Gravitino Ontology definition: %s",
+          originalMessage(e));
     }
   }
 

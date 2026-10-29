@@ -83,7 +83,12 @@ public interface Entity extends Serializable {
     JOB_TEMPLATE,
     JOB,
     AUDIT,
-    FUNCTION;
+    FUNCTION,
+    /**
+     * A metalake-level Apache Ossie ontology: a versioned concept graph addressed by name alone
+     * inside its metalake.
+     */
+    ONTOLOGY;
   }
 
   /**

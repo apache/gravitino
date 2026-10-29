@@ -568,6 +568,43 @@ CREATE TABLE IF NOT EXISTS `semantic_model_metric_meta` (
     KEY `idx_smmm_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model metric identities';
 
+-- The ontology tables hold metalake-level Apache Ossie ontologies: an identity row that owns
+-- the status and the version pointers, and one immutable snapshot row per version.
+
+CREATE TABLE IF NOT EXISTS `ontology_meta` (
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',
+    `ontology_name` VARCHAR(128) NOT NULL COMMENT 'ontology name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `status` VARCHAR(16) NOT NULL COMMENT 'ontology status: DRAFT or PUBLISHED',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'ontology identity audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ontology deleted at',
+    PRIMARY KEY (`ontology_id`),
+    UNIQUE KEY `uk_om_mid_name_del` (`metalake_id`, `ontology_name`, `deleted_at`),
+    KEY `idx_om_mid` (`metalake_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology metadata';
+
+CREATE TABLE IF NOT EXISTS `ontology_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'ontology version',
+    `ontology_name` VARCHAR(128) NOT NULL COMMENT 'ontology name snapshot',
+    `ontology_comment` TEXT DEFAULT NULL COMMENT 'ontology comment snapshot',
+    `ai_context` MEDIUMTEXT DEFAULT NULL COMMENT 'ontology AI context snapshot (JSON)',
+    `requires_sql` MEDIUMTEXT DEFAULT NULL COMMENT 'ontology-level expressions snapshot (JSON array)',
+    `ontology` MEDIUMTEXT NOT NULL COMMENT 'concept components snapshot (JSON array)',
+    `prefixes` MEDIUMTEXT DEFAULT NULL COMMENT 'IRI prefix snapshot (JSON object)',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'ontology properties snapshot (JSON)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'ontology version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ovi_oid_ver_del` (`ontology_id`, `version`, `deleted_at`),
+    KEY `idx_ovi_mid` (`metalake_id`),
+    KEY `idx_ovi_oid` (`ontology_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology version information';
+
 CREATE TABLE IF NOT EXISTS `scheduled_expand_tasks` (
     `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
     `task_instance` VARCHAR(100) NOT NULL COMMENT 'task instance',
