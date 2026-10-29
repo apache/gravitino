@@ -40,6 +40,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.maintenance.policy.MaintenanceExecutablePolicyValidator;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
@@ -122,6 +123,7 @@ public class PolicyManager implements PolicyDispatcher {
     checkMetalake(metalakeIdent, entityStore);
     content.validate();
     validateReadRestrictionContent(type, content);
+    MaintenanceExecutablePolicyValidator.validate(type, content);
 
     PolicyEntity policyEntity =
         PolicyEntity.builder()
@@ -360,6 +362,7 @@ public class PolicyManager implements PolicyDispatcher {
         newContent = updateContent.getContent();
         contentUpdated = true;
         validateReadRestrictionContent(policyType, newContent);
+        MaintenanceExecutablePolicyValidator.validate(policyType, newContent);
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }

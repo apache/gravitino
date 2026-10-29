@@ -323,7 +323,7 @@ public class TestPolicyDTO {
     Assertions.assertTrue(orphanEx.getMessage().contains("commitTrigger"));
 
     // Cron syntax is not validated on the policy API; scheduler registration parses it.
-    // Catalog jobOptions are still required whenever timeTrigger schedules Spark maintenance.
+    // Catalog jobOptions for scheduled Spark are enforced on PolicyManager create/alter (core).
     PolicyContentDTO.IcebergCompactionContentDTO opaqueCron =
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
             .withExecutionSpec(

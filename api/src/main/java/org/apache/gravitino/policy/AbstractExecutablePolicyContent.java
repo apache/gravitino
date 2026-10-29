@@ -18,11 +18,8 @@
  */
 package org.apache.gravitino.policy;
 
-import com.google.common.base.Preconditions;
-import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 
 /**
  * Base for built-in Iceberg maintenance policy contents that carry optional execution peers.
@@ -34,24 +31,6 @@ import org.apache.commons.lang3.StringUtils;
  * flattening the five fields onto this type.
  */
 public abstract class AbstractExecutablePolicyContent implements ExecutablePolicyContent {
-
-  /** Flat jobConf key consumed by {@code builtin-iceberg-maintenance-task}. */
-  public static final String JOB_OPTION_WAREHOUSE_LOCATION = "warehouse_location";
-
-  /** Short alias routed to {@link #JOB_OPTION_WAREHOUSE_LOCATION} by TMS jobConf builder. */
-  public static final String JOB_OPTION_WAREHOUSE = "warehouse";
-
-  /** Flat jobConf key for Iceberg REST / JDBC catalog URI. */
-  public static final String JOB_OPTION_CATALOG_URI = "catalog_uri";
-
-  /** Short alias routed to {@link #JOB_OPTION_CATALOG_URI}. */
-  public static final String JOB_OPTION_URI = "uri";
-
-  /** Flat jobConf key for catalog type ({@code rest}, {@code jdbc}, …). */
-  public static final String JOB_OPTION_CATALOG_TYPE = "catalog_type";
-
-  /** Short alias routed to {@link #JOB_OPTION_CATALOG_TYPE}. */
-  public static final String JOB_OPTION_TYPE = "type";
 
   private final PolicyExecutionSpec executionSpec;
 
@@ -76,73 +55,16 @@ public abstract class AbstractExecutablePolicyContent implements ExecutablePolic
   }
 
   /**
-   * Validates universal {@link PolicyContent} rules and TMS submit-time {@code jobOptions}.
+   * Validates universal {@link PolicyContent} rules.
    *
    * <p>Shared execution-peer constraints are enforced when constructing {@link
-   * PolicyExecutionSpec}. When {@code timeTrigger} is set or {@code commitTrigger} is {@code true},
-   * cron/commit submit will run {@code builtin-iceberg-maintenance-task}; require the catalog
-   * connection keys that template placeholders expect from policy {@code jobOptions} (TMS fills
-   * table/policy ids later). Type-specific contracts (for example orphan forbidding {@code
-   * commitTrigger}) belong on concrete subclasses.
+   * PolicyExecutionSpec}. Type-specific maintenance contracts (for example orphan cleanup
+   * forbidding {@code commitTrigger}, or cron parsing) belong on concrete subclasses or the server
+   * create/alter path with the real {@link Policy.BuiltInType}.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     ExecutablePolicyContent.super.validate();
-    validateJobOptionsForScheduledSubmit(executionSpec());
-  }
-
-  /**
-   * Requires catalog connection keys in {@code jobOptions} when the policy can schedule Spark
-   * maintenance.
-   *
-   * <p>Accepted aliases match {@code MaintenanceJobConfBuilder} routing: {@code warehouse} / {@code
-   * warehouse_location}, {@code uri} / {@code catalog_uri}, {@code type} / {@code catalog_type}.
-   *
-   * @param spec execution peers
-   * @throws IllegalArgumentException when a scheduled policy is missing required jobOptions
-   */
-  static void validateJobOptionsForScheduledSubmit(PolicyExecutionSpec spec) {
-    boolean willSchedule =
-        StringUtils.isNotBlank(spec.timeTrigger()) || Boolean.TRUE.equals(spec.commitTrigger());
-    if (!willSchedule) {
-      return;
-    }
-    Map<String, String> jobOptions = spec.jobOptions();
-    requireJobOption(
-        jobOptions,
-        JOB_OPTION_WAREHOUSE_LOCATION,
-        JOB_OPTION_WAREHOUSE,
-        "jobOptions must set '"
-            + JOB_OPTION_WAREHOUSE_LOCATION
-            + "' (or '"
-            + JOB_OPTION_WAREHOUSE
-            + "') when timeTrigger or commitTrigger schedules maintenance Spark jobs");
-    requireJobOption(
-        jobOptions,
-        JOB_OPTION_CATALOG_URI,
-        JOB_OPTION_URI,
-        "jobOptions must set '"
-            + JOB_OPTION_CATALOG_URI
-            + "' (or '"
-            + JOB_OPTION_URI
-            + "') when timeTrigger or commitTrigger schedules maintenance Spark jobs");
-    requireJobOption(
-        jobOptions,
-        JOB_OPTION_CATALOG_TYPE,
-        JOB_OPTION_TYPE,
-        "jobOptions must set '"
-            + JOB_OPTION_CATALOG_TYPE
-            + "' (or '"
-            + JOB_OPTION_TYPE
-            + "') when timeTrigger or commitTrigger schedules maintenance Spark jobs");
-  }
-
-  private static void requireJobOption(
-      Map<String, String> jobOptions, String primary, String alias, String message) {
-    boolean present =
-        StringUtils.isNotBlank(jobOptions.get(primary))
-            || StringUtils.isNotBlank(jobOptions.get(alias));
-    Preconditions.checkArgument(present, message);
   }
 
   /**

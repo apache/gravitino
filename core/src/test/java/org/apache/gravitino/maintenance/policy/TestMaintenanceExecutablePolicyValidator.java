@@ -16,17 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy;
+package org.apache.gravitino.maintenance.policy;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/**
- * Create/alter validation for maintenance policy {@code jobOptions} when Spark will be scheduled.
- */
-public class TestExecutablePolicyJobOptionsValidation {
+/** Server-side maintenance policy checks invoked from {@code PolicyManager}. */
+public class TestMaintenanceExecutablePolicyValidator {
 
   private static final Map<String, String> COMPLETE_JOB_OPTIONS =
       ImmutableMap.of(
@@ -35,18 +36,24 @@ public class TestExecutablePolicyJobOptionsValidation {
           "warehouse_location", "/tmp/iceberg-warehouse");
 
   @Test
+  void nonMaintenanceTypesAreNoOp() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            MaintenanceExecutablePolicyValidator.validate(
+                Policy.BuiltInType.CUSTOM, PolicyContents.custom(null, null, null)));
+  }
+
+  @Test
   void noTriggerDoesNotRequireJobOptions() {
-    Assertions.assertDoesNotThrow(() -> PolicyContents.icebergDataCompaction().validate());
     Assertions.assertDoesNotThrow(
         () ->
-            PolicyContents.icebergSnapshotExpiration(1L, 1L, false, null, null, null, null, null)
-                .validate());
+            MaintenanceExecutablePolicyValidator.validate(
+                Policy.BuiltInType.ICEBERG_COMPACTION, PolicyContents.icebergDataCompaction()));
     Assertions.assertDoesNotThrow(
         () ->
-            PolicyContents.icebergRewriteManifests(
-                    null, null, null, null, null, null, null, null, null, null)
-                .validate());
-    Assertions.assertDoesNotThrow(() -> PolicyContents.icebergOrphanFileRemoval().validate());
+            MaintenanceExecutablePolicyValidator.validate(
+                Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
+                PolicyContents.icebergOrphanFileRemoval()));
   }
 
   @Test
@@ -55,7 +62,9 @@ public class TestExecutablePolicyJobOptionsValidation {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                PolicyContents.icebergDataCompaction(
+                MaintenanceExecutablePolicyValidator.validate(
+                    Policy.BuiltInType.ICEBERG_COMPACTION,
+                    PolicyContents.icebergDataCompaction(
                         0L,
                         0L,
                         1L,
@@ -68,8 +77,7 @@ public class TestExecutablePolicyJobOptionsValidation {
                         null,
                         null,
                         null,
-                        null)
-                    .validate());
+                        null)));
     Assertions.assertTrue(ex.getMessage().contains("warehouse_location"));
   }
 
@@ -79,7 +87,9 @@ public class TestExecutablePolicyJobOptionsValidation {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                PolicyContents.icebergDataCompaction(
+                MaintenanceExecutablePolicyValidator.validate(
+                    Policy.BuiltInType.ICEBERG_COMPACTION,
+                    PolicyContents.icebergDataCompaction(
                         0L,
                         0L,
                         1L,
@@ -92,8 +102,7 @@ public class TestExecutablePolicyJobOptionsValidation {
                         true,
                         null,
                         ImmutableMap.of("type", "rest", "uri", "http://irc"),
-                        null)
-                    .validate());
+                        null)));
     Assertions.assertTrue(ex.getMessage().contains("warehouse_location"));
   }
 
@@ -101,7 +110,9 @@ public class TestExecutablePolicyJobOptionsValidation {
   void shortAliasesSatisfyRequiredJobOptions() {
     Assertions.assertDoesNotThrow(
         () ->
-            PolicyContents.icebergDataCompaction(
+            MaintenanceExecutablePolicyValidator.validate(
+                Policy.BuiltInType.ICEBERG_COMPACTION,
+                PolicyContents.icebergDataCompaction(
                     0L,
                     0L,
                     1L,
@@ -114,8 +125,7 @@ public class TestExecutablePolicyJobOptionsValidation {
                     true,
                     0L,
                     COMPLETE_JOB_OPTIONS,
-                    null)
-                .validate());
+                    null)));
   }
 
   @Test
@@ -127,17 +137,21 @@ public class TestExecutablePolicyJobOptionsValidation {
             "warehouse_location", "/tmp/iceberg-warehouse");
     Assertions.assertDoesNotThrow(
         () ->
-            PolicyContents.icebergSnapshotExpiration(
-                    1L, 1L, false, "0 0 3 * * ?", null, null, opts, null)
-                .validate());
+            MaintenanceExecutablePolicyValidator.validate(
+                Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
+                PolicyContents.icebergSnapshotExpiration(
+                    1L, 1L, false, "0 0 3 * * ?", null, null, opts, null)));
     Assertions.assertDoesNotThrow(
         () ->
-            PolicyContents.icebergRewriteManifests(
-                    null, null, null, null, null, "0 0 4 * * ?", null, null, opts, null)
-                .validate());
+            MaintenanceExecutablePolicyValidator.validate(
+                Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS,
+                PolicyContents.icebergRewriteManifests(
+                    null, null, null, null, null, "0 0 4 * * ?", null, null, opts, null)));
     Assertions.assertDoesNotThrow(
         () ->
-            PolicyContents.icebergOrphanFileRemoval(
+            MaintenanceExecutablePolicyValidator.validate(
+                Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
+                PolicyContents.icebergOrphanFileRemoval(
                     IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS,
                     null,
                     false,
@@ -145,8 +159,28 @@ public class TestExecutablePolicyJobOptionsValidation {
                     null,
                     null,
                     opts,
-                    null)
-                .validate());
+                    null)));
+  }
+
+  @Test
+  void orphanRejectsCommitTriggerBeforeJobOptions() {
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                MaintenanceExecutablePolicyValidator.validate(
+                    Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
+                    PolicyContents.icebergOrphanFileRemoval(
+                        IcebergOrphanFileRemovalContent.DEFAULT_OLDER_THAN_DAYS,
+                        null,
+                        false,
+                        null,
+                        true,
+                        null,
+                        null,
+                        null)));
+    Assertions.assertTrue(ex.getMessage().contains("commitTrigger"));
+    Assertions.assertFalse(ex.getMessage().contains("warehouse_location"));
   }
 
   @Test
@@ -155,7 +189,9 @@ public class TestExecutablePolicyJobOptionsValidation {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                PolicyContents.icebergOrphanFileRemoval(
+                MaintenanceExecutablePolicyValidator.validate(
+                    Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
+                    PolicyContents.icebergOrphanFileRemoval(
                         3L,
                         null,
                         false,
@@ -163,8 +199,7 @@ public class TestExecutablePolicyJobOptionsValidation {
                         null,
                         null,
                         ImmutableMap.of("type", "rest", "warehouse_location", "/tmp/w"),
-                        null)
-                    .validate());
+                        null)));
     Assertions.assertTrue(
         ex.getMessage().contains("catalog_uri") || ex.getMessage().contains("uri"));
   }
@@ -175,7 +210,9 @@ public class TestExecutablePolicyJobOptionsValidation {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                PolicyContents.icebergRewriteManifests(
+                MaintenanceExecutablePolicyValidator.validate(
+                    Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS,
+                    PolicyContents.icebergRewriteManifests(
                         null,
                         null,
                         null,
@@ -186,8 +223,7 @@ public class TestExecutablePolicyJobOptionsValidation {
                         null,
                         ImmutableMap.of(
                             "uri", "http://irc", "warehouse_location", "/tmp/iceberg-warehouse"),
-                        null)
-                    .validate());
+                        null)));
     Assertions.assertTrue(
         ex.getMessage().contains("catalog_type") || ex.getMessage().contains("'type'"));
   }

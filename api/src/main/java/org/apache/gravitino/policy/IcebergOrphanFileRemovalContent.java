@@ -145,11 +145,10 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
 
   @Override
   public void validate() {
-    // Reject commitTrigger before shared jobOptions checks so the type-specific message wins.
+    super.validate();
     Preconditions.checkArgument(
         !Boolean.TRUE.equals(executionSpec().commitTrigger()),
         "commitTrigger is not allowed for orphan file removal");
-    super.validate();
     validateOlderThanDays(olderThanDays);
     Preconditions.checkArgument(
         location == null || StringUtils.isNotBlank(location), "location must not be blank");
