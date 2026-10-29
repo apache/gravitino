@@ -440,10 +440,10 @@ enough. The rule is governance model, not object category.
 
 ## Task Breakdown
 
-Each item below is one issue and one pull request. Issues are opened as the work starts rather than up
-front, as the Domain epic does, so this list is the plan and not a status board. The phases are ordered
-by dependency rather than by value; Phase 1a is the smallest slice that can be reviewed and merged on
-its own.
+Tracked as an epic in #14309, one issue per item below. Issues are opened as the work starts rather than
+up front, as the Domain epic does, so this list is the plan and not a status board. The phases are
+ordered by dependency rather than by value; Phase 1a is the smallest slice that can be reviewed and
+merged on its own.
 
 ### Phase 0: Prerequisites
 
