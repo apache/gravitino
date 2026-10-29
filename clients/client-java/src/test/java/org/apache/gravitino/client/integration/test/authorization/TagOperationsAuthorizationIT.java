@@ -17,9 +17,9 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -86,7 +86,6 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createSchema(SCHEMA, "test", new HashMap<>());
     // try to load the schema as normal user, expect failure
     assertThrows(
-        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.",
         RuntimeException.class,
         () -> {
           normalUserClient
@@ -94,7 +93,8 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadCatalog(CATALOG)
               .asSchemas()
               .loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.");
     // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -108,11 +108,11 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
-        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata.{" + CATALOG + "." + SCHEMA + "}.");
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     tableCatalog.createTable(
         NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
@@ -132,11 +132,11 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.createTag("tag1", "tag1", Map.of());
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).createTag("tag2", "tag2", Map.of());
-        });
+        },
+        "Can not access metadata.");
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE),
@@ -150,11 +150,11 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testAlterTag() {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.alterTag("tag1", TagChange.setProperty("k1", "v1"));
-        });
+        },
+        "Can not access metadata.");
     gravitinoMetalakeLoadByNormalUser.alterTag("tag2", TagChange.setProperty("k1", "v1"));
   }
 
@@ -175,11 +175,11 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     gravitinoMetalakeLoadByNormalUser.getTag("tag2");
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.getTag("tag1");
-        });
+        },
+        "Can not access metadata.");
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.getTag("tag1");
     gravitinoMetalake.getTag("tag2");
@@ -193,7 +193,6 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     SupportsTags supportsTags = gravitinoMetalake.loadCatalog(CATALOG).supportsTags();
     supportsTags.associateTags(new String[] {"tag1"}, null);
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           normalUserClient
@@ -203,9 +202,9 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadTable(NameIdentifier.of(SCHEMA, "table1"))
               .supportsTags()
               .associateTags(new String[] {"tag1"}, null);
-        });
+        },
+        "Can not access metadata.");
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           normalUserClient
@@ -215,13 +214,13 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadTable(NameIdentifier.of(SCHEMA, "table1"))
               .supportsTags()
               .associateTags(new String[] {"tag2"}, null);
-        });
+        },
+        "Can not access metadata.");
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
         ImmutableList.of(Privileges.SelectTable.allow(), Privileges.UseSchema.allow()));
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           normalUserClient
@@ -231,7 +230,8 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadTable(NameIdentifier.of(SCHEMA, "table1"))
               .supportsTags()
               .associateTags(new String[] {"tag1"}, null);
-        });
+        },
+        "Can not access metadata.");
     normalUserClient
         .loadMetalake(METALAKE)
         .loadCatalog(CATALOG)
@@ -370,7 +370,6 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     Arrays.sort(objs);
     Assertions.assertArrayEquals(new String[] {"table1"}, objs);
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           Arrays.stream(
@@ -378,7 +377,8 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
               .map(MetadataObject::name)
               .toList()
               .toArray(new String[0]);
-        });
+        },
+        "Can not access metadata.");
     objs =
         Arrays.stream(
                 gravitinoMetalakeLoadByNormalUser.getTag("tag2").associatedObjects().objects())
@@ -498,11 +498,11 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testDropTag() {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
-        "Can not access metadata.",
         ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.deleteTag("tag1");
-        });
+        },
+        "Can not access metadata.");
     gravitinoMetalakeLoadByNormalUser.deleteTag("tag2");
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.deleteTag("tag1");

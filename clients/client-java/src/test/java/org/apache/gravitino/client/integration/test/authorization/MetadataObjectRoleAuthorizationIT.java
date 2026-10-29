@@ -17,7 +17,7 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
