@@ -137,13 +137,14 @@ public class DomainEntity implements Entity, Auditable, HasIdentifier {
     this.status = status;
     this.parent = parent;
     this.backingTagId = backingTagId;
-    this.backingTagName = backingTagName;
+    // The name is read from the bound tag, so it follows the ID: clearing the ID unbinds the tag.
+    this.backingTagName = backingTagId == null ? null : backingTagName;
     this.backingTagValue = backingTagValue;
     this.auditInfo = auditInfo;
     validate();
     Preconditions.checkArgument(
-        backingTagId != null || (backingTagName == null && backingTagValue == null),
-        "The backing tag name and value of domain %s need a backing tag ID",
+        backingTagId != null || backingTagValue == null,
+        "The backing tag value of domain %s needs a backing tag ID",
         name);
     // A tag bound without a value is stored as NULL, so the value is never blank.
     Preconditions.checkArgument(

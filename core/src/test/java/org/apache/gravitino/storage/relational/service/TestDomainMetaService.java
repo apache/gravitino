@@ -104,6 +104,8 @@ public class TestDomainMetaService extends TestJDBCBackend {
             Lists.newArrayList(
                 finance.nameIdentifier(), NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing")));
     Assertions.assertEquals(Lists.newArrayList(finance), batch);
+    Assertions.assertTrue(
+        domainMetaService.batchGetDomainByIdentifier(Lists.newArrayList()).isEmpty());
 
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
@@ -504,11 +506,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
         trading.nameIdentifier(),
         entity ->
             ((DomainEntity) entity)
-                .toBuilder()
-                    .withBackingTagId(null)
-                    .withBackingTagName(null)
-                    .withBackingTagValue(null)
-                    .build());
+                .toBuilder().withBackingTagId(null).withBackingTagValue(null).build());
     DomainEntity unbound = domainMetaService.getDomainByIdentifier(trading.nameIdentifier());
     Assertions.assertFalse(unbound.backingTag().isPresent());
     Assertions.assertNull(unbound.backingTagId());

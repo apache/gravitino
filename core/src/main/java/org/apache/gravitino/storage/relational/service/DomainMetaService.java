@@ -23,6 +23,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -105,6 +106,9 @@ public class DomainMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchGetDomainByIdentifier")
   public List<DomainEntity> batchGetDomainByIdentifier(List<NameIdentifier> identifiers) {
+    if (identifiers.isEmpty()) {
+      return Collections.emptyList();
+    }
     NameIdentifier firstIdent = identifiers.get(0);
     String metalakeName = firstIdent.namespace().level(0);
     List<String> domainNames =

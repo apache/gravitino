@@ -41,6 +41,11 @@ import org.apache.gravitino.meta.DomainEntity;
  * The persistent object of a row in {@code domain_meta}. The backing tag name is not a column of
  * the row: reads that join the live tag fill it, and it is null when the domain has no backing tag
  * or the tag is deleted.
+ *
+ * <p>A tag bound without a value has a NULL {@code backing_tag_value}, while {@code
+ * tag_relation_meta.tag_value} stores the empty string for an assignment without a value. A lookup
+ * from tag assignments to the domains they back must map the empty string to NULL instead of
+ * comparing the two columns directly.
  */
 @Getter
 @Accessors(fluent = true)
@@ -130,8 +135,8 @@ public class DomainPO {
   }
 
   /**
-   * Converts a domain persistent object to a domain entity. The parent and the inherited source are
-   * not stored in the domain row, so they are not set.
+   * Converts a domain persistent object to a domain entity. The parent is not stored in the domain
+   * row, so it is not set. The backing tag name is set only when the read joined the live tag.
    *
    * @param domainPO The domain persistent object.
    * @param namespace The namespace of the domain.

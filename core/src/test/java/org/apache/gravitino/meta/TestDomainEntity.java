@@ -92,10 +92,14 @@ public class TestDomainEntity {
     Assertions.assertEquals(100L, deletedTag.backingTagId());
     Assertions.assertEquals("trading", deletedTag.backingTagValue());
 
-    // A tag name or value needs the tag ID.
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> domain.toBuilder().withBackingTagName("Finance").build());
+    // Clearing the tag ID unbinds the tag, without clearing the name read from the tag.
+    DomainEntity unbound = valueless.toBuilder().withBackingTagId(null).build();
+    Assertions.assertFalse(unbound.backingTag().isPresent());
+    Assertions.assertEquals(domain, unbound);
+    Assertions.assertFalse(
+        domain.toBuilder().withBackingTagName("Finance").build().backingTag().isPresent());
+
+    // A tag value needs the tag ID.
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> domain.toBuilder().withBackingTagValue("trading").build());
