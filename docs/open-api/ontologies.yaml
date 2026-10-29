@@ -212,14 +212,7 @@ paths:
       operationId: deleteOntology
       responses:
         "200":
-          description: Returns whether an ontology was deleted
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/DropResponse"
-              examples:
-                DropResponse:
-                  $ref: "./openapi.yaml#/components/examples/DropResponse"
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
         "404":
           description: Not Found - The specified metalake does not exist
           content:
@@ -322,17 +315,18 @@ components:
         definition:
           $ref: "#/components/schemas/OntologyDefinition"
         audit:
-          $ref: "./openapi.yaml#/components/schemas/AuditInfo"
+          $ref: "./openapi.yaml#/components/schemas/Audit"
       additionalProperties: false
 
     OntologyStatus:
       type: string
       description: >-
-        The lifecycle status. A DRAFT ontology is still being edited and is not meant to be used for
-        query planning; a PUBLISHED ontology is stable and can be.
+        The lifecycle status. A draft ontology is still being edited and is not meant to be used for
+        query planning; a published ontology is stable and can be. Enum values are written in lower
+        case and read case-insensitively.
       enum:
-        - DRAFT
-        - PUBLISHED
+        - draft
+        - published
 
     OntologyDefinition:
       type: object
@@ -419,10 +413,10 @@ components:
       type: string
       description: >-
         Whether the concept is an entity type that has instances, or a value type used as an
-        attribute value.
+        attribute value. Enum values are written in lower case and read case-insensitively.
       enum:
-        - ENTITY_TYPE
-        - VALUE_TYPE
+        - entity_type
+        - value_type
 
     OntologyRelationship:
       type: object
@@ -469,10 +463,12 @@ components:
 
     Multiplicity:
       type: string
-      description: The cardinality of a relationship
+      description: >-
+        The cardinality of a relationship. Enum values are written in lower case and read
+        case-insensitively.
       enum:
-        - MANY_TO_ONE
-        - ONE_TO_ONE
+        - many_to_one
+        - one_to_one
 
     OntologyRole:
       type: object
@@ -649,7 +645,7 @@ components:
           "concepts": [
             {
               "concept": "Account",
-              "type": "ENTITY_TYPE"
+              "type": "entity_type"
             }
           ]
         }
@@ -672,7 +668,7 @@ components:
           $ref: "#/components/schemas/OntologyStatus"
       example: {
         "@type": "updateStatus",
-        "status": "PUBLISHED"
+        "status": "published"
       }
 
   examples:
@@ -693,14 +689,14 @@ components:
             "name": "Finance",
             "comment": "Certified finance vocabulary",
             "properties": {"ossie-version": "0.2.0.dev0"},
-            "status": "PUBLISHED",
+            "status": "published",
             "definition": {
               "aiContext": "Certified vocabulary for finance reporting",
               "requires": ["Account IS NOT NULL"],
               "concepts": [
                 {
                   "concept": "Account",
-                  "type": "ENTITY_TYPE",
+                  "type": "entity_type",
                   "description": "A financial account",
                   "relationships": [
                     {
@@ -708,7 +704,7 @@ components:
                       "description": "An account holds a balance",
                       "verbalizes": ["an account holds a balance"],
                       "roles": [{"concept": "Balance"}],
-                      "multiplicity": "MANY_TO_ONE",
+                      "multiplicity": "many_to_one",
                       "iri": "ex:holds"
                     }
                   ],
@@ -716,7 +712,7 @@ components:
                 },
                 {
                   "concept": "Balance",
-                  "type": "VALUE_TYPE",
+                  "type": "value_type",
                   "description": "A monetary amount",
                   "iri": "ex:Balance"
                 }
@@ -745,7 +741,7 @@ components:
           "concepts": [
             {
               "concept": "Account",
-              "type": "ENTITY_TYPE",
+              "type": "entity_type",
               "description": "A financial account",
               "relationships": [
                 {
@@ -753,7 +749,7 @@ components:
                   "description": "An account holds a balance",
                   "verbalizes": ["an account holds a balance"],
                   "roles": [{"concept": "Balance"}],
-                  "multiplicity": "MANY_TO_ONE",
+                  "multiplicity": "many_to_one",
                   "iri": "ex:holds"
                 }
               ],
@@ -761,7 +757,7 @@ components:
             },
             {
               "concept": "Balance",
-              "type": "VALUE_TYPE",
+              "type": "value_type",
               "description": "A monetary amount",
               "iri": "ex:Balance"
             }
@@ -778,12 +774,12 @@ components:
           "name": "Finance",
           "comment": "Certified finance vocabulary",
           "properties": {"ossie-version": "0.2.0.dev0"},
-          "status": "DRAFT",
+          "status": "draft",
           "definition": {
             "concepts": [
               {
                 "concept": "Account",
-                "type": "ENTITY_TYPE",
+                "type": "entity_type",
                 "iri": "ex:Account"
               }
             ],
@@ -803,7 +799,7 @@ components:
       value: {
         "updates": [
           {"@type": "updateComment", "newComment": "Certified finance vocabulary"},
-          {"@type": "updateStatus", "status": "PUBLISHED"}
+          {"@type": "updateStatus", "status": "published"}
         ]
       }
 

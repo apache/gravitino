@@ -87,9 +87,10 @@ An ontology name is unique per metalake, case-insensitively. A name that contain
 must be URL-encoded in a path. The examples below use the metalake `example` and the ontology name
 `finance`.
 
-The native JSON uses camelCase field names and the Java enum constants (`ENTITY_TYPE`,
-`MANY_TO_ONE`). An Apache Ossie document uses snake_case and the specification spellings
-(`EntityType`, `ManyToOne`); see
+The native JSON uses camelCase field names and lower-case enum values (`entity_type`,
+`many_to_one`); the server reads them case-insensitively, so `ENTITY_TYPE` is accepted on input but
+`entity_type` is what comes back. An Apache Ossie document uses snake_case and the specification
+spellings (`EntityType`, `ManyToOne`) instead; see
 [Importing and exporting Ossie documents](#importing-and-exporting-ossie-documents).
 
 ### Create an ontology
@@ -115,13 +116,13 @@ curl -X POST http://localhost:8090/api/metalakes/example/ontologies \
       "concepts": [
         {
           "concept": "Customer",
-          "type": "ENTITY_TYPE",
+          "type": "entity_type",
           "description": "A party that holds one or more accounts",
           "iri": "fin:Customer"
         },
         {
           "concept": "Account",
-          "type": "ENTITY_TYPE",
+          "type": "entity_type",
           "description": "An account held by a customer",
           "identifyBy": ["account_id"],
           "iri": "fin:Account",
@@ -131,14 +132,14 @@ curl -X POST http://localhost:8090/api/metalakes/example/ontologies \
               "description": "The customer that owns the account",
               "verbalizes": ["an account is held by a customer"],
               "roles": [{"concept": "Customer"}],
-              "multiplicity": "MANY_TO_ONE",
+              "multiplicity": "many_to_one",
               "iri": "fin:heldBy"
             }
           ]
         },
         {
           "concept": "Balance",
-          "type": "VALUE_TYPE",
+          "type": "value_type",
           "description": "The amount on an account at a point in time",
           "iri": "fin:Balance"
         }
@@ -158,7 +159,7 @@ The response repeats the definition and adds the assigned status and audit infor
     "properties": {
       "ossie-version": "0.2.0.dev0"
     },
-    "status": "DRAFT",
+    "status": "draft",
     "definition": {
       "aiContext": "Use this vocabulary for questions about accounts, balances, and customers.",
       "prefixes": {
@@ -167,13 +168,13 @@ The response repeats the definition and adds the assigned status and audit infor
       "concepts": [
         {
           "concept": "Customer",
-          "type": "ENTITY_TYPE",
+          "type": "entity_type",
           "description": "A party that holds one or more accounts",
           "iri": "fin:Customer"
         },
         {
           "concept": "Account",
-          "type": "ENTITY_TYPE",
+          "type": "entity_type",
           "description": "An account held by a customer",
           "identifyBy": ["account_id"],
           "iri": "fin:Account",
@@ -183,14 +184,14 @@ The response repeats the definition and adds the assigned status and audit infor
               "description": "The customer that owns the account",
               "verbalizes": ["an account is held by a customer"],
               "roles": [{"concept": "Customer"}],
-              "multiplicity": "MANY_TO_ONE",
+              "multiplicity": "many_to_one",
               "iri": "fin:heldBy"
             }
           ]
         },
         {
           "concept": "Balance",
-          "type": "VALUE_TYPE",
+          "type": "value_type",
           "description": "The amount on an account at a point in time",
           "iri": "fin:Balance"
         }
@@ -211,8 +212,10 @@ written against. An explicitly supplied non-blank value is preserved.
 
 ### List ontologies
 
-`GET /api/metalakes/{metalake}/ontologies` returns the names visible to the caller. Drafts the caller
-cannot manage are omitted.
+`GET /api/metalakes/{metalake}/ontologies` returns the ontology names of the metalake. The current
+release does not hide drafts from readers, so every caller with access to the metalake sees every
+ontology; filtering drafts by privilege arrives with the `USE_ONTOLOGY` / `MANAGE_ONTOLOGY`
+privileges described under [Authorization](#authorization).
 
 ```bash
 curl -H "Accept: application/vnd.gravitino.v1+json" \
@@ -270,7 +273,7 @@ curl -X PUT http://localhost:8090/api/metalakes/example/ontologies/finance \
 | `setProperty` | `{"@type": "setProperty", "property": "owner", "value": "finance-team"}` | Sets a property, replacing its value if it exists. |
 | `removeProperty` | `{"@type": "removeProperty", "property": "owner"}` | Removes a property. An absent property is not an error. |
 | `replaceDefinition` | `{"@type": "replaceDefinition", "definition": { ... }}` | Replaces the whole definition; name, comment, status, and properties are unchanged. |
-| `updateStatus` | `{"@type": "updateStatus", "status": "PUBLISHED"}` | Publishes or unpublishes the ontology. Use `"DRAFT"` to unpublish. |
+| `updateStatus` | `{"@type": "updateStatus", "status": "published"}` | Publishes or unpublishes the ontology. Use `"draft"` to unpublish. |
 
 Publishing is an `updateStatus` to `PUBLISHED`:
 
@@ -278,7 +281,7 @@ Publishing is an `updateStatus` to `PUBLISHED`:
 curl -X PUT http://localhost:8090/api/metalakes/example/ontologies/finance \
   -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -d '{"updates": [{"@type": "updateStatus", "status": "PUBLISHED"}]}'
+  -d '{"updates": [{"@type": "updateStatus", "status": "published"}]}'
 ```
 
 A replacement definition is validated the same way as a created one: unknown fields, dangling
@@ -395,3 +398,7 @@ These privileges are not yet part of the authorization model. `Privilege` declar
 and an ontology is not yet a securable object type, so an ontology-specific grant cannot be made or
 enforced. Treat the names above as the intended contract rather than as configuration available
 today.
+
+What is enforced today is metalake-scoped. With authorization enabled, reading an ontology requires
+the same metalake access as any other metalake-level metadata read, and creating, altering or
+deleting one requires metalake ownership. With authorization disabled, every caller may do both.
