@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -218,42 +219,41 @@ public class MysqlTableOperations extends JdbcTableOperations {
       tableBuilder.withComment(
           tableBuilder.properties().getOrDefault(COMMENT, tableBuilder.comment()));
     }
-    correctLossyTypeColumns(connection, databaseName, tableName, tableBuilder);
+    correctColumnTypes(connection, databaseName, tableName, tableBuilder);
   }
 
   /**
-   * VARBINARY/ENUM/SET fall back to a bare Types.ExternalType, BIT/BINARY of any width both
-   * collapse to plain Types.BinaryType, and the fractional seconds precision of TIME/DATETIME/
-   * TIMESTAMP is unknown when the driver predates 8.0.16, because JdbcTypeConverter only sees
-   * TYPE_NAME/COLUMN_SIZE. If any column needs it, this queries information_schema.columns once for
-   * the whole table to recover the full declaration (e.g. "enum('a','b','c')", "binary(16)",
-   * "datetime(6)") and fixes those columns.
+   * Corrects metadata that is not available through DatabaseMetaData. This includes character set
+   * and collation for character types, full declarations for VARBINARY/ENUM/SET and wide BINARY
+   * columns, and fractional seconds precision when an older driver does not report it.
    */
-  private static void correctLossyTypeColumns(
+  private static void correctColumnTypes(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
     Column[] columns = tableBuilder.columns();
     if (ArrayUtils.isEmpty(columns)
-        || Arrays.stream(columns).noneMatch(MysqlTableOperations::isLossyTypeCandidate)) {
+        || Arrays.stream(columns).noneMatch(MysqlTableOperations::needsColumnTypeMetadata)) {
       return;
     }
 
-    Map<String, String> fullTypesByColumn =
-        fetchColumnFullTypes(connection, databaseName, tableName);
+    Map<String, MysqlColumnTypeMetadata> metadataByColumn =
+        fetchColumnTypeMetadata(connection, databaseName, tableName);
     JdbcColumn[] correctedColumns = new JdbcColumn[columns.length];
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = (JdbcColumn) columns[i];
       correctedColumns[i] =
-          isLossyTypeCandidate(column)
-              ? correctColumnType(column, fullTypesByColumn.get(column.name()))
+          needsColumnTypeMetadata(column)
+              ? correctColumnType(column, metadataByColumn.get(column.name()))
               : column;
     }
     tableBuilder.withColumns(correctedColumns);
   }
 
-  private static boolean isLossyTypeCandidate(Column column) {
+  private static boolean needsColumnTypeMetadata(Column column) {
     Type type = column.dataType();
-    if (type instanceof Types.BinaryType || hasUnknownDatetimePrecision(type)) {
+    if (type instanceof Type.CharacterType
+        || type instanceof Types.BinaryType
+        || hasUnknownDatetimePrecision(type)) {
       return true;
     }
     if (type instanceof Types.ExternalType) {
@@ -265,11 +265,21 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return false;
   }
 
-  private static JdbcColumn correctColumnType(JdbcColumn column, String fullType) {
-    if (StringUtils.isEmpty(fullType)) {
+  private static JdbcColumn correctColumnType(
+      JdbcColumn column, @Nullable MysqlColumnTypeMetadata metadata) {
+    if (metadata == null) {
       return column;
     }
     Type type = column.dataType();
+    if (type instanceof Type.CharacterType) {
+      return copyWithType(
+          column,
+          withCharacterMetadata((Type.CharacterType) type, metadata.charset, metadata.collation));
+    }
+    String fullType = metadata.fullType;
+    if (StringUtils.isEmpty(fullType)) {
+      return column;
+    }
     if (hasUnknownDatetimePrecision(type)) {
       // MySQL leaves the precision out of the declaration when it is 0, e.g. "datetime".
       return copyWithType(column, withDatetimePrecision(type, parseLength(fullType, 0)));
@@ -279,6 +289,20 @@ public class MysqlTableOperations extends JdbcTableOperations {
       return column;
     }
     return copyWithType(column, Types.ExternalType.of(fullType));
+  }
+
+  private static Type.CharacterType withCharacterMetadata(
+      Type.CharacterType type, @Nullable String charset, @Nullable String collation) {
+    switch (type.name()) {
+      case STRING:
+        return Types.StringType.of(charset, collation);
+      case VARCHAR:
+        return Types.VarCharType.of(((Types.VarCharType) type).length(), charset, collation);
+      case FIXEDCHAR:
+        return Types.FixedCharType.of(((Types.FixedCharType) type).length(), charset, collation);
+      default:
+        throw new IllegalArgumentException("Unsupported character type: " + type.name());
+    }
   }
 
   private static boolean hasUnknownDatetimePrecision(Type type) {
@@ -317,16 +341,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .build();
   }
 
-  private static Map<String, String> fetchColumnFullTypes(
+  private static Map<String, MysqlColumnTypeMetadata> fetchColumnTypeMetadata(
       Connection connection, String databaseName, String tableName) throws SQLException {
     // TABLE_SCHEMA/TABLE_NAME comparisons in information_schema use a case-insensitive collation.
     // TABLE_NAME is re-checked exactly, matching the pattern used in getColumnBuilder. The rows are
     // grouped by their exact TABLE_SCHEMA: with lower_case_table_names=0 both "a_b" and "A_B" may
     // exist and only the exact one is wanted, while with lower_case_table_names=1 the stored name
     // may differ in case from the requested one and is then the only candidate.
-    Map<String, Map<String, String>> columnTypesBySchema = new HashMap<>();
+    Map<String, Map<String, MysqlColumnTypeMetadata>> columnTypesBySchema = new HashMap<>();
     String query =
-        "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.columns "
+        "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, CHARACTER_SET_NAME, "
+            + "COLLATION_NAME FROM information_schema.columns "
             + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
     try (PreparedStatement statement = connection.prepareStatement(query)) {
       statement.setString(1, databaseName);
@@ -336,12 +361,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
           if (Objects.equals(resultSet.getString("TABLE_NAME"), tableName)) {
             columnTypesBySchema
                 .computeIfAbsent(resultSet.getString("TABLE_SCHEMA"), schema -> new HashMap<>())
-                .put(resultSet.getString("COLUMN_NAME"), resultSet.getString("COLUMN_TYPE"));
+                .put(
+                    resultSet.getString("COLUMN_NAME"),
+                    new MysqlColumnTypeMetadata(
+                        resultSet.getString("COLUMN_TYPE"),
+                        resultSet.getString("CHARACTER_SET_NAME"),
+                        resultSet.getString("COLLATION_NAME")));
           }
         }
       }
     }
-    Map<String, String> exactSchemaTypes = columnTypesBySchema.get(databaseName);
+    Map<String, MysqlColumnTypeMetadata> exactSchemaTypes = columnTypesBySchema.get(databaseName);
     if (exactSchemaTypes != null) {
       return exactSchemaTypes;
     }
@@ -357,6 +387,19 @@ public class MysqlTableOperations extends JdbcTableOperations {
           tableName);
     }
     return Collections.emptyMap();
+  }
+
+  private static class MysqlColumnTypeMetadata {
+    private final String fullType;
+    @Nullable private final String charset;
+    @Nullable private final String collation;
+
+    private MysqlColumnTypeMetadata(
+        String fullType, @Nullable String charset, @Nullable String collation) {
+      this.fullType = fullType;
+      this.charset = charset;
+      this.collation = collation;
+    }
   }
 
   @Override

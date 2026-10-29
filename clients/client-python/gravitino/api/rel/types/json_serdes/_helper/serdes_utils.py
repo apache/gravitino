@@ -20,7 +20,7 @@ from typing import Any, Dict, Union, overload
 
 from dataclasses_json.core import Json
 
-from gravitino.api.rel.types.type import Name, Type
+from gravitino.api.rel.types.type import CharacterType, Name, Type
 from gravitino.api.rel.types.types import Types
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.serdes import SerdesUtilsBase
@@ -39,6 +39,11 @@ class SerdesUtils(SerdesUtilsBase):
         """
 
         type_name = data_type.name()
+        if isinstance(data_type, CharacterType) and (
+            data_type.charset() is not None or data_type.collation() is not None
+        ):
+            return cls.write_character_type(data_type)
+
         if type_name in cls.PRIMITIVE_AND_NULL_TYPES:
             return data_type.simple_string()
 
@@ -61,6 +66,24 @@ class SerdesUtils(SerdesUtilsBase):
             return cls.write_unparsed_type(data_type)
 
         return cls.write_unparsed_type(data_type.simple_string())
+
+    @classmethod
+    def write_character_type(cls, character_type: CharacterType) -> Dict[str, Any]:
+        """Writes a character type that has charset or collation metadata."""
+        if character_type.name() is Name.STRING:
+            character_data = {cls.TYPE: "string"}
+        elif character_type.name() is Name.FIXEDCHAR:
+            character_data = {cls.TYPE: "char", cls.LENGTH: character_type.length()}
+        elif character_type.name() is Name.VARCHAR:
+            character_data = {cls.TYPE: "varchar", cls.LENGTH: character_type.length()}
+        else:
+            raise ValueError(f"Unsupported character type: {character_type.name()}")
+
+        if character_type.charset() is not None:
+            character_data[cls.CHARSET] = character_type.charset()
+        if character_type.collation() is not None:
+            character_data[cls.COLLATION] = character_type.collation()
+        return character_data
 
     @classmethod
     def write_struct_type(cls, struct_type: Types.StructType) -> Dict[str, Any]:
@@ -169,12 +192,33 @@ class SerdesUtils(SerdesUtilsBase):
                 return cls.read_map_type(type_data)
             if cls.UNION == type_str:
                 return cls.read_union_type(type_data)
+            if type_str in ("string", "char", "varchar"):
+                return cls.read_character_type(type_data)
             if cls.UNPARSED == type_str:
                 return cls.read_unparsed_type(type_data)
             if cls.EXTERNAL == type_str:
                 return cls.read_external_type(type_data)
 
         return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
+
+    @classmethod
+    def read_character_type(cls, type_data: Dict[str, Any]) -> CharacterType:
+        """Reads a character type with optional charset and collation metadata."""
+        type_str = type_data[cls.TYPE]
+        charset = type_data.get(cls.CHARSET)
+        collation = type_data.get(cls.COLLATION)
+        if type_str == "string":
+            return Types.StringType.of(charset, collation)
+
+        Precondition.check_argument(
+            cls.LENGTH in type_data,
+            f"Cannot parse {type_str} type from missing length: {type_data}",
+        )
+        if type_str == "char":
+            return Types.FixedCharType.of(type_data[cls.LENGTH], charset, collation)
+        if type_str == "varchar":
+            return Types.VarCharType.of(type_data[cls.LENGTH], charset, collation)
+        raise ValueError(f"Unsupported character type: {type_str}")
 
     @classmethod
     def from_primitive_type_string(  # pylint: disable=too-many-return-statements

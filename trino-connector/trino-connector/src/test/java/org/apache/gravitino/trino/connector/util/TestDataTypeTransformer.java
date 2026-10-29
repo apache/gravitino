@@ -199,6 +199,15 @@ public class TestDataTypeTransformer {
         dataTypeTransformer.getTrinoType(Types.VarCharType.of(10)),
         VarcharType.createVarcharType(10));
     Assertions.assertEquals(
+        dataTypeTransformer.getTrinoType(Types.FixedCharType.of(10, "utf8mb4", "utf8mb4_bin")),
+        CharType.createCharType(10));
+    Assertions.assertEquals(
+        dataTypeTransformer.getTrinoType(Types.VarCharType.of(10, "utf8mb4", "utf8mb4_bin")),
+        VarcharType.createVarcharType(10));
+    Assertions.assertEquals(
+        dataTypeTransformer.getTrinoType(Types.StringType.of("utf8mb4", "utf8mb4_bin")),
+        VarcharType.VARCHAR);
+    Assertions.assertEquals(
         dataTypeTransformer.getTrinoType(Types.VarCharType.of(Integer.MAX_VALUE - 1)),
         VarcharType.createVarcharType(VarcharType.MAX_LENGTH));
 

@@ -50,6 +50,9 @@ class SerdesUtilsBase:
     UNPARSED_TYPE: Final[str] = "unparsedType"
     EXTERNAL: Final[str] = "external"
     CATALOG_STRING: Final[str] = "catalogString"
+    LENGTH: Final[str] = "length"
+    CHARSET: Final[str] = "charset"
+    COLLATION: Final[str] = "collation"
 
     PARTITION_TYPE: Final[str] = "type"
     PARTITION_NAME: Final[str] = "name"

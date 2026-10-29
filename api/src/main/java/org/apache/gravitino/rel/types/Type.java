@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.rel.types;
 
+import java.util.Objects;
+import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 
 /** An interface representing all data types supported by Apache Gravitino. */
@@ -120,6 +123,64 @@ public interface Type {
 
   /** The base type of all primitive types. */
   abstract class PrimitiveType implements Type {}
+
+  /** The base type of all character types. */
+  abstract class CharacterType extends PrimitiveType {
+    @Nullable private final String charset;
+    @Nullable private final String collation;
+
+    /**
+     * Creates a character type with optional character set and collation metadata.
+     *
+     * @param charset The character set, or null if it is not specified.
+     * @param collation The collation, or null if it is not specified.
+     */
+    protected CharacterType(@Nullable String charset, @Nullable String collation) {
+      validateMetadata(charset, "charset");
+      validateMetadata(collation, "collation");
+      this.charset = charset;
+      this.collation = collation;
+    }
+
+    /**
+     * @return The optional character set associated with this type.
+     */
+    public Optional<String> charset() {
+      return Optional.ofNullable(charset);
+    }
+
+    /**
+     * @return The optional collation associated with this type.
+     */
+    public Optional<String> collation() {
+      return Optional.ofNullable(collation);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof CharacterType)) {
+        return false;
+      }
+      CharacterType that = (CharacterType) o;
+      return name() == that.name()
+          && Objects.equals(charset, that.charset)
+          && Objects.equals(collation, that.collation);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name(), charset, collation);
+    }
+
+    private static void validateMetadata(@Nullable String value, String name) {
+      if (value != null && value.trim().isEmpty()) {
+        throw new IllegalArgumentException(name + " cannot be empty or blank");
+      }
+    }
+  }
 
   /** The base type of all numeric types. */
   abstract class NumericType extends PrimitiveType {}

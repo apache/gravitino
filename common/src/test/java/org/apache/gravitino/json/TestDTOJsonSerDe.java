@@ -229,6 +229,24 @@ public class TestDTOJsonSerDe {
     Assertions.assertEquals(column, deserColumn);
     Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
 
+    Type attributedType = Types.VarCharType.of(64, "utf8mb4", "utf8mb4_bin");
+    ColumnDTO attributedColumn =
+        ColumnDTO.builder()
+            .withName(name)
+            .withDataType(attributedType)
+            .withComment(comment)
+            .build();
+    String attributedJson = JsonUtils.objectMapper().writeValueAsString(attributedColumn);
+    ColumnDTO deserializedAttributedColumn =
+        JsonUtils.objectMapper().readValue(attributedJson, ColumnDTO.class);
+    Assertions.assertEquals(attributedColumn, deserializedAttributedColumn);
+    Assertions.assertEquals(
+        JsonUtils.objectMapper()
+            .readTree(
+                "{\"type\":\"varchar\",\"length\":64,\"charset\":\"utf8mb4\","
+                    + "\"collation\":\"utf8mb4_bin\"}"),
+        JsonUtils.objectMapper().readTree(attributedJson).get("type"));
+
     // test default nullable
     String json = "{\"name\":\"column\",\"type\":\"byte\",\"comment\":\"comment\"}";
     ColumnDTO deColumn = JsonUtils.objectMapper().readValue(json, ColumnDTO.class);

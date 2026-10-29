@@ -43,6 +43,9 @@ public class TestSparkJdbcTypeConverter {
   void testConvertVarCharTypeToSparkString() {
     Assertions.assertEquals(
         DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.VarCharType.of(10)));
+    Assertions.assertEquals(
+        DataTypes.StringType,
+        sparkJdbcTypeConverter.toSparkType(Types.VarCharType.of(10, "utf8mb4", "utf8mb4_bin")));
   }
 
   @Test
