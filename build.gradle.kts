@@ -512,7 +512,7 @@ allprojects {
         param.include("**/integration/test/**")
       }
 
-      val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
+      val dockerTest = isDockerTestEnabled(project)
       param.environment("dockerTest", dockerTest.toString())
       // Must stay inside doFirst: tasks such as :core's database lanes set this flag in their own
       // configuration action, which may run after this configureEach action registers.
@@ -556,6 +556,21 @@ nexusPublishing {
   }
 
   packageGroup.set("org.apache.gravitino")
+}
+
+// Returns whether Docker-based tests are enabled for the given project. Docker tests can be
+// disabled for specific projects with -PskipDockerTestsForProjects=:core,:other, for example
+// when CI runs those projects' Docker tests in a separate job.
+fun isDockerTestEnabled(project: Project): Boolean {
+  if (rootProject.extra["dockerTest"] != true) {
+    return false
+  }
+  val skippedProjects = (rootProject.findProperty("skipDockerTestsForProjects") as? String)
+    ?.split(",")
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() }
+    ?: emptyList()
+  return project.path !in skippedProjects
 }
 
 fun excludePackagesForSparkConnector(project: Project) {
@@ -984,6 +999,10 @@ subprojects {
       val initTest = project.extra.get("initTestParam") as (Test) -> Unit
       initTest(this)
     }
+
+    // Docker tests change which tests and backends run, so results with and without them must not
+    // be reused for each other through up-to-date checks or the build cache.
+    inputs.property("dockerTest", provider { isDockerTestEnabled(project) })
 
     val testTaskStartTimeMsKey = "testTaskStartTimeMs"
     doFirst {
@@ -1611,7 +1630,7 @@ gradle.projectsEvaluated {
   allprojects {
     val runsIntegrationTestsOnly = rootProject.hasProperty("skipTests")
     val hasDockerTests =
-      rootProject.extra["dockerTest"] == true && fileTree("src/test") {
+      isDockerTestEnabled(project) && fileTree("src/test") {
         include("**/*.java", "**/*.kt")
       }.any { it.readText().contains("gravitino-docker-test") }
 
