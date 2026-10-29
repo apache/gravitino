@@ -218,12 +218,32 @@ Two deliberate consequences of adopting it rather than defining a `Page` here:
 
 ### The term-to-concept bridge
 
-A `GlossaryTerm` may reference zero or more ontology concepts:
+A `GlossaryTerm` may reference zero or more ontology concepts. The reference is specified here as
+`TermConceptRef`, and the glossary design only points at it, because a reference to a concept is an
+ontology side relation: the term stores *which* concept it means, and only this design says what a
+concept is. It is the row in the data model above, with ids inside the store and names in the API:
 
-- the reference names the ontology, the concept, and the concept's `iri` when the document supplies one;
-- it never stores a position in the document, so reordering or re-versioning an ontology does not break
-  it;
-- the reverse lookup, concepts to terms, is the one an agent uses to find how people talk about a
+| Field | Meaning |
+| :--- | :--- |
+| `termName` | The term that says it means the concept; the reference is stored on the term side. |
+| `ontology` | The metalake-level ontology that declares the concept. |
+| `concept` | The concept name, unique inside one ontology version. |
+| `iri` | The concept IRI the document declared, copied for display; empty when the document had none. |
+
+- **Stored on the term side.** The reference list belongs to the term, so listing a term's concepts and
+  the reverse lookup both start from the term; a mapping never holds term references.
+- **Unique per term, ontology and concept.** Re-adding a reference that already exists is a no-op
+  rather than a duplicate, so a client can retry safely.
+- **No document position, no version.** The reference names a concept, not a place, so reordering the
+  document or publishing a new version of the ontology does not break it.
+- **Validated at write time.** Adding a reference requires the ontology to exist and be visible to the
+  caller, and the concept to be declared in the version the caller can read; a `DRAFT` ontology is
+  allowed only for a caller who can see it. The `iri` is copied from the document, never supplied by
+  the caller.
+- **A stale reference is reported, not cascaded.** If a later version drops the concept, the reference
+  stays and reads as unresolved, so a vocabulary edit cannot silently erase what a term says. Dropping
+  the whole ontology while references exist conflicts, as the access control section requires.
+- **The reverse lookup, concepts to terms, is the one an agent uses** to find how people talk about a
   concept.
 
 The two objects are complementary rather than redundant. A term is the human entry point; a concept is
@@ -276,7 +296,8 @@ planning works against a Semantic Model alone, exactly as #14308 specifies.
 
 `Ontology` follows Domain's two-state model rather than the glossary's three-state one. A vocabulary
 is either being drafted or it is published; `APPROVED` and `DEPRECATED` exist in the glossary to
-record review of a single term, and a whole vocabulary has no reviewer to record.
+record review of a single term, and a whole vocabulary has no reviewer to record. The glossary design
+records the same split for the same reason, so the two documents agree rather than differ by accident.
 
 | Status | Visible to | Set by | Delete |
 | :--- | :--- | :--- | :--- |
@@ -315,6 +336,14 @@ Three rules are part of the contract:
   mapping or a term reference points at fails with a conflict, in the shape of Domain's
   `NonEmptyDomainException`. Cascading would silently destroy a binding rather than surface the
   dependency.
+
+**Naming is shared with the other business-definition objects.** The glossary design proposes general
+names, `VIEW_DEFINITION` / `CREATE_DEFINITION` / `MANAGE_DEFINITIONS`, granted on the metalake and on a
+domain, and leaves the choice open against the Domain design's `MANAGE_DOMAIN` / `USE_DOMAIN`. This
+design keeps `MANAGE_ONTOLOGY` / `USE_ONTOLOGY` because Domain already ships that shape and an ontology
+is a container like a domain, but the family name is orthogonal to the governance shape: if the Domain
+design settles on the general `*_DEFINITION` names, an ontology should take the same names with the same
+meaning, and the object keeps one privilege pair either way.
 
 None of these privileges grants access to data. Reading an ontology never implies reading the tables a
 mapped model is built on.
@@ -402,18 +431,24 @@ and its bindings.
 
 ## Resolved Questions
 
-Three questions this design first raised are settled by the Domain precedent. Domain is landing on the
-`branch-domain-dev` integration branch rather than on `main` yet, but it is the project's first object
-with a lifecycle at all — `SemanticModel` has no status, only create, alter and drop — and an ontology
-should follow it rather than contradict it.
+Three of the questions this design first raised are settled by the Domain precedent, and a fourth by the
+glossary discussion. Domain is landing on the `branch-domain-dev` integration branch rather than on
+`main` yet, but it is the project's first object with a lifecycle at all — `SemanticModel` has no
+status, only create, alter and drop — and an ontology should follow it rather than contradict it.
 
 1. **Scope of `Ontology`.** Metalake, as argued here. A vocabulary describes a business, not a catalog,
    and Domain already establishes the metalake as the home for business-level objects.
 2. **Status vocabulary.** `DRAFT` / `PUBLISHED`, Domain's two states. The glossary's three states exist
    to record review of a single term; a whole vocabulary has no reviewer to record.
 3. **Privilege family.** `MANAGE_ONTOLOGY` / `USE_ONTOLOGY`, in the shape Domain establishes with
-   `MANAGE_DOMAIN` / `USE_DOMAIN`. The glossary's `DEFINITION` family is not implemented today — the
-   `Privilege` enum has no `*_DEFINITION` entry — so this design does not build on it.
+   `MANAGE_DOMAIN` / `USE_DOMAIN`. The `Privilege` enum has no `*_DEFINITION` entry today, so this
+   design builds on nothing unlanded; the glossary discussion proposes general `*_DEFINITION` names and
+   leaves the choice open against Domain's shape, and the access control section records how this design
+   follows that decision without changing its governance shape.
+4. **Owner of the term-to-concept link.** This document. A reference to an Ossie concept needs the
+   concept contract, which only this design defines, and the glossary design only carries the list on
+   the term resource. The glossary author agreed to defer it here rather than specify it twice, so
+   Phase 3 below lands after ontology and adds no second definition of a reference.
 
 The two privilege shapes used across these objects are not an inconsistency. A container that a few
 stewards maintain — a domain, a vocabulary — is governed coarsely by `MANAGE_*` / `USE_*`, because
@@ -429,13 +464,10 @@ enough. The rule is governance model, not object category.
 1. **Placement of `OntologyMapping`.** A metalake object, or a child of the Semantic Model it maps? The
    Ossie document embeds `semantic_model`, which argues for the child; reuse across models argues for the
    object.
-2. **Owner of the term-to-concept link.** Should `TermConceptRef` be specified here or in the glossary
-   design, so that only one document owns it? Landing the glossary first and adding the link there may
-   be cleaner than cross-referencing. Raised in #14239.
-3. **Stable identity of a concept.** A concept is identified by name, with an optional IRI. A rename
+2. **Stable identity of a concept.** A concept is identified by name, with an optional IRI. A rename
    breaks every reference. Should Gravitino mint an internal concept id, and how would it appear in the
    exported document?
-4. **Specification version.** `0.2.0.dev0` is pre-release. Does a stored ontology keep the version it was
+3. **Specification version.** `0.2.0.dev0` is pre-release. Does a stored ontology keep the version it was
    written against and get migrated on write, or is it pinned as Semantic Models are?
 
 ## Task Breakdown
