@@ -36,6 +36,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -295,6 +296,10 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteDomainMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    DomainRelMapper.class,
+                    mapper -> mapper.softDeleteDomainRelsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
             () ->
@@ -405,6 +410,10 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteDomainMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    DomainRelMapper.class,
+                    mapper -> mapper.softDeleteDomainRelsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
             () ->
@@ -449,6 +458,22 @@ public class MetalakeMetaService {
             SessionUtils.getWithoutCommit(
                 MetalakeMetaMapper.class,
                 mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), name));
+  }
+
+  /**
+   * Locks and validates a metalake exclusively, which serializes a write with every other write
+   * that locks the metalake in the current transaction.
+   */
+  void lockMetalakeExclusivelyForChildWrite(String name, Long metalakeId) {
+    OccWriteSupport.lockParentForChildWrite(
+        name,
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper -> mapper.selectMetalakeMetaByIdForUpdate(metalakeId)),
         null,
         current -> Objects.equals(current.getMetalakeName(), name));
   }

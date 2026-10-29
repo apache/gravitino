@@ -35,9 +35,11 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -76,7 +78,7 @@ public class DomainMetaService {
     List<DomainPO> domainPOs =
         SessionUtils.getWithoutCommit(
             DomainMetaMapper.class, mapper -> mapper.listDomainPOsByMetalake(metalakeName));
-    return DomainPO.fromDomainPOs(domainPOs, ns);
+    return fromDomainPOsWithParents(domainPOs, ns);
   }
 
   /**
@@ -92,7 +94,7 @@ public class DomainMetaService {
   public DomainEntity getDomainByIdentifier(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
     DomainPO domainPO = getDomainPOByMetalakeAndName(metalakeName, ident.name());
-    return DomainPO.fromDomainPO(domainPO, ident.namespace());
+    return fromDomainPOWithParent(domainPO, ident.namespace());
   }
 
   /**
@@ -118,7 +120,7 @@ public class DomainMetaService {
         SessionUtils.getWithoutCommit(
             DomainMetaMapper.class,
             mapper -> mapper.listDomainPOsByMetalakeAndDomainNames(metalakeName, domainNames));
-    return DomainPO.fromDomainPOs(domainPOs, firstIdent.namespace());
+    return fromDomainPOsWithParents(domainPOs, firstIdent.namespace());
   }
 
   /**
@@ -185,7 +187,8 @@ public class DomainMetaService {
    * changing the new domain; a later call with the name acts on the new domain.
    *
    * <p>The returned domain is read back in the same transaction, so its backing tag name comes from
-   * the tag it is now bound to rather than from the updater's entity.
+   * the tag it is now bound to rather than from the updater's entity. The parent cannot be changed
+   * by an update, an updater that changes it is rejected; {@link DomainRelService} changes it.
    *
    * @param identifier The domain identifier.
    * @param updater The function that returns the updated domain.
@@ -216,20 +219,24 @@ public class DomainMetaService {
             // name of its backing tag.
             DomainPO lockedDomainPO = mapper.selectDomainMetaById(observedDomainPO.domainId());
             DomainEntity oldDomainEntity =
-                DomainPO.fromDomainPO(lockedDomainPO, identifier.namespace());
+                fromDomainPOWithParent(lockedDomainPO, identifier.namespace());
             DomainEntity updatedDomainEntity = (DomainEntity) updater.apply((E) oldDomainEntity);
             Preconditions.checkArgument(
                 Objects.equals(oldDomainEntity.id(), updatedDomainEntity.id()),
                 "The updated domain entity id: %s must have the same id as the old entity id %s",
                 updatedDomainEntity.id(),
                 oldDomainEntity.id());
+            Preconditions.checkArgument(
+                Objects.equals(oldDomainEntity.parent(), updatedDomainEntity.parent()),
+                "The parent of domain %s cannot be changed by an update, use DomainRelService",
+                identifier);
 
             DomainPO newDomainPO = DomainPO.updateDomainPO(lockedDomainPO, updatedDomainEntity);
             updateDomainWithVersion(identifier, mapper, lockedDomainPO, newDomainPO);
             storedDomainPO[0] = mapper.selectDomainMetaById(lockedDomainPO.domainId());
           });
 
-      return DomainPO.fromDomainPO(storedDomainPO[0], identifier.namespace());
+      return fromDomainPOWithParent(storedDomainPO[0], identifier.namespace());
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.DOMAIN, identifier.toString());
       throw e;
@@ -237,11 +244,12 @@ public class DomainMetaService {
   }
 
   /**
-   * Deletes a domain, together with its owner and the privileges granted on it. The backing tag and
-   * its assignments are kept.
+   * Deletes a domain, together with its parent edge, its owner and the privileges granted on it.
+   * The backing tag and its assignments are kept. A domain with sub-domains is not deleted.
    *
    * @param identifier The domain identifier.
    * @return True if the domain is deleted, false if it does not exist.
+   * @throws NonEmptyEntityException If the domain has sub-domains.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -257,19 +265,32 @@ public class DomainMetaService {
   }
 
   /**
-   * Hard-deletes the domains soft-deleted before the given time.
+   * Hard-deletes the domains and the parent edges soft-deleted before the given time.
    *
-   * @param legacyTimeline The time before which soft-deleted domains are removed.
-   * @param limit The maximum number of domains to remove.
-   * @return The number of removed domains.
+   * @param legacyTimeline The time before which soft-deleted rows are removed.
+   * @param limit The maximum number of rows to remove from each table.
+   * @return The number of removed rows.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteDomainMetasByLegacyTimeline")
   public int deleteDomainMetasByLegacyTimeline(long legacyTimeline, int limit) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        DomainMetaMapper.class,
-        mapper -> mapper.deleteDomainMetasByLegacyTimeline(legacyTimeline, limit));
+    int[] domainDeletedCount = new int[] {0};
+    int[] domainRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            domainDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    DomainMetaMapper.class,
+                    mapper -> mapper.deleteDomainMetasByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            domainRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    DomainRelMapper.class,
+                    mapper -> mapper.deleteDomainRelsByLegacyTimeline(legacyTimeline, limit)));
+
+    return domainDeletedCount[0] + domainRelDeletedCount[0];
   }
 
   /**
@@ -311,15 +332,18 @@ public class DomainMetaService {
 
     // The metalake lock comes first. Dropping the metalake soft-deletes the privileges before the
     // domains, while this delete changes the domain row before its privileges; without the lock
-    // the two could deadlock on a domain with privileges. The domain row is locked next, and a row
-    // that is gone or renamed makes the delete report the domain as missing before any dependent
-    // row is touched. The version-checked delete keeps the version as a backstop. The cleanups that
-    // follow are blanket soft deletes for this domain ID, so their row counts carry no information
-    // and are not checked.
+    // the two could deadlock on a domain with privileges. The domain row is locked next, which also
+    // keeps a sub-domain from being attached while the sub-domain check runs. A row that is gone or
+    // renamed makes the delete report the domain as missing before any dependent row is touched.
+    // The version-checked delete keeps the version as a backstop. The cleanups that follow are
+    // blanket soft deletes for this domain ID, so their row counts carry no information and are not
+    // checked.
     try {
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForDomainWrite(identifier.namespace().level(0), domainPO.metalakeId()),
           () -> deleteDomainWithVersion(identifier, lockAndGetDomainPO(identifier, domainPO)),
+          () ->
+              DomainRelService.getInstance().deleteDomainRelsOfDeletedDomain(identifier, domainId),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -481,5 +505,19 @@ public class DomainMetaService {
           domainName);
     }
     return domainPO;
+  }
+
+  private DomainEntity fromDomainPOWithParent(DomainPO domainPO, Namespace namespace) {
+    return DomainPO.fromDomainPO(
+        domainPO,
+        namespace,
+        DomainRelService.getInstance().getParentDomainName(domainPO.domainId()).orElse(null));
+  }
+
+  private List<DomainEntity> fromDomainPOsWithParents(
+      List<DomainPO> domainPOs, Namespace namespace) {
+    List<Long> domainIds = domainPOs.stream().map(DomainPO::domainId).collect(Collectors.toList());
+    return DomainPO.fromDomainPOs(
+        domainPOs, namespace, DomainRelService.getInstance().batchGetParentDomainNames(domainIds));
   }
 }

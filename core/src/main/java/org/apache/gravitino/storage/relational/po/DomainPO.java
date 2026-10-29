@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -135,15 +136,30 @@ public class DomainPO {
   }
 
   /**
-   * Converts a domain persistent object to a domain entity. The parent is not stored in the domain
-   * row, so it is not set. The backing tag name is set only when the read joined the live tag.
+   * Converts a domain persistent object to a top-level domain entity. The parent is not stored in
+   * the domain row, so it is not set. The backing tag name is set only when the read joined the
+   * live tag.
    *
    * @param domainPO The domain persistent object.
    * @param namespace The namespace of the domain.
    * @return The domain entity.
    */
-  @SuppressWarnings("unchecked")
   public static DomainEntity fromDomainPO(DomainPO domainPO, Namespace namespace) {
+    return fromDomainPO(domainPO, namespace, null);
+  }
+
+  /**
+   * Converts a domain persistent object to a domain entity with the given parent. The parent is not
+   * stored in the domain row; it is read from the sub-domain relation.
+   *
+   * @param domainPO The domain persistent object.
+   * @param namespace The namespace of the domain.
+   * @param parentName The name of the parent domain, or null if the domain is top-level.
+   * @return The domain entity.
+   */
+  @SuppressWarnings("unchecked")
+  public static DomainEntity fromDomainPO(
+      DomainPO domainPO, Namespace namespace, @Nullable String parentName) {
     try {
       return DomainEntity.builder()
           .withId(domainPO.domainId())
@@ -151,6 +167,7 @@ public class DomainPO {
           .withNamespace(namespace)
           .withComment(domainPO.comment())
           .withStatus(Domain.Status.valueOf(domainPO.status()))
+          .withParent(parentName)
           .withBackingTagId(domainPO.backingTagId())
           .withBackingTagName(domainPO.backingTagName())
           .withBackingTagValue(domainPO.backingTagValue())
@@ -164,14 +181,19 @@ public class DomainPO {
   }
 
   /**
-   * Converts domain persistent objects to domain entities.
+   * Converts domain persistent objects to domain entities with their parents.
    *
    * @param domainPOs The domain persistent objects.
    * @param namespace The namespace of the domains.
+   * @param parentNames The name of the parent of each sub-domain, keyed by domain ID. Domains that
+   *     are not in the map are top-level.
    * @return The domain entities.
    */
-  public static List<DomainEntity> fromDomainPOs(List<DomainPO> domainPOs, Namespace namespace) {
-    return domainPOs.stream().map(po -> fromDomainPO(po, namespace)).collect(Collectors.toList());
+  public static List<DomainEntity> fromDomainPOs(
+      List<DomainPO> domainPOs, Namespace namespace, Map<Long, String> parentNames) {
+    return domainPOs.stream()
+        .map(po -> fromDomainPO(po, namespace, parentNames.get(po.domainId())))
+        .collect(Collectors.toList());
   }
 
   // Returns the built PO rather than the lombok builder: javadoc runs before lombok, so a

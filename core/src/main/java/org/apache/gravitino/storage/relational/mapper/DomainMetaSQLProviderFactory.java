@@ -56,7 +56,13 @@ public class DomainMetaSQLProviderFactory {
 
   static class DomainMetaMySQLProvider extends DomainMetaBaseSQLProvider {}
 
-  static class DomainMetaH2Provider extends DomainMetaBaseSQLProvider {}
+  static class DomainMetaH2Provider extends DomainMetaBaseSQLProvider {
+    @Override
+    public String selectDomainMetaByIdForShare(Long domainId) {
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock.
+      return selectDomainMetaByIdForUpdate(domainId);
+    }
+  }
 
   /** Delegates {@link DomainMetaBaseSQLProvider#listDomainPOsByMetalake}. */
   public static String listDomainPOsByMetalake(@Param("metalakeName") String metalakeName) {
@@ -91,6 +97,11 @@ public class DomainMetaSQLProviderFactory {
     return getProvider().selectDomainMetaByIdForUpdate(domainId);
   }
 
+  /** Delegates {@link DomainMetaBaseSQLProvider#selectDomainMetaByIdForShare}. */
+  public static String selectDomainMetaByIdForShare(@Param("domainId") Long domainId) {
+    return getProvider().selectDomainMetaByIdForShare(domainId);
+  }
+
   /** Delegates {@link DomainMetaBaseSQLProvider#listDomainPOsByDomainIds}. */
   public static String listDomainPOsByDomainIds(@Param("domainIds") List<Long> domainIds) {
     return getProvider().listDomainPOsByDomainIds(domainIds);
@@ -100,6 +111,11 @@ public class DomainMetaSQLProviderFactory {
   public static String listDomainPOsByMetalakeAndDomainNames(
       @Param("metalakeName") String metalakeName, @Param("domainNames") List<String> domainNames) {
     return getProvider().listDomainPOsByMetalakeAndDomainNames(metalakeName, domainNames);
+  }
+
+  /** Delegates {@link DomainMetaBaseSQLProvider#listDomainPOsByParentId}. */
+  public static String listDomainPOsByParentId(@Param("parentId") Long parentId) {
+    return getProvider().listDomainPOsByParentId(parentId);
   }
 
   /** Delegates {@link DomainMetaBaseSQLProvider#insertDomainMeta}. */

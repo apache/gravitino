@@ -87,6 +87,15 @@ public class TestDomainPO {
   }
 
   @Test
+  public void testConvertDomainPOWithParent() {
+    DomainEntity domain = newDomain(10L, "Trading", null, null);
+    DomainEntity converted =
+        DomainPO.fromDomainPO(DomainPO.initializeDomainPO(domain, 1L), NAMESPACE, "Finance");
+    Assertions.assertEquals("Finance", converted.parent().orElse(null));
+    Assertions.assertEquals(domain.toBuilder().withParent("Finance").build(), converted);
+  }
+
+  @Test
   public void testUpdateDomainPO() {
     DomainPO oldDomainPO =
         DomainPO.initializeDomainPO(newDomain(10L, "Finance", "comment", null), 1L);
@@ -116,8 +125,10 @@ public class TestDomainPO {
         Lists.newArrayList(
             DomainPO.initializeDomainPO(finance, 1L), DomainPO.initializeDomainPO(markets, 1L));
 
+    // Only sub-domains are in the parent map; the others are top-level.
     Assertions.assertEquals(
-        Lists.newArrayList(finance, markets), DomainPO.fromDomainPOs(domainPOs, NAMESPACE));
+        Lists.newArrayList(finance, markets.toBuilder().withParent("Finance").build()),
+        DomainPO.fromDomainPOs(domainPOs, NAMESPACE, ImmutableMap.of(11L, "Finance")));
   }
 
   @Test

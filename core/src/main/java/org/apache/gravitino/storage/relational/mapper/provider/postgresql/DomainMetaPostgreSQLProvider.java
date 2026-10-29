@@ -28,6 +28,11 @@ import org.apache.ibatis.annotations.Param;
 public class DomainMetaPostgreSQLProvider extends DomainMetaBaseSQLProvider {
 
   @Override
+  public String selectDomainMetaByIdForShare(@Param("domainId") Long domainId) {
+    return selectLockableDomainMetaById(domainId) + " FOR SHARE";
+  }
+
+  @Override
   public String softDeleteDomainMetaByIdAndVersion(
       @Param("domainId") Long domainId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "

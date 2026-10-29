@@ -117,6 +117,18 @@ public interface DomainMetaMapper {
   DomainPO selectDomainMetaByIdForUpdate(@Param("domainId") Long domainId);
 
   /**
+   * Selects an active domain by ID and locks it for shared access. The backing tag name is not
+   * read, so that no tag row is locked.
+   *
+   * @param domainId The domain ID.
+   * @return The locked domain, or null if it is not active.
+   */
+  @SelectProvider(
+      type = DomainMetaSQLProviderFactory.class,
+      method = "selectDomainMetaByIdForShare")
+  DomainPO selectDomainMetaByIdForShare(@Param("domainId") Long domainId);
+
+  /**
    * Lists the active domains with the given IDs, for name lookups. The backing tag name is not
    * read.
    *
@@ -138,6 +150,15 @@ public interface DomainMetaMapper {
       method = "listDomainPOsByMetalakeAndDomainNames")
   List<DomainPO> listDomainPOsByMetalakeAndDomainNames(
       @Param("metalakeName") String metalakeName, @Param("domainNames") List<String> domainNames);
+
+  /**
+   * Lists the active sub-domains of a domain.
+   *
+   * @param parentId The ID of the parent domain.
+   * @return The active sub-domains.
+   */
+  @SelectProvider(type = DomainMetaSQLProviderFactory.class, method = "listDomainPOsByParentId")
+  List<DomainPO> listDomainPOsByParentId(@Param("parentId") Long parentId);
 
   /**
    * Inserts a domain.

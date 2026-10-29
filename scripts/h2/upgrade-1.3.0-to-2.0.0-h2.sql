@@ -229,3 +229,18 @@ CREATE TABLE IF NOT EXISTS `domain_meta` (
     UNIQUE KEY `uk_mi_dn_del` (`metalake_id`, `domain_name`, `deleted_at`),
     KEY `domain_meta_idx_backing_tag` (`metalake_id`, `backing_tag_id`, `backing_tag_value`, `deleted_at`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `domain_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `parent_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'parent domain id',
+    `child_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sub-domain id',
+    `audit_info` CLOB NOT NULL COMMENT 'domain relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dr_ci_del` (`child_id`, `deleted_at`),
+    KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
+    KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
+) ENGINE=InnoDB;
