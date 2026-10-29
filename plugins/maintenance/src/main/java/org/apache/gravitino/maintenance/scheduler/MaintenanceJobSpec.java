@@ -31,7 +31,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 
 /**
  * Enqueue-time spec stored as JSON in db-scheduler {@code task_data} for {@code cron-job} and

@@ -35,7 +35,7 @@ import java.util.Optional;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.JobEntity;
 import org.junit.jupiter.api.Assertions;

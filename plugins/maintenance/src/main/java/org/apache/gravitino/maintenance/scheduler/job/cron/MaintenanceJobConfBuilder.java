@@ -37,6 +37,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;

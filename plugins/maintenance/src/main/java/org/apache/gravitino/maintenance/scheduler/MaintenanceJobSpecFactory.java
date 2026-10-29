@@ -36,8 +36,8 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.PolicyEntity;
 

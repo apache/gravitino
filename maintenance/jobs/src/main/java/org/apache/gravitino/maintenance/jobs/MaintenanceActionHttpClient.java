@@ -67,6 +67,18 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
   private static final int DEFAULT_OAUTH_EXPIRES_IN_SECONDS = 300;
   private static final int ERROR_BODY_TRUNCATE = 512;
 
+  /**
+   * Shared mapper for TMS HTTP JSON (requests + OAuth token responses).
+   *
+   * <p>Copied from {@link JsonUtils#objectMapper()} with unknown properties ignored so IdP token
+   * payloads (e.g. Keycloak {@code refresh_expires_in}) do not fail deserialization — same stance
+   * as client-java {@code ObjectMapperProvider}.
+   */
+  private static final ObjectMapper MAPPER =
+      JsonUtils.objectMapper()
+          .copy()
+          .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
   private final ObjectMapper mapper;
   private final String baseUri;
   private final String metalakeName;
@@ -102,13 +114,7 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalake), "updater_options must contain metalake");
     GravitinoAuthSettings auth = GravitinoAuthSettings.from(new OptimizerConfig(properties));
-    // Keycloak (and other IdPs) return extra token fields such as refresh_expires_in; match
-    // client-java ObjectMapperProvider so OAuth callbacks do not fail on unknown properties.
-    ObjectMapper mapper =
-        JsonUtils.objectMapper()
-            .copy()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    return new MaintenanceActionHttpClient(mapper, uri.trim(), metalake.trim(), auth);
+    return new MaintenanceActionHttpClient(MAPPER, uri.trim(), metalake.trim(), auth);
   }
 
   /**
