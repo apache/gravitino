@@ -27,10 +27,10 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 
 /**
- * Process-wide bridge so a metalake Iceberg catalog can call the auxiliary Iceberg REST service in
- * this JVM. The holder lives on the server class loader, which both the catalog plugin and the
- * auxiliary service can see. The operations object itself is created on the auxiliary class loader,
- * next to that service's catalog wrapper, so the call does not go through HTTP.
+ * Process-wide bridge so a metalake Iceberg REST catalog can call the auxiliary Iceberg REST
+ * service in this JVM. The holder lives on the server class loader, which both the catalog plugin
+ * and the auxiliary service can see. The operations object itself is created on the auxiliary class
+ * loader, next to that service's catalog wrapper, so the call does not go through HTTP.
  */
 public final class AuxiliaryIcebergCatalogBridge {
 

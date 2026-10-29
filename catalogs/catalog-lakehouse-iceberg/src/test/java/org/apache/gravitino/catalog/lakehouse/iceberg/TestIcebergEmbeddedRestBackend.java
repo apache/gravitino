@@ -20,74 +20,20 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.iceberg.catalog.Namespace;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergEmbeddedRestBackend {
 
   @Test
-  void auxModeUsesIrcWrapperForCatalogName() {
-    IcebergCatalogWrapper ircWrapper = new IcebergCatalogWrapper(memoryConfig());
-
-    Map<String, String> conf =
-        ImmutableMap.of(
-            IcebergConstants.CATALOG_BACKEND,
-            "rest",
-            IcebergConstants.URI,
-            "http://remote.example:9001/iceberg",
-            IcebergConstants.WAREHOUSE,
-            "not-the-catalog-name");
-
-    IcebergBackend backend =
-        IcebergBackend.create(
-            "orders",
-            "metalake",
-            conf,
-            catalogName -> {
-              if ("orders".equals(catalogName)) {
-                return ircWrapper;
-              }
-              throw new NoSuchCatalogException("missing %s", catalogName);
-            });
-    Assertions.assertSame(ircWrapper, backend.wrapper());
-    Assertions.assertSame(ircWrapper, backend.wrapper());
-    backend.close();
-    Assertions.assertDoesNotThrow(() -> ircWrapper.listNamespace(Namespace.empty()));
-    Assertions.assertDoesNotThrow(ircWrapper::close);
-  }
-
-  @Test
-  void auxModeUsesIrcWrapperForHiveBackend() {
-    IcebergCatalogWrapper ircWrapper = new IcebergCatalogWrapper(memoryConfig());
-
-    Map<String, String> conf =
-        ImmutableMap.of(
-            IcebergConstants.CATALOG_BACKEND, "hive", IcebergConstants.WAREHOUSE, "/tmp/wh");
-    IcebergBackend backend =
-        IcebergBackend.create("hive_cat", "metalake", conf, catalogName -> ircWrapper);
-    Assertions.assertSame(ircWrapper, backend.wrapper());
-    backend.close();
-    Assertions.assertDoesNotThrow(ircWrapper::close);
-  }
-
-  @Test
-  void withoutAuxBridgeCatalogOwnsItsClient() {
+  void memoryCatalogOwnsItsClient() {
     Map<String, String> conf =
         ImmutableMap.of(
             IcebergConstants.CATALOG_BACKEND, "memory", IcebergConstants.WAREHOUSE, "/tmp/wh");
-    IcebergBackend backend = IcebergBackend.create("mem", "metalake", conf);
+    IcebergBackend backend = IcebergBackend.create(conf);
     IcebergCatalogWrapper owned = backend.wrapper();
     Assertions.assertNotNull(owned);
     backend.close();
-  }
-
-  private static IcebergConfig memoryConfig() {
-    return new IcebergConfig(
-        ImmutableMap.of(
-            IcebergConstants.CATALOG_BACKEND, "memory", IcebergConstants.WAREHOUSE, "/tmp/wh"));
   }
 }

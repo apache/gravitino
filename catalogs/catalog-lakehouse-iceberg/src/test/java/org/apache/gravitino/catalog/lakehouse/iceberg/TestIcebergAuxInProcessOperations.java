@@ -19,18 +19,22 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.auxiliary.AuxiliaryIcebergCatalogBridge;
 import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -49,47 +53,93 @@ public class TestIcebergAuxInProcessOperations {
   }
 
   @Test
-  void metalakeCatalogUsesAuxIrcWrapper() {
-    IcebergCatalogWrapper ircWrapper = new IcebergCatalogWrapper(memoryConfig());
-    AtomicReference<IcebergCatalogOperations> auxOps = new AtomicReference<>();
+  void memoryCatalogKeepsItsOwnClientWhenAuxIrcIsRunning() {
+    AtomicInteger creates = new AtomicInteger();
     operationsFactory =
         () -> {
-          IcebergCatalogOperations created =
-              IcebergCatalogOperations.createForLocalIrc(
-                  catalogName -> {
-                    if ("orders".equals(catalogName)) {
-                      return ircWrapper;
-                    }
-                    throw new NoSuchCatalogException("missing %s", catalogName);
-                  });
-          auxOps.set(created);
-          return created;
+          creates.incrementAndGet();
+          return IcebergCatalogOperations.createForLocalIrc(
+              catalogName -> {
+                throw new NoSuchCatalogException("unused %s", catalogName);
+              });
         };
     AuxiliaryIcebergCatalogBridge.register(operationsFactory);
 
-    CatalogInfo info =
-        new CatalogInfo(
-            1L,
-            "orders",
-            Catalog.Type.RELATIONAL,
-            "lakehouse-iceberg",
-            null,
-            memoryProperties(),
-            AuditInfo.EMPTY,
-            Namespace.of("metalake"));
+    IcebergCatalogOperations metalakeOps = new IcebergCatalogOperations();
+    metalakeOps.initialize(
+        memoryProperties(), catalogInfo("orders", memoryProperties()), metadata());
+    Assertions.assertNotNull(metalakeOps.backend);
+    NameIdentifier[] schemas = metalakeOps.listSchemas(Namespace.of("metalake", "orders"));
+    Assertions.assertEquals(0, schemas.length);
+    Assertions.assertEquals(0, creates.get());
+    metalakeOps.close();
+  }
+
+  @Test
+  void restCatalogBorrowsWarehouseWrapperFromAuxIrc() {
+    IcebergCatalogWrapper target = new IcebergCatalogWrapper(memoryConfig());
+    AtomicReference<String> lookedUp = new AtomicReference<>();
+    operationsFactory =
+        () ->
+            IcebergCatalogOperations.createForLocalIrc(
+                catalogName -> {
+                  lookedUp.set(catalogName);
+                  if ("orders".equals(catalogName)) {
+                    return target;
+                  }
+                  throw new NoSuchCatalogException("missing %s", catalogName);
+                });
+    AuxiliaryIcebergCatalogBridge.register(operationsFactory);
+
+    Map<String, String> restProperties =
+        ImmutableMap.of(
+            IcebergConstants.CATALOG_BACKEND,
+            "rest",
+            IcebergConstants.URI,
+            "http://remote.example:9001/iceberg",
+            IcebergConstants.WAREHOUSE,
+            "orders");
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("rest_catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("lakehouse-iceberg")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withProperties(restProperties)
+            .build();
+    IcebergCatalog catalog =
+        new IcebergCatalog().withCatalogConf(restProperties).withCatalogEntity(entity);
+    CatalogOperations ops = catalog.ops();
+    Assertions.assertTrue(ops instanceof IcebergCatalogOperations);
+    IcebergCatalogOperations icebergOps = (IcebergCatalogOperations) ops;
+    Assertions.assertSame(target, icebergOps.backend.wrapper());
+    Assertions.assertEquals("orders", lookedUp.get());
+    NameIdentifier[] schemas = icebergOps.listSchemas(Namespace.of("metalake", "rest_catalog"));
+    Assertions.assertEquals(0, schemas.length);
+    icebergOps.close();
+    Assertions.assertDoesNotThrow(target::close);
+  }
+
+  private static CatalogInfo catalogInfo(String name, Map<String, String> properties) {
+    return new CatalogInfo(
+        1L,
+        name,
+        Catalog.Type.RELATIONAL,
+        "lakehouse-iceberg",
+        null,
+        properties,
+        AuditInfo.EMPTY,
+        Namespace.of("metalake"));
+  }
+
+  private static HasPropertyMetadata metadata() {
     HasPropertyMetadata metadata = Mockito.mock(HasPropertyMetadata.class);
     Mockito.when(metadata.catalogPropertiesMetadata())
         .thenReturn(new IcebergCatalogPropertiesMetadata());
-
-    IcebergCatalogOperations metalakeOps = new IcebergCatalogOperations();
-    metalakeOps.initialize(memoryProperties(), info, metadata);
-    Assertions.assertNull(metalakeOps.backend);
-
-    NameIdentifier[] schemas = metalakeOps.listSchemas(Namespace.of("metalake", "orders"));
-    Assertions.assertEquals(0, schemas.length);
-    Assertions.assertSame(ircWrapper, auxOps.get().backend.wrapper());
-    metalakeOps.close();
-    Assertions.assertDoesNotThrow(ircWrapper::close);
+    return metadata;
   }
 
   private static Map<String, String> memoryProperties() {

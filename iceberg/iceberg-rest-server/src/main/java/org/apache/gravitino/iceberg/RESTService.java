@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.inject.Singleton;
-import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryIcebergCatalogBridge;
@@ -140,7 +139,6 @@ public class RESTService implements GravitinoAuxiliaryService {
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
     if (auxMode) {
-      // Metalake catalogs delegate here and borrow this IRC's wrapper in-process.
       operationsFactory =
           () ->
               IcebergCatalogOperations.createForLocalIrc(
@@ -229,8 +227,8 @@ public class RESTService implements GravitinoAuxiliaryService {
           }
         });
 
-    Servlet servlet = new ServletContainer(config);
-    server.addServlet(servlet, ICEBERG_SPEC);
+    ServletContainer icebergServlet = new ServletContainer(config);
+    server.addServlet(icebergServlet, ICEBERG_SPEC);
     // Registered before HttpAuditFilter so audit events dispatched during this request carry the
     // request's query parameters and remote address, exactly as on the main server.
     ClientAddressResolver clientAddressResolver = serverConfig.getClientAddressResolver();
