@@ -323,7 +323,9 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ToolError, "502"):
                 await self._call(tool, _NAMESPACE)
             self.status = 200
-            with self.assertRaises(ToolError):
+            with self.assertRaisesRegex(
+                ToolError, "Invalid Gravitino response: invalid JSON"
+            ):
                 await self._call(tool, _NAMESPACE)
 
     async def test_load_semantic_model_preserves_native_definition(self):

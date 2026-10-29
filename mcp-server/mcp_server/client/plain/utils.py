@@ -47,9 +47,11 @@ def extract_list_from_response(response, field: str) -> str:
     """
     try:
         payload = simplejson.loads(response.content, use_decimal=True)
-    except simplejson.JSONDecodeError:
+    except simplejson.JSONDecodeError as exc:
         response.raise_for_status()
-        raise
+        raise GravitinoException(
+            "Invalid Gravitino response: invalid JSON"
+        ) from exc
     if isinstance(payload, dict):
         _handle_gravitino_exception(payload)
     response.raise_for_status()
