@@ -187,6 +187,7 @@ public class DomainRelService {
     try {
       DomainPO childPO = getDomainPO(childIdent);
       DomainPO parentPO = getDomainPO(parentIdent);
+      checkDistinctRows(childIdent, childPO, parentPO);
       SessionUtils.doMultipleWithCommit(
           () -> {
             Pair<DomainPO, DomainPO> locked = lockMetalakeAndDomains(childIdent, childPO, parentPO);
@@ -408,6 +409,7 @@ public class DomainRelService {
     try {
       DomainPO childPO = getDomainPO(childIdent);
       DomainPO parentPO = getDomainPO(parentIdent);
+      checkDistinctRows(childIdent, childPO, parentPO);
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeAndDomains(childIdent, childPO, parentPO),
           () -> {
@@ -451,6 +453,7 @@ public class DomainRelService {
     try {
       DomainPO childPO = getDomainPO(childIdent);
       DomainPO newParentPO = getDomainPO(newParentIdent);
+      checkDistinctRows(childIdent, childPO, newParentPO);
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeAndDomains(childIdent, childPO, newParentPO),
           () -> {
@@ -646,6 +649,16 @@ public class DomainRelService {
           identifier.name());
     }
     return domainPO;
+  }
+
+  // Two names can resolve to the same row, for example on MySQL, whose collation ignores trailing
+  // spaces, so the rows are compared as well as the names.
+  private static void checkDistinctRows(
+      NameIdentifier childIdent, DomainPO childPO, DomainPO parentPO) {
+    Preconditions.checkArgument(
+        !Objects.equals(childPO.domainId(), parentPO.domainId()),
+        "The domain %s cannot be its own parent",
+        childIdent);
   }
 
   private static void checkSameMetalakeAndDistinct(

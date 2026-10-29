@@ -953,6 +953,23 @@ public class TestDomainRelService extends TestJDBCBackend {
         () ->
             domainRelService.setDomainParentAndGet(
                 elsewhere.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO, s -> {}));
+    // On MySQL, whose collation ignores trailing spaces, both names resolve to the same row, which
+    // is refused as its own parent; elsewhere the second name does not exist. No edge is written.
+    RuntimeException selfParent =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                domainRelService.setDomainParentAndGet(
+                    finance.nameIdentifier(),
+                    NameIdentifierUtil.ofDomain(METALAKE_NAME, "Finance "),
+                    AUDIT_INFO,
+                    s -> {}));
+    Assertions.assertTrue(
+        selfParent instanceof IllegalArgumentException
+            || selfParent instanceof NoSuchEntityException,
+        String.valueOf(selfParent));
+    Assertions.assertFalse(domainRelService.getParentDomainName(finance.id()).isPresent());
+
     NameIdentifier missing = NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing");
     Assertions.assertThrows(
         NoSuchEntityException.class,
