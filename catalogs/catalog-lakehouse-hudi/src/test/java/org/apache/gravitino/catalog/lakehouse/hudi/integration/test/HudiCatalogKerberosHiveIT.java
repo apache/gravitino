@@ -37,8 +37,10 @@ import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
 import org.apache.gravitino.hive.kerberos.KerberosConfig;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.TableCatalog;
@@ -53,10 +55,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@HiveFixture(auth = HiveAuth.KERBEROS)
 public class HudiCatalogKerberosHiveIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HudiCatalogKerberosHiveIT.class);
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final String SDK_KERBEROS_PRINCIPAL_KEY = "client.kerberos.principal";
   private static final String SDK_KERBEROS_KEYTAB_KEY = "client.kerberos.keytab";
@@ -76,7 +77,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
   private static GravitinoAdminClient adminClient;
 
-  protected static HiveContainer kerberosHiveContainer;
+  @FixtureContainer protected static HiveContainer kerberosHive;
 
   static String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
   static String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
@@ -85,9 +86,6 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startKerberosHiveContainer();
-    kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
-
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
     File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
@@ -96,16 +94,13 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     HIVE_METASTORE_URI =
         String.format(
             "thrift://%s:%d",
-            kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+            kerberosHive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
 
     // Prepare kerberos related-config;
     prepareKerberosConfig();
 
     // Config kerberos configuration for Gravitino server
     addKerberosConfig();
-
-    // Create hive tables
-    createHudiTables();
 
     // Start Gravitino server
     super.startIntegrationTest();
@@ -126,26 +121,26 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
   private static void prepareKerberosConfig() throws Exception {
     // Keytab of the Gravitino SDK client
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
 
     // Keytab of the Gravitino server
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
 
     // Keytab of Gravitino server to connector to Hive
-    kerberosHiveContainer
+    kerberosHive
         .getContainer()
         .copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
 
     String tmpKrb5Path = TMP_DIR + "/krb5.conf_tmp";
     String krb5Path = TMP_DIR + "/krb5.conf";
-    kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+    kerberosHive.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
-    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+    String ip = kerberosHive.getContainerIpAddress();
     String content =
         FileUtils.readFileToString(new File(tmpKrb5Path), java.nio.charset.StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
@@ -206,7 +201,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     properties.put("list-all-tables", "false");
     properties.put(
         CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
-        "hive/_HOST@HADOOPKRB".replace("_HOST", kerberosHiveContainer.getHostName()));
+        "hive/_HOST@HADOOPKRB".replace("_HOST", kerberosHive.getHostName()));
     properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
     properties.put(CATALOG_BYPASS_PREFIX + "hadoop.security.authentication", "kerberos");
 
@@ -216,7 +211,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
         "warehouse",
         String.format(
             "hdfs://%s:%d/user/hive/warehouse-catalog-hudi",
-            kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
+            kerberosHive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
     Catalog catalog =
         gravitinoMetalake.createCatalog(
             CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-hudi", "comment", properties);
@@ -226,6 +221,8 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     Schema schema = catalog.asSchemas().loadSchema(SCHEMA_NAME);
     Assertions.assertEquals(SCHEMA_NAME, schema.name());
 
+    // TABLE_NAME is never created, so no Hive SQL setup is needed: the catalog must report the
+    // table as missing from the metastore, not as a non-Hudi table.
     TableCatalog tableOps = catalog.asTableCatalog();
     NoSuchTableException exception =
         Assertions.assertThrows(
@@ -237,24 +234,5 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
             .getMessage()
             .contains("Hive table " + TABLE_NAME + " does not exist in Hive Metastore"),
         "Unexpected exception message: " + exception.getMessage());
-  }
-
-  private static void createHudiTables() {
-    String createTableSql =
-        String.format(
-            "CREATE TABLE %s.%s (\n"
-                + "  id STRING,\n"
-                + "  name STRING,\n"
-                + "  age INT\n"
-                + ") \n"
-                + "LOCATION 'hdfs://localhost:9000/user/hive/warehouse-catalog-hudi' ",
-            SCHEMA_NAME, TABLE_NAME);
-    kerberosHiveContainer.executeInContainer("hive", "-e", "'" + createTableSql + ";'");
-    LOG.info("create table {} success[{}]", TABLE_NAME, createTableSql);
-
-    String insertTableSql =
-        String.format("INSERT INTO %s.%s" + " VALUES " + "(1,'Cyber',26)", SCHEMA_NAME, TABLE_NAME);
-    kerberosHiveContainer.executeInContainer("hive", "-e", "'" + insertTableSql + ";'");
-    LOG.info("insert table {} data success[{}]", TABLE_NAME, insertTableSql);
   }
 }

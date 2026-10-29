@@ -28,6 +28,8 @@ cd $GRAVITINO_ROOT_DIR
 
 PID_FILE="$GRAVITINO_ROOT_DIR/integration-test-common/build/trino-test-env.pid"
 
+# The environment's containers belong to the Gradle test JVM: TrinoCluster stops them when the JVM
+# shuts down, and Testcontainers' reaper removes any that are left once it is gone.
 if [ "$1" = "--stop" ]; then
   if [ -f "$PID_FILE" ]; then
     GRADLE_PID=$(cat "$PID_FILE")
@@ -36,21 +38,20 @@ if [ "$1" = "--stop" ]; then
       if [[ -n "$PGID" && "$PGID" =~ ^[0-9]+$ ]]; then
         echo "Stopping environment (PGID: $PGID)..."
         kill -TERM -- "-$PGID" 2>/dev/null
-        for i in $(seq 1 60); do
-          kill -0 "$GRADLE_PID" 2>/dev/null || break
-          sleep 1
-        done
       else
-        echo "Could not determine process group for PID $GRADLE_PID, stopping containers directly..."
+        echo "Could not determine process group for PID $GRADLE_PID, stopping it alone..."
+        kill -TERM "$GRADLE_PID" 2>/dev/null
       fi
+      for i in $(seq 1 60); do
+        kill -0 "$GRADLE_PID" 2>/dev/null || break
+        sleep 1
+      done
     else
-      echo "Environment process ($GRADLE_PID) is no longer running, stopping containers directly..."
+      echo "Environment process ($GRADLE_PID) is no longer running."
     fi
-    "$GRAVITINO_ROOT_DIR/integration-test-common/docker-script/shutdown.sh"
     rm -f "$PID_FILE"
   else
-    echo "No running environment found, stopping containers directly..."
-    "$GRAVITINO_ROOT_DIR/integration-test-common/docker-script/shutdown.sh"
+    echo "No running environment found."
   fi
   exit 0
 fi

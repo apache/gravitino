@@ -32,6 +32,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -48,7 +49,7 @@ import org.testcontainers.containers.Network;
 public class TrinoContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoContainer.class);
 
-  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_TRINO_DOCKER_IMAGE");
+  public static final String DEFAULT_IMAGE = TestImages.TRINO;
   public static final String HOST_NAME = "gravitino-ci-trino";
   public static final int TRINO_PORT = 8080;
   public static final int TRINO_HTTPS_PORT = 8443;
@@ -108,6 +109,7 @@ public class TrinoContainer extends BaseContainer {
   protected boolean checkContainerStatus(int retryLimit) {
     await()
         .atMost(30, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
         .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
@@ -155,6 +157,7 @@ public class TrinoContainer extends BaseContainer {
   public boolean checkSyncCatalogFromGravitino(int retryLimit, String catalogName) {
     await()
         .atMost(30, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
         .pollInterval(60 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
