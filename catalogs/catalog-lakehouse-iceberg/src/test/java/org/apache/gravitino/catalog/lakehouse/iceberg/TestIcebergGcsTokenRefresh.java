@@ -19,8 +19,8 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -28,33 +28,39 @@ import org.junit.jupiter.api.Test;
 public class TestIcebergGcsTokenRefresh {
 
   @Test
-  void fixedBackendSkipsRefreshWithoutExpiry() {
-    IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(memoryConfig());
-    IcebergBackend backend = IcebergBackend.fixed(wrapper);
+  void reusesClientWhenTokenExpiryIsAbsent() {
+    IcebergBackend backend = IcebergBackend.create(memoryConfig(null));
+    IcebergCatalogWrapper wrapper = backend.wrapper();
     Assertions.assertSame(wrapper, backend.wrapper());
-    Assertions.assertSame(wrapper, backend.wrapper());
+    backend.close();
   }
 
   @Test
-  void fixedBackendSkipsRefreshWhenTokenFarFromExpiry() {
+  void reusesClientWhenTokenIsFarFromExpiry() {
     long expiresAt = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1);
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/wh",
-                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
-                String.valueOf(expiresAt)));
-    IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(config);
-    IcebergBackend backend = IcebergBackend.fixed(wrapper);
+    IcebergBackend backend = IcebergBackend.create(memoryConfig(expiresAt));
+    IcebergCatalogWrapper wrapper = backend.wrapper();
     Assertions.assertSame(wrapper, backend.wrapper());
+    backend.close();
   }
 
-  private static IcebergConfig memoryConfig() {
-    return new IcebergConfig(
-        ImmutableMap.of(
-            IcebergConstants.CATALOG_BACKEND, "memory", IcebergConstants.WAREHOUSE, "/tmp/wh"));
+  @Test
+  void rebuildsClientInsideTheRefreshBuffer() {
+    long expiresAt = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(1);
+    IcebergBackend backend = IcebergBackend.create(memoryConfig(expiresAt));
+    IcebergCatalogWrapper first = backend.wrapper();
+    Assertions.assertNotSame(first, backend.wrapper());
+    backend.close();
+  }
+
+  private static Map<String, String> memoryConfig(Long expiresAt) {
+    ImmutableMap.Builder<String, String> builder =
+        ImmutableMap.<String, String>builder()
+            .put(IcebergConstants.CATALOG_BACKEND, "memory")
+            .put(IcebergConstants.WAREHOUSE, "/tmp/wh");
+    if (expiresAt != null) {
+      builder.put(IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT, String.valueOf(expiresAt));
+    }
+    return builder.build();
   }
 }

@@ -18,12 +18,9 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -50,78 +47,45 @@ final class IcebergBackend implements AutoCloseable {
 
   private static final long GCS_TOKEN_REFRESH_BUFFER_MS = TimeUnit.MINUTES.toMillis(5);
 
-  @Nullable private final Map<String, String> catalogConf;
-
-  private boolean ownsWrapper;
+  private final Map<String, String> catalogConf;
 
   private IcebergCatalogWrapper wrapper;
   private IcebergCatalogWrapperHelper helper;
   private IcebergViewCatalogOperations views;
 
-  private IcebergBackend(@Nullable Map<String, String> catalogConf, boolean ownsWrapper) {
+  private IcebergBackend(Map<String, String> catalogConf) {
     this.catalogConf = catalogConf;
-    this.ownsWrapper = ownsWrapper;
   }
 
   /**
-   * Creates a backend that owns its Iceberg client.
+   * Creates a backend that owns its Iceberg client and remints GCS tokens.
    *
    * @param catalogConf resolved Iceberg catalog configuration
    * @return backend that owns its client
    */
   static IcebergBackend create(Map<String, String> catalogConf) {
-    return createOwned(catalogConf);
-  }
-
-  /** Owned client that remints GCS tokens. */
-  static IcebergBackend createOwned(Map<String, String> catalogConf) {
-    IcebergBackend backend = new IcebergBackend(catalogConf, true);
+    IcebergBackend backend = new IcebergBackend(catalogConf);
     backend.reload();
     return backend;
   }
 
-  /** Fixed client for tests; skips GCS reminting and does not close the wrapper. */
-  @VisibleForTesting
-  static IcebergBackend fixed(IcebergCatalogWrapper wrapper) {
-    Preconditions.checkNotNull(wrapper, "wrapper");
-    IcebergBackend backend = new IcebergBackend(null, false);
-    backend.wrapper = wrapper;
-    return backend;
-  }
-
   synchronized IcebergCatalogWrapper wrapper() {
-    ensureClient();
     refreshGcsTokenIfNeeded();
     return wrapper;
   }
 
   synchronized IcebergCatalogWrapperHelper helper() {
-    ensureClient();
     refreshGcsTokenIfNeeded();
-    if (helper == null) {
-      helper = new IcebergCatalogWrapperHelper(wrapper.getCatalog());
-    }
     return helper;
   }
 
   synchronized IcebergViewCatalogOperations views() {
-    ensureClient();
     refreshGcsTokenIfNeeded();
-    if (views == null) {
-      views = new IcebergViewCatalogOperations(wrapper);
-    }
     return views;
   }
 
-  private void ensureClient() {
-    if (wrapper != null) {
-      return;
-    }
-    reload();
-  }
-
   private void refreshGcsTokenIfNeeded() {
-    if (!ownsWrapper || catalogConf == null || wrapper == null) {
+    if (wrapper == null) {
       return;
     }
     String expiresAt =
@@ -146,7 +110,7 @@ final class IcebergBackend implements AutoCloseable {
   }
 
   private void reload() {
-    Map<String, String> conf = catalogConf == null ? new HashMap<>() : new HashMap<>(catalogConf);
+    Map<String, String> conf = new HashMap<>(catalogConf);
     IcebergConfig icebergConfig =
         IcebergCatalogUtil.withGcsServiceAccountCredentials(new IcebergConfig(conf));
     try {
@@ -175,9 +139,7 @@ final class IcebergBackend implements AutoCloseable {
 
   @Override
   public synchronized void close() {
-    if (ownsWrapper) {
-      closeQuietly(wrapper);
-    }
+    closeQuietly(wrapper);
     wrapper = null;
     helper = null;
     views = null;

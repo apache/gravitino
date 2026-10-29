@@ -106,7 +106,6 @@ dependencies {
   implementation(project(":bundles:azure"))
   implementation(project(":bundles:gcp"))
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
   implementation(project(":clients:client-java"))
   implementation(project(":core")) {
     exclude("*")
@@ -205,13 +204,6 @@ dependencies {
 }
 
 tasks {
-  named("compileJava") {
-    dependsOn(
-      ":catalogs:catalog-lakehouse-iceberg:jar",
-      ":catalogs:catalog-lakehouse-iceberg:runtimeJars"
-    )
-  }
-
   val copyDepends by registering(Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")

@@ -99,9 +99,6 @@ public class IcebergCatalogOperations
 
   @VisibleForTesting @Nullable String catalogUuid;
 
-  /** Catalog plugin instance. Owns its Hive, JDBC, or REST client. */
-  public IcebergCatalogOperations() {}
-
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
    *
@@ -113,11 +110,6 @@ public class IcebergCatalogOperations
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    initFromResolvedConf(toIcebergConf(conf, info, propertiesMetadata), info);
-  }
-
-  private Map<String, String> toIcebergConf(
-      Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata) {
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
@@ -128,12 +120,8 @@ public class IcebergCatalogOperations
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
-    resultConf.put(IcebergConstants.CATALOG_UUID, info.id().toString());
-    return resultConf;
-  }
-
-  private void initFromResolvedConf(Map<String, String> resultConf, CatalogInfo info) {
     this.catalogUuid = info.id().toString();
+    resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
     this.backend = IcebergBackend.create(resultConf);
   }
 

@@ -267,9 +267,9 @@ public class IcebergCatalogUtil {
 
   private static Catalog loadRestCatalog(IcebergConfig icebergConfig) {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
-    Map<String, String> properties = Maps.newHashMap(icebergConfig.getIcebergCatalogProperties());
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
+    Map<String, String> properties = Maps.newHashMap(icebergConfig.getIcebergCatalogProperties());
     applyDefaultResolvingFileIO(properties);
 
     // REST catalog must use forward access token from the user request
