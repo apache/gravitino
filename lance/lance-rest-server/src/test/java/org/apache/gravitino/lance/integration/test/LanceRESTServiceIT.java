@@ -91,6 +91,7 @@ import org.lance.namespace.model.ListTablesRequest;
 import org.lance.namespace.model.NamespaceExistsRequest;
 import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.RegisterTableResponse;
+import org.lance.namespace.model.RenameTableRequest;
 import org.lance.namespace.model.TableExistsRequest;
 
 @SuppressWarnings("deprecation")
@@ -771,6 +772,109 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(2, jsonArrowFields.size());
     Assertions.assertEquals("id", jsonArrowFields.get(0).getName());
     Assertions.assertEquals("value_new", jsonArrowFields.get(1).getName());
+  }
+
+  @Test
+  void testRenameTablePreservesDatasetMetadata() throws IOException {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+    String targetSchema = GravitinoITUtils.genRandomName("lance_rename_target");
+    catalog.asSchemas().createSchema(targetSchema, "rename target schema", null);
+
+    String location = tempDir.resolve("rename_table").toString();
+    String originalName = "rename_table_original";
+    String sameSchemaName = "rename_table_same_schema";
+    String crossSchemaName = "rename_table_cross_schema";
+    List<String> originalIds = List.of(CATALOG_NAME, SCHEMA_NAME, originalName);
+    org.apache.arrow.vector.types.pojo.Schema arrowSchema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+    CreateTableResponse created =
+        createTable(
+            originalIds,
+            location,
+            ImmutableMap.of("key1", "value1"),
+            ArrowUtils.generateIpcStream(arrowSchema),
+            "create");
+    Assertions.assertNotNull(created.getVersion());
+    DescribeTableRequest describeRequest = new DescribeTableRequest();
+    describeRequest.setId(originalIds);
+    DescribeTableResponse beforeRename = ns.describeTable(describeRequest);
+
+    RenameTableRequest sameSchemaRename = new RenameTableRequest();
+    sameSchemaRename.setId(originalIds);
+    sameSchemaRename.setNewTableName(sameSchemaName);
+    Assertions.assertDoesNotThrow(() -> ns.renameTable(sameSchemaRename));
+    Assertions.assertFalse(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA_NAME, originalName)));
+    Assertions.assertTrue(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA_NAME, sameSchemaName)));
+
+    List<String> sameSchemaIds = List.of(CATALOG_NAME, SCHEMA_NAME, sameSchemaName);
+    RenameTableRequest crossSchemaRename = new RenameTableRequest();
+    crossSchemaRename.setId(sameSchemaIds);
+    crossSchemaRename.setNewTableName(crossSchemaName);
+    crossSchemaRename.setNewNamespaceId(List.of(CATALOG_NAME, targetSchema));
+    Assertions.assertDoesNotThrow(() -> ns.renameTable(crossSchemaRename));
+
+    List<String> renamedIds = List.of(CATALOG_NAME, targetSchema, crossSchemaName);
+    Assertions.assertFalse(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA_NAME, sameSchemaName)));
+    Assertions.assertTrue(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(targetSchema, crossSchemaName)));
+    describeRequest.setId(renamedIds);
+    DescribeTableResponse afterRename = ns.describeTable(describeRequest);
+    Assertions.assertEquals(beforeRename.getLocation(), afterRename.getLocation());
+    Assertions.assertEquals(beforeRename.getVersion(), afterRename.getVersion());
+    Assertions.assertEquals("value1", afterRename.getProperties().get("key1"));
+    Assertions.assertEquals(
+        beforeRename.getProperties().get(Table.PROPERTY_TABLE_FORMAT),
+        afterRename.getProperties().get(Table.PROPERTY_TABLE_FORMAT));
+    Assertions.assertTrue(Files.exists(Path.of(location)));
+  }
+
+  @Test
+  void testRenameTableFailurePreservesSourceRegistration() {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+    String sourceName = "rename_failure_source";
+    String targetName = "rename_failure_target";
+    List<String> sourceIds = List.of(CATALOG_NAME, SCHEMA_NAME, sourceName);
+    List<String> targetIds = List.of(CATALOG_NAME, SCHEMA_NAME, targetName);
+    DeclareTableRequest declareRequest = new DeclareTableRequest();
+    declareRequest.setId(sourceIds);
+    declareRequest.setLocation(tempDir.resolve(sourceName).toString());
+    Assertions.assertDoesNotThrow(() -> ns.declareTable(declareRequest));
+    declareRequest.setId(targetIds);
+    declareRequest.setLocation(tempDir.resolve(targetName).toString());
+    Assertions.assertDoesNotThrow(() -> ns.declareTable(declareRequest));
+
+    RenameTableRequest missingSourceRename = new RenameTableRequest();
+    missingSourceRename.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "missing_table"));
+    missingSourceRename.setNewTableName("renamed_missing_table");
+    RuntimeException exception =
+        Assertions.assertThrows(RuntimeException.class, () -> ns.renameTable(missingSourceRename));
+    assertLanceErrorCode(exception, ErrorCode.TABLE_NOT_FOUND);
+
+    RenameTableRequest conflictingRename = new RenameTableRequest();
+    conflictingRename.setId(sourceIds);
+    conflictingRename.setNewTableName(targetName);
+    exception =
+        Assertions.assertThrows(RuntimeException.class, () -> ns.renameTable(conflictingRename));
+    assertLanceErrorCode(exception, ErrorCode.TABLE_ALREADY_EXISTS);
+    Assertions.assertTrue(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA_NAME, sourceName)));
+
+    RenameTableRequest invalidNamespaceRename = new RenameTableRequest();
+    invalidNamespaceRename.setId(sourceIds);
+    invalidNamespaceRename.setNewTableName("renamed_source");
+    invalidNamespaceRename.setNewNamespaceId(List.of(CATALOG_NAME, "missing_rename_target_schema"));
+    exception =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> ns.renameTable(invalidNamespaceRename));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
+    Assertions.assertTrue(
+        catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA_NAME, sourceName)));
   }
 
   @Test

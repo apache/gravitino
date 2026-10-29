@@ -61,6 +61,7 @@ import org.lance.namespace.model.DeclareTableRequest;
 import org.lance.namespace.model.DescribeTableResponse;
 import org.lance.namespace.model.ListTablesResponse;
 import org.lance.namespace.model.RegisterTableRequest;
+import org.lance.namespace.model.RenameTableRequest;
 
 /** Verifies that Lance REST table operations are authorized and filtered. */
 public class LanceTableAuthorizationIT extends BaseIT {
@@ -69,6 +70,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String READER = "lance_table_authz_reader";
   private static final String PROBER = "lance_table_authz_prober";
   private static final String MUTATOR = "lance_table_authz_mutator";
+  private static final String MOVER = "lance_table_authz_mover";
   private static final String SCHEMA_OWNER = "lance_table_authz_schema_owner";
   private static final String LONE_OWNER = "lance_table_authz_lone_owner";
   private static final String CATALOG = "lance_table_authz_catalog";
@@ -76,6 +78,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
   // Tables created by the write tests live in their own schema, so the listing tests keep asserting
   // the exact contents of the read schema whatever order the tests run in.
   private static final String WRITE_SCHEMA = "lance_table_authz_write_schema";
+  private static final String RENAME_SCHEMA = "lance_table_authz_rename_schema";
   // Two schemas owned by users who created nothing in them, to exercise ancestor ownership.
   private static final String OWNED_SCHEMA = "lance_table_authz_owned_schema";
   private static final String LONE_SCHEMA = "lance_table_authz_lone_schema";
@@ -87,6 +90,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String MISSING_TABLE = "c_missing_table";
   private static final String PROBER_TABLE = "d_prober_table";
   private static final String MUTABLE_TABLE = "e_mutable_table";
+  private static final String RENAME_SOURCE_TABLE = "rename_source_table";
+  private static final String RENAMED_TABLE = "rename_target_table";
   private static final String DEREGISTER_TABLE = "f_deregister_table";
   private static final String DROP_TABLE = "g_drop_table";
   private static final String OWNED_SCHEMA_TABLE = "h_owned_schema_table";
@@ -113,17 +118,22 @@ public class LanceTableAuthorizationIT extends BaseIT {
     metalake.addUser(READER);
     metalake.addUser(PROBER);
     metalake.addUser(MUTATOR);
+    metalake.addUser(MOVER);
     metalake.addUser(SCHEMA_OWNER);
     metalake.addUser(LONE_OWNER);
 
     createNamespace(CATALOG);
     createNamespace(id(CATALOG, SCHEMA));
     createNamespace(id(CATALOG, WRITE_SCHEMA));
+    createNamespace(id(CATALOG, RENAME_SCHEMA));
     createNamespace(id(CATALOG, OWNED_SCHEMA));
     createNamespace(id(CATALOG, LONE_SCHEMA));
     registerTable(VISIBLE_TABLE);
     registerTable(HIDDEN_TABLE);
     createTable(WRITE_SCHEMA, MUTABLE_TABLE);
+    assertStatus(
+        200,
+        register(ADMIN, WRITE_SCHEMA, RENAME_SOURCE_TABLE, null, location(RENAME_SOURCE_TABLE)));
     Catalog catalog = metalake.loadCatalog(CATALOG);
     catalog
         .asTableCatalog()
@@ -223,7 +233,29 @@ public class LanceTableAuthorizationIT extends BaseIT {
                 catalogScope,
                 WRITE_SCHEMA,
                 new ArrayList<>(
-                    List.of(Privileges.UseSchema.allow(), Privileges.ModifyTable.allow())))));
+                    List.of(Privileges.UseSchema.allow(), Privileges.ModifyTable.allow()))),
+            SecurableObjects.ofSchema(
+                catalogScope,
+                RENAME_SCHEMA,
+                new ArrayList<>(List.of(Privileges.UseSchema.allow())))));
+
+    grant(
+        metalake,
+        "lance_table_authz_mover_role",
+        MOVER,
+        List.of(
+            SecurableObjects.ofCatalog(
+                CATALOG, new ArrayList<>(List.of(Privileges.UseCatalog.allow()))),
+            SecurableObjects.ofSchema(
+                catalogScope,
+                WRITE_SCHEMA,
+                new ArrayList<>(
+                    List.of(Privileges.UseSchema.allow(), Privileges.ModifyTable.allow()))),
+            SecurableObjects.ofSchema(
+                catalogScope,
+                RENAME_SCHEMA,
+                new ArrayList<>(
+                    List.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow())))));
   }
 
   @AfterAll
@@ -329,6 +361,31 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   @Test
+  public void testCrossSchemaRenameRequiresDestinationCreateTable() throws Exception {
+    String sourceLocation = describe(ADMIN, WRITE_SCHEMA, RENAME_SOURCE_TABLE).getLocation();
+
+    // READER lacks MODIFY_TABLE on the source. The denial must happen before the target check.
+    assertStatus(
+        403, renameTable(READER, WRITE_SCHEMA, RENAME_SOURCE_TABLE, RENAME_SCHEMA, RENAMED_TABLE));
+    assertStatus(404, table(ADMIN, RENAME_SCHEMA, RENAMED_TABLE, "describe"));
+
+    // MUTATOR can modify the source table and use the destination schema, but has no
+    // CREATE_TABLE privilege there.
+    assertStatus(
+        403, renameTable(MUTATOR, WRITE_SCHEMA, RENAME_SOURCE_TABLE, RENAME_SCHEMA, RENAMED_TABLE));
+    Assertions.assertEquals(
+        sourceLocation, describe(ADMIN, WRITE_SCHEMA, RENAME_SOURCE_TABLE).getLocation());
+    assertStatus(404, table(ADMIN, RENAME_SCHEMA, RENAMED_TABLE, "describe"));
+
+    // MOVER has MODIFY_TABLE on the source and CREATE_TABLE on the target schema.
+    assertStatus(
+        200, renameTable(MOVER, WRITE_SCHEMA, RENAME_SOURCE_TABLE, RENAME_SCHEMA, RENAMED_TABLE));
+    assertStatus(404, table(ADMIN, WRITE_SCHEMA, RENAME_SOURCE_TABLE, "describe"));
+    Assertions.assertEquals(
+        sourceLocation, describe(ADMIN, RENAME_SCHEMA, RENAMED_TABLE).getLocation());
+  }
+
+  @Test
   public void testRemovingATableRequiresOwnership() throws Exception {
     // MODIFY_TABLE alters a table but never removes it.
     assertStatus(403, table(MUTATOR, VISIBLE_TABLE, "deregister"));
@@ -372,6 +429,16 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(403, table(READER, MISSING_TABLE, "deregister"));
     assertStatus(200, table(ADMIN, HIDDEN_TABLE, "describe"));
     assertStatus(404, table(ADMIN, MISSING_TABLE, "deregister"));
+  }
+
+  private HttpResponse<String> renameTable(
+      String user, String sourceSchema, String sourceTable, String targetSchema, String targetTable)
+      throws Exception {
+    RenameTableRequest request = new RenameTableRequest();
+    request.setId(List.of(CATALOG, sourceSchema, sourceTable));
+    request.setNewTableName(targetTable);
+    request.setNewNamespaceId(List.of(CATALOG, targetSchema));
+    return send(user, "/v1/table/" + id(CATALOG, sourceSchema, sourceTable) + "/rename", request);
   }
 
   private HttpResponse<String> dropColumns(String user, String tableName, String column)
