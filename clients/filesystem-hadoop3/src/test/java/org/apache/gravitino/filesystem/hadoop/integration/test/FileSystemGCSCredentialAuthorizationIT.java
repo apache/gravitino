@@ -21,6 +21,7 @@ package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.gcs.fs.GCSFileSystemProvider;
@@ -28,7 +29,6 @@ import org.apache.gravitino.storage.GCSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.junit.platform.commons.util.StringUtils;
 
 @EnabledIf(value = "isGCPConfigured", disabledReason = "GCP is not configured")
 public class FileSystemGCSCredentialAuthorizationIT

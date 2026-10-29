@@ -18,7 +18,7 @@
 package org.apache.gravitino.spark.connector.integration.test.authorization;
 
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -222,11 +222,11 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE), MetadataObject.Type.SCHEMA),
         ImmutableList.of(Privileges.CreateTable.deny()));
     assertThrows(
-        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
         ForbiddenException.class,
         () -> {
           normalUserSparkSession.sql("CREATE TABLE table_d(a STRING)");
-        });
+        },
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.");
     List<Row> tables = normalUserSparkSession.sql("show tables").collectAsList();
     assertEqualsRows(
         ImmutableList.of(
@@ -252,22 +252,22 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             RowFactory.create("jdbcDatabase", "table_c", false)),
         tables);
     assertThrows(
-        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
         ForbiddenException.class,
         () -> {
           normalUserSparkSession.sql("ALTER TABLE table_c ADD COLUMNS (b STRING);");
-        });
+        },
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.");
   }
 
   @Test
   @Order(4)
   public void testDropTable() {
     assertThrows(
-        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
         ForbiddenException.class,
         () -> {
           normalUserSparkSession.sql("DROP TABLE table_c");
-        });
+        },
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.");
     normalUserSparkSession.sql("DROP TABLE table_a");
   }
 
