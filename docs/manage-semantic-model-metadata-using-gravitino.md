@@ -730,6 +730,7 @@ An authorized request for an absent model returns `false` (`dropped: false` in R
 
 The [Gravitino MCP server](./gravitino-mcp-server.md#semantic-models) provides
 `list_of_semantic_models`, `load_semantic_model`, `create_semantic_model`, `alter_semantic_model`,
-and `drop_semantic_model`. Enable the `semantic_model` tool tag when filtering tools.
+`drop_semantic_model`, `list_metrics`, and `list_metric_infos`. Enable the `semantic_model` tool tag
+when filtering tools. Metric discovery tools return the same full namespaces as REST.
 Create and alter use the native REST definition format. Use REST or the SDKs for Ossie import and
 export. The current Web UI does not provide Semantic Model workflows.
