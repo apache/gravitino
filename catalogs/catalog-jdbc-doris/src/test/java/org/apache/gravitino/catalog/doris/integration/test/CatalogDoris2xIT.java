@@ -35,9 +35,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
+import org.apache.gravitino.integration.test.container.DorisFixture;
 import org.apache.gravitino.integration.test.container.DorisImageName;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -58,11 +59,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Integration tests for Doris 2.1.0 with the Nereids planner enabled. */
 @Tag("gravitino-docker-test")
 @Tag("doris-multi-version")
+@DorisFixture(version = DorisImageName.VERSION_2_1)
 public class CatalogDoris2xIT extends BaseIT {
+  @FixtureContainer private DorisContainer doris;
 
   private static final String PROVIDER = "jdbc-doris";
   private static final String DRIVER_CLASS_NAME = "com.mysql.cj.jdbc.Driver";
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private final String metalakeName = GravitinoITUtils.genRandomName("doris2x_metalake");
   private final String catalogName = GravitinoITUtils.genRandomName("doris2x_catalog");
@@ -74,7 +76,6 @@ public class CatalogDoris2xIT extends BaseIT {
 
   @BeforeAll
   public void startup() {
-    containerSuite.startDorisContainer(DorisImageName.VERSION_2_1);
     createMetalake();
     createCatalog();
     createSchema();
@@ -190,7 +191,7 @@ public class CatalogDoris2xIT extends BaseIT {
   }
 
   private void createCatalog() {
-    DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_2_1);
+    DorisContainer dorisContainer = doris;
     jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/",

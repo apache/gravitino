@@ -29,7 +29,7 @@ import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefault
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import org.junit.jupiter.api.BeforeAll;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 public class TestPostgreSql extends TestJdbc {
 
@@ -38,7 +38,7 @@ public class TestPostgreSql extends TestJdbc {
   @BeforeAll
   public static void startup() throws Exception {
     CONTAINER =
-        new PostgreSQLContainer<>(DEFAULT_POSTGRES_IMAGE)
+        new PostgreSQLContainer(DEFAULT_POSTGRES_IMAGE)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");

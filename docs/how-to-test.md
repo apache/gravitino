@@ -57,7 +57,7 @@ To run one class or method, add `--tests` to its lane:
 
 If the class is not in that lane, Gradle fails with "No tests found for given includes".
 
-`coreMySQLTest` and `corePostgreSQLTest` run their test JVM with the system property `gravitino.test.db.disposableData=true`, so the MySQL and PostgreSQL containers keep their data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk. No other task sets it. Other tasks run MySQL with the image's default settings and PostgreSQL with the Testcontainers module's default, `fsync=off`.
+Test containers skip durability work by default: MySQL and PostgreSQL keep their data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk, Hive keeps HDFS in memory and its metastore database skips syncing, Doris and StarRocks keep their backend storage in memory, and so on. No test reads data back after a container stops, so nothing is lost that a test needs. A test class that needs durable data asks for it on its fixture, for example `@HiveFixture(durability = Durability.DURABLE, scope = Scope.CLASS)`, and gets its own container; today only `@HiveFixture` with HDFS storage supports that. To make every container durable, for example to inspect a container's data after a failure, pass `-PdurableTestContainers`.
 
 #### Database reuse and reset
 

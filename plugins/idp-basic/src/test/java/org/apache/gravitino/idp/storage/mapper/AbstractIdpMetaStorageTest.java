@@ -38,12 +38,16 @@ import org.apache.gravitino.idp.storage.relational.converters.IdpSQLExceptionCon
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+// Containers are shared across tests and closed once per run; each test recreates its own database.
+@ExtendWith(CloseContainerExtension.class)
 public abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
@@ -66,7 +70,7 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   @AfterEach
-  void closeSuite() throws IOException {
+  void closeBackend() throws IOException {
     closeSession();
     if (backend != null) {
       backend.close();
@@ -75,7 +79,6 @@ public abstract class AbstractIdpMetaStorageTest {
 
     SqlSessionFactoryHelper.getInstance().close();
     IdpSQLExceptionConverterFactory.close();
-    ContainerSuite.getInstance().close();
 
     if (h2Path != null && Files.exists(h2Path)) {
       deleteDirectory(h2Path);
