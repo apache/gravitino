@@ -759,28 +759,30 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
-  public DomainEntity setDomainParent(
+  public DomainEntity setDomainParentAndGet(
       NameIdentifier ident,
       NameIdentifier parentIdent,
       AuditInfo auditInfo,
       Consumer<LockedDomainState> check)
       throws IOException {
-    return DomainRelService.getInstance().setDomainParent(ident, parentIdent, auditInfo, check);
+    return DomainRelService.getInstance()
+        .setDomainParentAndGet(ident, parentIdent, auditInfo, check);
   }
 
   @Override
-  public DomainEntity removeDomainParent(NameIdentifier ident) throws IOException {
-    return DomainRelService.getInstance().removeDomainParent(ident);
+  public DomainEntity removeDomainParentAndGet(
+      NameIdentifier ident, Consumer<LockedDomainState> check) throws IOException {
+    return DomainRelService.getInstance().removeDomainParentAndGet(ident, check);
   }
 
   @Override
-  public DomainEntity updateDomainStatus(
+  public DomainEntity updateDomainStatusAndGet(
       NameIdentifier ident,
       Domain.Status status,
       AuditInfo auditInfo,
       Consumer<LockedDomainState> check)
       throws IOException {
-    return DomainRelService.getInstance().updateDomainStatus(ident, status, auditInfo, check);
+    return DomainRelService.getInstance().updateDomainStatusAndGet(ident, status, auditInfo, check);
   }
 
   @Override

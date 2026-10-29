@@ -31,11 +31,13 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 
 /**
- * The domain changes whose rules depend on other domains: creating a domain, changing its parent
- * and changing its status. Each change runs in one transaction. It locks the rows of the domains
- * involved, reads them, hands them to the caller's check as a {@link LockedDomainState}, and writes
- * the change only if the check returns. A check that throws rolls the change back, and the
- * exception reaches the caller unchanged.
+ * The domain changes whose rules depend on other domains, or whose authorization depends on the
+ * current parent: creating a domain, changing or removing its parent and changing its status. Each
+ * change runs in one transaction. It locks the rows of the domains involved, reads them, hands them
+ * to the caller's check as a {@link LockedDomainState}, and writes the change only if the check
+ * returns. A check that throws rolls the change back, and the exception reaches the caller
+ * unchanged, unless it is caused by a database error, which is reported like any other failure of
+ * the store.
  *
  * <p>The store only locks, reads and writes; the rules themselves, such as how deep the hierarchy
  * may be or which status a parent needs, are the caller's check. Since the check sees the domains
@@ -54,8 +56,9 @@ public interface SupportsDomainOperations {
    * together with its parent edge.
    *
    * <p>The metalake is locked shared and the parent, if any, is locked shared, so the parent cannot
-   * be attached elsewhere, deleted or unpublished before the change commits. The check gets the new
-   * domain, the parent with its own parent set, and no sub-domains.
+   * be attached elsewhere, deleted or unpublished before the change commits. The domain is written
+   * before the check runs, so a duplicate name fails first. The check gets the new domain, the
+   * parent with its own parent set, and no sub-domains.
    *
    * @param domain The domain to insert.
    * @param check The check of the locked state.
@@ -86,7 +89,7 @@ public interface SupportsDomainOperations {
    * @throws IllegalArgumentException If the new parent is the domain itself or is in another
    *     metalake.
    */
-  DomainEntity setDomainParent(
+  DomainEntity setDomainParentAndGet(
       NameIdentifier ident,
       NameIdentifier parentIdent,
       AuditInfo auditInfo,
@@ -97,12 +100,18 @@ public interface SupportsDomainOperations {
    * Removes the parent edge of a domain, which makes it top-level. Removing the parent of a
    * top-level domain changes nothing.
    *
+   * <p>The domain is locked exclusively, so its parent cannot change before the change commits. The
+   * check gets the domain with its current parent set, which is the parent the edge is removed
+   * from; the parent itself is not locked, so the state has no parent entity and no sub-domains.
+   *
    * @param ident The identifier of the domain.
+   * @param check The check of the locked state.
    * @return The domain after the change.
    * @throws IOException If the change cannot be stored.
    * @throws NoSuchEntityException If the domain does not exist.
    */
-  DomainEntity removeDomainParent(NameIdentifier ident) throws IOException, NoSuchEntityException;
+  DomainEntity removeDomainParentAndGet(NameIdentifier ident, Consumer<LockedDomainState> check)
+      throws IOException, NoSuchEntityException;
 
   /**
    * Sets the status of a domain. Setting the current status writes nothing.
@@ -126,7 +135,7 @@ public interface SupportsDomainOperations {
    * @throws OptimisticLockException If the parent kept changing until the retries ran out.
    * @throws IllegalStateException If it is called inside a transaction.
    */
-  DomainEntity updateDomainStatus(
+  DomainEntity updateDomainStatusAndGet(
       NameIdentifier ident,
       Domain.Status status,
       AuditInfo auditInfo,
@@ -178,7 +187,7 @@ public interface SupportsDomainOperations {
     /**
      * Returns the parent involved in the change, with its own parent set: the parent of a new
      * sub-domain, the new parent when the parent is set, or the current parent when the status
-     * changes.
+     * changes. It is empty when the parent is removed, since that parent is not locked.
      *
      * @return The parent, or empty if the change involves none.
      */
@@ -187,7 +196,8 @@ public interface SupportsDomainOperations {
     }
 
     /**
-     * Returns the sub-domains of the domain being changed. For an insert, there are none.
+     * Returns the sub-domains of the domain being changed. For an insert, there are none, and when
+     * the parent is removed they are not read.
      *
      * @return The sub-domains.
      */

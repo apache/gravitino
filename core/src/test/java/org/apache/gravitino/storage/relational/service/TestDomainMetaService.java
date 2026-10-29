@@ -149,12 +149,30 @@ public class TestDomainMetaService extends TestJDBCBackend {
     DomainEntity finance = newDomain(METALAKE_NAME, "Finance", "comment");
     domainMetaService.insertDomain(finance, false);
 
-    DomainEntity replacement =
-        finance.toBuilder().withComment("replaced").withStatus(Domain.Status.PUBLISHED).build();
+    DomainEntity replacement = finance.toBuilder().withComment("replaced").build();
     domainMetaService.insertDomain(replacement, true);
     Assertions.assertEquals(
         replacement, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
     Assertions.assertEquals(2L, selectDomainPO(finance.id()).currentVersion());
+
+    // A replacement keeps the status, which changes only under the status locks.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.insertDomain(
+                replacement.toBuilder().withStatus(Domain.Status.PUBLISHED).build(), true));
+    Assertions.assertEquals(2L, selectDomainPO(finance.id()).currentVersion());
+
+    // A sub-domain is inserted only with its parent locked and checked.
+    DomainEntity trading = newDomain(METALAKE_NAME, "Trading", null);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.insertDomain(
+                trading.toBuilder().withParent("Finance").build(), false));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.getDomainByIdentifier(trading.nameIdentifier()));
 
     // An overwrite cannot reuse the ID of a deleted domain.
     Assertions.assertTrue(domainMetaService.deleteDomain(finance.nameIdentifier()));

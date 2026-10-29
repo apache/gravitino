@@ -127,18 +127,27 @@ public class DomainMetaService {
   }
 
   /**
-   * Inserts a domain.
+   * Inserts a top-level domain. A sub-domain, whose parent must be locked and checked, is inserted
+   * with {@link #insertDomain(DomainEntity, Consumer)}. Replacing a domain keeps its status and its
+   * parent: the status is changed only under the locks its rules need, by {@link
+   * DomainRelService#updateDomainStatusAndGet}.
    *
    * @param domainEntity The domain to insert.
    * @param overwritten Whether to replace an active domain with the same name or ID.
    * @throws IOException If the domain cannot be stored.
    * @throws EntityAlreadyExistsException If a domain with the same name exists and {@code
    *     overwritten} is false.
+   * @throws IllegalArgumentException If the domain has a parent, or replaces a domain with another
+   *     status.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertDomain")
   public void insertDomain(DomainEntity domainEntity, boolean overwritten) throws IOException {
+    Preconditions.checkArgument(
+        !domainEntity.parent().isPresent(),
+        "The domain %s has a parent and must be inserted with its parent locked",
+        domainEntity.nameIdentifier());
     Namespace ns = domainEntity.namespace();
     String metalakeName = ns.level(0);
 
@@ -204,11 +213,11 @@ public class DomainMetaService {
                     .map(
                         parentName ->
                             DomainRelService.getInstance()
-                                .lockParentOfNewSubDomain(NameIdentifier.of(ns, parentName)))
+                                .lockAndGetParentOfNewSubDomain(NameIdentifier.of(ns, parentName)))
                     .orElse(null);
-            check.accept(new LockedDomainState(domainEntity, parent, Collections.emptyList()));
-
+            // The domain is written before the check, so that a duplicate name fails as such.
             insertNewDomainWithoutCommit(domainPO);
+            check.accept(new LockedDomainState(domainEntity, parent, Collections.emptyList()));
             if (parent != null) {
               DomainRelService.getInstance()
                   .insertDomainRelOfNewSubDomain(
@@ -289,7 +298,7 @@ public class DomainMetaService {
             Preconditions.checkArgument(
                 oldDomainEntity.status() == updatedDomainEntity.status(),
                 "The status of domain %s cannot be changed by an update, use"
-                    + " DomainRelService#updateDomainStatus",
+                    + " DomainRelService#updateDomainStatusAndGet",
                 identifier);
 
             DomainPO newDomainPO = DomainPO.updateDomainPO(lockedDomainPO, updatedDomainEntity);
@@ -475,6 +484,10 @@ public class DomainMetaService {
       return;
     }
 
+    Preconditions.checkArgument(
+        Objects.equals(existingDomainPO.status(), domainEntity.status().name()),
+        "The status of domain %s cannot be changed by replacing it",
+        domainEntity.nameIdentifier());
     DomainPO replacementDomainPO = DomainPO.updateDomainPO(existingDomainPO, domainEntity);
     NameIdentifier observedIdentifier =
         NameIdentifier.of(domainEntity.namespace(), existingDomainPO.domainName());

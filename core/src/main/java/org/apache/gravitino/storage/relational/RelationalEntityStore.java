@@ -433,37 +433,38 @@ public class RelationalEntityStore
   }
 
   @Override
-  public DomainEntity setDomainParent(
+  public DomainEntity setDomainParentAndGet(
       NameIdentifier ident,
       NameIdentifier parentIdent,
       AuditInfo auditInfo,
       Consumer<LockedDomainState> check)
       throws IOException {
     try {
-      return backend.setDomainParent(ident, parentIdent, auditInfo, check);
+      return backend.setDomainParentAndGet(ident, parentIdent, auditInfo, check);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
     }
   }
 
   @Override
-  public DomainEntity removeDomainParent(NameIdentifier ident) throws IOException {
+  public DomainEntity removeDomainParentAndGet(
+      NameIdentifier ident, Consumer<LockedDomainState> check) throws IOException {
     try {
-      return backend.removeDomainParent(ident);
+      return backend.removeDomainParentAndGet(ident, check);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
     }
   }
 
   @Override
-  public DomainEntity updateDomainStatus(
+  public DomainEntity updateDomainStatusAndGet(
       NameIdentifier ident,
       Domain.Status status,
       AuditInfo auditInfo,
       Consumer<LockedDomainState> check)
       throws IOException {
     try {
-      return backend.updateDomainStatus(ident, status, auditInfo, check);
+      return backend.updateDomainStatusAndGet(ident, status, auditInfo, check);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
     }

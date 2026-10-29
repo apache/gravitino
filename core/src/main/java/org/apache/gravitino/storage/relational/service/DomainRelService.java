@@ -48,10 +48,8 @@ import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.DomainRelPO;
-import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.ibatis.session.SqlSession;
 
 /**
  * The service that stores the parent edge of sub-domains in the {@code domain_rel} table. A domain
@@ -177,8 +175,8 @@ public class DomainRelService {
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "setDomainParent")
-  public DomainEntity setDomainParent(
+      baseMetricName = "setDomainParentAndGet")
+  public DomainEntity setDomainParentAndGet(
       NameIdentifier childIdent,
       NameIdentifier parentIdent,
       AuditInfo auditInfo,
@@ -230,22 +228,35 @@ public class DomainRelService {
    * Removes the parent edge of a domain, which makes it top-level, and returns the domain as it is
    * after the change. Removing the parent of a top-level domain changes nothing.
    *
+   * <p>The check gets the domain with its current parent, read under the exclusive lock on the
+   * domain, which every writer of its edge holds; so that parent is the one the edge is removed
+   * from.
+   *
    * @param childIdent The identifier of the domain.
+   * @param check The check of the locked state; the change is rolled back if it throws.
    * @return The domain after the change.
    * @throws IOException If the edge cannot be removed.
    * @throws NoSuchEntityException If the domain does not exist.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "removeDomainParent")
-  public DomainEntity removeDomainParent(NameIdentifier childIdent) throws IOException {
+      baseMetricName = "removeDomainParentAndGet")
+  public DomainEntity removeDomainParentAndGet(
+      NameIdentifier childIdent, Consumer<LockedDomainState> check) throws IOException {
     DomainEntity[] changed = new DomainEntity[1];
     try {
       DomainPO childPO = getDomainPO(childIdent);
       SessionUtils.doMultipleWithCommit(
-          () -> lockMetalakeAndDomains(childIdent, childPO, null),
-          () -> softDeleteDomainRel(childPO.domainId()),
-          () -> changed[0] = readDomain(childPO.domainId(), childIdent.namespace()));
+          () -> {
+            DomainPO lockedPO = lockMetalakeAndDomains(childIdent, childPO, null).getLeft();
+            check.accept(
+                new LockedDomainState(
+                    toEntityWithParent(lockedPO, childIdent.namespace()),
+                    null,
+                    Collections.emptyList()));
+            softDeleteDomainRel(childPO.domainId());
+            changed[0] = readDomain(childPO.domainId(), childIdent.namespace());
+          });
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.DOMAIN, childIdent.toString());
       throw e;
@@ -279,8 +290,8 @@ public class DomainRelService {
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateDomainStatus")
-  public DomainEntity updateDomainStatus(
+      baseMetricName = "updateDomainStatusAndGet")
+  public DomainEntity updateDomainStatusAndGet(
       NameIdentifier identifier,
       Domain.Status status,
       AuditInfo auditInfo,
@@ -377,7 +388,7 @@ public class DomainRelService {
   /**
    * Inserts the parent edge of a top-level domain, which makes it a sub-domain of {@code
    * parentIdent}. It takes no check of the locked state; production code sets a parent with {@link
-   * #setDomainParent}, so that the hierarchy rules are checked.
+   * #setDomainParentAndGet}, so that the hierarchy rules are checked.
    *
    * @param childIdent The identifier of the domain.
    * @param parentIdent The identifier of the parent domain, in the same metalake.
@@ -419,7 +430,7 @@ public class DomainRelService {
   /**
    * Re-points the parent edge of a sub-domain to another parent. Re-pointing it to its current
    * parent changes nothing. It takes no check of the locked state; production code sets a parent
-   * with {@link #setDomainParent}, so that the hierarchy rules are checked.
+   * with {@link #setDomainParentAndGet}, so that the hierarchy rules are checked.
    *
    * @param childIdent The identifier of the sub-domain.
    * @param newParentIdent The identifier of the new parent domain, in the same metalake.
@@ -466,33 +477,6 @@ public class DomainRelService {
   }
 
   /**
-   * Removes the parent edge of a domain, which makes it top-level. Production code uses {@link
-   * #removeDomainParent}, which also returns the domain.
-   *
-   * @param childIdent The identifier of the domain.
-   * @return True if the edge is removed, false if the domain is already top-level.
-   * @throws IOException If the edge cannot be removed.
-   * @throws NoSuchEntityException If the domain does not exist.
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteDomainRel")
-  @VisibleForTesting
-  boolean deleteDomainRel(NameIdentifier childIdent) throws IOException {
-    int[] deleted = new int[1];
-    try {
-      DomainPO childPO = getDomainPO(childIdent);
-      SessionUtils.doMultipleWithCommit(
-          () -> lockMetalakeAndDomains(childIdent, childPO, null),
-          () -> deleted[0] = softDeleteDomainRel(childPO.domainId()));
-    } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(e, Entity.EntityType.DOMAIN, childIdent.toString());
-      throw e;
-    }
-    return deleted[0] > 0;
-  }
-
-  /**
    * Locks the parent of a new sub-domain shared, in the caller's transaction, after the caller
    * locked the metalake, and returns it with its own parent set.
    *
@@ -500,15 +484,15 @@ public class DomainRelService {
    * @return The locked parent domain.
    * @throws NoSuchEntityException If the parent domain does not exist.
    */
-  DomainEntity lockParentOfNewSubDomain(NameIdentifier parentIdent) {
+  DomainEntity lockAndGetParentOfNewSubDomain(NameIdentifier parentIdent) {
     DomainPO lockedParentPO = lockDomain(getDomainPO(parentIdent), false);
-    clearSessionCache();
+    SessionUtils.clearSessionCache();
     return toEntityWithParent(lockedParentPO, parentIdent.namespace());
   }
 
   /**
    * Inserts the parent edge of a new sub-domain, in the caller's transaction. The caller holds the
-   * shared lock on the parent from {@link #lockParentOfNewSubDomain(NameIdentifier)}.
+   * shared lock on the parent from {@link #lockAndGetParentOfNewSubDomain(NameIdentifier)}.
    *
    * @param metalakeId The metalake ID.
    * @param parentId The ID of the parent domain.
@@ -561,7 +545,7 @@ public class DomainRelService {
       DomainPO lockedParentPO = lockDomain(parentPO, false);
       locked = Pair.of(lockDomain(childPO, true), lockedParentPO);
     }
-    clearSessionCache();
+    SessionUtils.clearSessionCache();
     return locked;
   }
 
@@ -585,20 +569,8 @@ public class DomainRelService {
       lockedParentPO = selectDomainForShare(parentId);
       lockedPO = lockDomain(observedPO, true);
     }
-    clearSessionCache();
+    SessionUtils.clearSessionCache();
     return lockedParentPO == null ? null : Pair.of(lockedPO, lockedParentPO);
-  }
-
-  // A read of the same edge or domain earlier in this session, for example by a caller's outer
-  // transaction, may be in MyBatis's first-level cache. The reads that follow the locks must see
-  // the database as it is under them.
-  private static void clearSessionCache() {
-    SqlSession session = SqlSessions.getSqlSession();
-    try {
-      session.clearCache();
-    } finally {
-      SqlSessions.closeSqlSession();
-    }
   }
 
   @Nullable

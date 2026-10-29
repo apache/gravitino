@@ -285,31 +285,6 @@ public class TestDomainRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteDomainRel() throws IOException {
-    createAndInsertMakeLake(METALAKE_NAME);
-    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
-    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
-
-    Assertions.assertFalse(domainRelService.deleteDomainRel(trading.nameIdentifier()));
-    domainRelService.insertDomainRel(
-        trading.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO);
-    Assertions.assertTrue(domainRelService.deleteDomainRel(trading.nameIdentifier()));
-    Assertions.assertFalse(domainRelService.deleteDomainRel(trading.nameIdentifier()));
-    Assertions.assertFalse(domainRelService.getParentDomainName(trading.id()).isPresent());
-    Assertions.assertTrue(domainRelService.listSubDomains(finance.nameIdentifier()).isEmpty());
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            domainRelService.deleteDomainRel(
-                NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing")));
-
-    // A detached domain can be attached again.
-    domainRelService.insertDomainRel(
-        trading.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO);
-    Assertions.assertEquals("Finance", domainRelService.getParentDomainName(trading.id()).get());
-  }
-
-  @TestTemplate
   public void testDeleteDomainWithSubDomains() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
@@ -527,7 +502,11 @@ public class TestDomainRelService extends TestJDBCBackend {
           try {
             for (int i = 0; i < 3; i++) {
               insertDomainRel(child, parent);
-              Assertions.assertTrue(domainRelService.deleteDomainRel(child.nameIdentifier()));
+              Assertions.assertFalse(
+                  domainRelService
+                      .removeDomainParentAndGet(child.nameIdentifier(), state -> {})
+                      .parent()
+                      .isPresent());
             }
             insertDomainRel(child, parent);
             Assertions.assertTrue(domainMetaService.deleteDomain(child.nameIdentifier()));
@@ -759,7 +738,11 @@ public class TestDomainRelService extends TestJDBCBackend {
         () -> {
           insertDomainRel(child, parent);
           try {
-            Assertions.assertTrue(domainRelService.deleteDomainRel(child.nameIdentifier()));
+            Assertions.assertFalse(
+                domainRelService
+                    .removeDomainParentAndGet(child.nameIdentifier(), state -> {})
+                    .parent()
+                    .isPresent());
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -899,7 +882,7 @@ public class TestDomainRelService extends TestJDBCBackend {
 
     // Attaching a top-level domain inserts its edge; the check sees the locked domains.
     DomainEntity attached =
-        domainRelService.setDomainParent(
+        domainRelService.setDomainParentAndGet(
             trading.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO, states::add);
     Assertions.assertEquals(trading.toBuilder().withParent("Finance").build(), attached);
     LockedDomainState state = states.get(0);
@@ -923,7 +906,7 @@ public class TestDomainRelService extends TestJDBCBackend {
             .withLastModifiedTime(modifiedTime)
             .build();
     DomainEntity moved =
-        domainRelService.setDomainParent(
+        domainRelService.setDomainParentAndGet(
             trading.nameIdentifier(), markets.nameIdentifier(), modifiedAuditInfo, states::add);
     Assertions.assertEquals("Markets", moved.parent().get());
     Assertions.assertEquals("Finance", states.get(0).domain().parent().get());
@@ -937,13 +920,13 @@ public class TestDomainRelService extends TestJDBCBackend {
 
     // The check also sees that the new parent is itself a sub-domain.
     states.clear();
-    domainRelService.setDomainParent(
+    domainRelService.setDomainParentAndGet(
         finance.nameIdentifier(), desk.nameIdentifier(), AUDIT_INFO, states::add);
     Assertions.assertEquals("Trading", states.get(0).parent().get().parent().get());
-    domainRelService.deleteDomainRel(finance.nameIdentifier());
+    domainRelService.removeDomainParentAndGet(finance.nameIdentifier(), s -> {});
 
     // Setting the current parent changes nothing.
-    domainRelService.setDomainParent(
+    domainRelService.setDomainParentAndGet(
         trading.nameIdentifier(), markets.nameIdentifier(), modifiedAuditInfo, s -> {});
     Assertions.assertEquals(2L, selectDomainRel(trading.id()).currentVersion());
 
@@ -951,7 +934,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            domainRelService.setDomainParent(
+            domainRelService.setDomainParentAndGet(
                 trading.nameIdentifier(),
                 finance.nameIdentifier(),
                 AUDIT_INFO,
@@ -963,23 +946,23 @@ public class TestDomainRelService extends TestJDBCBackend {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            domainRelService.setDomainParent(
+            domainRelService.setDomainParentAndGet(
                 trading.nameIdentifier(), trading.nameIdentifier(), AUDIT_INFO, s -> {}));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            domainRelService.setDomainParent(
+            domainRelService.setDomainParentAndGet(
                 elsewhere.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO, s -> {}));
     NameIdentifier missing = NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing");
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () ->
-            domainRelService.setDomainParent(
+            domainRelService.setDomainParentAndGet(
                 missing, finance.nameIdentifier(), AUDIT_INFO, s -> {}));
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () ->
-            domainRelService.setDomainParent(
+            domainRelService.setDomainParentAndGet(
                 trading.nameIdentifier(), missing, AUDIT_INFO, s -> {}));
   }
 
@@ -989,16 +972,42 @@ public class TestDomainRelService extends TestJDBCBackend {
     DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
     DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
     insertDomainRel(trading, finance);
+    List<LockedDomainState> states = new ArrayList<>();
 
-    Assertions.assertEquals(trading, domainRelService.removeDomainParent(trading.nameIdentifier()));
+    // A failing check keeps the edge.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainRelService.removeDomainParentAndGet(
+                trading.nameIdentifier(),
+                s -> {
+                  throw new IllegalArgumentException("rejected");
+                }));
+    Assertions.assertEquals("Finance", domainRelService.getParentDomainName(trading.id()).get());
+
+    // The check sees the parent the edge is removed from.
+    Assertions.assertEquals(
+        trading, domainRelService.removeDomainParentAndGet(trading.nameIdentifier(), states::add));
+    Assertions.assertEquals("Finance", states.get(0).domain().parent().get());
+    Assertions.assertFalse(states.get(0).parent().isPresent());
+    Assertions.assertTrue(states.get(0).subDomains().isEmpty());
     Assertions.assertFalse(domainRelService.getParentDomainName(trading.id()).isPresent());
+    Assertions.assertTrue(domainRelService.listSubDomains(finance.nameIdentifier()).isEmpty());
+
     // Removing the parent of a top-level domain changes nothing.
-    Assertions.assertEquals(trading, domainRelService.removeDomainParent(trading.nameIdentifier()));
+    states.clear();
+    Assertions.assertEquals(
+        trading, domainRelService.removeDomainParentAndGet(trading.nameIdentifier(), states::add));
+    Assertions.assertFalse(states.get(0).domain().parent().isPresent());
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () ->
-            domainRelService.removeDomainParent(
-                NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing")));
+            domainRelService.removeDomainParentAndGet(
+                NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing"), s -> {}));
+
+    // A detached domain can be attached again.
+    insertDomainRel(trading, finance);
+    Assertions.assertEquals("Finance", domainRelService.getParentDomainName(trading.id()).get());
   }
 
   @TestTemplate
@@ -1017,7 +1026,7 @@ public class TestDomainRelService extends TestJDBCBackend {
 
     // A top-level domain has no parent; the check sees its sub-domains.
     DomainEntity published =
-        domainRelService.updateDomainStatus(
+        domainRelService.updateDomainStatusAndGet(
             finance.nameIdentifier(), Domain.Status.PUBLISHED, modifiedAuditInfo, states::add);
     Assertions.assertEquals(Domain.Status.PUBLISHED, published.status());
     Assertions.assertEquals(AUDIT_INFO.creator(), published.auditInfo().creator());
@@ -1033,7 +1042,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     // A sub-domain's check sees its parent.
     states.clear();
     DomainEntity publishedTrading =
-        domainRelService.updateDomainStatus(
+        domainRelService.updateDomainStatusAndGet(
             trading.nameIdentifier(), Domain.Status.PUBLISHED, modifiedAuditInfo, states::add);
     Assertions.assertEquals("Finance", publishedTrading.parent().get());
     Assertions.assertEquals("Finance", states.get(0).domain().parent().get());
@@ -1041,7 +1050,7 @@ public class TestDomainRelService extends TestJDBCBackend {
 
     // Setting the current status writes nothing.
     long version = selectDomainVersion(trading.id());
-    domainRelService.updateDomainStatus(
+    domainRelService.updateDomainStatusAndGet(
         trading.nameIdentifier(), Domain.Status.PUBLISHED, modifiedAuditInfo, s -> {});
     Assertions.assertEquals(version, selectDomainVersion(trading.id()));
 
@@ -1049,7 +1058,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            domainRelService.updateDomainStatus(
+            domainRelService.updateDomainStatusAndGet(
                 finance.nameIdentifier(),
                 Domain.Status.DRAFT,
                 modifiedAuditInfo,
@@ -1063,7 +1072,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () ->
-            domainRelService.updateDomainStatus(
+            domainRelService.updateDomainStatusAndGet(
                 NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing"),
                 Domain.Status.PUBLISHED,
                 modifiedAuditInfo,
@@ -1097,7 +1106,7 @@ public class TestDomainRelService extends TestJDBCBackend {
         Domain.Status.DRAFT, domainMetaService.getDomainByIdentifier(tradingIdent).status());
 
     // The domain is detached after its parent was read.
-    domainRelService.deleteDomainRel(tradingIdent);
+    domainRelService.removeDomainParentAndGet(tradingIdent, s -> {});
     Assertions.assertFalse(
         domainRelService
             .tryUpdateDomainStatusOnce(
@@ -1120,7 +1129,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     // A fresh read locks the current parent, which the check sees.
     List<LockedDomainState> states = new ArrayList<>();
     DomainEntity published =
-        domainRelService.updateDomainStatus(
+        domainRelService.updateDomainStatusAndGet(
             tradingIdent, Domain.Status.PUBLISHED, AUDIT_INFO, states::add);
     Assertions.assertEquals(Domain.Status.PUBLISHED, published.status());
     Assertions.assertEquals(markets.id(), states.get(0).parent().get().id());
@@ -1136,7 +1145,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     DomainRelPO observedRelPO = selectDomainRel(trading.id());
 
     // The domain is detached and its old parent deleted after the parent was read.
-    domainRelService.deleteDomainRel(trading.nameIdentifier());
+    domainRelService.removeDomainParentAndGet(trading.nameIdentifier(), s -> {});
     Assertions.assertTrue(domainMetaService.deleteDomain(finance.nameIdentifier()));
     Assertions.assertFalse(
         domainRelService
@@ -1166,7 +1175,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     Assertions.assertThrows(
         OptimisticLockException.class,
         () ->
-            service.updateDomainStatus(
+            service.updateDomainStatusAndGet(
                 finance.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {}));
     Mockito.verify(service, Mockito.times(3))
         .tryUpdateDomainStatusOnce(any(), any(), any(), any(), any(), any());
@@ -1183,7 +1192,7 @@ public class TestDomainRelService extends TestJDBCBackend {
             SessionUtils.doMultipleWithCommit(
                 () -> {
                   try {
-                    domainRelService.updateDomainStatus(
+                    domainRelService.updateDomainStatusAndGet(
                         finance.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {});
                   } catch (IOException e) {
                     throw new RuntimeException(e);
@@ -1207,7 +1216,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     assertWaitsForDomainRow(
         finance.id(),
         () ->
-            domainRelService.updateDomainStatus(
+            domainRelService.updateDomainStatusAndGet(
                 trading.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {}));
     assertWaitsForDomainRow(
         finance.id(),
@@ -1218,27 +1227,73 @@ public class TestDomainRelService extends TestJDBCBackend {
     assertWaitsForDomainRow(
         markets.id(),
         () ->
-            domainRelService.setDomainParent(
+            domainRelService.setDomainParentAndGet(
                 desk.nameIdentifier(), markets.nameIdentifier(), AUDIT_INFO, s -> {}));
     assertWaitsForDomainRow(
         desk.id(),
         () ->
-            domainRelService.setDomainParent(
+            domainRelService.setDomainParentAndGet(
                 desk.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO, s -> {}));
+
+    assertWaitsForDomainRow(
+        desk.id(), () -> domainRelService.removeDomainParentAndGet(desk.nameIdentifier(), s -> {}));
+    assertWaitsForDomainRow(
+        markets.id(),
+        () ->
+            domainRelService.updateDomainStatusAndGet(
+                markets.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {}));
 
     Assertions.assertEquals(
         Domain.Status.PUBLISHED,
         domainMetaService.getDomainByIdentifier(trading.nameIdentifier()).status());
-    Assertions.assertEquals("Finance", domainRelService.getParentDomainName(desk.id()).get());
+    Assertions.assertEquals(
+        Domain.Status.PUBLISHED,
+        domainMetaService.getDomainByIdentifier(markets.nameIdentifier()).status());
+    Assertions.assertFalse(domainRelService.getParentDomainName(desk.id()).isPresent());
   }
 
+  @TestTemplate
+  public void testLockedReadsBypassTheSessionCache() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity markets = insertDomain(METALAKE_NAME, "Markets");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            // An outer transaction reads the edge before another transaction attaches the domain;
+            // the empty result is now in this session's cache.
+            Assertions.assertNull(selectDomainRel(trading.id()));
+            try {
+              executor.submit(() -> insertDomainRel(trading, finance)).get(30, TimeUnit.SECONDS);
+              // Under its locks, the change reads the committed edge and re-points it, instead of
+              // inserting a second edge from the cached empty read.
+              DomainEntity moved =
+                  domainRelService.setDomainParentAndGet(
+                      trading.nameIdentifier(), markets.nameIdentifier(), AUDIT_INFO, s -> {});
+              Assertions.assertEquals("Markets", moved.parent().get());
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+          });
+    } finally {
+      executor.shutdownNow();
+    }
+    Assertions.assertEquals("Markets", domainRelService.getParentDomainName(trading.id()).get());
+    Assertions.assertEquals(1, countDomainRelRows(trading.id()));
+  }
+
+  // On H2 the metalake row is locked exclusively, so there the publish waits on the metalake row;
+  // testLockedOperationsWaitForDomainRows checks the parent row lock on every database.
   @TestTemplate
   public void testPublishWaitsForConcurrentParentUnpublish() throws Exception {
     createAndInsertMakeLake(METALAKE_NAME);
     DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
     DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
     insertDomainRel(trading, finance);
-    domainRelService.updateDomainStatus(
+    domainRelService.updateDomainStatusAndGet(
         finance.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {});
 
     CountDownLatch unpublishChecked = new CountDownLatch(1);
@@ -1248,7 +1303,7 @@ public class TestDomainRelService extends TestJDBCBackend {
         executor.submit(
             () -> {
               try {
-                domainRelService.updateDomainStatus(
+                domainRelService.updateDomainStatusAndGet(
                     finance.nameIdentifier(),
                     Domain.Status.DRAFT,
                     AUDIT_INFO,
@@ -1268,7 +1323,7 @@ public class TestDomainRelService extends TestJDBCBackend {
           executor.submit(
               () -> {
                 try {
-                  domainRelService.updateDomainStatus(
+                  domainRelService.updateDomainStatusAndGet(
                       trading.nameIdentifier(),
                       Domain.Status.PUBLISHED,
                       AUDIT_INFO,

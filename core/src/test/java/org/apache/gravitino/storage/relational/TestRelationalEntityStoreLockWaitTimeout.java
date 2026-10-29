@@ -353,18 +353,20 @@ public class TestRelationalEntityStoreLockWaitTimeout {
         Pair.of("batchPut", () -> store.batchPut(List.of(table), true)),
         Pair.of("insertDomain", () -> store.insertDomain(domain(), state -> {})),
         Pair.of(
-            "setDomainParent",
+            "setDomainParentAndGet",
             () ->
-                store.setDomainParent(
+                store.setDomainParentAndGet(
                     DOMAIN_IDENT,
                     NameIdentifierUtil.ofDomain(METALAKE, "parent"),
                     AUDIT_INFO,
                     state -> {})),
-        Pair.of("removeDomainParent", () -> store.removeDomainParent(DOMAIN_IDENT)),
         Pair.of(
-            "updateDomainStatus",
+            "removeDomainParentAndGet",
+            () -> store.removeDomainParentAndGet(DOMAIN_IDENT, state -> {})),
+        Pair.of(
+            "updateDomainStatusAndGet",
             () ->
-                store.updateDomainStatus(
+                store.updateDomainStatusAndGet(
                     DOMAIN_IDENT, Domain.Status.PUBLISHED, AUDIT_INFO, state -> {})));
   }
 
