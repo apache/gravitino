@@ -17,8 +17,8 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -55,11 +55,11 @@ public class GroupAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(1)
   public void testCreateGroup() {
     assertThrows(
-        "Current user access metadata {testMetalake}",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).addGroup("group1");
-        });
+        },
+        "Current user access metadata {testMetalake}");
     client.loadMetalake(METALAKE).addGroup("group1");
     client.loadMetalake(METALAKE).addGroup("group2");
   }
@@ -116,11 +116,11 @@ public class GroupAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(3)
   public void testRemoveGroup() {
     assertThrows(
-        "Current user access metadata {testMetalake}",
         ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).removeGroup("group1");
-        });
+        },
+        "Current user access metadata {testMetalake}");
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     // owner can remove user
     gravitinoMetalake.removeGroup("group1");

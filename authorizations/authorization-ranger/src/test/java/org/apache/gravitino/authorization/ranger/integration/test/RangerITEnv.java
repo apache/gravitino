@@ -92,14 +92,14 @@ public class RangerITEnv {
   protected static RangerHelper rangerHelper;
   protected static RangerHelper rangerHDFSHelper;
   public static String RANGER_ADMIN_URL = null;
+  private static RangerContainer rangerContainer;
 
-  public static void init(String metalakeName, boolean allowAnyoneAccessHDFS) {
-    containerSuite.startRangerContainer();
+  public static void init(
+      RangerContainer ranger, String metalakeName, boolean allowAnyoneAccessHDFS) {
+    rangerContainer = ranger;
     RANGER_ADMIN_URL =
-        String.format(
-            "http://%s:%d",
-            containerSuite.getRangerContainer().getContainerIpAddress(), RANGER_SERVER_PORT);
-    rangerClient = containerSuite.getRangerContainer().rangerClient;
+        String.format("http://%s:%d", rangerContainer.getContainerIpAddress(), RANGER_SERVER_PORT);
+    rangerClient = rangerContainer.rangerClient;
 
     rangerAuthHivePlugin =
         new RangerAuthorizationHadoopSQLPlugin(
@@ -108,8 +108,7 @@ public class RangerITEnv {
                 RangerAuthorizationProperties.RANGER_ADMIN_URL,
                 String.format(
                     "http://%s:%d",
-                    containerSuite.getRangerContainer().getContainerIpAddress(),
-                    RangerContainer.RANGER_SERVER_PORT),
+                    rangerContainer.getContainerIpAddress(), RangerContainer.RANGER_SERVER_PORT),
                 RangerAuthorizationProperties.RANGER_AUTH_TYPE,
                 RangerContainer.authType,
                 RangerAuthorizationProperties.RANGER_USERNAME,
@@ -135,7 +134,7 @@ public class RangerITEnv {
                     RangerAuthorizationProperties.RANGER_ADMIN_URL,
                     String.format(
                         "http://%s:%d",
-                        containerSuite.getRangerContainer().getContainerIpAddress(),
+                        rangerContainer.getContainerIpAddress(),
                         RangerContainer.RANGER_SERVER_PORT),
                     RangerAuthorizationProperties.RANGER_AUTH_TYPE,
                     RangerContainer.authType,
@@ -199,8 +198,7 @@ public class RangerITEnv {
                 RangerContainer.DOCKER_ENV_RANGER_SERVER_URL,
                 String.format(
                     "http://%s:%d",
-                    containerSuite.getRangerContainer().getContainerIpAddress(),
-                    RangerContainer.RANGER_SERVER_PORT),
+                    rangerContainer.getContainerIpAddress(), RangerContainer.RANGER_SERVER_PORT),
                 RangerContainer.DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME,
                 RangerContainer.DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME,

@@ -27,7 +27,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.DorisContainer;
+import org.apache.gravitino.integration.test.container.DorisFixture;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
@@ -46,11 +48,12 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DorisFixture
 public class CatalogsPageDorisTest extends BaseWebIT {
+  @FixtureContainer private DorisContainer doris;
+
   private MetalakePage metalakePage;
   private CatalogsPage catalogsPage;
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
   private static GravitinoMetalake metalake;
 
@@ -79,13 +82,8 @@ public class CatalogsPageDorisTest extends BaseWebIT {
     gravitinoClient = getGravitinoClient();
     gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
 
-    containerSuite.startDorisContainer();
-
     dorisJdbcConnectionUri =
-        String.format(
-            "jdbc:mysql://%s:%d/",
-            containerSuite.getDorisContainer().getContainerIpAddress(),
-            containerSuite.getDorisContainer().getFeMysqlPort());
+        String.format("jdbc:mysql://%s:%d/", doris.getContainerIpAddress(), doris.getFeMysqlPort());
     LOG.info("Doris jdbc url: {}", dorisJdbcConnectionUri);
 
     metalakePage = new MetalakePage(driver);

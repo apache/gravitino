@@ -73,6 +73,7 @@ dependencies {
   shadedJarTestRuntimeOnly(project(":server"))
   shadedJarTestRuntimeOnly(files(tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFile }))
   shadedJarTestRuntimeOnly(libs.junit.jupiter.engine)
+  shadedJarTestRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.withType(ShadowJar::class.java) {

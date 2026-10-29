@@ -40,6 +40,8 @@ import org.apache.gravitino.authorization.common.PathBasedMetadataObject;
 import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.integration.test.container.RangerContainer;
+import org.apache.gravitino.integration.test.container.RangerFixture;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,6 +51,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 @Tag("gravitino-docker-test")
+@RangerFixture
 public class RangerAuthorizationHDFSPluginIT {
 
   private static RangerAuthorizationPlugin rangerAuthPlugin;
@@ -57,8 +60,8 @@ public class RangerAuthorizationHDFSPluginIT {
   private static CatalogDispatcher previousInternalCatalogDispatcher;
 
   @BeforeAll
-  public static void setup() throws Exception {
-    RangerITEnv.init(RangerITEnv.currentFunName(), true);
+  public static void setup(RangerContainer ranger) throws Exception {
+    RangerITEnv.init(ranger, RangerITEnv.currentFunName(), true);
     rangerAuthPlugin = RangerITEnv.rangerAuthHDFSPlugin;
     previousCatalogDispatcher =
         (CatalogDispatcher)
