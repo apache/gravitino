@@ -181,7 +181,10 @@ datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
-aliyun-sdk-oss = "3.10.2"
+# hadoop-project 3.3.6 manages aliyun-sdk-oss at 3.13.0 and Iceberg 1.11 OSSFileIO is
+# compiled against the 3.13.0 OSSClient#deleteObject signature; 3.10.2 throws
+# NoSuchMethodError on OSS deletes.
+aliyun-sdk-oss = "3.13.0"
 tencentcloud-sdk-sts = "3.1.1239"
 openlineage = "1.29.0"
 jcstress = "0.8.15"
