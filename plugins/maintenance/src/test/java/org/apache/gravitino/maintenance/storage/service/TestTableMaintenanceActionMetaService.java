@@ -67,13 +67,10 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
         () -> actionService.recordBeforeMetrics(jobId, tableId, policyId, beforeMetricsId + 1));
 
     long afterMetricsId = metricsService.insertMetrics(tableId, policyId, 200L, "{\"mse\":2}");
-    actionService.markFinished(
-        jobId, tableId, policyId, afterMetricsId, System.currentTimeMillis());
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () ->
-            actionService.markFinished(
-                jobId, tableId, policyId, afterMetricsId + 1, System.currentTimeMillis()));
+    actionService.recordAfterMetrics(jobId, tableId, policyId, afterMetricsId);
+    actionService.markFinished(jobId, tableId, policyId, System.currentTimeMillis());
+    // Idempotent finish when already closed.
+    actionService.markFinished(jobId, tableId, policyId, System.currentTimeMillis() + 1);
 
     actionService.deleteByJobId(jobId);
 
@@ -101,46 +98,17 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     actions.recordBeforeMetrics(jobId, 102L, 202L, 22L);
 
     long finishedAtA = System.currentTimeMillis();
-    actions.markFinished(jobId, 101L, 201L, null, finishedAtA);
+    actions.markFinished(jobId, 101L, 201L, finishedAtA);
     Assertions.assertEquals(finishedAtA, actions.getByJobIdAndTableId(jobId, 101L).finishedAt());
     Assertions.assertEquals(0L, actions.getByJobIdAndTableId(jobId, 102L).finishedAt());
 
     long finishedAtB = finishedAtA + 10;
-    actions.markFinished(jobId, 102L, 202L, 33L, finishedAtB);
+    actions.recordAfterMetrics(jobId, 102L, 202L, 33L);
+    actions.markFinished(jobId, 102L, 202L, finishedAtB);
     Assertions.assertEquals(finishedAtB, actions.getByJobIdAndTableId(jobId, 102L).finishedAt());
     Assertions.assertEquals(33L, actions.getByJobIdAndTableId(jobId, 102L).afterMetricsId());
-    // Idempotent null-after finish for already closed A.
-    actions.markFinished(jobId, 101L, 201L, null, finishedAtA + 1);
-  }
-
-  @TestTemplate
-  void testMarkFinishedBackfillsAfterMetricsWhenAlreadyClosed() {
-    TableMaintenanceActionMetaService actionService =
-        TableMaintenanceActionMetaService.getInstance();
-    long jobId = 1999L;
-    long tableId = 12L;
-    long policyId = 22L;
-    OccupancyClaim claim =
-        actionService.insertInFlight(
-            tableId, policyId, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
-    actionService.bindJobId(claim, jobId);
-    actionService.recordBeforeMetrics(jobId, tableId, policyId, 100L);
-
-    long reclaimFinishedAt = System.currentTimeMillis();
-    actionService.markFinished(jobId, tableId, policyId, null, reclaimFinishedAt);
-    Assertions.assertEquals(
-        reclaimFinishedAt, actionService.getByJobIdAndTableId(jobId, tableId).finishedAt());
-    Assertions.assertNull(actionService.getByJobIdAndTableId(jobId, tableId).afterMetricsId());
-
-    actionService.markFinished(jobId, tableId, policyId, 200L, System.currentTimeMillis());
-    Assertions.assertEquals(
-        200L, actionService.getByJobIdAndTableId(jobId, tableId).afterMetricsId());
-    Assertions.assertEquals(
-        reclaimFinishedAt, actionService.getByJobIdAndTableId(jobId, tableId).finishedAt());
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () ->
-            actionService.markFinished(jobId, tableId, policyId, 201L, System.currentTimeMillis()));
+    // Idempotent finish for already closed A.
+    actions.markFinished(jobId, 101L, 201L, finishedAtA + 1);
   }
 
   @TestTemplate
@@ -242,7 +210,7 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
         22L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB).beforeMetricsId());
 
     long finishedAt = System.currentTimeMillis();
-    actions.markFinished(jobId, tableId, policyA, null, finishedAt);
+    actions.markFinished(jobId, tableId, policyA, finishedAt);
     Assertions.assertEquals(
         finishedAt, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyA).finishedAt());
     Assertions.assertEquals(
@@ -368,8 +336,8 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     Assertions.assertEquals(jobId, actions.getById(batch.get().get(1).id()).jobId());
 
     long finishedAt = System.currentTimeMillis();
-    actions.markFinished(jobId, tableId, policyA, 500L, finishedAt);
-    actions.markFinished(jobId, tableId, policyB, 501L, finishedAt + 1);
+    actions.markFinished(jobId, tableId, policyA, finishedAt);
+    actions.markFinished(jobId, tableId, policyB, finishedAt + 1);
     Assertions.assertTrue(actions.getById(batch.get().get(0).id()).finishedAt() > 0);
     Assertions.assertTrue(actions.getById(batch.get().get(1).id()).finishedAt() > 0);
   }

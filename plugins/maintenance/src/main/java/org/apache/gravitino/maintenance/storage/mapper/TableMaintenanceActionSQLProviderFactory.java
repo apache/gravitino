@@ -197,7 +197,6 @@ public class TableMaintenanceActionSQLProviderFactory {
    * @param jobId job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param afterMetricsId after metrics row id, or null
    * @param finishedAt finish millis
    * @return UPDATE statement
    */
@@ -205,24 +204,8 @@ public class TableMaintenanceActionSQLProviderFactory {
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterMetricsId") Long afterMetricsId,
       @Param("finishedAt") long finishedAt) {
-    return getProvider().markFinished(jobId, tableId, policyId, afterMetricsId, finishedAt);
-  }
-
-  /**
-   * @param jobId job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
-   * @param afterMetricsId after metrics row id
-   * @return UPDATE statement
-   */
-  public static String backfillAfterMetrics(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("afterMetricsId") long afterMetricsId) {
-    return getProvider().backfillAfterMetrics(jobId, tableId, policyId, afterMetricsId);
+    return getProvider().markFinished(jobId, tableId, policyId, finishedAt);
   }
 
   /**

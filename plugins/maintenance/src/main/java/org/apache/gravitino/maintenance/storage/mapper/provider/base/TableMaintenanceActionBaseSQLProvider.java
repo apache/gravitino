@@ -249,8 +249,8 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
-   * Releases the soft slot for one bound table/policy row. Optionally stores {@code
-   * after_metrics_id} when finishing together with the S1 sample.
+   * Releases the soft slot for one bound table/policy row. Does not write metrics pointers; S0/S1
+   * use {@link #updateBeforeMetrics} / {@link #updateAfterMetrics}.
    *
    * <p>Only one in-flight row exists per {@code (table_id, policy_id)} ({@code finished_at = 0}),
    * so finish timestamps do not contend across concurrent submitters.
@@ -258,7 +258,6 @@ public class TableMaintenanceActionBaseSQLProvider {
    * @param jobId Gravitino job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param afterMetricsId terminal metrics row id, or null when releasing without an S1
    * @param finishedAt finish time millis; must be {@code > 0}
    * @return UPDATE statement
    */
@@ -266,36 +265,12 @@ public class TableMaintenanceActionBaseSQLProvider {
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterMetricsId") Long afterMetricsId,
       @Param("finishedAt") long finishedAt) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET after_metrics_id = COALESCE(#{afterMetricsId}, after_metrics_id),"
-        + " finished_at = #{finishedAt}"
+        + " SET finished_at = #{finishedAt}"
         + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
         + " AND finished_at = 0";
-  }
-
-  /**
-   * Backfills {@code after_metrics_id} after failsafe reclaim closed the soft slot with a null
-   * after metrics pointer.
-   *
-   * @param jobId Gravitino job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
-   * @param afterMetricsId terminal metrics row id; must be non-null
-   * @return UPDATE statement
-   */
-  public String backfillAfterMetrics(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("afterMetricsId") long afterMetricsId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET after_metrics_id = #{afterMetricsId}"
-        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND finished_at > 0 AND after_metrics_id IS NULL";
   }
 
   /**

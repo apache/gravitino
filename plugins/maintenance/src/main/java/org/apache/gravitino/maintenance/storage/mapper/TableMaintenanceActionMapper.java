@@ -119,17 +119,7 @@ public interface TableMaintenanceActionMapper {
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterMetricsId") Long afterMetricsId,
       @Param("finishedAt") long finishedAt);
-
-  @UpdateProvider(
-      type = TableMaintenanceActionSQLProviderFactory.class,
-      method = "backfillAfterMetrics")
-  int backfillAfterMetrics(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("afterMetricsId") long afterMetricsId);
 
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteById")
   int deleteById(@Param("id") long id);

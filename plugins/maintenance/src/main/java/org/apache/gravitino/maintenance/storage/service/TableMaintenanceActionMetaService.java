@@ -533,42 +533,24 @@ public class TableMaintenanceActionMetaService {
    * single soft slot per pair (like {@code deleted_at}). Only one in-flight row can finish that
    * pair at a time, so two completed rows cannot race to the same millisecond {@code finished_at}.
    *
-   * <p>If the row was already closed with a null after metrics id, a later call may still backfill
-   * when {@code afterMetricsId} is non-null. Safe to retry when the row is already finished with a
-   * null after and {@code afterMetricsId} is also null.
+   * <p>Does not write metrics pointers; call {@link #recordBeforeMetrics} / {@link
+   * #recordAfterMetrics} separately when sampling. Safe to retry when the row is already finished.
    *
    * @param jobId Gravitino job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param afterMetricsId terminal metrics row id, or null when releasing without an S1
    * @param finishedAt finish timestamp millis
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "markTableMaintenanceActionFinished")
-  public void markFinished(
-      long jobId, long tableId, long policyId, Long afterMetricsId, long finishedAt) {
+  public void markFinished(long jobId, long tableId, long policyId, long finishedAt) {
     Preconditions.checkArgument(finishedAt > 0, "finishedAt must be positive");
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.markFinished(jobId, tableId, policyId, afterMetricsId, finishedAt));
+            mapper -> mapper.markFinished(jobId, tableId, policyId, finishedAt));
     if (updated == 1) {
-      return;
-    }
-    if (afterMetricsId != null) {
-      int backfilled =
-          SessionUtils.doWithCommitAndFetchResult(
-              TableMaintenanceActionMapper.class,
-              mapper -> mapper.backfillAfterMetrics(jobId, tableId, policyId, afterMetricsId));
-      Preconditions.checkState(
-          backfilled == 1,
-          "expected to finish or backfill action for job_id=%s table_id=%s policy_id=%s, finished=%s, backfilled=%s",
-          jobId,
-          tableId,
-          policyId,
-          updated,
-          backfilled);
       return;
     }
     TableMaintenanceActionPO current = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);

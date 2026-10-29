@@ -98,7 +98,7 @@ public class MaintenanceMetricsService {
                 request.getSnapshotId(),
                 request.getMetricsJson());
     actionMetaService.recordBeforeMetrics(jobId, action.tableId(), action.policyId(), metricsId);
-    maybeFinish(jobId, action, /*afterMetricsId=*/ null, finish, "before", metalake, metricsId);
+    maybeFinish(jobId, action, finish, "before", metalake, metricsId);
   }
 
   /**
@@ -122,7 +122,7 @@ public class MaintenanceMetricsService {
                 request.getSnapshotId(),
                 request.getMetricsJson());
     actionMetaService.recordAfterMetrics(jobId, action.tableId(), action.policyId(), metricsId);
-    maybeFinish(jobId, action, metricsId, finish, "after", metalake, metricsId);
+    maybeFinish(jobId, action, finish, "after", metalake, metricsId);
   }
 
   /**
@@ -136,11 +136,7 @@ public class MaintenanceMetricsService {
     TableMaintenanceActionPO action =
         loadInFlight(metalake, jobId, request.getTableId(), request.getPolicyId());
     actionMetaService.markFinished(
-        jobId,
-        action.tableId(),
-        action.policyId(),
-        /*afterMetricsId=*/ null,
-        System.currentTimeMillis());
+        jobId, action.tableId(), action.policyId(), System.currentTimeMillis());
     LOG.info(
         "action finished for job {} metalake {} table {} policy {}",
         jobId,
@@ -152,7 +148,6 @@ public class MaintenanceMetricsService {
   private void maybeFinish(
       long jobId,
       TableMaintenanceActionPO action,
-      Long afterMetricsId,
       boolean finish,
       String phase,
       String metalake,
@@ -169,7 +164,7 @@ public class MaintenanceMetricsService {
       return;
     }
     actionMetaService.markFinished(
-        jobId, action.tableId(), action.policyId(), afterMetricsId, System.currentTimeMillis());
+        jobId, action.tableId(), action.policyId(), System.currentTimeMillis());
     LOG.info(
         "{} metrics reported and action finished for job {} metalake {} table {} policy {} metricsId {}",
         phase,

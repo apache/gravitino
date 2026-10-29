@@ -21,7 +21,6 @@ package org.apache.gravitino.maintenance.web.rest;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -76,7 +75,7 @@ class TestTableMaintenanceActionOperations {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}");
     verify(actions).recordBeforeMetrics(JOB_ID, TABLE_ID, POLICY_ID, 501L);
-    verify(actions, never()).markFinished(anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
+    verify(actions, never()).markFinished(anyLong(), anyLong(), anyLong(), anyLong());
   }
 
   @Test
@@ -93,7 +92,7 @@ class TestTableMaintenanceActionOperations {
             new MaintenanceActionMetricsRequest(TABLE_ID, POLICY_ID, 100L, "{\"m\":1}"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), anyLong());
   }
 
   @Test
@@ -112,7 +111,7 @@ class TestTableMaintenanceActionOperations {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics).insertMetrics(TABLE_ID, POLICY_ID, 200L, "{\"m\":2}");
     verify(actions).recordAfterMetrics(JOB_ID, TABLE_ID, POLICY_ID, 502L);
-    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), eq(502L), anyLong());
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), anyLong());
   }
 
   @Test
@@ -164,7 +163,7 @@ class TestTableMaintenanceActionOperations {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(actions).bindJobIdIfUnbound(TABLE_ID, POLICY_ID, JOB_ID);
-    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), anyLong());
   }
 
   @Test
@@ -199,7 +198,7 @@ class TestTableMaintenanceActionOperations {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(metrics, never()).insertMetrics(anyLong(), anyLong(), anyLong(), anyString());
-    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), isNull(), anyLong());
+    verify(actions).markFinished(eq(JOB_ID), eq(TABLE_ID), eq(POLICY_ID), anyLong());
   }
 
   private TableMaintenanceActionOperations operations(LongFunction<String> lookup) {
