@@ -117,6 +117,18 @@ class TestMaintenanceJobSpecFactory {
   }
 
   @Test
+  void testMergeSparkConfJsonTakesMaxMemory() {
+    String merged =
+        MaintenanceJobSpecFactory.mergeSparkConfJson(
+            "{\"spark.executor.memory\":\"4g\",\"shared\":\"first\"}",
+            "{\"spark.executor.memory\":\"8g\",\"shared\":\"later\",\"spark.executor.cores\":\"2\"}");
+    Assertions.assertNotNull(merged);
+    Assertions.assertTrue(merged.contains("\"spark.executor.memory\":\"8g\""));
+    Assertions.assertTrue(merged.contains("\"shared\":\"first\""));
+    Assertions.assertTrue(merged.contains("\"spark.executor.cores\":\"2\""));
+  }
+
+  @Test
   void testMergeResourceKeysTakesMax() {
     Map<String, String> into =
         MaintenanceJobSpecFactory.newLinkedMap(

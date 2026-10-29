@@ -40,8 +40,10 @@ import org.slf4j.LoggerFactory;
  * in-flight gate → soft-slot claim → {@link MaintenanceJobManager#submitAndBind}.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same spec
- * shape; each {@link Task} becomes one Spark job. If any task table is in-flight, the whole pick
- * stops without partial submits (one-shot row is still removed by the caller).
+ * shape; each {@link Task} becomes one Spark job. After coalesce, a {@code table:} instance may
+ * still hold multiple tasks (members live in {@code task_data}); occupancy uses each task's own
+ * {@code policyId}. If any task is in-flight, the whole pick stops without partial submits
+ * (one-shot row is still removed by the caller).
  *
  * <p>Does not sample metrics or evaluate trigger-expr (both run inside Spark from enqueue-time
  * {@code rules} in task parameters).
@@ -89,42 +91,34 @@ public final class MaintenanceCronSubmitPipeline {
       return;
     }
 
-    Optional<long[]> tableIds = MaintenanceTaskIds.parseCronTable(instanceId);
-    Optional<long[]> batchIds = MaintenanceTaskIds.parseCronBatch(instanceId);
-    if (tableIds.isEmpty() && batchIds.isEmpty()) {
+    Optional<long[]> tableInstance = MaintenanceTaskIds.parseCronTable(instanceId);
+    Optional<long[]> batchInstance = MaintenanceTaskIds.parseCronBatch(instanceId);
+    if (tableInstance.isEmpty() && batchInstance.isEmpty()) {
       LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
       return;
     }
 
-    long policyId = spec.getTasks().get(0).getPolicyId();
-    // parseCron* returns [leftId, policyId]
-    long expectedPolicyId = tableIds.isPresent() ? tableIds.get()[1] : batchIds.get()[1];
-    if (policyId != expectedPolicyId) {
-      LOG.warn(
-          "Skipping cron-job submit for {}: spec policyId {} != instance policyId {}",
-          instanceId,
-          policyId,
-          expectedPolicyId);
-      return;
-    }
-    for (Task task : spec.getTasks()) {
-      if (task.getPolicyId() != policyId) {
+    // Instance id is row identity; member tables live in task_data (a table: row may hold peers
+    // after coalesce). Soft slot stays per task.policyId.
+    if (tableInstance.isPresent()) {
+      long instanceTableId = tableInstance.get()[0];
+      long instancePolicyId = tableInstance.get()[1];
+      Optional<Task> instanceTask =
+          spec.getTasks().stream().filter(t -> t.getTableId() == instanceTableId).findFirst();
+      if (instanceTask.isEmpty()) {
         LOG.warn(
-            "Skipping cron-job submit for {}: mixed policyIds in tasks ({} vs {})",
+            "Skipping cron-job submit for {}: instance tableId {} missing from spec tables {}",
             instanceId,
-            policyId,
-            task.getPolicyId());
+            instanceTableId,
+            spec.tableIds());
         return;
       }
-    }
-    if (tableIds.isPresent()) {
-      long expectedTableId = tableIds.get()[0];
-      if (spec.getTasks().size() != 1 || spec.getTasks().get(0).getTableId() != expectedTableId) {
+      if (instanceTask.get().getPolicyId() != instancePolicyId) {
         LOG.warn(
-            "Skipping cron-job submit for {}: spec tables {} do not match instance tableId {}",
+            "Skipping cron-job submit for {}: instance task policyId {} != instance policyId {}",
             instanceId,
-            spec.tableIds(),
-            expectedTableId);
+            instanceTask.get().getPolicyId(),
+            instancePolicyId);
         return;
       }
     }
@@ -132,12 +126,12 @@ public final class MaintenanceCronSubmitPipeline {
     // minInterval was gated at expand enqueue; pick only blocks on in-flight. Any in-flight
     // member aborts the whole pick so a batch row is not partially submitted then deleted.
     for (Task task : spec.getTasks()) {
-      if (occupancyGate.isInFlight(task.getTableId(), policyId)) {
+      if (occupancyGate.isInFlight(task.getTableId(), task.getPolicyId())) {
         LOG.info(
             "Skipping cron-job {} entirely (table {} in-flight for policy {})",
             instanceId,
             task.getTableId(),
-            policyId);
+            task.getPolicyId());
         return;
       }
     }

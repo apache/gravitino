@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
@@ -67,10 +68,12 @@ import org.slf4j.LoggerFactory;
  * batch_id} is allocated (§5.2.2).
  *
  * <p>Snapshot-expiry coalesce happens at expand enqueue (not cron pick): unpicked same-catalog
- * {@code expire_snapshots} {@code table:} / {@code batch:} rows may merge while under capacity. A
- * queued row is merged only when it is not already at capacity and the combined size would not
- * exceed capacity (all-or-nothing). Policy id need not match. Picked rows are never cancelled or
- * merged.
+ * {@code expire_snapshots} {@code table:} / {@code batch:} rows may merge while under capacity
+ * (whole queued row at a time). Claim-first: {@code cancel} each unpicked source row, then {@code
+ * reschedule} the target row's {@code task_data} (target {@code task_instance} unchanged) — never
+ * allocate a new instance just to coalesce. {@code spark_conf} is max-merged across the target,
+ * optional new enqueue spec, and successfully claimed sources. Policy id need not match;
+ * each merged {@link Task} keeps its original {@code policyId}. Picked rows are never claimed.
  *
  * <p>Enqueue builds a {@link MaintenanceJobSpec} once (policy → jobConf) into {@code task_data};
  * pick consumes that spec. The entity store disables JDBC autocommit; connections are wrapped via
@@ -149,7 +152,9 @@ public class CronJobClient {
     int scheduled = 0;
     int limit = Math.min(candidates.size(), expandLimit);
     for (ExpandTableCandidate candidate : candidates.subList(0, limit)) {
-      if (scheduleTable(client, policy, candidate.tableId(), due)) {
+      Optional<MaintenanceJobSpec> spec = buildSpec(policy, List.of(candidate.tableId()));
+      if (spec.isPresent()
+          && scheduleTableJob(client, policy, candidate.tableId(), spec.get(), due).isPresent()) {
         scheduled++;
       }
     }
@@ -200,14 +205,14 @@ public class CronJobClient {
     for (Long tableId : tableLevel) {
       scheduled += enqueueTableSnapshotExpiry(client, policy, tableId, batchCapacity, due);
     }
-    mergeJobsIntoOpenBatches(client, batchCapacity);
+    coalesceOpenExpireJobs(client, batchCapacity);
     return scheduled;
   }
 
   /**
-   * Enqueues one table-level snapshot-expiry winner: prefer filling an incomplete same-catalog
-   * {@code batch:}, else coalesce with other unpicked expire rows into a new {@code batch:}, else
-   * schedule a lone {@code table:} row.
+   * Enqueues one table-level snapshot-expiry winner: prefer coalescing into an incomplete same-
+   * catalog {@code batch:}, else schedule this {@code table:} and claim peer {@code table:}/ {@code
+   * batch:} rows into it (target instance id unchanged).
    */
   private int enqueueTableSnapshotExpiry(
       SchedulerClient client, PolicyEntity policy, long tableId, int batchCapacity, Instant due) {
@@ -220,28 +225,47 @@ public class CronJobClient {
       return 0;
     }
     String catalogName = resolved.get(0).catalogName();
-    Optional<QueuedExpireJob> incomplete =
-        findIncompleteExpireBatch(client, batchCapacity, catalogName);
-    if (incomplete.isPresent()
-        && mergeTablesIntoCronRow(client, incomplete.get(), List.of(tableId), batchCapacity)) {
+    Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, List.of(tableId));
+    if (enqueueSpec.isEmpty()) {
       return 0;
     }
+    List<Task> enqueueTasks = enqueueSpec.get().getTasks();
 
-    List<QueuedExpireJob> toMerge =
-        selectJobsToMerge(
-            client, catalogName, batchCapacity - 1, batchCapacity, Set.of(), Set.of(tableId));
-    if (!toMerge.isEmpty()) {
-      List<Long> chunk = new ArrayList<>();
-      chunk.add(tableId);
-      for (QueuedExpireJob job : toMerge) {
-        chunk.addAll(job.spec.tableIds());
-      }
-      if (chunk.size() <= batchCapacity && scheduleBatch(client, policy, chunk, due)) {
-        cancelJobs(client, toMerge);
-        return 1;
+    Optional<QueuedExpireJob> incompleteBatch =
+        findIncompleteExpireBatch(client, batchCapacity, catalogName);
+    if (incompleteBatch.isPresent()) {
+      QueuedExpireJob target = incompleteBatch.get();
+      int remainingCapacity = batchCapacity - target.spec.tableIds().size() - enqueueTasks.size();
+      List<QueuedExpireJob> peers =
+          selectQueuedJobsToClaim(
+              client,
+              catalogName,
+              remainingCapacity,
+              batchCapacity,
+              Set.of(target.instanceId.getId()),
+              unionTableIds(target.spec.tableIds(), List.of(tableId)));
+      if (coalesceInto(client, target, enqueueTasks, enqueueSpec.get(), peers, batchCapacity)) {
+        return 0;
       }
     }
-    return scheduleTable(client, policy, tableId, due) ? 1 : 0;
+
+    Optional<QueuedExpireJob> tableJob =
+        scheduleTableJob(client, policy, tableId, enqueueSpec.get(), due);
+    if (tableJob.isEmpty()) {
+      return 0;
+    }
+    List<QueuedExpireJob> peers =
+        selectQueuedJobsToClaim(
+            client,
+            catalogName,
+            batchCapacity - tableJob.get().spec.tableIds().size(),
+            batchCapacity,
+            Set.of(tableJob.get().instanceId.getId()),
+            new HashSet<>(tableJob.get().spec.tableIds()));
+    if (!peers.isEmpty()) {
+      coalesceInto(client, tableJob.get(), List.of(), null, peers, batchCapacity);
+    }
+    return 1;
   }
 
   private Map<String, List<Long>> groupByCatalog(List<Long> tableIds) {
@@ -272,275 +296,357 @@ public class CronJobClient {
     List<Long> remaining = new ArrayList<>(tableIds);
     int newRows = 0;
     while (!remaining.isEmpty()) {
-      Optional<QueuedExpireJob> incomplete =
+      Optional<QueuedExpireJob> incompleteBatch =
           findIncompleteExpireBatch(client, batchCapacity, catalogName);
-      if (incomplete.isPresent()) {
-        QueuedExpireJob open = incomplete.get();
-        int room = batchCapacity - open.spec.tableIds().size();
-        int fromRemaining = Math.min(room, remaining.size());
-        List<Long> chunk = new ArrayList<>(remaining.subList(0, fromRemaining));
-        Set<Long> excludeTables = new HashSet<>(open.spec.tableIds());
-        excludeTables.addAll(chunk);
-        List<QueuedExpireJob> toMerge =
-            selectJobsToMerge(
-                client,
-                catalogName,
-                room - chunk.size(),
-                batchCapacity,
-                Set.of(open.instanceId.getId()),
-                excludeTables);
-        for (QueuedExpireJob job : toMerge) {
-          chunk.addAll(job.spec.tableIds());
+      if (incompleteBatch.isPresent()) {
+        QueuedExpireJob target = incompleteBatch.get();
+        int remainingCapacity = batchCapacity - target.spec.tableIds().size();
+        int takeCount = Math.min(remainingCapacity, remaining.size());
+        List<Long> enqueueTableIds = new ArrayList<>(remaining.subList(0, takeCount));
+        Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, enqueueTableIds);
+        if (enqueueSpec.isPresent()) {
+          List<QueuedExpireJob> peers =
+              selectQueuedJobsToClaim(
+                  client,
+                  catalogName,
+                  remainingCapacity - enqueueTableIds.size(),
+                  batchCapacity,
+                  Set.of(target.instanceId.getId()),
+                  unionTableIds(target.spec.tableIds(), enqueueTableIds));
+          if (coalesceInto(
+              client,
+              target,
+              enqueueSpec.get().getTasks(),
+              enqueueSpec.get(),
+              peers,
+              batchCapacity)) {
+            remaining.subList(0, takeCount).clear();
+            continue;
+          }
         }
-        if (mergeTablesIntoCronRow(client, open, chunk, batchCapacity)) {
-          remaining.subList(0, fromRemaining).clear();
-          cancelJobs(client, toMerge);
+      }
+      int takeCount = Math.min(batchCapacity, remaining.size());
+      List<Long> enqueueTableIds = new ArrayList<>(remaining.subList(0, takeCount));
+      Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, enqueueTableIds);
+      if (enqueueSpec.isPresent()) {
+        Optional<QueuedExpireJob> batchJob =
+            scheduleBatchJob(client, policy, enqueueSpec.get(), due);
+        if (batchJob.isPresent()) {
+          List<QueuedExpireJob> peers =
+              selectQueuedJobsToClaim(
+                  client,
+                  catalogName,
+                  batchCapacity - batchJob.get().spec.tableIds().size(),
+                  batchCapacity,
+                  Set.of(batchJob.get().instanceId.getId()),
+                  new HashSet<>(batchJob.get().spec.tableIds()));
+          if (!peers.isEmpty()) {
+            coalesceInto(client, batchJob.get(), List.of(), null, peers, batchCapacity);
+          }
+          newRows++;
+          remaining.subList(0, takeCount).clear();
           continue;
         }
       }
-      int end = Math.min(batchCapacity, remaining.size());
-      List<Long> chunk = new ArrayList<>(remaining.subList(0, end));
-      List<QueuedExpireJob> toMerge =
-          selectJobsToMerge(
-              client,
-              catalogName,
-              batchCapacity - chunk.size(),
-              batchCapacity,
-              Set.of(),
-              new HashSet<>(chunk));
-      for (QueuedExpireJob job : toMerge) {
-        chunk.addAll(job.spec.tableIds());
-      }
-      if (chunk.size() <= batchCapacity && scheduleBatch(client, policy, chunk, due)) {
-        newRows++;
-        remaining.subList(0, end).clear();
-        cancelJobs(client, toMerge);
-        continue;
-      }
-      Long first = remaining.remove(0);
-      if (end > 1 && scheduleBatch(client, policy, List.of(first), due)) {
-        newRows++;
-      } else {
-        LOG.warn(
-            "Dropping table {} from snapshot-expiry enqueue for policy {} after failed batch build",
-            first,
-            policy.id());
-      }
+      Long droppedTableId = remaining.remove(0);
+      LOG.warn(
+          "Dropping table {} from snapshot-expiry enqueue for policy {} after failed batch build",
+          droppedTableId,
+          policy.id());
     }
     return newRows;
   }
 
-  /** Fills incomplete expire {@code batch:} rows with whole unpicked same-catalog cron rows. */
-  private void mergeJobsIntoOpenBatches(SchedulerClient client, int batchCapacity) {
-    Set<String> saturated = new HashSet<>();
+  /**
+   * Coalesces under-capacity expire rows (prefer {@code batch:}, then {@code table:}) by claiming
+   * peer rows. Shared by table-level and schema/catalog enqueue tails.
+   */
+  private void coalesceOpenExpireJobs(SchedulerClient client, int batchCapacity) {
+    Set<String> saturatedInstanceIds = new HashSet<>();
     for (; ; ) {
-      Optional<QueuedExpireJob> incomplete =
-          listQueuedExpireJobs(client).stream()
-              .filter(j -> j.isBatch && !j.picked && j.spec.tableIds().size() < batchCapacity)
-              .filter(j -> j.catalog != null)
-              .filter(j -> !saturated.contains(j.instanceId.getId()))
-              .min(Comparator.comparingLong(j -> j.batchId));
-      if (incomplete.isEmpty()) {
+      Optional<QueuedExpireJob> target =
+          findCoalesceTarget(client, batchCapacity, saturatedInstanceIds);
+      if (target.isEmpty()) {
         return;
       }
-      QueuedExpireJob open = incomplete.get();
-      int room = batchCapacity - open.spec.tableIds().size();
-      List<QueuedExpireJob> toMerge =
-          selectJobsToMerge(
+      QueuedExpireJob coalesceTarget = target.get();
+      int remainingCapacity = batchCapacity - coalesceTarget.spec.tableIds().size();
+      List<QueuedExpireJob> peers =
+          selectQueuedJobsToClaim(
               client,
-              open.catalog,
-              room,
+              coalesceTarget.catalog,
+              remainingCapacity,
               batchCapacity,
-              Set.of(open.instanceId.getId()),
-              new HashSet<>(open.spec.tableIds()));
-      if (toMerge.isEmpty()) {
-        saturated.add(open.instanceId.getId());
+              Set.of(coalesceTarget.instanceId.getId()),
+              new HashSet<>(coalesceTarget.spec.tableIds()));
+      if (peers.isEmpty()) {
+        saturatedInstanceIds.add(coalesceTarget.instanceId.getId());
         continue;
       }
-      List<Long> extra = new ArrayList<>();
-      for (QueuedExpireJob job : toMerge) {
-        extra.addAll(job.spec.tableIds());
+      if (!coalesceInto(client, coalesceTarget, List.of(), null, peers, batchCapacity)) {
+        saturatedInstanceIds.add(coalesceTarget.instanceId.getId());
       }
-      if (!mergeTablesIntoCronRow(client, open, extra, batchCapacity)) {
-        return;
-      }
-      cancelJobs(client, toMerge);
     }
   }
 
+  /** Prefers the oldest under-capacity {@code batch:}, else any under-capacity {@code table:}. */
+  private static Optional<QueuedExpireJob> findCoalesceTarget(
+      SchedulerClient client, int batchCapacity, Set<String> saturatedInstanceIds) {
+    List<QueuedExpireJob> underCapacity =
+        listQueuedExpireJobs(client).stream()
+            .filter(job -> !job.picked && job.spec.tableIds().size() < batchCapacity)
+            .filter(job -> job.catalog != null)
+            .filter(job -> !saturatedInstanceIds.contains(job.instanceId.getId()))
+            .toList();
+    Optional<QueuedExpireJob> batchTarget =
+        underCapacity.stream()
+            .filter(job -> job.isBatch)
+            .min(Comparator.comparingLong(job -> job.batchId));
+    if (batchTarget.isPresent()) {
+      return batchTarget;
+    }
+    return underCapacity.stream()
+        .filter(job -> !job.isBatch)
+        .min(Comparator.comparing(job -> job.instanceId.getId()));
+  }
+
+  private static Set<Long> unionTableIds(List<Long> left, List<Long> right) {
+    Set<Long> tableIds = new HashSet<>(left);
+    tableIds.addAll(right);
+    return tableIds;
+  }
+
   /**
-   * Selects whole unpicked expire cron rows that fit in {@code room} without exceeding capacity.
-   * Skips rows already at capacity. All-or-nothing per row.
+   * Claim-first coalesce into {@code target}: cancel each unpicked peer (takes ownership), then
+   * reschedule the target's {@code task_data}. Target {@code task_instance} is unchanged. Envelope
+   * {@code spark_conf} is max-merged across target, optional enqueue spec, and claimed peers.
+   *
+   * @return true when the target was updated, or when there was nothing to merge
    */
-  private static List<QueuedExpireJob> selectJobsToMerge(
+  private boolean coalesceInto(
+      SchedulerClient client,
+      QueuedExpireJob target,
+      List<Task> enqueueTasks,
+      @Nullable MaintenanceJobSpec enqueueSpec,
+      List<QueuedExpireJob> peersToClaim,
+      int batchCapacity) {
+    Set<Long> plannedTableIds = new HashSet<>(target.spec.tableIds());
+    for (Task task : enqueueTasks) {
+      plannedTableIds.add(task.getTableId());
+    }
+    for (QueuedExpireJob peer : peersToClaim) {
+      plannedTableIds.addAll(peer.spec.tableIds());
+    }
+    if (plannedTableIds.size() > batchCapacity) {
+      return false;
+    }
+
+    List<Task> claimedTasks = new ArrayList<>();
+    List<String> sparkConfJsons = new ArrayList<>();
+    sparkConfJsons.add(target.spec.getSparkConf());
+    if (enqueueSpec != null) {
+      sparkConfJsons.add(enqueueSpec.getSparkConf());
+    }
+    for (QueuedExpireJob peer : peersToClaim) {
+      Optional<MaintenanceJobSpec> claimedSpec = tryClaimQueuedJob(client, peer);
+      if (claimedSpec.isEmpty()) {
+        continue;
+      }
+      claimedTasks.addAll(claimedSpec.get().getTasks());
+      sparkConfJsons.add(claimedSpec.get().getSparkConf());
+    }
+
+    List<Task> tasksToAdd = new ArrayList<>(enqueueTasks);
+    tasksToAdd.addAll(claimedTasks);
+    if (tasksToAdd.isEmpty()) {
+      // No enqueue tables and no successful claims (peers picked/gone) — not progress.
+      return peersToClaim.isEmpty();
+    }
+    String mergedSparkConf =
+        MaintenanceJobSpecFactory.mergeSparkConfJson(sparkConfJsons.toArray(new String[0]));
+    return rescheduleMergedTaskData(client, target, tasksToAdd, mergedSparkConf, batchCapacity);
+  }
+
+  /**
+   * Cancels an unpicked queued expire row and returns its latest {@code task_data}. Empty means the
+   * row was missing, already picked, or cancel failed — do not merge those tables into the target.
+   */
+  private static Optional<MaintenanceJobSpec> tryClaimQueuedJob(
+      SchedulerClient client, QueuedExpireJob queuedJob) {
+    Optional<ScheduledExecution<Object>> execution =
+        client.getScheduledExecution(queuedJob.instanceId);
+    if (execution.isEmpty() || execution.get().isPicked()) {
+      return Optional.empty();
+    }
+    Object data = execution.get().getData();
+    if (!(data instanceof MaintenanceJobSpec)) {
+      return Optional.empty();
+    }
+    MaintenanceJobSpec spec = (MaintenanceJobSpec) data;
+    if (!spec.isValid()) {
+      return Optional.empty();
+    }
+    try {
+      client.cancel(queuedJob.instanceId);
+    } catch (RuntimeException e) {
+      LOG.debug(
+          "Could not claim cron-job {} for snapshot-expiry coalesce: {}",
+          queuedJob.instanceId.getId(),
+          e.toString());
+      return Optional.empty();
+    }
+    return Optional.of(spec);
+  }
+
+  /**
+   * Selects whole unpicked expire cron rows that fit in {@code remainingCapacity} without exceeding
+   * {@code batchCapacity}. Skips rows already at capacity. All-or-nothing per row.
+   */
+  private static List<QueuedExpireJob> selectQueuedJobsToClaim(
       SchedulerClient client,
       String catalogName,
-      int room,
+      int remainingCapacity,
       int batchCapacity,
       Set<String> excludeInstanceIds,
       Set<Long> excludeTableIds) {
-    if (room <= 0) {
+    if (remainingCapacity <= 0) {
       return List.of();
     }
     List<QueuedExpireJob> candidates =
         listQueuedExpireJobs(client).stream()
-            .filter(j -> !j.picked)
-            .filter(j -> catalogName.equals(j.catalog))
-            .filter(j -> !excludeInstanceIds.contains(j.instanceId.getId()))
-            .filter(j -> j.spec.tableIds().size() < batchCapacity)
-            .filter(j -> j.spec.tableIds().stream().noneMatch(excludeTableIds::contains))
+            .filter(job -> !job.picked)
+            .filter(job -> catalogName.equals(job.catalog))
+            .filter(job -> !excludeInstanceIds.contains(job.instanceId.getId()))
+            .filter(job -> job.spec.tableIds().size() < batchCapacity)
+            .filter(job -> job.spec.tableIds().stream().noneMatch(excludeTableIds::contains))
             .sorted(
-                Comparator.comparingInt((QueuedExpireJob j) -> j.spec.tableIds().size())
-                    .thenComparing(j -> j.instanceId.getId()))
+                Comparator.comparingInt((QueuedExpireJob job) -> job.spec.tableIds().size())
+                    .thenComparing(job -> job.instanceId.getId()))
             .toList();
-    List<QueuedExpireJob> taken = new ArrayList<>();
-    int left = room;
-    Set<Long> claimedTables = new HashSet<>(excludeTableIds);
+    List<QueuedExpireJob> selected = new ArrayList<>();
+    int capacityLeft = remainingCapacity;
+    Set<Long> reservedTableIds = new HashSet<>(excludeTableIds);
     for (QueuedExpireJob candidate : candidates) {
       int size = candidate.spec.tableIds().size();
-      if (size > left) {
+      if (size > capacityLeft) {
         continue;
       }
-      if (candidate.spec.tableIds().stream().anyMatch(claimedTables::contains)) {
+      if (candidate.spec.tableIds().stream().anyMatch(reservedTableIds::contains)) {
         continue;
       }
-      taken.add(candidate);
-      claimedTables.addAll(candidate.spec.tableIds());
-      left -= size;
-      if (left == 0) {
+      selected.add(candidate);
+      reservedTableIds.addAll(candidate.spec.tableIds());
+      capacityLeft -= size;
+      if (capacityLeft == 0) {
         break;
       }
     }
-    return taken;
+    return selected;
   }
 
-  private boolean mergeTablesIntoCronRow(
-      SchedulerClient client, QueuedExpireJob open, List<Long> extraTableIds, int batchCapacity) {
-    if (extraTableIds.isEmpty()) {
-      return true;
+  /**
+   * Reschedules {@code target} with claimed/enqueue tasks appended. Per-task {@code policyId} is
+   * preserved; {@code sparkConf} is the already max-merged {@code spark_conf}.
+   */
+  private boolean rescheduleMergedTaskData(
+      SchedulerClient client,
+      QueuedExpireJob target,
+      List<Task> tasksToAdd,
+      @Nullable String sparkConf,
+      int batchCapacity) {
+    Map<Long, Task> tasksByTableId = new LinkedHashMap<>();
+    for (Task task : target.spec.getTasks()) {
+      tasksByTableId.putIfAbsent(task.getTableId(), task);
     }
-    Map<Long, Task> byTableId = new LinkedHashMap<>();
-    for (Task task : open.spec.getTasks()) {
-      byTableId.putIfAbsent(task.getTableId(), task);
-    }
-    if (byTableId.size() + extraTableIds.stream().filter(id -> !byTableId.containsKey(id)).count()
-        > batchCapacity) {
-      return false;
-    }
-    String openCatalog = open.catalog;
-    if (openCatalog == null || openCatalog.isEmpty()) {
+    String targetCatalog = target.catalog;
+    if (targetCatalog == null || targetCatalog.isEmpty()) {
       LOG.warn(
-          "Could not merge tables into cron-job {}: open job missing catalog name",
-          open.instanceId.getId());
+          "Could not merge tables into cron-job {}: target missing catalog name",
+          target.instanceId.getId());
       return false;
     }
-    List<ResolvedTableRef> resolved = tableRefResolver.apply(extraTableIds);
-    if (resolved.size() != extraTableIds.size()) {
+    if (target.spec.metalake() == null) {
       LOG.warn(
-          "Could not merge tables into cron-job {}: resolved {} of {} ids {}",
-          open.instanceId.getId(),
-          resolved.size(),
-          extraTableIds.size(),
-          extraTableIds);
+          "Could not merge tables into cron-job {}: missing metalake on target spec",
+          target.instanceId.getId());
       return false;
     }
-    if (open.spec.metalake() == null) {
-      LOG.warn(
-          "Could not merge tables into cron-job {}: missing metalake on open spec",
-          open.instanceId.getId());
-      return false;
-    }
-    Task template = open.spec.getTasks().get(0);
     boolean added = false;
-    for (ResolvedTableRef ref : resolved) {
-      if (!openCatalog.equals(ref.catalogName())) {
+    for (Task task : tasksToAdd) {
+      if (tasksByTableId.containsKey(task.getTableId())) {
+        continue;
+      }
+      String catalog = task.catalogName();
+      if (catalog == null || !targetCatalog.equals(catalog)) {
         LOG.warn(
-            "Could not merge table {} into cron-job {}: catalog {} != open job catalog {}",
-            ref.tableId(),
-            open.instanceId.getId(),
-            ref.catalogName(),
-            openCatalog);
+            "Could not merge table {} into cron-job {}: catalog {} != target catalog {}",
+            task.getTableId(),
+            target.instanceId.getId(),
+            catalog,
+            targetCatalog);
         return false;
       }
-      if (!byTableId.containsKey(ref.tableId())) {
-        Map<String, String> parameters = new LinkedHashMap<>(template.getParameters());
-        parameters.put("catalog_name", ref.catalogName());
-        parameters.put("table_identifier", ref.tableIdentifier());
-        byTableId.put(
-            ref.tableId(),
-            new Task(
-                ref.tableId(),
-                template.getPolicyId(),
-                template.getMaintenanceType(),
-                null,
-                parameters));
-        added = true;
-      }
+      tasksByTableId.put(task.getTableId(), task);
+      added = true;
     }
     if (!added) {
       return true;
     }
-    if (byTableId.size() > batchCapacity) {
+    if (tasksByTableId.size() > batchCapacity) {
       return false;
     }
-    MaintenanceJobSpec merged =
+    MaintenanceJobSpec mergedSpec =
         new MaintenanceJobSpec(
-            new ArrayList<>(byTableId.values()),
-            open.spec.getUpdaterOptions(),
-            open.spec.getSparkConf());
+            new ArrayList<>(tasksByTableId.values()), target.spec.getUpdaterOptions(), sparkConf);
     try {
-      return client.reschedule(open.instanceId, open.executionTime, merged);
+      return client.reschedule(target.instanceId, target.executionTime, mergedSpec);
     } catch (RuntimeException e) {
       LOG.debug(
-          "Could not merge tables into cron-job {}: {}", open.instanceId.getId(), e.toString());
+          "Could not reschedule cron-job {} after snapshot-expiry coalesce: {}",
+          target.instanceId.getId(),
+          e.toString());
       return false;
     }
   }
 
-  private static void cancelJobs(SchedulerClient client, List<QueuedExpireJob> jobs) {
-    for (QueuedExpireJob job : jobs) {
-      Optional<ScheduledExecution<Object>> execution = client.getScheduledExecution(job.instanceId);
-      if (execution.isEmpty()) {
-        continue;
-      }
-      if (execution.get().isPicked()) {
-        LOG.warn(
-            "Skip cancel of picked cron-job {} after snapshot-expiry merge",
-            job.instanceId.getId());
-        continue;
-      }
-      try {
-        client.cancel(job.instanceId);
-      } catch (RuntimeException e) {
-        LOG.warn(
-            "Failed to cancel merged cron-job {} after snapshot-expiry merge: {}",
-            job.instanceId.getId(),
-            e.toString());
-      }
-    }
-  }
-
-  private boolean scheduleTable(
-      SchedulerClient client, PolicyEntity policy, long tableId, Instant due) {
-    Optional<MaintenanceJobSpec> spec = buildSpec(policy, List.of(tableId));
-    if (spec.isEmpty()) {
-      return false;
-    }
+  private Optional<QueuedExpireJob> scheduleTableJob(
+      SchedulerClient client,
+      PolicyEntity policy,
+      long tableId,
+      MaintenanceJobSpec spec,
+      Instant due) {
     String id = MaintenanceTaskIds.forCronTable(tableId, policy.id());
-    return client.scheduleIfNotExists(
-        new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec.get()), due);
+    boolean created =
+        client.scheduleIfNotExists(
+            new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec), due);
+    if (!created) {
+      return Optional.empty();
+    }
+    return findExpireJob(client, id);
   }
 
-  private boolean scheduleBatch(
-      SchedulerClient client, PolicyEntity policy, List<Long> tableIds, Instant due) {
-    Optional<MaintenanceJobSpec> spec = buildSpec(policy, tableIds);
-    if (spec.isEmpty()) {
-      return false;
+  /** Schedules a new {@code batch:} for enqueue tables only; peers are claimed afterward. */
+  private Optional<QueuedExpireJob> scheduleBatchJob(
+      SchedulerClient client, PolicyEntity policy, MaintenanceJobSpec spec, Instant due) {
+    if (spec.getTasks() == null || spec.getTasks().isEmpty()) {
+      return Optional.empty();
     }
     long batchId = nextBatchId(client, policy.id());
     String id = MaintenanceTaskIds.forCronBatch(batchId, policy.id());
-    return client.scheduleIfNotExists(
-        new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec.get()), due);
+    boolean created =
+        client.scheduleIfNotExists(
+            new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec), due);
+    if (!created) {
+      return Optional.empty();
+    }
+    return findExpireJob(client, id);
+  }
+
+  private static Optional<QueuedExpireJob> findExpireJob(
+      SchedulerClient client, String instanceId) {
+    return listQueuedExpireJobs(client).stream()
+        .filter(j -> j.instanceId.getId().equals(instanceId))
+        .findFirst();
   }
 
   private Optional<MaintenanceJobSpec> buildSpec(PolicyEntity policy, List<Long> tableIds) {

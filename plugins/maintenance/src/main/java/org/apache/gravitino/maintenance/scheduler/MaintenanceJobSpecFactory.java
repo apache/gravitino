@@ -30,11 +30,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
@@ -52,8 +54,8 @@ public final class MaintenanceJobSpecFactory {
       Pattern.compile("^(\\d+(?:\\.\\d+)?)\\s*([kmgt]?i?b?)$", Pattern.CASE_INSENSITIVE);
 
   /**
-   * Keys that belong on the {@code task_data} envelope or are re-derived at submit — not stored in
-   * per-task {@code parameters}.
+   * Keys that belong on the shared {@code task_data} fields or are re-derived at submit — not
+   * stored in per-task {@code parameters}.
    */
   private static final Set<String> NON_PARAMETER_KEYS =
       ImmutableSet.of(
@@ -86,7 +88,7 @@ public final class MaintenanceJobSpecFactory {
 
   /**
    * Cron spec for one or more tables under a single policy. Shared {@code updater_options} / {@code
-   * spark_conf} sit on the envelope; each table becomes one {@link Task} with its own {@code
+   * spark_conf} sit on the spec; each table becomes one {@link Task} with its own {@code
    * parameters}.
    *
    * <p>All tables must share the same Spark catalog name so catalog-scoped {@code spark_conf} keys
@@ -114,21 +116,21 @@ public final class MaintenanceJobSpecFactory {
 
     Map<String, String> built = jobConfBuilder.build(policy, catalogName);
     MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, catalogName);
-    EnqueueBags bags = splitEnqueueBags(built);
+    JobConfParts parts = splitJobConfParts(built);
 
     List<Task> tasks = new ArrayList<>(tables.size());
     for (ResolvedTableRef ref : tables) {
-      Map<String, String> parameters = new LinkedHashMap<>(bags.parameters);
+      Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
       parameters.put("catalog_name", ref.catalogName());
       parameters.put("table_identifier", ref.tableIdentifier());
       tasks.add(new Task(ref.tableId(), policy.id(), wire.get(), null, parameters));
     }
-    return new MaintenanceJobSpec(tasks, bags.updaterOptions, bags.sparkConf);
+    return new MaintenanceJobSpec(tasks, parts.updaterOptions, parts.sparkConf);
   }
 
   /**
-   * Assembles the flat {@code runJob} map for one cron task: task {@code parameters} + envelope
-   * bags + TMS wire keys + one-element {@code tables} JSON.
+   * Assembles the flat {@code runJob} map for one cron task: task {@code parameters} + shared
+   * {@code updater_options}/{@code spark_conf} + TMS wire keys + one-element {@code tables} JSON.
    *
    * @param spec enqueue spec
    * @param task task to submit
@@ -145,7 +147,7 @@ public final class MaintenanceJobSpecFactory {
         task.getTableId());
 
     Map<String, String> jobConf = new LinkedHashMap<>(task.getParameters());
-    putSharedBags(jobConf, spec);
+    putSharedJobConfFields(jobConf, spec);
     jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, task.getMaintenanceType());
     jobConf.put(MaintenanceJobTemplates.POLICY_IDS_KEY, Long.toString(task.getPolicyId()));
     jobConf.put("tables", toTablesJson(task.getTableId(), catalogName, tableIdentifier));
@@ -157,7 +159,7 @@ public final class MaintenanceJobSpecFactory {
 
   /**
    * Assembles one chained commit {@code runJob} map from all tasks (merged parameters + shared
-   * bags).
+   * {@code updater_options}/{@code spark_conf}).
    *
    * @param spec commit-chain spec
    * @return mutable jobConf
@@ -180,7 +182,7 @@ public final class MaintenanceJobSpecFactory {
       mergeTaskParameters(jobConf, later);
       mergePolicyRulesByType(jobConf, later);
     }
-    putSharedBags(jobConf, spec);
+    putSharedJobConfFields(jobConf, spec);
 
     List<String> types = new ArrayList<>(spec.getTasks().size());
     List<String> policyIds = new ArrayList<>(spec.getTasks().size());
@@ -197,7 +199,7 @@ public final class MaintenanceJobSpecFactory {
     return jobConf;
   }
 
-  private static void putSharedBags(Map<String, String> jobConf, MaintenanceJobSpec spec) {
+  private static void putSharedJobConfFields(Map<String, String> jobConf, MaintenanceJobSpec spec) {
     if (spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank()) {
       jobConf.put(MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY, spec.getUpdaterOptions());
     }
@@ -207,9 +209,10 @@ public final class MaintenanceJobSpecFactory {
   }
 
   /**
-   * Splits a {@link MaintenanceJobConfBuilder#build} map into envelope bags vs per-task parameters.
+   * Splits a {@link MaintenanceJobConfBuilder#build} map into per-task {@code parameters} plus
+   * shared {@code updater_options} / {@code spark_conf}.
    */
-  public static EnqueueBags splitEnqueueBags(Map<String, String> built) {
+  public static JobConfParts splitJobConfParts(Map<String, String> built) {
     Preconditions.checkNotNull(built, "built");
     Map<String, String> parameters = new LinkedHashMap<>();
     String updaterOptions = null;
@@ -236,7 +239,50 @@ public final class MaintenanceJobSpecFactory {
     Preconditions.checkArgument(
         updaterOptions != null && !updaterOptions.isBlank(),
         "updater_options is required on enqueue jobConf");
-    return new EnqueueBags(parameters, updaterOptions, sparkConf);
+    return new JobConfParts(parameters, updaterOptions, sparkConf);
+  }
+
+  /**
+   * Merges nested {@code spark_conf} JSON into {@code into}: max resource-shaped values, otherwise
+   * first-wins {@code putIfAbsent}. Used by commit-chain build and cron snapshot-expiry coalesce.
+   *
+   * @param into mutable flat spark conf map
+   * @param fromJson candidate {@code spark_conf} JSON, or null/blank
+   */
+  public static void mergeSparkConfMaps(Map<String, String> into, @Nullable String fromJson) {
+    if (fromJson == null || fromJson.trim().isEmpty()) {
+      return;
+    }
+    Map<String, String> later = IcebergSparkConfigUtils.parseFlatJsonMap(fromJson, "spark_conf");
+    mergeResourceKeys(into, later);
+    for (Map.Entry<String, String> entry : later.entrySet()) {
+      into.putIfAbsent(entry.getKey(), entry.getValue());
+    }
+  }
+
+  /**
+   * Merges several enqueue-time {@code spark_conf} JSON strings. Resource-shaped keys (memory /
+   * cores / instances) take the larger magnitude; other keys are first-wins.
+   *
+   * @param sparkConfJsons ordered {@code spark_conf} JSON strings (earlier wins non-resource keys)
+   * @return merged JSON, or null when empty
+   */
+  @Nullable
+  public static String mergeSparkConfJson(String... sparkConfJsons) {
+    Map<String, String> merged = new LinkedHashMap<>();
+    if (sparkConfJsons != null) {
+      for (String sparkConfJson : sparkConfJsons) {
+        mergeSparkConfMaps(merged, sparkConfJson);
+      }
+    }
+    if (merged.isEmpty()) {
+      return null;
+    }
+    try {
+      return JsonUtils.anyFieldMapper().writeValueAsString(new TreeMap<>(merged));
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to serialize spark_conf", e);
+    }
   }
 
   /**
@@ -427,16 +473,20 @@ public final class MaintenanceJobSpecFactory {
     return map;
   }
 
-  /** Envelope bags peeled from {@link MaintenanceJobConfBuilder#build}. */
-  public static final class EnqueueBags {
-    /** Per-task template placeholders (no updater/spark session bags). */
+  /**
+   * Result of splitting {@link MaintenanceJobConfBuilder#build} into per-task parameters and shared
+   * jobConf fields.
+   */
+  public static final class JobConfParts {
+    /** Per-task template placeholders (excludes updater_options / spark_conf). */
     public final Map<String, String> parameters;
     /** Shared updater_options JSON string. */
     public final String updaterOptions;
     /** Shared spark_conf JSON string; may be null. */
     @Nullable public final String sparkConf;
 
-    EnqueueBags(Map<String, String> parameters, String updaterOptions, @Nullable String sparkConf) {
+    JobConfParts(
+        Map<String, String> parameters, String updaterOptions, @Nullable String sparkConf) {
       this.parameters = parameters;
       this.updaterOptions = updaterOptions;
       this.sparkConf = sparkConf;

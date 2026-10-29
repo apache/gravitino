@@ -40,7 +40,7 @@ import org.apache.gravitino.policy.PolicyExecutionSpec;
  * cluster overlay.
  *
  * <p>Cluster-static {@code gravitinoAuth} / {@code ircAuth} normally make every policy identical.
- * When conf leaves those bags empty, policies may carry different auth-shaped options; a single
+ * When conf leaves those overlays empty, policies may carry different auth-shaped options; a single
  * chained Spark Job cannot pick one identity silently.
  */
 final class CommitAuthConsistency {
@@ -50,7 +50,7 @@ final class CommitAuthConsistency {
   /**
    * @param chain filtered commit-chain members (same table)
    * @param gravitinoConfig server config used for auth overlay
-   * @throws IllegalArgumentException when effective auth bags disagree
+   * @throws IllegalArgumentException when effective auth options disagree
    */
   static void requireConsistent(List<CommitChainMember> chain, Config gravitinoConfig) {
     Preconditions.checkNotNull(chain);

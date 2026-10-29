@@ -131,7 +131,7 @@ public final class MaintenanceJobConfBuilder {
    *
    * @param policy effective maintenance policy
    * @param catalogName Spark catalog alias for IRC property scoping
-   * @return mutable jobConf (split into envelope bags / task {@code parameters} by the factory)
+   * @return mutable jobConf (split into shared fields / task {@code parameters} by the factory)
    */
   public Map<String, String> build(PolicyEntity policy, String catalogName) {
     PolicyContent content = policy.content();
@@ -196,7 +196,8 @@ public final class MaintenanceJobConfBuilder {
 
   /**
    * Re-derives flat template placeholders ({@code spark_executor_memory}, {@code catalog_type}, …)
-   * from nested {@code spark_conf}. Used when enqueue {@code task_data} stores only the JSON bag.
+   * from nested {@code spark_conf}. Used when enqueue {@code task_data} stores only the nested
+   * {@code spark_conf} JSON.
    *
    * @param jobConf mutable runJob map that already contains {@code spark_conf}
    * @param catalogName Spark catalog alias for IRC property scoping
@@ -215,8 +216,7 @@ public final class MaintenanceJobConfBuilder {
 
   /**
    * Folds flat session placeholders ({@code spark_executor_memory}, {@code catalog_type}, …) into
-   * nested {@code spark_conf} so enqueue {@code task_data} can keep only the JSON bag at the top
-   * level.
+   * nested {@code spark_conf} so enqueue {@code task_data} can keep only that JSON at the top level.
    *
    * @param jobConf mutable map from {@link #build}
    * @param catalogName Spark catalog alias for IRC property scoping

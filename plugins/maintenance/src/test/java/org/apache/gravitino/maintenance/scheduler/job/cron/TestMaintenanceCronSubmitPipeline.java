@@ -142,6 +142,89 @@ class TestMaintenanceCronSubmitPipeline {
   }
 
   @Test
+  void testTableInstanceSubmitAllowsAbsorbedPeerTables() {
+    long peerTable = TABLE_ID + 1;
+    long peerPolicy = POLICY_ID + 1;
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
+    when(mgr.submitAndBind(anyString(), anyMap(), anyList()))
+        .thenReturn(Optional.of(1L), Optional.of(2L));
+    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
+    when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(new OccupancyClaim(1L, 10L)));
+    when(actions.tryAcquireInFlight(peerTable, peerPolicy, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(new OccupancyClaim(2L, 20L)));
+
+    Map<String, String> p1 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t");
+    Map<String, String> p2 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t2");
+    MaintenanceJobSpec coalesced =
+        new MaintenanceJobSpec(
+            List.of(
+                new Task(TABLE_ID, POLICY_ID, "expire_snapshots", null, new LinkedHashMap<>(p1)),
+                new Task(peerTable, peerPolicy, "expire_snapshots", null, new LinkedHashMap<>(p2))),
+            UPDATER,
+            null);
+
+    pipeline(false, actions, mgr).submit(INSTANCE, coalesced);
+
+    verify(mgr, times(2)).submitAndBind(eq("metalake"), anyMap(), anyList());
+  }
+
+  @Test
+  void testBatchSubmitAllowsMixedPolicyIds() {
+    long policyB = POLICY_ID + 1;
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
+    when(mgr.submitAndBind(anyString(), anyMap(), anyList()))
+        .thenReturn(Optional.of(555L), Optional.of(556L));
+    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
+    OccupancyClaim claimA = new OccupancyClaim(1L, 10L);
+    OccupancyClaim claimB = new OccupancyClaim(2L, 20L);
+    when(actions.tryAcquireInFlight(10L, POLICY_ID, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(claimA));
+    when(actions.tryAcquireInFlight(11L, policyB, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(claimB));
+
+    Map<String, String> p1 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t1");
+    Map<String, String> p2 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t2");
+    MaintenanceJobSpec mixed =
+        new MaintenanceJobSpec(
+            List.of(
+                new Task(10L, POLICY_ID, "expire_snapshots", null, new LinkedHashMap<>(p1)),
+                new Task(11L, policyB, "expire_snapshots", null, new LinkedHashMap<>(p2))),
+            UPDATER,
+            null);
+
+    pipeline(false, actions, mgr).submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), mixed);
+
+    verify(actions).tryAcquireInFlight(10L, POLICY_ID, CLAIM_TIMEOUT_MS);
+    verify(actions).tryAcquireInFlight(11L, policyB, CLAIM_TIMEOUT_MS);
+    verify(mgr, times(2)).submitAndBind(eq("metalake"), anyMap(), anyList());
+  }
+
+  @Test
+  void testBatchInFlightUsesPerTaskPolicyId() {
+    long policyB = POLICY_ID + 1;
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
+    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
+
+    Map<String, String> p1 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t1");
+    Map<String, String> p2 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t2");
+    MaintenanceJobSpec mixed =
+        new MaintenanceJobSpec(
+            List.of(
+                new Task(10L, POLICY_ID, "expire_snapshots", null, new LinkedHashMap<>(p1)),
+                new Task(11L, policyB, "expire_snapshots", null, new LinkedHashMap<>(p2))),
+            UPDATER,
+            null);
+
+    // In-flight only for (11, policyB) — must abort whole batch; wrong if gated on POLICY_ID alone.
+    pipeline((t, p) -> t == 11L && p == policyB, actions, mgr)
+        .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), mixed);
+
+    verify(actions, never()).tryAcquireInFlight(anyLong(), anyLong(), anyLong());
+    verify(mgr, never()).submitAndBind(anyString(), anyMap(), anyList());
+  }
+
+  @Test
   void testConsumesSpecJobConfWithoutRebuild() {
     MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     when(mgr.submitAndBind(anyString(), anyMap(), anyList())).thenReturn(Optional.of(1L));

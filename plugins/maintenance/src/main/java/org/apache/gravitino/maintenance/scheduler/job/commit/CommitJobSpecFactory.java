@@ -31,7 +31,7 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfig
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory.EnqueueBags;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory.JobConfParts;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 
@@ -69,7 +69,7 @@ final class CommitJobSpecFactory {
 
     Map<String, String> firstBuilt = jobConfBuilder.build(chain.get(0).policy(), ref.catalogName());
     MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(firstBuilt, ref.catalogName());
-    EnqueueBags first = MaintenanceJobSpecFactory.splitEnqueueBags(firstBuilt);
+    JobConfParts first = MaintenanceJobSpecFactory.splitJobConfParts(firstBuilt);
     String updaterOptions = first.updaterOptions;
     Map<String, String> sparkConf =
         new LinkedHashMap<>(
@@ -78,16 +78,16 @@ final class CommitJobSpecFactory {
     List<Task> tasks = new ArrayList<>(chain.size());
     for (int i = 0; i < chain.size(); i++) {
       CommitChainMember member = chain.get(i);
-      EnqueueBags bags;
+      JobConfParts parts;
       if (i == 0) {
-        bags = first;
+        parts = first;
       } else {
         Map<String, String> built = jobConfBuilder.build(member.policy(), ref.catalogName());
         MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, ref.catalogName());
-        bags = MaintenanceJobSpecFactory.splitEnqueueBags(built);
-        mergeSparkConfMaps(sparkConf, bags.sparkConf);
+        parts = MaintenanceJobSpecFactory.splitJobConfParts(built);
+        mergeSparkConfMaps(sparkConf, parts.sparkConf);
       }
-      Map<String, String> parameters = new LinkedHashMap<>(bags.parameters);
+      Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
       parameters.put("catalog_name", ref.catalogName());
       parameters.put("table_identifier", ref.tableIdentifier());
       tasks.add(
@@ -104,14 +104,7 @@ final class CommitJobSpecFactory {
    * first-wins {@code putIfAbsent}.
    */
   static void mergeSparkConfMaps(Map<String, String> into, @Nullable String fromJson) {
-    if (fromJson == null || fromJson.trim().isEmpty()) {
-      return;
-    }
-    Map<String, String> later = IcebergSparkConfigUtils.parseFlatJsonMap(fromJson, "spark_conf");
-    MaintenanceJobSpecFactory.mergeResourceKeys(into, later);
-    for (Map.Entry<String, String> entry : later.entrySet()) {
-      into.putIfAbsent(entry.getKey(), entry.getValue());
-    }
+    MaintenanceJobSpecFactory.mergeSparkConfMaps(into, fromJson);
   }
 
   private static String writeJson(Object value, String field) {
