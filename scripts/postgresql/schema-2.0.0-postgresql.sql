@@ -1297,7 +1297,7 @@ COMMENT ON COLUMN scheduled_commit_tasks.last_success IS 'last successful execut
 COMMENT ON COLUMN scheduled_commit_tasks.last_failure IS 'last failed execution time';
 
 CREATE TABLE IF NOT EXISTS table_maintenance_action (
-    id BIGSERIAL PRIMARY KEY,
+    action_id BIGSERIAL PRIMARY KEY,
     job_id BIGINT,
     table_id BIGINT NOT NULL,
     policy_id BIGINT NOT NULL,
@@ -1313,7 +1313,7 @@ CREATE INDEX IF NOT EXISTS idx_tma_before_metrics ON table_maintenance_action (b
 CREATE INDEX IF NOT EXISTS idx_tma_after_metrics ON table_maintenance_action (after_metrics_id);
 CREATE INDEX IF NOT EXISTS idx_tma_created_at ON table_maintenance_action (created_at);
 COMMENT ON TABLE table_maintenance_action IS 'table maintenance action metadata';
-COMMENT ON COLUMN table_maintenance_action.id IS 'auto increment id';
+COMMENT ON COLUMN table_maintenance_action.action_id IS 'maintenance action id';
 COMMENT ON COLUMN table_maintenance_action.job_id IS 'job run id, maps to job_run_meta.job_run_id';
 COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';

@@ -50,9 +50,9 @@ public final class TableMaintenanceActionTestUtils {
                     "UPDATE table_maintenance_action SET created_at = ? "
                         + "WHERE id = ? AND job_id IS NULL AND finished_at = 0")) {
       statement.setLong(1, expiredAt);
-      statement.setLong(2, claim.id());
+      statement.setLong(2, claim.actionId());
       Assertions.assertEquals(1, statement.executeUpdate());
     }
-    return new OccupancyClaim(claim.id(), expiredAt);
+    return new OccupancyClaim(claim.actionId(), expiredAt);
   }
 }

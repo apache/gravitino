@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.jobs;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -101,38 +102,43 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalake), "updater_options must contain metalake");
     GravitinoAuthSettings auth = GravitinoAuthSettings.from(new OptimizerConfig(properties));
-    return new MaintenanceActionHttpClient(
-        JsonUtils.objectMapper(), uri.trim(), metalake.trim(), auth);
+    // Keycloak (and other IdPs) return extra token fields such as refresh_expires_in; match
+    // client-java ObjectMapperProvider so OAuth callbacks do not fail on unknown properties.
+    ObjectMapper mapper =
+        JsonUtils.objectMapper()
+            .copy()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    return new MaintenanceActionHttpClient(mapper, uri.trim(), metalake.trim(), auth);
   }
 
   /**
    * Reports S0 (before-maintenance) snapshot metrics.
    *
-   * @param jobId Gravitino job run id
+   * @param actionId maintenance action id
    * @param request metrics payload
    */
-  public void reportBeforeMetrics(long jobId, MaintenanceActionMetricsRequest request) {
-    postJson(jobId, "metrics/before", request);
+  public void reportBeforeMetrics(long actionId, MaintenanceActionMetricsRequest request) {
+    postJson(actionId, "metrics/before", request);
   }
 
   /**
    * Reports S1 (after-maintenance) snapshot metrics.
    *
-   * @param jobId Gravitino job run id
+   * @param actionId maintenance action id
    * @param request metrics payload
    */
-  public void reportAfterMetrics(long jobId, MaintenanceActionMetricsRequest request) {
-    postJson(jobId, "metrics/after", request);
+  public void reportAfterMetrics(long actionId, MaintenanceActionMetricsRequest request) {
+    postJson(actionId, "metrics/after", request);
   }
 
   /**
    * Closes the soft slot for one table without writing metrics.
    *
-   * @param jobId Gravitino job run id
+   * @param actionId maintenance action id
    * @param request finish payload
    */
-  public void finish(long jobId, MaintenanceActionFinishRequest request) {
-    postJson(jobId, "finish", request);
+  public void finish(long actionId, MaintenanceActionFinishRequest request) {
+    postJson(actionId, "finish", request);
   }
 
   @Override
@@ -141,13 +147,13 @@ public final class MaintenanceActionHttpClient implements AutoCloseable {
     bearerExpiresAtMillis = 0L;
   }
 
-  private void postJson(long jobId, String action, RESTRequest request) {
+  private void postJson(long actionId, String action, RESTRequest request) {
     Preconditions.checkArgument(request != null, "request must not be null");
     request.validate();
     String path =
         String.format(
             "/api/metalakes/%s/maintenance/actions/%d/%s",
-            RESTUtils.encodeString(metalakeName), jobId, action);
+            RESTUtils.encodeString(metalakeName), actionId, action);
     try {
       HttpResult result =
           post(baseUri + path, JSON, mapper.writeValueAsString(request), authorizationHeader());

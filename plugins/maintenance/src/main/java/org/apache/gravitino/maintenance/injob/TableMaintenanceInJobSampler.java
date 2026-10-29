@@ -57,7 +57,7 @@ public class TableMaintenanceInJobSampler {
    * <p>If HEAD has drifted after the sample, the caller must end the job early and must not
    * re-sample in a loop (§4.3).
    *
-   * @param jobId Gravitino {@code job_run_meta.job_run_id} for the in-flight maintenance row
+   * @param actionId {@code table_maintenance_action.action_id} for the in-flight row
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param sampledSnapshotId Iceberg snapshot id at sample time ({@code S0})
@@ -66,7 +66,7 @@ public class TableMaintenanceInJobSampler {
    * @return continue vs drift stop outcome
    */
   public InJobGateOutcome sampleAndGateCronJob(
-      long jobId,
+      long actionId,
       long tableId,
       long policyId,
       long sampledSnapshotId,
@@ -75,16 +75,24 @@ public class TableMaintenanceInJobSampler {
     Preconditions.checkNotNull(metricsJson, "metricsJson");
     Preconditions.checkNotNull(head, "head");
 
-    TableMaintenanceActionPO action =
-        actionMetaService.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
-    Preconditions.checkState(action != null, "no maintenance action for job %s", jobId);
+    TableMaintenanceActionPO action = actionMetaService.getById(actionId);
+    Preconditions.checkState(action != null, "no maintenance action for action_id %s", actionId);
+    Preconditions.checkState(
+        action.tableId() != null
+            && action.tableId() == tableId
+            && action.policyId() != null
+            && action.policyId() == policyId,
+        "action_id %s does not match table %s policy %s",
+        actionId,
+        tableId,
+        policyId);
     long metricsId;
     if (action.beforeMetricsId() != null) {
       metricsId = action.beforeMetricsId();
     } else {
       metricsId =
           metricsMetaService.insertMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
-      actionMetaService.recordBeforeMetrics(jobId, tableId, policyId, metricsId);
+      actionMetaService.recordBeforeMetrics(actionId, metricsId);
     }
 
     long headSnapshotId = head.currentSnapshotId();

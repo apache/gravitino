@@ -112,24 +112,24 @@ public class TableMaintenanceActionSQLProviderFactory {
   }
 
   /**
-   * @param id action id
+   * @param actionId action id
    * @param jobId job run id
    * @param expectedCreatedAt claim lease start observed at acquire time
    * @return UPDATE statement
    */
   public static String bindJobId(
-      @Param("id") long id,
+      @Param("actionId") long actionId,
       @Param("jobId") long jobId,
       @Param("expectedCreatedAt") long expectedCreatedAt) {
-    return getProvider().bindJobId(id, jobId, expectedCreatedAt);
+    return getProvider().bindJobId(actionId, jobId, expectedCreatedAt);
   }
 
   /**
-   * @param id action id
+   * @param actionId action id
    * @return SELECT statement
    */
-  public static String selectById(@Param("id") long id) {
-    return getProvider().selectById(id);
+  public static String selectById(@Param("actionId") long actionId) {
+    return getProvider().selectById(actionId);
   }
 
   /**
@@ -164,66 +164,51 @@ public class TableMaintenanceActionSQLProviderFactory {
   }
 
   /**
-   * @param jobId job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
+   * @param actionId action id
    * @param beforeMetricsId S0 metrics row id
    * @return UPDATE statement
    */
   public static String updateBeforeMetrics(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("beforeMetricsId") long beforeMetricsId) {
-    return getProvider().updateBeforeMetrics(jobId, tableId, policyId, beforeMetricsId);
+      @Param("actionId") long actionId, @Param("beforeMetricsId") long beforeMetricsId) {
+    return getProvider().updateBeforeMetrics(actionId, beforeMetricsId);
   }
 
   /**
-   * @param jobId job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
+   * @param actionId action id
    * @param afterMetricsId S1 metrics row id
    * @return UPDATE statement
    */
   public static String updateAfterMetrics(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("afterMetricsId") long afterMetricsId) {
-    return getProvider().updateAfterMetrics(jobId, tableId, policyId, afterMetricsId);
+      @Param("actionId") long actionId, @Param("afterMetricsId") long afterMetricsId) {
+    return getProvider().updateAfterMetrics(actionId, afterMetricsId);
   }
 
   /**
-   * @param jobId job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
+   * @param actionId action id
    * @param finishedAt finish millis
    * @return UPDATE statement
    */
   public static String markFinished(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("finishedAt") long finishedAt) {
-    return getProvider().markFinished(jobId, tableId, policyId, finishedAt);
+      @Param("actionId") long actionId, @Param("finishedAt") long finishedAt) {
+    return getProvider().markFinished(actionId, finishedAt);
   }
 
   /**
-   * @param id action id
+   * @param actionId action id
    * @return DELETE statement
    */
-  public static String deleteById(@Param("id") long id) {
-    return getProvider().deleteById(id);
+  public static String deleteById(@Param("actionId") long actionId) {
+    return getProvider().deleteById(actionId);
   }
 
   /**
-   * @param id action id
+   * @param actionId action id
    * @param expectedCreatedAt claim lease start
    * @return DELETE statement
    */
   public static String deleteUnboundClaim(
-      @Param("id") long id, @Param("expectedCreatedAt") long expectedCreatedAt) {
-    return getProvider().deleteUnboundClaim(id, expectedCreatedAt);
+      @Param("actionId") long actionId, @Param("expectedCreatedAt") long expectedCreatedAt) {
+    return getProvider().deleteUnboundClaim(actionId, expectedCreatedAt);
   }
 
   /**

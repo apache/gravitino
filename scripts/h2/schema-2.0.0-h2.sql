@@ -761,7 +761,7 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `after_metrics_id` BIGINT COMMENT 'table_snapshot_metrics.metrics_id for S1 sample',
     `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
     `finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`action_id`)
 ) COMMENT='table maintenance action metadata';
 CREATE INDEX IF NOT EXISTS `idx_tma_job_id` ON `table_maintenance_action`(`job_id`);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).

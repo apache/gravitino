@@ -620,7 +620,7 @@ CREATE TABLE IF NOT EXISTS `scheduled_commit_tasks` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table maintenance commit schedule metadata';
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `action_id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'maintenance action id',
     `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job run id, maps to job_run_meta.job_run_id',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
@@ -628,7 +628,7 @@ CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
     `after_metrics_id` BIGINT(20) UNSIGNED NULL COMMENT 'table_snapshot_metrics.metrics_id for S1 sample',
     `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
     `finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
-    PRIMARY KEY (`id`),
+    PRIMARY KEY (`action_id`),
     KEY `idx_tma_job_id` (`job_id`),
     -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
     UNIQUE KEY `uk_tma_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),

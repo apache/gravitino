@@ -76,8 +76,9 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
-   * Extends an expired unbound claim lease by CAS on {@code created_at} (ShedLock-style). Lease age
-   * is evaluated against the database clock so every node shares one TTL timeline.
+   * Abandons an expired unbound soft slot by setting {@code finished_at} to the database clock.
+   * Callers then {@code INSERT} a new in-flight row (new {@code action_id}). Lease age uses the
+   * database clock so multi-node TTL does not depend on JVM skew.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
@@ -91,7 +92,7 @@ public class TableMaintenanceActionBaseSQLProvider {
     String now = currentTimeMillisExpr();
     return "UPDATE "
         + TABLE_NAME
-        + " SET created_at = "
+        + " SET finished_at = "
         + now
         + " WHERE table_id = #{tableId} AND policy_id = #{policyId}"
         + " AND job_id IS NULL AND finished_at = 0"
@@ -113,8 +114,7 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
-   * Unbound in-flight claims for a table (any policy). Used by callback lazy-bind when the Spark
-   * job reports before submit-side {@code bindJobId}.
+   * Unbound in-flight claims for a table (any policy).
    *
    * @param tableId table entity id
    * @return SELECT statement
@@ -145,31 +145,31 @@ public class TableMaintenanceActionBaseSQLProvider {
 
   /**
    * Binds the Gravitino job run id after {@code runJob}. Keeps {@code finished_at = 0} so the soft
-   * slot covers the whole run. {@code expectedCreatedAt} fences against a concurrent reclaim that
-   * CAS-updated {@code created_at}.
+   * slot covers the whole run. {@code expectedCreatedAt} fences against a concurrent abandon that
+   * closed this row and inserted a new {@code action_id}.
    *
-   * @param id action row id
+   * @param actionId action row id
    * @param jobId {@code job_run_meta.job_run_id}
    * @param expectedCreatedAt claim lease start observed at acquire time
    * @return UPDATE statement
    */
   public String bindJobId(
-      @Param("id") long id,
+      @Param("actionId") long actionId,
       @Param("jobId") long jobId,
       @Param("expectedCreatedAt") long expectedCreatedAt) {
     return "UPDATE "
         + TABLE_NAME
         + " SET job_id = #{jobId}"
-        + " WHERE id = #{id} AND job_id IS NULL AND finished_at = 0"
+        + " WHERE action_id = #{actionId} AND job_id IS NULL AND finished_at = 0"
         + " AND created_at = #{expectedCreatedAt}";
   }
 
   /**
-   * @param id action row id
+   * @param actionId action row id
    * @return SELECT statement
    */
-  public String selectById(@Param("id") long id) {
-    return selectColumns() + " WHERE id = #{id}";
+  public String selectById(@Param("actionId") long actionId) {
+    return selectColumns() + " WHERE action_id = #{actionId}";
   }
 
   /**
@@ -206,94 +206,79 @@ public class TableMaintenanceActionBaseSQLProvider {
 
   /**
    * Sets {@code before_metrics_id} when {@code S0} is sampled ({@code IS NULL} first write).
-   * Callers treat an already-matching value as an idempotent no-op in Java.
+   * Requires the soft slot to be bound ({@code job_id IS NOT NULL}) so unbound TTL cannot abandon
+   * the row after a successful metrics write.
    *
-   * @param jobId Gravitino job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
+   * @param actionId action row id
    * @param beforeMetricsId {@code table_snapshot_metrics.metrics_id} for the S0 sample
    * @return UPDATE statement
    */
   public String updateBeforeMetrics(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("beforeMetricsId") long beforeMetricsId) {
+      @Param("actionId") long actionId, @Param("beforeMetricsId") long beforeMetricsId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET before_metrics_id = #{beforeMetricsId}"
-        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND before_metrics_id IS NULL AND finished_at = 0";
+        + " WHERE action_id = #{actionId}"
+        + " AND job_id IS NOT NULL AND before_metrics_id IS NULL AND finished_at = 0";
   }
 
   /**
    * Sets {@code after_metrics_id} when {@code S1} is sampled ({@code IS NULL} first write) while
-   * the soft slot is still open.
+   * the soft slot is still open and bound.
    *
-   * @param jobId Gravitino job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
+   * @param actionId action row id
    * @param afterMetricsId {@code table_snapshot_metrics.metrics_id} for the S1 sample
    * @return UPDATE statement
    */
   public String updateAfterMetrics(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("afterMetricsId") long afterMetricsId) {
+      @Param("actionId") long actionId, @Param("afterMetricsId") long afterMetricsId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET after_metrics_id = #{afterMetricsId}"
-        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND after_metrics_id IS NULL AND finished_at = 0";
+        + " WHERE action_id = #{actionId}"
+        + " AND job_id IS NOT NULL AND after_metrics_id IS NULL AND finished_at = 0";
   }
 
   /**
-   * Releases the soft slot for one bound table/policy row. Does not write metrics pointers; S0/S1
-   * use {@link #updateBeforeMetrics} / {@link #updateAfterMetrics}.
+   * Releases the soft slot for one bound action row. Does not write metrics pointers; S0/S1 use
+   * {@link #updateBeforeMetrics} / {@link #updateAfterMetrics}.
    *
    * <p>Only one in-flight row exists per {@code (table_id, policy_id)} ({@code finished_at = 0}),
    * so finish timestamps do not contend across concurrent submitters.
    *
-   * @param jobId Gravitino job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
+   * @param actionId action row id
    * @param finishedAt finish time millis; must be {@code > 0}
    * @return UPDATE statement
    */
   public String markFinished(
-      @Param("jobId") long jobId,
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("finishedAt") long finishedAt) {
+      @Param("actionId") long actionId, @Param("finishedAt") long finishedAt) {
     return "UPDATE "
         + TABLE_NAME
         + " SET finished_at = #{finishedAt}"
-        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND finished_at = 0";
+        + " WHERE action_id = #{actionId} AND job_id IS NOT NULL AND finished_at = 0";
   }
 
   /**
-   * @param id action row id
+   * @param actionId action row id
    * @return DELETE statement
    */
-  public String deleteById(@Param("id") long id) {
-    return "DELETE FROM " + TABLE_NAME + " WHERE id = #{id}";
+  public String deleteById(@Param("actionId") long actionId) {
+    return "DELETE FROM " + TABLE_NAME + " WHERE action_id = #{actionId}";
   }
 
   /**
    * Deletes an unbound claim only when the lease {@code created_at} still matches. A concurrent
-   * reclaim that CAS-updated {@code created_at} leaves the new owner's row intact.
+   * abandon that closed this row leaves the new owner's {@code action_id} intact.
    *
-   * @param id action row id
+   * @param actionId action row id
    * @param expectedCreatedAt claim lease start observed at acquire time
    * @return DELETE statement
    */
   public String deleteUnboundClaim(
-      @Param("id") long id, @Param("expectedCreatedAt") long expectedCreatedAt) {
+      @Param("actionId") long actionId, @Param("expectedCreatedAt") long expectedCreatedAt) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE id = #{id} AND job_id IS NULL AND finished_at = 0"
+        + " WHERE action_id = #{actionId} AND job_id IS NULL AND finished_at = 0"
         + " AND created_at = #{expectedCreatedAt}";
   }
 
@@ -333,7 +318,7 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   private static String selectColumns() {
-    return "SELECT id, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
+    return "SELECT action_id AS actionId, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
         + " before_metrics_id AS beforeMetricsId, after_metrics_id AS afterMetricsId,"
         + " created_at AS createdAt, finished_at AS finishedAt FROM "
         + TABLE_NAME;

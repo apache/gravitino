@@ -36,8 +36,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
@@ -93,18 +92,17 @@ class TestMaintenanceCommitSubmitPipeline {
             eq(TABLE_ID), eq(List.of(POLICY_ID, EXPIRE_POLICY_ID)), eq(CLAIM_TIMEOUT_MS)))
         .thenReturn(Optional.of(claims));
 
-    Map<String, String> jobConf = new LinkedHashMap<>();
-    jobConf.put(
-        MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, "rewrite_data_files,expire_snapshots");
-    jobConf.put("updater_options", "{\"gravitino_uri\":\"http://localhost:8090\"}");
-
+    Map<String, String> p1 = new LinkedHashMap<>();
+    p1.put("catalog_name", "iceberg");
+    p1.put("table_identifier", "db.t");
+    Map<String, String> p2 = new LinkedHashMap<>(p1);
     MaintenanceJobSpec spec =
         new MaintenanceJobSpec(
-            List.of(new TableTarget(TABLE_ID, List.of("ml", "iceberg", "db", "t"))),
             List.of(
-                new Operation(POLICY_ID, "rewrite_data_files"),
-                new Operation(EXPIRE_POLICY_ID, "expire_snapshots")),
-            jobConf);
+                new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, p1),
+                new Task(TABLE_ID, EXPIRE_POLICY_ID, "expire_snapshots", null, p2)),
+            "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"ml\"}",
+            null);
 
     pipeline(allowAllGate(), actions, submitter)
         .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), spec);
@@ -178,12 +176,12 @@ class TestMaintenanceCommitSubmitPipeline {
   }
 
   private static MaintenanceJobSpec spec() {
-    Map<String, String> jobConf = new LinkedHashMap<>();
-    jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, "rewrite_data_files");
-    jobConf.put("updater_options", "{\"gravitino_uri\":\"http://localhost:8090\"}");
+    Map<String, String> parameters = new LinkedHashMap<>();
+    parameters.put("catalog_name", "iceberg");
+    parameters.put("table_identifier", "db.t");
     return new MaintenanceJobSpec(
-        List.of(new TableTarget(TABLE_ID, List.of("ml", "iceberg", "db", "t"))),
-        List.of(new Operation(POLICY_ID, "rewrite_data_files")),
-        jobConf);
+        List.of(new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, parameters)),
+        "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"ml\"}",
+        null);
   }
 }
