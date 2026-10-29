@@ -52,7 +52,6 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -92,19 +91,6 @@ import org.slf4j.LoggerFactory;
 public class IcebergCatalogOperations
     implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog, CatalogDropAware {
 
-  /** Resolves an auxiliary IRC catalog wrapper by catalog name. */
-  @FunctionalInterface
-  public interface Lookup {
-    /**
-     * Returns the wrapper owned by auxiliary IRC for {@code catalogName}.
-     *
-     * @param catalogName catalog name from the REST {@code warehouse} property
-     * @return wrapper owned by auxiliary IRC
-     * @throws NoSuchCatalogException if auxiliary IRC has no catalog of that name
-     */
-    IcebergCatalogWrapper lookup(String catalogName) throws NoSuchCatalogException;
-  }
-
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogOperations.class);
@@ -113,29 +99,8 @@ public class IcebergCatalogOperations
 
   @VisibleForTesting @Nullable String catalogUuid;
 
-  /** Aux-loader lookup of IRC's catalog wrapper. Null when this instance owns its client. */
-  @Nullable private final Lookup lookup;
-
-  /** Catalog plugin instance. Owns its Hive, JDBC, or HTTP REST client. */
-  public IcebergCatalogOperations() {
-    this(null);
-  }
-
-  private IcebergCatalogOperations(@Nullable Lookup lookup) {
-    this.lookup = lookup;
-  }
-
-  /**
-   * Operations that live on the auxiliary IRC class loader and borrow its catalog wrapper.
-   *
-   * @param lookup resolves IRC's wrapper by catalog name; throws {@link NoSuchCatalogException}
-   *     when IRC has no such catalog
-   * @return operations that borrow the IRC wrapper for the REST {@code warehouse} catalog
-   */
-  public static IcebergCatalogOperations createForLocalIrc(Lookup lookup) {
-    Preconditions.checkNotNull(lookup, "lookup");
-    return new IcebergCatalogOperations(lookup);
-  }
+  /** Catalog plugin instance. Owns its Hive, JDBC, or REST client. */
+  public IcebergCatalogOperations() {}
 
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
@@ -157,11 +122,9 @@ public class IcebergCatalogOperations
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
     // Hold keys that lie in GRAVITINO_CONFIG_TO_ICEBERG
-    // Build metadata here so this method does not cast a properties object from another class
-    // loader. Auxiliary IRC and the catalog plugin each define IcebergCatalogPropertiesMetadata.
-    Preconditions.checkNotNull(propertiesMetadata, "propertiesMetadata");
     Map<String, String> gravitinoConfig =
-        new IcebergCatalogPropertiesMetadata().transformProperties(conf);
+        ((IcebergCatalogPropertiesMetadata) propertiesMetadata.catalogPropertiesMetadata())
+            .transformProperties(conf);
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
@@ -171,11 +134,7 @@ public class IcebergCatalogOperations
 
   private void initFromResolvedConf(Map<String, String> resultConf, CatalogInfo info) {
     this.catalogUuid = info.id().toString();
-    if (lookup != null) {
-      this.backend = IcebergBackend.borrow(resultConf, info.name(), lookup);
-    } else {
-      this.backend = IcebergBackend.create(resultConf);
-    }
+    this.backend = IcebergBackend.create(resultConf);
   }
 
   @Override

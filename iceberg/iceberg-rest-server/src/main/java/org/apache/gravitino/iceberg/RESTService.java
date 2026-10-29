@@ -26,9 +26,7 @@ import java.util.Optional;
 import javax.inject.Singleton;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.auxiliary.AuxiliaryIcebergCatalogBridge;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogOperations;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -89,7 +87,6 @@ public class RESTService implements GravitinoAuxiliaryService {
       "org.apache.gravitino.iceberg.service.rest";
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
-  private AuxiliaryIcebergCatalogBridge.OperationsFactory operationsFactory;
   private IcebergMetricsManager icebergMetricsManager;
   private Optional<IcebergCleanupManager> cleanupManager;
   private IcebergConfigProvider configProvider;
@@ -138,13 +135,6 @@ public class RESTService implements GravitinoAuxiliaryService {
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
-    if (auxMode) {
-      operationsFactory =
-          () ->
-              IcebergCatalogOperations.createForLocalIrc(
-                  icebergCatalogWrapperManager::getCatalogWrapper);
-      AuxiliaryIcebergCatalogBridge.register(operationsFactory);
-    }
     IcebergRESTServerContext authorizationContext =
         IcebergRESTServerContext.create(
             configProvider,
@@ -310,10 +300,6 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceStop() throws Exception {
-    if (auxMode) {
-      AuxiliaryIcebergCatalogBridge.unregister(operationsFactory);
-      operationsFactory = null;
-    }
     if (server != null) {
       server.stop();
       LOG.info("Iceberg REST service stopped");

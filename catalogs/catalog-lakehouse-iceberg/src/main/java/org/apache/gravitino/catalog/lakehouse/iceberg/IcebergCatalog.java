@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.auxiliary.AuxiliaryIcebergCatalogBridge;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -60,15 +59,6 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    if (config != null
-        && IcebergCatalogBackend.REST
-            .name()
-            .equalsIgnoreCase(config.get(IcebergConstants.CATALOG_BACKEND))) {
-      CatalogOperations auxOps = AuxiliaryIcebergCatalogBridge.create();
-      if (auxOps != null) {
-        return auxOps;
-      }
-    }
     return new IcebergCatalogOperations();
   }
 
