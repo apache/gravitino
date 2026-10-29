@@ -56,6 +56,19 @@ public interface ViewUpdateRequest extends RESTRequest {
    */
   ViewChange viewChange();
 
+  /**
+   * Validates the request with a prefix for writable-type field paths.
+   *
+   * <p>The default implementation delegates to {@link #validate()} and preserves existing
+   * validation messages.
+   *
+   * @param fieldPrefix the field path prefix, including a trailing dot when nonempty
+   * @throws IllegalArgumentException if the request is invalid
+   */
+  default void validateWithPrefix(String fieldPrefix) throws IllegalArgumentException {
+    validate();
+  }
+
   /** Represents a request to rename a view. */
   @EqualsAndHashCode
   @ToString
@@ -236,7 +249,9 @@ public interface ViewUpdateRequest extends RESTRequest {
           comment);
     }
 
-    void validateWithPrefix(String fieldPrefix) {
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
       Preconditions.checkArgument(
           representations != null && representations.length > 0,
           "\"representations\" field is required and cannot be empty");

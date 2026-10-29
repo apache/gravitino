@@ -203,11 +203,16 @@ public final class WritableDataTypeValidator {
    *
    * @param columns The new columns.
    * @param fieldPath The request field path of the columns array.
-   * @throws IllegalArgumentException If a new type or literal type is not writable.
+   * @throws IllegalArgumentException If a new type or literal type is not writable, or the columns
+   *     array or a column is null.
    */
   public static void validateColumns(Column[] columns, String fieldPath) {
+    Preconditions.checkArgument(
+        columns != null, "\"%s\" field is required and cannot be null", fieldPath);
     for (int i = 0; i < columns.length; i++) {
       String columnPath = fieldPath + "[" + i + "]";
+      Preconditions.checkArgument(
+          columns[i] != null, "\"%s\" field is required and cannot be null", columnPath);
       validate(columns[i].dataType(), columnPath + ".type");
       validateExpression(columns[i].defaultValue(), columnPath + ".defaultValue");
     }
@@ -220,7 +225,8 @@ public final class WritableDataTypeValidator {
    * @param partitioning The partitioning, or null when absent.
    * @param distribution The distribution, or null when absent.
    * @param sortOrders The sort orders, or null when absent.
-   * @throws IllegalArgumentException If a new type is not writable.
+   * @throws IllegalArgumentException If a new type is not writable, or a required array, column or
+   *     sort order is null.
    */
   public static void validateTable(
       Column[] columns,
@@ -235,12 +241,16 @@ public final class WritableDataTypeValidator {
     }
     if (distribution != null) {
       Expression[] expressions = distribution.expressions();
+      Preconditions.checkArgument(
+          expressions != null, "\"distribution.funcArgs\" field is required and cannot be null");
       for (int i = 0; i < expressions.length; i++) {
         validateExpression(expressions[i], "distribution.funcArgs[" + i + "]");
       }
     }
     if (sortOrders != null) {
       for (int i = 0; i < sortOrders.length; i++) {
+        Preconditions.checkArgument(
+            sortOrders[i] != null, "\"sortOrders[%s]\" field is required and cannot be null", i);
         validateExpression(sortOrders[i].expression(), "sortOrders[" + i + "].sortTerm");
       }
     }
@@ -272,14 +282,19 @@ public final class WritableDataTypeValidator {
    *
    * @param definition The new definition.
    * @param fieldPath The request field path used in validation errors.
-   * @throws IllegalArgumentException If a new type is not writable.
+   * @throws IllegalArgumentException If a new type is not writable, or the definition, a required
+   *     array or an array element is null.
    */
   public static void validateDefinition(FunctionDefinition definition, String fieldPath) {
     Preconditions.checkArgument(
         definition != null, "\"%s\" field is required and cannot be null", fieldPath);
     FunctionParam[] parameters = definition.parameters();
+    Preconditions.checkArgument(
+        parameters != null, "\"%s.parameters\" field is required and cannot be null", fieldPath);
     for (int i = 0; i < parameters.length; i++) {
       String parameterPath = fieldPath + ".parameters[" + i + "]";
+      Preconditions.checkArgument(
+          parameters[i] != null, "\"%s\" field is required and cannot be null", parameterPath);
       validate(parameters[i].dataType(), parameterPath + ".dataType");
       validateExpression(parameters[i].defaultValue(), parameterPath + ".defaultValue");
     }
@@ -287,8 +302,13 @@ public final class WritableDataTypeValidator {
       validate(definition.returnType(), fieldPath + ".returnType");
     }
     FunctionColumn[] columns = definition.returnColumns();
+    Preconditions.checkArgument(
+        columns != null, "\"%s.returnColumns\" field is required and cannot be null", fieldPath);
     for (int i = 0; i < columns.length; i++) {
-      validate(columns[i].dataType(), fieldPath + ".returnColumns[" + i + "].dataType");
+      String columnPath = fieldPath + ".returnColumns[" + i + "]";
+      Preconditions.checkArgument(
+          columns[i] != null, "\"%s\" field is required and cannot be null", columnPath);
+      validate(columns[i].dataType(), columnPath + ".dataType");
     }
   }
 }

@@ -99,6 +99,19 @@ public interface TableUpdateRequest extends RESTRequest {
    */
   TableChange tableChange();
 
+  /**
+   * Validates the request with a prefix for writable-type field paths.
+   *
+   * <p>The default implementation delegates to {@link #validate()} and preserves existing
+   * validation messages.
+   *
+   * @param fieldPrefix the field path prefix, including a trailing dot when nonempty
+   * @throws IllegalArgumentException if the request is invalid
+   */
+  default void validateWithPrefix(String fieldPrefix) throws IllegalArgumentException {
+    validate();
+  }
+
   /** Represents a request to rename a table. */
   @EqualsAndHashCode
   @ToString
@@ -410,7 +423,9 @@ public interface TableUpdateRequest extends RESTRequest {
           fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
     }
 
-    void validateWithPrefix(String fieldPrefix) {
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
       Preconditions.checkArgument(
           fieldName != null
               && fieldName.length > 0
@@ -528,7 +543,9 @@ public interface TableUpdateRequest extends RESTRequest {
       return TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
     }
 
-    void validateWithPrefix(String fieldPrefix) {
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
       Preconditions.checkArgument(
           fieldName != null
               && fieldName.length > 0
@@ -593,7 +610,9 @@ public interface TableUpdateRequest extends RESTRequest {
       return TableChange.updateColumnType(fieldName, newType);
     }
 
-    void validateWithPrefix(String fieldPrefix) {
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
       Preconditions.checkArgument(
           fieldName != null
               && fieldName.length > 0

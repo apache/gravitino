@@ -227,8 +227,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     TableEntity.NAME.validate(ident.name(), TABLE);
-    validateColumns(columns);
     WritableDataTypeValidator.validateTable(columns, partitions, distribution, sortOrders);
+    validateColumns(columns);
 
     // Load the schema to make sure the schema exists.
     SchemaDispatcher schemaDispatcher = getSchemaDispatcher();

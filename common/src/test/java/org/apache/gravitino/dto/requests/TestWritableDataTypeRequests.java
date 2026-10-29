@@ -76,6 +76,21 @@ public class TestWritableDataTypeRequests {
   }
 
   @Test
+  public void testPreserveValidationForUpdatesWithoutTypes() throws Exception {
+    String json = "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"\"}]}";
+    for (RESTRequest request :
+        new RESTRequest[] {
+          JsonUtils.objectMapper().readValue(json, TableUpdatesRequest.class),
+          JsonUtils.objectMapper().readValue(json, ViewUpdatesRequest.class)
+        }) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+      Assertions.assertEquals(
+          "\"newName\" field is required and cannot be empty", exception.getMessage());
+    }
+  }
+
+  @Test
   public void testAcceptExplicitExternalAndNativeTypes() throws Exception {
     for (String type :
         new String[] {

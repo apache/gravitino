@@ -20,14 +20,27 @@ package org.apache.gravitino.utils;
 
 import java.util.Map;
 import java.util.stream.Stream;
+import org.apache.gravitino.function.FunctionColumn;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -35,6 +48,10 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestWritableDataTypeValidator {
+
+  private static final FunctionImpl[] IMPLS = {
+    FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.UDF")
+  };
 
   @ParameterizedTest
   @MethodSource("invalidExpressions")
@@ -54,6 +71,29 @@ public class TestWritableDataTypeValidator {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> WritableDataTypeValidator.validatePartition(partition, "partition"));
+    Assertions.assertEquals(
+        "\"" + path + "\" field is required and cannot be null", exception.getMessage());
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidFunctionDefinitions")
+  public void testRejectNullFunctionArraysAndElements(FunctionDefinition definition, String path) {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> WritableDataTypeValidator.validateDefinition(definition, "definition"));
+    Assertions.assertEquals(
+        "\"" + path + "\" field is required and cannot be null", exception.getMessage());
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidTableInputs")
+  public void testRejectNullTableInputs(
+      Column[] columns, Distribution distribution, SortOrder[] sortOrders, String path) {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> WritableDataTypeValidator.validateTable(columns, null, distribution, sortOrders));
     Assertions.assertEquals(
         "\"" + path + "\" field is required and cannot be null", exception.getMessage());
   }
@@ -100,6 +140,31 @@ public class TestWritableDataTypeValidator {
                 Partitions.list("p", new Literal<?>[0][], null), "partition"));
   }
 
+  @Test
+  public void testPreserveEmptyFunctionArraysAndOptionalReturnType() {
+    FunctionDefinition scalar = FunctionDefinitions.of(null, Types.StringType.get(), IMPLS);
+    Assertions.assertDoesNotThrow(
+        () -> WritableDataTypeValidator.validateDefinition(scalar, "definition"));
+    FunctionDefinition table =
+        FunctionDefinitions.of(
+            null,
+            new FunctionColumn[] {FunctionColumn.of("c", Types.StringType.get(), null)},
+            IMPLS);
+    Assertions.assertNull(table.returnType());
+    Assertions.assertDoesNotThrow(
+        () -> WritableDataTypeValidator.validateDefinition(table, "definition"));
+  }
+
+  @Test
+  public void testPreserveAbsentTableOptionsAndEmptyArrays() {
+    Assertions.assertDoesNotThrow(
+        () -> WritableDataTypeValidator.validateTable(new Column[0], null, null, null));
+    Assertions.assertDoesNotThrow(
+        () ->
+            WritableDataTypeValidator.validateTable(
+                new Column[0], null, Distributions.NONE, SortOrders.NONE));
+  }
+
   private static Stream<Arguments> invalidExpressions() {
     return Stream.of(
         Arguments.of(FunctionExpression.of("f", (Expression[]) null), "expression.funcArgs"),
@@ -121,5 +186,61 @@ public class TestWritableDataTypeValidator {
         Arguments.of(
             Partitions.list("p", new Literal<?>[][] {{Literals.integerLiteral(1)}, null}, null),
             "partition.lists[1]"));
+  }
+
+  private static Stream<Arguments> invalidFunctionDefinitions() {
+    return Stream.of(
+        Arguments.of(
+            definitionWithArrays(null, FunctionDefinition.EMPTY_COLUMNS), "definition.parameters"),
+        Arguments.of(
+            FunctionDefinitions.of(
+                new FunctionParam[] {FunctionParams.of("x", Types.StringType.get()), null},
+                Types.StringType.get(),
+                IMPLS),
+            "definition.parameters[1]"),
+        Arguments.of(definitionWithArrays(new FunctionParam[0], null), "definition.returnColumns"),
+        Arguments.of(
+            FunctionDefinitions.of(
+                new FunctionParam[0],
+                new FunctionColumn[] {FunctionColumn.of("c", Types.StringType.get(), null), null},
+                IMPLS),
+            "definition.returnColumns[1]"));
+  }
+
+  private static Stream<Arguments> invalidTableInputs() {
+    Column column = Column.of("c", Types.StringType.get());
+    return Stream.of(
+        Arguments.of(null, null, null, "columns"),
+        Arguments.of(new Column[] {column, null}, null, null, "columns[1]"),
+        Arguments.of(
+            new Column[] {column},
+            Distributions.hash(2, (Expression[]) null),
+            null,
+            "distribution.funcArgs"),
+        Arguments.of(
+            new Column[] {column},
+            null,
+            new SortOrder[] {SortOrders.ascending(Literals.integerLiteral(1)), null},
+            "sortOrders[1]"));
+  }
+
+  private static FunctionDefinition definitionWithArrays(
+      FunctionParam[] parameters, FunctionColumn[] columns) {
+    return new FunctionDefinition() {
+      @Override
+      public FunctionParam[] parameters() {
+        return parameters;
+      }
+
+      @Override
+      public FunctionColumn[] returnColumns() {
+        return columns;
+      }
+
+      @Override
+      public FunctionImpl[] impls() {
+        return IMPLS;
+      }
+    };
   }
 }

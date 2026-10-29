@@ -178,6 +178,41 @@ public class TestWritableDataTypeDispatchers extends TestOperationDispatcher {
   }
 
   @Test
+  public void testNullTableInputsRejectedBeforeCatalogAccess() {
+    for (Column[] columns : new Column[][] {null, new Column[] {null}}) {
+      assertRejected(
+          () -> tables.createTable(ident("invalid_table"), columns, null, PROPERTIES),
+          columns == null ? "\"columns\"" : "columns[0]");
+    }
+    Column[] columns = {Column.of("c", Types.StringType.get())};
+    assertRejected(
+        () ->
+            tables.createTable(
+                ident("invalid_table"),
+                columns,
+                null,
+                PROPERTIES,
+                new Transform[0],
+                Distributions.hash(2, (Expression[]) null),
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES),
+        "distribution.funcArgs");
+    assertRejected(
+        () ->
+            tables.createTable(
+                ident("invalid_table"),
+                columns,
+                null,
+                PROPERTIES,
+                new Transform[0],
+                Distributions.NONE,
+                new SortOrder[] {null},
+                Indexes.EMPTY_INDEXES),
+        "sortOrders[0]");
+    verifyNoInteractions(entityStore);
+  }
+
+  @Test
   public void testTableChangesValidateEntireBatchBeforeMutation() {
     NameIdentifier ident = ident("alter_types");
     tables.createTable(ident, new Column[] {Column.of("c", EXTERNAL)}, "original", PROPERTIES);
@@ -247,6 +282,7 @@ public class TestWritableDataTypeDispatchers extends TestOperationDispatcher {
   public void testViewTypesRejectedBeforeCatalogAccess() {
     for (Column column :
         new Column[] {
+          null,
           Column.of("c", UNPARSED),
           Column.of("c", Types.ListType.of(UNPARSED, true)),
           Column.of("c", Types.ExternalType.of(" ")),
@@ -339,7 +375,7 @@ public class TestWritableDataTypeDispatchers extends TestOperationDispatcher {
           Partitions.range("p", literal, Literals.stringLiteral("a"), null),
           Partitions.range("p", Literals.stringLiteral("z"), literal, null)
         }) {
-      assertRejected(() -> partitions.addPartition(ident("missing"), partition), "partitions[0]");
+      assertRejected(() -> partitions.addPartition(ident("missing"), partition), "partition.");
     }
     verifyNoInteractions(entityStore);
   }
@@ -358,6 +394,8 @@ public class TestWritableDataTypeDispatchers extends TestOperationDispatcher {
         new FunctionDefinition[] {
           FunctionDefinitions.of(invalidParam, Types.StringType.get(), IMPLS),
           FunctionDefinitions.of(invalidDefault, Types.StringType.get(), IMPLS),
+          FunctionDefinitions.of(new FunctionParam[] {null}, Types.StringType.get(), IMPLS),
+          FunctionDefinitions.of(new FunctionParam[0], new FunctionColumn[] {null}, IMPLS),
           FunctionDefinitions.of(new FunctionParam[0], Types.ListType.of(UNPARSED, true), IMPLS),
           FunctionDefinitions.of(
               new FunctionParam[0],

@@ -195,6 +195,33 @@ public class TestTableOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testRejectNullTableInputsBeforeDispatch() {
+    String[][] invalidRequests = {
+      {"{\"name\":\"t\",\"columns\":null}", "columns"},
+      {"{\"name\":\"t\",\"columns\":[null]}", "columns[0]"},
+      {
+        "{\"name\":\"t\",\"columns\":[{\"name\":\"c\",\"type\":\"string\"}],\"sortOrders\":[null]}",
+        "sortOrders[0]"
+      }
+    };
+    for (String[] invalidRequest : invalidRequests) {
+      try (Response response =
+          target(tablePath(metalake, catalog, schema))
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(Entity.json(invalidRequest[0]))) {
+        Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertTrue(
+            response
+                .readEntity(ErrorResponse.class)
+                .getMessage()
+                .contains("\"" + invalidRequest[1] + "\" field is required and cannot be null"));
+      }
+    }
+    Mockito.verifyNoInteractions(dispatcher);
+  }
+
+  @Test
   public void testListTables() {
     NameIdentifier table1 = NameIdentifier.of(metalake, catalog, schema, "table1");
     NameIdentifier table2 = NameIdentifier.of(metalake, catalog, schema, "table2");

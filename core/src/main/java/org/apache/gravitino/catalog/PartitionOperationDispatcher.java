@@ -69,7 +69,7 @@ public class PartitionOperationDispatcher extends OperationDispatcher
   @Override
   public Partition addPartition(NameIdentifier tableIdent, Partition partition)
       throws PartitionAlreadyExistsException {
-    WritableDataTypeValidator.validatePartition(partition, "partitions[0]");
+    WritableDataTypeValidator.validatePartition(partition, "partition");
     return doWithTable(
         tableIdent, p -> p.addPartition(partition), PartitionAlreadyExistsException.class);
   }
