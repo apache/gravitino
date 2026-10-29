@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.injob;
 
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -51,30 +52,27 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
 
   @TestTemplate
   void testContinuesWhenNoDriftAndRecommenderMaintains() {
-    long jobId = 2001L;
-    insertBoundAction(jobId, 10L, 20L);
+    long actionId = insertBoundAction(2001L, 10L, 20L);
     InJobGateOutcome outcome =
-        maintainPipeline.gateCronJob(jobId, 10L, 20L, 100L, METRICS_JSON, () -> 100L);
+        maintainPipeline.gateCronJob(actionId, 10L, 20L, 100L, METRICS_JSON, () -> 100L);
     Assertions.assertTrue(outcome.continueMaintenance());
     Assertions.assertNull(outcome.stopReason());
   }
 
   @TestTemplate
   void testStopsOnDriftBeforeRecommend() {
-    long jobId = 2002L;
-    insertBoundAction(jobId, 11L, 21L);
+    long actionId = insertBoundAction(2002L, 11L, 21L);
     InJobGateOutcome outcome =
-        maintainPipeline.gateCronJob(jobId, 11L, 21L, 200L, METRICS_JSON, () -> 201L);
+        maintainPipeline.gateCronJob(actionId, 11L, 21L, 200L, METRICS_JSON, () -> 201L);
     Assertions.assertFalse(outcome.continueMaintenance());
     Assertions.assertEquals(InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, outcome.stopReason());
   }
 
   @TestTemplate
   void testStopsWhenRecommenderSkips() {
-    long jobId = 2003L;
-    insertBoundAction(jobId, 12L, 22L);
+    long actionId = insertBoundAction(2003L, 12L, 22L);
     InJobGateOutcome outcome =
-        skipPipeline.gateCronJob(jobId, 12L, 22L, 300L, METRICS_JSON, () -> 300L);
+        skipPipeline.gateCronJob(actionId, 12L, 22L, 300L, METRICS_JSON, () -> 300L);
     Assertions.assertFalse(outcome.continueMaintenance());
     Assertions.assertEquals(InJobGateOutcome.StopReason.RECOMMENDER_SKIP, outcome.stopReason());
   }
@@ -90,10 +88,11 @@ class TestTableMaintenanceInJobPipeline extends TestJDBCBackend {
     Assertions.assertEquals(InJobGateOutcome.StopReason.RECOMMENDER_SKIP, skip.stopReason());
   }
 
-  private void insertBoundAction(long jobId, long tableId, long policyId) {
-    actionMetaService.bindJobId(
+  private long insertBoundAction(long jobId, long tableId, long policyId) {
+    OccupancyClaim claim =
         actionMetaService.insertInFlight(
-            tableId, policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS),
-        jobId);
+            tableId, policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actionMetaService.bindJobId(claim, jobId);
+    return claim.actionId();
   }
 }

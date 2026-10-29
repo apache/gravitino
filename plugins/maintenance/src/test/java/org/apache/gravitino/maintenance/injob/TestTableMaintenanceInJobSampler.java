@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.injob;
 
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
+import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -45,14 +46,13 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
 
   @TestTemplate
   void testCronJobSamplePersistsAndContinuesWhenNoDrift() {
-    long jobId = 1001L;
-    insertBoundAction(jobId, 1L, 2L);
+    long actionId = insertBoundAction(1001L, 1L, 2L);
     InJobGateOutcome outcome =
-        sampler.sampleAndGateCronJob(jobId, 1L, 2L, 100L, METRICS_JSON, () -> 100L);
+        sampler.sampleAndGateCronJob(actionId, 1L, 2L, 100L, METRICS_JSON, () -> 100L);
 
     Assertions.assertTrue(outcome.continueMaintenance());
     Assertions.assertNull(outcome.stopReason());
-    long metricsId = actionMetaService.getByJobId(jobId).beforeMetricsId();
+    long metricsId = actionMetaService.getById(actionId).beforeMetricsId();
     TableSnapshotMetricsPO stored = metricsMetaService.getMetrics(metricsId);
     Assertions.assertNotNull(stored);
     Assertions.assertEquals(METRICS_JSON, stored.metricsValue());
@@ -61,32 +61,30 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
 
   @TestTemplate
   void testCronJobEndsEarlyWhenSnapshotDriftsAfterSample() {
-    long jobId = 1002L;
-    insertBoundAction(jobId, 3L, 4L);
+    long actionId = insertBoundAction(1002L, 3L, 4L);
     InJobGateOutcome outcome =
-        sampler.sampleAndGateCronJob(jobId, 3L, 4L, 200L, METRICS_JSON, () -> 201L);
+        sampler.sampleAndGateCronJob(actionId, 3L, 4L, 200L, METRICS_JSON, () -> 201L);
 
     Assertions.assertFalse(outcome.continueMaintenance());
     Assertions.assertEquals(InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, outcome.stopReason());
     Assertions.assertEquals(200L, outcome.sampledSnapshotId());
     Assertions.assertEquals(201L, outcome.headSnapshotId());
-    long metricsId = actionMetaService.getByJobId(jobId).beforeMetricsId();
+    long metricsId = actionMetaService.getById(actionId).beforeMetricsId();
     Assertions.assertNotNull(metricsMetaService.getMetrics(metricsId));
   }
 
   @TestTemplate
   void testCronJobSampleRetryWithSameS0IsIdempotent() {
-    long jobId = 1003L;
-    insertBoundAction(jobId, 5L, 6L);
+    long actionId = insertBoundAction(1003L, 5L, 6L);
     InJobGateOutcome first =
-        sampler.sampleAndGateCronJob(jobId, 5L, 6L, 300L, METRICS_JSON, () -> 300L);
-    long metricsId = actionMetaService.getByJobId(jobId).beforeMetricsId();
+        sampler.sampleAndGateCronJob(actionId, 5L, 6L, 300L, METRICS_JSON, () -> 300L);
+    long metricsId = actionMetaService.getById(actionId).beforeMetricsId();
     InJobGateOutcome retry =
-        sampler.sampleAndGateCronJob(jobId, 5L, 6L, 300L, "{\"mse\":9}", () -> 300L);
+        sampler.sampleAndGateCronJob(actionId, 5L, 6L, 300L, "{\"mse\":9}", () -> 300L);
 
     Assertions.assertTrue(first.continueMaintenance());
     Assertions.assertTrue(retry.continueMaintenance());
-    Assertions.assertEquals(metricsId, actionMetaService.getByJobId(jobId).beforeMetricsId());
+    Assertions.assertEquals(metricsId, actionMetaService.getById(actionId).beforeMetricsId());
     Assertions.assertEquals(METRICS_JSON, metricsMetaService.getMetrics(metricsId).metricsValue());
   }
 
@@ -100,10 +98,11 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
     Assertions.assertEquals(InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, drift.stopReason());
   }
 
-  private void insertBoundAction(long jobId, long tableId, long policyId) {
-    actionMetaService.bindJobId(
+  private long insertBoundAction(long jobId, long tableId, long policyId) {
+    OccupancyClaim claim =
         actionMetaService.insertInFlight(
-            tableId, policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS),
-        jobId);
+            tableId, policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+    actionMetaService.bindJobId(claim, jobId);
+    return claim.actionId();
   }
 }
