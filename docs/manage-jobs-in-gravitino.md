@@ -289,7 +289,8 @@ Otherwise another server may settle the job, and cancellation of a late submissi
 before its run request fails. Cancellation cannot undo completed work. If the job was already
 settled and this late cancellation fails, check the execution in the runner before retrying.
 `gravitino.job.stagingDirKeepTimeInMs` must also be longer than preparing, submitting, queueing and
-running a job of the local executor, as described below.
+running a job of the local executor, as described in
+[Local Job Executor](./local-job-executor.md#multiple-servers-and-restarts).
 :::
 
 ### List Jobs, Get a Job, and Cancel

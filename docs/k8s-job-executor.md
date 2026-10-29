@@ -133,7 +133,7 @@ configurations, or volumes, can also be set once as server-level defaults, or bu
 
 ### Rejected Runs
 
-A run is rejected, and no job is created, when:
+A run is rejected, and its job is removed, when:
 
 - The job template is a shell template.
 - A resource of the job is a path on the Gravitino server, see [Job Resources](#job-resources).
@@ -145,6 +145,29 @@ A run is rejected, and no job is created, when:
 - Kubernetes rejects the `SparkApplication`, for example because the namespace doesn't exist, the
   job executor lacks a permission, or the operator isn't installed. The error carries the reason
   that Kubernetes gives.
+- A `SparkApplication` of the same name belongs to another job, for example of another Gravitino
+  deployment that shares the namespace, see
+  [Multiple Servers and Restarts](#multiple-servers-and-restarts).
+
+### Failed Submissions
+
+When it isn't known whether the `SparkApplication` was created, the run request fails, but the job
+is kept:
+
+- The API server can't be reached, doesn't answer in time, or answers with another error than the
+  rejections above, for example a server error or `401 Unauthorized`.
+- The `SparkApplication` of the job exists but is being deleted, or is gone before it can be read,
+  for example after a retried request.
+
+The job executor tries to delete the `SparkApplication` right away, see
+[Cluster Connection](#cluster-connection). Gravitino marks the job as `CANCELLING`, and about three
+times `gravitino.job.statusPullIntervalInMs` later looks up the `SparkApplication` by its name and
+namespace. If it's found, it is cancelled. Either way, the job is then marked as `CANCELLED`. A
+lookup that fails, for example because the API server still can't be reached, is tried again on
+the next status pull. For the details, see [Run a Job](./manage-jobs-in-gravitino.md#run-a-job).
+
+The error of the run request names the job. Check the job before running the job template again, as
+another run request creates another job.
 
 ### Job Status
 
@@ -365,7 +388,8 @@ up to `connectionTimeoutInMs`, or `requestTimeoutInMs` for an API server that ac
 but doesn't answer. With the defaults, a cancellation fails after about 15 seconds if the API server
 can't be reached, or 30 seconds if it doesn't answer. A submission can take twice as long, as the
 job executor then also tries to delete the `SparkApplication` in case it was created. It does the
-same after a server error from the API server. If that deletion fails, the server log names the
+same after a server error from the API server. If that deletion fails too, Gravitino cancels the
+job later, see [Failed Submissions](#failed-submissions), and the server log names the
 `SparkApplication` to delete by hand. After a status query fails this way, the status queries of the
 other jobs fail right away for 10 seconds, and Gravitino tries them again on its next status pull.
 
@@ -575,6 +599,12 @@ The job executor keeps no job state on the Gravitino server:
 - Jobs keep running while Gravitino is down, and Gravitino picks up their status when it is back.
   The `SparkApplication` of a job is deleted `spark.ttlAfterStopInMs` after the job stops, 7 days by
   default. A job that Gravitino hasn't recorded as finished by then fails.
+- If a Gravitino server exits while submitting a job, another server, or the same server after a
+  restart, looks up the `SparkApplication` of the job about three times
+  `gravitino.job.statusPullIntervalInMs` later. A job that is found is tracked as usual, and a job
+  that isn't found fails. The lookup derives the name and namespace of the `SparkApplication` from
+  the job template and the current `namePrefix` and `namespace` configurations, so a job isn't found
+  if they changed in between.
 - Gravitino deployments that share a namespace need different `namePrefix` values, so that their
   `SparkApplication` names don't collide.
 
