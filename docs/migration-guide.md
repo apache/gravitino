@@ -30,15 +30,21 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 ### Policies are selected through tags
 
-- Direct policy associations with metadata objects are no longer read or written. The upgrade
-  does not convert existing direct associations. Before upgrading, export each policy's directly
-  associated objects from `GET /api/metalakes/{metalake}/policies/{policy}/objects`. Save the
-  policy name, object type, and full name, including direct associations on ancestor objects.
-  Back up the metadata database before the schema upgrade.
-- To preserve the old scope, create one dedicated tag per policy, associate the policy with that
-  tag using the `ALL_VALUES` selector, and assign the tag to every object that had a direct
-  policy association. A tag on a catalog or schema reaches its descendants. If a policy was
-  directly associated with both a parent and a child, assign the tag to both.
+- Direct policy associations with metadata objects are no longer read or written at runtime.
+  Before starting 2.0, use the offline migration tool below to convert historical bindings to
+  `object → hidden tag → policy`. Startup is refused while active legacy bindings remain.
+- The tool creates one server-managed hidden tag per policy and assigns it only to the objects
+  with historical direct bindings. It does not expand assignments onto descendants. Policy IDs
+  determine tag identities, so policy renames do not change scope. A policy attached to both a
+  parent and a child retains both assignments and the child's direct-match flag.
+- Each newly created policy also receives an unassigned hidden tag and its policy-to-tag
+  relation in the same metadata transaction.
+- The `tag_meta.hidden` column defaults to `false` for existing and ordinary tags. Policy-owned
+  hidden tags store `hidden=true`; the server preserves this flag when loading and copying tags.
+- Hidden tags have no assignment values and select the policy by tag presence. They are excluded
+  from ordinary tag and policy-to-tag listings. Tag APIs cannot create, rename, change, assign,
+  detach, or delete them. The `reserved_` name prefix is reserved, including alternate
+  casing. New scope changes use ordinary policy-to-tag associations.
 - Object policy lookup at `GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies`
   remains available, but now returns enabled policies matching the object's effective tags.
   A policy matching through multiple tags appears once. With `details=true`, `inherited` is
@@ -82,17 +88,17 @@ policy-to-tag association changes.
   inherited values, and a nearer ancestor overrides a farther one. For example,
   `data_domain=risk` on a schema overrides `data_domain=finance` on its catalog for every table
   in that schema, so a `TAG_VALUE("finance")` association no longer matches those tables. A
-  dedicated migration tag with `ALL_VALUES` avoids this interaction.
+  hidden migration tag matching presence avoids this interaction.
 
 See [Manage Tags](./manage-tags-in-gravitino.md#create-a-tag-with-a-value-constraint)
 for tag creation and value assignment examples.
 
 ### Authorization, UI, and consumers
 
-- Creating a migration tag requires `CREATE_TAG` on the metalake or ownership. Associating
-  a policy with a tag requires access to both: `APPLY_POLICY` on the policy and `APPLY_TAG`
-  on the tag, or the corresponding ownership. Assigning a tag also requires access to the
-  target metadata object.
+- The offline tool uses the metadata database credentials from the server configuration.
+  Run it only while every server using that database is stopped. It does not start the server,
+  run schema upgrades, or expose a direct-binding REST or client API. Normal policy-to-tag
+  operations retain their existing authorization requirements.
 - Read-only inspection requires `VIEW_TAG` or `APPLY_TAG` for tags and `VIEW_POLICY` or
   `APPLY_POLICY` for policies. Object policy results include only policies visible to the caller;
   use an account with the same policy visibility when comparing results before and after migration.
@@ -101,25 +107,64 @@ for tag creation and value assignment examples.
 - Update TMS and other policy consumers to read the resolved object policy list. Confirm the
   expected policy appears on representative tables before resuming maintenance jobs.
 
-### Migration checklist
+### Offline policy binding migration
 
-1. On the old runtime, back up the database. Export direct policy associations for **each
-   metalake**, inventory disabled policies, and record policy results on representative
-   descendants. Re-enable disabled policies that consumers must continue to receive. The old
-   `/policies/{policy}/objects` endpoint is unavailable after the upgrade.
-2. Map each direct relation to a tag assignment. A dedicated tag per policy with
-   `ALL_VALUES` preserves the original scope; review existing tag values and child overrides
-   before choosing `TAG_VALUE`.
-3. Stop direct policy writes and pause consumers that require complete policy results. Upgrade
-   the server and schema using [Upgrade Gravitino](./how-to-upgrade.md).
-4. Create the tags, add policy-to-tag associations, and assign tags to every object from the
-   exported direct-relation inventory.
-5. Compare resolved policy names and `inherited` values for every inventoried object and
-   representative descendants. Check enabled and disabled policies, direct child assignments,
-   and value selectors. Use the same policy visibility for before and after comparisons.
-6. Resume consumers after verification. Keep the inventory and database backup until the
-   deployment is stable. If rollback is needed, stop the new server and follow the
-   [database rollback procedure](./how-to-upgrade.md#rollback-if-upgrade-fails).
+The server distribution includes `bin/migrate-policy-bindings.sh`. It reads `gravitino.conf`
+from `GRAVITINO_CONF_DIR` (default: `$GRAVITINO_HOME/conf`) and uses the configured JDBC store.
+H2, MySQL, and PostgreSQL are supported. For H2, the tool resolves the same storage path as the
+server and requires the database file to exist; it never creates an empty replacement database.
+Install the same JDBC driver in `libs` as for the server.
 
-There is no automatic converter or verification command for direct policy relations. Do not
-edit relation tables directly as part of this migration.
+1. Inventory policies, disabled states, and representative descendant results on the old runtime.
+   Stop all servers sharing the metadata database and pause policy consumers. Back up the database.
+2. Apply the required SQL schema upgrades through 2.0 using
+   [Upgrade Gravitino](./how-to-upgrade.md). Keep the preserved `policy_relation_meta` table
+   until migration finishes.
+3. From the upgraded server distribution, run the precheck:
+
+   ```shell
+   bin/migrate-policy-bindings.sh --dry-run
+   ```
+
+   This command is read-only. It reports the number of active legacy bindings and rejects
+   unsupported object types, missing or foreign objects, missing policies or metalakes, and
+   reserved tag name collisions. Resolve reported problems before proceeding.
+4. Convert the historical bindings:
+
+   ```shell
+   bin/migrate-policy-bindings.sh
+   ```
+
+   Each policy is migrated in one database transaction. The tool calls the internal
+   `PolicyManager.addPolicyToObject` method to create or reuse its hidden tag and object association,
+   then checks every replacement, then soft-deletes its old relations.
+   Relation audit information is preserved. Progress is logged for verification and committed cleanup.
+   If a policy fails, its transaction rolls back; already committed policies remain migrated. Rerun the same command
+   after correcting the failure. It resumes from the remaining active legacy rows.
+5. Verify before restarting servers:
+
+   ```shell
+   bin/migrate-policy-bindings.sh --verify
+   ```
+
+   This command is read-only and fails if active legacy bindings remain, hidden tags or their
+   policy relations are invalid, or a hidden tag has assignment values. Each replacement object
+   association is verified inside its migration transaction before the old binding is retired.
+   Subsequent `--verify` runs check the current hidden-tag structure and migration completion.
+   A fresh installation without the legacy table needs no migration. Repeat execution creates no
+   duplicate tags or associations. The tool accepts no object or policy arguments to create
+   arbitrary bindings.
+6. Start the new server and compare resolved policy names and `inherited` values on representative
+   objects and descendants, using the same policy visibility as before. Verify disabled policies
+   and existing business tag associations, then resume consumers.
+
+Migrated policies remain visible through object policy lookup and normal policy lifecycle APIs.
+Disabling a policy suspends its effect; deleting it removes its hidden tag and assignments in the
+same storage transaction. Ordinary tag APIs do not offer per-object editing of migrated bindings.
+For ongoing scope management, use visible business tags and policy-to-tag associations. Run
+`--verify` as an upgrade check before normal object deletion or other metadata changes resume.
+
+Keep the database backup and migration logs until the deployment is stable. If rollback is
+needed, stop all new servers and restore the complete pre-upgrade backup using the
+[database rollback procedure](./how-to-upgrade.md#rollback-if-upgrade-fails). Do not restart the
+old runtime against a partially migrated database or manually edit relation tables.
