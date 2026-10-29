@@ -88,9 +88,14 @@ gravitino.client.oauth2.scope=gravitino
 |--------------------------------------|-----------------------------------------------------------------|---------------|-----------------------------|
 | `gravitino.client.authType`          | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable OAuth2)      |
 | `gravitino.client.oauth2.serverUri`  | OAuth2 server URI                                               | (none)        | Yes if authType is `oauth2` |
-| `gravitino.client.oauth2.credential` | OAuth2 credentials in format `client_id:client_secret`          | (none)        | Yes if authType is `oauth2` |
+| `gravitino.client.oauth2.credential` | OAuth2 credentials in the format `client_id:client_secret` or `client_id:client_secret:username:password` | (none)        | Yes if authType is `oauth2` |
 | `gravitino.client.oauth2.path`       | OAuth2 token endpoint path                                      | (none)        | Yes if authType is `oauth2` |
 | `gravitino.client.oauth2.scope`      | OAuth2 scope                                                    | (none)        | Yes if authType is `oauth2` |
+
+The four-part `client_id:client_secret:username:password` format requests the token with the
+`password` grant, so the connector acts as the given user instead of the configured service account.
+The password may contain `:` because the credential is split into at most four parts; keep the
+username free of `:` characters.
 
 ### Example: Connecting to OAuth-Protected Gravitino Server
 

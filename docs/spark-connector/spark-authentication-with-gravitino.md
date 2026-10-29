@@ -54,6 +54,24 @@ In the OAuth2 mode, you could use the following configuration to fetch an OAuth2
 | spark.sql.gravitino.oauth2.credential | string | None          | The credential to request the OAuth2 token.   | Yes, for OAuth2 mode |
 | spark.sql.gravitino.oauth2.scope      | string | None          | The scope to request the OAuth2 token.        | Yes, for OAuth2 mode |
 
+The `spark.sql.gravitino.oauth2.credential` property accepts the following formats:
+
+- `client_id:client_secret`: requests the token with the `client_credentials` grant, so the Spark job
+  acts as a service account.
+- `client_id:client_secret:username:password`: requests the token with the `password` grant, so the
+  Spark job acts as the given user instead of a service account. Leave `client_id` empty
+  (`:client_secret:username:password`) if the OAuth2 server does not require a client ID.
+
+For example, to submit a Spark job as the user `usera`:
+
+```shell
+spark-sql \
+  --conf spark.sql.gravitino.oauth2.serverUri=http://localhost:8080 \
+  --conf spark.sql.gravitino.oauth2.tokenPath=/realms/gravitinorealm/protocol/openid-connect/token \
+  --conf spark.sql.gravitino.oauth2.credential=gravitino-client:client-secret:usera:pass:word \
+  --conf spark.sql.gravitino.oauth2.scope=openid
+```
+
 ## Kerberos Mode
 
 In kerberos mode, you could use the Spark kerberos configuration to fetch a kerberos ticket to access Gravitino server, use `spark.kerberos.principal`, `spark.kerberos.keytab` to specify kerberos principal and keytab.
