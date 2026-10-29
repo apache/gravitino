@@ -29,7 +29,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.RustFSContainer;
+import org.apache.gravitino.integration.test.container.RustFSFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.storage.S3Properties;
@@ -40,7 +42,9 @@ import org.junit.jupiter.api.Test;
 
 /** Tests an existing Fileset catalog connection with S3 temporary credentials against RustFS. */
 @Tag("gravitino-docker-test")
+@RustFSFixture
 public class FilesetS3TokenConnectionIT extends BaseIT {
+  @FixtureContainer private RustFSContainer rustFSContainer;
 
   private final String bucketName =
       "fileset-connection-" + UUID.randomUUID().toString().replace("-", "");
@@ -54,8 +58,6 @@ public class FilesetS3TokenConnectionIT extends BaseIT {
   @BeforeAll
   public void startIntegrationTest() throws Exception {
     copyBundleJarsToHadoop("aws-bundle");
-    containerSuite.startRustFSContainer();
-    RustFSContainer rustFSContainer = containerSuite.getRustFSContainer();
     rustFSContainer.createBucket(bucketName);
 
     super.startIntegrationTest();

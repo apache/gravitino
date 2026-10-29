@@ -48,9 +48,7 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
     // change the ownership, the normal user will not have the permission to create table in Hive
     // as the /user/hive is owned by user `cli`, please see what's done in `initEnv` method in
     // superclass.
-    containerSuite
-        .getKerberosHiveContainer()
-        .executeInContainer("hadoop", "fs", "-chown", "-R", NORMAL_USER, "/user/hive/");
+    IcebergRestKerberosTestEnv.hdfs(kerberosHive).setOwner("/user/hive/", NORMAL_USER, true);
 
     super.prepareSQLContext();
   }
@@ -94,9 +92,7 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
     }
 
     IcebergRestKerberosTestEnv.configureSparkKerberos(
-        sparkConf,
-        HIVE_METASTORE_CLIENT_PRINCIPAL,
-        containerSuite.getKerberosHiveContainer().getHostName());
+        sparkConf, HIVE_METASTORE_CLIENT_PRINCIPAL, kerberosHive.getHostName());
 
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }

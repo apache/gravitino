@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -40,8 +40,9 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.KafkaContainer;
+import org.apache.gravitino.integration.test.container.KafkaFixture;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
@@ -55,23 +56,20 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@KafkaFixture
 public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
+  @FixtureContainer private KafkaContainer kafka;
 
   private static final String CATALOG = "catalog";
   private static final String SCHEMA = "default";
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String kafkaBootstrapServers;
   private static String role = "role";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startKafkaContainer();
     super.startIntegrationTest();
     kafkaBootstrapServers =
-        String.format(
-            "%s:%d",
-            containerSuite.getKafkaContainer().getContainerIpAddress(),
-            KafkaContainer.DEFAULT_BROKER_PORT);
+        String.format("%s:%d", kafka.getContainerIpAddress(), KafkaContainer.DEFAULT_BROKER_PORT);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("bootstrap.servers", kafkaBootstrapServers);
     client
@@ -79,7 +77,6 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createCatalog(CATALOG, Catalog.Type.MESSAGING, "kafka", "comment", properties);
     // try to load the schema as normal user, expect failure
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         RuntimeException.class,
         () -> {
           normalUserClient
@@ -87,7 +84,8 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
               .loadCatalog(CATALOG)
               .asSchemas()
               .loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
     // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -100,11 +98,11 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
   }
 
   @Test
@@ -117,19 +115,19 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
     TopicCatalog topicCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTopicCatalog();
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.createTopic(
               NameIdentifier.of(SCHEMA, "topic2"), "test2", null, new HashMap<>());
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
 
     assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.listTopics(Namespace.of(SCHEMA));
-        });
+        },
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.");
 
     // grant privileges
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -185,11 +183,11 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTopicCatalog();
     // normal user can load topic2 and topic3, but not topic1
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"),
         ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.loadTopic(NameIdentifier.of(SCHEMA, "topic1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"));
     Topic topic2 = topicCatalogNormalUser.loadTopic(NameIdentifier.of(SCHEMA, "topic2"));
     assertEquals("topic2", topic2.name());
     Topic topic3 = topicCatalogNormalUser.loadTopic(NameIdentifier.of(SCHEMA, "topic3"));
@@ -213,12 +211,12 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     // normal user cannot alter topic1 (no privilege)
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"),
         ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.alterTopic(
               NameIdentifier.of(SCHEMA, "topic1"), TopicChange.updateComment("new comment"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"));
     // grant normal user owner privilege on topic1
     gravitinoMetalake.setOwner(
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "topic1"), MetadataObject.Type.TOPIC),
@@ -241,11 +239,11 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
         Owner.Type.USER);
     // normal user cannot drop topic1
     assertThrows(
-        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"),
         ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.dropTopic(NameIdentifier.of(SCHEMA, "topic1"));
-        });
+        },
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"));
     // normal user can drop topic2 and topic3 (they created them)
     topicCatalogNormalUser.dropTopic(NameIdentifier.of(SCHEMA, "topic2"));
     topicCatalogNormalUser.dropTopic(NameIdentifier.of(SCHEMA, "topic3"));

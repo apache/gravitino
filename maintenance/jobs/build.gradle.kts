@@ -70,7 +70,6 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.awaitility)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
   testRuntimeOnly(libs.mysql.driver)
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion") {

@@ -42,7 +42,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 public class OceanBaseContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(OceanBaseContainer.class);
 
-  public static final String DEFAULT_IMAGE = "oceanbase/oceanbase-ce:4.2.1-lts";
+  public static final String DEFAULT_IMAGE = TestImages.OCEANBASE;
   public static final String HOST_NAME = "gravitino-ci-oceanbase";
   public static final int OCEANBASE_PORT = 2881;
   public static final String USER_NAME = "root@test";
@@ -84,6 +84,7 @@ public class OceanBaseContainer extends BaseContainer {
 
     await()
         .atMost(30, TimeUnit.SECONDS)
+        .pollDelay(Duration.ZERO)
         .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
