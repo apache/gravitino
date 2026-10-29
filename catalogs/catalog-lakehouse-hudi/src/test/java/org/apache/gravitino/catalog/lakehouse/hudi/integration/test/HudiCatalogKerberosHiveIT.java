@@ -104,9 +104,6 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     // Config kerberos configuration for Gravitino server
     addKerberosConfig();
 
-    // Create hive tables
-    createHudiTables();
-
     // Start Gravitino server
     super.startIntegrationTest();
   }
@@ -226,6 +223,8 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     Schema schema = catalog.asSchemas().loadSchema(SCHEMA_NAME);
     Assertions.assertEquals(SCHEMA_NAME, schema.name());
 
+    // TABLE_NAME is never created, so no Hive SQL setup is needed: the catalog must report the
+    // table as missing from the metastore, not as a non-Hudi table.
     TableCatalog tableOps = catalog.asTableCatalog();
     NoSuchTableException exception =
         Assertions.assertThrows(
@@ -237,24 +236,5 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
             .getMessage()
             .contains("Hive table " + TABLE_NAME + " does not exist in Hive Metastore"),
         "Unexpected exception message: " + exception.getMessage());
-  }
-
-  private static void createHudiTables() {
-    String createTableSql =
-        String.format(
-            "CREATE TABLE %s.%s (\n"
-                + "  id STRING,\n"
-                + "  name STRING,\n"
-                + "  age INT\n"
-                + ") \n"
-                + "LOCATION 'hdfs://localhost:9000/user/hive/warehouse-catalog-hudi' ",
-            SCHEMA_NAME, TABLE_NAME);
-    kerberosHiveContainer.executeInContainer("hive", "-e", "'" + createTableSql + ";'");
-    LOG.info("create table {} success[{}]", TABLE_NAME, createTableSql);
-
-    String insertTableSql =
-        String.format("INSERT INTO %s.%s" + " VALUES " + "(1,'Cyber',26)", SCHEMA_NAME, TABLE_NAME);
-    kerberosHiveContainer.executeInContainer("hive", "-e", "'" + insertTableSql + ";'");
-    LOG.info("insert table {} data success[{}]", TABLE_NAME, insertTableSql);
   }
 }

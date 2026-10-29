@@ -23,6 +23,10 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -597,17 +601,7 @@ public class TrinoConnectorIT extends BaseIT {
   void testColumnTypeNotNullByTrino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
-    String[] command = {
-      "mysql",
-      "-h127.0.0.1",
-      "-uroot",
-      "-pds123", // username and password are referred from Hive dockerfile.
-      "-e",
-      "grant all privileges on *.* to root@'%' identified by 'ds123'"
-    };
-
-    // There exists a mysql instance in Hive the container.
-    containerSuite.getHiveContainer().executeInContainer(command);
+    grantRootAccessToHiveMysql();
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
@@ -1007,17 +1001,7 @@ public class TrinoConnectorIT extends BaseIT {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
-    String[] command = {
-      "mysql",
-      "-h127.0.0.1",
-      "-uroot",
-      "-pds123", // username and password are referred from Hive dockerfile
-      "-e",
-      "grant all privileges on *.* to root@'%' identified by 'ds123'"
-    };
-
-    // There exists a mysql instance in Hive the container.
-    containerSuite.getHiveContainer().executeInContainer(command);
+    grantRootAccessToHiveMysql();
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
@@ -1090,17 +1074,7 @@ public class TrinoConnectorIT extends BaseIT {
   void testMySQLCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
-    String[] command = {
-      "mysql",
-      "-h127.0.0.1",
-      "-uroot",
-      "-pds123", // username and password are referred from Hive dockerfile.
-      "-e",
-      "grant all privileges on *.* to root@'%' identified by 'ds123'"
-    };
-
-    // There exists a mysql instance in Hive the container.
-    containerSuite.getHiveContainer().executeInContainer(command);
+    grantRootAccessToHiveMysql();
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
@@ -1133,17 +1107,7 @@ public class TrinoConnectorIT extends BaseIT {
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
-    String[] command = {
-      "mysql",
-      "-h127.0.0.1",
-      "-uroot",
-      "-pds123", // username and password are referred from Hive dockerfile.
-      "-e",
-      "grant all privileges on *.* to root@'%' identified by 'ds123'"
-    };
-
-    // There exists a mysql instance in Hive the container.
-    containerSuite.getHiveContainer().executeInContainer(command);
+    grantRootAccessToHiveMysql();
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
@@ -1241,17 +1205,7 @@ public class TrinoConnectorIT extends BaseIT {
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
-    String[] command = {
-      "mysql",
-      "-h127.0.0.1",
-      "-uroot",
-      "-pds123", // username and password are referred from Hive dockerfile.
-      "-e",
-      "grant all privileges on *.* to root@'%' identified by 'ds123'"
-    };
-
-    // There exists a mysql instance in Hive the container.
-    containerSuite.getHiveContainer().executeInContainer(command);
+    grantRootAccessToHiveMysql();
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
@@ -1359,17 +1313,7 @@ public class TrinoConnectorIT extends BaseIT {
   void testDropCatalogAndCreateAgain() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
-    String[] command = {
-      "mysql",
-      "-h127.0.0.1",
-      "-uroot",
-      "-pds123", // username and password are referred from Hive dockerfile.
-      "-e",
-      "grant all privileges on *.* to root@'%' identified by 'ds123'"
-    };
-
-    // There exists a mysql instance in Hive the container.
-    containerSuite.getHiveContainer().executeInContainer(command);
+    grantRootAccessToHiveMysql();
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     // Create the catalog and drop it for 3 times to test the create/drop catalog function work
@@ -1427,5 +1371,20 @@ public class TrinoConnectorIT extends BaseIT {
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;
+  }
+
+  // Lets the tests' MySQL catalogs reach the MySQL inside the Hive container as root. Root may only
+  // log in from localhost there, so the grant runs as `iceberg`, which the image creates for any
+  // host with the grant option.
+  private static void grantRootAccessToHiveMysql() {
+    String url =
+        String.format(
+            "jdbc:mysql://%s:3306/", containerSuite.getHiveContainer().getContainerIpAddress());
+    try (Connection connection = DriverManager.getConnection(url, "iceberg", "iceberg");
+        Statement statement = connection.createStatement()) {
+      statement.execute("GRANT ALL PRIVILEGES ON *.* TO root@'%' IDENTIFIED BY 'ds123'");
+    } catch (SQLException e) {
+      throw new IllegalStateException("Failed to grant root access to the Hive MySQL", e);
+    }
   }
 }
