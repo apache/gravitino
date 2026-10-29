@@ -749,68 +749,29 @@ class TestDTOConverters(unittest.TestCase):
 
     def test_to_dtos_indexes(self):
         field_names = [[f"field_{i}"] for i in range(2)]
+        cases = list(product(Index.IndexType, ({}, {"key": "value"})))
 
         indexes: list[Index] = [
-            Indexes.of(index_type, index_type.value, field_names, {})
-            for index_type in Index.IndexType
+            Indexes.of(index_type, index_type.value, field_names, properties)
+            for index_type, properties in cases
         ]
         expected_dtos: list[IndexDTO] = [
             IndexDTO(
                 index_type=index_type,
                 name=index_type.value,
                 field_names=field_names,
+                properties=properties,
             )
-            for index_type in Index.IndexType
+            for index_type, properties in cases
         ]
         converted_dtos = DTOConverters.to_dtos(indexes)
-        for converted, expected in zip(converted_dtos, expected_dtos):
-            self.assertEqual(converted.type(), expected.type())
-            self.assertEqual(converted.name(), expected.name())
-            self.assertListEqual(converted.field_names(), expected.field_names())
+        self.assertListEqual(converted_dtos, expected_dtos)
+        self.assertListEqual(
+            DTOConverters.to_dtos(DTOConverters.from_dtos(converted_dtos)),
+            expected_dtos,
+        )
 
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
-
-    def test_index_properties_survive_dto_conversion(self):
-        cases = (
-            (
-                Index.IndexType.DATA_SKIPPING_TEXT,
-                {"tokenizer": "ngrams", "ngram_size": "3"},
-            ),
-            (
-                Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
-                {"type": "hnsw", "distance_function": "L2Distance", "dimensions": "3"},
-            ),
-            (
-                Index.IndexType.DATA_SKIPPING_ANNOY,
-                {
-                    "annoy_trees": "100",
-                    "clickhouse_type_full": "annoy(100)",
-                    "granularity": "1",
-                },
-            ),
-            (
-                Index.IndexType.DATA_SKIPPING_USEARCH,
-                {
-                    "usearch_distance_function": "cosineDistance",
-                    "clickhouse_type_full": "usearch('cosineDistance')",
-                    "granularity": "1",
-                },
-            ),
-        )
-        for index_type, properties in cases:
-            with self.subTest(index_type=index_type):
-                index = Indexes.of(index_type, "idx_body", [["body"]], properties)
-
-                dto = DTOConverters.to_dto(index)
-                self.assertIs(dto.type(), index_type)
-                self.assertEqual(dto.name(), "idx_body")
-                self.assertEqual(dto.field_names(), [["body"]])
-                self.assertEqual(dto.properties(), properties)
-                restored = DTOConverters.from_dto(dto)
-                self.assertIs(restored.type(), index_type)
-                self.assertEqual(restored.name(), "idx_body")
-                self.assertEqual(restored.field_names(), [["body"]])
-                self.assertEqual(restored.properties(), properties)
 
     def test_to_dtos_representations(self):
         representations = [
