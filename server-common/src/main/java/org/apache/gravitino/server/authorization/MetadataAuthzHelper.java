@@ -31,7 +31,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -90,9 +89,7 @@ public class MetadataAuthzHelper {
       Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
 
   private static final Set<Entity.EntityType> METADATA_OBJECT_ENTITY_TYPES =
-      Arrays.stream(MetadataObject.Type.values())
-          .map(MetadataObjectUtil::toEntityType)
-          .collect(Collectors.toUnmodifiableSet());
+      MetadataObjectUtil.metadataObjectEntityTypes();
 
   private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String MODEL_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";

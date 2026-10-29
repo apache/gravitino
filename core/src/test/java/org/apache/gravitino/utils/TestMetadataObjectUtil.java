@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -118,6 +119,23 @@ public class TestMetadataObjectUtil {
         MetadataObjectUtil.toEntityType(
             MetadataObjects.of(
                 "catalog.schema", "sales_model", MetadataObject.Type.SEMANTIC_MODEL)));
+  }
+
+  @Test
+  public void testMetadataObjectEntityTypes() {
+    Set<Entity.EntityType> entityTypes = MetadataObjectUtil.metadataObjectEntityTypes();
+    for (MetadataObject.Type type : MetadataObject.Type.values()) {
+      if (type == MetadataObject.Type.ONTOLOGY) {
+        // ONTOLOGY is not backed by an entity yet.
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> MetadataObjectUtil.toEntityType(type));
+        continue;
+      }
+      Assertions.assertTrue(entityTypes.contains(MetadataObjectUtil.toEntityType(type)));
+    }
+    Assertions.assertEquals(MetadataObject.Type.values().length - 1, entityTypes.size());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> entityTypes.add(Entity.EntityType.USER));
   }
 
   @Test
