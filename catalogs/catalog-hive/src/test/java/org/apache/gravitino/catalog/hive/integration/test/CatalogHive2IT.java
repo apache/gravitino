@@ -83,8 +83,9 @@ import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -128,6 +129,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture
 public class CatalogHive2IT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHive2IT.class);
 
@@ -146,7 +148,7 @@ public class CatalogHive2IT extends BaseIT {
   protected String hiveMetastoreUris;
   protected String hmsCatalog = "";
   protected final String provider = "hive";
-  protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer protected HiveContainer hive;
   protected HiveClientPool hiveClientPool;
   protected GravitinoMetalake metalake;
   protected Catalog catalog;
@@ -179,14 +181,9 @@ public class CatalogHive2IT extends BaseIT {
           "'gravitino_it_test'");
 
   protected void startNecessaryContainer() {
-    containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2));
-
     hiveMetastoreUris =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
   }
 
   protected void initSparkSession() {
@@ -199,8 +196,7 @@ public class CatalogHive2IT extends BaseIT {
                 "spark.sql.warehouse.dir",
                 String.format(
                     "hdfs://%s:%d/user/hive/warehouse",
-                    containerSuite.getHiveContainer().getContainerIpAddress(),
-                    HiveContainer.HDFS_DEFAULTFS_PORT))
+                    hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT))
             .config("spark.sql.storeAssignmentPolicy", "LEGACY")
             .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
             .enableHiveSupport();
@@ -212,9 +208,7 @@ public class CatalogHive2IT extends BaseIT {
     conf.set(
         "fs.defaultFS",
         String.format(
-            "hdfs://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT));
+            "hdfs://%s:%d", hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
     fileSystem = FileSystem.get(conf);
   }
 
@@ -264,8 +258,6 @@ public class CatalogHive2IT extends BaseIT {
     if (sparkSession != null) {
       sparkSession.close();
     }
-
-    ContainerSuite.getInstance().close();
 
     if (fileSystem != null) {
       fileSystem.close();
@@ -2012,7 +2004,7 @@ public class CatalogHive2IT extends BaseIT {
         "location",
         String.format(
             "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
+            hive.getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
     return properties;

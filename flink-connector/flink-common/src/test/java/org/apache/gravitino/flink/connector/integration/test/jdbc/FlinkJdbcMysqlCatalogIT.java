@@ -133,13 +133,6 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
     mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
   }
 
-  @Override
-  protected void stopCatalogEnv() throws Exception {
-    if (null != containerSuite) {
-      containerSuite.close();
-    }
-  }
-
   @Test
   public void testCreateGravitinoJdbcCatalogUsingSQL() {
     tableEnv.useCatalog(DEFAULT_CATALOG);

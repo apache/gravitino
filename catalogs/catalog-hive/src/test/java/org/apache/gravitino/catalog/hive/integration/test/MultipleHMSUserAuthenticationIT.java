@@ -31,7 +31,7 @@ import org.junit.jupiter.api.TestInstance;
 public class MultipleHMSUserAuthenticationIT extends HiveUserAuthenticationIT {
   @BeforeAll
   static void setHiveURI() {
-    String ip = kerberosHiveContainer.getContainerIpAddress();
+    String ip = kerberosHive.getContainerIpAddress();
     int oldHMSPort = HiveContainer.HIVE_METASTORE_PORT;
 
     // About the value of `newAddedHMSPort`, please see the value `hive.metastore.port` in the

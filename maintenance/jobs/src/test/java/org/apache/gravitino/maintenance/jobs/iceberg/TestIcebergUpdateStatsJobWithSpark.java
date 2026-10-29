@@ -72,7 +72,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.mysql.MySQLContainer;
 
 /** Integration tests for IcebergUpdateStatsAndMetricsJob with a real Spark+Iceberg runtime. */
 public class TestIcebergUpdateStatsJobWithSpark {
@@ -180,7 +180,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
     SparkSession restSpark = null;
     try {
       restSpark = createRestSparkSession();
-      try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33");
+      try (MySQLContainer mysql = new MySQLContainer("mysql:8.0.33");
           GravitinoAdminClient adminClient = GravitinoAdminClient.builder(SERVER_URI).build()) {
         mysql.start();
         initializeMySqlMetricsSchema(mysql);
@@ -423,7 +423,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
   @Test
   @Tag("gravitino-docker-test")
   public void testUpdatePartitionedTableMetricsStoredInMySql() throws Exception {
-    try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33")) {
+    try (MySQLContainer mysql = new MySQLContainer("mysql:8.0.33")) {
       mysql.start();
 
       Map<String, String> conf = new HashMap<>();
@@ -465,7 +465,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
     }
   }
 
-  private static void initializeMySqlMetricsSchema(MySQLContainer<?> mysql) throws Exception {
+  private static void initializeMySqlMetricsSchema(MySQLContainer mysql) throws Exception {
     Path schemaPath =
         findRepoRoot()
             .resolve("scripts")
@@ -629,7 +629,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         DataScope.forPartition(tableIdentifier, partitionPath), now - 1800, now + 1800);
   }
 
-  private static Map<String, String> buildJdbcMetricsConfigs(MySQLContainer<?> mysql) {
+  private static Map<String, String> buildJdbcMetricsConfigs(MySQLContainer mysql) {
     Map<String, String> conf = new HashMap<>();
     conf.put("gravitino.optimizer.jdbcMetrics.jdbcUrl", mysql.getJdbcUrl());
     conf.put("gravitino.optimizer.jdbcMetrics.jdbcUser", mysql.getUsername());
@@ -646,7 +646,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         + "\",\"statistics_updater\":\"gravitino-statistics-updater\"}";
   }
 
-  private static String buildUpdaterOptionsForMetricsUpdaterOnly(MySQLContainer<?> mysql) {
+  private static String buildUpdaterOptionsForMetricsUpdaterOnly(MySQLContainer mysql) {
     return "{\"metrics_updater\":\"gravitino-metrics-updater\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcUrl\":\""
         + mysql.getJdbcUrl()
@@ -662,7 +662,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         + "\"}";
   }
 
-  private static String buildUpdaterOptionsForAllMode(MySQLContainer<?> mysql) {
+  private static String buildUpdaterOptionsForAllMode(MySQLContainer mysql) {
     return "{\"gravitino_uri\":\""
         + SERVER_URI
         + "\",\"metalake\":\""

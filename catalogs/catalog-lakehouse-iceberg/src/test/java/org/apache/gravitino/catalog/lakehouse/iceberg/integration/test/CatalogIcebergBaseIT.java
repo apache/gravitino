@@ -61,7 +61,9 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -103,9 +105,12 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+@HiveFixture
 public abstract class CatalogIcebergBaseIT extends BaseIT {
 
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  /** The Hive server whose metastore and HDFS the subclasses point the catalog at. */
+  @FixtureContainer protected HiveContainer hive;
+
   protected String WAREHOUSE;
   protected String URIS;
   protected String TYPE;
@@ -139,7 +144,6 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   public void startup() throws Exception {
     super.ignoreIcebergAuxRestService = false;
     super.startIntegrationTest();
-    containerSuite.startHiveContainer();
     initIcebergCatalogProperties();
     createMetalake();
     createCatalog();
