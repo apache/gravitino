@@ -49,6 +49,7 @@ import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.ontology.OntologyDispatcher;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretProviderRegistry;
@@ -179,6 +180,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
             bind(gravitinoEnv.tagDispatcher()).to(TagDispatcher.class).ranked(1);
+            bind(gravitinoEnv.ontologyDispatcher()).to(OntologyDispatcher.class).ranked(1);
             bind(gravitinoEnv.policyDispatcher()).to(PolicyDispatcher.class).ranked(1);
             bind(gravitinoEnv.credentialOperationDispatcher())
                 .to(CredentialOperationDispatcher.class)

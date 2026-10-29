@@ -182,6 +182,8 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ossie:
     $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ossie"
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1ontologies"
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1ontologies~1%7Bontology%7D"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
     $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions"

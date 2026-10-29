@@ -1,0 +1,835 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/ontologies:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    get:
+      tags:
+        - ontology
+      summary: List ontologies (names)
+      description: >-
+        Lists the ontologies of a metalake. With {details} set to false only the names are
+        returned; with {details} set to true the complete ontologies, including their definitions,
+        are returned.
+      operationId: listOntologies
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: >-
+            Returns the ontology names, or the complete ontologies when {details} is true
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/OntologyListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+                OntologyListResponse:
+                  $ref: "#/components/examples/OntologyListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - ontology
+      summary: Create an ontology
+      description: >-
+        Creates a metalake-level ontology from a complete concept graph. The definition is validated
+        before it is stored: at least one concept is required, concept and relationship names must
+        be unique across the ontology, and every {@code extends}, role and prefix reference must
+        resolve inside the definition. A newly created ontology starts in the DRAFT status.
+      operationId: createOntology
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OntologyCreateRequest"
+            examples:
+              CreateFinanceOntology:
+                $ref: "#/components/examples/CreateFinanceOntology"
+      responses:
+        "200":
+          description: Returns the created ontology
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/OntologyResponse"
+              examples:
+                OntologyResponse:
+                  $ref: "#/components/examples/OntologyResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "409":
+          description: Conflict - An ontology with the same name already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                OntologyAlreadyExistsException:
+                  $ref: "#/components/examples/OntologyAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/ontologies/{ontology}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/ontology"
+
+    get:
+      tags:
+        - ontology
+      summary: Get an ontology
+      description: Returns one ontology, including its complete definition and audit information.
+      operationId: getOntology
+      responses:
+        "200":
+          description: Returns the requested ontology
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/OntologyResponse"
+              examples:
+                OntologyResponse:
+                  $ref: "#/components/examples/OntologyResponse"
+        "404":
+          description: >-
+            Not Found - The specified metalake or ontology does not exist, or the caller may not
+            see it
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchOntologyException:
+                  $ref: "#/components/examples/NoSuchOntologyException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - ontology
+      summary: Alter an ontology
+      description: >-
+        Applies an ordered batch of updates atomically. A content update (a replacement definition,
+        a property change or a rename) allocates a new version; flipping only the status does not.
+        Renaming an ontology does not rename the concepts inside it.
+      operationId: alterOntology
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OntologyUpdatesRequest"
+            examples:
+              PublishOntology:
+                $ref: "#/components/examples/PublishOntology"
+      responses:
+        "200":
+          description: Returns the altered ontology
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/OntologyResponse"
+              examples:
+                OntologyResponse:
+                  $ref: "#/components/examples/OntologyResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or ontology does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchOntologyException:
+                  $ref: "#/components/examples/NoSuchOntologyException"
+        "409":
+          description: Conflict - The rename target already exists, or the ontology changed
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                OntologyAlreadyExistsException:
+                  $ref: "#/components/examples/OntologyAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - ontology
+      summary: Delete an ontology
+      description: >-
+        Deletes an ontology together with all of its versions. Deleting an ontology that does not
+        exist succeeds and reports that nothing was dropped, so the operation is idempotent. An
+        ontology that is still referenced by a mapping cannot be deleted.
+      operationId: deleteOntology
+      responses:
+        "200":
+          description: Returns whether an ontology was deleted
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/DropResponse"
+              examples:
+                DropResponse:
+                  $ref: "./openapi.yaml#/components/examples/DropResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "409":
+          description: Conflict - The ontology is still referenced by a mapping
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NonEmptyOntologyException:
+                  $ref: "#/components/examples/NonEmptyOntologyException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  parameters:
+
+    ontology:
+      name: ontology
+      in: path
+      required: true
+      description: The ontology name
+      schema:
+        type: string
+
+    details:
+      name: details
+      in: query
+      required: false
+      description: Whether to return the complete ontologies instead of only their names
+      schema:
+        type: boolean
+        default: false
+
+  schemas:
+
+    OntologyResponse:
+      type: object
+      description: The response envelope of one ontology
+      required:
+        - code
+        - ontology
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: The status code of the response
+        ontology:
+          $ref: "#/components/schemas/Ontology"
+
+    OntologyListResponse:
+      type: object
+      description: The response envelope of a list of ontologies
+      required:
+        - code
+        - ontologies
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: The status code of the response
+        ontologies:
+          type: array
+          description: The ontologies of the metalake
+          items:
+            $ref: "#/components/schemas/Ontology"
+
+    Ontology:
+      type: object
+      description: >-
+        A metalake-level ontology: a concept graph plus the term mappings that connect it to
+        physical data.
+      required:
+        - name
+        - status
+        - definition
+      properties:
+        name:
+          type: string
+          description: The ontology name
+        comment:
+          type: string
+          nullable: true
+          description: The ontology comment
+        properties:
+          type: object
+          description: The Gravitino-specific properties of the ontology
+          additionalProperties:
+            type: string
+        status:
+          $ref: "#/components/schemas/OntologyStatus"
+        definition:
+          $ref: "#/components/schemas/OntologyDefinition"
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/AuditInfo"
+      additionalProperties: false
+
+    OntologyStatus:
+      type: string
+      description: >-
+        The lifecycle status. A DRAFT ontology is still being edited and is not meant to be used for
+        query planning; a PUBLISHED ontology is stable and can be.
+      enum:
+        - DRAFT
+        - PUBLISHED
+
+    OntologyDefinition:
+      type: object
+      description: The concept graph of an ontology
+      required:
+        - concepts
+      properties:
+        aiContext:
+          description: >-
+            The AI context shared by the whole ontology. Gravitino accepts both the shorthand
+            string form and the structured object form.
+          oneOf:
+            - type: string
+            - type: object
+              additionalProperties: true
+        requires:
+          type: array
+          description: Ontology-level SQL expressions that hold for every concept
+          items:
+            type: string
+        concepts:
+          type: array
+          description: The concepts of the ontology; at least one is required
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OntologyConcept"
+        prefixes:
+          type: object
+          description: >-
+            The prefix to IRI mapping used to resolve relative IRIs. An IRI that is neither absolute
+            nor prefixed is rejected.
+          additionalProperties:
+            type: string
+      additionalProperties: false
+
+    OntologyConcept:
+      type: object
+      description: One concept of the ontology
+      required:
+        - concept
+        - type
+      properties:
+        concept:
+          type: string
+          description: The concept name, unique across the ontology
+        type:
+          $ref: "#/components/schemas/ConceptType"
+        description:
+          type: string
+          nullable: true
+          description: The concept description
+        extends:
+          type: array
+          description: The concepts this concept extends; each must be defined in the ontology
+          items:
+            type: string
+        derivedBy:
+          type: array
+          description: The derivation rules of the concept
+          items:
+            type: string
+        identifyBy:
+          type: array
+          description: The preferred identifier of an instance of the concept
+          items:
+            type: string
+        requires:
+          type: array
+          description: The SQL expressions the concept depends on
+          items:
+            type: string
+        relationships:
+          type: array
+          description: The relationships this concept declares
+          items:
+            $ref: "#/components/schemas/OntologyRelationship"
+        iri:
+          type: string
+          nullable: true
+          description: The IRI of the concept, absolute or resolved through prefixes
+      additionalProperties: false
+
+    ConceptType:
+      type: string
+      description: >-
+        Whether the concept is an entity type that has instances, or a value type used as an
+        attribute value.
+      enum:
+        - ENTITY_TYPE
+        - VALUE_TYPE
+
+    OntologyRelationship:
+      type: object
+      description: A relationship between concepts
+      required:
+        - name
+        - verbalizes
+      properties:
+        name:
+          type: string
+          description: The relationship name, unique across the ontology
+        description:
+          type: string
+          nullable: true
+          description: The relationship description
+        verbalizes:
+          type: array
+          description: The natural-language phrasings that express the relationship; at least one
+          minItems: 1
+          items:
+            type: string
+        roles:
+          type: array
+          description: The concepts the relationship connects
+          items:
+            $ref: "#/components/schemas/OntologyRole"
+        multiplicity:
+          $ref: "#/components/schemas/Multiplicity"
+        derivedBy:
+          type: array
+          description: The derivation rules of the relationship
+          items:
+            type: string
+        requires:
+          type: array
+          description: The SQL expressions the relationship depends on
+          items:
+            type: string
+        iri:
+          type: string
+          nullable: true
+          description: The IRI of the relationship, absolute or resolved through prefixes
+      additionalProperties: false
+
+    Multiplicity:
+      type: string
+      description: The cardinality of a relationship
+      enum:
+        - MANY_TO_ONE
+        - ONE_TO_ONE
+
+    OntologyRole:
+      type: object
+      description: One role played by a concept in a relationship
+      required:
+        - concept
+      properties:
+        concept:
+          type: string
+          description: The concept this role plays
+        name:
+          type: string
+          nullable: true
+          description: The role name
+      additionalProperties: false
+
+    OntologyCreateRequest:
+      type: object
+      description: The request body of a create ontology operation
+      required:
+        - name
+        - definition
+      properties:
+        name:
+          type: string
+          description: The ontology name
+        comment:
+          type: string
+          nullable: true
+          description: The ontology comment
+        properties:
+          type: object
+          description: The Gravitino-specific properties of the ontology
+          additionalProperties:
+            type: string
+        definition:
+          $ref: "#/components/schemas/OntologyDefinition"
+      additionalProperties: false
+
+    OntologyUpdatesRequest:
+      type: object
+      description: A non-empty ordered batch of updates applied atomically
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OntologyUpdateRequest"
+      additionalProperties: false
+
+    OntologyUpdateRequest:
+      description: One polymorphic ontology update
+      oneOf:
+        - $ref: "#/components/schemas/RenameOntologyRequest"
+        - $ref: "#/components/schemas/UpdateOntologyCommentRequest"
+        - $ref: "#/components/schemas/SetOntologyPropertyRequest"
+        - $ref: "#/components/schemas/RemoveOntologyPropertyRequest"
+        - $ref: "#/components/schemas/ReplaceOntologyDefinitionRequest"
+        - $ref: "#/components/schemas/UpdateOntologyStatusRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameOntologyRequest"
+          updateComment: "#/components/schemas/UpdateOntologyCommentRequest"
+          setProperty: "#/components/schemas/SetOntologyPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveOntologyPropertyRequest"
+          replaceDefinition: "#/components/schemas/ReplaceOntologyDefinitionRequest"
+          updateStatus: "#/components/schemas/UpdateOntologyStatusRequest"
+
+    RenameOntologyRequest:
+      type: object
+      description: Renames the ontology without renaming the concepts inside it
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - rename
+        newName:
+          type: string
+          minLength: 1
+          description: The new non-blank ontology name
+      example: {
+        "@type": "rename",
+        "newName": "FinanceV2"
+      }
+
+    UpdateOntologyCommentRequest:
+      type: object
+      description: >-
+        Replaces the comment. An omitted or null newComment clears the comment; an explicit empty
+        string is stored as an empty comment.
+      required:
+        - "@type"
+      properties:
+        "@type":
+          type: string
+          enum:
+            - updateComment
+        newComment:
+          type: string
+          nullable: true
+          description: The new comment, null to clear it, or an empty string to retain empty
+      example: {
+        "@type": "updateComment",
+        "newComment": "Certified finance vocabulary"
+      }
+
+    SetOntologyPropertyRequest:
+      type: object
+      description: Sets or replaces one Gravitino-specific property
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setProperty
+        property:
+          type: string
+          minLength: 1
+          description: The non-blank property name
+        value:
+          type: string
+          description: The property value; an empty string is valid
+      example: {
+        "@type": "setProperty",
+        "property": "ossie-version",
+        "value": "0.2.0.dev0"
+      }
+
+    RemoveOntologyPropertyRequest:
+      type: object
+      description: Removes one Gravitino-specific property if it exists
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          enum:
+            - removeProperty
+        property:
+          type: string
+          minLength: 1
+          description: The non-blank property name
+      example: {
+        "@type": "removeProperty",
+        "property": "legacy"
+      }
+
+    ReplaceOntologyDefinitionRequest:
+      type: object
+      description: Replaces and validates the complete concept graph atomically
+      required:
+        - "@type"
+        - definition
+      properties:
+        "@type":
+          type: string
+          enum:
+            - replaceDefinition
+        definition:
+          $ref: "#/components/schemas/OntologyDefinition"
+      example: {
+        "@type": "replaceDefinition",
+        "definition": {
+          "concepts": [
+            {
+              "concept": "Account",
+              "type": "ENTITY_TYPE"
+            }
+          ]
+        }
+      }
+
+    UpdateOntologyStatusRequest:
+      type: object
+      description: >-
+        Changes the lifecycle status. Flip the status only through this update; changing the content
+        of an ontology allocates a version but does not change the status.
+      required:
+        - "@type"
+        - status
+      properties:
+        "@type":
+          type: string
+          enum:
+            - updateStatus
+        status:
+          $ref: "#/components/schemas/OntologyStatus"
+      example: {
+        "@type": "updateStatus",
+        "status": "PUBLISHED"
+      }
+
+  examples:
+
+    NameListResponse:
+      summary: A names-only ontology list
+      value: {
+        "code": 0,
+        "names": ["Finance"]
+      }
+
+    OntologyListResponse:
+      summary: A list of complete ontologies
+      value: {
+        "code": 0,
+        "ontologies": [
+          {
+            "name": "Finance",
+            "comment": "Certified finance vocabulary",
+            "properties": {"ossie-version": "0.2.0.dev0"},
+            "status": "PUBLISHED",
+            "definition": {
+              "aiContext": "Certified vocabulary for finance reporting",
+              "requires": ["Account IS NOT NULL"],
+              "concepts": [
+                {
+                  "concept": "Account",
+                  "type": "ENTITY_TYPE",
+                  "description": "A financial account",
+                  "relationships": [
+                    {
+                      "name": "holds",
+                      "description": "An account holds a balance",
+                      "verbalizes": ["an account holds a balance"],
+                      "roles": [{"concept": "Balance"}],
+                      "multiplicity": "MANY_TO_ONE",
+                      "iri": "ex:holds"
+                    }
+                  ],
+                  "iri": "ex:Account"
+                },
+                {
+                  "concept": "Balance",
+                  "type": "VALUE_TYPE",
+                  "description": "A monetary amount",
+                  "iri": "ex:Balance"
+                }
+              ],
+              "prefixes": {"ex": "http://example.com/finance/"}
+            },
+            "audit": {
+              "creator": "admin",
+              "createTime": "2026-10-29T00:00:00Z",
+              "lastModifier": "admin",
+              "lastModifiedTime": "2026-10-29T00:00:00Z"
+            }
+          }
+        ]
+      }
+
+    CreateFinanceOntology:
+      summary: Create a small finance ontology
+      value: {
+        "name": "Finance",
+        "comment": "Certified finance vocabulary",
+        "properties": {"ossie-version": "0.2.0.dev0"},
+        "definition": {
+          "aiContext": "Certified vocabulary for finance reporting",
+          "requires": ["Account IS NOT NULL"],
+          "concepts": [
+            {
+              "concept": "Account",
+              "type": "ENTITY_TYPE",
+              "description": "A financial account",
+              "relationships": [
+                {
+                  "name": "holds",
+                  "description": "An account holds a balance",
+                  "verbalizes": ["an account holds a balance"],
+                  "roles": [{"concept": "Balance"}],
+                  "multiplicity": "MANY_TO_ONE",
+                  "iri": "ex:holds"
+                }
+              ],
+              "iri": "ex:Account"
+            },
+            {
+              "concept": "Balance",
+              "type": "VALUE_TYPE",
+              "description": "A monetary amount",
+              "iri": "ex:Balance"
+            }
+          ],
+          "prefixes": {"ex": "http://example.com/finance/"}
+        }
+      }
+
+    OntologyResponse:
+      summary: One ontology
+      value: {
+        "code": 0,
+        "ontology": {
+          "name": "Finance",
+          "comment": "Certified finance vocabulary",
+          "properties": {"ossie-version": "0.2.0.dev0"},
+          "status": "DRAFT",
+          "definition": {
+            "concepts": [
+              {
+                "concept": "Account",
+                "type": "ENTITY_TYPE",
+                "iri": "ex:Account"
+              }
+            ],
+            "prefixes": {"ex": "http://example.com/finance/"}
+          },
+          "audit": {
+            "creator": "admin",
+            "createTime": "2026-10-29T00:00:00Z",
+            "lastModifier": "admin",
+            "lastModifiedTime": "2026-10-29T00:00:00Z"
+          }
+        }
+      }
+
+    PublishOntology:
+      summary: Publish an ontology
+      value: {
+        "updates": [
+          {"@type": "updateComment", "newComment": "Certified finance vocabulary"},
+          {"@type": "updateStatus", "status": "PUBLISHED"}
+        ]
+      }
+
+    NoSuchOntologyException:
+      summary: The requested ontology does not exist
+      value: {
+        "code": 1003,
+        "type": "NoSuchOntologyException",
+        "message": "Failed to operate ontology(ies) [Finance] operation [LOAD] under metalake [metalake], reason [Ontology with name Finance under metalake metalake does not exist]",
+        "stack": []
+      }
+
+    OntologyAlreadyExistsException:
+      summary: An ontology with the same name already exists
+      value: {
+        "code": 1004,
+        "type": "OntologyAlreadyExistsException",
+        "message": "Failed to operate ontology(ies) [Finance] operation [CREATE] under metalake [metalake], reason [Ontology with name Finance under metalake metalake already exists]",
+        "stack": []
+      }
+
+    NonEmptyOntologyException:
+      summary: The ontology is still referenced
+      value: {
+        "code": 1009,
+        "type": "NonEmptyOntologyException",
+        "message": "Failed to operate ontology(ies) [Finance] operation [DROP] under metalake [metalake], reason [Ontology Finance is still referenced by a mapping]",
+        "stack": []
+      }

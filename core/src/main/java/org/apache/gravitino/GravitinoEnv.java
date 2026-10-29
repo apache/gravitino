@@ -103,6 +103,8 @@ import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metalake.MetalakeNormalizeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
+import org.apache.gravitino.ontology.OntologyDispatcher;
+import org.apache.gravitino.ontology.OntologyOperationDispatcher;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.secret.SecretManager;
@@ -181,6 +183,8 @@ public class GravitinoEnv {
 
   private TagDispatcher tagDispatcher;
   private TagDispatcher internalTagDispatcher;
+
+  private OntologyDispatcher ontologyDispatcher;
 
   private PolicyDispatcher policyDispatcher;
   private PolicyDispatcher internalPolicyDispatcher;
@@ -682,6 +686,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the ontology dispatcher associated with the Gravitino environment.
+   *
+   * @return The ontology dispatcher.
+   */
+  public OntologyDispatcher ontologyDispatcher() {
+    return ontologyDispatcher;
+  }
+
+  /**
    * Get the PolicyDispatcher associated with the Gravitino environment.
    *
    * @return The PolicyDispatcher instance.
@@ -935,6 +948,7 @@ public class GravitinoEnv {
 
     this.internalTagDispatcher = new TagManager(idGenerator, entityStore);
     this.internalPolicyDispatcher = new PolicyManager(idGenerator, entityStore);
+    this.ontologyDispatcher = new OntologyOperationDispatcher(entityStore, idGenerator);
 
     return new MetadataOperations(
         filesetOperationDispatcher,

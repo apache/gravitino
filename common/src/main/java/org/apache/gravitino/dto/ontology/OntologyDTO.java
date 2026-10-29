@@ -29,6 +29,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.ontology.Ontology;
 import org.apache.gravitino.ontology.OntologyDefinition;
 
@@ -138,7 +139,7 @@ public class OntologyDTO implements Ontology {
         ontology.properties().isEmpty() ? null : ontology.properties(),
         ontology.status(),
         OntologyDefinitionDTO.fromOntologyDefinition(ontology.definition()),
-        (AuditDTO) ontology.auditInfo());
+        DTOConverters.toDTO(ontology.auditInfo()));
   }
 
   /** Validates the ontology DTO. */

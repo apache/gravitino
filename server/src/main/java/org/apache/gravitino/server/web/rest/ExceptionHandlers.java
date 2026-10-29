@@ -38,11 +38,14 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchOntologyException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyOntologyException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OntologyAlreadyExistsException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
@@ -136,6 +139,11 @@ public class ExceptionHandlers {
   public static Response handleTagException(
       OperationType op, String tag, String parent, Exception e) {
     return TagExceptionHandler.INSTANCE.handle(op, tag, parent, e);
+  }
+
+  public static Response handleOntologyException(
+      OperationType op, String ontology, String parent, Exception e) {
+    return OntologyExceptionHandler.INSTANCE.handle(op, ontology, parent, e);
   }
 
   public static Response handlePolicyException(
@@ -876,6 +884,44 @@ public class ExceptionHandlers {
         return Utils.forbidden(errorMsg, e);
       } else {
         return super.handle(op, tag, parent, e);
+      }
+    }
+  }
+
+  private static class OntologyExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new OntologyExceptionHandler();
+
+    private static String getOntologyErrorMsg(
+        String ontology, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate ontology(ies)%s operation [%s] under metalake [%s], reason [%s]",
+          ontology, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String ontology, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(ontology) ? "" : " [" + ontology + "]";
+      String errorMsg = getOntologyErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof NoSuchOntologyException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof OntologyAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NonEmptyOntologyException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else {
+        return super.handle(op, ontology, parent, e);
       }
     }
   }
