@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -34,14 +36,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
@@ -58,6 +64,7 @@ import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
@@ -576,44 +583,49 @@ public class TestDomainMetaService extends TestJDBCBackend {
     Assertions.assertEquals(dept.id(), orphaned.backingTagId());
     Assertions.assertEquals("trading", orphaned.backingTagValue());
 
-    // An update writes the binding: replace it, then remove it.
-    DomainEntity rebound =
-        domainMetaService.updateDomain(
-            trading.nameIdentifier(),
-            entity ->
-                ((DomainEntity) entity)
-                    .toBuilder().withBackingTagId(finance.id()).withBackingTagValue(null).build());
-    Assertions.assertEquals(finance.id(), rebound.backingTagId());
-    Assertions.assertEquals(TagValue.noValue("Finance"), rebound.backingTag().orElse(null));
+    // Neither an update nor a replacement can change the binding; it is changed under the binding
+    // rules by updateDomainBackingTagAndGet.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.updateDomain(
+                trading.nameIdentifier(),
+                entity ->
+                    ((DomainEntity) entity)
+                        .toBuilder()
+                            .withBackingTagId(finance.id())
+                            .withBackingTagValue(null)
+                            .build()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.updateDomain(
+                trading.nameIdentifier(),
+                entity ->
+                    ((DomainEntity) entity).toBuilder().withBackingTagValue("other").build()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.insertDomain(
+                financeDomain.toBuilder().withBackingTagValue("other").build(), true));
     Assertions.assertEquals(
-        TagValue.noValue("Finance"),
-        domainMetaService
-            .getDomainByIdentifier(trading.nameIdentifier())
-            .backingTag()
-            .orElse(null));
+        orphaned, domainMetaService.getDomainByIdentifier(trading.nameIdentifier()));
 
-    domainMetaService.updateDomain(
-        trading.nameIdentifier(),
-        entity ->
-            ((DomainEntity) entity)
-                .toBuilder().withBackingTagId(null).withBackingTagValue(null).build());
+    // Rebinding away from a deleted tag returns the new tag's name, then the binding is removed.
+    TagEntity region = newTag("region");
+    backend.insert(region, false);
+    DomainEntity rebound =
+        domainMetaService.updateDomainBackingTagAndGet(
+            trading.nameIdentifier(), TagValue.of("region", "apac"), AUDIT_INFO, s -> {});
+    Assertions.assertEquals(TagValue.of("region", "apac"), rebound.backingTag().orElse(null));
+    Assertions.assertEquals(
+        rebound, domainMetaService.getDomainByIdentifier(trading.nameIdentifier()));
+
+    domainMetaService.updateDomainBackingTagAndGet(
+        trading.nameIdentifier(), null, AUDIT_INFO, s -> {});
     DomainEntity unbound = domainMetaService.getDomainByIdentifier(trading.nameIdentifier());
     Assertions.assertFalse(unbound.backingTag().isPresent());
     Assertions.assertNull(unbound.backingTagId());
-
-    // Rebinding away from a live tag returns the new tag's name, not the one the updater's entity
-    // still carries.
-    TagEntity region = newTag("region");
-    backend.insert(region, false);
-    DomainEntity switched =
-        domainMetaService.updateDomain(
-            financeDomain.nameIdentifier(),
-            entity ->
-                ((DomainEntity) entity)
-                    .toBuilder().withBackingTagId(region.id()).withBackingTagValue("apac").build());
-    Assertions.assertEquals(TagValue.of("region", "apac"), switched.backingTag().orElse(null));
-    Assertions.assertEquals(
-        switched, domainMetaService.getDomainByIdentifier(financeDomain.nameIdentifier()));
   }
 
   @TestTemplate
@@ -684,7 +696,8 @@ public class TestDomainMetaService extends TestJDBCBackend {
     DomainMetaService domainMetaService = DomainMetaService.getInstance();
     TagEntity tag = newTag("Finance");
     backend.insert(tag, false);
-    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    DomainEntity finance =
+        newDomain(METALAKE_NAME, "Finance", null).toBuilder().withBackingTagId(tag.id()).build();
     domainMetaService.insertDomain(finance, false);
 
     CountDownLatch domainLocked = new CountDownLatch(1);
@@ -703,8 +716,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
                         SessionUtils.getWithoutCommit(
                             TagMetaMapper.class,
                             mapper -> mapper.selectTagByTagIdForUpdate(tag.id()));
-                        return ((DomainEntity) entity)
-                            .toBuilder().withBackingTagId(tag.id()).build();
+                        return ((DomainEntity) entity).toBuilder().withComment("updated").build();
                       }));
       Assertions.assertTrue(domainLocked.await(30, TimeUnit.SECONDS));
 
@@ -943,6 +955,453 @@ public class TestDomainMetaService extends TestJDBCBackend {
     }
   }
 
+  @TestTemplate
+  public void testInsertDomainWithBackingTag() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    TagEntity dept = newTag("dept");
+    backend.insert(dept, false);
+    List<LockedDomainState> states = new ArrayList<>();
+
+    domainMetaService.insertDomainWithBackingTag(
+        newDomain(METALAKE_NAME, "Finance", null), TagValue.of("dept", "finance"), states::add);
+    LockedDomainState state = states.get(0);
+    DomainEntity finance = state.domain();
+    Assertions.assertEquals(TagValue.of("dept", "finance"), finance.backingTag().orElse(null));
+    Assertions.assertEquals(dept.id(), finance.backingTagId());
+    Assertions.assertEquals(
+        finance, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
+    Assertions.assertEquals(dept.id(), state.backingTag().get().id());
+    Assertions.assertTrue(state.backingTagBindings().isEmpty());
+
+    // A sub-domain is inserted with its edge, and the check sees the domains the tag backs.
+    states.clear();
+    domainMetaService.insertDomainWithBackingTag(
+        newDomain(METALAKE_NAME, "Tax", null).toBuilder().withParent("Finance").build(),
+        TagValue.noValue("dept"),
+        states::add);
+    DomainEntity tax = states.get(0).domain();
+    Assertions.assertEquals(tax, domainMetaService.getDomainByIdentifier(tax.nameIdentifier()));
+    Assertions.assertEquals("Finance", tax.parent().orElse(null));
+    Assertions.assertEquals(TagValue.noValue("dept"), tax.backingTag().orElse(null));
+    state = states.get(0);
+    Assertions.assertEquals(finance.id(), state.parent().get().id());
+    Assertions.assertEquals(1, state.backingTagBindings().size());
+    Assertions.assertEquals(finance.id(), state.backingTagBindings().get(0).id());
+    Assertions.assertEquals("finance", state.backingTagBindings().get(0).backingTagValue());
+
+    // A missing tag or a failing check inserts nothing.
+    DomainEntity markets = newDomain(METALAKE_NAME, "Markets", null);
+    Assertions.assertThrows(
+        NoSuchTagException.class,
+        () ->
+            domainMetaService.insertDomainWithBackingTag(
+                markets, TagValue.noValue("missing"), s -> {}));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.insertDomainWithBackingTag(
+                markets,
+                TagValue.noValue("dept"),
+                s -> {
+                  throw new IllegalArgumentException("rejected");
+                }));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.getDomainByIdentifier(markets.nameIdentifier()));
+  }
+
+  @TestTemplate
+  public void testInsertDomainWithNewBackingTag() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity financeTag = newValuelessTag("Finance");
+    List<LockedDomainState> states = new ArrayList<>();
+
+    domainMetaService.insertDomainWithNewBackingTag(
+        newDomain(METALAKE_NAME, "Finance", null), financeTag, states::add);
+    DomainEntity finance = states.get(0).domain();
+    Assertions.assertEquals(TagValue.noValue("Finance"), finance.backingTag().orElse(null));
+    Assertions.assertEquals(
+        finance, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
+    TagEntity storedTag = tagMetaService.getTagByIdentifier(financeTag.nameIdentifier());
+    Assertions.assertEquals(financeTag.id(), storedTag.id());
+    Assertions.assertEquals(TagValueConstraint.noValue(), storedTag.valueConstraint());
+    Assertions.assertEquals(financeTag, states.get(0).backingTag().orElse(null));
+    Assertions.assertTrue(states.get(0).backingTagBindings().isEmpty());
+
+    // A tag name in use fails the insert, and the domain is not inserted.
+    DomainEntity markets = newDomain(METALAKE_NAME, "Markets", null);
+    Assertions.assertThrows(
+        TagAlreadyExistsException.class,
+        () ->
+            domainMetaService.insertDomainWithNewBackingTag(
+                markets, newValuelessTag("Finance"), s -> {}));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.getDomainByIdentifier(markets.nameIdentifier()));
+
+    // A domain name in use fails the insert before the new tag is written.
+    TagEntity marketsTag = newValuelessTag("Markets");
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            domainMetaService.insertDomainWithNewBackingTag(
+                newDomain(METALAKE_NAME, "Finance", null), marketsTag, s -> {}));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> tagMetaService.getTagByIdentifier(marketsTag.nameIdentifier()));
+
+    // A failing check, which runs after the domain and the tag are written, rolls both back.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.insertDomainWithNewBackingTag(
+                markets,
+                marketsTag,
+                s -> {
+                  throw new IllegalArgumentException("rejected");
+                }));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.getDomainByIdentifier(markets.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> tagMetaService.getTagByIdentifier(marketsTag.nameIdentifier()));
+  }
+
+  @TestTemplate
+  public void testUpdateDomainBackingTag() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    TagEntity dept = newTag("dept");
+    TagEntity region = newTag("region");
+    backend.insert(dept, false);
+    backend.insert(region, false);
+    List<LockedDomainState> inserts = new ArrayList<>();
+    domainMetaService.insertDomainWithBackingTag(
+        newDomain(METALAKE_NAME, "Finance", null), TagValue.of("dept", "finance"), inserts::add);
+    domainMetaService.insertDomainWithBackingTag(
+        newDomain(METALAKE_NAME, "Markets", null), TagValue.of("dept", "markets"), inserts::add);
+    DomainEntity finance = inserts.get(0).domain();
+    DomainEntity markets = inserts.get(1).domain();
+    AuditInfo modified =
+        AuditInfo.builder()
+            .withCreator("modifier")
+            .withCreateTime(Instant.now())
+            .withLastModifier("modifier")
+            .withLastModifiedTime(Instant.now())
+            .build();
+    List<LockedDomainState> states = new ArrayList<>();
+
+    // The check sees the domain as it is, with the new tag, which backs no domain yet.
+    DomainEntity updated =
+        domainMetaService.updateDomainBackingTagAndGet(
+            finance.nameIdentifier(), TagValue.noValue("region"), modified, states::add);
+    Assertions.assertEquals(TagValue.noValue("region"), updated.backingTag().orElse(null));
+    Assertions.assertEquals(
+        updated, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
+    Assertions.assertEquals(finance.auditInfo().creator(), updated.auditInfo().creator());
+    Assertions.assertEquals("modifier", updated.auditInfo().lastModifier());
+    LockedDomainState state = states.get(0);
+    Assertions.assertEquals(dept.id(), state.domain().backingTagId());
+    Assertions.assertEquals("finance", state.domain().backingTagValue());
+    Assertions.assertEquals(region.id(), state.backingTag().get().id());
+    Assertions.assertTrue(state.backingTagBindings().isEmpty());
+
+    // The bindings of the tag include the domain itself when the tag already backs it.
+    states.clear();
+    domainMetaService.updateDomainBackingTagAndGet(
+        markets.nameIdentifier(), TagValue.of("dept", "other"), modified, states::add);
+    Assertions.assertEquals(
+        Lists.newArrayList(markets.id()),
+        states.get(0).backingTagBindings().stream()
+            .map(DomainEntity::id)
+            .collect(Collectors.toList()));
+
+    // Setting the current backing tag writes nothing.
+    long version = selectDomainPO(markets.id()).currentVersion();
+    domainMetaService.updateDomainBackingTagAndGet(
+        markets.nameIdentifier(), TagValue.of("dept", "other"), modified, s -> {});
+    Assertions.assertEquals(version, selectDomainPO(markets.id()).currentVersion());
+
+    // Removing the backing tag locks no tag.
+    states.clear();
+    DomainEntity removed =
+        domainMetaService.updateDomainBackingTagAndGet(
+            markets.nameIdentifier(), null, modified, states::add);
+    Assertions.assertFalse(removed.backingTag().isPresent());
+    Assertions.assertNull(removed.backingTagId());
+    Assertions.assertFalse(states.get(0).backingTag().isPresent());
+
+    // A missing tag or a failing check changes nothing.
+    Assertions.assertThrows(
+        NoSuchTagException.class,
+        () ->
+            domainMetaService.updateDomainBackingTagAndGet(
+                finance.nameIdentifier(), TagValue.noValue("missing"), modified, s -> {}));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.updateDomainBackingTagAndGet(
+                finance.nameIdentifier(),
+                TagValue.of("dept", "finance"),
+                modified,
+                s -> {
+                  throw new IllegalArgumentException("rejected");
+                }));
+    Assertions.assertEquals(
+        TagValue.noValue("region"),
+        domainMetaService
+            .getDomainByIdentifier(finance.nameIdentifier())
+            .backingTag()
+            .orElse(null));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            domainMetaService.updateDomainBackingTagAndGet(
+                NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing"), null, modified, s -> {}));
+  }
+
+  @TestTemplate
+  public void testBindingWaitsForConcurrentBinding() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    backend.insert(newTag("dept"), false);
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    domainMetaService.insertDomain(finance, false);
+    DomainEntity markets = newDomain(METALAKE_NAME, "Markets", null);
+
+    CountDownLatch bound = new CountDownLatch(1);
+    CountDownLatch allowCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> updateResult =
+        executor.submit(
+            () -> {
+              try {
+                domainMetaService.updateDomainBackingTagAndGet(
+                    finance.nameIdentifier(),
+                    TagValue.of("dept", "x"),
+                    AUDIT_INFO,
+                    s -> {
+                      bound.countDown();
+                      await(allowCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      Assertions.assertTrue(bound.await(30, TimeUnit.SECONDS));
+      Future<Throwable> insertResult =
+          executor.submit(
+              () -> {
+                try {
+                  domainMetaService.insertDomainWithBackingTag(
+                      markets,
+                      TagValue.of("dept", "x"),
+                      s ->
+                          Preconditions.checkArgument(
+                              s.backingTagBindings().isEmpty(), "The tag is already bound"));
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      // The update holds the tag row, so the insert waits and then sees the new binding.
+      Assertions.assertThrows(
+          TimeoutException.class, () -> insertResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowCommit.countDown();
+      Assertions.assertNull(updateResult.get(30, TimeUnit.SECONDS));
+      Throwable insertFailure = insertResult.get(30, TimeUnit.SECONDS);
+      Assertions.assertTrue(
+          insertFailure instanceof IllegalArgumentException, String.valueOf(insertFailure));
+    } finally {
+      allowCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.getDomainByIdentifier(markets.nameIdentifier()));
+  }
+
+  @TestTemplate
+  public void testConcurrentNewBackingTagsWithTheSameName() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    DomainEntity markets = newDomain(METALAKE_NAME, "Markets", null);
+    TagEntity financeTag = newValuelessTag("shared_tag");
+    TagEntity marketsTag = newValuelessTag("shared_tag");
+
+    CountDownLatch written = new CountDownLatch(1);
+    CountDownLatch allowCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> financeResult =
+        executor.submit(
+            () -> {
+              try {
+                domainMetaService.insertDomainWithNewBackingTag(
+                    finance,
+                    financeTag,
+                    s -> {
+                      written.countDown();
+                      await(allowCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      Assertions.assertTrue(written.await(30, TimeUnit.SECONDS));
+      Future<Throwable> marketsResult =
+          executor.submit(
+              () -> {
+                try {
+                  domainMetaService.insertDomainWithNewBackingTag(markets, marketsTag, s -> {});
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      // The first insert holds the new tag name, so the second one waits for it and then fails.
+      Assertions.assertThrows(
+          TimeoutException.class, () -> marketsResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowCommit.countDown();
+      Assertions.assertNull(financeResult.get(30, TimeUnit.SECONDS));
+      Throwable marketsFailure = marketsResult.get(30, TimeUnit.SECONDS);
+      Assertions.assertTrue(
+          marketsFailure instanceof TagAlreadyExistsException, String.valueOf(marketsFailure));
+    } finally {
+      allowCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    // The tag is the first one's, and the second domain is rolled back with its tag.
+    Assertions.assertEquals(
+        financeTag.id(), tagMetaService.getTagByIdentifier(financeTag.nameIdentifier()).id());
+    Assertions.assertEquals(
+        financeTag.id(),
+        domainMetaService.getDomainByIdentifier(finance.nameIdentifier()).backingTagId());
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.getDomainByIdentifier(markets.nameIdentifier()));
+  }
+
+  @TestTemplate
+  public void testBindingsAreReadUnderTheTagLock() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    TagEntity dept = newTag("dept");
+    backend.insert(dept, false);
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    domainMetaService.insertDomain(finance, false);
+    DomainEntity markets = newDomain(METALAKE_NAME, "Markets", null);
+    domainMetaService.insertDomain(markets, false);
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(METALAKE_NAME);
+    List<LockedDomainState> states = new ArrayList<>();
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            // An earlier read in the same session caches the bindings of the tag.
+            Assertions.assertTrue(
+                SessionUtils.getWithoutCommit(
+                        DomainMetaMapper.class,
+                        mapper -> mapper.listDomainPOsByBackingTagId(metalakeId, dept.id()))
+                    .isEmpty());
+            try {
+              Assertions.assertNotNull(
+                  executor
+                      .submit(
+                          () ->
+                              domainMetaService.updateDomainBackingTagAndGet(
+                                  finance.nameIdentifier(),
+                                  TagValue.of("dept", "x"),
+                                  AUDIT_INFO,
+                                  s -> {}))
+                      .get(30, TimeUnit.SECONDS));
+              domainMetaService.updateDomainBackingTagAndGet(
+                  markets.nameIdentifier(), TagValue.of("dept", "y"), AUDIT_INFO, states::add);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+          });
+    } finally {
+      executor.shutdownNow();
+    }
+
+    // The bindings read under the lock include the one committed after the cached read.
+    Assertions.assertEquals(
+        Lists.newArrayList(finance.id()),
+        states.get(0).backingTagBindings().stream()
+            .map(DomainEntity::id)
+            .collect(Collectors.toList()));
+  }
+
+  @TestTemplate
+  public void testBackingTagIsResolvedPastTheSessionCache() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    TagEntity dept = newTag("dept");
+    backend.insert(dept, false);
+    TagEntity recreated = newTag("dept");
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    domainMetaService.insertDomain(finance, false);
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(METALAKE_NAME);
+    List<LockedDomainState> states = new ArrayList<>();
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            // An earlier read in the same session caches the tag.
+            Assertions.assertEquals(
+                dept.id(),
+                SessionUtils.getWithoutCommit(
+                        TagMetaMapper.class,
+                        mapper -> mapper.selectTagMetaByMetalakeIdAndName(metalakeId, "dept"))
+                    .getTagId());
+            try {
+              // The tag is dropped and created again under a new ID.
+              executor
+                  .submit(
+                      () -> {
+                        Assertions.assertTrue(
+                            TagMetaService.getInstance().deleteTag(dept.nameIdentifier()));
+                        backend.insert(recreated, false);
+                        return null;
+                      })
+                  .get(30, TimeUnit.SECONDS);
+              domainMetaService.updateDomainBackingTagAndGet(
+                  finance.nameIdentifier(), TagValue.noValue("dept"), AUDIT_INFO, states::add);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+          });
+    } finally {
+      executor.shutdownNow();
+    }
+
+    // The domain is bound to the tag that has the name now, not to the cached one.
+    Assertions.assertEquals(recreated.id(), states.get(0).backingTag().get().id());
+    Assertions.assertEquals(
+        recreated.id(),
+        domainMetaService
+            .getDomainByIdentifier(NameIdentifierUtil.ofDomain(METALAKE_NAME, "Finance"))
+            .backingTagId());
+  }
+
   private DomainEntity newDomain(String metalake, String name, String comment) {
     return DomainEntity.builder()
         .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -960,6 +1419,16 @@ public class TestDomainMetaService extends TestJDBCBackend {
         .withId(RandomIdGenerator.INSTANCE.nextId())
         .withName(name)
         .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private TagEntity newValuelessTag(String name) {
+    return TagEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+        .withAllowedValues(new String[0])
         .withAuditInfo(AUDIT_INFO)
         .build();
   }

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.meta;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,6 +36,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagAssignment;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.tag.TagValueConstraint;
 
 public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
@@ -132,6 +134,51 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   @Override
   public Optional<Boolean> inherited() {
     return Optional.ofNullable(inherited);
+  }
+
+  /**
+   * Checks that this tag can be assigned with the given value. See {@link
+   * #validateAllowedValue(String[], TagValue)}.
+   *
+   * @param tagValue The tag value to assign.
+   * @throws IllegalArgumentException If this tag does not allow the value.
+   */
+  public void validateAllowedValue(TagValue tagValue) {
+    validateAllowedValue(allowedValues, tagValue);
+  }
+
+  /**
+   * Checks that a tag with the given allowed values can be assigned with a value: a tag with
+   * allowed values only with one of them, a tag that allows no values only without a value, and a
+   * tag without a constraint with or without any value.
+   *
+   * @param allowedValues The allowed values of the tag: null if the tag has no constraint, empty if
+   *     it allows no values.
+   * @param tagValue The tag value to assign.
+   * @throws IllegalArgumentException If the tag does not allow the value.
+   */
+  public static void validateAllowedValue(@Nullable String[] allowedValues, TagValue tagValue) {
+    if (allowedValues == null) {
+      return;
+    }
+
+    if (!tagValue.value().isPresent()) {
+      Preconditions.checkArgument(
+          allowedValues.length == 0,
+          "Tag %s requires assignment values from allowed values %s",
+          tagValue.name(),
+          Arrays.toString(allowedValues));
+      return;
+    }
+
+    Preconditions.checkArgument(
+        allowedValues.length > 0, "Tag %s does not allow assignment values", tagValue.name());
+    Preconditions.checkArgument(
+        Arrays.asList(allowedValues).contains(tagValue.value().get()),
+        "Tag %s value %s is not in allowed values %s",
+        tagValue.name(),
+        tagValue.value().get(),
+        Arrays.toString(allowedValues));
   }
 
   @Override

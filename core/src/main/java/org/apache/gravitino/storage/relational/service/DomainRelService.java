@@ -494,6 +494,20 @@ public class DomainRelService {
   }
 
   /**
+   * Locks the metalake shared and a domain exclusively, in the caller's transaction, for a change
+   * of the domain row that involves no other domain, and returns the domain row as it is under the
+   * lock.
+   *
+   * @param identifier The identifier of the domain.
+   * @param observedPO The domain row the caller read before locking.
+   * @return The locked domain row.
+   * @throws NoSuchEntityException If the domain was deleted or renamed after it was read.
+   */
+  DomainPO lockAndGetDomainForChange(NameIdentifier identifier, DomainPO observedPO) {
+    return lockMetalakeAndDomains(identifier, observedPO, null).getLeft();
+  }
+
+  /**
    * Inserts the parent edge of a new sub-domain, in the caller's transaction. The caller holds the
    * shared lock on the parent from {@link #lockAndGetParentOfNewSubDomain(NameIdentifier)}.
    *

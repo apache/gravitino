@@ -34,6 +34,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -753,9 +754,28 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
-  public void insertDomain(DomainEntity domain, Consumer<LockedDomainState> check)
+  public void insertDomainWithBackingTag(
+      DomainEntity domain, TagValue backingTag, Consumer<LockedDomainState> check)
       throws IOException {
-    DomainMetaService.getInstance().insertDomain(domain, check);
+    DomainMetaService.getInstance().insertDomainWithBackingTag(domain, backingTag, check);
+  }
+
+  @Override
+  public void insertDomainWithNewBackingTag(
+      DomainEntity domain, TagEntity backingTag, Consumer<LockedDomainState> check)
+      throws IOException {
+    DomainMetaService.getInstance().insertDomainWithNewBackingTag(domain, backingTag, check);
+  }
+
+  @Override
+  public DomainEntity updateDomainBackingTagAndGet(
+      NameIdentifier ident,
+      @Nullable TagValue backingTag,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    return DomainMetaService.getInstance()
+        .updateDomainBackingTagAndGet(ident, backingTag, auditInfo, check);
   }
 
   @Override
