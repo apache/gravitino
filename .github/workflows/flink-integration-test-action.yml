@@ -4,6 +4,26 @@ name: Flink Integration Test Action
 on:
   workflow_call:
     inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
       architecture:
         required: true
         description: 'Architecture of the platform'
@@ -22,6 +42,15 @@ jobs:
       PLATFORM: ${{ inputs.architecture }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: actions/setup-java@v4
         with:
@@ -48,7 +77,7 @@ jobs:
         id: integrationTest
         # run embedded mode and deploy mode integration tests for every supported Flink minor
         run: |
-          for v in 1.19 1.20 2.1; do
+          for v in 1.19 1.20 2.1 2.2; do
             ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false -PskipWeb=true \
               :flink-connector:flink-$v:test \
               --tests "org.apache.gravitino.flink.connector.integration.test.**"
@@ -70,6 +99,8 @@ jobs:
             flink-connector/v1.20/flink/build/*.tar
             flink-connector/v2.1/flink/build/*.log
             flink-connector/v2.1/flink/build/*.tar
+            flink-connector/v2.2/flink/build/*.log
+            flink-connector/v2.2/flink/build/*.tar
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log

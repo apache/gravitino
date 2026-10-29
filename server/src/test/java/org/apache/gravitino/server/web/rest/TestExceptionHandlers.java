@@ -26,6 +26,7 @@ import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,23 @@ public class TestExceptionHandlers {
       Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
       Assertions.assertEquals(
           InUseException.class.getSimpleName(), ((ErrorResponse) response.getEntity()).getType());
+    }
+  }
+
+  @Test
+  void testSubmittedJobRegistrationFailureDoesNotReturnRetryableConflict() {
+    RuntimeException failure =
+        new RuntimeException(
+            "Execution submitted_conflict may already have run; check it before retrying",
+            new OptimisticLockException("lock wait timeout"));
+    try (Response response =
+        ExceptionHandlers.handleJobException(OperationType.RUN, "job", "metalake", failure)) {
+      Assertions.assertEquals(
+          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(RuntimeException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains("submitted_conflict"));
+      Assertions.assertTrue(error.getMessage().contains("check it before retrying"));
     }
   }
 
@@ -113,6 +131,23 @@ public class TestExceptionHandlers {
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     Assertions.assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, errorResponse.getCode());
     Assertions.assertEquals(OptimisticLockException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testServiceUnavailableReturnsServiceUnavailable() {
+    Response response =
+        ExceptionHandlers.handleTableException(
+            OperationType.LOAD,
+            "table",
+            "schema",
+            new ServiceUnavailableException("secret provider 'vault' is unavailable"));
+
+    Assertions.assertEquals(
+        Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        ServiceUnavailableException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test

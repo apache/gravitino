@@ -34,10 +34,12 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +62,23 @@ public class TestRelationalEntityStore {
 
     FieldUtils.writeField(store, "backend", backend, true);
     FieldUtils.writeField(store, "cache", Mockito.spy(new NoOpsCache(config)), true);
+  }
+
+  @Test
+  void testUncachedInsertStillInvokesRelatedInvalidationAfterEpochChanges() throws Exception {
+    BaseEntityCache cache = Mockito.mock(BaseEntityCache.class);
+    FieldUtils.writeField(store, "cache", cache, true);
+    ModelEntity entity = Mockito.mock(ModelEntity.class);
+    Mockito.when(entity.type()).thenReturn(Entity.EntityType.MODEL);
+    Mockito.doAnswer(
+            invocation -> {
+              store.clearCache();
+              return null;
+            })
+        .when(backend)
+        .insert(entity, false);
+    store.put(entity, false);
+    Mockito.verify(cache).put(entity);
   }
 
   @Test

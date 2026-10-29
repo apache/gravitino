@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
@@ -91,16 +92,27 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
     return config;
   }
 
+  /**
+   * Applies Glue API keys from {@link AwsSecretKeyCredential} and S3 data-access keys from {@link
+   * S3SecretKeyCredential}. When only {@link S3SecretKeyCredential} is present (legacy remap), it
+   * fills both Glue and S3 keys for backward compatibility.
+   */
   static void applyS3Credential(Credential[] credentials, Map<String, String> config) {
+    S3SecretKeyCredential s3SecretKey = null;
     for (Credential credential : credentials) {
-      if (credential instanceof S3SecretKeyCredential) {
-        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
-        config.put(HIVE_METASTORE_GLUE_ACCESS_KEY, s3.accessKeyId());
-        config.put(HIVE_METASTORE_GLUE_SECRET_KEY, s3.secretAccessKey());
-        config.put(HIVE_S3_ACCESS_KEY, s3.accessKeyId());
-        config.put(HIVE_S3_SECRET_KEY, s3.secretAccessKey());
-        return;
+      if (credential instanceof AwsSecretKeyCredential) {
+        AwsSecretKeyCredential aws = (AwsSecretKeyCredential) credential;
+        config.put(HIVE_METASTORE_GLUE_ACCESS_KEY, aws.accessKeyId());
+        config.put(HIVE_METASTORE_GLUE_SECRET_KEY, aws.secretAccessKey());
+      } else if (credential instanceof S3SecretKeyCredential) {
+        s3SecretKey = (S3SecretKeyCredential) credential;
+        config.put(HIVE_S3_ACCESS_KEY, s3SecretKey.accessKeyId());
+        config.put(HIVE_S3_SECRET_KEY, s3SecretKey.secretAccessKey());
       }
+    }
+    if (!config.containsKey(HIVE_METASTORE_GLUE_ACCESS_KEY) && s3SecretKey != null) {
+      config.put(HIVE_METASTORE_GLUE_ACCESS_KEY, s3SecretKey.accessKeyId());
+      config.put(HIVE_METASTORE_GLUE_SECRET_KEY, s3SecretKey.secretAccessKey());
     }
   }
 

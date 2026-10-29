@@ -163,6 +163,17 @@ public class TestIcebergTableUpdate {
             });
   }
 
+  /** Rejects attempts to modify the default spec through ordinary table properties. */
+  @Test
+  public void testDefaultSpecPropertyIsReadOnly() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> updateTable(identifier, TableChange.setProperty("default-spec-id", "1")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> updateTable(identifier, TableChange.removeProperty("default-spec-id")));
+  }
+
   @Test
   public void testRenameTable() {
     TableChange renameTable = TableChange.rename("new_table_name");

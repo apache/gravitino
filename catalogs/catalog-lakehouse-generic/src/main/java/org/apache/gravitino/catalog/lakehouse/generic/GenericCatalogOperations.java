@@ -56,6 +56,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -287,6 +288,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // table properties, and the built-in provider returns it verbatim as its first branch, so a
     // catalog on the built-in provider is unaffected. What an allocating provider does with it is
     // the provider's decision: honour it, rewrite it, or reject the creation.
+    properties = LancePropertiesUtils.normalizeTableProperties(properties);
     String tableLocation = provisionTableLocation(ident, properties, schema);
 
     Map<String, String> newProperties = Maps.newHashMap(properties);
@@ -438,7 +440,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // Read the same way the table formats and the property metadata read it: a catalog that
     // disagreed with the format about a value like `external=yes` would skip reclaiming a location
     // the format had just deleted the data under.
-    boolean external = Boolean.parseBoolean(context.tableProperties().get(Table.PROPERTY_EXTERNAL));
+    // Use the same effective ownership as the format, including legacy Lance registrations.
+    boolean external = LancePropertiesUtils.isExternalTable(context.tableProperties());
     if (dropped && (purge || !external)) {
       TableLocationProvider provider = tableLocationProvider;
       try {

@@ -47,11 +47,11 @@ import org.apache.gravitino.utils.RequestContext;
  * from each HTTP request and stores them in {@link RequestContext} so that audit event constructors
  * can read them on the same thread.
  *
- * <p>When a reverse proxy is in use, the real client IP is taken from the first entry of the {@code
- * X-Forwarded-For} header (a de-facto standard header set by reverse proxies; note that it is
- * trusted unconditionally — deployments where the server is reachable directly, without a trusted
- * reverse proxy, should be aware that clients can spoof this header). If the header is absent,
- * {@link HttpServletRequest#getRemoteAddr()} is used instead.
+ * <p>The client address is resolved by a {@link ClientAddressResolver}. The {@code X-Forwarded-For}
+ * header is honored only when the request arrives from a configured trusted proxy ({@code
+ * trustedProxies} in {@link JettyServerConfig}); otherwise {@link
+ * HttpServletRequest#getRemoteAddr()} is used, so a caller cannot choose the address that audit
+ * events record by sending the header itself.
  *
  * <p>Query parameters are parsed from {@link HttpServletRequest#getQueryString()}, not from {@link
  * HttpServletRequest#getParameterMap()}. The latter also parses an {@code
@@ -77,8 +77,6 @@ import org.apache.gravitino.utils.RequestContext;
  */
 public class RequestContextFilter implements Filter {
 
-  private static final String X_FORWARDED_FOR = "X-Forwarded-For";
-
   /** Maximum number of distinct query-parameter names captured per request. */
   static final int MAX_PARAMETERS = 50;
 
@@ -89,8 +87,12 @@ public class RequestContextFilter implements Filter {
   static final String TRUNCATED_SUFFIX = "...(truncated)";
 
   private final Optional<EventBus> eventBus;
+  private final ClientAddressResolver clientAddressResolver;
 
-  /** Constructs a {@code RequestContextFilter} that never captures query parameters. */
+  /**
+   * Constructs a {@code RequestContextFilter} that never captures query parameters and trusts no
+   * proxy.
+   */
   public RequestContextFilter() {
     this(null);
   }
@@ -103,7 +105,21 @@ public class RequestContextFilter implements Filter {
    *     happens, since {@code HttpAuditFilter}'s own fallback events need it regardless).
    */
   public RequestContextFilter(@Nullable EventBus eventBus) {
+    this(eventBus, ClientAddressResolver.noTrustedProxies());
+  }
+
+  /**
+   * Constructs a {@code RequestContextFilter}.
+   *
+   * @param eventBus the event bus that will consume the captured query parameters; may be {@code
+   *     null}, in which case query-parameter capture is skipped.
+   * @param clientAddressResolver resolves the client address from the request, honoring {@code
+   *     X-Forwarded-For} only from trusted proxies.
+   */
+  public RequestContextFilter(
+      @Nullable EventBus eventBus, ClientAddressResolver clientAddressResolver) {
     this.eventBus = Optional.ofNullable(eventBus);
+    this.clientAddressResolver = clientAddressResolver;
   }
 
   @Override
@@ -115,7 +131,7 @@ public class RequestContextFilter implements Filter {
     try {
       if (request instanceof HttpServletRequest) {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
-        RequestContext.setRemoteAddress(resolveClientAddress(httpRequest));
+        RequestContext.setRemoteAddress(clientAddressResolver.resolve(httpRequest));
         if (eventBus.isPresent()) {
           RequestContext.setRequestQueryParams(parseQueryString(httpRequest.getQueryString()));
         }
@@ -128,14 +144,6 @@ public class RequestContextFilter implements Filter {
 
   @Override
   public void destroy() {}
-
-  private String resolveClientAddress(HttpServletRequest request) {
-    String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
-    if (StringUtils.isNotBlank(xForwardedFor)) {
-      return xForwardedFor.split(",")[0].trim();
-    }
-    return request.getRemoteAddr();
-  }
 
   /**
    * Parses a raw HTTP query string into a name-to-value map (joining multi-valued parameters with a

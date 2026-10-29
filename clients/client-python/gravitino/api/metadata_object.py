@@ -75,9 +75,6 @@ class MetadataObject(ABC):
         MODEL = "model"
         """A model is mapped to the model artifact in ML."""
 
-        MODEL_VERSION = "model_version"
-        """A model version is a checkpoint / snapshot linked to a registered model."""
-
         TAG = "tag"
         """A tag is used to help manage other metadata object."""
 
@@ -89,6 +86,9 @@ class MetadataObject(ABC):
 
         JOB_TEMPLATE = "job_template"
         """A job template represents a reusable template for creating jobs in Gravitino."""
+
+        SEMANTIC_MODEL = "semantic_model"
+        """A Semantic Model defines business semantics over catalog data."""
 
         FUNCTION = "function"
         """A function represents a user-defined function registered in Gravitino."""

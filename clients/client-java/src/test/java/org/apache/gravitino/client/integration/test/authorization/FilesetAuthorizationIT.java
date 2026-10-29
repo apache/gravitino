@@ -371,7 +371,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(8)
-  public void testUseSecretPrivilegeForGetSecrets() {
+  public void testUseSecretsPrivilegeForGetSecrets() {
     String filesetName = "secret_fileset";
     String secretKey = "access_token";
     String secretValue = "plain-token-value";
@@ -404,7 +404,8 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, readableFileset.properties().get(secretKey));
     assertEquals("visible-value", readableFileset.properties().get("visible-key"));
 
-    // Can load the object but lacks USE_SECRET → empty secrets (not ForbiddenException).
+    // Can load the object but lacks USE_SECRETS → empty secrets
+    // (not ForbiddenException).
     Map<String, String> secretsWithoutPrivilege = readableFileset.supportsSecrets().getSecrets();
     assertTrue(secretsWithoutPrivilege.isEmpty());
 
@@ -413,7 +414,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     MetadataObject schemaObject =
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA);
     gravitinoMetalake.grantPrivilegesToRole(
-        role, schemaObject, ImmutableList.of(Privileges.UseSecret.allow()));
+        role, schemaObject, ImmutableList.of(Privileges.UseSecrets.allow()));
     assertEquals(
         secretValue,
         normalFilesetCatalog
@@ -424,17 +425,67 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     // DENY on the fileset overrides schema-level allow → empty again.
     gravitinoMetalake.grantPrivilegesToRole(
-        role, filesetObject, ImmutableList.of(Privileges.UseSecret.deny()));
+        role, filesetObject, ImmutableList.of(Privileges.UseSecrets.deny()));
     assertTrue(
         normalFilesetCatalog.loadFileset(filesetIdent).supportsSecrets().getSecrets().isEmpty());
 
     gravitinoMetalake.revokePrivilegesFromRole(
-        role, schemaObject, ImmutableSet.of(Privileges.UseSecret.allow()));
+        role, schemaObject, ImmutableSet.of(Privileges.UseSecrets.allow()));
     gravitinoMetalake.revokePrivilegesFromRole(
         role,
         filesetObject,
-        ImmutableSet.of(Privileges.ReadFileset.allow(), Privileges.UseSecret.deny()));
+        ImmutableSet.of(Privileges.ReadFileset.allow(), Privileges.UseSecrets.deny()));
     adminFilesetCatalog.dropFileset(filesetIdent);
+  }
+
+  /** Verifies that writers can change the fileset lifecycle without gaining drop permission. */
+  @Test
+  @Order(9)
+  public void testWriterCanConvertFilesetTypeButCannotDrop() {
+    String filesetName = "type_conversion_fileset";
+    NameIdentifier filesetIdent = NameIdentifier.of(SCHEMA, filesetName);
+    MetadataObject filesetObject =
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, filesetName), MetadataObject.Type.FILESET);
+    GravitinoMetalake metalake = client.loadMetalake(METALAKE);
+    FilesetCatalog ownerFilesetCatalog = metalake.loadCatalog(CATALOG).asFilesetCatalog();
+    FilesetCatalog writerFilesetCatalog =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+
+    ownerFilesetCatalog.createFileset(
+        filesetIdent,
+        "comment",
+        Fileset.Type.EXTERNAL,
+        storageLocation(GravitinoITUtils.genRandomName("FilesetAuthorizationIT_type_conversion")),
+        new HashMap<>());
+    try {
+      metalake.grantPrivilegesToRole(
+          role, filesetObject, ImmutableList.of(Privileges.ReadFileset.allow()));
+      assertThrows(
+          ForbiddenException.class,
+          () ->
+              writerFilesetCatalog.alterFileset(
+                  filesetIdent, FilesetChange.updateType(Fileset.Type.MANAGED)));
+      assertEquals(Fileset.Type.EXTERNAL, ownerFilesetCatalog.loadFileset(filesetIdent).type());
+
+      metalake.grantPrivilegesToRole(
+          role, filesetObject, ImmutableList.of(Privileges.WriteFileset.allow()));
+      Fileset managedFileset =
+          writerFilesetCatalog.alterFileset(
+              filesetIdent, FilesetChange.updateType(Fileset.Type.MANAGED));
+      assertEquals(Fileset.Type.MANAGED, managedFileset.type());
+      assertThrows(ForbiddenException.class, () -> writerFilesetCatalog.dropFileset(filesetIdent));
+      assertEquals(Fileset.Type.MANAGED, writerFilesetCatalog.loadFileset(filesetIdent).type());
+
+      Fileset externalFileset =
+          writerFilesetCatalog.alterFileset(
+              filesetIdent, FilesetChange.updateType(Fileset.Type.EXTERNAL));
+      assertEquals(Fileset.Type.EXTERNAL, externalFileset.type());
+      assertThrows(ForbiddenException.class, () -> writerFilesetCatalog.dropFileset(filesetIdent));
+      assertEquals(Fileset.Type.EXTERNAL, writerFilesetCatalog.loadFileset(filesetIdent).type());
+    } finally {
+      ownerFilesetCatalog.dropFileset(filesetIdent);
+    }
   }
 
   private String defaultBaseLocation() {

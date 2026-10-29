@@ -18,10 +18,17 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.job.JobHandle;
@@ -29,8 +36,14 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -197,11 +210,14 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         newJobEntity("job_template_with_jobs", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
     backend.insert(jobEntity2, false);
 
+    long lastChangeId = maxEntityChangeId();
     Assertions.assertThrows(
         NonEmptyEntityException.class,
         () ->
             jobTemplateMetaService.deleteJobTemplate(
                 NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_with_jobs")));
+    // A delete rejected for active jobs logs no change, so peers keep a valid mapping.
+    Assertions.assertTrue(jobTemplateChangesAfter(lastChangeId).isEmpty());
     Assertions.assertEquals(
         2,
         JobMetaService.getInstance()
@@ -220,6 +236,66 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     List<JobEntity> jobs =
         JobMetaService.getInstance().listJobsByNamespace(NamespaceUtil.ofJob(METALAKE_NAME));
     Assertions.assertEquals(0, jobs.size());
+  }
+
+  @TestTemplate
+  public void testDeleteJobTemplateCleansOwnersAndPrivileges() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "job_template_owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+
+    JobTemplateEntity dropped = newShellJobTemplateEntity("dropped", "", METALAKE_NAME);
+    JobTemplateEntity kept = newShellJobTemplateEntity("kept", "", METALAKE_NAME);
+    backend.insert(dropped, false);
+    backend.insert(kept, false);
+    JobEntity droppedJob = newJobEntity("dropped", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    JobEntity keptJob = newJobEntity("kept", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    backend.insert(droppedJob, false);
+    backend.insert(keptJob, false);
+
+    OwnerMetaService ownerMetaService = OwnerMetaService.getInstance();
+    for (NameIdentifier ident :
+        new NameIdentifier[] {dropped.nameIdentifier(), kept.nameIdentifier()}) {
+      ownerMetaService.setOwner(
+          ident, Entity.EntityType.JOB_TEMPLATE, user.nameIdentifier(), user.type());
+    }
+    for (JobEntity job : new JobEntity[] {droppedJob, keptJob}) {
+      ownerMetaService.setOwner(
+          NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+          Entity.EntityType.JOB,
+          user.nameIdentifier(),
+          user.type());
+    }
+    backend.insert(
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "job_template_role",
+            AUDIT_INFO,
+            Lists.newArrayList(
+                SecurableObjects.ofJobTemplate(
+                    "dropped", Lists.newArrayList(Privileges.UseJobTemplate.allow())),
+                SecurableObjects.ofJobTemplate(
+                    "kept", Lists.newArrayList(Privileges.UseJobTemplate.allow()))),
+            null),
+        false);
+
+    Assertions.assertTrue(
+        JobTemplateMetaService.getInstance().deleteJobTemplate(dropped.nameIdentifier()));
+
+    Assertions.assertEquals(0, countOwnerRows(dropped.id(), "JOB_TEMPLATE"));
+    Assertions.assertEquals(0, countSecurableObjectRows(dropped.id(), "JOB_TEMPLATE"));
+    Assertions.assertEquals(0, countOwnerRows(droppedJob.id(), "JOB"));
+    Assertions.assertEquals(1, countOwnerRows(kept.id(), "JOB_TEMPLATE"));
+    Assertions.assertEquals(1, countSecurableObjectRows(kept.id(), "JOB_TEMPLATE"));
+    Assertions.assertEquals(1, countOwnerRows(keptJob.id(), "JOB"));
   }
 
   @TestTemplate
@@ -284,11 +360,99 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
             .withAuditInfo(updatedJobTemplateEntity.auditInfo())
             .build();
 
+    long lastChangeId = maxEntityChangeId();
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
         () ->
             jobTemplateMetaService.updateJobTemplate(
                 updatedJobTemplateEntity.nameIdentifier(), e -> duplicateNameJobTemplateEntity));
+    // A rename rejected for a duplicate name logs no change.
+    Assertions.assertTrue(jobTemplateChangesAfter(lastChangeId).isEmpty());
+  }
+
+  @TestTemplate
+  public void testRenameAndDeleteJobTemplateLogChanges() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    JobTemplateMetaService jobTemplateMetaService = JobTemplateMetaService.getInstance();
+    JobTemplateEntity original =
+        newShellJobTemplateEntity("logged_template", "A logged job template", METALAKE_NAME);
+    jobTemplateMetaService.insertJobTemplate(original, false);
+
+    // A change that keeps the name leaves the cached name-to-id mapping valid.
+    long lastChangeId = maxEntityChangeId();
+    JobTemplateEntity commented = renamedJobTemplate(original, original.name(), "new comment");
+    jobTemplateMetaService.updateJobTemplate(original.nameIdentifier(), e -> commented);
+    Assertions.assertTrue(jobTemplateChangesAfter(lastChangeId).isEmpty());
+
+    lastChangeId = maxEntityChangeId();
+    JobTemplateEntity renamed = renamedJobTemplate(commented, "renamed_template", "renamed");
+    jobTemplateMetaService.updateJobTemplate(commented.nameIdentifier(), e -> renamed);
+    assertJobTemplateChange(lastChangeId, "logged_template", OperateType.ALTER);
+
+    lastChangeId = maxEntityChangeId();
+    Assertions.assertTrue(jobTemplateMetaService.deleteJobTemplate(renamed.nameIdentifier()));
+    assertJobTemplateChange(lastChangeId, "renamed_template", OperateType.DROP);
+
+    // Deleting a missing template changes nothing, so it must not log a change.
+    lastChangeId = maxEntityChangeId();
+    Assertions.assertFalse(jobTemplateMetaService.deleteJobTemplate(renamed.nameIdentifier()));
+    Assertions.assertTrue(jobTemplateChangesAfter(lastChangeId).isEmpty());
+  }
+
+  private static JobTemplateEntity renamedJobTemplate(
+      JobTemplateEntity entity, String name, String comment) {
+    return JobTemplateEntity.builder()
+        .withId(entity.id())
+        .withName(name)
+        .withNamespace(entity.namespace())
+        .withTemplateContent(entity.templateContent())
+        .withComment(comment)
+        .withAuditInfo(entity.auditInfo())
+        .build();
+  }
+
+  private static long maxEntityChangeId() {
+    Long maxId =
+        SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId);
+    return maxId == null ? 0L : maxId;
+  }
+
+  private static List<EntityChangeRecord> jobTemplateChangesAfter(long lastConsumedId) {
+    return SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(lastConsumedId, 100))
+        .stream()
+        .filter(change -> Entity.EntityType.JOB_TEMPLATE.name().equals(change.getEntityType()))
+        .collect(Collectors.toList());
+  }
+
+  private static void assertJobTemplateChange(
+      long lastConsumedId, String jobTemplateName, OperateType operateType) {
+    List<EntityChangeRecord> changes = jobTemplateChangesAfter(lastConsumedId);
+    Assertions.assertEquals(1, changes.size());
+    EntityChangeRecord change = changes.get(0);
+    Assertions.assertEquals(METALAKE_NAME, change.getMetalakeName());
+    Assertions.assertEquals(
+        EntityChangeLogNameIdentifierCodec.encode(
+            NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, jobTemplateName)),
+        change.getFullName());
+    Assertions.assertEquals(operateType, change.getOperateType());
+  }
+
+  private int countOwnerRows(long objectId, String objectType) {
+    return countActiveRowsWhere(
+        "owner_meta",
+        String.format(
+            "metadata_object_id = %d AND metadata_object_type = '%s'", objectId, objectType));
+  }
+
+  private int countSecurableObjectRows(long objectId, String objectType) {
+    return countActiveRowsWhere(
+        "role_meta_securable_object",
+        String.format("metadata_object_id = %d AND type = '%s'", objectId, objectType));
   }
 
   static JobEntity newJobEntity(String templateName, JobHandle.Status status, String metalake) {

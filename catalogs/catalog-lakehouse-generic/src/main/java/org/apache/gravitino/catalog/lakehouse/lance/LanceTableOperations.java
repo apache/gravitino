@@ -68,10 +68,12 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
+import org.lance.WriteDatasetBuilder;
 import org.lance.WriteParams;
 import org.lance.index.DistanceType;
 import org.lance.index.IndexOptions;
@@ -288,10 +290,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // dataset) for a table that is about to be deleted anyway.
       Table table = super.loadTable(ident);
       validateLanceTable(ident, table);
-      boolean external =
-          Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
-              .map(Boolean::parseBoolean)
-              .orElse(false);
+      boolean external = LancePropertiesUtils.isExternalTable(table.properties());
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -316,6 +315,10 @@ public class LanceTableOperations extends ManagedTableOperations {
       return false;
     } catch (IllegalArgumentException e) {
       throw e;
+    } catch (OptimisticLockException e) {
+      // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
+      // not changed, so the dataset is kept and the operation can be retried.
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }
@@ -327,10 +330,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // Use super.loadTable to skip schema-refresh overhead when dropping.
       Table table = super.loadTable(ident);
       validateLanceTable(ident, table);
-      boolean external =
-          Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
-              .map(Boolean::parseBoolean)
-              .orElse(false);
+      boolean external = LancePropertiesUtils.isExternalTable(table.properties());
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -352,6 +352,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchTableException e) {
       return false;
     } catch (IllegalArgumentException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
+      // not changed, so the dataset is kept and the operation can be retried.
       throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to drop Lance dataset for table " + ident, e);
@@ -399,6 +403,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     if (register) {
+      properties = LancePropertiesUtils.normalizeTableProperties(properties);
       // Currently, register operation does not read the schema from the underlying Lance dataset.
       // So we can't get the version of the dataset here.
       return super.createTable(
@@ -419,13 +424,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     Map<String, String> storageProps =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
-    try (Dataset ignored =
-        Dataset.write()
-            .schema(convertColumnsToArrowSchema(columns))
-            .uri(location)
-            .mode(WriteParams.WriteMode.CREATE)
-            .storageOptions(storageProps)
-            .execute()) {
+    try (Dataset ignored = createDataset(location, columns, storageProps)) {
       // Only create the table metadata in Gravitino after the Lance dataset is successfully
       // created.
       long datasetVersion = ignored.version();
@@ -445,10 +444,19 @@ public class LanceTableOperations extends ManagedTableOperations {
           indexes);
     } catch (NoSuchSchemaException e) {
       throw e;
-    } catch (TableAlreadyExistsException e) {
-      // If the table metadata already exists, but the underlying lance table was just created
-      // successfully, we need to clean up the created lance table to avoid orphaned datasets.
-      Dataset.drop(location, storageProps);
+    } catch (TableAlreadyExistsException | OptimisticLockException e) {
+      // Metadata registration failed after creating the dataset. Attempt to remove it so a retry
+      // can create it again; if cleanup fails, retain the registration error and cleanup failure.
+      try {
+        Dataset.drop(location, storageProps);
+      } catch (Exception dropFailure) {
+        // JNI can throw checked exceptions even though Dataset.drop declares none.
+        LOG.warn(
+            "Failed to drop the Lance dataset at {} after metadata registration failed",
+            location,
+            dropFailure);
+        e.addSuppressed(dropFailure);
+      }
       throw e;
     } catch (IllegalArgumentException e) {
       if (e.getMessage().contains("Dataset already exists")) {
@@ -459,6 +467,23 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to create Lance dataset at location " + location, e);
     }
+  }
+
+  /**
+   * Creates an empty Lance dataset for the columns. The Lance file format version is chosen from
+   * the blob columns, because blob v2 and legacy blob each require a different version.
+   */
+  Dataset createDataset(String location, Column[] columns, Map<String, String> storageOptions) {
+    Schema schema = convertColumnsToArrowSchema(columns);
+    WriteDatasetBuilder builder =
+        Dataset.write()
+            .schema(schema)
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .storageOptions(storageOptions);
+    LanceDataTypeConverter.requiredFileFormatVersion(schema.getFields())
+        .ifPresent(builder::dataStorageVersion);
+    return builder.execute();
   }
 
   private Schema convertColumnsToArrowSchema(Column[] columns) {
@@ -614,8 +639,9 @@ public class LanceTableOperations extends ManagedTableOperations {
    *
    * <p>Two concurrent loads can both read the old metadata. The first update wins; the second gets
    * {@link OptimisticLockException}. Repair is safe to run more than once, so the loser waits
-   * briefly, reads the winner's latest row, and tries again. Ordinary IO failures are not safe to
-   * retry here and are returned immediately.
+   * briefly, reads the winner's latest row, and tries again. Lock wait timeouts are returned
+   * immediately: each attempt has already consumed the backend's lock wait budget. Ordinary IO
+   * failures are not safe to retry here and are returned immediately.
    */
   private TableEntity updateTableWithCasRetry(
       NameIdentifier ident, Function<TableEntity, TableEntity> updater) throws IOException {
@@ -624,6 +650,9 @@ public class LanceTableOperations extends ManagedTableOperations {
       try {
         return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
       } catch (OptimisticLockException e) {
+        if (ExceptionUtils.isLockWaitTimeout(e)) {
+          throw e;
+        }
         lastConflict = e;
         LOG.debug(
             "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",
@@ -820,43 +849,24 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @return the new version id of the Lance dataset after applying the changes
    */
   long handleLanceTableChange(Table table, TableChange[] changes) {
+    // Reject what Lance cannot apply before opening the dataset, so a change that fails these
+    // checks does not leave the changes before it applied to the dataset but not to the metadata.
+    validateLanceTableChanges(changes);
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
       for (TableChange change : changes) {
         if (change instanceof TableChange.AddColumn addColumn) {
-          String[] fieldName = addColumn.fieldName();
-          Preconditions.checkArgument(
-              fieldName.length == 1,
-              "Lance only supports adding top-level columns: %s",
-              String.join(".", fieldName));
-          String columnName = fieldName[0];
-          Preconditions.checkArgument(
-              addColumn.isNullable(),
-              "Lance only supports adding nullable columns because existing rows are backfilled "
-                  + "with null: %s",
-              columnName);
-          Preconditions.checkArgument(
-              TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
-              "Lance only supports appending new columns: %s",
-              columnName);
-          Preconditions.checkArgument(
-              !addColumn.isAutoIncrement(),
-              "Lance does not support adding auto-increment columns: %s",
-              columnName);
-          Preconditions.checkArgument(
-              addColumn.getDefaultValue() == null
-                  || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
-              "Lance does not support default values when adding columns: %s",
-              columnName);
+          String columnName = addColumn.fieldName()[0];
 
           Field field =
               LanceDataTypeConverter.CONVERTER.toArrowField(
                   columnName, addColumn.getDataType(), true);
+          LanceDataTypeConverter.checkFileFormatVersion(field, dataset.getLanceFileFormatVersion());
           dataset.addColumns(List.of(field));
         } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
-          dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
+          dataset.dropColumns(List.of(deleteColumn.fieldName()[0]));
         } else if (change instanceof TableChange.AddIndex addIndex) {
           IndexType indexType = IndexType.valueOf(addIndex.getType().name());
           IndexParams indexParams = getIndexParamsByIndexType(indexType);
@@ -872,16 +882,10 @@ public class LanceTableOperations extends ManagedTableOperations {
                   .build());
         } else if (change instanceof TableChange.RenameColumn renameColumn) {
           ColumnAlteration lanceColumnAlter =
-              new ColumnAlteration.Builder(String.join(".", renameColumn.fieldName()))
+              new ColumnAlteration.Builder(renameColumn.fieldName()[0])
                   .rename(renameColumn.getNewName())
                   .build();
           dataset.alterColumns(List.of(lanceColumnAlter));
-        } else {
-          // Currently, only column add/drop/rename and index addition are supported.
-          // TODO: Support change column type once we have a clear knowledge about the means of
-          // castTo in Lance.
-          throw new UnsupportedOperationException(
-              "Unsupported changes to lance table: " + change.getClass().getSimpleName());
         }
       }
       return dataset.getVersion().getId();
@@ -890,6 +894,52 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw ExceptionMessages.wrap(
           "Failed to handle alterations to Lance dataset at location " + location, e);
+    }
+  }
+
+  private static void validateLanceTableChanges(TableChange[] changes) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn addColumn) {
+        String[] fieldName = addColumn.fieldName();
+        Preconditions.checkArgument(
+            fieldName.length == 1,
+            "Lance only supports adding top-level columns: %s",
+            String.join(".", fieldName));
+        String columnName = fieldName[0];
+        Preconditions.checkArgument(
+            addColumn.isNullable(),
+            "Lance only supports adding nullable columns because existing rows are backfilled "
+                + "with null: %s",
+            columnName);
+        Preconditions.checkArgument(
+            TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
+            "Lance only supports appending new columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            !addColumn.isAutoIncrement(),
+            "Lance does not support adding auto-increment columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            addColumn.getDefaultValue() == null
+                || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
+            "Lance does not support default values when adding columns: %s",
+            columnName);
+      } else if (change instanceof TableChange.DeleteColumn
+          || change instanceof TableChange.RenameColumn) {
+        String[] fieldName = ((TableChange.ColumnChange) change).fieldName();
+        // Gravitino stores a Lance table's columns as top-level columns only, so a nested change
+        // applied to the dataset could not be recorded in the metadata.
+        Preconditions.checkArgument(
+            fieldName.length == 1,
+            "Lance only supports dropping or renaming top-level columns: %s",
+            String.join(".", fieldName));
+      } else if (!(change instanceof TableChange.AddIndex)) {
+        // Currently, only column add/drop/rename and index addition are supported.
+        // TODO: Support change column type once we have a clear knowledge about the means of
+        // castTo in Lance.
+        throw new UnsupportedOperationException(
+            "Unsupported changes to lance table: " + change.getClass().getSimpleName());
+      }
     }
   }
 

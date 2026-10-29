@@ -20,12 +20,14 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -130,8 +133,11 @@ public class RoleMetaService {
         SessionUtils.getWithoutCommit(
             RoleMetaMapper.class,
             mapper ->
-                mapper.listRolesByMetadataObjectIdAndType(
-                    metadataObjectId, metadataObject.type().name()));
+                allFields
+                    ? mapper.listRolesWithPrivilegesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name())
+                    : mapper.listRolesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name()));
     return rolePOs.stream()
         .map(
             po -> {
@@ -160,28 +166,24 @@ public class RoleMetaService {
       AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 
       String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalake);
-      }
+      MetalakePO metalakePO = MetalakeMetaService.getInstance().requireMetalakeByName(metalake);
 
       RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakePO.getMetalakeId());
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
       List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
+      List<EndpointLock> endpointLocks = Lists.newArrayList();
       for (SecurableObject object : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder objectBuilder =
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getType(object));
         NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
         Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
-        objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(identifier, entityType));
+        NamespacedEntityId observed = EntityIdService.getEntityIds(identifier, entityType);
+        objectBuilder.withMetadataObjectId(observed.entityId());
+        endpointLocks.add(new EndpointLock(identifier, entityType, observed));
         securableObjectPOs.add(objectBuilder.build());
       }
+      Collections.sort(endpointLocks);
 
       // The role row is written before its securable objects. Concurrent overwrites then contend
       // on the role row first and replace the child rows only after they are serialized. The role
@@ -198,6 +200,7 @@ public class RoleMetaService {
                       mapper.insertRoleMeta(rolePO);
                     }
                   }),
+          () -> endpointLocks.forEach(Runnable::run),
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,
@@ -226,7 +229,7 @@ public class RoleMetaService {
       String metalake = NameIdentifierUtil.getMetalake(identifier);
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
 
-      RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+      RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name(), true);
       RoleEntity oldRoleEntity =
           POConverters.fromRolePO(
               rolePO, listSecurableObjects(rolePO), AuthorizationUtils.ofRoleNamespace(metalake));
@@ -251,10 +254,33 @@ public class RoleMetaService {
       List<SecurableObjectPO> deleteSecurableObjectPOs =
           toSecurableObjectPOs(deleteObjects, oldRoleEntity, metalake);
 
-      List<SecurableObjectPO> insertSecurableObjectPOs =
-          toSecurableObjectPOs(insertObjects, oldRoleEntity, metalake);
+      List<SecurableObjectPO> insertSecurableObjectPOs = Lists.newArrayList();
+      List<EndpointLock> endpointLocks = Lists.newArrayList();
+      for (SecurableObject object : insertObjects) {
+        NameIdentifier objectIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+        Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object.type());
+        NamespacedEntityId observed;
+        try {
+          observed = EntityIdService.getEntityIds(objectIdentifier, objectType);
+        } catch (NoSuchEntityException nse) {
+          throw new NoSuchMetadataObjectException(
+              nse, "Metadata object %s type %s doesn't exist", object.fullName(), object.type());
+        }
+        insertSecurableObjectPOs.add(
+            POConverters.initializeSecurablePOBuilderWithVersion(
+                    oldRoleEntity.id(), object, getType(object))
+                .withMetadataObjectId(observed.entityId())
+                .build());
+        endpointLocks.add(new EndpointLock(objectIdentifier, objectType, observed));
+      }
+      Collections.sort(endpointLocks);
 
       SessionUtils.doMultipleWithCommit(
+          () ->
+              LiveEndpointService.lockLiveEndpoint(
+                  NameIdentifier.of(metalake),
+                  Entity.EntityType.METALAKE,
+                  new NamespacedEntityId(metalakeId)),
           () -> {
             int updated =
                 SessionUtils.getWithoutCommit(
@@ -266,6 +292,10 @@ public class RoleMetaService {
               throw roleWriteFailure(identifier, rolePO);
             }
           },
+          // Target deletion locks the endpoint before cleaning its privilege relations. Fence
+          // every added endpoint before touching old relations to keep the same lock order when
+          // replacing the privileges on an existing endpoint.
+          () -> endpointLocks.forEach(Runnable::run),
           () -> {
             if (deleteSecurableObjectPOs.isEmpty()) {
               return;
@@ -355,7 +385,7 @@ public class RoleMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name(), true);
 
     List<SecurableObject> securableObjects = listSecurableObjects(rolePO);
 
@@ -410,14 +440,6 @@ public class RoleMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         roleId, MetadataObject.Type.ROLE.name())));
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "listSecurableObjectsByRoleId")
-  public static List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
-    return SessionUtils.getWithoutCommit(
-        SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
   @Monitored(
@@ -479,7 +501,8 @@ public class RoleMetaService {
   }
 
   private static List<SecurableObject> listSecurableObjects(RolePO po) {
-    List<SecurableObjectPO> securableObjectPOs = listSecurableObjectsByRoleId(po.getRoleId());
+    // Full role conversions must use privileges from the same statement as the role metadata.
+    List<SecurableObjectPO> securableObjectPOs = po.requireSecurableObjectPOs();
     List<SecurableObject> securableObjects = Lists.newArrayList();
 
     securableObjectPOs.stream()
@@ -520,10 +543,18 @@ public class RoleMetaService {
   }
 
   private static RolePO getRolePOByMetalakeIdAndName(Long metalakeId, String roleName) {
+    return getRolePOByMetalakeIdAndName(metalakeId, roleName, false);
+  }
+
+  private static RolePO getRolePOByMetalakeIdAndName(
+      Long metalakeId, String roleName, boolean withPrivileges) {
     RolePO rolePO =
         SessionUtils.getWithoutCommit(
             RoleMetaMapper.class,
-            mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+            mapper ->
+                withPrivileges
+                    ? mapper.selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName)
+                    : mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
 
     if (rolePO == null) {
       throw new NoSuchEntityException(
@@ -589,5 +620,51 @@ public class RoleMetaService {
 
   private static String getType(SecurableObject securableObject) {
     return securableObject.type().name();
+  }
+
+  @VisibleForTesting
+  static final class EndpointLock implements Runnable, Comparable<EndpointLock> {
+    private static final Comparator<EndpointLock> ORDER =
+        Comparator.comparingInt((EndpointLock lock) -> lockOrder(lock.type))
+            .thenComparingLong(lock -> lock.observed.entityId());
+
+    private final NameIdentifier identifier;
+    private final Entity.EntityType type;
+    private final NamespacedEntityId observed;
+
+    EndpointLock(NameIdentifier identifier, Entity.EntityType type, NamespacedEntityId observed) {
+      this.identifier = identifier;
+      this.type = type;
+      this.observed = observed;
+    }
+
+    @Override
+    public void run() {
+      LiveEndpointService.lockLiveEndpoint(identifier, type, observed);
+    }
+
+    @Override
+    public int compareTo(EndpointLock other) {
+      return ORDER.compare(this, other);
+    }
+
+    @Override
+    public String toString() {
+      // A failed ordering assertion is about which endpoint sits where, so print that rather
+      // than an identity hash.
+      return type + "(" + observed.entityId() + ")";
+    }
+
+    private static int lockOrder(Entity.EntityType type) {
+      // Relation writers take ordinary metadata endpoints before tags and policies, and
+      // PolicyTagRelService locks tags before policies.
+      if (type == Entity.EntityType.TAG) {
+        return Integer.MAX_VALUE - 1;
+      }
+      if (type == Entity.EntityType.POLICY) {
+        return Integer.MAX_VALUE;
+      }
+      return type.ordinal();
+    }
   }
 }

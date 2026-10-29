@@ -88,6 +88,7 @@ public class SemanticModelCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(
         definition != null, "\"definition\" field is required and cannot be null");
+    definition.validate();
   }
 
   /**

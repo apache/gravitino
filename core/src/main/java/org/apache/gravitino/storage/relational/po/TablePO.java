@@ -20,6 +20,9 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nullable;
 import lombok.Getter;
 
 @Getter
@@ -42,6 +45,33 @@ public class TablePO {
   private String distribution;
   private String indexes;
   private String comment;
+
+  // Populated only by the single-statement aggregate read; not a column of table_meta.
+  @Nullable private List<ColumnPO> columnPOs;
+
+  /**
+   * Returns the column rows loaded in the same statement as this entity.
+   *
+   * @return the snapshot, empty when loaded without children, or null for metadata-only reads
+   */
+  @Nullable
+  public List<ColumnPO> getColumnPOs() {
+    return columnPOs;
+  }
+
+  /**
+   * Requires the aggregate snapshot before a complete entity is assembled or updated.
+   *
+   * @return the loaded column snapshot, which may be empty
+   * @throws IllegalStateException if only the entity metadata was loaded
+   */
+  public List<ColumnPO> requireColumnPOs() {
+    Preconditions.checkState(
+        columnPOs != null,
+        "The column snapshot was not loaded for table %s; use an aggregate mapper",
+        tableId);
+    return columnPOs;
+  }
 
   public Long getTableId() {
     return tableId;
@@ -140,6 +170,7 @@ public class TablePO {
       tablePO.distribution = source.distribution;
       tablePO.indexes = source.indexes;
       tablePO.comment = source.comment;
+      tablePO.columnPOs = source.columnPOs == null ? null : new ArrayList<>(source.columnPOs);
     }
 
     public Builder withTableId(Long tableId) {
@@ -251,7 +282,8 @@ public class TablePO {
 
   /**
    * Creates a new instance of {@link Builder} pre-filled with the values of an existing table, so
-   * that a caller changing a few columns does not have to restate the others.
+   * that a caller changing a few columns does not have to restate the others. Loaded column
+   * snapshots are copied into an independent list; metadata-only copies remain unloaded.
    *
    * @param tablePO The table to copy the values from.
    * @return The new instance.

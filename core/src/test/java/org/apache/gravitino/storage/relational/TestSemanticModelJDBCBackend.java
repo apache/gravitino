@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -46,12 +47,21 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SemanticModelEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.AIContextObject;
 import org.apache.gravitino.semantic.CustomExtension;
@@ -69,6 +79,9 @@ import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
+import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
+import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
+import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.POStorageReadRouting;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -81,7 +94,115 @@ import org.junit.jupiter.api.TestTemplate;
 public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
 
   @TestTemplate
-  public void testCreateAndLoadRoundTrip() throws IOException {
+  public void testSemanticModelGrantRoundTrip() throws IOException {
+    Namespace namespace = createParents("grants");
+    SemanticModelEntity model =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "SalesModel", false, ImmutableMap.of());
+    backend.insert(model, false);
+    RoleEntity role =
+        semanticModelRole(
+            model,
+            List.of(
+                Privileges.UseSemanticModel.allow(),
+                Privileges.ModifySemanticModel.allow(),
+                Privileges.ManageGrants.allow()));
+    backend.insert(role, false);
+    RoleEntity loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(role.securableObjects(), loaded.securableObjects());
+
+    SemanticModelEntity renamed =
+        semanticModel(model.id(), namespace, "RenamedModel", false, ImmutableMap.of());
+    backend.update(model.nameIdentifier(), model.type(), old -> renamed);
+    loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals("RenamedModel", loaded.securableObjects().get(0).name());
+
+    RoleEntity updated =
+        backend.update(
+            role.nameIdentifier(),
+            Entity.EntityType.ROLE,
+            old ->
+                RoleEntity.builder()
+                    .withId(role.id())
+                    .withName(role.name())
+                    .withNamespace(role.namespace())
+                    .withAuditInfo(AUDIT_INFO)
+                    .withProperties(ImmutableMap.of())
+                    .withSecurableObjects(
+                        semanticModelRole(renamed, List.of(Privileges.UseSemanticModel.allow()))
+                            .securableObjects())
+                    .build());
+    loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(updated.securableObjects(), loaded.securableObjects());
+    backend.update(
+        role.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        old ->
+            RoleEntity.builder()
+                .withId(role.id())
+                .withName(role.name())
+                .withNamespace(role.namespace())
+                .withAuditInfo(AUDIT_INFO)
+                .withProperties(ImmutableMap.of())
+                .withSecurableObjects(List.of())
+                .build());
+    loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertTrue(loaded.securableObjects().isEmpty());
+  }
+
+  @TestTemplate
+  public void testSemanticModelOwnerAndOrphanCleanup() throws IOException {
+    Namespace namespace = createParents("owner_cleanup");
+    SemanticModelEntity model =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "SalesModel", false, ImmutableMap.of());
+    SemanticModelEntity live =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "LiveModel", false, ImmutableMap.of());
+    backend.insert(model, false);
+    backend.insert(live, false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(namespace.level(0)),
+            "owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    for (SemanticModelEntity entity : List.of(model, live)) {
+      OwnerMetaService.getInstance()
+          .setOwner(entity.nameIdentifier(), entity.type(), user.nameIdentifier(), user.type());
+      assertEquals(
+          user,
+          OwnerMetaService.getInstance()
+              .getOwner(entity.nameIdentifier(), entity.type())
+              .orElseThrow());
+      backend.insert(
+          semanticModelRole(entity, List.of(Privileges.UseSemanticModel.allow())), false);
+    }
+    assertEquals(
+        0,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.SEMANTIC_MODEL, 10));
+    assertTrue(backend.delete(model.nameIdentifier(), model.type(), false));
+    assertEquals(
+        2,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.SEMANTIC_MODEL, 10));
+    assertEquals(
+        0,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.SEMANTIC_MODEL, 10));
+    assertEquals(
+        user,
+        OwnerMetaService.getInstance().getOwner(live.nameIdentifier(), live.type()).orElseThrow());
+    RoleEntity liveRole =
+        backend.get(
+            AuthorizationUtils.ofRole(namespace.level(0), live.name()), Entity.EntityType.ROLE);
+    assertEquals(1, liveRole.securableObjects().size());
+  }
+
+  @TestTemplate
+  public void testCreateAndLoadRoundTrip() throws IOException, SQLException {
     Namespace namespace = createParents("round_trip");
     SemanticModelEntity absent =
         semanticModel(
@@ -118,6 +239,78 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
         loadedAbsent.definition().aiContext().object().additionalProperties().get("threshold"));
     assertNull(loadedAbsent.definition().aiContext().object().examples());
     assertEquals(0, loadedAbsent.definition().aiContext().object().synonyms().length);
+    assertStoredDefinition(absent, 1);
+    assertStoredDefinition(empty, 1);
+  }
+
+  @TestTemplate
+  public void testDefinitionColumnsAcrossReplacementsAndOverwrite()
+      throws IOException, SQLException {
+    Namespace namespace = createParents("definition_columns");
+    SemanticModelEntity base =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "sales_model", false, Map.of());
+    SemanticModelDefinition fullDefinition =
+        JsonUtils.anyFieldMapper()
+            .readValue(
+                """
+                {
+                  "datasets": [
+                    {"name": "orders",
+                     "source": {"namespace": ["sales", "mart"], "name": "orders"}},
+                    {"name": "customers",
+                     "source": {"namespace": ["sales", "mart"], "name": "customers"}}
+                  ],
+                  "relationships": [
+                    {"name": "orders_customers", "from": "orders", "to": "customers",
+                     "fromColumns": ["customer_id"], "toColumns": ["id"]}
+                  ],
+                  "metrics": [
+                    {"name": "z_count", "expression": {
+                      "dialects": [{"dialect": "ANSI_SQL", "expression": "COUNT(*)"}]}},
+                    {"name": "a_revenue", "expression": {
+                      "dialects": [{"dialect": "ANSI_SQL", "expression": "SUM(orders.amount)"}]}}
+                  ],
+                  "aiContext": "Use certified definitions",
+                  "customExtensions": [
+                    {"vendorName": "z_vendor", "data": "first"},
+                    {"vendorName": "a_vendor", "data": "second"}
+                  ]
+                }
+                """,
+                SemanticModelDefinitionDTO.class)
+            .toDefinition();
+    SemanticModelEntity original = withDefinition(base, fullDefinition);
+    SemanticModelEntity empty =
+        withDefinition(
+            base,
+            SemanticModelDefinition.builder()
+                .withDatasets(fullDefinition.datasets())
+                .withAIContext(AIContext.of(""))
+                .withRelationships(new Relationship[0])
+                .withMetrics(new Metric[0])
+                .withCustomExtensions(new CustomExtension[0])
+                .build());
+    SemanticModelEntity absent =
+        withDefinition(
+            base,
+            SemanticModelDefinition.builder().withDatasets(base.definition().datasets()).build());
+
+    backend.insert(original, false);
+    assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
+    backend.update(original.nameIdentifier(), original.type(), ignored -> empty);
+    assertEquals(empty, backend.get(original.nameIdentifier(), original.type()));
+    backend.update(original.nameIdentifier(), original.type(), ignored -> absent);
+    assertEquals(absent, backend.get(original.nameIdentifier(), original.type()));
+    backend.insert(original, true);
+    assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
+    assertEquals(4, getSemanticModelPO(original.id()).getCurrentVersion());
+    assertEquals(List.of(1, 2, 3, 4), activeSnapshotVersions(original.id()));
+
+    assertStoredDefinition(original, 1);
+    assertStoredDefinition(empty, 2);
+    assertStoredDefinition(absent, 3);
+    assertStoredDefinition(original, 4);
   }
 
   @TestTemplate
@@ -521,6 +714,26 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     assertTrue(allVersionRowsAreSoftDeleted(metalakeChild.id()));
   }
 
+  private RoleEntity semanticModelRole(SemanticModelEntity model, List<Privilege> privileges) {
+    return RoleEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(model.name())
+        .withNamespace(AuthorizationUtils.ofRoleNamespace(model.namespace().level(0)))
+        .withAuditInfo(AUDIT_INFO)
+        .withProperties(ImmutableMap.of())
+        .withSecurableObjects(
+            List.of(
+                SecurableObjects.parse(
+                    model.namespace().level(1)
+                        + "."
+                        + model.namespace().level(2)
+                        + "."
+                        + model.name(),
+                    MetadataObject.Type.SEMANTIC_MODEL,
+                    privileges)))
+        .build();
+  }
+
   private Namespace createParents(String prefix) throws IOException {
     String suffix = Long.toUnsignedString(RandomIdGenerator.INSTANCE.nextId());
     String metalakeName = prefix + "_metalake_" + suffix;
@@ -588,6 +801,75 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
         .withProperties(properties)
         .withAuditInfo(AUDIT_INFO)
         .build();
+  }
+
+  private static SemanticModelEntity withDefinition(
+      SemanticModelEntity model, SemanticModelDefinition definition) {
+    return SemanticModelEntity.builder()
+        .withId(model.id())
+        .withName(model.name())
+        .withNamespace(model.namespace())
+        .withComment(model.comment())
+        .withDefinition(definition)
+        .withProperties(model.properties())
+        .withAuditInfo(model.auditInfo())
+        .build();
+  }
+
+  private void assertStoredDefinition(SemanticModelEntity model, int version)
+      throws IOException, SQLException {
+    JsonNode expected =
+        JsonUtils.anyFieldMapper()
+            .readTree(
+                JsonUtils.anyFieldMapper()
+                    .writeValueAsString(
+                        SemanticModelDefinitionDTO.fromDefinition(model.definition())));
+    SemanticModelVersionInfoPO snapshot =
+        SessionUtils.getWithoutCommit(
+            SemanticModelVersionInfoMapper.class,
+            mapper ->
+                mapper.selectSemanticModelVersionInfoBySemanticModelIdAndVersion(
+                    model.id(), version));
+    assertNotNull(snapshot);
+    Map<String, String> columns =
+        Map.of(
+            "datasets", "datasets",
+            "relationships", "relationships",
+            "metrics", "metrics",
+            "ai_context", "aiContext",
+            "custom_extensions", "customExtensions");
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT datasets, relationships, metrics, ai_context, custom_extensions"
+                    + " FROM semantic_model_version_info"
+                    + " WHERE semantic_model_id = ? AND version = ? AND deleted_at = 0")) {
+      statement.setLong(1, model.id());
+      statement.setInt(2, version);
+      try (ResultSet result = statement.executeQuery()) {
+        assertTrue(result.next());
+        for (Map.Entry<String, String> column : columns.entrySet()) {
+          String json = result.getString(column.getKey());
+          if (expected.has(column.getValue())) {
+            assertNotNull(json, column.getKey());
+            assertEquals(
+                expected.get(column.getValue()),
+                JsonUtils.anyFieldMapper().readTree(json),
+                column.getKey());
+          } else {
+            assertNull(json, column.getKey());
+          }
+        }
+        assertEquals(result.getString("datasets"), snapshot.datasets());
+        assertEquals(result.getString("relationships"), snapshot.relationships());
+        assertEquals(result.getString("metrics"), snapshot.metrics());
+        assertEquals(result.getString("ai_context"), snapshot.aiContext());
+        assertEquals(result.getString("custom_extensions"), snapshot.customExtensions());
+        assertFalse(result.next());
+      }
+    }
   }
 
   private int countRows(String tableName, Long semanticModelId) {

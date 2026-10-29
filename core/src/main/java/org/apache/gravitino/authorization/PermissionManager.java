@@ -426,7 +426,6 @@ class PermissionManager {
                           if (targetObject == null) {
                             return createNewSecurableObject(
                                 metalake,
-                                role,
                                 object,
                                 privileges,
                                 roleEntity,
@@ -434,8 +433,6 @@ class PermissionManager {
                           } else {
                             return updateGrantedSecurableObject(
                                 metalake,
-                                role,
-                                object,
                                 privileges,
                                 roleEntity,
                                 targetObject,
@@ -475,8 +472,6 @@ class PermissionManager {
 
   private static SecurableObject updateGrantedSecurableObject(
       String metalake,
-      String role,
-      MetadataObject object,
       Set<Privilege> privileges,
       RoleEntity roleEntity,
       SecurableObject targetObject,
@@ -500,14 +495,8 @@ class PermissionManager {
       // We will execute the callback after we execute the SQL transaction.
       authorizationPluginCallbackWrapper.setCallback(
           () ->
-              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                  metalake,
-                  object,
-                  authorizationPlugin -> {
-                    authorizationPlugin.onRoleUpdated(
-                        roleEntity,
-                        RoleChange.updateSecurableObject(role, targetObject, newSecurableObject));
-                  }));
+              AuthorizationUtils.notifyRolePrivilegesUpdated(
+                  metalake, roleEntity, targetObject, newSecurableObject));
 
       return newSecurableObject;
     }
@@ -545,8 +534,6 @@ class PermissionManager {
                             // time.
                             return updateRevokedSecurableObject(
                                 metalake,
-                                role,
-                                object,
                                 privileges,
                                 roleEntity,
                                 targetObject,
@@ -635,15 +622,8 @@ class PermissionManager {
                     () -> {
                       authzPluginCreatedObjects.forEach(
                           object -> {
-                            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                                metalake,
-                                object,
-                                authorizationPlugin -> {
-                                  authorizationPlugin.onRoleUpdated(
-                                      roleEntity,
-                                      RoleChange.addSecurableObject(
-                                          role, updatedObjectMap.get(object)));
-                                });
+                            AuthorizationUtils.notifyRolePrivilegesUpdated(
+                                metalake, roleEntity, null, updatedObjectMap.get(object));
                           });
                       authzPluginUpdateObjects.forEach(
                           object -> {
@@ -656,28 +636,14 @@ class PermissionManager {
                                 && !existingObject
                                     .privileges()
                                     .equals(newSecurableObject.privileges())) {
-                              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                                  metalake,
-                                  object,
-                                  authorizationPlugin -> {
-                                    authorizationPlugin.onRoleUpdated(
-                                        roleEntity,
-                                        RoleChange.updateSecurableObject(
-                                            role, existingObject, newSecurableObject));
-                                  });
+                              AuthorizationUtils.notifyRolePrivilegesUpdated(
+                                  metalake, roleEntity, existingObject, newSecurableObject);
                             }
                           });
                       authzPluginDeletedObjects.forEach(
                           object -> {
-                            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                                metalake,
-                                object,
-                                authorizationPlugin -> {
-                                  authorizationPlugin.onRoleUpdated(
-                                      roleEntity,
-                                      RoleChange.removeSecurableObject(
-                                          role, originObjectMap.get(object)));
-                                });
+                            AuthorizationUtils.notifyRolePrivilegesUpdated(
+                                metalake, roleEntity, originObjectMap.get(object), null);
                           });
                     });
 
@@ -714,7 +680,6 @@ class PermissionManager {
 
   private static SecurableObject createNewSecurableObject(
       String metalake,
-      String role,
       MetadataObject object,
       Set<Privilege> privileges,
       RoleEntity roleEntity,
@@ -729,13 +694,8 @@ class PermissionManager {
     // We will execute the callback after we execute the SQL transaction.
     authorizationPluginCallbackWrapper.setCallback(
         () ->
-            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                metalake,
-                object,
-                authorizationPlugin -> {
-                  authorizationPlugin.onRoleUpdated(
-                      roleEntity, RoleChange.addSecurableObject(role, securableObject));
-                }));
+            AuthorizationUtils.notifyRolePrivilegesUpdated(
+                metalake, roleEntity, null, securableObject));
 
     return securableObject;
   }
@@ -743,8 +703,6 @@ class PermissionManager {
   @SuppressWarnings("deprecation")
   private static SecurableObject updateRevokedSecurableObject(
       String metalake,
-      String role,
-      MetadataObject object,
       Set<Privilege> privileges,
       RoleEntity roleEntity,
       SecurableObject targetObject,
@@ -789,14 +747,8 @@ class PermissionManager {
       // We will execute the callback after we execute the SQL transaction.
       authorizationCallbackWrapper.setCallback(
           () ->
-              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                  metalake,
-                  object,
-                  authorizationPlugin -> {
-                    authorizationPlugin.onRoleUpdated(
-                        roleEntity,
-                        RoleChange.updateSecurableObject(role, targetObject, newSecurableObject));
-                  }));
+              AuthorizationUtils.notifyRolePrivilegesUpdated(
+                  metalake, roleEntity, targetObject, newSecurableObject));
 
       return newSecurableObject;
     } else {
@@ -805,13 +757,8 @@ class PermissionManager {
       // We will execute the callback after we execute the SQL transaction.
       authorizationCallbackWrapper.setCallback(
           () ->
-              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                  metalake,
-                  object,
-                  authorizationPlugin -> {
-                    authorizationPlugin.onRoleUpdated(
-                        roleEntity, RoleChange.removeSecurableObject(role, targetObject));
-                  }));
+              AuthorizationUtils.notifyRolePrivilegesUpdated(
+                  metalake, roleEntity, targetObject, null));
       // If we return null, the newly generated objects won't contain this object, the storage will
       // delete this object.
       return null;

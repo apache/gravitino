@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -45,10 +46,13 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -60,6 +64,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
+import org.apache.gravitino.storage.relational.po.TagRelationTagPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -106,15 +111,7 @@ public class TagMetaService {
     String metalakeName = ns.level(0);
 
     try {
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
-      }
+      MetalakePO metalakePO = MetalakeMetaService.getInstance().requireMetalakeByName(metalakeName);
 
       TagPO.Builder builder = TagPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       TagPO tagPO = POConverters.initializeTagPOWithVersion(tagEntity, builder);
@@ -209,6 +206,74 @@ public class TagMetaService {
     }
 
     return tagPOsToTagEntities(tagPOs, NamespaceUtil.ofTag(metalake));
+  }
+
+  /**
+   * Lists direct tag assignments for metadata objects of one type in one metalake.
+   *
+   * @param objectIdentifiers source identifiers
+   * @param objectType source entity type
+   * @return tag relation edges with their source identifiers
+   */
+  public List<RelationalEntity<?>> listTagsForMetadataObjects(
+      List<NameIdentifier> objectIdentifiers, Entity.EntityType objectType) {
+    if (objectIdentifiers.isEmpty()) {
+      return new ArrayList<>();
+    }
+    String metalake = objectIdentifiers.get(0).namespace().level(0);
+    Map<Long, NameIdentifier> identifiersById = new LinkedHashMap<>();
+    Map<NameIdentifier, List<NameIdentifier>> columnsByTable = new LinkedHashMap<>();
+    for (NameIdentifier identifier : objectIdentifiers) {
+      Preconditions.checkArgument(
+          metalake.equals(identifier.namespace().level(0)),
+          "All metadata objects must belong to the same metalake");
+      if (objectType == Entity.EntityType.COLUMN) {
+        columnsByTable
+            .computeIfAbsent(
+                NameIdentifier.of(identifier.namespace().levels()), ignored -> new ArrayList<>())
+            .add(identifier);
+      } else {
+        identifiersById.put(EntityIdService.getEntityId(identifier, objectType), identifier);
+      }
+    }
+    columnsByTable.forEach(
+        (table, columns) -> {
+          Long tableId = EntityIdService.getEntityId(table, Entity.EntityType.TABLE);
+          Map<String, Long> ids =
+              TableColumnMetaService.getInstance()
+                  .getColumnIdsByTableIdAndNames(
+                      tableId,
+                      columns.stream().map(NameIdentifier::name).collect(Collectors.toList()));
+          columns.forEach(column -> identifiersById.put(ids.get(column.name()), column));
+        });
+    List<TagRelationTagPO> rows = new ArrayList<>();
+    String metadataObjectType =
+        NameIdentifierUtil.toMetadataObject(objectIdentifiers.get(0), objectType).type().toString();
+    for (List<Long> batch : Lists.partition(new ArrayList<>(identifiersById.keySet()), 500)) {
+      rows.addAll(
+          SessionUtils.getWithoutCommit(
+              TagMetadataObjectRelMapper.class,
+              mapper -> mapper.listTagPOsByMetadataObjectIdsAndType(batch, metadataObjectType)));
+    }
+    Map<Long, List<TagPO>> rowsByObject = new LinkedHashMap<>();
+    rows.forEach(
+        row ->
+            rowsByObject
+                .computeIfAbsent(row.getMetadataObjectId(), ignored -> new ArrayList<>())
+                .add(row));
+    List<RelationalEntity<?>> result = new ArrayList<>();
+    rowsByObject.forEach(
+        (id, tagRows) ->
+            tagPOsToTagEntities(tagRows, NamespaceUtil.ofTag(metalake))
+                .forEach(
+                    tag ->
+                        result.add(
+                            new RelationalEntity<>(
+                                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                                identifiersById.get(id),
+                                objectType,
+                                tag))));
+    return result;
   }
 
   @Monitored(
@@ -395,7 +460,8 @@ public class TagMetaService {
     String metalake = objectIdent.namespace().level(0);
 
     try {
-      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
+      NamespacedEntityId observedEndpoint = EntityIdService.getEntityIds(objectIdent, objectType);
+      Long metadataObjectId = observedEndpoint.entityId();
       List<TagValue> tagValuesToAdd = new ArrayList<>(Arrays.asList(nullToEmpty(tagsToAdd)));
       List<TagValue> tagValuesToRemove = new ArrayList<>(Arrays.asList(nullToEmpty(tagsToRemove)));
       Set<TagValue> commonTagValues = new LinkedHashSet<>(tagValuesToAdd);
@@ -403,12 +469,26 @@ public class TagMetaService {
       tagValuesToAdd.removeAll(commonTagValues);
       tagValuesToRemove.removeAll(commonTagValues);
 
+      NameIdentifier metalakeIdent = NameIdentifier.of(metalake);
+      long metalakeId =
+          objectType == Entity.EntityType.METALAKE
+              ? observedEndpoint.entityId()
+              : observedEndpoint.namespaceIds()[0];
+      LiveEndpointService.lockLiveEndpoint(
+          metalakeIdent, Entity.EntityType.METALAKE, new NamespacedEntityId(metalakeId));
+      if (objectType != Entity.EntityType.POLICY) {
+        LiveEndpointService.lockLiveEndpoint(objectIdent, objectType, observedEndpoint);
+      }
+
       List<String> tagNamesToUpdate = tagNamesToUpdate(tagValuesToAdd, tagValuesToRemove);
       List<TagPO> tagPOsToUpdate =
           tagNamesToUpdate.isEmpty()
               ? Collections.emptyList()
               : getTagPOsByMetalakeAndNames(metalake, tagNamesToUpdate);
       tagPOsToUpdate = lockTagsForAssignment(tagPOsToUpdate);
+      if (objectType == Entity.EntityType.POLICY) {
+        LiveEndpointService.lockLiveEndpoint(objectIdent, objectType, observedEndpoint);
+      }
       Map<String, TagPO> tagPOsByName = tagPOsByName(tagPOsToUpdate);
 
       List<TagPO> currentTagPOs =
@@ -524,6 +604,11 @@ public class TagMetaService {
       return tagPOsToTagEntities(tagPOs, NamespaceUtil.ofTag(metalake));
 
     } catch (RuntimeException e) {
+      ExceptionUtils.throwIfLockWaitTimeout(
+          e,
+          String.format(
+              "The tags of %s %s",
+              metadataObject.type().name().toLowerCase(Locale.ROOT), objectIdent));
       ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, objectIdent.toString());
       throw e;
     }
@@ -820,13 +905,37 @@ public class TagMetaService {
   }
 
   /**
-   * Locks every tag taking part in an assignment change and returns the rows as they are now, so
-   * the assignment cannot be written against a tag that is being renamed or dropped.
+   * Locks every tag taking part in an assignment change and returns the rows that still carry the
+   * name the caller resolved, so the assignment cannot be written against a tag that is being
+   * renamed or dropped.
    *
-   * <p>See {@link #lockTags} for how the rows are locked and what counts as a missing tag.
+   * <p>The rows are locked by one statement in tag ID order, like {@link #lockTags}. Unlike that
+   * method, a tag that was dropped or renamed after it was resolved is left out instead of failing
+   * the change: an assignment ignores a tag name that does not exist, and whether that name
+   * disappeared before or after it was resolved must not change the outcome.
    */
-  private List<TagPO> lockTagsForAssignment(List<TagPO> observedTagPOs) {
-    return new ArrayList<>(lockTags(observedTagPOs).values());
+  @VisibleForTesting
+  static List<TagPO> lockTagsForAssignment(List<TagPO> observedTagPOs) {
+    if (observedTagPOs.isEmpty()) {
+      return new ArrayList<>();
+    }
+    List<Long> tagIds =
+        observedTagPOs.stream().map(TagPO::getTagId).distinct().collect(Collectors.toList());
+    Map<Long, TagPO> lockedById = new LinkedHashMap<>();
+    SessionUtils.getWithoutCommit(
+            TagMetaMapper.class, mapper -> mapper.listTagPOsByTagIdsForUpdate(tagIds))
+        .forEach(tagPO -> lockedById.put(tagPO.getTagId(), tagPO));
+
+    List<TagPO> liveTagPOs = new ArrayList<>();
+    for (TagPO observedTagPO : observedTagPOs) {
+      TagPO current = lockedById.get(observedTagPO.getTagId());
+      if (current != null
+          && Objects.equals(current.getTagName(), observedTagPO.getTagName())
+          && Objects.equals(current.getMetalakeId(), observedTagPO.getMetalakeId())) {
+        liveTagPOs.add(current);
+      }
+    }
+    return liveTagPOs;
   }
 
   /**
