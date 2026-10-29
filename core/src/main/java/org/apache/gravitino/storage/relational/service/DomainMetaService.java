@@ -151,7 +151,8 @@ public class DomainMetaService {
       DomainPO domainPO = DomainPO.initializeDomainPO(domainEntity, metalakePO.getMetalakeId());
 
       SessionUtils.doMultipleWithCommit(
-          () -> lockMetalakeForDomainCreate(metalakePO),
+          () ->
+              lockMetalakeForDomainWrite(metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
           () -> insertDomainWithoutCommit(domainEntity, domainPO, overwritten));
     } catch (RuntimeException e) {
       try {
@@ -290,12 +291,16 @@ public class DomainMetaService {
   boolean deleteDomain(NameIdentifier identifier, DomainPO domainPO) {
     long domainId = domainPO.domainId();
 
-    // The version-checked delete of the domain row must stay first: it decides whether this
-    // delete wins, and a losing delete throws there and rolls the transaction back before any
-    // dependent row is touched. The cleanups that follow are blanket soft deletes for this domain
-    // ID, so their row counts carry no information and are not checked.
+    // The metalake lock comes first. Dropping the metalake soft-deletes the privileges before the
+    // domains, while this delete changes the domain row before its privileges; without the lock
+    // the two could deadlock on a domain with privileges. The version-checked delete of the domain
+    // row comes next: it decides whether this delete wins, and a losing delete throws there and
+    // rolls the transaction back before any dependent row is touched. The cleanups that follow are
+    // blanket soft deletes for this domain ID, so their row counts carry no information and are
+    // not checked.
     try {
       SessionUtils.doMultipleWithCommit(
+          () -> lockMetalakeForDomainWrite(identifier.namespace().level(0), domainPO.metalakeId()),
           () -> deleteDomainWithVersion(identifier, domainPO),
           () ->
               SessionUtils.doWithoutCommit(
@@ -317,21 +322,21 @@ public class DomainMetaService {
   }
 
   /**
-   * Holds the parent metalake row for the rest of the transaction, so a domain cannot be created
-   * under a metalake that is going away. The lock is shared, so domains can be created under the
-   * same metalake at the same time, while dropping the metalake takes an exclusive lock on the row.
+   * Holds the parent metalake row for the rest of the transaction, so a domain cannot be created or
+   * deleted while the metalake is being dropped. The lock is shared, so domains under the same
+   * metalake can be written at the same time, while dropping the metalake takes an exclusive lock
+   * on the row. A metalake that is gone or renamed is reported as missing.
    */
-  private void lockMetalakeForDomainCreate(MetalakePO observedMetalakePO) {
+  private void lockMetalakeForDomainWrite(String metalakeName, Long metalakeId) {
     OccWriteSupport.lockParentForChildWrite(
-        observedMetalakePO.getMetalakeName(),
+        metalakeName,
         Entity.EntityType.METALAKE,
         () ->
             SessionUtils.getWithoutCommit(
                 MetalakeMetaMapper.class,
-                mapper ->
-                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+                mapper -> mapper.selectMetalakeMetaByIdForShare(metalakeId)),
         null,
-        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+        current -> Objects.equals(current.getMetalakeName(), metalakeName));
   }
 
   /**

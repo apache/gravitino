@@ -29,6 +29,12 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
@@ -46,7 +52,9 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
@@ -527,6 +535,68 @@ public class TestDomainMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteDomainWaitsForConcurrentMetalakeDelete() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    domainMetaService.insertDomain(finance, false);
+    MetalakePO observedMetalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+
+    // The metalake drop holds its exclusive row lock, so the domain delete must wait for it
+    // instead of racing it on the domain and privilege rows.
+    CountDownLatch dropWritten = new CountDownLatch(1);
+    CountDownLatch allowDropCommit = new CountDownLatch(1);
+    CountDownLatch deleteStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> dropResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () ->
+                        Assertions.assertEquals(
+                            Integer.valueOf(1),
+                            SessionUtils.getWithoutCommit(
+                                MetalakeMetaMapper.class,
+                                mapper ->
+                                    mapper.softDeleteMetalakeMetaByMetalakeId(
+                                        observedMetalakePO.getMetalakeId(),
+                                        observedMetalakePO.getCurrentVersion()))),
+                    () -> {
+                      dropWritten.countDown();
+                      await(allowDropCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      Assertions.assertTrue(dropWritten.await(30, TimeUnit.SECONDS));
+      Future<Boolean> deleteResult =
+          executor.submit(
+              () -> {
+                deleteStarted.countDown();
+                return domainMetaService.deleteDomain(finance.nameIdentifier());
+              });
+      Assertions.assertTrue(deleteStarted.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(
+          TimeoutException.class, () -> deleteResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDropCommit.countDown();
+      Assertions.assertNull(dropResult.get(30, TimeUnit.SECONDS));
+      // The metalake is gone once the delete gets the lock, so the domain is reported as missing.
+      Assertions.assertFalse(deleteResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowDropCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @TestTemplate
   public void testDomainLifeCycleWithMetalakeDeleteAndGarbageCollection() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
     String anotherMetalakeName = METALAKE_NAME + "_another";
@@ -607,6 +677,15 @@ public class TestDomainMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         MetadataObjects.of(null, "Finance", MetadataObject.Type.DOMAIN),
         NameIdentifierUtil.toMetadataObject(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
+  }
+
+  private void await(CountDownLatch latch) {
+    try {
+      Assertions.assertTrue(latch.await(30, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
   }
 
   private DomainEntity newDomain(String metalake, String name, String comment) {
