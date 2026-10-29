@@ -65,6 +65,8 @@ Use either to manage metadata. See
 * [Manage Semantic Model metadata using Gravitino](./manage-semantic-model-metadata-using-gravitino.md)
   to learn how to define, govern, and exchange semantic metadata. Start with
   [Semantic Models](./semantic-models.md) for concepts and supported use cases.
+* [Ontologies](./ontologies.md) to learn the metalake-scoped vocabulary of concepts and
+  relationships that applications can share across models.
 * [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
   how to manage fileset metadata.
 * [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
