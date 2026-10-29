@@ -47,8 +47,12 @@ dependencies {
   testImplementation(libs.commons.io)
   testImplementation(libs.guava)
   testImplementation(libs.httpclient5)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.platform.commons)
+  testImplementation(libs.junit.platform.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.jdbc)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.ranger.intg) {
@@ -65,12 +69,18 @@ dependencies {
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
 
-  testImplementation(platform("org.junit:junit-bom:5.9.1"))
   testImplementation("org.junit.jupiter:junit-jupiter")
+  testImplementation("org.junit.platform:junit-platform-testkit")
 }
 
 tasks.test {
   useJUnitPlatform()
+}
+
+// Nested fixture classes TestContainerExtension runs through EngineTestKit; Gradle's class scan
+// would run them directly too. Keep in sync with TestContainerExtension.FIXTURE.
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform { excludeTags("gravitino-test-fixture") }
 }
 
 val testJar by tasks.registering(Jar::class) {
@@ -83,10 +93,12 @@ configurations {
 }
 
 dependencies {
-  // ContainerSuite builds its MySQL and PostgreSQL containers on these Testcontainers modules, so
+  // The shared MySQL and PostgreSQL containers build on these Testcontainers modules, so
   // every module that uses the test artifacts needs them at test runtime.
   "testArtifacts"(libs.testcontainers.mysql)
   "testArtifacts"(libs.testcontainers.postgresql)
+  // The container classes wait with Awaitility, which Gravitino's code style imports unshaded.
+  "testArtifacts"(libs.awaitility)
 }
 
 artifacts {

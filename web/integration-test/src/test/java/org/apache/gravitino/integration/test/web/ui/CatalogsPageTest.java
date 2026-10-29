@@ -30,8 +30,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.container.TrinoITContainers;
+import org.apache.gravitino.integration.test.container.TrinoCluster;
+import org.apache.gravitino.integration.test.container.TrinoFixture;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
@@ -46,7 +46,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -58,11 +57,11 @@ import org.openqa.selenium.By;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TrinoFixture
 public class CatalogsPageTest extends BaseWebIT {
   private MetalakePage metalakePage;
   private CatalogsPage catalogsPage;
 
-  protected static TrinoITContainers trinoITContainers;
   protected static GravitinoAdminClient gravitinoClient;
   protected static String gravitinoUri = "http://127.0.0.1:8090";
   protected static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
@@ -114,16 +113,14 @@ public class CatalogsPageTest extends BaseWebIT {
 
   private static String defaultBaseLocation;
 
+  // Asks for the Trino cluster here, after BaseIT has started the Gravitino server it calls.
   @BeforeAll
-  public void before() throws Exception {
+  public void before(TrinoCluster trino) throws Exception {
     gravitinoClient = getGravitinoClient();
 
     gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
 
-    trinoITContainers = ContainerSuite.getTrinoITContainers();
-    trinoITContainers.launch(getGravitinoServerPort());
-
-    Map<String, String> serviceUrls = trinoITContainers.getServiceUrls();
+    Map<String, String> serviceUrls = trino.serviceUrls();
     hiveMetastoreUri = serviceUrls.get("hive_uri");
     hdfsUri = serviceUrls.get("hdfs_uri");
     mysqlUri = serviceUrls.get("mysql_uri");
@@ -200,15 +197,6 @@ public class CatalogsPageTest extends BaseWebIT {
    */
   private static String storageLocation(String schemaName, String filesetName) {
     return defaultBaseLocation(schemaName) + "/" + filesetName;
-  }
-
-  @AfterAll
-  public static void after() {
-    try {
-      if (trinoITContainers != null) trinoITContainers.shutdown();
-    } catch (Exception e) {
-      LOG.error("shutdown trino containers error", e);
-    }
   }
 
   @Test

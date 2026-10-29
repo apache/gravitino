@@ -19,51 +19,35 @@
 
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.HiveStorage;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.testcontainers.utility.MountableFile;
 
 @EnabledIf(value = "isGCSConfigured", disabledReason = "Google Cloud Storage(GCS) is not prepared.")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture(version = HiveVersion.HIVE3, storage = HiveStorage.GCS)
 public class CatalogHiveGCSIT extends CatalogHive2IT {
 
   private static final String GCS_BUCKET_NAME = System.getenv("GCS_BUCKET_NAME");
   private static final String GCS_ACCOUNT_JSON_FILE =
       System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH");
-  private static final String GCS_ACCOUNT_JSON_FILE_IN_CONTAINER = "/tmp/gcs-service-account.json";
 
   @Override
   protected void startNecessaryContainer() {
-    Map<String, String> hiveContainerEnv =
-        ImmutableMap.of(
-            "SERVICE_ACCOUNT_FILE",
-            GCS_ACCOUNT_JSON_FILE_IN_CONTAINER,
-            HiveContainer.HIVE_RUNTIME_VERSION,
-            HiveContainer.HIVE3);
-
-    containerSuite.startHiveContainerWithS3(hiveContainerEnv);
-
     hiveMetastoreUris =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
-
-    containerSuite
-        .getHiveContainerWithS3()
-        .getContainer()
-        .copyFileToContainer(
-            MountableFile.forHostPath(GCS_ACCOUNT_JSON_FILE), "/tmp/gcs-service-account.json");
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
   }
 
   @Override

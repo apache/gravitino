@@ -33,6 +33,8 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
+import org.apache.gravitino.integration.test.container.RangerContainer;
+import org.apache.gravitino.integration.test.container.RangerFixture;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -40,12 +42,13 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@RangerFixture
 public class RangerAuthorizationPluginIT {
   private static RangerAuthorizationPlugin rangerAuthPlugin;
 
   @BeforeAll
-  public static void setup() {
-    RangerITEnv.init(RangerITEnv.currentFunName(), true);
+  public static void setup(RangerContainer ranger) {
+    RangerITEnv.init(ranger, RangerITEnv.currentFunName(), true);
     rangerAuthPlugin = RangerITEnv.rangerAuthHivePlugin;
   }
 

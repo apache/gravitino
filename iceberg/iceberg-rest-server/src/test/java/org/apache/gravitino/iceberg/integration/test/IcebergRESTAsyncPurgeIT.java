@@ -32,7 +32,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
@@ -71,6 +73,7 @@ import org.slf4j.LoggerFactory;
  * {@code file://} warehouse, since cleanup jobs are keyed by catalog id and the files must be
  * visible on disk.
  */
+@PostgreSQLFixture(database = TestDatabaseName.PG_ICEBERG_ASYNC_CLEANUP_IT)
 public class IcebergRESTAsyncPurgeIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTAsyncPurgeIT.class);
@@ -89,7 +92,7 @@ public class IcebergRESTAsyncPurgeIT extends BaseIT {
           Types.NestedField.required(1, "id", Types.LongType.get()),
           Types.NestedField.optional(2, "data", Types.StringType.get()));
 
-  private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
+  @FixtureContainer private PostgreSQLContainer postgreSQL;
 
   private Path warehouseDir;
   private RESTCatalog restCatalog;
@@ -97,7 +100,6 @@ public class IcebergRESTAsyncPurgeIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    CONTAINER_SUITE.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_ASYNC_CLEANUP_IT);
     warehouseDir = Files.createTempDirectory("gravitino-iceberg-async-cleanup");
     ignoreIcebergAuxRestService = false;
 
@@ -194,17 +196,10 @@ public class IcebergRESTAsyncPurgeIT extends BaseIT {
     Map<String, String> props = Maps.newHashMap();
     props.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
     props.put(
-        IcebergConstants.URI,
-        CONTAINER_SUITE
-            .getPostgreSQLContainer()
-            .getJdbcUrl(TestDatabaseName.PG_ICEBERG_ASYNC_CLEANUP_IT));
+        IcebergConstants.URI, postgreSQL.getJdbcUrl(TestDatabaseName.PG_ICEBERG_ASYNC_CLEANUP_IT));
     props.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.postgresql.Driver");
-    props.put(
-        IcebergConstants.GRAVITINO_JDBC_USER,
-        CONTAINER_SUITE.getPostgreSQLContainer().getUsername());
-    props.put(
-        IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-        CONTAINER_SUITE.getPostgreSQLContainer().getPassword());
+    props.put(IcebergConstants.GRAVITINO_JDBC_USER, postgreSQL.getUsername());
+    props.put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, postgreSQL.getPassword());
     props.put("gravitino.bypass.jdbc.schema-version", "v1");
     props.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
     props.put(IcebergConstants.WAREHOUSE, warehouseDir.toUri().toString());
