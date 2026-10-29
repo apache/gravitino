@@ -48,7 +48,7 @@ public final class TableMaintenanceActionTestUtils {
                 .getConnection()
                 .prepareStatement(
                     "UPDATE table_maintenance_action SET created_at = ? "
-                        + "WHERE id = ? AND job_id IS NULL AND finished_at = 0")) {
+                        + "WHERE action_id = ? AND job_id IS NULL AND finished_at = 0")) {
       statement.setLong(1, expiredAt);
       statement.setLong(2, claim.actionId());
       Assertions.assertEquals(1, statement.executeUpdate());

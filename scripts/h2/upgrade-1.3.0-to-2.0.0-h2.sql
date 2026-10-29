@@ -173,7 +173,7 @@ CREATE INDEX IF NOT EXISTS `scheduled_commit_tasks_execution_time_idx` ON `sched
 CREATE INDEX IF NOT EXISTS `scheduled_commit_tasks_last_heartbeat_idx` ON `scheduled_commit_tasks`(`last_heartbeat`);
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `action_id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'maintenance action id',
     `job_id` BIGINT COMMENT 'job run id, maps to job_run_meta.job_run_id',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
