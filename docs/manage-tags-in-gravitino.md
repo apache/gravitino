@@ -292,6 +292,14 @@ raw_events.supports_tags().associate_tags(["pii"], None)
 </TabItem>
 </Tabs>
 
+:::note
+Column tags follow the column's internal id. For tables whose metadata is kept by an external
+catalog, such as Hive, Iceberg or JDBC catalogs, a column rename that runs concurrently with a load
+or another alter of the same table, on any Gravitino server, can be stored as a dropped column plus
+a new one. The renamed column then loses its tags. Avoid loading or altering a table while one of
+its columns is being renamed, and check the column's tags after the rename.
+:::
+
 ### Assign and Remove Tag Values
 
 Tag values are updated as pairs of tag name and value. Adding a pair preserves the tag's other

@@ -337,7 +337,7 @@ public class GravitinoConnectorPluginManager {
           new ThreadContextClassLoader(plugin.getClass().getClassLoader())) {
         ConnectorFactory connectorFactory = plugin.getConnectorFactories().iterator().next();
         Connector connector = connectorFactory.create(connectorName, config, context);
-        LOG.info("create connector %s with config %s successful", connectorName, config);
+        LOG.info("create connector %s successful", connectorName);
         return connector;
       }
     } catch (Exception e) {

@@ -38,6 +38,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
@@ -66,7 +67,8 @@ class TestMaintenanceCommitSubmitPipeline {
   void testNullSpecSkipsSubmit() {
     MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
-    pipeline(allowAllGate(), actions, submitter).submit(Long.toString(TABLE_ID), null);
+    pipeline(allowAllGate(), actions, submitter)
+        .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), null);
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
     verify(actions, never()).tryAcquireInFlightBatch(anyLong(), anyList(), anyLong());
   }
@@ -75,7 +77,8 @@ class TestMaintenanceCommitSubmitPipeline {
   void testInFlightRemainingMemberSkipsSubmit() {
     MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
-    pipeline(inFlightGate(POLICY_ID), actions, submitter).submit(Long.toString(TABLE_ID), spec());
+    pipeline(inFlightGate(POLICY_ID), actions, submitter)
+        .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), spec());
     verify(actions, never()).tryAcquireInFlightBatch(anyLong(), anyList(), anyLong());
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
   }
@@ -103,7 +106,8 @@ class TestMaintenanceCommitSubmitPipeline {
                 new Operation(EXPIRE_POLICY_ID, "expire_snapshots")),
             jobConf);
 
-    pipeline(allowAllGate(), actions, submitter).submit(Long.toString(TABLE_ID), spec);
+    pipeline(allowAllGate(), actions, submitter)
+        .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), spec);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
