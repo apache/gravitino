@@ -331,9 +331,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   IllegalArgumentException.class);
           Table alteredTable = catalogResult.table;
 
+          // The change is already applied in the catalog. A result without a column list fails
+          // after the store is updated, but can't be returned to clients, which require one.
           if (catalogResult.managed) {
-            return EntityCombinedTable.of(alteredTable)
-                .withHiddenProperties(catalogResult.hiddenProperties);
+            return checkColumnsReported(
+                ident,
+                EntityCombinedTable.of(alteredTable)
+                    .withHiddenProperties(catalogResult.hiddenProperties));
           }
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
@@ -344,8 +348,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               te = getEntity(ident, TABLE, TableEntity.class);
             }
             if (te == null) {
-              return EntityCombinedTable.of(alteredTable)
-                  .withHiddenProperties(catalogResult.hiddenProperties);
+              return checkColumnsReported(
+                  ident,
+                  EntityCombinedTable.of(alteredTable)
+                      .withHiddenProperties(catalogResult.hiddenProperties));
             }
           }
 
@@ -404,8 +410,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 ident, newIdent);
           }
 
-          return EntityCombinedTable.of(alteredTable, updatedTableEntity)
-              .withHiddenProperties(catalogResult.hiddenProperties);
+          return checkColumnsReported(
+              ident,
+              EntityCombinedTable.of(alteredTable, updatedTableEntity)
+                  .withHiddenProperties(catalogResult.hiddenProperties));
         });
   }
 
@@ -629,6 +637,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             },
             NoSuchTableException.class);
     Table table = catalogResult.table;
+    // Fail before importing the table or updating its stored columns.
+    checkColumnsReported(ident, table);
 
     if (catalogResult.managed) {
       return EntityCombinedTable.of(table)
@@ -767,6 +777,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   private TableCatalogResult snapshotTable(CatalogManager.CatalogWrapper catalog, Table table)
       throws Exception {
     return snapshotTable(catalog, table, isManagedEntity(catalog, Capability.Scope.TABLE));
+  }
+
+  private <T extends Table> T checkColumnsReported(NameIdentifier ident, T table) {
+    if (table.columns() == null) {
+      throw new IllegalStateException(
+          String.format(
+              "Catalog %s returned table %s without a column list",
+              getCatalogIdentifier(ident), ident));
+    }
+    return table;
   }
 
   private List<ColumnEntity> toColumnEntities(Column[] columns, AuditInfo audit) {
@@ -978,7 +998,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
 
     // A catalog that reports no column list says nothing about the columns, so keep the stored
-    // ones. Treating it as "all columns dropped" would delete their tags, policies and owners.
+    // ones. Treating it as "all columns dropped" would delete their tags, policies and owners. Load
+    // rejects such a table before getting here, and alter keeps the columns as they were before it.
     if (tableFromCatalog.columns() == null) {
       LOG.warn(
           "Table {} from the underlying source has no column list, keeping the stored columns",

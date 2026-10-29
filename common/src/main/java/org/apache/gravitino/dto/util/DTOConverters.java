@@ -298,6 +298,8 @@ public class DTOConverters {
     return TableDTO.builder()
         .withName(table.name())
         .withComment(table.comment())
+        // Connector results are snapshotted through here before the table dispatcher rejects a
+        // missing column list with a clear error, so a null list must not throw here.
         .withColumns(
             table.columns() == null
                 ? null

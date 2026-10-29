@@ -1459,6 +1459,9 @@ public class TestCatalogOperations
   }
 
   private Column[] updateColumns(Column[] columns, TableChange.ColumnChange[] columnChanges) {
+    if (columns == null) {
+      return null;
+    }
     Map<String, Column> columnMap =
         Arrays.stream(columns).collect(Collectors.toMap(Column::name, Function.identity()));
 

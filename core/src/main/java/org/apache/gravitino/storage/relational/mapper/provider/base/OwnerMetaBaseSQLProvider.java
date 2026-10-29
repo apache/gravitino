@@ -287,6 +287,8 @@ public class OwnerMetaBaseSQLProvider {
 
   public String softDeleteOwnerRelOfJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId) {
     String now = currentTimestampMillisExpression();
+    // No deleted_at filter on the job rows: the template delete soft-deletes its jobs earlier in
+    // the same transaction, and filtering them out would make this a no-op.
     return "UPDATE "
         + OWNER_TABLE_NAME
         + " SET deleted_at = "

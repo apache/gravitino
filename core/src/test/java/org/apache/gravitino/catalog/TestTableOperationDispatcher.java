@@ -1494,8 +1494,36 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testLoadKeepsStoredColumnsWhenCatalogReportsNoColumns() throws IOException {
-    Namespace tableNs = Namespace.of(metalake, catalog, "schema_null_columns");
+  public void testLoadFailsWhenCatalogReportsNoColumns() throws IOException {
+    NameIdentifier tableIdent = createTableReportingNoColumns("schema_null_columns_load");
+    Map<String, Long> ids = columnIds(tableIdent);
+
+    IllegalStateException e =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> tableOperationDispatcher.loadTable(tableIdent));
+
+    Assertions.assertTrue(e.getMessage().contains("without a column list"), e.getMessage());
+    Assertions.assertTrue(e.getMessage().contains(catalog), e.getMessage());
+    Assertions.assertEquals(ids, columnIds(tableIdent));
+  }
+
+  @Test
+  public void testAlterKeepsStoredColumnsWhenCatalogReportsNoColumns() throws IOException {
+    NameIdentifier tableIdent = createTableReportingNoColumns("schema_null_columns_alter");
+    Map<String, Long> ids = columnIds(tableIdent);
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k3", "v3")));
+
+    // The catalog applied the change, and the stored columns are kept.
+    Assertions.assertEquals(
+        "v3", testCatalogOperations().loadTable(tableIdent).properties().get("k3"));
+    Assertions.assertEquals(ids, columnIds(tableIdent));
+  }
+
+  private NameIdentifier createTableReportingNoColumns(String schemaName) {
+    Namespace tableNs = Namespace.of(metalake, catalog, schemaName);
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_columns");
@@ -1508,12 +1536,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
               .build()
         };
     tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
-    Map<String, Long> ids = columnIds(tableIdent);
 
-    TestCatalog testCatalog =
-        (TestCatalog)
-            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
-    ((TestCatalogOperations) testCatalog.ops())
+    testCatalogOperations()
         .replaceTable(
             tableIdent,
             TestTable.builder()
@@ -1523,11 +1547,14 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                 .withAuditInfo(
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());
+    return tableIdent;
+  }
 
-    Table loaded = tableOperationDispatcher.loadTable(tableIdent);
-
-    Assertions.assertNull(loaded.columns());
-    Assertions.assertEquals(ids, columnIds(tableIdent));
+  private TestCatalogOperations testCatalogOperations() {
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    return (TestCatalogOperations) testCatalog.ops();
   }
 
   @Test

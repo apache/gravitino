@@ -309,7 +309,7 @@ public class TableDTO implements Table {
      * Builds a Table DTO based on the provided builder parameters.
      *
      * @return A new TableDTO instance.
-     * @throws IllegalArgumentException If required fields name, columns and audit are not set.
+     * @throws IllegalArgumentException If required fields name and audit are not set.
      */
     public TableDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
