@@ -39,8 +39,12 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
 
     long before = System.currentTimeMillis();
     OccupancyClaim claim =
-        actionService.insertInFlight(
-            10L, 20L, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
+        actionService
+            .tryAcquireInFlight(
+                10L,
+                20L,
+                TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10).claimTimeoutMs())
+            .orElseThrow();
     long after = System.currentTimeMillis();
     Assertions.assertNull(actionService.getById(claim.actionId()).jobId());
     Assertions.assertEquals(0L, actionService.getById(claim.actionId()).finishedAt());
@@ -88,13 +92,14 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
     long jobId = 777L;
-    OccupancyClaim claimA = actions.insertInFlight(101L, 201L, config);
-    OccupancyClaim claimB = actions.insertInFlight(102L, 202L, config);
+    OccupancyClaim claimA =
+        actions.tryAcquireInFlight(101L, 201L, config.claimTimeoutMs()).orElseThrow();
+    OccupancyClaim claimB =
+        actions.tryAcquireInFlight(102L, 202L, config.claimTimeoutMs()).orElseThrow();
     actions.bindJobId(claimA, jobId);
     actions.bindJobId(claimB, jobId);
 
     Assertions.assertEquals(2, actions.listByJobId(jobId).size());
-    Assertions.assertThrows(IllegalStateException.class, () -> actions.getByJobId(jobId));
 
     actions.recordBeforeMetrics(claimA.actionId(), 11L);
     actions.recordBeforeMetrics(claimB.actionId(), 22L);
@@ -120,7 +125,8 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long tableId = 31L;
     long policyId = 41L;
     long jobId = 5100L;
-    OccupancyClaim claim = actions.insertInFlight(tableId, policyId, config);
+    OccupancyClaim claim =
+        actions.tryAcquireInFlight(tableId, policyId, config.claimTimeoutMs()).orElseThrow();
     actions.bindJobId(claim, jobId);
     // Spark lazy-bound first; submit-side bind must not fail.
     actions.bindJobId(claim, jobId);
@@ -135,8 +141,10 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long policyA = 48L;
     long policyB = 49L;
     long jobId = 5700L;
-    OccupancyClaim claimA = actions.insertInFlight(tableId, policyA, config);
-    OccupancyClaim claimB = actions.insertInFlight(tableId, policyB, config);
+    OccupancyClaim claimA =
+        actions.tryAcquireInFlight(tableId, policyA, config.claimTimeoutMs()).orElseThrow();
+    OccupancyClaim claimB =
+        actions.tryAcquireInFlight(tableId, policyB, config.claimTimeoutMs()).orElseThrow();
     actions.bindJobId(claimA, jobId);
     actions.bindJobId(claimB, jobId);
     // Spark may lazy-bind before commit-chain submit-side bindJobIds.
@@ -149,46 +157,10 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
   void testBindJobIdFailsWhenBoundToDifferentJob() {
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
-    OccupancyClaim claim = actions.insertInFlight(32L, 42L, config);
+    OccupancyClaim claim =
+        actions.tryAcquireInFlight(32L, 42L, config.claimTimeoutMs()).orElseThrow();
     actions.bindJobId(claim, 5200L);
     Assertions.assertThrows(IllegalStateException.class, () -> actions.bindJobId(claim, 5201L));
-  }
-
-  @TestTemplate
-  void testBindJobIdIfUnboundLazyBindsSoleClaim() {
-    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
-    long tableId = 33L;
-    long policyId = 43L;
-    long jobId = 5300L;
-    actions.insertInFlight(tableId, policyId, config);
-
-    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, policyId, jobId));
-    Assertions.assertEquals(
-        jobId, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId).jobId());
-    // Already bound to same job — still reports success via idempotent bind.
-    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, policyId, jobId));
-  }
-
-  @TestTemplate
-  void testBindJobIdIfUnboundDisambiguatesPoliciesOnSameTable() {
-    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    TableMaintenanceConfig config = TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10);
-    long tableId = 34L;
-    long policyA = 44L;
-    long policyB = 45L;
-    long jobId = 5400L;
-    // Two policies → two soft slots on the same table; policyId selects which claim to bind.
-    actions.insertInFlight(tableId, policyA, config);
-    actions.insertInFlight(tableId, policyB, config);
-
-    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, policyA, jobId));
-    Assertions.assertEquals(
-        jobId, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyA).jobId());
-    Assertions.assertNull(actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB));
-    Assertions.assertTrue(actions.bindJobIdIfUnbound(tableId, policyB, jobId));
-    Assertions.assertEquals(
-        jobId, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB).jobId());
   }
 
   @TestTemplate
@@ -199,8 +171,10 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long policyA = 46L;
     long policyB = 47L;
     long jobId = 5600L;
-    OccupancyClaim claimA = actions.insertInFlight(tableId, policyA, config);
-    OccupancyClaim claimB = actions.insertInFlight(tableId, policyB, config);
+    OccupancyClaim claimA =
+        actions.tryAcquireInFlight(tableId, policyA, config.claimTimeoutMs()).orElseThrow();
+    OccupancyClaim claimB =
+        actions.tryAcquireInFlight(tableId, policyB, config.claimTimeoutMs()).orElseThrow();
     actions.bindJobId(claimA, jobId);
     actions.bindJobId(claimB, jobId);
 
@@ -217,12 +191,6 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
         finishedAt, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyA).finishedAt());
     Assertions.assertEquals(
         0L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB).finishedAt());
-  }
-
-  @TestTemplate
-  void testBindJobIdIfUnboundReturnsFalseWhenNoClaim() {
-    TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    Assertions.assertFalse(actions.bindJobIdIfUnbound(35L, 55L, 5500L));
   }
 
   @TestTemplate

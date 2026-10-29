@@ -132,8 +132,12 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     OccupancyClaim claim =
-        actions.insertInFlight(
-            tableId, policyId, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
+        actions
+            .tryAcquireInFlight(
+                tableId,
+                policyId,
+                TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10).claimTimeoutMs())
+            .orElseThrow();
     assertNotNull(claim);
 
     String beforeBody =

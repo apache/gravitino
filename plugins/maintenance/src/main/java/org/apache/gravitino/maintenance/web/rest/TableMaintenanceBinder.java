@@ -26,6 +26,6 @@ public class TableMaintenanceBinder extends AbstractBinder {
 
   @Override
   protected void configure() {
-    bind(MaintenanceMetricsManager.create()).to(MaintenanceMetricsManager.class);
+    bind(MaintenanceMetricsManager.getInstance()).to(MaintenanceMetricsManager.class);
   }
 }

@@ -131,11 +131,12 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
             config.expandEnqueueBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);
 
+    MaintenanceJobManager jobManager = MaintenanceJobManager.getInstance();
     MaintenanceSparkSubmitPipeline cronSubmit =
         new MaintenanceSparkSubmitPipeline(
             occupancyGate::isInFlight,
             TableMaintenanceActionMetaService.getInstance(),
-            MaintenanceJobManager.create(),
+            jobManager,
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     CRON_SUBMIT.set(cronSubmit::submit);
@@ -144,7 +145,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         new MaintenanceCommitSubmitPipeline(
             CommitOccupancyGate.of(occupancyGate),
             TableMaintenanceActionMetaService.getInstance(),
-            MaintenanceJobManager.create(),
+            jobManager,
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     COMMIT_SUBMIT.set(commitSubmit::submit);

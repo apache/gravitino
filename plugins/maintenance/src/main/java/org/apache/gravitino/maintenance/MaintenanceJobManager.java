@@ -45,32 +45,31 @@ public class MaintenanceJobManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceJobManager.class);
 
+  private static final TableMaintenanceActionMetaService ACTION_SERVICE =
+      TableMaintenanceActionMetaService.getInstance();
+
+  private static volatile MaintenanceJobManager instance;
+
   private final JobOperationDispatcher jobOperationDispatcher;
-  private final TableMaintenanceActionMetaService actionService;
 
   /**
-   * Production wiring.
+   * Returns the shared TMS job manager for the server process.
    *
-   * @return manager bound to {@link GravitinoEnv#jobOperationDispatcher()} and the action meta
-   *     singleton
+   * @return singleton manager
    */
-  public static MaintenanceJobManager create() {
-    return new MaintenanceJobManager(
-        GravitinoEnv.getInstance().jobOperationDispatcher(),
-        TableMaintenanceActionMetaService.getInstance());
+  public static MaintenanceJobManager getInstance() {
+    if (instance == null) {
+      synchronized (MaintenanceJobManager.class) {
+        if (instance == null) {
+          instance = new MaintenanceJobManager(GravitinoEnv.getInstance().jobOperationDispatcher());
+        }
+      }
+    }
+    return instance;
   }
 
-  /**
-   * Creates a manager with explicit collaborators.
-   *
-   * @param jobOperationDispatcher Gravitino job run / cancel entry point
-   * @param actionService soft-slot bind / release
-   */
-  public MaintenanceJobManager(
-      JobOperationDispatcher jobOperationDispatcher,
-      TableMaintenanceActionMetaService actionService) {
+  private MaintenanceJobManager(JobOperationDispatcher jobOperationDispatcher) {
     this.jobOperationDispatcher = jobOperationDispatcher;
-    this.actionService = actionService;
   }
 
   /**
@@ -98,7 +97,7 @@ public class MaintenanceJobManager {
           jobOperationDispatcher.runJob(
               metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
       jobId = job.id();
-      actionService.bindJobIds(claims, jobId);
+      ACTION_SERVICE.bindJobIds(claims, jobId);
       return Optional.of(jobId);
     } catch (RuntimeException e) {
       if (jobId != null) {
@@ -113,7 +112,7 @@ public class MaintenanceJobManager {
         }
       }
       try {
-        actionService.deleteClaims(claims);
+        ACTION_SERVICE.deleteClaims(claims);
       } catch (RuntimeException releaseError) {
         LOG.warn("Failed to release occupancy claims after submit failure", releaseError);
       }

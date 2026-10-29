@@ -51,8 +51,10 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
 
     OccupancyClaim claim =
-        actions.insertInFlight(
-            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+        actions
+            .tryAcquireInFlight(
+                table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS)
+            .orElseThrow();
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
 
     actions.bindJobId(claim, 7001L);
@@ -80,8 +82,10 @@ class TestOccupancyGate extends TestJDBCBackend {
     long policyId = insertPolicy(metalakeName, "occ-policy-2").id();
 
     OccupancyClaim claim =
-        actions.insertInFlight(
-            table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
+        actions
+            .tryAcquireInFlight(
+                table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS)
+            .orElseThrow();
     long jobId = 8001L;
     actions.bindJobId(claim, jobId);
     long finishedAt = 1_700_000_000_000L;
@@ -106,7 +110,8 @@ class TestOccupancyGate extends TestJDBCBackend {
     OccupancyGate gate = new OccupancyGate(actions, claimTimeoutMs);
     long policyId = insertPolicy(metalakeName, "occ-policy-3").id();
 
-    OccupancyClaim claim = actions.insertInFlight(table.id(), policyId, claimTimeoutMs);
+    OccupancyClaim claim =
+        actions.tryAcquireInFlight(table.id(), policyId, claimTimeoutMs).orElseThrow();
     Assertions.assertTrue(actions.hasLiveUnboundClaim(table.id(), policyId, claimTimeoutMs));
     Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
 
