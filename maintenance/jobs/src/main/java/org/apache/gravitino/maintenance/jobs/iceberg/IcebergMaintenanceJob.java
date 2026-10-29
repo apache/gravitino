@@ -154,8 +154,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         .withClassName(IcebergMaintenanceJob.class.getName())
         .withArguments(buildArguments())
         .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
-        .withCustomFields(
-            Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v1"))
         .build();
   }
 

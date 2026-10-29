@@ -71,11 +71,13 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
       return false;
     }
 
+    // Version is optional; when present it must match v\\d+ (legacy built-in templates).
     Optional<String> version =
         Optional.ofNullable(template.customFields())
             .map(fields -> fields.get(JobTemplateProvider.PROPERTY_VERSION_KEY));
-    if (!version.isPresent() || !VERSION_PATTERN.matcher(version.get()).matches()) {
-      LOG.warn("Skip built-in job template {} without valid version", template.name());
+    if (version.isPresent() && !VERSION_PATTERN.matcher(version.get()).matches()) {
+      LOG.warn(
+          "Skip built-in job template {} with invalid version {}", template.name(), version.get());
       return false;
     }
 

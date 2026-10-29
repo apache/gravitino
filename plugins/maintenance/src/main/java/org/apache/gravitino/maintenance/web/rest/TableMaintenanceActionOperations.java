@@ -35,7 +35,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.dto.responses.BaseResponse;
-import org.apache.gravitino.maintenance.MaintenanceMetricsService;
+import org.apache.gravitino.maintenance.MaintenanceMetricsManager;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.web.TableMaintenanceRESTUtils;
@@ -61,18 +61,18 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 @Produces("application/vnd.gravitino.v1+json")
 public class TableMaintenanceActionOperations {
 
-  private final MaintenanceMetricsService metricsService;
+  private final MaintenanceMetricsManager metricsManager;
 
   @Context private HttpServletRequest httpRequest;
 
   /**
    * Creates the resource.
    *
-   * @param metricsService metrics report domain service
+   * @param metricsManager metrics report manager
    */
   @Inject
-  public TableMaintenanceActionOperations(MaintenanceMetricsService metricsService) {
-    this.metricsService = metricsService;
+  public TableMaintenanceActionOperations(MaintenanceMetricsManager metricsManager) {
+    this.metricsManager = metricsManager;
   }
 
   /**
@@ -101,7 +101,7 @@ public class TableMaintenanceActionOperations {
         httpRequest,
         () -> {
           requireBody(request);
-          metricsService.reportBeforeMetrics(metalake, actionId, finish, request);
+          metricsManager.reportBeforeMetrics(metalake, actionId, finish, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
         "report-before-metrics",
@@ -135,7 +135,7 @@ public class TableMaintenanceActionOperations {
         httpRequest,
         () -> {
           requireBody(request);
-          metricsService.reportAfterMetrics(metalake, actionId, finish, request);
+          metricsManager.reportAfterMetrics(metalake, actionId, finish, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
         "report-after-metrics",
@@ -165,7 +165,7 @@ public class TableMaintenanceActionOperations {
         httpRequest,
         () -> {
           requireBody(request);
-          metricsService.finishAction(metalake, actionId, request);
+          metricsManager.finishAction(metalake, actionId, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
         "finish",
