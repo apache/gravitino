@@ -300,6 +300,10 @@ Both can write bindings. The server checks each term in the request separately:
 
 - A user with `MANAGE_DEFINITIONS` on the metalake or on one of the term's domains sets the status
   with `PATCH`. Edits take effect at once in any status, and are audited.
+- **Why three states**: each term is reviewed on its own, so `APPROVED` records that a reviewer
+  accepted it. Bindings and people keep using a term after it is replaced, so `DEPRECATED` keeps it
+  readable, which a delete cannot do. A domain or an ontology (#14310) is published as a whole and
+  has no review per item, so `DRAFT` / `PUBLISHED` is enough there.
 - **Every API shows the same terms** (REST, clients, MCP). If the caller cannot see a term, lists
   leave it out and get returns 404. The same rule applies inside responses. The `broader`,
   `narrower` and `related` lists of a term, the terms of an object, and the terms of a domain all
@@ -580,8 +584,14 @@ tools of #13867, an agent can go from a domain to its terms, and then to the dat
 
 1. **Domain membership of terms**: Option A (recommended) or Option B? This needs agreement with
    the Domain design.
-2. **One privilege set**: #13867 uses `MANAGE_DOMAIN` / `USE_DOMAIN` for domains. Should domains
-   and terms use the same definition privileges instead?
+2. **Privileges**: two parts, to be agreed with the Domain design (#13867).
+   - **Names**: general names (`*_DEFINITION`), so other business-definition objects can use them
+     too? Or term names (`CREATE_TERM` / `USE_TERM` / `MODIFY_TERM` with `OWNER`), the same shape as
+     the Semantic Model privileges?
+   - **Where they are granted**: on the metalake and on domains, as in this design? Or on the
+     metalake only, with `USE_DOMAIN` to see a domain's terms and `MANAGE_DOMAIN` to approve them?
+     The second way needs one privilege set fewer. But on a domain, it cannot let a user create
+     terms without also letting them approve terms.
 3. **Default read access**: everyone should be able to read terms by default. But Gravitino has no
    built-in role for all users. Should we add one (for example `PUBLIC`) with `VIEW_DEFINITION` on
    the metalake, or should admins grant it?
