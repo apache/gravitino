@@ -47,6 +47,7 @@ from tests.unittests.auth.mock_base import (
     GENERATED_TIME,
     mock_authentication_with_error_authentication_type,
     mock_authentication_invalid_grant_error,
+    mock_token_response,
 )
 
 # pylint: disable=protected-access,too-many-lines,too-many-locals
@@ -73,7 +74,8 @@ class TestLocalFilesystem(unittest.TestCase):
     _server_uri = "http://localhost:9090"
     _local_base_dir_path: str = "file:/tmp/fileset"
     _fileset_dir: str = (
-        f"{_local_base_dir_path}/{generate_unique_random_string(10)}/fileset_catalog/tmp"
+        f"{_local_base_dir_path}/{generate_unique_random_string(10)}"
+        "/fileset_catalog/tmp"
     )
 
     def setUp(self) -> None:
@@ -233,11 +235,8 @@ class TestLocalFilesystem(unittest.TestCase):
             sub="gravitino", exp=GENERATED_TIME + 10000, aud="service1"
         )
         with patch(
-            "gravitino.auth.default_oauth2_token_provider.DefaultOAuth2TokenProvider._get_access_token",
-            return_value=mocked_jwt,
-        ), patch(
-            "gravitino.auth.default_oauth2_token_provider.DefaultOAuth2TokenProvider._fetch_token",
-            return_value=mocked_jwt,
+            "gravitino.utils.http_client.HTTPClient.post_form",
+            return_value=mock_token_response(mocked_jwt, expires_in=3600),
         ):
             fileset_storage_location = f"{self._fileset_dir}/test_oauth2_auth"
             fileset_virtual_location = "fileset/fileset_catalog/tmp/test_oauth2_auth"

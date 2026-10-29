@@ -119,6 +119,24 @@ def mock_authentication_with_non_jwt():
     )
 
 
+def mock_token_response(token, **metadata):
+    """Build a token response without depending on the module-import clock."""
+    return TestResponse(
+        body=json.dumps(
+            {
+                "code": 0,
+                "access_token": token,
+                "token_type": "bearer",
+                "issued_token_type": None,
+                "scope": "test",
+                "refresh_token": None,
+                **metadata,
+            }
+        ).encode("utf-8"),
+        status_code=HTTPStatus.OK.value,
+    )
+
+
 def mock_jwt(sub, exp, aud):
     return jwt.encode(
         TestJWT(sub, exp, aud).to_dict(),
