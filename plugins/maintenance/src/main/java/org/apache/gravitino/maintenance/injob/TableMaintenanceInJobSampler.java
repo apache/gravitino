@@ -19,12 +19,13 @@
 package org.apache.gravitino.maintenance.injob;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
 
 /**
  * In-Spark sampling path for cron jobs (§5.2.2): sample once at {@code S0}, persist metrics, record
- * {@code before_snapshot_id}, then gate on snapshot drift without re-sampling.
+ * {@code before_metrics_id}, then gate on snapshot drift without re-sampling.
  */
 public class TableMaintenanceInJobSampler {
 
@@ -50,7 +51,7 @@ public class TableMaintenanceInJobSampler {
   }
 
   /**
-   * Persists metrics for {@code S0}, sets {@code before_snapshot_id} on the maintenance action row,
+   * Persists metrics for {@code S0}, sets {@code before_metrics_id} on the maintenance action row,
    * and returns whether the cron Spark Job should continue.
    *
    * <p>If HEAD has drifted after the sample, the caller must end the job early and must not
@@ -74,8 +75,17 @@ public class TableMaintenanceInJobSampler {
     Preconditions.checkNotNull(metricsJson, "metricsJson");
     Preconditions.checkNotNull(head, "head");
 
-    metricsMetaService.insertMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
-    actionMetaService.recordBeforeSnapshot(jobId, tableId, policyId, sampledSnapshotId);
+    TableMaintenanceActionPO action =
+        actionMetaService.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+    Preconditions.checkState(action != null, "no maintenance action for job %s", jobId);
+    long metricsId;
+    if (action.beforeMetricsId() != null) {
+      metricsId = action.beforeMetricsId();
+    } else {
+      metricsId =
+          metricsMetaService.insertMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
+      actionMetaService.recordBeforeMetrics(jobId, tableId, policyId, metricsId);
+    }
 
     long headSnapshotId = head.currentSnapshotId();
     if (sampledSnapshotId != headSnapshotId) {

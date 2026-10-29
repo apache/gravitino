@@ -52,10 +52,11 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
 
     Assertions.assertTrue(outcome.continueMaintenance());
     Assertions.assertNull(outcome.stopReason());
-    TableSnapshotMetricsPO stored = metricsMetaService.getMetrics(1L, 2L, 100L);
+    long metricsId = actionMetaService.getByJobId(jobId).beforeMetricsId();
+    TableSnapshotMetricsPO stored = metricsMetaService.getMetrics(metricsId);
     Assertions.assertNotNull(stored);
     Assertions.assertEquals(METRICS_JSON, stored.metricsValue());
-    Assertions.assertEquals(100L, actionMetaService.getByJobId(jobId).beforeSnapshotId());
+    Assertions.assertEquals(100L, stored.snapshotId());
   }
 
   @TestTemplate
@@ -69,7 +70,8 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
     Assertions.assertEquals(InJobGateOutcome.StopReason.SNAPSHOT_DRIFT, outcome.stopReason());
     Assertions.assertEquals(200L, outcome.sampledSnapshotId());
     Assertions.assertEquals(201L, outcome.headSnapshotId());
-    Assertions.assertNotNull(metricsMetaService.getMetrics(3L, 4L, 200L));
+    long metricsId = actionMetaService.getByJobId(jobId).beforeMetricsId();
+    Assertions.assertNotNull(metricsMetaService.getMetrics(metricsId));
   }
 
   @TestTemplate
@@ -78,14 +80,14 @@ class TestTableMaintenanceInJobSampler extends TestJDBCBackend {
     insertBoundAction(jobId, 5L, 6L);
     InJobGateOutcome first =
         sampler.sampleAndGateCronJob(jobId, 5L, 6L, 300L, METRICS_JSON, () -> 300L);
+    long metricsId = actionMetaService.getByJobId(jobId).beforeMetricsId();
     InJobGateOutcome retry =
         sampler.sampleAndGateCronJob(jobId, 5L, 6L, 300L, "{\"mse\":9}", () -> 300L);
 
     Assertions.assertTrue(first.continueMaintenance());
     Assertions.assertTrue(retry.continueMaintenance());
-    Assertions.assertEquals(
-        METRICS_JSON, metricsMetaService.getMetrics(5L, 6L, 300L).metricsValue());
-    Assertions.assertEquals(300L, actionMetaService.getByJobId(jobId).beforeSnapshotId());
+    Assertions.assertEquals(metricsId, actionMetaService.getByJobId(jobId).beforeMetricsId());
+    Assertions.assertEquals(METRICS_JSON, metricsMetaService.getMetrics(metricsId).metricsValue());
   }
 
   @TestTemplate

@@ -55,31 +55,33 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     Assertions.assertEquals(jobId, actionService.getByJobIdAndTableId(jobId, tableId).jobId());
     Assertions.assertEquals(0L, actionService.getByJobIdAndTableId(jobId, tableId).finishedAt());
 
-    actionService.recordBeforeSnapshot(jobId, tableId, policyId, 100L);
+    long beforeMetricsId = metricsService.insertMetrics(tableId, policyId, 100L, "{\"mse\":1}");
+    actionService.recordBeforeMetrics(jobId, tableId, policyId, beforeMetricsId);
     Assertions.assertEquals(
-        100L, actionService.getByJobIdAndTableId(jobId, tableId).beforeSnapshotId());
-    actionService.recordBeforeSnapshot(jobId, tableId, policyId, 100L);
+        beforeMetricsId, actionService.getByJobIdAndTableId(jobId, tableId).beforeMetricsId());
+    actionService.recordBeforeMetrics(jobId, tableId, policyId, beforeMetricsId);
     Assertions.assertEquals(
-        100L, actionService.getByJobIdAndTableId(jobId, tableId).beforeSnapshotId());
+        beforeMetricsId, actionService.getByJobIdAndTableId(jobId, tableId).beforeMetricsId());
     Assertions.assertThrows(
         IllegalStateException.class,
-        () -> actionService.recordBeforeSnapshot(jobId, tableId, policyId, 101L));
+        () -> actionService.recordBeforeMetrics(jobId, tableId, policyId, beforeMetricsId + 1));
 
-    metricsService.insertMetrics(tableId, policyId, 100L, "{\"mse\":1}");
-    actionService.markFinished(jobId, tableId, policyId, 200L, System.currentTimeMillis());
+    long afterMetricsId = metricsService.insertMetrics(tableId, policyId, 200L, "{\"mse\":2}");
+    actionService.markFinished(
+        jobId, tableId, policyId, afterMetricsId, System.currentTimeMillis());
     Assertions.assertThrows(
         IllegalStateException.class,
         () ->
-            actionService.markFinished(jobId, tableId, policyId, 201L, System.currentTimeMillis()));
-    metricsService.insertMetrics(tableId, policyId, 200L, "{\"mse\":2}");
+            actionService.markFinished(
+                jobId, tableId, policyId, afterMetricsId + 1, System.currentTimeMillis()));
 
     actionService.deleteByJobId(jobId);
 
     Assertions.assertTrue(actionService.listByJobId(jobId).isEmpty());
     Assertions.assertEquals(
-        "{\"mse\":1}", metricsService.getMetrics(tableId, policyId, 100L).metricsValue());
+        "{\"mse\":1}", metricsService.getMetrics(beforeMetricsId).metricsValue());
     Assertions.assertEquals(
-        "{\"mse\":2}", metricsService.getMetrics(tableId, policyId, 200L).metricsValue());
+        "{\"mse\":2}", metricsService.getMetrics(afterMetricsId).metricsValue());
   }
 
   @TestTemplate
@@ -95,8 +97,8 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     Assertions.assertEquals(2, actions.listByJobId(jobId).size());
     Assertions.assertThrows(IllegalStateException.class, () -> actions.getByJobId(jobId));
 
-    actions.recordBeforeSnapshot(jobId, 101L, 201L, 11L);
-    actions.recordBeforeSnapshot(jobId, 102L, 202L, 22L);
+    actions.recordBeforeMetrics(jobId, 101L, 201L, 11L);
+    actions.recordBeforeMetrics(jobId, 102L, 202L, 22L);
 
     long finishedAtA = System.currentTimeMillis();
     actions.markFinished(jobId, 101L, 201L, null, finishedAtA);
@@ -106,13 +108,13 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     long finishedAtB = finishedAtA + 10;
     actions.markFinished(jobId, 102L, 202L, 33L, finishedAtB);
     Assertions.assertEquals(finishedAtB, actions.getByJobIdAndTableId(jobId, 102L).finishedAt());
-    Assertions.assertEquals(33L, actions.getByJobIdAndTableId(jobId, 102L).afterSnapshotId());
+    Assertions.assertEquals(33L, actions.getByJobIdAndTableId(jobId, 102L).afterMetricsId());
     // Idempotent null-after finish for already closed A.
     actions.markFinished(jobId, 101L, 201L, null, finishedAtA + 1);
   }
 
   @TestTemplate
-  void testMarkFinishedBackfillsAfterSnapshotWhenAlreadyClosed() {
+  void testMarkFinishedBackfillsAfterMetricsWhenAlreadyClosed() {
     TableMaintenanceActionMetaService actionService =
         TableMaintenanceActionMetaService.getInstance();
     long jobId = 1999L;
@@ -122,17 +124,17 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
         actionService.insertInFlight(
             tableId, policyId, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
     actionService.bindJobId(claim, jobId);
-    actionService.recordBeforeSnapshot(jobId, tableId, policyId, 100L);
+    actionService.recordBeforeMetrics(jobId, tableId, policyId, 100L);
 
     long reclaimFinishedAt = System.currentTimeMillis();
     actionService.markFinished(jobId, tableId, policyId, null, reclaimFinishedAt);
     Assertions.assertEquals(
         reclaimFinishedAt, actionService.getByJobIdAndTableId(jobId, tableId).finishedAt());
-    Assertions.assertNull(actionService.getByJobIdAndTableId(jobId, tableId).afterSnapshotId());
+    Assertions.assertNull(actionService.getByJobIdAndTableId(jobId, tableId).afterMetricsId());
 
     actionService.markFinished(jobId, tableId, policyId, 200L, System.currentTimeMillis());
     Assertions.assertEquals(
-        200L, actionService.getByJobIdAndTableId(jobId, tableId).afterSnapshotId());
+        200L, actionService.getByJobIdAndTableId(jobId, tableId).afterMetricsId());
     Assertions.assertEquals(
         reclaimFinishedAt, actionService.getByJobIdAndTableId(jobId, tableId).finishedAt());
     Assertions.assertThrows(
@@ -232,12 +234,12 @@ class TestTableMaintenanceActionMetaService extends TestJDBCBackend {
     actions.bindJobId(claimA, jobId);
     actions.bindJobId(claimB, jobId);
 
-    actions.recordBeforeSnapshot(jobId, tableId, policyA, 11L);
-    actions.recordBeforeSnapshot(jobId, tableId, policyB, 22L);
+    actions.recordBeforeMetrics(jobId, tableId, policyA, 11L);
+    actions.recordBeforeMetrics(jobId, tableId, policyB, 22L);
     Assertions.assertEquals(
-        11L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyA).beforeSnapshotId());
+        11L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyA).beforeMetricsId());
     Assertions.assertEquals(
-        22L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB).beforeSnapshotId());
+        22L, actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyB).beforeMetricsId());
 
     long finishedAt = System.currentTimeMillis();
     actions.markFinished(jobId, tableId, policyA, null, finishedAt);

@@ -76,7 +76,7 @@ public class TableMaintenanceActionOperations {
   }
 
   /**
-   * Persists S0 metrics and {@code before_snapshot_id} for the action bound to {@code jobId}.
+   * Persists S0 metrics and {@code before_metrics_id} for the action bound to {@code jobId}.
    *
    * @param metalake metalake name from the request path
    * @param jobId Gravitino job run id bound to the action

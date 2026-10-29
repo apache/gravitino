@@ -225,7 +225,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
             for (int i = 0; i < types.size(); i++) {
               MaintenanceType type = types.get(i);
               long policyId = policyIds.get(i);
-              Long afterSnapshotId = null;
               try {
                 SnapshotSample s0 =
                     sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
@@ -258,10 +257,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                 runProcedure(spark, type, table.catalogName, table.tableIdentifier, argMap);
                 SnapshotSample s1 =
                     sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
-                afterSnapshotId = s1.snapshotId;
                 reportMetricsQuietly(client, jobId, table.tableId, policyId, s1, /*after=*/ true);
               } finally {
-                finishQuietly(client, jobId, table.tableId, policyId, afterSnapshotId);
+                finishQuietly(client, jobId, table.tableId, policyId);
                 finishedSlots.add(slotKey(table.tableId, policyId));
               }
             }
@@ -274,7 +272,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           for (TableTarget table : tables) {
             for (long policyId : policyIds) {
               if (!finishedSlots.contains(slotKey(table.tableId, policyId))) {
-                finishQuietly(client, jobId, table.tableId, policyId, /*afterSnapshotId=*/ null);
+                finishQuietly(client, jobId, table.tableId, policyId);
               }
             }
           }
@@ -555,20 +553,15 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   private static void finishQuietly(
-      MaintenanceActionHttpClient client,
-      long jobId,
-      long tableId,
-      long policyId,
-      @Nullable Long afterSnapshotId) {
+      MaintenanceActionHttpClient client, long jobId, long tableId, long policyId) {
     try {
-      client.finish(jobId, new MaintenanceActionFinishRequest(tableId, policyId, afterSnapshotId));
+      client.finish(jobId, new MaintenanceActionFinishRequest(tableId, policyId));
     } catch (Exception e) {
       LOG.warn(
-          "Best-effort TMS finish failed for job {} table {} policy {} afterSnapshotId={}",
+          "Best-effort TMS finish failed for job {} table {} policy {}",
           jobId,
           tableId,
           policyId,
-          afterSnapshotId,
           e);
     }
   }

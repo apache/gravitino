@@ -149,13 +149,18 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
         actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
     assertNotNull(afterBefore);
     assertEquals(jobId, afterBefore.jobId());
-    assertEquals(100L, afterBefore.beforeSnapshotId());
+    assertNotNull(afterBefore.beforeMetricsId());
     assertEquals(0L, afterBefore.finishedAt());
     assertEquals(
         "{\"mse\":1}",
         TableSnapshotMetricsMetaService.getInstance()
-            .getMetrics(tableId, policyId, 100L)
+            .getMetrics(afterBefore.beforeMetricsId())
             .metricsValue());
+    assertEquals(
+        100L,
+        TableSnapshotMetricsMetaService.getInstance()
+            .getMetrics(afterBefore.beforeMetricsId())
+            .snapshotId());
 
     String afterBody =
         "{\"tableId\":"
@@ -170,13 +175,18 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
     TableMaintenanceActionPO finished =
         actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
     assertNotNull(finished);
-    assertEquals(200L, finished.afterSnapshotId());
+    assertNotNull(finished.afterMetricsId());
     assertTrue(finished.finishedAt() > 0L);
     assertEquals(
         "{\"mse\":2}",
         TableSnapshotMetricsMetaService.getInstance()
-            .getMetrics(tableId, policyId, 200L)
+            .getMetrics(finished.afterMetricsId())
             .metricsValue());
+    assertEquals(
+        200L,
+        TableSnapshotMetricsMetaService.getInstance()
+            .getMetrics(finished.afterMetricsId())
+            .snapshotId());
   }
 
   private static String actionPath(long jobId, String suffix) {

@@ -98,29 +98,38 @@ public interface TableMaintenanceActionMapper {
 
   @UpdateProvider(
       type = TableMaintenanceActionSQLProviderFactory.class,
-      method = "updateBeforeSnapshot")
-  int updateBeforeSnapshot(
+      method = "updateBeforeMetrics")
+  int updateBeforeMetrics(
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("beforeSnapshotId") long beforeSnapshotId);
+      @Param("beforeMetricsId") long beforeMetricsId);
+
+  @UpdateProvider(
+      type = TableMaintenanceActionSQLProviderFactory.class,
+      method = "updateAfterMetrics")
+  int updateAfterMetrics(
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterMetricsId") long afterMetricsId);
 
   @UpdateProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "markFinished")
   int markFinished(
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterSnapshotId") Long afterSnapshotId,
+      @Param("afterMetricsId") Long afterMetricsId,
       @Param("finishedAt") long finishedAt);
 
   @UpdateProvider(
       type = TableMaintenanceActionSQLProviderFactory.class,
-      method = "backfillAfterSnapshot")
-  int backfillAfterSnapshot(
+      method = "backfillAfterMetrics")
+  int backfillAfterMetrics(
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterSnapshotId") long afterSnapshotId);
+      @Param("afterMetricsId") long afterMetricsId);
 
   @DeleteProvider(type = TableMaintenanceActionSQLProviderFactory.class, method = "deleteById")
   int deleteById(@Param("id") long id);

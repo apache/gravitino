@@ -167,22 +167,37 @@ public class TableMaintenanceActionSQLProviderFactory {
    * @param jobId job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param beforeSnapshotId snapshot id
+   * @param beforeMetricsId S0 metrics row id
    * @return UPDATE statement
    */
-  public static String updateBeforeSnapshot(
+  public static String updateBeforeMetrics(
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("beforeSnapshotId") long beforeSnapshotId) {
-    return getProvider().updateBeforeSnapshot(jobId, tableId, policyId, beforeSnapshotId);
+      @Param("beforeMetricsId") long beforeMetricsId) {
+    return getProvider().updateBeforeMetrics(jobId, tableId, policyId, beforeMetricsId);
   }
 
   /**
    * @param jobId job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param afterSnapshotId after snapshot
+   * @param afterMetricsId S1 metrics row id
+   * @return UPDATE statement
+   */
+  public static String updateAfterMetrics(
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterMetricsId") long afterMetricsId) {
+    return getProvider().updateAfterMetrics(jobId, tableId, policyId, afterMetricsId);
+  }
+
+  /**
+   * @param jobId job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param afterMetricsId after metrics row id, or null
    * @param finishedAt finish millis
    * @return UPDATE statement
    */
@@ -190,24 +205,24 @@ public class TableMaintenanceActionSQLProviderFactory {
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterSnapshotId") Long afterSnapshotId,
+      @Param("afterMetricsId") Long afterMetricsId,
       @Param("finishedAt") long finishedAt) {
-    return getProvider().markFinished(jobId, tableId, policyId, afterSnapshotId, finishedAt);
+    return getProvider().markFinished(jobId, tableId, policyId, afterMetricsId, finishedAt);
   }
 
   /**
    * @param jobId job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param afterSnapshotId after snapshot
+   * @param afterMetricsId after metrics row id
    * @return UPDATE statement
    */
-  public static String backfillAfterSnapshot(
+  public static String backfillAfterMetrics(
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterSnapshotId") long afterSnapshotId) {
-    return getProvider().backfillAfterSnapshot(jobId, tableId, policyId, afterSnapshotId);
+      @Param("afterMetricsId") long afterMetricsId) {
+    return getProvider().backfillAfterMetrics(jobId, tableId, policyId, afterMetricsId);
   }
 
   /**

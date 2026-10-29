@@ -205,29 +205,52 @@ public class TableMaintenanceActionBaseSQLProvider {
   }
 
   /**
-   * Sets {@code before_snapshot_id} when {@code S0} is sampled ({@code IS NULL} first write).
+   * Sets {@code before_metrics_id} when {@code S0} is sampled ({@code IS NULL} first write).
    * Callers treat an already-matching value as an idempotent no-op in Java.
    *
    * @param jobId Gravitino job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param beforeSnapshotId sampled snapshot id
+   * @param beforeMetricsId {@code table_snapshot_metrics.metrics_id} for the S0 sample
    * @return UPDATE statement
    */
-  public String updateBeforeSnapshot(
+  public String updateBeforeMetrics(
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("beforeSnapshotId") long beforeSnapshotId) {
+      @Param("beforeMetricsId") long beforeMetricsId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET before_snapshot_id = #{beforeSnapshotId}"
+        + " SET before_metrics_id = #{beforeMetricsId}"
         + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND before_snapshot_id IS NULL AND finished_at = 0";
+        + " AND before_metrics_id IS NULL AND finished_at = 0";
   }
 
   /**
-   * Sets terminal snapshot pointers for one bound table/policy row and releases its soft slot.
+   * Sets {@code after_metrics_id} when {@code S1} is sampled ({@code IS NULL} first write) while
+   * the soft slot is still open.
+   *
+   * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param afterMetricsId {@code table_snapshot_metrics.metrics_id} for the S1 sample
+   * @return UPDATE statement
+   */
+  public String updateAfterMetrics(
+      @Param("jobId") long jobId,
+      @Param("tableId") long tableId,
+      @Param("policyId") long policyId,
+      @Param("afterMetricsId") long afterMetricsId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET after_metrics_id = #{afterMetricsId}"
+        + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
+        + " AND after_metrics_id IS NULL AND finished_at = 0";
+  }
+
+  /**
+   * Releases the soft slot for one bound table/policy row. Optionally stores {@code
+   * after_metrics_id} when finishing together with the S1 sample.
    *
    * <p>Only one in-flight row exists per {@code (table_id, policy_id)} ({@code finished_at = 0}),
    * so finish timestamps do not contend across concurrent submitters.
@@ -235,7 +258,7 @@ public class TableMaintenanceActionBaseSQLProvider {
    * @param jobId Gravitino job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param afterSnapshotId terminal snapshot id
+   * @param afterMetricsId terminal metrics row id, or null when releasing without an S1
    * @param finishedAt finish time millis; must be {@code > 0}
    * @return UPDATE statement
    */
@@ -243,35 +266,36 @@ public class TableMaintenanceActionBaseSQLProvider {
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterSnapshotId") Long afterSnapshotId,
+      @Param("afterMetricsId") Long afterMetricsId,
       @Param("finishedAt") long finishedAt) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET after_snapshot_id = #{afterSnapshotId}, finished_at = #{finishedAt}"
+        + " SET after_metrics_id = COALESCE(#{afterMetricsId}, after_metrics_id),"
+        + " finished_at = #{finishedAt}"
         + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
         + " AND finished_at = 0";
   }
 
   /**
-   * Backfills a real S1 after failsafe reclaim closed the soft slot with {@code after_snapshot_id}
-   * still null (finish listener raced after reclaim).
+   * Backfills {@code after_metrics_id} after failsafe reclaim closed the soft slot with a null
+   * after metrics pointer.
    *
    * @param jobId Gravitino job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param afterSnapshotId terminal snapshot id; must be non-null
+   * @param afterMetricsId terminal metrics row id; must be non-null
    * @return UPDATE statement
    */
-  public String backfillAfterSnapshot(
+  public String backfillAfterMetrics(
       @Param("jobId") long jobId,
       @Param("tableId") long tableId,
       @Param("policyId") long policyId,
-      @Param("afterSnapshotId") long afterSnapshotId) {
+      @Param("afterMetricsId") long afterMetricsId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET after_snapshot_id = #{afterSnapshotId}"
+        + " SET after_metrics_id = #{afterMetricsId}"
         + " WHERE job_id = #{jobId} AND table_id = #{tableId} AND policy_id = #{policyId}"
-        + " AND finished_at > 0 AND after_snapshot_id IS NULL";
+        + " AND finished_at > 0 AND after_metrics_id IS NULL";
   }
 
   /**
@@ -335,8 +359,8 @@ public class TableMaintenanceActionBaseSQLProvider {
 
   private static String selectColumns() {
     return "SELECT id, job_id AS jobId, table_id AS tableId, policy_id AS policyId,"
-        + " before_snapshot_id AS beforeSnapshotId, after_snapshot_id AS afterSnapshotId,"
-        + " finished_at AS finishedAt, created_at AS createdAt FROM "
+        + " before_metrics_id AS beforeMetricsId, after_metrics_id AS afterMetricsId,"
+        + " created_at AS createdAt, finished_at AS finishedAt FROM "
         + TABLE_NAME;
   }
 }

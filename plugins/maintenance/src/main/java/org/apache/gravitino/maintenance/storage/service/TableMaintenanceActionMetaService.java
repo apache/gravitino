@@ -455,24 +455,24 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Records the sampled Iceberg snapshot id ({@code S0}) for a running action on one table/policy.
+   * Records the S0 metrics row id for a running action on one table/policy.
    *
-   * <p>Safe to retry with the same {@code beforeSnapshotId} (cron / in-job re-entry after a partial
-   * sample). A different snapshot id on an already-set row fails.
+   * <p>Safe to retry with the same {@code beforeMetricsId}. A different metrics id on an
+   * already-set row fails.
    *
    * @param jobId Gravitino job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param beforeSnapshotId sampled snapshot id
+   * @param beforeMetricsId {@code table_snapshot_metrics.metrics_id} for S0
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "recordTableMaintenanceActionBeforeSnapshot")
-  public void recordBeforeSnapshot(long jobId, long tableId, long policyId, long beforeSnapshotId) {
+      baseMetricName = "recordTableMaintenanceActionBeforeMetrics")
+  public void recordBeforeMetrics(long jobId, long tableId, long policyId, long beforeMetricsId) {
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.updateBeforeSnapshot(jobId, tableId, policyId, beforeSnapshotId));
+            mapper -> mapper.updateBeforeMetrics(jobId, tableId, policyId, beforeMetricsId));
     if (updated == 1) {
       return;
     }
@@ -484,10 +484,46 @@ public class TableMaintenanceActionMetaService {
         tableId,
         policyId);
     Preconditions.checkState(
-        current.beforeSnapshotId() != null && current.beforeSnapshotId() == beforeSnapshotId,
-        "before_snapshot_id already set to %s, refusing %s",
-        current.beforeSnapshotId(),
-        beforeSnapshotId);
+        current.beforeMetricsId() != null && current.beforeMetricsId() == beforeMetricsId,
+        "before_metrics_id already set to %s, refusing %s",
+        current.beforeMetricsId(),
+        beforeMetricsId);
+  }
+
+  /**
+   * Records the S1 metrics row id for a running action on one table/policy.
+   *
+   * <p>Safe to retry with the same {@code afterMetricsId}. A different metrics id on an already-set
+   * row fails.
+   *
+   * @param jobId Gravitino job run id
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @param afterMetricsId {@code table_snapshot_metrics.metrics_id} for S1
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "recordTableMaintenanceActionAfterMetrics")
+  public void recordAfterMetrics(long jobId, long tableId, long policyId, long afterMetricsId) {
+    int updated =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.updateAfterMetrics(jobId, tableId, policyId, afterMetricsId));
+    if (updated == 1) {
+      return;
+    }
+    TableMaintenanceActionPO current = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+    Preconditions.checkState(
+        current != null && current.finishedAt() != null && current.finishedAt() == 0L,
+        "expected an unfinished action for job_id=%s table_id=%s policy_id=%s",
+        jobId,
+        tableId,
+        policyId);
+    Preconditions.checkState(
+        current.afterMetricsId() != null && current.afterMetricsId() == afterMetricsId,
+        "after_metrics_id already set to %s, refusing %s",
+        current.afterMetricsId(),
+        afterMetricsId);
   }
 
   /**
@@ -497,34 +533,34 @@ public class TableMaintenanceActionMetaService {
    * single soft slot per pair (like {@code deleted_at}). Only one in-flight row can finish that
    * pair at a time, so two completed rows cannot race to the same millisecond {@code finished_at}.
    *
-   * <p>If the row was already closed with a null after snapshot, a later call may still backfill a
-   * real S1 when {@code afterSnapshotId} is non-null. Safe to retry when the row is already
-   * finished with a null after and {@code afterSnapshotId} is also null.
+   * <p>If the row was already closed with a null after metrics id, a later call may still backfill
+   * when {@code afterMetricsId} is non-null. Safe to retry when the row is already finished with a
+   * null after and {@code afterMetricsId} is also null.
    *
    * @param jobId Gravitino job run id
    * @param tableId table entity id
    * @param policyId policy entity id
-   * @param afterSnapshotId terminal snapshot id, or null when releasing without an S1
+   * @param afterMetricsId terminal metrics row id, or null when releasing without an S1
    * @param finishedAt finish timestamp millis
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "markTableMaintenanceActionFinished")
   public void markFinished(
-      long jobId, long tableId, long policyId, Long afterSnapshotId, long finishedAt) {
+      long jobId, long tableId, long policyId, Long afterMetricsId, long finishedAt) {
     Preconditions.checkArgument(finishedAt > 0, "finishedAt must be positive");
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.markFinished(jobId, tableId, policyId, afterSnapshotId, finishedAt));
+            mapper -> mapper.markFinished(jobId, tableId, policyId, afterMetricsId, finishedAt));
     if (updated == 1) {
       return;
     }
-    if (afterSnapshotId != null) {
+    if (afterMetricsId != null) {
       int backfilled =
           SessionUtils.doWithCommitAndFetchResult(
               TableMaintenanceActionMapper.class,
-              mapper -> mapper.backfillAfterSnapshot(jobId, tableId, policyId, afterSnapshotId));
+              mapper -> mapper.backfillAfterMetrics(jobId, tableId, policyId, afterMetricsId));
       Preconditions.checkState(
           backfilled == 1,
           "expected to finish or backfill action for job_id=%s table_id=%s policy_id=%s, finished=%s, backfilled=%s",
