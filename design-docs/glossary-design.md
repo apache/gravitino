@@ -43,9 +43,9 @@ find the approved term, and follow its links to the data.
    glossary container. Domains and the term hierarchy group the terms.
 2. **Hierarchy**: a term can have several broader (parent) terms, in any domain. Narrower (child)
    terms come from the other side. `RELATED` links two terms both ways. The server rejects cycles.
-3. **Bindings**: a term can be linked to catalogs, schemas, tables, views, columns, filesets,
-   topics, models and semantic-model metrics. A term lists its objects, and an object lists its
-   terms. A binding never gives access to data.
+3. **Bindings**: a term can be linked to tables, views and columns (where the data is stored), and
+   to semantic-model metrics (what is computed from it). A term lists its objects, and an object
+   lists its terms. A binding never gives access to data.
 4. **Domains**: a term belongs to zero or more domains. Grants on these domains control the term.
    The first version allows at most one domain per term. The storage and the API already support
    several domains, so the limit can be removed later without a migration or an API change.
@@ -178,22 +178,26 @@ without a domain is controlled by metalake grants only. There are two ways to st
 
 **Option B: backing tags, the same as assets in #13867**
 
-- `GLOSSARY_TERM` becomes taggable and is added to `DomainMember.SUPPORTED_TYPES`. A term is in
-  domain D when it has D's backing (tag, value). Terms then show in `GET /domains/{domain}/objects`
-  and in the domains of an object. There is no relation table.
-- The normal tag rules are not enough here:
-  - For an asset, read access plus `APPLY_TAG` on a backing tag adds the asset to a domain. This
-    gives nobody any permission.
-  - For a term, the domain decides who manages the term. A user with only `VIEW_DEFINITION` and
-    `APPLY_TAG` could put a term into Finance, and the Finance admins would then control it.
+How the Domain design puts a table into a domain: each domain has a tag, called its backing tag.
+For example, domain Finance has tag `finance`. A table with tag `finance` is in Finance. There is
+no member table: the tag alone decides it.
 
-  So the tag code needs two special rules for `GLOSSARY_TERM`:
-  1. Besides `APPLY_TAG`, the caller also needs the edit privilege on the term and
-     `CREATE_DEFINITION` on the domain behind the (tag, value). The domain is found with the Domain
-     design's reverse lookup.
-  2. A backing-tag change on a term goes through `TermChangeHandler`, like any other term change.
-- If a domain's backing tag is changed or deleted, its terms silently leave the domain. Who manages
-  them changes, but nobody edited a term. Dropping a domain works the same as for assets.
+Option B uses the same rule for terms. Term `Revenue` gets tag `finance`, so it is in Finance.
+Terms then also show in `GET /domains/{domain}/objects`. There is no relation table.
+
+The problem: tags are added with `APPLY_TAG`, and the Domain design gives `APPLY_TAG` to many table
+owners, so they can put their tables into a domain. For a table this is safe, because the domain
+does not change who can read the table. For a term it is not safe, because **the domain decides who
+can see, edit and approve the term**:
+
+| What happens                                                                            | Result                                                                              |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| A table owner with `APPLY_TAG` on `finance` adds `finance` to the Sales term `Customer` | The Finance admins now also manage `Customer`. Nobody in Sales agreed               |
+| Someone deletes tag `finance`, or gives Finance another backing tag                     | All Finance terms leave Finance, and who manages them changes. Nobody edited a term |
+
+To block the first case, the tag code needs special rules only for terms: besides `APPLY_TAG`, the
+caller also needs the edit privilege on the term and `CREATE_DEFINITION` on the domain behind the
+tag. The second case cannot be blocked without changing how tags work.
 
 **Recommendation: Option A.** The reasons:
 
@@ -228,13 +232,20 @@ domain includes its subdomains.
 A binding links a term to the data behind it. A term page shows two kinds of bindings. An object
 page shows the terms linked to the object.
 
-| Kind               | Meaning                                        | Targets                                                                     | Example                                                                                        |
-| ------------------ | ---------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Implemented by** | The object stores or computes the term         | `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`, `MODEL` | `Customer` is implemented by table `sales.public.customers` and column `customers.customer_id` |
-| **Used by**        | A semantic-model metric is built from the term | a metric: (`SEMANTIC_MODEL`, `metricName`)                                  | metric `net_revenue` uses `Net revenue` and `Order`                                            |
+| Kind               | Meaning                                        | Targets                                    | Example                                                                                        |
+| ------------------ | ---------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| **Implemented by** | The object stores or computes the term         | `TABLE`, `VIEW`, `COLUMN`                  | `Customer` is implemented by table `sales.public.customers` and column `customers.customer_id` |
+| **Used by**        | A semantic-model metric is built from the term | a metric: (`SEMANTIC_MODEL`, `metricName`) | metric `net_revenue` uses `Net revenue` and `Order`                                            |
 
 Both kinds are stored in `glossary_term_binding`. `metric_name` is set only for Used by, so it
-tells the two kinds apart. A binding is direct only: binding a schema does not bind its tables.
+tells the two kinds apart. A binding is direct only: binding a table does not bind its columns.
+
+- **Only these targets in the first version.** An agent uses Implemented by to write SQL, so it
+  needs a table, a view or a column. No requirement asks for catalogs, schemas, filesets, topics or
+  models. `object_type` is already stored, so more types can be added later without a storage or
+  API change.
+- There is no semantic view type in Gravitino. A semantic view from another system (for example
+  Snowflake) is stored as a semantic model, so its metrics use Used by.
 
 **One write endpoint, two ways to be allowed**
 
@@ -255,16 +266,15 @@ Both can write bindings. The server checks each term in the request separately:
 - **Admin privilege on an object**:
   - tables and columns: the existing `MODIFY_TABLE_AUTHORIZATION_EXPRESSION` (owner of the table or
     of a parent, or `MODIFY_TABLE` with `USE_CATALOG` and `USE_SCHEMA`);
-  - metrics: `MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION`;
-  - other types have no modify privilege, so the caller must own the object or one of its parents
-    (metalake, catalog, schema).
+  - views: the existing `VIEW_OWNER_AUTHORIZATION_EXPRESSION` (owner of the view or of a parent);
+  - metrics: `MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION`.
 - The endpoint checks the object once, and then checks each term in the request body in code. If
   one term fails both checks, the whole request fails with 403 and nothing changes. Removing a
   binding needs the same privilege as adding it.
 - Each changed term saves a version and goes through `TermChangeHandler`. So a workflow can hold a
   binding change, like any other term change.
-- Binding a missing object or metric fails with 404. If an object admin binds a term that is not
-  `APPROVED`, the request fails with 400.
+- Binding a missing object or metric fails with 404. Binding any other object type fails with 400.
+  If an object admin binds a term that is not `APPROVED`, the request fails with 400.
 - When a term is deprecated later, it keeps its bindings. It no longer shows in lookups or MCP
   results.
 
@@ -468,9 +478,9 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 - **Errors**:
   - 404: `NoSuchTermException` (missing, or the caller cannot see it), `NoSuchMetadataObjectException`;
   - 409: `TermAlreadyExistsException` (same name or same source reference), `NonEmptyDomainException`;
-  - 400: a cycle, a term as its own parent, a synonym equal to another term's name, deleting an
-    `APPROVED` term, an object admin binding a term that is not `APPROVED`, or more than 20 `match`
-    values;
+  - 400: a cycle, a term as its own parent, binding an unsupported object type, a synonym equal to
+    another term's name, deleting an `APPROVED` term, an object admin binding a term that is not
+    `APPROVED`, or more than 20 `match` values;
   - 403: `ForbiddenException`.
 - **Concurrency**: changes apply to the current state, and the last write wins, the same as other
   Gravitino metadata. Writes do not check the version. Responses include `version`, so a client
@@ -484,8 +494,8 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
     `createTerm`, `alterTerm`, `setTermStatus`, `dropTerm`, and `matchTerms(words, domain)`.
     `matchTerms` returns approved terms with their bindings. It is for agents that do not use MCP.
   - On a `Term`: `broader()`, `narrower()`, `listBindings(kind)`.
-  - `SupportsTerms` (`listTerms()`, `associateTerms(add, remove)`) on catalogs, schemas, tables,
-    views, columns, filesets, topics and models. Tables and views also have `listColumnTerms()`.
+  - `SupportsTerms` (`listTerms()`, `associateTerms(add, remove)`) on tables, views and columns.
+    Tables and views also have `listColumnTerms()`.
     `SemanticModel` has `listMetricTerms` and `associateMetricTerms`.
 
 ### Web UI support
