@@ -22,7 +22,12 @@ from mcp.types import ToolAnnotations
 
 
 def load_semantic_model_tools(mcp: FastMCP):
-    @mcp.tool(tags={"semantic_model"})
+    @mcp.tool(
+        tags={"semantic_model"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True
+        ),
+    )
     async def list_of_semantic_models(
         ctx: Context, catalog_name: str, schema_name: str
     ) -> str:
@@ -103,7 +108,12 @@ def load_semantic_model_tools(mcp: FastMCP):
             catalog_name, schema_name
         )
 
-    @mcp.tool(tags={"semantic_model"})
+    @mcp.tool(
+        tags={"semantic_model"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True
+        ),
+    )
     async def load_semantic_model(
         ctx: Context,
         catalog_name: str,

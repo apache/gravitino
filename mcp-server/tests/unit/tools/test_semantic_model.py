@@ -223,6 +223,13 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(1, len(self.requests))
         self._assert_request("GET", _METRICS_PATH + "?details=true")
 
+        self.definition["metrics"] = [metric]
+        self.response = {"code": 0, "semanticModel": self.model}
+        model = await self._call("load_semantic_model", _MODEL_ARGS)
+        self.assertEqual(model, self.model)
+        self.assertEqual(result[0]["metric"], model["definition"]["metrics"][0])
+        self._assert_request("GET", f"{_MODELS_PATH}/sales_model")
+
     async def test_metric_discovery_empty_results(self):
         for tool, field, details in _METRIC_TOOLS:
             with self.subTest(tool=tool):
@@ -319,14 +326,17 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             self.response = {"code": 0, field: []}
             with self.assertRaisesRegex(ToolError, "502"):
                 await self._call(tool, _NAMESPACE)
-            self.response = b"Bad Gateway"
-            with self.assertRaisesRegex(ToolError, "502"):
-                await self._call(tool, _NAMESPACE)
-            self.status = 200
-            with self.assertRaisesRegex(
-                ToolError, "Invalid Gravitino response: invalid JSON"
-            ):
-                await self._call(tool, _NAMESPACE)
+            for body in (b"Bad Gateway", b'\xff\xfe{"code":0}'):
+                with self.subTest(tool=tool, body=body):
+                    self.response = body
+                    self.status = 502
+                    with self.assertRaisesRegex(ToolError, "502"):
+                        await self._call(tool, _NAMESPACE)
+                    self.status = 200
+                    with self.assertRaisesRegex(
+                        ToolError, "Invalid Gravitino response: invalid JSON"
+                    ):
+                        await self._call(tool, _NAMESPACE)
 
     async def test_load_semantic_model_preserves_native_definition(self):
         result = await self._call("load_semantic_model", _MODEL_ARGS)
@@ -569,6 +579,13 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 {"catalog_name", "schema_name"},
                 set(tool.inputSchema["required"]),
             )
+        for name in (
+            "list_of_semantic_models",
+            "list_metrics",
+            "list_metric_infos",
+            "load_semantic_model",
+        ):
+            tool = tools[name]
             self.assertTrue(tool.annotations.readOnlyHint)
             self.assertTrue(tool.annotations.idempotentHint)
             self.assertFalse(tool.annotations.destructiveHint)

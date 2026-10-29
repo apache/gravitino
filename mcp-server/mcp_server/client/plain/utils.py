@@ -15,8 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
 import logging
+from decimal import Decimal
 from urllib.parse import quote
 
 import simplejson
@@ -34,9 +34,9 @@ def encode_path_segment(segment: str) -> str:
 
 
 def extract_content_from_response(response, field: str, default="") -> str:
-    response_json = response.json()
+    response_json = response.json(parse_float=Decimal)
     _handle_gravitino_exception(response_json)
-    return json.dumps(response_json.get(field, default))
+    return simplejson.dumps(response_json.get(field, default), use_decimal=True)
 
 
 def extract_list_from_response(response, field: str) -> str:
@@ -47,7 +47,7 @@ def extract_list_from_response(response, field: str) -> str:
     """
     try:
         payload = simplejson.loads(response.content, use_decimal=True)
-    except simplejson.JSONDecodeError as exc:
+    except (simplejson.JSONDecodeError, UnicodeDecodeError) as exc:
         response.raise_for_status()
         raise GravitinoException(
             "Invalid Gravitino response: invalid JSON"
@@ -65,9 +65,9 @@ def extract_list_from_response(response, field: str) -> str:
 
 
 def extract_response(response) -> str:
-    response_json = response.json()
+    response_json = response.json(parse_float=Decimal)
     _handle_gravitino_exception(response_json)
-    return json.dumps(response_json)
+    return simplejson.dumps(response_json, use_decimal=True)
 
 
 def _handle_gravitino_exception(response: dict):
