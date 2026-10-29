@@ -292,15 +292,17 @@ Both can write bindings. The server checks each term in the request separately:
 
 ### Status and versions
 
-| Status            | Who can see it                              | Set by               | Who can delete it                                       |
-| ----------------- | ------------------------------------------- | -------------------- | ------------------------------------------------------- |
-| `DRAFT` (initial) | `CREATE_DEFINITION` or `MANAGE_DEFINITIONS` | creation             | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS` |
-| `APPROVED`        | `VIEW_DEFINITION`; MCP                      | `MANAGE_DEFINITIONS` | nobody; deprecate it first                              |
-| `DEPRECATED`      | `VIEW_DEFINITION`; not MCP                  | `MANAGE_DEFINITIONS` | `MANAGE_DEFINITIONS`                                    |
+| Status            | Who can see it                              | Set by               | Who can edit it                                         | Who can delete it                                       |
+| ----------------- | ------------------------------------------- | -------------------- | ------------------------------------------------------- | ------------------------------------------------------- |
+| `DRAFT` (initial) | `CREATE_DEFINITION` or `MANAGE_DEFINITIONS` | creation             | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS` | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS` |
+| `APPROVED`        | `VIEW_DEFINITION`; MCP                      | `MANAGE_DEFINITIONS` | `MANAGE_DEFINITIONS`                                    | nobody; deprecate it first                              |
+| `DEPRECATED`      | `VIEW_DEFINITION`; not MCP                  | `MANAGE_DEFINITIONS` | `MANAGE_DEFINITIONS`                                    | `MANAGE_DEFINITIONS`                                    |
 
 - A user with `MANAGE_DEFINITIONS` on the metalake or on one of the term's domains sets the status
-  with `PATCH`. Edits take effect at once and are audited. Once a term is `APPROVED`, only
-  `MANAGE_DEFINITIONS` can edit it (see Access control).
+  with `PATCH`.
+- **Edits after approval**: the owner can edit the term only while it is `DRAFT`. After approval,
+  only `MANAGE_DEFINITIONS` can edit it, so a reviewed definition does not change without a
+  reviewer. Edits take effect at once and are audited.
 - **Why three states**: each term is reviewed on its own, so `APPROVED` records that a reviewer
   accepted it. Bindings and people keep using a term after it is replaced, so `DEPRECATED` keeps it
   readable, which a delete cannot do. A domain or an ontology (#14310) is published as a whole and
@@ -621,9 +623,9 @@ tools of #13867, an agent can go from a domain to its terms, and then to the dat
 - [ ] `GlossaryTerm` API and `MetadataObject.Type.GLOSSARY_TERM` in `api/`; definition privileges on metalake and domain
 - [ ] Storage: the six glossary tables and `glossary_hierarchy_lock` (H2, MySQL, PostgreSQL, upgrade scripts)
 - [ ] `GlossaryManager`: CRUD, name and synonym rules, relations with the cycle check, domain membership, status, version rows, `TermChangeHandler`, locking
-- [ ] Authorization: `TermScopeResolver`, the `GLOSSARY_TERM` case in `JcasbinAuthorizer`, draft visibility, owner-only edits for `CREATE_DEFINITION`
+- [ ] Authorization: `TermScopeResolver`, the `GLOSSARY_TERM` case in `JcasbinAuthorizer`, draft visibility, owner edits only on `DRAFT` terms for `CREATE_DEFINITION`
 - [ ] REST endpoints for terms (including links), status and hierarchy; `GlossaryEventDispatcher`; the domain drop check
-- [ ] Tests on H2, MySQL and PostgreSQL: name and synonym rules, cycle check with concurrent edits, deny across domains, hidden drafts in relation lists, and a multi-node test (edit or move on one server, read on another)
+- [ ] Tests on H2, MySQL and PostgreSQL: name and synonym rules, cycle check with concurrent edits, deny across domains, hidden drafts in relation lists, an owner with only `CREATE_DEFINITION` cannot edit an approved term, and a multi-node test (edit or move on one server, read on another)
 
 ### Phase 2: Bindings and lookup
 
