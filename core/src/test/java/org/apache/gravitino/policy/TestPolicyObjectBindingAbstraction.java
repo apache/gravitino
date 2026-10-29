@@ -28,6 +28,7 @@ import static org.mockito.Mockito.withSettings;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -43,16 +44,19 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 
 /** Verifies policy binding works against the entity store contract without a JDBC backend. */
 public class TestPolicyObjectBindingAbstraction {
 
   /** The manager reads models and submits a relation update to the injected store. */
-  @Test
-  public void testUsesEntityStoreRelationOperations() throws Exception {
+  @ParameterizedTest
+  @MethodSource("supportedObjects")
+  public void testUsesEntityStoreRelationOperations(MetadataObject object) throws Exception {
     EntityStore store =
         mock(EntityStore.class, withSettings().extraInterfaces(SupportsRelationOperations.class));
     SupportsRelationOperations relations = mock(SupportsRelationOperations.class);
@@ -76,8 +80,7 @@ public class TestPolicyObjectBindingAbstraction {
                 .build());
     when(store.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class)).thenReturn(policy);
     when(store.get(tag.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class)).thenReturn(tag);
-    NameIdentifier catalog = NameIdentifier.of("m", "catalog");
-    when(store.exists(catalog, Entity.EntityType.CATALOG)).thenReturn(true);
+    NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent("m", object);
     when(relations.batchListEntitiesByRelation(any(), any(), any()))
         .thenReturn(
             List.of(
@@ -87,26 +90,30 @@ public class TestPolicyObjectBindingAbstraction {
                     Entity.EntityType.TAG,
                     policy)));
     PolicyManager manager = new PolicyManager(mock(IdGenerator.class), store);
-    assertEquals(
-        34L,
-        manager.addPolicyToObject(
-            "m", "p", MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG), audit));
+    assertEquals(34L, manager.addPolicyToObject("m", "p", object, audit));
     ArgumentCaptor<RelationUpdate> captured = ArgumentCaptor.forClass(RelationUpdate.class);
     verify(relations).updateEntityRelations(captured.capture());
     RelationUpdate update = captured.getValue();
     assertEquals(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, update.relationType());
-    assertEquals(catalog, update.sourceIdentifier());
+    assertEquals(objectIdent, update.sourceIdentifier());
     assertEquals(tag.nameIdentifier(), update.targetsToAdd()[0].nameIdentifier());
     assertEquals(audit, update.auditInfo().orElseThrow());
     assertFalse(update.targetsToAdd()[0].relationValue().isPresent());
     assertFalse(
         RelationUpdate.of(
                 update.relationType(),
-                catalog,
-                Entity.EntityType.CATALOG,
+                objectIdent,
+                MetadataObjectUtil.toEntityType(object),
                 update.targetsToAdd(),
                 null)
             .auditInfo()
             .isPresent());
+  }
+
+  private static Stream<MetadataObject> supportedObjects() {
+    return Stream.of(
+        MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG),
+        MetadataObjects.parse("catalog.schema.table.column", MetadataObject.Type.COLUMN),
+        MetadataObjects.parse("catalog.schema.model", MetadataObject.Type.SEMANTIC_MODEL));
   }
 }

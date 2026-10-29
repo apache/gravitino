@@ -20,6 +20,7 @@
 package org.apache.gravitino.policy;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+import static org.apache.gravitino.tag.TagManager.SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
@@ -94,29 +95,21 @@ public class PolicyManager implements PolicyDispatcher {
       String metalake, String policyName, MetadataObject object, Audit auditInfo)
       throws IOException {
     Preconditions.checkNotNull(auditInfo, "Policy binding audit information is required");
-    switch (object.type()) {
-      case CATALOG:
-      case SCHEMA:
-      case TABLE:
-      case VIEW:
-      case FILESET:
-      case TOPIC:
-      case MODEL:
-      case FUNCTION:
-        break;
-      default:
-        throw new IllegalArgumentException(
-            "Unsupported policy binding object type: " + object.type());
-    }
+    Preconditions.checkArgument(
+        SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(object.type()),
+        "Unsupported policy binding object type: %s",
+        object.type());
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
     PolicyEntity policy =
         entityStore.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class);
     NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, object);
     Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object);
-    if (!entityStore.exists(objectIdent, objectType)) {
-      throw new NoSuchEntityException("Metadata object does not exist: %s", objectIdent);
-    }
+    // Relation lookup validates the endpoint, including columns stored as part of a table.
+    entityStore
+        .relationOperations()
+        .listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, objectIdent, objectType);
     NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, HiddenPolicyTag.name(policy.id()));
     TagEntity tag;
     try {

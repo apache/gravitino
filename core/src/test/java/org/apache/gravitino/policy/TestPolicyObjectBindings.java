@@ -140,7 +140,7 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
             manager.addPolicyToObject(
                 METALAKE,
                 policy.name(),
-                MetadataObjects.parse("catalog.schema.table.column", MetadataObject.Type.COLUMN),
+                MetadataObjects.parse("policy", MetadataObject.Type.POLICY),
                 AUDIT_INFO));
     assertThrows(NullPointerException.class, () -> addPolicy(policy.name(), catalog.name(), null));
     assertEquals(0, count("tag_meta"));

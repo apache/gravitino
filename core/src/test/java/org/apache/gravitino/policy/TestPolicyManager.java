@@ -71,6 +71,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -108,6 +109,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.RaceTestUtils;
@@ -306,6 +308,34 @@ public class TestPolicyManager {
         .forEach(policyName -> policyManager.deletePolicy(METALAKE, policyName));
     Arrays.stream(tagManager.listTags(METALAKE))
         .forEach(tagName -> tagManager.deleteTag(METALAKE, tagName));
+  }
+
+  /** Internal policy bindings accept columns using the shared tag object types. */
+  @Test
+  public void testAddPolicyToColumn() throws IOException {
+    PolicyEntity policy =
+        createCustomPolicy(
+            METALAKE,
+            "column_binding_policy",
+            PolicyContents.custom(
+                ImmutableMap.of("rule", 1),
+                Collections.singleton(MetadataObject.Type.COLUMN),
+                null));
+    MetadataObject column =
+        MetadataObjects.parse(
+            CATALOG + "." + SCHEMA + "." + TABLE + "." + COLUMN, MetadataObject.Type.COLUMN);
+    long tagId =
+        policyManager.addPolicyToObject(METALAKE, policy.name(), column, policy.auditInfo());
+    List<TagEntity> tags =
+        entityStore
+            .relationOperations()
+            .listEntitiesByRelation(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                MetadataObjectUtil.toEntityIdent(METALAKE, column),
+                Entity.EntityType.COLUMN);
+    Assertions.assertEquals(1, tags.size());
+    Assertions.assertEquals(tagId, tags.get(0).id());
+    Assertions.assertTrue(tags.get(0).hidden());
   }
 
   @Test
