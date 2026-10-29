@@ -54,7 +54,12 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
+import org.apache.gravitino.integration.test.container.LocalStackFixture;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -69,7 +74,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 
 /**
  * Verifies the complete secured Trino connector path: HTTPS coordinator, OAuth2-authenticated
@@ -77,6 +81,8 @@ import org.testcontainers.containers.Container;
  */
 @Tag("gravitino-docker-test")
 @EnabledIfSystemProperty(named = ITUtils.TEST_MODE, matches = ITUtils.DEPLOY_TEST_MODE)
+@LocalStackFixture
+@PostgreSQLFixture(database = TestDatabaseName.PG_ICEBERG_AUTHZ_IT)
 public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(TrinoTlsOAuthCredentialVendingIT.class);
@@ -98,16 +104,14 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private OAuthServer oauthServer;
   private TrinoContainer trinoContainer;
-  private GravitinoLocalStackContainer localStack;
+  @FixtureContainer private GravitinoLocalStackContainer localStack;
+  @FixtureContainer private PostgreSQLContainer postgreSQL;
   private Path trinoConfigDirectory;
 
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    containerSuite.startLocalStackContainer();
-    localStack = containerSuite.getLocalStackContainer();
     createBucket();
-    containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
 
     oauthServer = new OAuthServer(keyPair, AUDIENCE, "admin", CLIENT_CREDENTIAL);
     oauthServer.start();
@@ -160,10 +164,8 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
         oauthServer.invalidRequests(),
         "The mock OAuth2 server rejected an unexpected or malformed token request");
 
-    Container.ExecResult objects =
-        localStack.executeInContainer("awslocal", "s3", "ls", "s3://" + bucketName, "--recursive");
-    assertEquals(0, objects.getExitCode(), objects.getStderr());
-    assertFalse(objects.getStdout().isBlank(), "No Iceberg objects were written to S3");
+    assertFalse(
+        localStack.listObjectKeys(bucketName).isEmpty(), "No Iceberg objects were written to S3");
 
     trinoContainer.executeUpdateSQL("DROP TABLE " + table);
     trinoContainer.executeUpdateSQL("DROP SCHEMA " + catalogName + "." + schema);
@@ -278,18 +280,10 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
             .put(IcebergConstants.CATALOG_BACKEND, "jdbc")
-            .put(
-                IcebergConstants.URI,
-                containerSuite
-                    .getPostgreSQLContainer()
-                    .getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT))
+            .put(IcebergConstants.URI, postgreSQL.getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT))
             .put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.postgresql.Driver")
-            .put(
-                IcebergConstants.GRAVITINO_JDBC_USER,
-                containerSuite.getPostgreSQLContainer().getUsername())
-            .put(
-                IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-                containerSuite.getPostgreSQLContainer().getPassword())
+            .put(IcebergConstants.GRAVITINO_JDBC_USER, postgreSQL.getUsername())
+            .put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, postgreSQL.getPassword())
             .put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true")
             .put("gravitino.bypass.jdbc.schema-version", "v1")
             .put(IcebergConstants.WAREHOUSE, "s3://" + bucketName + "/warehouse")
@@ -406,16 +400,14 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
                     TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, connectorDirectory))
             .withExtraHosts(ImmutableMap.of("host.docker.internal", "host-gateway"))
             .withEnvVars(ImmutableMap.of("IRC_CLIENT_CREDENTIAL", CLIENT_CREDENTIAL))
-            .withNetwork(containerSuite.getNetwork())
+            .withNetwork(Fixtures.network())
             .withTls(truststore.toString(), STORE_PASSWORD, "PKCS12")
             .build();
     trinoContainer.start();
   }
 
   private void createBucket() {
-    Container.ExecResult result =
-        localStack.executeInContainer("awslocal", "s3", "mb", "s3://" + bucketName);
-    assertEquals(0, result.getExitCode(), result.getStderr());
+    localStack.createBucket(bucketName);
   }
 
   private void copyIcebergAwsBundle() {

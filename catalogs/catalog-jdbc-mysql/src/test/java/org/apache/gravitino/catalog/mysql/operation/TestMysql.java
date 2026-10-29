@@ -29,21 +29,21 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.BeforeAll;
 
+@MySQLFixture(database = TestDatabaseName.MYSQL_MYSQL_ABSTRACT_IT)
 public class TestMysql extends TestJdbc {
   public static final String defaultMysqlImageName = "mysql:8.0";
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static TestDatabaseName TEST_DB_NAME;
+  @FixtureContainer private static MySQLContainer mySQLContainer;
 
   @BeforeAll
   public static void startup() throws Exception {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
     TEST_DB_NAME = TestDatabaseName.MYSQL_MYSQL_ABSTRACT_IT;
-    containerSuite.startMySQLContainer(TEST_DB_NAME);
     DataSource dataSource = DataSourceUtils.createDataSource(getMySQLCatalogProperties());
 
     DATABASE_OPERATIONS = new MysqlDatabaseOperations();
@@ -60,8 +60,6 @@ public class TestMysql extends TestJdbc {
 
   protected static Map<String, String> getMySQLCatalogProperties() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
-
-    MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();
 
     String jdbcUrl = mySQLContainer.getJdbcUrl(TEST_DB_NAME);
 

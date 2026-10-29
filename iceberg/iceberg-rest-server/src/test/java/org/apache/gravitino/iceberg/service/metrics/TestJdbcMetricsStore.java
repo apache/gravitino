@@ -32,7 +32,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLFixture;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLFixture;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.iceberg.ClientPool;
@@ -54,16 +58,18 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@MySQLFixture(database = TestDatabaseName.MYSQL_JDBC_BACKEND)
+@PostgreSQLFixture(database = TestDatabaseName.PG_JDBC_BACKEND)
 public class TestJdbcMetricsStore {
 
   private static final String CURRENT_SCRIPT_VERSION = "1.1.0";
   private static final Map<String, Map<String, String>> dbProperties = Maps.newHashMap();
 
+  @FixtureContainer private static MySQLContainer mySQL;
+  @FixtureContainer private static PostgreSQLContainer postgreSQL;
+
   @BeforeAll
   public static void beforeAll() {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_JDBC_BACKEND);
-    containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_JDBC_BACKEND);
     // Prepare test configurations
     Map<String, String> h2Properties = Maps.newHashMap();
     h2Properties.put("jdbc-metrics.jdbc-driver", "org.h2.Driver");
@@ -72,21 +78,15 @@ public class TestJdbcMetricsStore {
 
     Map<String, String> mysqlProperties = Maps.newHashMap();
     mysqlProperties.put("jdbc-metrics.jdbc-driver", "com.mysql.cj.jdbc.Driver");
-    mysqlProperties.put(
-        "jdbc-metrics.uri",
-        containerSuite.getMySQLContainer().getJdbcUrl(TestDatabaseName.MYSQL_JDBC_BACKEND));
-    mysqlProperties.put("jdbc-metrics.jdbc-user", containerSuite.getMySQLContainer().getUsername());
-    mysqlProperties.put(
-        "jdbc-metrics.jdbc-password", containerSuite.getMySQLContainer().getPassword());
+    mysqlProperties.put("jdbc-metrics.uri", mySQL.getJdbcUrl(TestDatabaseName.MYSQL_JDBC_BACKEND));
+    mysqlProperties.put("jdbc-metrics.jdbc-user", mySQL.getUsername());
+    mysqlProperties.put("jdbc-metrics.jdbc-password", mySQL.getPassword());
     dbProperties.put("mysql", mysqlProperties);
     Map<String, String> postgresqlProperties = Maps.newHashMap();
     postgresqlProperties.put("jdbc-metrics.jdbc-driver", "org.postgresql.Driver");
-    postgresqlProperties.put(
-        "jdbc-metrics.uri", containerSuite.getPostgreSQLContainer().getJdbcUrl());
-    postgresqlProperties.put(
-        "jdbc-metrics.jdbc-user", containerSuite.getPostgreSQLContainer().getUsername());
-    postgresqlProperties.put(
-        "jdbc-metrics.jdbc-password", containerSuite.getPostgreSQLContainer().getPassword());
+    postgresqlProperties.put("jdbc-metrics.uri", postgreSQL.getJdbcUrl());
+    postgresqlProperties.put("jdbc-metrics.jdbc-user", postgreSQL.getUsername());
+    postgresqlProperties.put("jdbc-metrics.jdbc-password", postgreSQL.getPassword());
     dbProperties.put("postgresql", postgresqlProperties);
   }
 

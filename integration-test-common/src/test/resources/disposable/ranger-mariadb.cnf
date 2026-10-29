@@ -17,15 +17,11 @@
 # under the License.
 #
 
-TEST_CONTAINERS=${TEST_CONTAINERS:-default}
-
-if [ "$TEST_CONTAINERS" = "default" ]; then
-  COMPOSE_FILE=docker-compose.yaml
-else
-  COMPOSE_FILE=docker-compose-trino-${TEST_CONTAINERS}.yaml
-fi
-
-if [ ! -f "$COMPOSE_FILE" ]; then
-  echo "ERROR: Unsupported TEST_CONTAINERS value: $TEST_CONTAINERS (expected compose file $COMPOSE_FILE not found)."
-  exit 1
-fi
+# Gravitino's Ranger test container copies this file into the image's MariaDB when test data is
+# disposable. Ranger rebuilds its schema at every container start, so the server skips
+# crash-safety work. The data directory stays on disk: a tmpfs over it would hide the system tables
+# the image was built with.
+[mysqld]
+# Write and flush the redo log once a second instead of at each commit.
+innodb_flush_log_at_trx_commit = 0
+innodb_doublewrite = OFF
