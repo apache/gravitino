@@ -1,584 +1,264 @@
-<!--
-  Licensed to the Apache Software Foundation (ASF) under one
-  or more contributor license agreements.  See the NOTICE file
-  distributed with this work for additional information
-  regarding copyright ownership.  The ASF licenses this file
-  to you under the Apache License, Version 2.0 (the
-  "License"); you may not use this file except in compliance
-  with the License.  You may obtain a copy of the License at
-
-   http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing,
-  software distributed under the License is distributed on an
-  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-  KIND, either express or implied.  See the License for the
-  specific language governing permissions and limitations
-  under the License.
--->
-
-# Design: Ontology, Mappings and Glossary Terms
+# Design: Ontology Export and Glossary Terms
 
 ## Background
 
-Gravitino stores [Semantic Models](./gravitino-semantic-model-design.md) that conform to the Apache
-Ossie core specification, and [Domains](./domain-design.md) that group assets by business purpose
-through tags. Neither answers two questions a business user or an agent asks next: *what concepts
-exist in this business and how do they relate*, and *what does this business word mean*.
+Gravitino stores [Semantic Models](./gravitino-semantic-model-design.md) that conform to the Apache Ossie
+core specification, and [Domains](./domain-design.md) that group assets by business purpose through tags.
+Neither answers two questions a business user or an agent asks next: *what concepts exist in this
+business and how do they relate*, and *what does this business word mean*.
 
 The Semantic Model design defers the first question explicitly:
 
 > **Ontology management.** Apache Ossie Ontology definitions and mappings are separate metadata
 > concepts and require their own design.
 
-This document is that design.
-
-The second question is already covered by the [Business Glossary design](https://github.com/apache/gravitino/pull/14239)
+The second question is covered by the [Business Glossary design](https://github.com/apache/gravitino/pull/14239)
 (issue #14238, in review), which defines the `GlossaryTerm` object, its hierarchy, bindings and
 privileges. **This design adopts `GlossaryTerm` as the term model and does not introduce a competing
-one.** It adds the two pieces the glossary design does not have: the machine-readable concept graph
-that Apache Ossie specifies, and an explicit reference between a term and the concepts it elaborates.
-Once the glossary design merges, these links become relative paths to `glossary-design.md`.
+one.** Once the glossary design merges, that link becomes a relative path to `glossary-design.md`.
 
-The reference for the overall shape is Databricks' Unity Catalog semantics, whose metric views,
-domains, pages and certification form the human-modeled layer of the Genie Ontology. Two facts about
-that reference shape the scope:
+Apache Ossie specifies two documents beyond the core schema: `ontology/ontology.json`, which declares a
+concept graph, and `ontology/mapping.json`, which binds a Semantic Model's datasets and fields onto those
+concepts. The question this design answers is not *how Gravitino stores them* but *what Gravitino does
+with them*.
 
-1. **The Genie Ontology is not a stored object.** It is the union of modeled context and context an
-   engine infers from assets and usage. Only the modeled half is metadata.
-2. **Ossie specifies a concept graph, not a term directory.** It has concepts, relationships and a
-   mapping document, with no definition, synonyms, hierarchy, bindings, status or owner. Those are the
-   glossary's contract.
+The reference for the overall shape is Databricks' Unity Catalog semantics. Databricks defines exactly
+four components — metric views, domains, pages and certification — and states what they are for:
+
+> Together, these tools make up the human-modeled layer of the Genie Ontology: the business context that
+> you define and govern explicitly. Genie One combines this modeled context with context it infers
+> automatically from your assets and usage, forming a unified context layer.
+
+**The Genie Ontology is not a stored object.** No user creates, versions or deletes one; it is computed at
+query time from modeled context plus inferred context. Gravitino's counterparts to the four modeled
+components are Semantic Models, Domains and Glossary Terms, and it has nothing that corresponds to the
+computed layer itself.
+
+This design adds an **export**, not an entity. Gravitino renders its vocabulary as an Ossie ontology
+document on request. Nothing is stored, and no metadata object, status, version, privilege or lifecycle is
+introduced.
 
 ## Goals
 
-1. **Ossie conformance**: an `Ontology` is stored and exported as a document valid against the Ossie
-   ontology schema, as a Semantic Model is stored and exported against the core schema.
-2. **Mappings are first-class documents**: binding a Semantic Model's datasets, fields and
-   relationships onto ontology concepts is its own entity, because Ossie defines it as its own document
-   and deprecates embedding it in the ontology.
-3. **One term model**: a business term is a `GlossaryTerm` as specified by the Business Glossary
-   design, not a second entity defined here.
-4. **A bridge between the two**: a term can reference the concepts it elaborates, so a human reads the
-   term and a machine resolves the concept.
-5. **Privileges consistent with Domain**: ontology and mapping access use `MANAGE_ONTOLOGY` and
-   `USE_ONTOLOGY`, the shape Domain establishes with `MANAGE_DOMAIN` and `USE_DOMAIN`, and none of
-   them grants access to data. Term access keeps the glossary's own privileges, because a term is a
-   glossary object.
-6. **Lifecycle consistency with Domain**: ontologies use `DRAFT` / `PUBLISHED`, the same two states
-   as Domain, rather than inventing a third state set. A term keeps the glossary's three-state
-   lifecycle.
+1. **Export conformance**: an exported document is valid against the Ossie ontology schema, as a Semantic
+   Model is exported against the core schema.
+2. **One vocabulary**: the concepts come from the glossary's `GlossaryTerm` and from nothing else. There is
+   no second concept object to keep in sync.
+3. **No new governance surface**: exporting adds no storage table, no status, no version snapshot, no
+   privilege family and no lifecycle transitions.
+4. **Standard interchange**: a consumer that speaks Ossie reads the vocabulary without speaking
+   Gravitino's API, so the vocabulary can feed an agent, a planner or another catalog.
 
 ## Non-Goals
 
-1. **Inference.** Deriving concepts or terms from assets, usage or query logs. Engine and agent feature,
-   not catalog metadata.
-2. **Query planning and execution.** Unchanged from the Semantic Model design.
-3. **Term CRUD, hierarchy, bindings, domains and resolve.** Specified and implemented by the Business
+1. **Storing ontologies.** Recorded as a rejected alternative below.
+2. **Authoring concepts that are not terms.** Whether a concept may exist without a term is Open
+   Question 1; the export's derivation rules wait on it.
+3. **Importing an ontology document.** With nothing to store it in, the import direction has no meaning
+   yet.
+4. **Inference.** Deriving concepts from assets, usage or query logs. Engine and agent feature, not
+   catalog metadata.
+5. **Query planning and execution.** Unchanged from the Semantic Model design.
+6. **Term CRUD, hierarchy, bindings, domains and resolve.** Specified and implemented by the Business
    Glossary design; this document does not restate them.
-4. **Approval workflow, version history API and CSV import/export.** Enterprise, per the glossary
-   design.
-5. **A rich-text term body.** The glossary term carries a `definition`. If a long-form body is needed,
-   it is a field on `GlossaryTerm` in the glossary design, not a second entity here.
-6. **Materialization.**
+7. **A rich-text term body.** The glossary term carries a `definition`. If a long-form body is needed, it
+   is a field on `GlossaryTerm` in the glossary design.
 
 ## Usage Scenario
 
-1. A steward with `MANAGE_ONTOLOGY` creates ontology Finance, whose concepts include `Account` and
-   `Balance` and whose relationships carry natural-language phrasings.
-2. The steward maps the `marketing` Semantic Model onto that ontology: dataset `orders` populates
-   `Account`, field `amount` identifies `Balance`.
-3. A steward creates the term "Attributed revenue" in domain Finance, binds it to the metric
-   `active_customers` and to a column, and a holder of the glossary's manage privilege sets it to `APPROVED`.
-4. The steward links that term to the ontology concept `Revenue`.
-5. A user asks a question; an agent resolves the word to the term, reads its bindings to find the data,
-   and reads its concepts to understand what it is. Draft terms are invisible to the agent.
+1. Stewards curate terms in domain Finance — `Revenue`, `Active Customer` — with definitions, synonyms
+   and a `BROADER` hierarchy between them.
+2. A steward maps the `marketing` Semantic Model onto that vocabulary: dataset `orders` supplies
+   `Revenue`, metric `active_customers` supplies `Active Customer`.
+3. An agent, or an external tool that speaks Ossie, calls
+   `GET /api/metalakes/{metalake}/semantic-models/{model}/ossie-ontology` and receives a document that
+   validates against `ontology/ontology.json`.
+4. The document carries the terms as concepts, the `BROADER` hierarchy as `extends`, and the model's
+   datasets and metrics as the mapping document's targets.
+5. Nothing is written back. Asking again later reflects whatever the glossary and the model say at that
+   moment.
 
 ## Design
 
-### Data model
+### What is rendered
 
-This design adds three objects and one reference:
+Two documents, both derived on request and neither stored:
 
-```
-Ontology        { id, name, comment, ossieVersion, definition,
-                  status: DRAFT | PUBLISHED, properties, audit_info }
-OntologyVersion { ontologyId, version, definition, audit_info }
-OntologyMapping { id, name, ontologyId, semanticModelRef, definition, audit_info }
-TermConceptRef  { termId, ontologyId, conceptId, iri?, audit_info }
-
-definition      { aiContext?, requires?, prefixes?, concepts[Concept] }
-Concept         { conceptId, concept, type, description?, extends[], derivedBy?,
-                  identifyBy[], requires[], relationships[Relationship], iri? }
-Relationship    { relationshipId, name, description?, verbalizes[], roles[Role],
-                  multiplicity?, derivedBy?, requires[], iri? }
-```
-
-`conceptId` is the one field an Ossie document never contains because the specification names a concept
-by its `concept` string alone. Gravitino mints it on write and keeps it inside `definition`, which is a
-JSON document rather than a new column, so no table shape changes: it travels with every
-`OntologyVersion` snapshot, which is why a reference resolved against an older version still names the
-concept that version declared. Export strips it, so an exported document is exactly what the
-specification describes; a term reference and a mapping bind it, so a rename in a later version leaves
-them intact.
-
-A relationship carries a `relationshipId` for the same reason: a mapping document names a relationship
-the way it names a concept, so renaming one would otherwise break every stored `LinkMapping` and
-`ReferentMapping`. Both ids are minted, stored and stripped together, and a mapping binds the ids, not
-the names it was written with.
-
-`GlossaryTerm`, `TermRelation`, `TermDomain`, `TermBinding`, `TermVersion` and their tables are
-specified in the [Business Glossary design](https://github.com/apache/gravitino/pull/14239) and are not repeated here.
-
-### Scope and identity
-
-| Entity | Scope | Why |
+| Document | Address | Content |
 | :--- | :--- | :--- |
-| `Ontology` | Metalake | A business vocabulary spans catalogs and schemas, the same reasoning that puts `Domain` at the metalake. |
-| `OntologyMapping` | Metalake, referencing a schema-scoped Semantic Model | Ossie models a mapping as a standalone document; making it a child of the model would prevent one ontology from mapping several models. |
-| `TermConceptRef` | Metalake, between a `GlossaryTerm` and an ontology concept | Both endpoints are metalake-scoped, and the reference binds the concept's minted id rather than its name. |
+| Ontology | `GET .../semantic-models/{model}/ossie-ontology` | `version`, `name`, `description`, `ai_context`, `requires`, `prefixes`, `ontology[]` |
+| Mapping | `GET .../semantic-models/{model}/ossie-ontology/mapping` | `name`, `description`, `semantic_model`, `concept_mappings[]` |
 
-Ontologies are addressed by name alone within a metalake, follow the tag and domain name rules (unique
-per metalake, up to 128 characters, `/` allowed and URL-encoded in paths), and use the same
-case-insensitive uniqueness as glossary terms.
+The ontology document is addressed per Semantic Model because the mapping half is model-specific while the
+concept half is not: a term belongs to a business, not to a catalog, and the same vocabulary is routinely
+mapped onto several models. Addressing per model keeps one vocabulary from being copied per model.
 
-### Ontology documents and Ossie conformance
+### Ossie conformance
 
-An `Ontology` stores a document valid against
-[`ontology/ontology.json`](https://github.com/apache/ossie/blob/main/ontology/ontology.json). The
-schema is closed: `additionalProperties` is `false` and required properties are `version`, `name` and
-`ontology`. The root carries `version`, `name`, `description`, `ai_context`, `requires`, `ontology`
-and `prefixes`.
+The schema is closed at every level, so validation is part of the render path rather than a documentation
+concern:
 
-Each component of `ontology` carries:
+- the root accepts only `version`, `name`, `description`, `ai_context`, `requires`, `prefixes` and
+  `ontology`; `ontology_mappings` is rejected, because Ossie deprecates the embedded form and directs
+  writers to the standalone mapping document;
+- each concept requires `concept` and `type`, where `type` is a closed enum of `EntityType` and
+  `ValueType`;
+- each relationship requires `name` and `verbalizes`, with at least one non-blank phrasing. A relationship
+  without a verbalization is rejected, not defaulted, because the phrasing is what an agent quotes when it
+  explains the edge;
+- `additionalProperties` is `false`, so every property of a component, relationship or role must be one the
+  schema defines.
 
-- `concept` and `type`, both required, where `type` is `EntityType` or `ValueType`.
-- Optional `description`, `extends`, `derived_by` (ANSI SQL expressions), `identify_by`, `requires`,
-  `relationships` and `iri`. An `iri` is a full IRI or a QName resolved against `prefixes`.
+Two consequences follow for a derived document:
 
-Each relationship carries:
+- **The export drops what Ossie has no home for.** A term's definition, synonyms, bindings, status and
+  owner have no schema field. They are omitted, not smuggled into a `custom_extensions` key, because a
+  non-conformant document is worse than a lossy one.
+- **Every concept must be resolvable inside the document.** A concept named by `extends` or by a
+  relationship role has to be declared in the same document, so the render fails rather than emitting a
+  dangling name.
 
-- `name` and `verbalizes`, both required. At least one natural-language phrasing is part of the
-  contract.
-- Optional `description`, `roles` (a concept, plus an optional role name when a concept plays more than
-  one role), `multiplicity` (`ManyToOne` or `OneToOne`), `derived_by`, `requires` and `iri`.
+The specification version is pinned to `0.2.0.dev0`, matching `OssieVersion.DEFAULT_VERSION`, and is
+recorded in the document's `version`. Because the document is rendered rather than stored, a version bump
+is a code change and never a migration.
 
-Three consequences follow, and they are validation rules rather than documentation:
+### What the export cannot carry
 
-- **A relationship without `verbalizes` is invalid.** It is rejected, not defaulted.
-- **`type` is a closed enum of two values.** A glossary term is therefore not expressible as an
-  ontology concept, which is the structural reason the term is a separate object rather than a field on
-  a concept.
-- **The document has no place for external references.** `additionalProperties` is `false`, so a
-  term-to-concept link cannot be stored inside the Ossie document. It has to be its own metadata, which
-  is what `TermConceptRef` is.
+This is the cost of not storing an ontology, and it should be read as a limitation rather than a detail:
 
-The specification version is pinned to `0.2.0.dev0`, matching `OssieVersion.DEFAULT_VERSION`, so an
-ontology and a Semantic Model agree on the version they were written against. A stored ontology keeps
-the version it was written against and is not migrated in place: the specification is pre-release, and
-a silent migration under an agent's semantic parser is a worse failure than a rejected write. When Ossie
-reaches a stable version, migration becomes a write-time step over the `OntologyVersion` snapshots,
-which already hold every document the metalake has stored.
-
-**Concept identity is internal to Gravitino.** The ids live in the internal form of the document only,
-so the converter is where they are decided: `toDefinitionJson` keeps them, `fromDefinitionJson` mints
-ids for concepts the stored version does not already have and keeps the ones it does, and
-`exportDocument` strips them. A rename is therefore the one change that names which concept it means
-rather than which name it had, and it carries the id across so nothing that references the concept
-notices.
-
-Ontologies are always managed by Gravitino and never persisted in an underlying catalog, and one Ossie
-document maps to one `Ontology`, as one Ossie core document maps to one Semantic Model. Import and
-export reuse `OssieDocument`, `OssieFormat` and the existing import/export event pattern. One addition
-is needed: the accepted root properties of an ontology document differ from those of a core document,
-so the converter needs a second entry point rather than a flag on the existing one.
-
-`Ontology` keeps version snapshots, because the document carries a `version` and a vocabulary changes
-over time. As in the glossary design, the OSS exposes no version history API and the snapshot exists so
-Enterprise does not need its own storage.
-
-### Mappings
-
-Ossie defines a mapping as a standalone document validated against `ontology/mapping.json`, and marks
-the embedded form in the ontology document as deprecated:
-
-> **Deprecated.** Embedded ontology maps, accepted only so existing documents continue to validate;
-> write mappings as standalone documents validated against `ontology/mapping.json` instead.
-
-A mapping document contains:
-
-- `name`, `description`, `semantic_model` and `concept_mappings`.
-- A `ConceptMapping` names a `concept` and carries `object_mappings` (valid only when the concept is an
-  `EntityType`) or `link_mappings`, or both.
-- An `ObjectMapping` names a `concept` and carries either an `expression` or `referent_mappings`.
-- A `LinkMapping` names a `relationship` and carries an `object_mapping` and optional nested
-  `children`.
-- A `ReferentMapping` names a `relationship` and carries either an `expression` or nested
-  `referent_mappings`.
-
-`OntologyMapping` stores such a document together with a stable reference to one `Ontology` and one
-Semantic Model. Because the document embeds the model identity, the mapping references the model by
-identifier and version at creation time rather than duplicating its definition.
-
-**A mapping is a metalake-level object, not a child of the model it names.** The embedded
-`semantic_model` is a document reference, not ownership: Ossie's model identity says which model the
-mapping describes, the same way `concept_mappings` name concepts without owning them. A vocabulary
-describes a business, and one vocabulary is routinely mapped onto several models that live in different
-catalogs and schemas; making the mapping a child of one model would force a copy per model and let the
-copies drift. It also matches the scope the other business objects already have: `Domain`, `Ontology`
-and the term object are metalake-level for the same reason.
-
-A stored mapping binds the `conceptId` and `relationshipId` values it was written against, not the names
-in the document it came from, so renaming a concept or a relationship in the ontology leaves a mapping
-readable. The document keeps names because Ossie has no ids; the ids are recovered on import and
-attached on export, exactly as for the ontology document itself.
-
-**Visibility follows both sides.** A mapping is returned only to a caller who can read the ontology and
-the Semantic Model it binds. It is never more visible than the less visible of the two.
-
-### Glossary terms
-
-The term object is specified in the [Business Glossary design](https://github.com/apache/gravitino/pull/14239). This design
-depends on the following parts of that contract and adopts them unchanged:
-
-| Aspect | Adopted behavior |
-| :--- | :--- |
-| Identity | Name unique per metalake, case-insensitive; a synonym cannot equal another term's name |
-| Lifecycle | `DRAFT` → `APPROVED` → `DEPRECATED`, set through the term API by a holder of the glossary's manage privilege |
-| Hierarchy | Multi-parent acyclic `BROADER`, symmetric `RELATED`, cycles rejected |
-| Domains | Explicit `TermDomain` relation, not tags; domain grants govern the term |
-| Bindings | Direct bindings to catalogs, schemas, tables, views, columns, filesets, topics, models, and metrics as `(SEMANTIC_MODEL, metricName)` |
-| Lookup | Exact, case-insensitive resolve from a business word to approved terms |
-
-Two deliberate consequences of adopting it rather than defining a `Page` here:
-
-- **A term has a `definition`, not a rich body.** A long-form body is a glossary change if it is ever
-  needed. Duplicating the term as a second object would give the same word two definitions, two owners
-  and two approval states.
-- **Term bindings point at data, ontology mappings point at semantics.** A binding says which column or
-  metric implements a term. A mapping says which dataset populates a concept. They are different
-  relations and are not merged.
-
-### The term-to-concept bridge
-
-A `GlossaryTerm` may reference zero or more ontology concepts. The reference is specified here as
-`TermConceptRef`, and the glossary design only points at it, because a reference to a concept is an
-ontology side relation: the term stores *which* concept it means, and only this design says what a
-concept is. It is the row in the data model above, with ids inside the store and names in the API:
-
-| Field | Meaning |
-| :--- | :--- |
-| `termName` | The term that says it means the concept; the reference is stored on the term side. |
-| `ontology` | The metalake-level ontology that declares the concept. |
-| `conceptId` | The concept's minted id, resolved to the concept name when the reference is read. |
-| `iri` | The concept IRI the document declared, copied for display; empty when the document had none. |
-
-- **Stored on the term side.** The reference list belongs to the term, so listing a term's concepts and
-  the reverse lookup both start from the term; a mapping never holds term references.
-- **Unique per term, ontology and concept.** Re-adding a reference that already exists is a no-op
-  rather than a duplicate, so a client can retry safely.
-- **No document position, no version.** The reference binds the concept's minted id, not its name and
-  not a place in the document, so reordering the document, renaming the concept or publishing a new
-  version does not break it. The name and the `iri` a reader sees come from the version being read.
-- **The API takes a name, the store keeps an id.** A caller adds a reference by naming the ontology and
-  the concept, and the server resolves the name to the id; reads return both, so a client can display
-  the current name without knowing that the concept was renamed.
-- **A rename is invisible to the reference.** Because the id travels with the concept across versions,
-  renaming a concept updates what every term reads without touching a single reference row.
-- **Validated at write time.** Adding a reference requires the ontology to exist and be visible to the
-  caller, and the concept to be declared in the version the caller can read; a `DRAFT` ontology is
-  allowed only for a caller who can see it. The `iri` is copied from the document, never supplied by
-  the caller.
-- **A stale reference is reported, not cascaded.** If a later version drops the concept, the reference
-  stays and reads as unresolved, so a vocabulary edit cannot silently erase what a term says. Dropping
-  the whole ontology while references exist conflicts, as the access control section requires.
-- **The reverse lookup, concepts to terms, is the one an agent uses** to find how people talk about a
-  concept.
-
-The two objects are complementary rather than redundant. A term is the human entry point; a concept is
-the machine-readable node. Neither substitutes for the other:
-
-| | `GlossaryTerm` | Ontology concept |
+| Glossary term has | Ossie concept has | Result |
 | :--- | :--- | :--- |
-| Answers | What this word means to the business | What this concept consists of, and how it relates |
-| Human-readable definition | Yes | No, only a description |
-| Synonyms | Yes | No |
-| Hierarchy | `BROADER` / `RELATED`, multi-parent | `extends`, typed `relationships` with cardinality |
-| Typed | No | `EntityType` or `ValueType` |
-| Sub-type detail | No | `identify_by`, `derived_by`, `roles` |
-| Bound to data | Yes, directly | Through a mapping |
-| Approval state | Yes | Yes, but of the whole vocabulary |
-| Ossie conformance | Not applicable | Yes |
+| `name` | `concept` | carried |
+| `definition` | nothing | **dropped** |
+| `synonyms` | nothing | **dropped** |
+| `BROADER` | `extends` | carried |
+| `RELATED` | `relationships` (typed) | **partly** — a relation with no type has no `verbalizes` to quote |
+| `TermBinding` | mapping document | carried |
+| `status`, owner, `sourceRef` | nothing | **dropped** |
 
-A term without a concept is a normal state: it is defined for the business before the vocabulary is
-modelled. A concept without a term is also normal: a vocabulary is modelled before every term is
-written.
-
-### Relationship to Domains and Semantic Models
-
-- **Domain** answers *where in the business does this asset belong*. Membership is a tag, and a domain
-  grants no access to data.
-- **Glossary term** answers *what does this business word mean*. It joins domains by an explicit
-  relation, and it binds to data without owning semantics.
-- **Ontology** answers *what concepts exist and how do they relate*. It is a machine-readable graph and
-  holds no assets.
-- **Ontology mapping** answers *which part of a Semantic Model implements a concept*.
-
-All four sit above the same assets and none of them grants access to data. They are complements, not
-layers that replace one another: a domain says where an asset belongs, an ontology says what the
-business's concepts are, a mapping says which dataset populates a concept, and a term says what a word
-means to people.
-
-### Relationship to semantic query planning
-
-The semantic query planning contract (issue #14308) lets a caller send metrics, dimensions and filters
-against a Semantic Model and receive SQL, with Gravitino owning model resolution, authorization and the
-response envelope and a `SemanticQueryPlanner` SPI owning SQL generation.
-
-An ontology does not replace that contract and is not a prerequisite for it. The two meet at one point:
-once `OntologyMapping` exists, a planner can accept concept names as the vocabulary of a query and
-resolve them through the mapping to the datasets and fields of the Semantic Model. That is a
-capability of the planner, behind the same endpoint, not a second planning API. Until mappings exist,
-planning works against a Semantic Model alone, exactly as #14308 specifies.
-
-### Status and visibility
-
-`Ontology` follows Domain's two-state model rather than the glossary's three-state one. A vocabulary
-is either being drafted or it is published; `APPROVED` and `DEPRECATED` exist in the glossary to
-record review of a single term, and a whole vocabulary has no reviewer to record. The glossary design
-records the same split for the same reason, so the two documents agree rather than differ by accident.
-
-| Status | Visible to | Set by | Delete |
-| :--- | :--- | :--- | :--- |
-| `DRAFT` | `MANAGE_ONTOLOGY` | creation | creator, or `MANAGE_ONTOLOGY` |
-| `PUBLISHED` | `USE_ONTOLOGY` | `MANAGE_ONTOLOGY` | not allowed while a mapping or term reference points at it |
-
-A `DRAFT` ontology is omitted from lists, returns 404 on get, and is not returned by a mapping whose
-caller could not otherwise see it. `TermConceptRef` rows pointing at a draft ontology are visible only
-to a caller who can see that ontology. Publishing and unpublishing are status changes, not deletes, so
-a published mapping can be unpublished without being lost.
+A consumer that needs the definition or the synonyms reads the term through the glossary API; the ontology
+document is the machine-readable skeleton, not the whole vocabulary.
 
 ### Access control
 
-Ontologies use a privilege family of their own, in the shape Domain establishes with `MANAGE_DOMAIN`
-and `USE_DOMAIN`. A Define object therefore does not reuse the glossary's privileges, which govern a
-term rather than a vocabulary:
+No privilege is added. The export is a read of two existing objects, so it requires what already exists:
 
-| Privilege | On | Allows |
-| :--- | :--- | :--- |
-| `USE_ONTOLOGY` | Metalake, ontology | Read published ontologies and the mappings that reference them |
-| `MANAGE_ONTOLOGY` | Metalake, ontology | Create, edit, publish, unpublish and delete ontologies and mappings; see and edit drafts |
-
-`MANAGE_ONTOLOGY` includes `USE_ONTOLOGY`; the creator, the ontology owner and the metalake owner
-hold both. There is no separate `CREATE_ONTOLOGY`, for the same reason Domain has no `CREATE_DOMAIN`:
-creating is a manage operation on the metalake, and the creator owns what it creates.
-
-Three rules are part of the contract:
-
-- **Creating a mapping needs both sides.** The caller needs `MANAGE_ONTOLOGY` on the ontology and
-  `USE_SEMANTIC_MODEL` on the target model. Checking one side would let a caller attach a vocabulary
-  they do not control to a model they do, or the reverse.
-- **Referencing a concept needs the term edit privilege and ontology visibility.** Adding a
-  `TermConceptRef` edits the term and reads the ontology; it does not need a write privilege on the
-  ontology.
-- **A referenced object is not dropped out from under its referrers.** Dropping an ontology that a
-  mapping or a term reference points at fails with a conflict, in the shape of Domain's
-  `NonEmptyDomainException`. Cascading would silently destroy a binding rather than surface the
-  dependency.
-
-**Naming is shared with the other business-definition objects.** The glossary design proposes general
-names, `VIEW_DEFINITION` / `CREATE_DEFINITION` / `MANAGE_DEFINITIONS`, granted on the metalake and on a
-domain, and leaves the choice open against the Domain design's `MANAGE_DOMAIN` / `USE_DOMAIN`. This
-design keeps `MANAGE_ONTOLOGY` / `USE_ONTOLOGY` because Domain already ships that shape and an ontology
-is a container like a domain, but the family name is orthogonal to the governance shape: if the Domain
-design settles on the general `*_DEFINITION` names, an ontology should take the same names with the same
-meaning, and the object keeps one privilege pair either way.
-
-None of these privileges grants access to data. Reading an ontology never implies reading the tables a
-mapped model is built on.
+- the caller needs the privilege that reads the Semantic Model, because the address is the model;
+- a term appears in the document only if the caller can see it under the glossary's own rules, so a draft
+  term is absent for a caller who cannot see drafts;
+- a document grants no access to data, exactly as the model it is derived from grants none.
 
 ### REST API
 
-Ontology endpoints, under `/api/metalakes/{metalake}`:
-
 | Operation | Endpoint |
 | :--- | :--- |
-| List / create | `GET /ontologies`, `POST /ontologies` |
-| Get / alter / drop | `GET /ontologies/{ontology}`, `PUT /ontologies/{ontology}`, `DELETE /ontologies/{ontology}` |
-| Import / export | `POST /ontologies/{ontology}/ossie`, `GET /ontologies/{ontology}/ossie` |
-| Set status | `PATCH /ontologies/{ontology}` |
-| List / create mapping | `GET /ontology-mappings`, `POST /ontology-mappings` |
-| Get / alter / drop mapping | `GET`, `PUT`, `DELETE /ontology-mappings/{mapping}` |
-| Terms of an ontology | `GET /ontologies/{ontology}/terms` |
-| Concepts of a term | `GET /glossary/terms/{term}/concepts` |
-| Link / unlink concept | `POST /glossary/terms/{term}/concepts` |
+| Render the ontology document | `GET /api/metalakes/{metalake}/semantic-models/{model}/ossie-ontology` |
+| Render the mapping document | `GET /api/metalakes/{metalake}/semantic-models/{model}/ossie-ontology/mapping` |
 
-Term, hierarchy, binding, resolve and domain-term endpoints are owned by the Business Glossary design
-and are not duplicated. The concept endpoints extend the glossary paths rather than adding a second
-term namespace.
+Both accept `?format=json|yaml`, reusing `OssieFormat`. Both are read-only, so there is no create, alter or
+delete, and no status endpoint.
 
-### MCP tools
+### Relationship to Domains and Glossary Terms
 
-The `glossary` tool tag is owned by the Business Glossary design. This design adds read-only tools that
-need the concept graph:
+Domains and terms are metalake-level objects; the export inherits that. The document's `name` is the model
+name, and the vocabulary it draws from is the metalake's, not a domain's. A domain-scoped export is not
+offered, because a term may belong to zero or more domains and a document that silently dropped the terms
+outside one domain would be misleading.
 
-| Tool | Endpoint | Use |
-| :--- | :--- | :--- |
-| `list_ontologies` | `GET /ontologies?details=true` | Find the vocabularies available |
-| `get_ontology_by_name` | `GET /ontologies/{ontology}` | Read concepts and relationships |
-| `list_concepts_for_term` | `GET /glossary/terms/{term}/concepts` | Move from a business word to its concept |
-| `list_terms_for_concept` | `GET /ontologies/{ontology}/terms?concept=` | Move from a concept to how people describe it |
-
-Draft ontologies are filtered by the same rules as everywhere else, because the MCP server forwards the
-caller's `Authorization` header.
-
-### Events and audit
-
-Ontology create, alter, status, import, export and drop emit pre, success and failure events through an
-`OntologyEventDispatcher`, mirroring `GlossaryEventDispatcher`. Mapping create, alter and drop emit
-their own events, because they change what an agent can resolve. Linking or unlinking a concept is
-audited as part of the term's change history.
+The term object, its hierarchy and its bindings are owned by the Business Glossary design. This design
+only reads them.
 
 ## Alternatives Considered
 
+**Store an `Ontology` metadata object with its own status, versions, privileges and lifecycle.** This was
+an earlier revision of this document, and it is rejected. Four reasons:
+
+1. **It has no counterpart in the reference.** Databricks' computed layer is not an object, and the four
+   modeled components Gravitino mirrors are Semantic Models, Domains and Glossary Terms. A stored ontology
+   would be a component justified only by the Ossie specification's own shape, not by a user need anyone
+   stated.
+2. **It duplicates the authoring surface.** The glossary already owns the words. A stored ontology would
+   own a second set of concepts that must be kept aligned with terms, and every alignment bug is a document
+   that disagrees with the glossary.
+3. **Its governance cost is disproportionate.** A stored object needs a scope, a status vocabulary, a
+   version snapshot table, a privilege family, ownership, events and a delete policy. That machinery
+   exists to govern state; a rendered document has no state.
+4. **Most of its hard questions disappear.** Concept ids across renames, relationship ids, version
+   migration and the placement of the mapping were all real problems — and all of them were caused by
+   storage. Rendering answers them by construction.
+
 **Define a `Page` object alongside `GlossaryTerm`.** Rejected. Both would answer "what does this word
-mean", giving one term two definitions, two owners and two approval states. The glossary design already
-covers the term; the missing piece was the concept graph, not another document object.
-
-**Model terms as ontology concepts.** Rejected. Ossie's concept `type` is a closed enum of `EntityType`
-and `ValueType`, and a concept has no definition, synonyms, hierarchy, bindings, status or owner. A term
-would either not validate or would overload a value type to mean something else.
-
-**Store the term-to-concept link inside the Ossie document.** Rejected. `additionalProperties` is
-`false` and the schema has no such field, so this would produce a non-conformant ontology.
+mean", giving one term two definitions, two owners and two approval states.
 
 **Embed the mapping in the ontology document.** Rejected. Ossie marks that form deprecated and directs
 writers to standalone mapping documents.
 
-**Put ontologies at the schema scope, like Semantic Models.** Rejected for now. A vocabulary describes a
-business, not a catalog, and a schema-scoped ontology would be pinned to the catalog whose schema holds
-it while mapping models from elsewhere. This is the most likely point of disagreement and is recorded as
-an open question.
+**Address the ontology at the metalake, not per model.** Rejected for now. The concept half is
+metalake-scoped, but the mapping half is per model by construction, and one document carrying several
+models' mappings would not validate. This is Open Question 4.
 
 ## Prior Art
 
 Unity Catalog semantics (Databricks): metric views, domains, pages and certification, forming the
-human-modeled layer of the Genie Ontology. A Page is a governed definition of a business concept, belongs
-to a domain, and is the source Genie cites when it answers using a defined term. Notably, that
-documentation has no separate glossary object, which is why the granularity question is worth settling
-explicitly rather than by analogy.
+human-modeled layer of the Genie Ontology. That documentation is explicit that the Genie Ontology itself is
+a computed context layer combining modeled and inferred context, which is why this design stops at
+exporting the modeled half. A Page is a governed definition of a business concept and belongs to a domain;
+the glossary term is its Gravitino counterpart. Databricks has no separate glossary object, which is why
+the granularity question is worth settling explicitly rather than by analogy.
 
 Apache Ossie: `core-spec/spec.md` defines Semantic Models, datasets, fields, metrics, dimensions and
-relationships; `ontology/ontology.json` defines the concept graph, and `ontology/mapping.json` the
-mapping from a semantic model onto it. The ontology section is separate from the core specification,
-which is why this design is separate from the Semantic Model design.
+relationships; `ontology/ontology.json` defines the concept graph, and `ontology/mapping.json` the mapping
+from a semantic model onto it. The ontology section is separate from the core specification, which is why
+this design is separate from the Semantic Model design.
 
-In-flight Gravitino designs this one depends on: [Domain](./domain-design.md) for metalake-level scope,
-tag-backed membership and the `NonEmptyDomainException` precedent, and the
-[Business Glossary](https://github.com/apache/gravitino/pull/14239) for the term object, its hierarchy
-and its bindings.
+In-flight Gravitino designs this one depends on: [Domain](./domain-design.md) for the metalake-level
+precedent, and the [Business Glossary](https://github.com/apache/gravitino/pull/14239) for the term object,
+its hierarchy and its bindings.
 
-## Resolved Questions
+## Open Questions
 
-Three of the questions this design first raised are settled by the Domain precedent, a fourth by the
-glossary discussion, and the last three by the decisions recorded below. Domain is landing on the
-`branch-domain-dev` integration branch rather than on `main` yet, but it is the project's first object
-with a lifecycle at all — `SemanticModel` has no status, only create, alter and drop — and an ontology
-should follow it rather than contradict it.
-
-1. **Scope of `Ontology`.** Metalake, as argued here. A vocabulary describes a business, not a catalog,
-   and Domain already establishes the metalake as the home for business-level objects.
-2. **Status vocabulary.** `DRAFT` / `PUBLISHED`, Domain's two states. The glossary's three states exist
-   to record review of a single term; a whole vocabulary has no reviewer to record.
-3. **Privilege family.** `MANAGE_ONTOLOGY` / `USE_ONTOLOGY`, in the shape Domain establishes with
-   `MANAGE_DOMAIN` / `USE_DOMAIN`. The `Privilege` enum has no `*_DEFINITION` entry today, so this
-   design builds on nothing unlanded; the glossary discussion proposes general `*_DEFINITION` names and
-   leaves the choice open against Domain's shape, and the access control section records how this design
-   follows that decision without changing its governance shape.
-4. **Owner of the term-to-concept link.** This document. A reference to an Ossie concept needs the
-   concept contract, which only this design defines, and the glossary design only carries the list on
-   the term resource. The glossary author agreed to defer it here rather than specify it twice, so
-   Phase 3 below lands after ontology and adds no second definition of a reference.
-5. **Placement of `OntologyMapping`.** A metalake-level object, as the Mappings section argues. A
-   vocabulary is mapped onto several models across catalogs, and the embedded `semantic_model` is a
-   document reference rather than ownership, so a child placement would force one copy per model.
-6. **Stable identity of a concept, and of a relationship.** Gravitino mints a `conceptId` per concept
-   and a `relationshipId` per relationship, and keeps both in the internal definition; a term
-   reference and a mapping bind the ids rather than the names, so a rename updates every reference
-   without a migration. Export strips them, because Ossie names a concept by its `concept` string and a
-   relationship by its `name` alone, and an exported document has to stay conformant. Relationships get
-   ids for the same reason concepts do rather than a phase later: a mapping is the first object a
-   relationship rename would break, and adding the id afterwards would mean migrating stored mapping
-   documents.
-7. **Specification version.** Pinned, as Semantic Models are, while the specification is
-   pre-release. Migration on write becomes possible once Ossie ships a stable version, and the
-   `OntologyVersion` snapshots are the basis it will run on; a silent migration today would break an
-   agent's parser on a syntax change nobody reviewed.
-
-The two privilege shapes used across these objects are not an inconsistency. A container that a few
-stewards maintain — a domain, a vocabulary — is governed coarsely by `MANAGE_*` / `USE_*`, because
-creating it and administering it are the same decision, made by the same small group. Content that many
-people contribute — a term above all — is governed finely by `CREATE_*` / `USE_*` / `MODIFY_*` plus
-ownership, which is also the shape `SemanticModel` already ships, so the family exists rather than being
-invented here. `MANAGE_DOMAIN` cannot express "create a term without being able to approve one", so a
-term needs the finer shape; a vocabulary has no per-item reviewer to record, so the coarse shape is
-enough. The rule is governance model, not object category.
+1. **Where concepts come from.** The likely answer is that a term becomes a concept, but a term has no
+   place for `iri`, no `conceptType`, and no way to express a concept that is not a term. Whether to carry
+   both in the term's free-form `properties`, to add typed fields to `GlossaryTerm`, or to accept that the
+   export only ever covers terms, is undecided. Phase 2 waits on it; Phase 1 does not.
+2. **How a `RELATED` relation becomes an Ossie relationship.** Ossie requires `verbalizes` and allows a
+   `multiplicity`; the glossary relation has neither. Either the glossary gains a relation type, or those
+   relations are omitted from the export.
+3. **Whether the mapping document ships in the first version.** Rendering it requires term bindings to be
+   matched against model datasets and metrics, which is more derivation than the ontology document needs.
+4. **Whether a metalake-level export should exist** for callers who want the vocabulary without a model,
+   accepting that it carries no mapping.
 
 ## Task Breakdown
 
 Tracked as an epic in #14309, one issue per item below. Issues are opened as the work starts rather than
-up front, as the Domain epic does, so this list is the plan and not a status board. The phases are
-ordered by dependency rather than by value; Phase 1a is the smallest slice that can be reviewed and
-merged on its own.
+up front, as the Domain epic does, so this list is the plan and not a status board.
 
 ### Phase 0: Prerequisites
 
-- [x] Settle the scope, the status vocabulary and the privilege family on the Domain precedent, as
-      recorded in Resolved Questions
-- [x] Decide whether the term-to-concept link belongs in this design or the glossary design: it stays here
-- [ ] Land the Business Glossary design, which Phase 3 depends on
+- [ ] Land the Business Glossary design, which Phases 2 and 3 depend on
+- [x] Decide the shape: an export rather than a stored entity, recorded in Alternatives Considered
 
-### Phase 1a: Ontology object and storage
+### Phase 1: Document model and rendering
 
-The object, its persistence and its API surface. This phase carries no governance: no privileges, no
-events, and no Ossie import or export.
+Independent of the glossary: it takes concepts in and produces a validated document out.
 
-- [ ] Ontology API and Ossie document conversion: the `Ontology` interface, the definition, concepts,
-      relationships, roles, change types, exceptions and the closed-root Ossie validation
-- [ ] Ontology entity and metadata storage: `EntityType.ONTOLOGY`, the relational tables and upgrade
-      scripts for H2, MySQL and PostgreSQL, version snapshots, garbage collection and metalake delete
-- [ ] Ontology REST resource, Java and Python clients, OpenAPI definitions and user documentation
-- [ ] Concept and relationship identity: mint a `conceptId` and a `relationshipId`, carry them in the
-      internal codec across versions, strip them from exported documents, and keep them across an
-      explicit rename
+- [ ] Ossie ontology document model: concepts, relationships, roles, the two concept types, the two
+      multiplicities, and the closed-root validation
+- [ ] Rendering to JSON and YAML, reusing `OssieFormat`, with the export re-parsed before it is returned
 
-### Phase 1b: Ontology governance
+### Phase 2: The mapping document
 
-The governance Phase 1a defers. Each item changes behaviour an administrator depends on, so none of them
-is folded back into Phase 1a.
+- [ ] Derivation of `concept_mappings` from a Semantic Model's datasets, fields and metrics
+- [ ] The `ossie-ontology/mapping` endpoint and its tests
 
-- [ ] Ossie ontology import and export, both on the API and as REST endpoints
-- [ ] Events and audit: an `OntologyEventDispatcher` covering create, alter, status change, import,
-      export and drop
-- [ ] Privileges and authorization filtering: `MANAGE_ONTOLOGY` and `USE_ONTOLOGY`, ownership, and the
-      draft visibility rule that Phase 1a approximates with a metalake-level check
+### Phase 3: The concept document
 
-### Phase 2: Mapping documents
+- [ ] Derivation of `ontology[]` from glossary terms, once Open Questions 1 and 2 are settled
+- [ ] The `ossie-ontology` endpoint and its tests
 
-- [ ] `OntologyMapping` entity and storage
-- [ ] Ossie mapping document validation against the mapping schema
-- [ ] REST endpoints, dual-side authorization and reference integrity on drop
+### Phase 4: Clients, MCP and documentation
 
-### Phase 3: Term-to-concept bridge
-
-- [ ] `TermConceptRef` storage and indexes
-- [ ] Concept endpoints on the term, and the reverse lookup from an ontology
-- [ ] Visibility rules for references to draft ontologies
-- [ ] Tests, including reference integrity on ontology drop
-
-### Phase 4: MCP and query planning
-
-- [ ] MCP ontology tools and the two concept-lookup tools
-- [ ] A planner behind the #14308 `SemanticQueryPlanner` SPI that resolves concept names through
-      `OntologyMapping` to semantic-model datasets and fields
-- [ ] Tests that plan the same query by metric name and by concept name and compare the generated SQL
+- [ ] Java and Python client methods for the two endpoints
+- [ ] A read-only MCP tool that returns the document
+- [ ] OpenAPI definitions and user documentation
