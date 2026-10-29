@@ -192,7 +192,9 @@ datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
-aliyun-sdk-oss = "3.10.2"
+# Match Hadoop 3.3.6. Iceberg 1.11.0 expects OSS.deleteObject(String, String)
+# to return VoidResult. SDK 3.10.2 returns void and fails to link on delete.
+aliyun-sdk-oss = "3.13.0"
 tencentcloud-sdk-sts = "3.1.1239"
 openlineage = "1.29.0"
 jcstress = "0.8.15"
