@@ -45,6 +45,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -143,7 +144,7 @@ public class TestRelationalEntityStoreRedisCache extends AbstractEntityStorageTe
     Mockito.when(config.get(Configs.CACHE_REDIS_NAMESPACE)).thenReturn(namespace);
     Mockito.when(config.get(Configs.CACHE_REDIS_SERIALIZER)).thenReturn("kryo");
     Mockito.when(config.get(Configs.CACHE_REDIS_TIMEOUT_MS)).thenReturn(2_000);
-    Mockito.when(config.get(Configs.CACHE_REDIS_FENCE_TTL_MS)).thenReturn(0L);
+    Mockito.when(config.get(Configs.CACHE_REDIS_SSL)).thenReturn(false);
     EntityStore store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
     return store;
@@ -289,6 +290,36 @@ public class TestRelationalEntityStoreRedisCache extends AbstractEntityStorageTe
   }
 
   @Test
+  void testAFailedInvalidationDoesNotFailTheWriteAndIsRepairedByTheChangeLog() throws Exception {
+    createHierarchy(storeA);
+    TableEntity v1 = newTable("t_replay", "v1");
+    storeA.put(v1, false);
+    NameIdentifier ident = v1.nameIdentifier();
+    Assertions.assertEquals(
+        "v1", storeA.get(ident, Entity.EntityType.TABLE, TableEntity.class).comment());
+    Assertions.assertTrue(rawClient.exists(valueKey(ident)));
+
+    // Store B commits v2, but its invalidation does not reach Redis. The committed write is still
+    // reported as a success.
+    LatchedRedisEntityCache.failNextInvalidationOf(ident);
+    Assertions.assertDoesNotThrow(
+        () ->
+            storeB.update(
+                ident, TableEntity.class, Entity.EntityType.TABLE, t -> withComment(t, "v2")));
+
+    // Every node replays the change log, which repeats the invalidation and repairs the copy.
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(200, TimeUnit.MILLISECONDS)
+        .until(
+            () ->
+                "v2"
+                    .equals(
+                        storeA.get(ident, Entity.EntityType.TABLE, TableEntity.class).comment()));
+    Assertions.assertTrue(LatchedRedisEntityCache.invalidationFailed());
+  }
+
+  @Test
   void testClosingOneStoreLeavesTheOtherStoresEntries() throws Exception {
     createHierarchy(storeA);
     TableEntity table = newTable("t_close", "v1");
@@ -315,6 +346,8 @@ public class TestRelationalEntityStoreRedisCache extends AbstractEntityStorageTe
   public static class LatchedRedisEntityCache extends RedisEntityCache {
 
     private static final AtomicReference<NameIdentifier> pauseOn = new AtomicReference<>();
+    private static final AtomicReference<NameIdentifier> failOn = new AtomicReference<>();
+    private static volatile boolean failed;
     private static volatile CountDownLatch loaded = new CountDownLatch(1);
     private static volatile CountDownLatch resume = new CountDownLatch(1);
 
@@ -324,8 +357,29 @@ public class TestRelationalEntityStoreRedisCache extends AbstractEntityStorageTe
 
     static void reset() {
       pauseOn.set(null);
+      failOn.set(null);
+      failed = false;
       loaded = new CountDownLatch(1);
       resume = new CountDownLatch(1);
+    }
+
+    /** Makes the next invalidation of the identifier report a failure, as Redis being down does. */
+    static void failNextInvalidationOf(NameIdentifier ident) {
+      failed = false;
+      failOn.set(ident);
+    }
+
+    static boolean invalidationFailed() {
+      return failed;
+    }
+
+    @Override
+    public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
+      if (ident.equals(failOn.get()) && failOn.compareAndSet(ident, null)) {
+        failed = true;
+        return false;
+      }
+      return super.invalidate(ident, type);
     }
 
     static void pauseNextFillOf(NameIdentifier ident) {

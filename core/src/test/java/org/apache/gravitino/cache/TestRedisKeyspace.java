@@ -46,25 +46,27 @@ public class TestRedisKeyspace {
     Assertions.assertEquals("ns:{m1}:", keyspace.slotPrefix(metalake));
     Assertions.assertEquals("ns:{m1}:", keyspace.slotPrefix(table));
     Assertions.assertEquals("ns:{m1}:", keyspace.slotPrefix("m1"));
-    Assertions.assertEquals("ns:{m1}:IDX", keyspace.indexKey(table));
-    Assertions.assertEquals("ns:{m1}:IDX", keyspace.indexKey("m1"));
     Assertions.assertEquals("ns:{m1}:G", keyspace.generationKey(table));
+    Assertions.assertEquals("ns:{m1}:G", keyspace.generationKey("m1"));
+    Assertions.assertEquals("ns:{m1}:F", keyspace.fencesKey(table));
+    Assertions.assertEquals("ns:{m1}:F", keyspace.fencesKey("m1"));
     Assertions.assertEquals(
         "ns:{m1}:D:m1.c1.s1.t1:TABLE",
         keyspace.valueKey(EntityCacheKey.of(table, Entity.EntityType.TABLE)));
     Assertions.assertEquals(
         "ns:{m1}:D:m1:METALAKE",
         keyspace.valueKey(EntityCacheKey.of(metalake, Entity.EntityType.METALAKE)));
-    Assertions.assertEquals("ns:{m1}:F:m1.c1", keyspace.fenceKey(table, "m1.c1"));
-    // The metalake's own fence, which every fill under it checks, by name and by identifier.
-    Assertions.assertEquals("ns:{m1}:F:m1", keyspace.metalakeFenceKey("m1"));
-    Assertions.assertEquals("ns:{m1}:F:m1", keyspace.fenceKey(table, "m1"));
   }
 
   @Test
-  void testRegistryIsTheOnlyKeyWithoutAHashTag() {
-    Assertions.assertEquals("ns:metalakes", keyspace.registryKey());
-    Assertions.assertFalse(keyspace.registryKey().contains("{"));
+  void testMetalakeOfValueKeyMatchesOnlyThisNamespace() {
+    Assertions.assertEquals("ns:{*}:D:*", keyspace.allValueKeysPattern());
+    Assertions.assertEquals("m1", keyspace.metalakeOfValueKey("ns:{m1}:D:m1.c1:CATALOG"));
+    // The scan pattern of "ns" never matches "ns2", but other keys of "ns" are not values.
+    Assertions.assertNull(keyspace.metalakeOfValueKey("ns2:{m1}:D:m1.c1:CATALOG"));
+    Assertions.assertNull(keyspace.metalakeOfValueKey("ns:{m1}:F"));
+    Assertions.assertNull(keyspace.metalakeOfValueKey("ns:{m1}:G"));
+    Assertions.assertNull(keyspace.metalakeOfValueKey("ns:{}:D:x"));
   }
 
   @Test
@@ -105,19 +107,11 @@ public class TestRedisKeyspace {
   }
 
   @Test
-  void testDescendantPrefixesUseTheLevelBoundary() {
-    Assertions.assertEquals(
-        ImmutableList.of("m1.c1."),
-        RedisKeyspace.descendantPrefixes(
-            EntityCacheKey.of(NameIdentifier.of("m1", "c1"), Entity.EntityType.CATALOG), SEP));
-    Assertions.assertEquals(
-        ImmutableList.of("m1.c1.s1.", "m1.c1.s1:"),
-        RedisKeyspace.descendantPrefixes(
-            EntityCacheKey.of(NameIdentifier.of("m1", "c1", "s1"), Entity.EntityType.SCHEMA), SEP));
-    Assertions.assertEquals(
-        ImmutableList.of("m1.c1.s1."),
-        RedisKeyspace.descendantPrefixes(
-            EntityCacheKey.of(NameIdentifier.of("m1", "c1", "s1"), Entity.EntityType.SCHEMA), ""));
+  void testStampOfACatalogNeverIncludesASiblingWithACommonPrefix() {
+    // catalog1 and catalog10 are siblings; dropping one must not outdate the other.
+    Assertions.assertFalse(
+        RedisKeyspace.fencePaths(NameIdentifier.of("m1", "catalog10", "s1"), SEP)
+            .contains("m1.catalog1"));
   }
 
   @Test

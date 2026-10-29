@@ -327,14 +327,18 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  void testSharedCacheDoesNotRegisterChangeLogListener() throws IllegalAccessException {
+  void testSharedCacheRegistersChangeLogListener() throws IllegalAccessException {
     EntityChangeLogPoller poller = givenCacheWithCoherence(Coherence.SHARED);
 
     store.registerCacheChangeLogListener();
 
-    // A shared cache has a single cluster-wide copy, so there is nothing per-node to invalidate.
-    Assertions.assertNull(FieldUtils.readField(store, "entityCacheChangeLogListener", true));
-    Mockito.verify(poller, Mockito.never()).registerListener(Mockito.any());
+    // The single shared copy is invalidated after the commit, which can fail; replaying the change
+    // log on every node repeats that invalidation.
+    EntityCacheChangeLogListener listener =
+        (EntityCacheChangeLogListener)
+            FieldUtils.readField(store, "entityCacheChangeLogListener", true);
+    Assertions.assertNotNull(listener);
+    Mockito.verify(poller).registerListener(listener);
   }
 
   @Test

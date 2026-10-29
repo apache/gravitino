@@ -19,6 +19,11 @@
 
 package org.apache.gravitino.cache;
 
+import com.google.common.collect.Lists;
+import java.util.List;
+import java.util.Optional;
+import org.apache.gravitino.HasIdentifier;
+
 /**
  * {@code EntityCache} is a cache interface in Gravitino designed to accelerate metadata access for
  * individual entities keyed by their {@code NameIdentifier} and type. The cache supports cascading
@@ -57,6 +62,23 @@ public interface EntityCache extends SupportsEntityStoreCache {
    * @return The number of entries in the cache
    */
   long size();
+
+  /**
+   * Looks up several entries for a caller that only reads, such as an identifier resolver, and will
+   * not write the entries back. Unlike {@link #getIfPresent}, a miss here prepares nothing for a
+   * later {@link #put}. A cache whose reads are remote can answer all keys in one round trip.
+   *
+   * @param keys The keys to look up
+   * @return One element per key, in order, empty where the key is not cached
+   */
+  default List<Optional<HasIdentifier>> peekAll(List<EntityCacheKey> keys) {
+    List<Optional<HasIdentifier>> result = Lists.newArrayListWithCapacity(keys.size());
+    for (EntityCacheKey key : keys) {
+      result.add(
+          getIfPresent(key.identifier(), key.entityType()).map(entity -> (HasIdentifier) entity));
+    }
+    return result;
+  }
 
   /**
    * Executes the given action within a cache context.

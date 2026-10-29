@@ -356,4 +356,39 @@ public class TestKryoEntitySerializer {
     }
     Assertions.assertThrows(KryoException.class, () -> serializer.deserialize(bytes));
   }
+
+  @Test
+  void testClassOutsideTheAllowlistIsRefusedBeforeItIsBuilt() {
+    // Anyone who can write to the shared Redis controls these bytes; a class that is not an entity
+    // building block must be refused by name, not instantiated and then type-checked.
+    byte[] bytes;
+    com.esotericsoftware.kryo.kryo5.Kryo kryo = new com.esotericsoftware.kryo.kryo5.Kryo();
+    kryo.setRegistrationRequired(false);
+    try (com.esotericsoftware.kryo.kryo5.io.Output output =
+        new com.esotericsoftware.kryo.kryo5.io.Output(64, -1)) {
+      kryo.writeClassAndObject(output, new java.util.concurrent.ConcurrentHashMap<>());
+      bytes = output.toBytes();
+    }
+    KryoException e =
+        Assertions.assertThrows(KryoException.class, () -> serializer.deserialize(bytes));
+    Assertions.assertTrue(
+        e.getMessage().contains("java.util.concurrent.ConcurrentHashMap"), e.getMessage());
+  }
+
+  @Test
+  void testAllowlist() {
+    Assertions.assertTrue(KryoEntitySerializer.isAllowed(TableEntity.class));
+    Assertions.assertTrue(KryoEntitySerializer.isAllowed(String.class));
+    Assertions.assertTrue(KryoEntitySerializer.isAllowed(long[].class));
+    Assertions.assertTrue(KryoEntitySerializer.isAllowed(Instant.class));
+    Assertions.assertTrue(KryoEntitySerializer.isAllowed(ImmutableList.of(1, 2).getClass()));
+    Assertions.assertTrue(KryoEntitySerializer.isAllowed(List.of(1, 2).getClass()));
+    Assertions.assertTrue(KryoEntitySerializer.isAllowed(Column[].class));
+
+    Assertions.assertFalse(KryoEntitySerializer.isAllowed(java.net.URL.class));
+    Assertions.assertFalse(KryoEntitySerializer.isAllowed(ProcessBuilder.class));
+    Assertions.assertFalse(KryoEntitySerializer.isAllowed(Object.class));
+    Assertions.assertFalse(KryoEntitySerializer.isAllowed(java.util.PriorityQueue.class));
+    Assertions.assertFalse(KryoEntitySerializer.isAllowed(java.net.URL[].class));
+  }
 }

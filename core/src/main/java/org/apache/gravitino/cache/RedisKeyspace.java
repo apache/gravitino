@@ -23,7 +23,6 @@ import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 
@@ -33,36 +32,33 @@ import org.apache.gravitino.Namespace;
  *
  * <table>
  *   <caption>Keys written under one namespace</caption>
- *   <tr><th>Purpose</th><th>Key</th><th>Redis type</th></tr>
- *   <tr><td>Value</td><td>{@code <ns>:{<metalake>}:D:<identifier>:<TYPE>}</td><td>string</td></tr>
- *   <tr><td>Fence</td><td>{@code <ns>:{<metalake>}:F:<identifier>}</td><td>string (generation)</td></tr>
- *   <tr><td>Generation</td><td>{@code <ns>:{<metalake>}:G}</td><td>string (counter)</td></tr>
- *   <tr><td>Index</td><td>{@code <ns>:{<metalake>}:IDX}</td><td>sorted set, all scores 0</td></tr>
- *   <tr><td>Registry</td><td>{@code <ns>:metalakes}</td><td>set of metalake names</td></tr>
+ *   <tr><th>Purpose</th><th>Key</th><th>Redis type</th><th>TTL</th></tr>
+ *   <tr><td>Value</td><td>{@code <ns>:{<metalake>}:D:<identifier>:<TYPE>}</td>
+ *       <td>hash: {@code v} bytes, {@code s} stamp</td><td>the value TTL</td></tr>
+ *   <tr><td>Fences</td><td>{@code <ns>:{<metalake>}:F}</td>
+ *       <td>hash: identifier to generation</td><td>none</td></tr>
+ *   <tr><td>Generation</td><td>{@code <ns>:{<metalake>}:G}</td><td>string (counter)</td>
+ *       <td>none</td></tr>
  * </table>
  *
  * <p>The {@code {<metalake>}} segment is a Redis Cluster hash tag holding the first level of the
- * identifier, so every key of one metalake lives in one hash slot and the multi-key scripts that
- * drop a container and its descendants never span slots. The index holds one member per cached
- * value, {@code <identifier>:<TYPE>}, so the descendants of a container are exactly the members in
- * the lexicographic range starting with {@code <identifier>.} (and, for a schema, {@code
- * <identifier><schema separator>}).
+ * identifier, so every key of one metalake lives in one hash slot and every script here is
+ * single-slot.
  *
  * <p>A fence is keyed by the identifier alone, without the type, and holds the generation at which
- * that identifier was last dropped. Generations are drawn from the metalake's counter, which never
- * expires, so no two drops ever produce the same fence value even if the fence key itself expired
- * in between. A write compares the fences of the identifier and of every ancestor against the
- * values it observed before it loaded the entity, so a load that began before a drop anywhere above
- * it cannot refill the key afterwards.
+ * that identifier was last invalidated; an identifier never invalidated has no field and reads as
+ * {@code 0}. Generations are drawn from the metalake's counter, so no two invalidations produce the
+ * same value. The <em>stamp</em> of a key is the list of fences of the identifier and of every
+ * ancestor (see {@link #fencePaths(NameIdentifier, String)}). A value carries the stamp it was
+ * filled under and is served only while the stamp still matches, so invalidating a container moves
+ * one fence and every descendant stops being served at once, without being enumerated.
  *
- * <p>The registry names every metalake a read of this namespace ever missed on, recorded before the
- * load that follows the miss begins. It is the only key that carries no hash tag, so it lives in a
- * slot of its own and is touched only by single-key commands. Namespace-wide operations walk it
- * instead of scanning the keyspace, which is why they see metalakes with fills in flight but
- * nothing indexed yet, and why one namespace can never touch another's keys.
+ * <p>Neither the fences nor the counter carry a TTL, so a {@code volatile-*} eviction policy never
+ * removes them. An {@code allkeys-*} policy could, which is why the cache refuses to start under
+ * one.
  *
  * <p>The namespace is restricted to letters, digits and {@code . _ - :} so that it can never carry
- * a hash tag.
+ * a hash tag or a glob metacharacter.
  */
 final class RedisKeyspace {
 
@@ -76,10 +72,8 @@ final class RedisKeyspace {
   private static final int SCHEMA_LEVEL = 2;
 
   private static final String VALUE_MARKER = "D:";
-  private static final String FENCE_MARKER = "F:";
+  private static final String FENCES_NAME = "F";
   private static final String GENERATION_NAME = "G";
-  private static final String INDEX_NAME = "IDX";
-  private static final String REGISTRY_NAME = "metalakes";
   private static final String TAG_OPEN = ":{";
   private static final String TAG_CLOSE = "}:";
 
@@ -102,11 +96,6 @@ final class RedisKeyspace {
     return key.toString();
   }
 
-  /** The set of metalake names this namespace has missed on: {@code <ns>:metalakes}. */
-  String registryKey() {
-    return namespace + ":" + REGISTRY_NAME;
-  }
-
   /** Prefix shared by every key of the identifier's metalake: {@code <ns>:{<metalake>}:}. */
   String slotPrefix(NameIdentifier ident) {
     return slotPrefix(hashTag(ident));
@@ -117,40 +106,53 @@ final class RedisKeyspace {
     return namespace + TAG_OPEN + metalake + TAG_CLOSE;
   }
 
-  String indexKey(NameIdentifier ident) {
-    return indexKey(hashTag(ident));
-  }
-
-  String indexKey(String metalake) {
-    return slotPrefix(metalake) + INDEX_NAME;
-  }
-
   String valueKey(EntityCacheKey key) {
     return slotPrefix(key.identifier()) + VALUE_MARKER + member(key);
   }
 
   /** The per-metalake generation counter every fence value is drawn from. Never expires. */
   String generationKey(NameIdentifier ident) {
-    return slotPrefix(ident) + GENERATION_NAME;
+    return generationKey(hashTag(ident));
+  }
+
+  String generationKey(String metalake) {
+    return slotPrefix(metalake) + GENERATION_NAME;
+  }
+
+  /** The per-metalake hash of fences, identifier path to generation. Never expires. */
+  String fencesKey(NameIdentifier ident) {
+    return fencesKey(hashTag(ident));
+  }
+
+  String fencesKey(String metalake) {
+    return slotPrefix(metalake) + FENCES_NAME;
+  }
+
+  /** A glob matching every value key of this namespace, for maintenance scans. */
+  String allValueKeysPattern() {
+    return namespace + TAG_OPEN + "*" + TAG_CLOSE + VALUE_MARKER + "*";
   }
 
   /**
-   * The fence key of one identifier path, see {@link #fencePaths(NameIdentifier, String)}.
-   *
-   * @param ident The identifier whose metalake selects the hash slot
-   * @param identifierPath The fenced identifier, the entity's own or an ancestor's
+   * The metalake of a value key of this namespace, or {@code null} if the key is not one. A scan
+   * pattern can match keys of a longer namespace that starts with this one, so the match is checked
+   * exactly here.
    */
-  String fenceKey(NameIdentifier ident, String identifierPath) {
-    return slotPrefix(ident) + FENCE_MARKER + identifierPath;
-  }
-
-  /** The fence key of the named metalake itself, which every fill under it checks. */
-  String metalakeFenceKey(String metalake) {
-    return slotPrefix(metalake) + FENCE_MARKER + metalake;
+  String metalakeOfValueKey(String key) {
+    String start = namespace + TAG_OPEN;
+    if (!key.startsWith(start)) {
+      return null;
+    }
+    int close = key.indexOf(TAG_CLOSE + VALUE_MARKER, start.length());
+    if (close <= start.length()) {
+      return null;
+    }
+    String metalake = key.substring(start.length(), close);
+    return metalake.contains("{") || metalake.contains("}") ? null : metalake;
   }
 
   /**
-   * The identifier paths whose fences guard a write of the given identifier: every ancestor from
+   * The identifier paths whose fences form the stamp of the given identifier: every ancestor from
    * the metalake down, plus the identifier itself. A nested schema such as {@code raw:events:2024}
    * also contributes each of its hierarchical prefixes ({@code raw}, {@code raw:events}), because
    * dropping any of those drops the nested schema and everything under it.
@@ -181,24 +183,5 @@ final class RedisKeyspace {
       paths.add(path.toString());
     }
     return paths;
-  }
-
-  /**
-   * The index-member prefixes whose entries a drop of the given key removes: the ordinary children
-   * below {@code <identifier>.} and, for a schema, the nested schemas below {@code
-   * <identifier><schema separator>}. Matching on a boundary rather than the bare identifier keeps
-   * {@code catalog1} from matching {@code catalog10}.
-   *
-   * @param key The key being dropped
-   * @param schemaSeparator The configured hierarchical schema separator, may be blank
-   * @return The prefixes to range over in the index
-   */
-  static List<String> descendantPrefixes(EntityCacheKey key, String schemaSeparator) {
-    String identifier = key.identifier().toString();
-    List<String> prefixes = Lists.newArrayList(identifier + NAME_LEVEL_BOUNDARY);
-    if (key.entityType() == Entity.EntityType.SCHEMA && StringUtils.isNotEmpty(schemaSeparator)) {
-      prefixes.add(identifier + schemaSeparator);
-    }
-    return prefixes;
   }
 }

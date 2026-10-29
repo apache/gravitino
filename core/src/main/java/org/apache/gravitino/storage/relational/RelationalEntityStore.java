@@ -88,8 +88,10 @@ public class RelationalEntityStore
   // version check: this counter cannot detect changes made on another node.
   private final AtomicLong cacheInvalidationEpoch = new AtomicLong();
 
-  // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
-  // caches have no per-node copy to invalidate, so no listener is registered.
+  // Null only for a NONE cache, which has nothing to invalidate. A LOCAL_PER_NODE cache needs it
+  // for
+  // cross-node invalidation; a SHARED cache needs it to repair an invalidation that did not reach
+  // the shared copy.
   @Nullable private EntityCacheChangeLogListener entityCacheChangeLogListener;
 
   @VisibleForTesting
@@ -135,13 +137,16 @@ public class RelationalEntityStore
 
   /**
    * The coherence gate: a {@link Coherence#LOCAL_PER_NODE} cache keeps its own copy per node, so
-   * changes made on other nodes must be replayed here through the change log. {@link
-   * Coherence#SHARED} and {@link Coherence#NONE} caches have nothing per-node to invalidate, so no
-   * listener is registered.
+   * changes made on other nodes must be replayed here through the change log. A {@link
+   * Coherence#SHARED} cache is invalidated once by the node that made the change, but that
+   * invalidation runs after the commit and can fail or be lost; replaying the change log on every
+   * node repeats it idempotently, which bounds how long a stale shared copy can be served by the
+   * poll interval rather than the value TTL. A {@link Coherence#NONE} cache has nothing to
+   * invalidate, so no listener is registered.
    */
   @VisibleForTesting
   void registerCacheChangeLogListener() {
-    if (cache.coherence() != Coherence.LOCAL_PER_NODE) {
+    if (cache.coherence() == Coherence.NONE) {
       return;
     }
 

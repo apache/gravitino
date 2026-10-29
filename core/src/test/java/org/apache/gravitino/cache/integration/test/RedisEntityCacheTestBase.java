@@ -124,12 +124,6 @@ public abstract class RedisEntityCacheTestBase {
     return newNode(config(ttlMs));
   }
 
-  protected RedisEntityCache newNode(long ttlMs, long fenceTtlMs) {
-    Config config = config(ttlMs);
-    config.set(Configs.CACHE_REDIS_FENCE_TTL_MS, fenceTtlMs);
-    return newNode(config);
-  }
-
   protected RedisEntityCache newNode(Config config) {
     EntityCache cache = CacheFactory.getEntityCache(config);
     Assertions.assertInstanceOf(RedisEntityCache.class, cache);
@@ -141,12 +135,17 @@ public abstract class RedisEntityCacheTestBase {
     return slotPrefix(ident) + "D:" + ident + ":" + type;
   }
 
-  protected String indexKey(String metalake) {
-    return namespace + ":{" + metalake + "}:IDX";
+  protected String fencesKey(NameIdentifier ident) {
+    return slotPrefix(ident) + "F";
   }
 
-  protected String fenceKey(NameIdentifier ident) {
-    return slotPrefix(ident) + "F:" + ident;
+  protected String generationKey(NameIdentifier ident) {
+    return slotPrefix(ident) + "G";
+  }
+
+  /** Plants an undecodable value under the stamp a never-invalidated catalog of m1 carries. */
+  protected void plantGarbage(String valueKey) {
+    rawClient().hset(valueKey, ImmutableMap.of("v", "not a serialized entity", "s", "0,0"));
   }
 
   private String slotPrefix(NameIdentifier ident) {
@@ -289,11 +288,39 @@ public abstract class RedisEntityCacheTestBase {
 
     cache.invalidate(NameIdentifier.of("m1"), Entity.EntityType.METALAKE);
 
-    Assertions.assertEquals(2, cache.size());
     Assertions.assertTrue(cache.contains(NameIdentifier.of("m2"), Entity.EntityType.METALAKE));
     Assertions.assertTrue(cache.contains(NameIdentifier.of("m2", "c1"), Entity.EntityType.CATALOG));
+    Assertions.assertFalse(cache.contains(NameIdentifier.of("m1"), Entity.EntityType.METALAKE));
+    Assertions.assertFalse(
+        cache.contains(NameIdentifier.of("m1", "c1"), Entity.EntityType.CATALOG));
+    Assertions.assertFalse(
+        cache.contains(NameIdentifier.of("m1", "c1", "s1"), Entity.EntityType.SCHEMA));
     Assertions.assertFalse(
         cache.contains(NameIdentifier.of("m1", "c1", "s1", "t1"), Entity.EntityType.TABLE));
+    // Each outdated value was reclaimed by the read that found it.
+    Assertions.assertEquals(2, cache.size());
+  }
+
+  @Test
+  void testInvalidationLeavesDescendantsInPlaceUntilReadOrExpired() {
+    RedisEntityCache cache = newNode(300L);
+    CatalogEntity catalog = catalog("m1", "c1");
+    SchemaEntity schema = schema("m1", "c1", "s1");
+    load(cache, catalog);
+    load(cache, schema);
+
+    cache.invalidate(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+
+    // The drop deleted the catalog only; the schema is outdated but not enumerated.
+    Assertions.assertFalse(
+        rawClient().exists(valueKey(catalog.nameIdentifier(), Entity.EntityType.CATALOG)));
+    Assertions.assertTrue(
+        rawClient().exists(valueKey(schema.nameIdentifier(), Entity.EntityType.SCHEMA)));
+    // Nobody reads it again, so its TTL reclaims it.
+    Awaitility.await()
+        .atMost(5, TimeUnit.SECONDS)
+        .pollInterval(50, TimeUnit.MILLISECONDS)
+        .until(() -> valueKeys().isEmpty());
   }
 
   @Test
@@ -451,10 +478,9 @@ public abstract class RedisEntityCacheTestBase {
     NameIdentifier ident = catalog.nameIdentifier();
     String key = valueKey(ident, Entity.EntityType.CATALOG);
 
-    rawClient().set(key, "not a serialized entity");
-    rawClient().zadd(indexKey("m1"), 0, "m1.c1:CATALOG");
+    plantGarbage(key);
 
-    // The undecodable entry is discarded, which is a miss that recorded no fences...
+    // The undecodable entry is discarded, which is a miss that recorded no stamp...
     Assertions.assertEquals(Optional.empty(), get(nodeA, ident, Entity.EntityType.CATALOG));
     Assertions.assertFalse(rawClient().exists(key));
     // ...so the fill that follows it, racing an invalidation on node B, is not performed.
@@ -469,55 +495,23 @@ public abstract class RedisEntityCacheTestBase {
   }
 
   @Test
-  void testRecreatedFenceNeverRepeatsTheGenerationAnOlderReadObserved() throws Exception {
-    long valueTtlMs = 100L;
-    long fenceTtlMs = 200L;
-    RedisEntityCache nodeA = newNode(valueTtlMs, fenceTtlMs);
-    RedisEntityCache nodeB = newNode(valueTtlMs, fenceTtlMs);
+  void testFencesAndTheCounterNeverExpireSoGenerationsAreNeverReused() {
+    RedisEntityCache nodeA = newNode(100L);
+    RedisEntityCache nodeB = newNode(100L);
     TableEntity oldTable = table("m1", "c1", "s1", "t1", "old");
     NameIdentifier ident = oldTable.nameIdentifier();
 
-    // Node A drops the table once: the fence exists with the first generation.
     nodeA.invalidate(ident, Entity.EntityType.TABLE);
-    String firstFence = rawClient().get(fenceKey(ident));
-    // Node B misses just before that fence expires and starts a slow load of the old row.
+    long first = Long.parseLong(rawClient().hget(fencesKey(ident), ident.toString()));
+    // Node B misses and starts a slow load, well past the value TTL.
     Assertions.assertEquals(Optional.empty(), get(nodeB, ident, Entity.EntityType.TABLE));
-    Awaitility.await()
-        .atMost(5, TimeUnit.SECONDS)
-        .pollInterval(20, TimeUnit.MILLISECONDS)
-        .until(() -> !rawClient().exists(fenceKey(ident)));
-    // Another node commits an update and invalidates again, recreating the fence.
     nodeA.invalidate(ident, Entity.EntityType.TABLE);
-    String secondFence = rawClient().get(fenceKey(ident));
-    Assertions.assertNotEquals(firstFence, secondFence, "generations must never be reused");
-    Assertions.assertTrue(Long.parseLong(secondFence) > Long.parseLong(firstFence));
+    long second = Long.parseLong(rawClient().hget(fencesKey(ident), ident.toString()));
 
-    // Node B's stale fill: rejected both because its record is older than the fence lifetime and
-    // because the fence it would compare against carries a new generation.
-    nodeB.put(oldTable);
-    Assertions.assertFalse(nodeA.contains(ident, Entity.EntityType.TABLE));
-  }
-
-  @Test
-  void testAbsentFenceThatWasSetAndExpiredCannotAdmitAnOlderRead() throws Exception {
-    long valueTtlMs = 100L;
-    long fenceTtlMs = 200L;
-    RedisEntityCache nodeA = newNode(valueTtlMs, fenceTtlMs);
-    RedisEntityCache nodeB = newNode(valueTtlMs, fenceTtlMs);
-    TableEntity oldTable = table("m1", "c1", "s1", "t1", "old");
-    NameIdentifier ident = oldTable.nameIdentifier();
-
-    // Node B misses while no fence exists at all, and starts a slow load of the old row.
-    Assertions.assertEquals(Optional.empty(), get(nodeB, ident, Entity.EntityType.TABLE));
-    // Node A commits an update and invalidates; the fence is set, then expires again.
-    nodeA.invalidate(ident, Entity.EntityType.TABLE);
-    Assertions.assertTrue(rawClient().exists(fenceKey(ident)));
-    Awaitility.await()
-        .atMost(5, TimeUnit.SECONDS)
-        .pollInterval(20, TimeUnit.MILLISECONDS)
-        .until(() -> !rawClient().exists(fenceKey(ident)));
-
-    // Absent before, absent now: only the record's age tells the two apart, and it is too old.
+    // Neither key carries a TTL, so neither expires nor is a volatile-* eviction candidate.
+    Assertions.assertEquals(-1L, rawClient().pttl(fencesKey(ident)));
+    Assertions.assertEquals(-1L, rawClient().pttl(generationKey(ident)));
+    Assertions.assertTrue(second > first);
     nodeB.put(oldTable);
     Assertions.assertFalse(nodeA.contains(ident, Entity.EntityType.TABLE));
   }
@@ -537,62 +531,27 @@ public abstract class RedisEntityCacheTestBase {
 
     Assertions.assertFalse(nodeA.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
     Assertions.assertEquals(0, nodeA.size());
-    // Nothing survives that a later hierarchical invalidation could not find.
+    // A later metalake invalidation outdates what was filled after the clear.
     load(nodeB, table);
     nodeA.invalidate(NameIdentifier.of("m1"), Entity.EntityType.METALAKE);
+    Assertions.assertFalse(nodeA.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
     Assertions.assertEquals(ImmutableList.of(), valueKeys());
   }
 
   @Test
-  void testClearOnAColdCacheRejectsAnInFlightFillOfAnUnindexedMetalake() {
+  void testFreshReadAfterAClearIsCurrent() {
+    // clear() is a maintenance operation: on a metalake with nothing cached it finds nothing to
+    // fence, so it does not promise to reject a fill already in flight there. A read that starts
+    // after it returns is current.
     RedisEntityCache nodeA = newNode();
     RedisEntityCache nodeB = newNode();
-    TableEntity oldTable = table("m1", "c1", "s1", "t1", "old");
-    NameIdentifier ident = oldTable.nameIdentifier();
-    Assertions.assertEquals(0, nodeA.size());
-
-    // Nothing of m1 is indexed anywhere. Node B misses and starts loading the old row; node A
-    // clears while there is no index for m1 that a keyspace scan could have found.
-    Assertions.assertEquals(Optional.empty(), get(nodeB, ident, Entity.EntityType.TABLE));
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", "s1", "t1");
     nodeA.clear();
-    nodeB.put(oldTable);
 
-    Assertions.assertFalse(nodeA.contains(ident, Entity.EntityType.TABLE));
-    Assertions.assertEquals(ImmutableList.of(), valueKeys());
-    // A fresh miss after the clear loads and fills normally.
     load(nodeB, table("m1", "c1", "s1", "t1", "new"));
     Assertions.assertEquals(
         "new",
         get(nodeA, ident, Entity.EntityType.TABLE).map(TableEntity.class::cast).get().comment());
-  }
-
-  @Test
-  void testExpiredIndexMembersAreReclaimedAndRefillsSurvive() {
-    RedisEntityCache cache = newNode(200L);
-    CatalogEntity c1 = catalog("m1", "c1");
-    CatalogEntity c2 = catalog("m1", "c2");
-    CatalogEntity c3 = catalog("m1", "c3");
-    load(cache, c1);
-    load(cache, c2);
-    load(cache, c3);
-    Assertions.assertEquals(3, cache.size());
-
-    Awaitility.await()
-        .atMost(5, TimeUnit.SECONDS)
-        .pollInterval(50, TimeUnit.MILLISECONDS)
-        .until(() -> !cache.contains(c3.nameIdentifier(), Entity.EntityType.CATALOG));
-    // The values expired on their own; sizing reaps the members they left behind.
-    Awaitility.await()
-        .atMost(5, TimeUnit.SECONDS)
-        .pollInterval(50, TimeUnit.MILLISECONDS)
-        .until(() -> cache.size() == 0);
-    Assertions.assertEquals(0, rawClient().zcard(indexKey("m1")));
-
-    // A refill after expiry is indexed again and is not reaped while its value is live.
-    load(cache, c2);
-    Assertions.assertEquals(1, cache.size());
-    Assertions.assertTrue(cache.contains(c2.nameIdentifier(), Entity.EntityType.CATALOG));
-    Assertions.assertEquals(1, rawClient().zcard(indexKey("m1")));
   }
 
   @Test
@@ -768,8 +727,7 @@ public abstract class RedisEntityCacheTestBase {
     NameIdentifier ident = NameIdentifier.of("m1", "c1");
     String key = valueKey(ident, Entity.EntityType.CATALOG);
 
-    rawClient().set(key, "not a serialized entity");
-    rawClient().zadd(indexKey("m1"), 0, "m1.c1:CATALOG");
+    plantGarbage(key);
 
     Assertions.assertEquals(Optional.empty(), get(cache, ident, Entity.EntityType.CATALOG));
     Assertions.assertFalse(rawClient().exists(key));

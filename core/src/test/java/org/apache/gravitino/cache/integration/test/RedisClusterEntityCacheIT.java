@@ -250,15 +250,26 @@ public class RedisClusterEntityCacheIT extends RedisEntityCacheTestBase {
     }
     Assertions.assertEquals(metalakes * 6, cache.size());
 
-    // Metalakes spread over the cluster's slots; every drop is a multi-key script over one slot.
+    // Metalakes spread over the cluster's slots; every script is multi-key over one slot. A failed
+    // invalidation is reported, not thrown, so a CROSSSLOT error would show up as false here.
     for (int m = 0; m < metalakes; m++) {
       String metalake = "metalake" + m;
-      cache.invalidate(NameIdentifier.of(metalake, "c1", "s1"), Entity.EntityType.SCHEMA);
+      Assertions.assertTrue(
+          cache.invalidate(NameIdentifier.of(metalake, "c1", "s1"), Entity.EntityType.SCHEMA));
       Assertions.assertFalse(
           cache.contains(
               NameIdentifier.of(metalake, "c1", "s1" + SEP + "nested", "t2"),
               Entity.EntityType.TABLE));
-      cache.invalidate(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+      Assertions.assertTrue(
+          cache.invalidate(NameIdentifier.of(metalake), Entity.EntityType.METALAKE));
+      // Everything under the metalake is outdated; each read reclaims what it finds.
+      Assertions.assertFalse(
+          cache.contains(NameIdentifier.of(metalake, "c1"), Entity.EntityType.CATALOG));
+      Assertions.assertFalse(
+          cache.contains(
+              NameIdentifier.of(metalake, "c1", "s1" + SEP + "nested"), Entity.EntityType.SCHEMA));
+      Assertions.assertFalse(
+          cache.contains(NameIdentifier.of(metalake, "c1", "s1", "t1"), Entity.EntityType.TABLE));
     }
     Assertions.assertEquals(0, cache.size());
   }

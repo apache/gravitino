@@ -20,8 +20,6 @@ package org.apache.gravitino.cache;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -29,15 +27,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.TestUtil;
@@ -46,12 +46,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
+import redis.clients.jedis.exceptions.JedisNoScriptException;
 import redis.clients.jedis.util.JedisClusterCRC16;
 
 /**
  * Unit tests of {@link RedisEntityCache} that need no Redis: configuration, the failure policy, and
- * the fence bookkeeping around the scripts. Behavior against a real server is covered by the
- * integration tests.
+ * the stamp bookkeeping around the scripts. Behavior against a real server is covered by {@link
+ * TestRedisEntityCacheScripts} and the integration tests.
  */
 public class TestRedisEntityCache {
 
@@ -60,7 +61,7 @@ public class TestRedisEntityCache {
       TestUtil.getTestCatalogEntity(1L, "c1", Namespace.of("m1"), "hive", "cmt");
 
   /** A miss reply: not found, and the fences of m1 and m1.c1 both absent. */
-  private static final List<Object> MISS = ImmutableList.of(0L, utf8("0"), utf8("0"));
+  private static final List<Object> MISS = ImmutableList.of(0L, utf8("0,0"));
 
   private static Config redisConfig() {
     Config config = new Config(false) {};
@@ -118,6 +119,11 @@ public class TestRedisEntityCache {
   }
 
   @Test
+  void testSslIsOffByDefault() {
+    Assertions.assertFalse(redisConfig().get(Configs.CACHE_REDIS_SSL));
+  }
+
+  @Test
   void testNamespaceRejectsBracesAndGlobMetacharacters() {
     Config config = redisConfig();
     Assertions.assertEquals("gravitino", config.get(Configs.CACHE_REDIS_NAMESPACE));
@@ -131,20 +137,13 @@ public class TestRedisEntityCache {
   }
 
   @Test
-  void testFenceTtlMustOutliveValueTtl() {
+  void testValueTtlMustBePositive() {
+    // Outdated values are reclaimed by their TTL, so a value that never expires could leak.
     Config config = redisConfig();
-    config.set(Configs.CACHE_EXPIRATION_TIME, 1_000L);
-    config.set(Configs.CACHE_REDIS_FENCE_TTL_MS, 1_000L);
+    config.set(Configs.CACHE_EXPIRATION_TIME, 0L);
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> new RedisEntityCache(config, mock(UnifiedJedis.class)));
-
-    config.set(Configs.CACHE_REDIS_FENCE_TTL_MS, 0L);
-    Assertions.assertDoesNotThrow(() -> new RedisEntityCache(config, mock(UnifiedJedis.class)));
-
-    config.set(Configs.CACHE_EXPIRATION_TIME, 0L);
-    config.set(Configs.CACHE_REDIS_FENCE_TTL_MS, 5L);
-    Assertions.assertDoesNotThrow(() -> new RedisEntityCache(config, mock(UnifiedJedis.class)));
   }
 
   @Test
@@ -157,7 +156,7 @@ public class TestRedisEntityCache {
   void testEveryKeyOfAMetalakeHashesToOneClusterSlot() {
     RedisKeyspace keyspace = new RedisKeyspace("gravitino");
     NameIdentifier table = NameIdentifier.of("m1", "c1", "s1", "t1");
-    int slot = JedisClusterCRC16.getSlot(keyspace.indexKey(table));
+    int slot = JedisClusterCRC16.getSlot(keyspace.fencesKey(table));
     Assertions.assertEquals(
         slot,
         JedisClusterCRC16.getSlot(
@@ -168,63 +167,113 @@ public class TestRedisEntityCache {
             keyspace.valueKey(
                 EntityCacheKey.of(NameIdentifier.of("m1"), Entity.EntityType.METALAKE))));
     Assertions.assertEquals(slot, JedisClusterCRC16.getSlot(keyspace.generationKey(table)));
-    for (String path : RedisKeyspace.fencePaths(table, ":")) {
-      Assertions.assertEquals(slot, JedisClusterCRC16.getSlot(keyspace.fenceKey(table, path)));
-    }
     Assertions.assertNotEquals(
-        slot, JedisClusterCRC16.getSlot(keyspace.indexKey(NameIdentifier.of("m2"))));
+        slot, JedisClusterCRC16.getSlot(keyspace.fencesKey(NameIdentifier.of("m2"))));
   }
 
   @Test
   void testReadFailureIsAMiss() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList()))
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
         .thenThrow(new JedisConnectionException("down"));
-    when(jedis.exists(any(byte[].class))).thenThrow(new JedisConnectionException("down"));
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
 
     Assertions.assertEquals(
         Optional.empty(), cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG));
     Assertions.assertFalse(cache.contains(CATALOG_IDENT, Entity.EntityType.CATALOG));
+    Assertions.assertEquals(2L, cache.metrics().getCounter("redis-failures-total").getCount());
   }
 
   @Test
   void testWriteFailureIsDiscarded() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList()))
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
         .thenReturn(MISS)
         .thenThrow(new JedisConnectionException("down"));
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
 
     cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG);
     Assertions.assertDoesNotThrow(() -> cache.put(CATALOG));
-    verify(jedis, times(2)).eval(any(byte[].class), anyList(), anyList());
+    verify(jedis, times(2)).evalsha(any(byte[].class), anyList(), anyList());
   }
 
   @Test
-  void testInvalidateFailurePropagates() {
+  void testInvalidateFailureIsRetriedThenReportedWithoutThrowing() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList()))
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
         .thenThrow(new JedisConnectionException("down"));
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
 
-    RuntimeException e =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> cache.invalidate(CATALOG_IDENT, Entity.EntityType.CATALOG));
-    Assertions.assertInstanceOf(JedisConnectionException.class, e.getCause());
+    // The store committed before invalidating, so a Redis failure must not turn a successful write
+    // into a failed one. The change-log replay repeats the invalidation.
+    Assertions.assertFalse(cache.invalidate(CATALOG_IDENT, Entity.EntityType.CATALOG));
+    verify(jedis, times(2)).evalsha(any(byte[].class), anyList(), anyList());
+    Assertions.assertEquals(
+        1L, cache.metrics().getCounter("invalidation-failures-total").getCount());
+  }
+
+  @Test
+  void testInvalidateSucceedsOnRetry() {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
+        .thenThrow(new JedisConnectionException("blip"))
+        .thenReturn(1L);
+    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
+
+    Assertions.assertTrue(cache.invalidate(CATALOG_IDENT, Entity.EntityType.CATALOG));
+    Assertions.assertEquals(
+        0L, cache.metrics().getCounter("invalidation-failures-total").getCount());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testInvalidateMovesOneFenceAndDeclaresEveryKey() {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList())).thenReturn(1L);
+    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
+
+    cache.invalidate(CATALOG_IDENT, Entity.EntityType.CATALOG);
+    cache.invalidate(NameIdentifier.of("m1"), Entity.EntityType.METALAKE);
+
+    ArgumentCaptor<List<byte[]>> keys = ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<List<byte[]>> args = ArgumentCaptor.forClass(List.class);
+    verify(jedis, times(2)).evalsha(any(byte[].class), keys.capture(), args.capture());
+    Assertions.assertEquals(
+        ImmutableList.of("gravitino:{m1}:G", "gravitino:{m1}:F", "gravitino:{m1}:D:m1.c1:CATALOG"),
+        decode(keys.getAllValues().get(0)));
+    Assertions.assertEquals(ImmutableList.of("m1.c1", "0"), decode(args.getAllValues().get(0)));
+    // Invalidating the metalake itself also discards its fences, which the new metalake fence
+    // outdates anyway.
+    Assertions.assertEquals(ImmutableList.of("m1", "1"), decode(args.getAllValues().get(1)));
+  }
+
+  @Test
+  void testScriptBodyIsSentOnlyWhenRedisDoesNotHaveIt() {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
+        .thenThrow(new JedisNoScriptException("NOSCRIPT"));
+    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(MISS);
+    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
+
+    cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG);
+
+    ArgumentCaptor<byte[]> body = ArgumentCaptor.forClass(byte[].class);
+    verify(jedis).eval(body.capture(), anyList(), anyList());
+    Assertions.assertEquals(RedisEntityCache.READ_SCRIPT, decode(body.getValue()));
+    Assertions.assertEquals(0L, cache.metrics().getCounter("redis-failures-total").getCount());
   }
 
   @Test
   void testHitReturnsTheDeserializedEntity() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     byte[] value = new KryoEntitySerializer().serialize(CATALOG);
-    when(jedis.eval(any(byte[].class), anyList(), anyList()))
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
         .thenReturn(ImmutableList.of(1L, value));
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
 
     Optional<CatalogEntity> cached = cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG);
     Assertions.assertEquals(Optional.of(CATALOG), cached);
+    Assertions.assertEquals(1L, cache.metrics().getCounter("hits-total").getCount());
   }
 
   @Test
@@ -232,7 +281,7 @@ public class TestRedisEntityCache {
   void testUndecodableEntryIsDiscardedOnlyIfUnchanged() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     byte[] garbage = utf8("not an entity");
-    when(jedis.eval(any(byte[].class), anyList(), anyList()))
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
         .thenReturn(ImmutableList.of(1L, garbage))
         .thenReturn(1L);
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
@@ -240,27 +289,23 @@ public class TestRedisEntityCache {
     Assertions.assertEquals(
         Optional.empty(), cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG));
 
-    ArgumentCaptor<byte[]> scripts = ArgumentCaptor.forClass(byte[].class);
     ArgumentCaptor<List<byte[]>> keys = ArgumentCaptor.forClass(List.class);
     ArgumentCaptor<List<byte[]>> args = ArgumentCaptor.forClass(List.class);
-    verify(jedis, times(2)).eval(scripts.capture(), keys.capture(), args.capture());
+    verify(jedis, times(2)).evalsha(any(byte[].class), keys.capture(), args.capture());
     // The discard is one script that checks the bytes are still the ones read, so a concurrent
-    // fill that replaced the value is never removed together with its index member.
-    Assertions.assertEquals(RedisEntityCache.DISCARD_SCRIPT, decode(scripts.getAllValues().get(1)));
+    // fill that replaced the value is never removed.
     Assertions.assertEquals(
-        ImmutableList.of("gravitino:{m1}:IDX", "gravitino:{m1}:D:m1.c1:CATALOG"),
-        decode(keys.getAllValues().get(1)));
-    Assertions.assertEquals("m1.c1:CATALOG", decode(args.getAllValues().get(1).get(0)));
-    Assertions.assertArrayEquals(garbage, args.getAllValues().get(1).get(1));
+        ImmutableList.of("gravitino:{m1}:D:m1.c1:CATALOG"), decode(keys.getAllValues().get(1)));
+    Assertions.assertArrayEquals(garbage, args.getAllValues().get(1).get(0));
   }
 
   @Test
   @SuppressWarnings("unchecked")
-  void testMissRecordsFencesThatGuardTheFollowingWrite() {
+  void testMissRecordsTheStampThatGuardsTheFollowingWrite() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    // The miss reports the fences of m1 and m1.c1 as "0" and "3"; the write must echo them back.
-    when(jedis.eval(any(byte[].class), anyList(), anyList()))
-        .thenReturn(ImmutableList.of(0L, utf8("0"), utf8("3")))
+    // The miss reports the stamp of m1 and m1.c1 as "0,3"; the write must echo it back.
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
+        .thenReturn(ImmutableList.of(0L, utf8("0,3")))
         .thenReturn(1L);
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
 
@@ -272,25 +317,36 @@ public class TestRedisEntityCache {
 
     ArgumentCaptor<List<byte[]>> keys = ArgumentCaptor.forClass(List.class);
     ArgumentCaptor<List<byte[]>> args = ArgumentCaptor.forClass(List.class);
-    verify(jedis, times(2)).eval(any(byte[].class), keys.capture(), args.capture());
+    verify(jedis, times(2)).evalsha(any(byte[].class), keys.capture(), args.capture());
 
-    List<byte[]> readArgs = args.getAllValues().get(0);
     Assertions.assertEquals(
-        ImmutableList.of("gravitino:{m1}:D:m1.c1:CATALOG"), decode(keys.getAllValues().get(0)));
-    Assertions.assertEquals(
-        ImmutableList.of("gravitino:{m1}:F:m1", "gravitino:{m1}:F:m1.c1"), decode(readArgs));
+        ImmutableList.of("gravitino:{m1}:D:m1.c1:CATALOG", "gravitino:{m1}:F"),
+        decode(keys.getAllValues().get(0)));
+    Assertions.assertEquals(ImmutableList.of("m1", "m1.c1"), decode(args.getAllValues().get(0)));
 
     List<byte[]> guardedWrite = args.getAllValues().get(1);
     Assertions.assertEquals(
-        ImmutableList.of("gravitino:{m1}:IDX", "gravitino:{m1}:D:m1.c1:CATALOG"),
+        ImmutableList.of("gravitino:{m1}:D:m1.c1:CATALOG", "gravitino:{m1}:F"),
         decode(keys.getAllValues().get(1)));
-    Assertions.assertEquals(7, guardedWrite.size());
-    Assertions.assertEquals("m1.c1:CATALOG", decode(guardedWrite.get(0)));
-    Assertions.assertEquals("3600000", decode(guardedWrite.get(2)));
-    Assertions.assertEquals("gravitino:{m1}:F:m1", decode(guardedWrite.get(3)));
-    Assertions.assertEquals("0", decode(guardedWrite.get(4)));
-    Assertions.assertEquals("gravitino:{m1}:F:m1.c1", decode(guardedWrite.get(5)));
-    Assertions.assertEquals("3", decode(guardedWrite.get(6)));
+    Assertions.assertEquals(5, guardedWrite.size());
+    Assertions.assertEquals("3600000", decode(guardedWrite.get(1)));
+    Assertions.assertEquals("0,3", decode(guardedWrite.get(2)));
+    Assertions.assertEquals("m1", decode(guardedWrite.get(3)));
+    Assertions.assertEquals("m1.c1", decode(guardedWrite.get(4)));
+    Assertions.assertEquals(1L, cache.metrics().getCounter("fills-written-total").getCount());
+    Assertions.assertEquals(1L, cache.metrics().getCounter("fills-skipped-total").getCount());
+  }
+
+  @Test
+  void testRejectedFillIsCounted() {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList())).thenReturn(MISS).thenReturn(0L);
+    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
+
+    cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG);
+    cache.put(CATALOG);
+
+    Assertions.assertEquals(1L, cache.metrics().getCounter("fills-rejected-total").getCount());
   }
 
   @Test
@@ -302,50 +358,33 @@ public class TestRedisEntityCache {
     // closed rather than being written unguarded.
     cache.put(CATALOG);
 
-    verify(jedis, never()).eval(any(byte[].class), anyList(), anyList());
+    verify(jedis, never()).evalsha(any(byte[].class), anyList(), anyList());
   }
 
   @Test
   void testReadFailureDropsAnEarlierRecordSoTheWriteIsNotPerformed() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList()))
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
         .thenReturn(MISS)
         .thenThrow(new JedisConnectionException("down"));
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
 
-    // A miss records fences, then a second read of the same key fails: the failed read must not
+    // A miss records a stamp, then a second read of the same key fails: the failed read must not
     // let the earlier record vouch for a load it did not bound.
     cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG);
     Assertions.assertEquals(
         Optional.empty(), cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG));
     cache.put(CATALOG);
 
-    verify(jedis, times(2)).eval(any(byte[].class), anyList(), anyList());
-  }
-
-  @Test
-  void testRecordOlderThanTheFenceLifetimeIsNotWritten() throws InterruptedException {
-    UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(MISS).thenReturn(1L);
-    Config config = redisConfig();
-    config.set(Configs.CACHE_EXPIRATION_TIME, 1L);
-    config.set(Configs.CACHE_REDIS_FENCE_TTL_MS, 2L);
-    RedisEntityCache cache = new RedisEntityCache(config, jedis);
-
-    cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG);
-    Thread.sleep(10);
-    // The fence this record observed may have expired by now, so the record cannot be trusted.
-    cache.put(CATALOG);
-
-    verify(jedis, times(1)).eval(any(byte[].class), anyList(), anyList());
+    verify(jedis, times(2)).evalsha(any(byte[].class), anyList(), anyList());
   }
 
   @Test
   void testRecordsEvictedFromThePendingBoundFailClosed() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(MISS);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList())).thenReturn(MISS);
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
-    int misses = RedisEntityCache.MAX_PENDING_FENCES + 1;
+    int misses = RedisEntityCache.MAX_PENDING_STAMPS + 1;
     CatalogEntity first = catalog(0);
     CatalogEntity last = catalog(misses - 1);
 
@@ -353,17 +392,17 @@ public class TestRedisEntityCache {
     for (int i = 0; i < misses; i++) {
       cache.getIfPresent(catalog(i).nameIdentifier(), Entity.EntityType.CATALOG);
     }
-    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(1L);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList())).thenReturn(1L);
     cache.put(first);
-    verify(jedis, times(misses)).eval(any(byte[].class), anyList(), anyList());
+    verify(jedis, times(misses)).evalsha(any(byte[].class), anyList(), anyList());
     cache.put(last);
-    verify(jedis, times(misses + 1)).eval(any(byte[].class), anyList(), anyList());
+    verify(jedis, times(misses + 1)).evalsha(any(byte[].class), anyList(), anyList());
   }
 
   @Test
-  void testWithCacheLockDropsAnUnconsumedFenceRecord() {
+  void testWithCacheLockDropsAnUnconsumedRecord() {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(MISS).thenReturn(1L);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList())).thenReturn(MISS).thenReturn(1L);
     RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
     EntityCacheKey key = EntityCacheKey.of(CATALOG_IDENT, Entity.EntityType.CATALOG);
 
@@ -373,7 +412,7 @@ public class TestRedisEntityCache {
         key, () -> cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG).isPresent());
     cache.put(CATALOG);
 
-    verify(jedis, times(1)).eval(any(byte[].class), anyList(), anyList());
+    verify(jedis, times(1)).evalsha(any(byte[].class), anyList(), anyList());
   }
 
   @Test
@@ -383,8 +422,61 @@ public class TestRedisEntityCache {
     UserEntity user = TestUtil.getTestUserEntity();
 
     cache.put(user);
+    Assertions.assertEquals(
+        Optional.empty(), cache.getIfPresent(user.nameIdentifier(), Entity.EntityType.USER));
 
-    verify(jedis, never()).eval(any(byte[].class), anyList(), anyList());
+    verify(jedis, never()).evalsha(any(byte[].class), anyList(), anyList());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testPeekAllReadsAnAncestorChainInOneScriptAndRecordsNothing() {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    BaseMetalake metalake = TestUtil.getTestMetalake(9L, "m1", "cmt");
+    byte[] catalogBytes = new KryoEntitySerializer().serialize(CATALOG);
+    byte[] metalakeBytes = new KryoEntitySerializer().serialize(metalake);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
+        .thenReturn(Arrays.asList(catalogBytes, metalakeBytes))
+        .thenReturn(1L);
+    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
+
+    List<Optional<HasIdentifier>> found =
+        cache.peekAll(
+            ImmutableList.of(
+                EntityCacheKey.of(CATALOG_IDENT, Entity.EntityType.CATALOG),
+                EntityCacheKey.of(NameIdentifier.of("m1"), Entity.EntityType.METALAKE)));
+    Assertions.assertEquals(1L, found.get(0).get().id());
+    Assertions.assertEquals(9L, found.get(1).get().id());
+
+    ArgumentCaptor<byte[]> sha = ArgumentCaptor.forClass(byte[].class);
+    ArgumentCaptor<List<byte[]>> keys = ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<List<byte[]>> args = ArgumentCaptor.forClass(List.class);
+    verify(jedis).evalsha(sha.capture(), keys.capture(), args.capture());
+    Assertions.assertEquals(
+        ImmutableList.of(
+            "gravitino:{m1}:F", "gravitino:{m1}:D:m1.c1:CATALOG", "gravitino:{m1}:D:m1:METALAKE"),
+        decode(keys.getValue()));
+    Assertions.assertEquals(
+        ImmutableList.of("2", "m1", "m1.c1", "1", "m1"), decode(args.getValue()));
+
+    // A peek prepares nothing for a later write.
+    cache.put(CATALOG);
+    verify(jedis, times(1)).evalsha(any(byte[].class), anyList(), anyList());
+  }
+
+  @Test
+  void testPeekAllFailureReportsEveryKeyAbsent() {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(jedis.evalsha(any(byte[].class), anyList(), anyList()))
+        .thenThrow(new JedisConnectionException("down"));
+    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
+
+    List<Optional<HasIdentifier>> found =
+        cache.peekAll(
+            ImmutableList.of(
+                EntityCacheKey.of(CATALOG_IDENT, Entity.EntityType.CATALOG),
+                EntityCacheKey.of(NameIdentifier.of("m1"), Entity.EntityType.METALAKE)));
+    Assertions.assertEquals(ImmutableList.of(Optional.empty(), Optional.empty()), found);
   }
 
   @Test
@@ -395,36 +487,8 @@ public class TestRedisEntityCache {
     cache.close();
 
     verify(jedis).close();
+    verify(jedis, never()).evalsha(any(byte[].class), anyList(), anyList());
     verify(jedis, never()).eval(any(byte[].class), anyList(), anyList());
-    verify(jedis, never()).smembers(anyString());
-  }
-
-  @Test
-  void testMissRegistersTheMetalakeBeforeTheCallerLoads() {
-    UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(MISS);
-    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
-
-    Assertions.assertEquals(
-        Optional.empty(), cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG));
-
-    // Registered on the miss itself, so a clear that runs during the load finds this metalake.
-    verify(jedis).sadd("gravitino:metalakes", "m1");
-  }
-
-  @Test
-  void testRegistrationFailureFailsTheFollowingWriteClosed() {
-    UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(MISS);
-    when(jedis.sadd(anyString(), anyString())).thenThrow(new JedisConnectionException("down"));
-    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
-
-    Assertions.assertEquals(
-        Optional.empty(), cache.getIfPresent(CATALOG_IDENT, Entity.EntityType.CATALOG));
-    cache.put(CATALOG);
-
-    // An unregistered metalake could be missed by a clear, so the miss recorded no fences.
-    verify(jedis, times(1)).eval(any(byte[].class), anyList(), anyList());
   }
 
   @Test
@@ -442,57 +506,15 @@ public class TestRedisEntityCache {
     Assertions.assertThrows(
         IllegalStateException.class,
         () -> cache.contains(CATALOG_IDENT, Entity.EntityType.CATALOG));
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            cache.peekAll(
+                ImmutableList.of(EntityCacheKey.of(CATALOG_IDENT, Entity.EntityType.CATALOG))));
     Assertions.assertThrows(IllegalStateException.class, () -> cache.put(CATALOG));
     Assertions.assertThrows(IllegalStateException.class, cache::size);
     Assertions.assertThrows(IllegalStateException.class, cache::clear);
-    verify(jedis, never()).eval(any(byte[].class), anyList(), anyList());
-  }
-
-  @Test
-  @SuppressWarnings("unchecked")
-  void testClearRunsTheAtomicScriptOnEveryRegisteredMetalake() {
-    UnifiedJedis jedis = mock(UnifiedJedis.class);
-    // The registry, not a keyspace scan, decides what clear touches: a metalake with fills in
-    // flight but no index yet is registered, and another namespace's keys are never seen.
-    when(jedis.smembers("gravitino:metalakes")).thenReturn(ImmutableSet.of("m1", "m2"));
-    when(jedis.eval(any(byte[].class), anyList(), anyList())).thenReturn(0L);
-    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
-
-    cache.clear();
-
-    ArgumentCaptor<byte[]> scripts = ArgumentCaptor.forClass(byte[].class);
-    ArgumentCaptor<List<byte[]>> keys = ArgumentCaptor.forClass(List.class);
-    ArgumentCaptor<List<byte[]>> args = ArgumentCaptor.forClass(List.class);
-    verify(jedis, times(2)).eval(scripts.capture(), keys.capture(), args.capture());
-    Assertions.assertEquals(RedisEntityCache.CLEAR_SCRIPT, decode(scripts.getAllValues().get(0)));
-    Assertions.assertEquals(
-        ImmutableSet.of("gravitino:{m1}:IDX", "gravitino:{m2}:IDX"),
-        ImmutableSet.of(
-            decode(keys.getAllValues().get(0)).get(0), decode(keys.getAllValues().get(1)).get(0)));
-    List<String> firstArgs = decode(args.getAllValues().get(0));
-    String metalake = firstArgs.get(0).equals("gravitino:{m1}:") ? "m1" : "m2";
-    Assertions.assertEquals(
-        ImmutableList.of(
-            "gravitino:{" + metalake + "}:",
-            "gravitino:{" + metalake + "}:F:" + metalake,
-            "7200000"),
-        firstArgs);
-  }
-
-  @Test
-  void testSizeReapsOneBatchPerRegisteredMetalake() {
-    UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.smembers("gravitino:metalakes")).thenReturn(ImmutableSet.of("m1"));
-    when(jedis.eval(any(byte[].class), anyList(), anyList()))
-        .thenReturn(ImmutableList.of(2L, 2L, utf8("m1.c1:CATALOG")));
-    when(jedis.zcard(eq("gravitino:{m1}:IDX"))).thenReturn(3L);
-    RedisEntityCache cache = new RedisEntityCache(redisConfig(), jedis);
-
-    Assertions.assertEquals(3L, cache.size());
-
-    ArgumentCaptor<byte[]> scripts = ArgumentCaptor.forClass(byte[].class);
-    verify(jedis, times(1)).eval(scripts.capture(), anyList(), anyList());
-    Assertions.assertEquals(RedisEntityCache.REAP_SCRIPT, decode(scripts.getValue()));
+    verify(jedis, never()).evalsha(any(byte[].class), anyList(), anyList());
   }
 
   private static CatalogEntity catalog(int i) {

@@ -23,245 +23,204 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.RedisEntityCacheMetricsSource;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisException;
+import redis.clients.jedis.exceptions.JedisNoScriptException;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * An {@link EntityCache} that keeps one copy of every cached entity in Redis, shared by all nodes
  * of a Gravitino cluster. It is selected with {@code gravitino.cache.implementation=redis} and
- * reports {@link Coherence#SHARED}: a write on any node invalidates the single shared copy, so no
- * per-node propagation is needed.
+ * reports {@link Coherence#SHARED}.
  *
  * <p>This is a shared cache, not a strongly consistent database and cache pair. The cache is only
- * touched after the entity store has committed, and an invalidation deletes the entry rather than
- * updating it in place, so a Redis failure degrades to a cache miss and never to a stale hit. What
- * remains is the window between a store commit and the invalidation that follows it: a node that
- * dies inside that window leaves the entry readable until its TTL expires. Callers that cannot
- * tolerate that must read the store directly.
+ * touched after the entity store has committed, and an invalidation never updates a value in place,
+ * so most Redis failures degrade to a cache miss. The remaining ways a node can serve a stale copy
+ * are listed in the server configuration docs: an invalidation that does not reach Redis, a node
+ * that dies between the commit and the invalidation, and a Redis failover that loses an
+ * acknowledged invalidation. Each is bounded by the next change-log replay of that change, which
+ * every node runs for a shared cache too (see {@code RelationalEntityStore}), and at the latest by
+ * the value TTL. Callers that cannot tolerate that must read the store directly.
  *
  * <p><b>Keyspace.</b> See {@link RedisKeyspace}. All keys of one metalake share a Redis Cluster
- * hash slot, so every script here is single-slot at any depth; the cost is that one metalake's
- * entries are bounded by one cluster node.
+ * hash slot, so every script here is single-slot and declares every key it touches in {@code KEYS};
+ * the cost is that one metalake's entries are bounded by one cluster node.
  *
- * <p><b>Container drop.</b> {@link #invalidate(NameIdentifier, Entity.EntityType)} runs one Lua
- * script that moves the fence of the dropped identifier to a fresh generation, deletes its value,
- * and walks the lexicographic index range of its descendants deleting each one. The script is
- * atomic, so a concurrent reader sees the subtree either complete or gone, never half dropped.
+ * <p><b>Lazy invalidation.</b> Every value carries the stamp it was filled under: the fence
+ * generations of its identifier and of every ancestor. A read serves the value only if the stamp
+ * still matches the current fences, and deletes it otherwise. {@link #invalidate(NameIdentifier,
+ * Entity.EntityType)} therefore only moves one fence to a fresh generation and deletes the one
+ * value, in constant time whatever the size of the subtree below it; every descendant stops being
+ * served at once and is reclaimed by its next read or by its TTL.
  *
- * <p><b>Stale-fill guard.</b> A read miss records, for the calling thread, the fences of the
- * identifier and of each of its ancestors as they were at the miss. The write that fills the entry
- * afterwards is a Lua script that compares those fences again and refuses to write if any moved, so
- * a load that began before a drop of the entity, or of any container above it, cannot refill the
- * key once the drop committed. The guard fails closed: a write with no recorded fences, whether
- * because no miss preceded it on this thread (caching a freshly inserted entity), because the miss
- * failed to reach Redis, or because the record was evicted from the per-thread bound, is not
- * written at all; the next read loads it under a fresh record.
+ * <p><b>Stale-fill guard.</b> A read miss records, for the calling thread, the stamp it observed.
+ * The write that fills the entry afterwards compares the stamp again inside its script and refuses
+ * to write if any fence moved, so a load that began before an invalidation of the entity, or of any
+ * container above it, cannot refill the key once the invalidation committed. The guard fails
+ * closed: a write with no recorded stamp, whether because no miss preceded it on this thread or
+ * because the miss failed to reach Redis, is not written at all. A record left by an earlier miss
+ * of the same key on the same thread still guards the write, so it is never unsafe.
  *
- * <p><b>Fence lifetime.</b> Fence values are generations drawn from a per-metalake counter that
- * never expires, so a recreated fence can never repeat the value a stale reader observed. Fence
- * keys themselves may expire after {@code gravitino.cache.redis.fenceTtlMs}, and a fill whose
- * record is older than that lifetime is discarded on the client, so a fence can only be missing for
- * a fill that is too old to be accepted anyway. Together these close both reuse sequences: a fence
- * that expires and is recreated, and a fence that was absent, set, and expired again.
- *
- * <p><b>Registry and clear.</b> A read miss registers its metalake in the namespace's registry set
- * before the caller loads the entity, so every metalake with a fill in flight is registered, even
- * one with nothing indexed yet. {@link #clear()} walks the registry and runs one script per
- * metalake that moves the metalake's own fence to a fresh generation, which rejects every fill in
- * flight for that metalake, and deletes the values and the index together, so a concurrent fill can
- * never leave a value without its index member. A miss registered after the clear read the registry
- * begins its load after the clear began, so what it fills is not older than the clear. Fences are
- * left in place and expire on their own. {@link #size()} walks the registry too; nothing here scans
- * the keyspace, so no operation depends on cluster topology.
- *
- * <p><b>Index reclamation.</b> Redis expires values on its own and leaves their index members
- * behind. A bounded reaper removes members whose value is gone, one batch per {@value
- * #REAP_EVERY_N_WRITES} writes into a metalake and one batch per metalake visited by {@link
- * #size()}, checking absence and removing inside one script so it can never unindex a concurrent
- * refill.
+ * <p><b>Fence lifetime.</b> Fences and the per-metalake generation counter carry no TTL, so no
+ * {@code volatile-*} eviction policy can remove them and a generation is never reused. An {@code
+ * allkeys-*} policy could evict either, so the cache refuses to start when Redis reports one. A
+ * metalake's fences are deleted only when the metalake itself is invalidated, which moves the
+ * metalake fence that every stamp under it includes.
  *
  * <p><b>Failure policy.</b> Reads and fills are optimizations: a Redis error or timeout makes them
- * a miss or a no-op. An invalidation is a correctness obligation: a failure is propagated as a
- * {@link RuntimeException} so it is never silently dropped, and the entry expires by TTL at the
- * latest. An unreachable Redis at startup fails fast. {@link #close()} releases only this node's
- * client; the shared data is left for the other nodes.
+ * a miss or a no-op. A failed invalidation is retried once, then logged and counted, and the call
+ * returns normally: the store has already committed, and failing the caller would report a
+ * successful write as failed. An unreachable Redis at startup fails fast. {@link #close()} releases
+ * only this node's client; the shared data is left for the other nodes.
+ *
+ * <p><b>Maintenance.</b> {@link #clear()} and {@link #size()} scan the keyspace on every primary.
+ * They have no production caller for a shared cache and are meant for operators and tests; {@link
+ * #clear()} moves the fence of every metalake it finds, which rejects the fills in flight there,
+ * but gives no such guarantee for a metalake with nothing cached when the scan passes it.
  */
 public class RedisEntityCache extends BaseEntityCache {
 
   private static final Logger LOG = LoggerFactory.getLogger(RedisEntityCache.class);
 
-  /** Per-thread bound on recorded fences awaiting the write that consumes them. */
-  @VisibleForTesting static final int MAX_PENDING_FENCES = 1024;
-
-  /** Writes into one metalake between two reaper batches over its index. */
-  @VisibleForTesting static final int REAP_EVERY_N_WRITES = 64;
-
-  /** Index members one reaper batch examines. */
-  @VisibleForTesting static final int REAP_BATCH = 256;
+  /** Per-thread bound on recorded stamps awaiting the write that consumes them. */
+  @VisibleForTesting static final int MAX_PENDING_STAMPS = 1024;
 
   private static final long FAILURE_LOG_INTERVAL_MS = 30_000L;
+  private static final int SCAN_BATCH = 1000;
+  private static final String MAXMEMORY_POLICY = "maxmemory-policy";
 
   /**
-   * Reads a value, or on a miss the fences guarding a later fill. {@code KEYS[1]} is the value key;
-   * {@code ARGV} lists the fence keys. Returns {@code {1, value}} on a hit and {@code {0,
-   * fence...}} on a miss, with an absent fence reported as {@code "0"}.
+   * Reads a value. {@code KEYS[1]} is the value key and {@code KEYS[2]} the metalake's fences;
+   * {@code ARGV} lists the fence paths of the stamp. Returns {@code {1, value}} on a hit, {@code
+   * {0, stamp}} on a miss, and {@code {2, stamp}} when a value was found under an outdated stamp
+   * and deleted. An absent fence reads as {@code "0"}.
    */
   @VisibleForTesting
   static final String READ_SCRIPT =
-      "local v = redis.call('GET', KEYS[1])\n"
-          + "if v then return {1, v} end\n"
-          + "local r = {0}\n"
-          + "for i = 1, #ARGV do r[#r + 1] = redis.call('GET', ARGV[i]) or '0' end\n"
+      "local f = redis.call('HMGET', KEYS[2], unpack(ARGV))\n"
+          + "for i = 1, #ARGV do f[i] = f[i] or '0' end\n"
+          + "local stamp = table.concat(f, ',')\n"
+          + "local e = redis.call('HMGET', KEYS[1], 'v', 's')\n"
+          + "if e[1] then\n"
+          + "  if e[2] == stamp then return {1, e[1]} end\n"
+          + "  redis.call('DEL', KEYS[1])\n"
+          + "  return {2, stamp}\n"
+          + "end\n"
+          + "return {0, stamp}\n";
+
+  /**
+   * Reads several values of one metalake without recording anything. {@code KEYS[1]} is the
+   * metalake's fences, followed by the value keys; {@code ARGV} holds, for each value key in order,
+   * the number of its fence paths followed by the paths. Returns one element per value key: the
+   * value, or nil when absent or outdated. An outdated value is deleted.
+   */
+  @VisibleForTesting
+  static final String PEEK_SCRIPT =
+      "local r = {}\n"
+          + "local a = 1\n"
+          + "for k = 2, #KEYS do\n"
+          + "  local c = tonumber(ARGV[a])\n"
+          + "  local f = redis.call('HMGET', KEYS[1], unpack(ARGV, a + 1, a + c))\n"
+          + "  for i = 1, c do f[i] = f[i] or '0' end\n"
+          + "  a = a + c + 1\n"
+          + "  local e = redis.call('HMGET', KEYS[k], 'v', 's')\n"
+          + "  if e[1] and e[2] == table.concat(f, ',') then\n"
+          + "    r[#r + 1] = e[1]\n"
+          + "  else\n"
+          + "    if e[1] then redis.call('DEL', KEYS[k]) end\n"
+          + "    r[#r + 1] = false\n"
+          + "  end\n"
+          + "end\n"
           + "return r\n";
 
   /**
-   * Writes a value unless a guarding fence moved. {@code KEYS[1]} is the index key and {@code
-   * KEYS[2]} the value key; {@code ARGV[1]} is the index member, {@code ARGV[2]} the value, {@code
-   * ARGV[3]} the TTL in milliseconds (0 for none), followed by (fence key, expected value) pairs.
+   * Writes a value unless its stamp changed. {@code KEYS[1]} is the value key and {@code KEYS[2]}
+   * the metalake's fences; {@code ARGV[1]} is the value, {@code ARGV[2]} the TTL in milliseconds,
+   * {@code ARGV[3]} the stamp observed by the miss, followed by the fence paths of the stamp.
    * Returns 1 if written and 0 if rejected.
    */
   @VisibleForTesting
   static final String PUT_SCRIPT =
-      "for i = 4, #ARGV, 2 do\n"
-          + "  if (redis.call('GET', ARGV[i]) or '0') ~= ARGV[i + 1] then return 0 end\n"
-          + "end\n"
-          + "if tonumber(ARGV[3]) > 0 then\n"
-          + "  redis.call('SET', KEYS[2], ARGV[2], 'PX', ARGV[3])\n"
-          + "else\n"
-          + "  redis.call('SET', KEYS[2], ARGV[2])\n"
-          + "end\n"
-          + "redis.call('ZADD', KEYS[1], 0, ARGV[1])\n"
+      "local f = redis.call('HMGET', KEYS[2], unpack(ARGV, 4, #ARGV))\n"
+          + "for i = 1, #ARGV - 3 do f[i] = f[i] or '0' end\n"
+          + "if table.concat(f, ',') ~= ARGV[3] then return 0 end\n"
+          + "redis.call('DEL', KEYS[1])\n"
+          + "redis.call('HSET', KEYS[1], 'v', ARGV[1], 's', ARGV[3])\n"
+          + "redis.call('PEXPIRE', KEYS[1], ARGV[2])\n"
           + "return 1\n";
 
   /**
-   * Drops an entry and its indexed descendants. {@code KEYS[1]} is the index key; {@code ARGV[1]}
-   * is the slot prefix, {@code ARGV[2]} the index member, {@code ARGV[3]} the identifier whose
-   * fence to move, {@code ARGV[4]} the fence TTL in milliseconds (0 for none), followed by the
-   * descendant prefixes to range over. The fence takes the next generation of the metalake's
-   * never-expiring counter. The upper bound {@code prefix\xff} is above every UTF-8 member starting
-   * with the prefix. Returns the number of values deleted.
+   * Invalidates an identifier and, lazily, everything below it. {@code KEYS[1]} is the metalake's
+   * generation counter, {@code KEYS[2]} its fences and {@code KEYS[3]} the value key; {@code
+   * ARGV[1]} is the fence path of the identifier and {@code ARGV[2]} is {@code "1"} when the
+   * identifier is the metalake itself, whose fences are then discarded: the metalake fence moves
+   * with them, so every stamp under the metalake is outdated anyway. Runs in constant time. Returns
+   * the number of values deleted.
    */
   @VisibleForTesting
   static final String DROP_SCRIPT =
-      "local idx = KEYS[1]\n"
-          + "local prefix = ARGV[1]\n"
-          + "local fence = prefix .. 'F:' .. ARGV[3]\n"
-          + "local generation = redis.call('INCR', prefix .. 'G')\n"
-          + "redis.call('SET', fence, generation)\n"
-          + "if tonumber(ARGV[4]) > 0 then redis.call('PEXPIRE', fence, ARGV[4]) end\n"
-          + "local removed = redis.call('DEL', prefix .. 'D:' .. ARGV[2])\n"
-          + "redis.call('ZREM', idx, ARGV[2])\n"
-          + "for i = 5, #ARGV do\n"
-          + "  local members = redis.call('ZRANGEBYLEX', idx, '[' .. ARGV[i], "
-          + "'[' .. ARGV[i] .. '\\255')\n"
-          + "  for _, m in ipairs(members) do\n"
-          + "    removed = removed + redis.call('DEL', prefix .. 'D:' .. m)\n"
-          + "    redis.call('ZREM', idx, m)\n"
-          + "  end\n"
-          + "end\n"
-          + "return removed\n";
+      "local g = redis.call('INCR', KEYS[1])\n"
+          + "if ARGV[2] == '1' then redis.call('UNLINK', KEYS[2]) end\n"
+          + "redis.call('HSET', KEYS[2], ARGV[1], g)\n"
+          + "return redis.call('DEL', KEYS[3])\n";
 
   /**
-   * Clears one metalake atomically, whether or not it has an index yet. {@code KEYS[1]} is the
-   * index key; {@code ARGV[1]} is the slot prefix, {@code ARGV[2]} the fence key of the metalake
-   * itself, {@code ARGV[3]} the fence TTL in milliseconds (0 for none). Moves the metalake fence to
-   * a fresh generation, so every fill in flight for the metalake is rejected, then deletes every
-   * indexed value and the index in the same script, so no fill can slip between them. Returns the
-   * number of values deleted.
-   */
-  @VisibleForTesting
-  static final String CLEAR_SCRIPT =
-      "local idx = KEYS[1]\n"
-          + "local prefix = ARGV[1]\n"
-          + "local generation = redis.call('INCR', prefix .. 'G')\n"
-          + "redis.call('SET', ARGV[2], generation)\n"
-          + "if tonumber(ARGV[3]) > 0 then redis.call('PEXPIRE', ARGV[2], ARGV[3]) end\n"
-          + "local members = redis.call('ZRANGE', idx, 0, -1)\n"
-          + "local removed = 0\n"
-          + "for _, m in ipairs(members) do\n"
-          + "  removed = removed + redis.call('DEL', prefix .. 'D:' .. m)\n"
-          + "end\n"
-          + "redis.call('DEL', idx)\n"
-          + "return removed\n";
-
-  /**
-   * Discards an entry only if it still holds the bytes the caller read. {@code KEYS[1]} is the
-   * index key and {@code KEYS[2]} the value key; {@code ARGV[1]} is the index member, {@code
-   * ARGV[2]} the bytes observed. A concurrent fill that replaced the value is left intact together
-   * with its index member. Returns 1 if discarded and 0 otherwise.
+   * Discards a value only if it still holds the bytes the caller read. {@code KEYS[1]} is the value
+   * key; {@code ARGV[1]} the bytes observed. A concurrent fill that replaced the value is left
+   * intact. Returns 1 if discarded and 0 otherwise.
    */
   @VisibleForTesting
   static final String DISCARD_SCRIPT =
-      "if redis.call('GET', KEYS[2]) == ARGV[2] then\n"
-          + "  redis.call('DEL', KEYS[2])\n"
-          + "  redis.call('ZREM', KEYS[1], ARGV[1])\n"
-          + "  return 1\n"
+      "if redis.call('HGET', KEYS[1], 'v') == ARGV[1] then\n"
+          + "  return redis.call('DEL', KEYS[1])\n"
           + "end\n"
           + "return 0\n";
 
-  /**
-   * Removes index members whose value no longer exists, one batch at a time. {@code KEYS[1]} is the
-   * index key; {@code ARGV[1]} is the slot prefix, {@code ARGV[2]} the member to resume after
-   * (empty to start), {@code ARGV[3]} the batch size. The absence check and the removal run in one
-   * script, so a member re-added by a concurrent fill is never removed. Returns {@code {removed,
-   * examined, last member}}.
-   */
-  @VisibleForTesting
-  static final String REAP_SCRIPT =
-      "local idx = KEYS[1]\n"
-          + "local prefix = ARGV[1]\n"
-          + "local lower = '-'\n"
-          + "if ARGV[2] ~= '' then lower = '(' .. ARGV[2] end\n"
-          + "local members = redis.call('ZRANGEBYLEX', idx, lower, '+', 'LIMIT', 0, "
-          + "tonumber(ARGV[3]))\n"
-          + "local removed = 0\n"
-          + "for _, m in ipairs(members) do\n"
-          + "  if redis.call('EXISTS', prefix .. 'D:' .. m) == 0 then\n"
-          + "    removed = removed + redis.call('ZREM', idx, m)\n"
-          + "  end\n"
-          + "end\n"
-          + "local last = ''\n"
-          + "if #members > 0 then last = members[#members] end\n"
-          + "return {removed, #members, last}\n";
+  private static final Script READ = new Script(READ_SCRIPT);
+  private static final Script PEEK = new Script(PEEK_SCRIPT);
+  private static final Script PUT = new Script(PUT_SCRIPT);
+  private static final Script DROP = new Script(DROP_SCRIPT);
+  private static final Script DISCARD = new Script(DISCARD_SCRIPT);
 
   private final UnifiedJedis jedis;
   private final RedisKeyspace keyspace;
   private final KryoEntitySerializer serializer;
   private final SegmentedLock segmentedLock;
   private final long valueTtlMs;
-  private final long fenceTtlMs;
-  private final byte[] readScript;
-  private final byte[] putScript;
-  private final byte[] dropScript;
-  private final byte[] clearScript;
-  private final byte[] discardScript;
-  private final byte[] reapScript;
+  private final RedisEntityCacheMetricsSource metrics = new RedisEntityCacheMetricsSource();
   private final AtomicLong lastFailureLogMs = new AtomicLong();
-  private final AtomicLong writes = new AtomicLong();
+  private volatile boolean metricsRegistered;
 
   /**
    * Set by {@link #close()}. A cluster client reconnects on demand after it was closed, so the
@@ -270,23 +229,18 @@ public class RedisEntityCache extends BaseEntityCache {
   private volatile boolean closed;
 
   /**
-   * Where the reaper resumes in each metalake's index, keyed by metalake; absent means the start.
+   * Stamps observed by a read miss on this thread, keyed by value key, consumed by the write that
+   * fills the entry. Bounded and access-ordered so an entry whose write never happens (the store
+   * had no such entity) is eventually evicted; a write whose record was evicted is not performed,
+   * never performed unguarded.
    */
-  private final ConcurrentMap<String, String> reapCursors = new ConcurrentHashMap<>();
-
-  /**
-   * Fences observed by a read miss on this thread, keyed by index member, consumed by the write
-   * that fills the entry. Bounded and access-ordered so an entry whose write never happens (the
-   * store had no such entity) is eventually evicted; a write whose record was evicted is not
-   * performed, never performed unguarded.
-   */
-  private final ThreadLocal<Map<String, FenceSnapshot>> pendingFences =
+  private final ThreadLocal<Map<String, StampRecord>> pendingStamps =
       ThreadLocal.withInitial(
           () ->
-              new LinkedHashMap<String, FenceSnapshot>(16, 0.75f, true) {
+              new LinkedHashMap<String, StampRecord>(16, 0.75f, true) {
                 @Override
-                protected boolean removeEldestEntry(Map.Entry<String, FenceSnapshot> eldest) {
-                  return size() > MAX_PENDING_FENCES;
+                protected boolean removeEldestEntry(Map.Entry<String, StampRecord> eldest) {
+                  return size() > MAX_PENDING_STAMPS;
                 }
               });
 
@@ -299,6 +253,11 @@ public class RedisEntityCache extends BaseEntityCache {
   public RedisEntityCache(Config cacheConfig) {
     this(cacheConfig, createClient(cacheConfig));
     probe(cacheConfig.get(Configs.CACHE_REDIS_ADDRESS));
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    if (metricsSystem != null) {
+      metricsSystem.register(metrics);
+      metricsRegistered = true;
+    }
   }
 
   /**
@@ -318,21 +277,13 @@ public class RedisEntityCache extends BaseEntityCache {
     this.serializer = new KryoEntitySerializer();
     this.segmentedLock = new SegmentedLock(cacheConfig.get(Configs.CACHE_LOCK_SEGMENTS));
     this.valueTtlMs = cacheConfig.get(Configs.CACHE_EXPIRATION_TIME);
-    long configuredFenceTtl = cacheConfig.get(Configs.CACHE_REDIS_FENCE_TTL_MS);
-    this.fenceTtlMs = configuredFenceTtl == 0 ? 2 * valueTtlMs : configuredFenceTtl;
+    // An outdated value is reclaimed by its next read or by its TTL. Without a TTL, a value nobody
+    // reads again after an ancestor was invalidated would stay in Redis forever.
     Preconditions.checkArgument(
-        valueTtlMs == 0 || fenceTtlMs > valueTtlMs,
-        "%s (%s ms) must exceed %s (%s ms)",
-        Configs.CACHE_REDIS_FENCE_TTL_MS.getKey(),
-        fenceTtlMs,
+        valueTtlMs > 0,
+        "%s must be positive when %s is 'redis'",
         Configs.CACHE_EXPIRATION_TIME.getKey(),
-        valueTtlMs);
-    this.readScript = utf8(READ_SCRIPT);
-    this.putScript = utf8(PUT_SCRIPT);
-    this.dropScript = utf8(DROP_SCRIPT);
-    this.clearScript = utf8(CLEAR_SCRIPT);
-    this.discardScript = utf8(DISCARD_SCRIPT);
-    this.reapScript = utf8(REAP_SCRIPT);
+        Configs.CACHE_IMPLEMENTATION.getKey());
   }
 
   /** {@inheritDoc} */
@@ -344,185 +295,255 @@ public class RedisEntityCache extends BaseEntityCache {
   /**
    * {@inheritDoc}
    *
-   * <p>On a miss, records the fences guarding this key for the calling thread and registers the
-   * key's metalake, so that the write which follows can be rejected if a drop or a clear commits in
-   * between. A Redis failure is a miss that records nothing, so the write which follows it is not
-   * performed.
+   * <p>On a miss, records the observed stamp for the calling thread, so that the write which
+   * follows can be rejected if an invalidation commits in between. A Redis failure is a miss that
+   * records nothing, so the write which follows it is not performed.
    */
   @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
       NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
-    EntityCacheKey key = EntityCacheKey.of(ident, type);
-    String member = RedisKeyspace.member(key);
-    List<String> fencePaths = RedisKeyspace.fencePaths(ident, schemaSeparator());
-    List<byte[]> fenceKeys = Lists.newArrayListWithCapacity(fencePaths.size());
-    for (String path : fencePaths) {
-      fenceKeys.add(utf8(keyspace.fenceKey(ident, path)));
+    if (!isCacheable(type)) {
+      return Optional.empty();
     }
+    EntityCacheKey key = EntityCacheKey.of(ident, type);
+    String valueKey = keyspace.valueKey(key);
+    List<byte[]> paths = fencePathArgs(ident);
 
     List<?> reply;
     try {
       reply =
           (List<?>)
-              jedis.eval(readScript, ImmutableList.of(utf8(keyspace.valueKey(key))), fenceKeys);
+              run(READ, ImmutableList.of(utf8(valueKey), utf8(keyspace.fencesKey(ident))), paths);
     } catch (JedisException e) {
       // A record left by an earlier miss must not vouch for a load this read did not bound.
-      pendingFences.get().remove(member);
+      pendingStamps.get().remove(valueKey);
       logFailure("read", key, e);
       return Optional.empty();
     }
 
-    if (((Long) reply.get(0)) == 1L) {
+    long status = (Long) reply.get(0);
+    if (status == 1L) {
       byte[] bytes = (byte[]) reply.get(1);
       try {
-        return Optional.of(convertEntity(serializer.deserialize(bytes)));
+        E entity = convertEntity(serializer.deserialize(bytes));
+        metrics.hit();
+        return Optional.of(entity);
       } catch (RuntimeException e) {
         LOG.warn("Discarding cache entry {} that could not be deserialized", key, e);
-        pendingFences.get().remove(member);
+        pendingStamps.get().remove(valueKey);
         discardQuietly(key, bytes);
+        metrics.miss();
         return Optional.empty();
       }
     }
 
-    List<byte[]> epochs = Lists.newArrayListWithCapacity(fenceKeys.size());
-    for (int i = 1; i < reply.size(); i++) {
-      epochs.add((byte[]) reply.get(i));
+    if (status == 2L) {
+      metrics.staleRead();
     }
-    // Registered before the caller loads, so a clear that runs from here on either sees this
-    // metalake and fences it, or read the registry before this load began.
-    try {
-      jedis.sadd(keyspace.registryKey(), RedisKeyspace.hashTag(ident));
-    } catch (JedisException e) {
-      pendingFences.get().remove(member);
-      logFailure("register", key, e);
-      return Optional.empty();
-    }
-    pendingFences.get().put(member, new FenceSnapshot(fenceKeys, epochs));
+    metrics.miss();
+    pendingStamps.get().put(valueKey, new StampRecord(paths, (byte[]) reply.get(1)));
     return Optional.empty();
   }
 
   /**
    * {@inheritDoc}
    *
-   * <p>Moves the fence of the identifier to a fresh generation and deletes the entry together with
-   * every indexed descendant in one atomic script. A Redis failure is propagated, because a dropped
-   * invalidation would leave a stale value readable by every node.
+   * <p>Keys of one metalake are read in a single script, so resolving the ancestors of an
+   * identifier costs one round trip. Nothing is recorded for a later write, and a Redis failure
+   * reports every key as absent.
+   */
+  @Override
+  public List<Optional<HasIdentifier>> peekAll(List<EntityCacheKey> keys) {
+    Preconditions.checkArgument(keys != null, "keys cannot be null");
+    checkOpen();
+    List<Optional<HasIdentifier>> result = Lists.newArrayListWithCapacity(keys.size());
+    if (keys.isEmpty()) {
+      return result;
+    }
+
+    String metalake = RedisKeyspace.hashTag(keys.get(0).identifier());
+    for (EntityCacheKey key : keys) {
+      if (!metalake.equals(RedisKeyspace.hashTag(key.identifier()))) {
+        // Keys of different metalakes live in different slots; read each on its own.
+        for (EntityCacheKey single : keys) {
+          result.add(peekAll(ImmutableList.of(single)).get(0));
+        }
+        return result;
+      }
+    }
+
+    List<byte[]> scriptKeys = Lists.newArrayList(utf8(keyspace.fencesKey(metalake)));
+    List<byte[]> args = Lists.newArrayList();
+    List<Integer> positions = Lists.newArrayList();
+    for (int i = 0; i < keys.size(); i++) {
+      EntityCacheKey key = keys.get(i);
+      result.add(Optional.empty());
+      if (!isCacheable(key.entityType())) {
+        continue;
+      }
+      List<byte[]> paths = fencePathArgs(key.identifier());
+      scriptKeys.add(utf8(keyspace.valueKey(key)));
+      args.add(utf8(Integer.toString(paths.size())));
+      args.addAll(paths);
+      positions.add(i);
+    }
+    if (positions.isEmpty()) {
+      return result;
+    }
+
+    List<?> reply;
+    try {
+      reply = (List<?>) run(PEEK, scriptKeys, args);
+    } catch (JedisException e) {
+      logFailure("peek", keys.get(0), e);
+      return result;
+    }
+
+    for (int j = 0; j < positions.size(); j++) {
+      int i = positions.get(j);
+      byte[] bytes = (byte[]) reply.get(j);
+      if (bytes == null) {
+        metrics.miss();
+        continue;
+      }
+      try {
+        result.set(i, Optional.of((HasIdentifier) convertEntity(serializer.deserialize(bytes))));
+        metrics.hit();
+      } catch (RuntimeException e) {
+        LOG.warn("Discarding cache entry {} that could not be deserialized", keys.get(i), e);
+        discardQuietly(keys.get(i), bytes);
+        metrics.miss();
+      }
+    }
+    return result;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Moves the fence of the identifier to a fresh generation and deletes its value, in constant
+   * time; descendants stop being served because their stamps include that fence. A Redis failure is
+   * retried once, then logged and counted, and this returns {@code false} instead of throwing: the
+   * store has already committed, and the change-log replay on every node repeats the invalidation.
    */
   @Override
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
     EntityCacheKey key = EntityCacheKey.of(ident, type);
-    List<byte[]> args = Lists.newArrayList();
-    args.add(utf8(keyspace.slotPrefix(ident)));
-    args.add(utf8(RedisKeyspace.member(key)));
-    args.add(utf8(ident.toString()));
-    args.add(utf8(Long.toString(fenceTtlMs)));
-    for (String prefix : RedisKeyspace.descendantPrefixes(key, schemaSeparator())) {
-      args.add(utf8(prefix));
-    }
-    List<byte[]> keys = ImmutableList.of(utf8(keyspace.indexKey(ident)));
+    List<byte[]> paths = fencePathArgs(ident);
+    List<byte[]> keys =
+        ImmutableList.of(
+            utf8(keyspace.generationKey(ident)),
+            utf8(keyspace.fencesKey(ident)),
+            utf8(keyspace.valueKey(key)));
+    List<byte[]> args =
+        ImmutableList.of(paths.get(paths.size() - 1), utf8(ident.hasNamespace() ? "0" : "1"));
 
     return segmentedLock.withLock(
         key,
         () -> {
-          try {
-            jedis.eval(dropScript, keys, args);
-            return true;
-          } catch (JedisException e) {
-            throw new RuntimeException(
-                "Failed to invalidate entity cache entry "
-                    + key
-                    + " in Redis; a stale entry may remain readable until it expires",
-                e);
+          JedisException failure = null;
+          for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+              run(DROP, keys, args);
+              return true;
+            } catch (JedisException e) {
+              failure = e;
+            }
           }
+          metrics.invalidationFailed();
+          LOG.error(
+              "Failed to invalidate entity cache entry {} in Redis; other nodes may serve the "
+                  + "previous copy until the change log replays this change or it expires",
+              key,
+              failure);
+          return false;
         });
   }
 
-  /** {@inheritDoc} A Redis failure is reported as absent. */
+  /** {@inheritDoc} Checks the stamp like a read does; a Redis failure is reported as absent. */
   @Override
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
-    EntityCacheKey key = EntityCacheKey.of(ident, type);
-    try {
-      return jedis.exists(utf8(keyspace.valueKey(key)));
-    } catch (JedisException e) {
-      logFailure("contains", key, e);
-      return false;
-    }
+    return peekAll(ImmutableList.of(EntityCacheKey.of(ident, type))).get(0).isPresent();
   }
 
   /**
    * {@inheritDoc}
    *
-   * <p>Sums the index of every registered metalake, so the result is a point-in-time estimate. Each
-   * metalake visited also gets one reaper batch, so members left behind by expired values are
-   * reclaimed by repeated calls even on an idle cache.
+   * <p>A maintenance operation: counts the value keys of this namespace on every primary. Values
+   * that are outdated but not yet reclaimed are counted too.
    */
   @Override
   public long size() {
     checkOpen();
-    long total = 0;
-    for (String metalake : registeredMetalakes()) {
-      reapBatch(metalake);
-      total += jedis.zcard(keyspace.indexKey(metalake));
-    }
-    return total;
+    AtomicLong total = new AtomicLong();
+    forEachPrimary(
+        node ->
+            scan(
+                node,
+                keyspace.allValueKeysPattern(),
+                valueKey -> {
+                  if (keyspace.metalakeOfValueKey(valueKey) != null) {
+                    total.incrementAndGet();
+                  }
+                }));
+    return total.get();
   }
 
   /**
    * {@inheritDoc}
    *
-   * <p>Clears one registered metalake at a time, each atomically with respect to the fills of that
-   * metalake: the metalake's own fence moves to a fresh generation, rejecting every fill in flight,
-   * and the values and index are deleted in the same script. Metalakes with fills in flight but
-   * nothing indexed yet are registered too, so they are fenced as well. Fences are left in place
-   * and expire on their own.
+   * <p>A maintenance operation: scans every primary, and for each metalake it finds moves the
+   * metalake fence, which outdates every value and rejects every fill in flight there, then deletes
+   * the values it finds. A metalake with nothing cached when the scan passes it is not fenced, so a
+   * fill in flight there may still land. A Redis failure is propagated.
    */
   @Override
   public void clear() {
     checkOpen();
     segmentedLock.withGlobalLock(
         () -> {
-          pendingFences.get().clear();
-          reapCursors.clear();
-          for (String metalake : registeredMetalakes()) {
-            List<byte[]> args =
-                ImmutableList.of(
-                    utf8(keyspace.slotPrefix(metalake)),
-                    utf8(keyspace.metalakeFenceKey(metalake)),
-                    utf8(Long.toString(fenceTtlMs)));
-            jedis.eval(clearScript, ImmutableList.of(utf8(keyspace.indexKey(metalake))), args);
-          }
+          pendingStamps.get().clear();
+          Set<String> fenced = new HashSet<>();
+          forEachPrimary(
+              node ->
+                  scan(
+                      node,
+                      keyspace.allValueKeysPattern(),
+                      valueKey -> {
+                        String metalake = keyspace.metalakeOfValueKey(valueKey);
+                        if (metalake == null) {
+                          return;
+                        }
+                        if (fenced.add(metalake)) {
+                          dropMetalake(metalake);
+                        }
+                        jedis.unlink(valueKey);
+                      }));
         });
   }
 
   /**
    * {@inheritDoc}
    *
-   * <p>Guarded by the fences recorded by the miss that preceded it on this thread. Fails closed:
-   * with no record, or a record older than the fence lifetime, nothing is written and the next read
-   * loads the entity under a fresh record. A Redis failure discards the write.
+   * <p>Guarded by the stamp recorded by the miss that preceded it on this thread. Fails closed:
+   * with no record nothing is written and the next read loads the entity under a fresh record. A
+   * Redis failure discards the write.
    */
   @Override
   protected <E extends Entity & HasIdentifier> void doPut(E entity) {
     checkOpen();
     NameIdentifier ident = getIdentFromEntity(entity);
     EntityCacheKey key = EntityCacheKey.of(ident, entity.type());
-    String member = RedisKeyspace.member(key);
-    FenceSnapshot snapshot = pendingFences.get().remove(member);
-    if (snapshot == null) {
+    String valueKey = keyspace.valueKey(key);
+    StampRecord record = pendingStamps.get().remove(valueKey);
+    if (record == null) {
+      metrics.fillSkipped();
       LOG.debug(
-          "Not caching {}: no miss on this thread recorded the fences that would bound its load",
+          "Not caching {}: no miss on this thread recorded the stamp that would bound its load",
           key);
-      return;
-    }
-    if (fenceTtlMs > 0 && snapshot.ageMs() >= fenceTtlMs) {
-      LOG.debug(
-          "Not caching {}: its fence record is {} ms old, at least the fence lifetime of {} ms",
-          key,
-          snapshot.ageMs(),
-          fenceTtlMs);
       return;
     }
 
@@ -534,24 +555,20 @@ public class RedisEntityCache extends BaseEntityCache {
       return;
     }
 
-    List<byte[]> keys =
-        ImmutableList.of(utf8(keyspace.indexKey(ident)), utf8(keyspace.valueKey(key)));
+    List<byte[]> keys = ImmutableList.of(utf8(valueKey), utf8(keyspace.fencesKey(ident)));
     List<byte[]> args = Lists.newArrayList();
-    args.add(utf8(member));
     args.add(value);
     args.add(utf8(Long.toString(valueTtlMs)));
-    for (int i = 0; i < snapshot.fenceKeys.size(); i++) {
-      args.add(snapshot.fenceKeys.get(i));
-      args.add(snapshot.epochs.get(i));
-    }
+    args.add(record.stamp);
+    args.addAll(record.paths);
 
     try {
-      Object written = jedis.eval(putScript, keys, args);
+      Object written = run(PUT, keys, args);
       if (Long.valueOf(0L).equals(written)) {
+        metrics.fillRejected();
         LOG.debug("Rejected write of {}: the entry was invalidated while it was loading", key);
-      }
-      if (writes.incrementAndGet() % REAP_EVERY_N_WRITES == 0) {
-        reapBatch(RedisKeyspace.hashTag(ident));
+      } else {
+        metrics.fillWritten();
       }
     } catch (JedisException e) {
       logFailure("write", key, e);
@@ -574,7 +591,7 @@ public class RedisEntityCache extends BaseEntityCache {
     try {
       segmentedLock.withLockAndThrow(key, action);
     } finally {
-      pendingFences.get().remove(RedisKeyspace.member(key));
+      pendingStamps.get().remove(keyspace.valueKey(key));
     }
   }
 
@@ -587,28 +604,17 @@ public class RedisEntityCache extends BaseEntityCache {
     try {
       return segmentedLock.withLockAndThrow(key, action);
     } finally {
-      pendingFences.get().remove(RedisKeyspace.member(key));
+      pendingStamps.get().remove(keyspace.valueKey(key));
     }
   }
 
   /**
    * {@inheritDoc}
    *
-   * <p>Redis expires values on its own and nothing calls this hook for them; the index members they
-   * leave behind are reclaimed by the reaper instead. Kept for callers that learn of an expiry by
-   * other means: removes the member only if the value is indeed gone.
+   * <p>Redis expires values on its own and keeps no index of them, so there is nothing to do.
    */
   @Override
-  protected void invalidateExpiredItem(EntityCacheKey key) {
-    try {
-      jedis.eval(
-          discardScript,
-          ImmutableList.of(utf8(keyspace.indexKey(key.identifier())), utf8(keyspace.valueKey(key))),
-          ImmutableList.of(utf8(RedisKeyspace.member(key)), new byte[0]));
-    } catch (JedisException e) {
-      logFailure("unindex", key, e);
-    }
-  }
+  protected void invalidateExpiredItem(EntityCacheKey key) {}
 
   /**
    * {@inheritDoc}
@@ -620,25 +626,14 @@ public class RedisEntityCache extends BaseEntityCache {
   @Override
   public void close() {
     closed = true;
+    if (metricsRegistered) {
+      MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+      if (metricsSystem != null) {
+        metricsSystem.unregister(metrics);
+      }
+      metricsRegistered = false;
+    }
     jedis.close();
-  }
-
-  /**
-   * Runs the reaper over the whole index of the given metalake, batch after batch, until it has
-   * been examined end to end.
-   *
-   * @param metalake the metalake whose index to reap
-   * @return the number of index members removed
-   */
-  @VisibleForTesting
-  long reapIndex(NameIdentifier metalake) {
-    String name = RedisKeyspace.hashTag(metalake);
-    reapCursors.remove(name);
-    long removed = 0;
-    do {
-      removed += reapBatch(name);
-    } while (reapCursors.containsKey(name));
-    return removed;
   }
 
   @VisibleForTesting
@@ -649,6 +644,11 @@ public class RedisEntityCache extends BaseEntityCache {
   @VisibleForTesting
   RedisKeyspace keyspace() {
     return keyspace;
+  }
+
+  @VisibleForTesting
+  RedisEntityCacheMetricsSource metrics() {
+    return metrics;
   }
 
   private static UnifiedJedis createClient(Config config) {
@@ -670,7 +670,9 @@ public class RedisEntityCache extends BaseEntityCache {
 
     int timeoutMs = config.get(Configs.CACHE_REDIS_TIMEOUT_MS);
     DefaultJedisClientConfig.Builder clientConfig =
-        DefaultJedisClientConfig.builder().timeoutMillis(timeoutMs);
+        DefaultJedisClientConfig.builder()
+            .timeoutMillis(timeoutMs)
+            .ssl(config.get(Configs.CACHE_REDIS_SSL));
     String username = config.get(Configs.CACHE_REDIS_USERNAME);
     if (StringUtils.isNotBlank(username)) {
       clientConfig.user(username);
@@ -693,63 +695,128 @@ public class RedisEntityCache extends BaseEntityCache {
     return new JedisPooled(nodes.iterator().next(), built);
   }
 
-  /** Fails fast if Redis cannot be reached, so a misconfiguration never degrades silently. */
+  /**
+   * Fails fast if Redis cannot be reached or evicts keys that carry no TTL, so a misconfiguration
+   * never degrades silently.
+   */
   private void probe(String address) {
     try {
-      jedis.exists(keyspace.registryKey());
+      jedis.exists(keyspace.generationKey(""));
     } catch (JedisException e) {
       jedis.close();
       throw new IllegalStateException("Cannot reach the Redis entity cache at " + address, e);
     }
+    try {
+      checkEvictionPolicy();
+    } catch (IllegalStateException e) {
+      jedis.close();
+      throw e;
+    }
   }
 
-  /** The metalakes this namespace has ever missed on; a Redis failure is propagated. */
-  private Set<String> registeredMetalakes() {
-    return jedis.smembers(keyspace.registryKey());
+  /**
+   * Refuses an {@code allkeys-*} eviction policy, under which Redis may evict the fences and the
+   * generation counter that the stale-fill guard relies on. Managed offerings often disable {@code
+   * CONFIG}; the policy is then unknown and only a warning is logged.
+   */
+  private void checkEvictionPolicy() {
+    List<String> policies = Lists.newArrayList();
+    try {
+      forEachPrimary(
+          node ->
+              policies.add(node.configGet(MAXMEMORY_POLICY).getOrDefault(MAXMEMORY_POLICY, "")));
+    } catch (JedisException e) {
+      LOG.warn(
+          "Could not read {} from Redis ({}). The Redis entity cache requires a policy that "
+              + "never evicts keys without a TTL: noeviction or one of volatile-*. Under "
+              + "allkeys-* a stale entry can be served after an invalidation.",
+          MAXMEMORY_POLICY,
+          e.getMessage());
+      return;
+    }
+    for (String policy : policies) {
+      if (policy.startsWith("allkeys-")) {
+        throw new IllegalStateException(
+            String.format(
+                "Redis reports %s=%s. The Redis entity cache requires noeviction or one of "
+                    + "volatile-*, because allkeys-* can evict the fences that keep stale "
+                    + "entries from being served",
+                MAXMEMORY_POLICY, policy));
+      }
+    }
+  }
+
+  /** Invalidates a metalake, outdating every value under it. A Redis failure is propagated. */
+  private void dropMetalake(String metalake) {
+    EntityCacheKey key = EntityCacheKey.of(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+    run(
+        DROP,
+        ImmutableList.of(
+            utf8(keyspace.generationKey(metalake)),
+            utf8(keyspace.fencesKey(metalake)),
+            utf8(keyspace.valueKey(key))),
+        ImmutableList.of(utf8(metalake), utf8("1")));
   }
 
   /** Discards an entry atomically, and only if it still holds the bytes that were read. */
   private void discardQuietly(EntityCacheKey key, byte[] observed) {
     try {
-      jedis.eval(
-          discardScript,
-          ImmutableList.of(utf8(keyspace.indexKey(key.identifier())), utf8(keyspace.valueKey(key))),
-          ImmutableList.of(utf8(RedisKeyspace.member(key)), observed));
+      run(DISCARD, ImmutableList.of(utf8(keyspace.valueKey(key))), ImmutableList.of(observed));
     } catch (JedisException e) {
       logFailure("discard", key, e);
     }
   }
 
   /**
-   * Runs one reaper batch over a metalake's index, resuming where the previous batch stopped. The
-   * cursor is dropped once the index has been examined end to end, so the next batch starts over.
-   *
-   * @return the number of index members removed, 0 on a Redis failure
+   * Runs a script by its digest, sending the body only when Redis does not have it cached yet, for
+   * example after a restart or on a node that never ran it.
    */
-  private long reapBatch(String metalake) {
-    String indexKey = keyspace.indexKey(metalake);
-    String cursor = reapCursors.getOrDefault(metalake, "");
-    List<byte[]> args =
-        ImmutableList.of(
-            utf8(keyspace.slotPrefix(metalake)), utf8(cursor), utf8(Integer.toString(REAP_BATCH)));
+  private Object run(Script script, List<byte[]> keys, List<byte[]> args) {
     try {
-      List<?> reply = (List<?>) jedis.eval(reapScript, ImmutableList.of(utf8(indexKey)), args);
-      long removed = (Long) reply.get(0);
-      long examined = (Long) reply.get(1);
-      if (examined < REAP_BATCH) {
-        reapCursors.remove(metalake);
-      } else {
-        reapCursors.put(metalake, new String((byte[]) reply.get(2), StandardCharsets.UTF_8));
+      try {
+        return jedis.evalsha(script.sha, keys, args);
+      } catch (JedisNoScriptException e) {
+        return jedis.eval(script.body, keys, args);
       }
-      if (removed > 0) {
-        LOG.debug("Reclaimed {} index members of expired values from {}", removed, indexKey);
-      }
-      return removed;
     } catch (JedisException e) {
-      reapCursors.remove(metalake);
-      LOG.debug("Index reclamation of {} failed; it resumes on a later write", indexKey, e);
-      return 0;
+      metrics.failure();
+      throw e;
     }
+  }
+
+  /**
+   * Runs an action on the standalone server, or on every primary of the cluster. Replicas are
+   * skipped: a key they report is then operated on through the cluster client, which routes by slot
+   * and follows redirections, so a topology change during a scan costs at most a retried command.
+   */
+  private void forEachPrimary(Consumer<Jedis> action) {
+    if (jedis instanceof JedisPooled) {
+      try (Jedis node = new Jedis(((JedisPooled) jedis).getPool().getResource())) {
+        action.accept(node);
+      }
+      return;
+    }
+    if (!(jedis instanceof JedisCluster)) {
+      throw new UnsupportedOperationException(
+          "Unsupported Redis client " + jedis.getClass().getName());
+    }
+    for (ConnectionPool pool : ((JedisCluster) jedis).getClusterNodes().values()) {
+      try (Jedis node = new Jedis(pool.getResource())) {
+        if (node.info("replication").contains("role:master")) {
+          action.accept(node);
+        }
+      }
+    }
+  }
+
+  private static void scan(Jedis node, String pattern, Consumer<String> onKey) {
+    ScanParams params = new ScanParams().match(pattern).count(SCAN_BATCH);
+    String cursor = ScanParams.SCAN_POINTER_START;
+    do {
+      ScanResult<String> result = node.scan(cursor, params);
+      result.getResult().forEach(onKey);
+      cursor = result.getCursor();
+    } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
   }
 
   private void logFailure(String operation, EntityCacheKey key, JedisException e) {
@@ -758,7 +825,7 @@ public class RedisEntityCache extends BaseEntityCache {
     if (now - last >= FAILURE_LOG_INTERVAL_MS && lastFailureLogMs.compareAndSet(last, now)) {
       LOG.warn(
           "Redis entity cache {} of {} failed; treating as a miss. Further failures are logged "
-              + "at DEBUG for {} ms",
+              + "at DEBUG for {} ms and counted in the redis-entity-cache metrics",
           operation,
           key,
           FAILURE_LOG_INTERVAL_MS,
@@ -766,6 +833,15 @@ public class RedisEntityCache extends BaseEntityCache {
     } else {
       LOG.debug("Redis entity cache {} of {} failed; treating as a miss", operation, key, e);
     }
+  }
+
+  private static List<byte[]> fencePathArgs(NameIdentifier ident) {
+    List<String> paths = RedisKeyspace.fencePaths(ident, schemaSeparator());
+    List<byte[]> args = Lists.newArrayListWithCapacity(paths.size());
+    for (String path : paths) {
+      args.add(utf8(path));
+    }
+    return args;
   }
 
   private static String schemaSeparator() {
@@ -786,21 +862,34 @@ public class RedisEntityCache extends BaseEntityCache {
     Preconditions.checkState(!closed, "The Redis entity cache has been closed");
   }
 
-  /** The fences observed by a read miss, passed back to the write that fills the entry. */
-  private static final class FenceSnapshot {
-    private final List<byte[]> fenceKeys;
-    private final List<byte[]> epochs;
-    private final long takenAtNanos = System.nanoTime();
+  /** A Lua script with its SHA-1 digest, for {@code EVALSHA}. */
+  private static final class Script {
+    private final byte[] body;
+    private final byte[] sha;
 
-    private FenceSnapshot(List<byte[]> fenceKeys, List<byte[]> epochs) {
-      Preconditions.checkArgument(
-          fenceKeys.size() == epochs.size(), "fence keys and epochs must pair up");
-      this.fenceKeys = fenceKeys;
-      this.epochs = epochs;
+    private Script(String body) {
+      this.body = utf8(body);
+      try {
+        byte[] digest = MessageDigest.getInstance("SHA-1").digest(this.body);
+        StringBuilder hex = new StringBuilder(digest.length * 2);
+        for (byte b : digest) {
+          hex.append(String.format("%02x", b));
+        }
+        this.sha = utf8(hex.toString());
+      } catch (NoSuchAlgorithmException e) {
+        throw new IllegalStateException("SHA-1 is not available", e);
+      }
     }
+  }
 
-    private long ageMs() {
-      return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - takenAtNanos);
+  /** The stamp observed by a read miss, passed back to the write that fills the entry. */
+  private static final class StampRecord {
+    private final List<byte[]> paths;
+    private final byte[] stamp;
+
+    private StampRecord(List<byte[]> paths, byte[] stamp) {
+      this.paths = paths;
+      this.stamp = stamp;
     }
   }
 }

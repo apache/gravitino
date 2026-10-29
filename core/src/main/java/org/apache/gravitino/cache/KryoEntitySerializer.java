@@ -20,15 +20,19 @@ package org.apache.gravitino.cache;
 
 import com.esotericsoftware.kryo.kryo5.Kryo;
 import com.esotericsoftware.kryo.kryo5.KryoException;
+import com.esotericsoftware.kryo.kryo5.Registration;
 import com.esotericsoftware.kryo.kryo5.Serializer;
 import com.esotericsoftware.kryo.kryo5.io.Input;
 import com.esotericsoftware.kryo.kryo5.io.Output;
 import com.esotericsoftware.kryo.kryo5.objenesis.strategy.StdInstantiatorStrategy;
 import com.esotericsoftware.kryo.kryo5.serializers.CompatibleFieldSerializer;
+import com.esotericsoftware.kryo.kryo5.util.DefaultClassResolver;
 import com.esotericsoftware.kryo.kryo5.util.DefaultInstantiatorStrategy;
+import com.esotericsoftware.kryo.kryo5.util.MapReferenceResolver;
 import com.esotericsoftware.kryo.kryo5.util.Pool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -54,7 +58,9 @@ import org.apache.gravitino.rel.types.Type;
  * Objenesis to instantiate them and {@link CompatibleFieldSerializer} to write field names, which
  * keeps a value written by one server version readable by another during a rolling upgrade: an
  * unknown field is skipped and a missing one stays at its default. Classes are written by name, so
- * no registration is needed. Two families of objects need custom handling:
+ * no registration is needed, but reading resolves a name only if it is on an allowlist (see {@link
+ * #isAllowed(Class)}): anyone who can write to the shared Redis controls the bytes read here. Two
+ * families of objects need custom handling:
  *
  * <ul>
  *   <li>{@link Type} values are written in the JSON form used by the REST API, because the
@@ -90,6 +96,44 @@ class KryoEntitySerializer {
 
   /** Registration id of the {@link Column#DEFAULT_VALUE_NOT_SET} marker; above Kryo's own ids. */
   private static final int DEFAULT_VALUE_NOT_SET_ID = 100;
+
+  private static final String GRAVITINO_PACKAGE = "org.apache.gravitino.";
+
+  /** Package or nested-class prefixes of the JDK and Guava types entities are built from. */
+  private static final List<String> ALLOWED_PREFIXES =
+      ImmutableList.of(
+          "java.time.",
+          "java.util.Collections$",
+          "java.util.ImmutableCollections$",
+          "com.google.common.collect.Immutable",
+          "com.google.common.collect.Regular",
+          "com.google.common.collect.Singleton");
+
+  /** Individual JDK value and collection types entities are built from. */
+  private static final Set<String> ALLOWED_CLASSES =
+      ImmutableSet.of(
+          "java.lang.Boolean",
+          "java.lang.Byte",
+          "java.lang.Character",
+          "java.lang.Double",
+          "java.lang.Float",
+          "java.lang.Integer",
+          "java.lang.Long",
+          "java.lang.Short",
+          "java.lang.String",
+          "java.math.BigDecimal",
+          "java.math.BigInteger",
+          "java.util.ArrayList",
+          "java.util.Arrays$ArrayList",
+          "java.util.HashMap",
+          "java.util.HashSet",
+          "java.util.LinkedHashMap",
+          "java.util.LinkedHashSet",
+          "java.util.LinkedList",
+          "java.util.Optional",
+          "java.util.TreeMap",
+          "java.util.TreeSet",
+          "java.util.UUID");
 
   private static final ObjectMapper TYPE_MAPPER =
       JsonUtils.objectMapper()
@@ -144,8 +188,35 @@ class KryoEntitySerializer {
     }
   }
 
+  /**
+   * Whether a class read by name may be instantiated. The bytes in Redis are written by every node
+   * sharing it and readable by anyone with write access to it, so only Gravitino's own classes and
+   * a fixed set of JDK and Guava value and collection types are accepted.
+   */
+  @VisibleForTesting
+  static boolean isAllowed(Class<?> type) {
+    Class<?> element = type;
+    while (element.isArray()) {
+      element = element.getComponentType();
+    }
+    if (element.isPrimitive()) {
+      return true;
+    }
+    String name = element.getName();
+    if (name.startsWith(GRAVITINO_PACKAGE)) {
+      // Third-party code relocated into a Gravitino package is not Gravitino's own.
+      return !name.contains(".shaded.");
+    }
+    for (String prefix : ALLOWED_PREFIXES) {
+      if (name.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return ALLOWED_CLASSES.contains(name);
+  }
+
   private static Kryo newKryo() {
-    Kryo kryo = new Kryo();
+    Kryo kryo = new Kryo(new AllowlistClassResolver(), new MapReferenceResolver());
     kryo.setRegistrationRequired(false);
     kryo.setReferences(true);
     kryo.setDefaultSerializer(CompatibleFieldSerializer.class);
@@ -162,6 +233,25 @@ class KryoEntitySerializer {
         new SingletonSerializer<>(Column.DEFAULT_VALUE_NOT_SET),
         DEFAULT_VALUE_NOT_SET_ID);
     return kryo;
+  }
+
+  /**
+   * Resolves classes written by name, refusing any class outside the allowlist. The class is loaded
+   * without being initialized, and refused before Kryo creates an instance, so no code of a refused
+   * class runs.
+   */
+  private static final class AllowlistClassResolver extends DefaultClassResolver {
+    @Override
+    protected Registration readName(Input input) {
+      Registration registration = super.readName(input);
+      if (registration != null && !isAllowed(registration.getType())) {
+        throw new KryoException(
+            "Refusing to deserialize class "
+                + registration.getType().getName()
+                + ", which is not an allowed entity cache type");
+      }
+      return registration;
+    }
   }
 
   /** Writes nothing and reads back a fixed instance. */

@@ -578,18 +578,14 @@ public class Configs {
               "The Redis cache namespace must contain only letters, digits and '.', '_', '-', ':'.")
           .createWithDefault("gravitino");
 
-  public static final ConfigEntry<Long> CACHE_REDIS_FENCE_TTL_MS =
-      new ConfigBuilder("gravitino.cache.redis.fenceTtlMs")
+  public static final ConfigEntry<Boolean> CACHE_REDIS_SSL =
+      new ConfigBuilder("gravitino.cache.redis.ssl")
           .doc(
-              "Lifetime in milliseconds of the version fence the Redis entity cache keeps for an "
-                  + "invalidated key. It must outlive gravitino.cache.expireTimeInMs. A cache fill "
-                  + "whose read began more than this long ago is discarded, so a fence may expire "
-                  + "safely: no fill it could have guarded is still acceptable. 0 means twice "
-                  + "gravitino.cache.expireTimeInMs.")
+              "Whether the Redis entity cache connects over TLS. The JVM's default trust store "
+                  + "verifies the server certificate.")
           .version(ConfigConstants.VERSION_2_0_0)
-          .longConf()
-          .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
-          .createWithDefault(0L);
+          .booleanConf()
+          .createWithDefault(false);
 
   public static final ConfigEntry<String> CACHE_REDIS_SERIALIZER =
       new ConfigBuilder("gravitino.cache.redis.serializer")

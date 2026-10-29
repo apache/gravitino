@@ -30,34 +30,33 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.params.SetParams;
 
 /**
  * Exercises the Lua scripts of {@link RedisEntityCache} one at a time against a real Redis, at
- * interleavings the cache API cannot produce on demand: a discard arriving after a concurrent fill,
- * a reaper batch racing a refill, and fence generations across deletion of the fence key.
+ * interleavings the cache API cannot produce on demand: a fill racing an invalidation, a discard
+ * arriving after a concurrent fill, an invalidation of a container with many cached descendants,
+ * and memory pressure under an eviction policy.
  */
 @Tag("gravitino-docker-test")
 public class TestRedisEntityCacheScripts {
 
   private static final String IMAGE = "redis:7.2-alpine";
   private static final int PORT = 6379;
-  private static final byte[] NONE = new byte[0];
 
   private static GenericContainer<?> container;
   private static JedisPooled jedis;
 
   private String prefix;
-  private String idx;
 
   @BeforeAll
   static void startRedis() {
     container = new GenericContainer<>(DockerImageName.parse(IMAGE)).withExposedPorts(PORT);
     container.start();
-    jedis =
-        new JedisPooled(
-            HostAndPort.from(container.getHost() + ":" + container.getMappedPort(PORT)));
+    jedis = connect(container);
   }
 
   @AfterAll
@@ -73,140 +72,224 @@ public class TestRedisEntityCacheScripts {
   @BeforeEach
   void newSlot() {
     prefix = "scripts-" + UUID.randomUUID().toString().substring(0, 8) + ":{m1}:";
-    idx = prefix + "IDX";
+  }
+
+  @Test
+  void testFillThenReadServesTheValueUnderAnUnchangedStamp() {
+    List<?> miss = read(jedis, "m1.c1:CATALOG", "m1", "m1.c1");
+    Assertions.assertEquals(0L, miss.get(0));
+    Assertions.assertEquals("0,0", utf8((byte[]) miss.get(1)));
+
+    Assertions.assertEquals(1L, put(jedis, "m1.c1:CATALOG", "v1", "0,0", "m1", "m1.c1"));
+
+    List<?> hit = read(jedis, "m1.c1:CATALOG", "m1", "m1.c1");
+    Assertions.assertEquals(1L, hit.get(0));
+    Assertions.assertEquals("v1", utf8((byte[]) hit.get(1)));
+    Assertions.assertTrue(jedis.pttl(prefix + "D:m1.c1:CATALOG") > 0);
+  }
+
+  @Test
+  void testFillIsRejectedWhenAnInvalidationCommittedDuringTheLoad() {
+    List<?> miss = read(jedis, "m1.c1.s1:SCHEMA", "m1", "m1.c1", "m1.c1.s1");
+    // While the reader loads, another node drops the catalog above the schema.
+    drop(jedis, "m1.c1:CATALOG", "m1.c1", false);
+
+    Assertions.assertEquals(
+        0L,
+        put(
+            jedis,
+            "m1.c1.s1:SCHEMA",
+            "old",
+            utf8((byte[]) miss.get(1)),
+            "m1",
+            "m1.c1",
+            "m1.c1.s1"));
+    Assertions.assertFalse(jedis.exists(prefix + "D:m1.c1.s1:SCHEMA"));
+  }
+
+  @Test
+  void testInvalidatingAContainerOutdatesEveryDescendantInConstantTime() {
+    int descendants = 20_000;
+    AbstractPipeline pipeline = jedis.pipelined();
+    for (int i = 0; i < descendants; i++) {
+      pipeline.hset(prefix + "D:m1.c1.s1.t" + i + ":TABLE", "v", "x");
+      pipeline.hset(prefix + "D:m1.c1.s1.t" + i + ":TABLE", "s", "0,0,0,0");
+    }
+    pipeline.sync();
+    pipeline.close();
+
+    // The drop touches the counter, the fences and the catalog's own value, nothing else.
+    Assertions.assertEquals(0L, drop(jedis, "m1.c1:CATALOG", "m1.c1", false));
+    Assertions.assertTrue(jedis.exists(prefix + "D:m1.c1.s1.t0:TABLE"));
+
+    // Each descendant stops being served on its next read, which also reclaims it.
+    List<?> stale = read(jedis, "m1.c1.s1.t0:TABLE", "m1", "m1.c1", "m1.c1.s1", "m1.c1.s1.t0");
+    Assertions.assertEquals(2L, stale.get(0));
+    Assertions.assertFalse(jedis.exists(prefix + "D:m1.c1.s1.t0:TABLE"));
+    // A sibling catalog keeps its stamp.
+    Assertions.assertEquals(1L, put(jedis, "m1.c2:CATALOG", "v", "0,0", "m1", "m1.c2"));
+    Assertions.assertEquals(1L, read(jedis, "m1.c2:CATALOG", "m1", "m1.c2").get(0));
+  }
+
+  @Test
+  void testInvalidatingTheMetalakeDiscardsItsFencesAndOutdatesEverything() {
+    drop(jedis, "m1.c1:CATALOG", "m1.c1", false);
+    List<?> miss = read(jedis, "m1.c1:CATALOG", "m1", "m1.c1");
+    String stamp = utf8((byte[]) miss.get(1));
+    Assertions.assertEquals(1L, put(jedis, "m1.c1:CATALOG", "v", stamp, "m1", "m1.c1"));
+
+    drop(jedis, "m1:METALAKE", "m1", true);
+
+    Assertions.assertEquals(1L, jedis.hlen(prefix + "F"));
+    Assertions.assertEquals("2", jedis.hget(prefix + "F", "m1"));
+    Assertions.assertEquals(2L, read(jedis, "m1.c1:CATALOG", "m1", "m1.c1").get(0));
+    // The counter survives, so the next generation never repeats one a reader observed.
+    drop(jedis, "m1.c1:CATALOG", "m1.c1", false);
+    Assertions.assertEquals("3", jedis.hget(prefix + "F", "m1.c1"));
+  }
+
+  @Test
+  void testPeekServesOnlyCurrentValuesAndRecordsNothing() {
+    put(jedis, "m1.c1:CATALOG", "cat", "0,0", "m1", "m1.c1");
+    put(jedis, "m1:METALAKE", "ml", "0", "m1");
+    put(jedis, "m1.c2:CATALOG", "old", "0,0", "m1", "m1.c2");
+    drop(jedis, "m1.c2:CATALOG", "m1.c2", false);
+
+    List<?> reply =
+        (List<?>)
+            jedis.eval(
+                utf8(RedisEntityCache.PEEK_SCRIPT),
+                ImmutableList.of(
+                    utf8(prefix + "F"),
+                    utf8(prefix + "D:m1.c1:CATALOG"),
+                    utf8(prefix + "D:m1.c2:CATALOG"),
+                    utf8(prefix + "D:m1.c3:CATALOG"),
+                    utf8(prefix + "D:m1:METALAKE")),
+                ImmutableList.of(
+                    utf8("2"),
+                    utf8("m1"),
+                    utf8("m1.c1"),
+                    utf8("2"),
+                    utf8("m1"),
+                    utf8("m1.c2"),
+                    utf8("2"),
+                    utf8("m1"),
+                    utf8("m1.c3"),
+                    utf8("1"),
+                    utf8("m1")));
+
+    Assertions.assertEquals(4, reply.size());
+    Assertions.assertEquals("cat", utf8((byte[]) reply.get(0)));
+    Assertions.assertNull(reply.get(1));
+    Assertions.assertNull(reply.get(2));
+    Assertions.assertEquals("ml", utf8((byte[]) reply.get(3)));
+    Assertions.assertFalse(jedis.exists(prefix + "D:m1.c2:CATALOG"));
   }
 
   @Test
   void testDiscardLeavesAConcurrentFillIntact() {
     String value = prefix + "D:m1.c1:CATALOG";
-    jedis.set(value, "garbage");
-    jedis.zadd(idx, 0, "m1.c1:CATALOG");
+    jedis.hset(value, "v", "garbage");
     // A reader observed "garbage"; before it discards, another node fills the key.
-    jedis.set(value, "fresh");
+    jedis.hset(value, "v", "fresh");
 
-    Object discarded =
-        jedis.eval(
-            utf8(RedisEntityCache.DISCARD_SCRIPT),
-            ImmutableList.of(utf8(idx), utf8(value)),
-            ImmutableList.of(utf8("m1.c1:CATALOG"), utf8("garbage")));
-
-    Assertions.assertEquals(0L, discarded);
-    Assertions.assertEquals("fresh", jedis.get(value));
-    Assertions.assertEquals(1, jedis.zcard(idx));
-
-    // With the bytes unchanged, the discard removes the value and its member together.
-    discarded =
-        jedis.eval(
-            utf8(RedisEntityCache.DISCARD_SCRIPT),
-            ImmutableList.of(utf8(idx), utf8(value)),
-            ImmutableList.of(utf8("m1.c1:CATALOG"), utf8("fresh")));
-    Assertions.assertEquals(1L, discarded);
+    Assertions.assertEquals(0L, discard(value, "garbage"));
+    Assertions.assertEquals("fresh", jedis.hget(value, "v"));
+    Assertions.assertEquals(1L, discard(value, "fresh"));
     Assertions.assertFalse(jedis.exists(value));
-    Assertions.assertEquals(0, jedis.zcard(idx));
   }
 
+  /**
+   * The round-3 reproduction: under {@code volatile-lru} memory pressure, the fence an invalidation
+   * planted must survive, so a fill that loaded before it is still rejected.
+   */
   @Test
-  void testReaperRemovesOnlyMembersWhoseValueIsGone() {
-    jedis.set(prefix + "D:m1.c1:CATALOG", "v");
-    jedis.zadd(idx, 0, "m1.c1:CATALOG");
-    jedis.zadd(idx, 0, "m1.c2:CATALOG"); // value expired
-    jedis.set(prefix + "D:m1.c3:CATALOG", "v");
-    jedis.zadd(idx, 0, "m1.c3:CATALOG");
-    jedis.zadd(idx, 0, "m1.c4:CATALOG"); // value expired
+  void testFencesSurviveVolatileEvictionSoAStaleFillIsStillRejected() {
+    try (GenericContainer<?> small =
+        new GenericContainer<>(DockerImageName.parse(IMAGE))
+            .withExposedPorts(PORT)
+            .withCommand(
+                "redis-server", "--maxmemory", "4mb", "--maxmemory-policy", "volatile-lru")) {
+      small.start();
+      try (JedisPooled evicting = connect(small)) {
+        // Node B misses on a key that was never invalidated and starts loading the old row.
+        List<?> miss = read(evicting, "m1.c1:CATALOG", "m1", "m1.c1");
+        // Node A commits an update and invalidates.
+        drop(evicting, "m1.c1:CATALOG", "m1.c1", false);
 
-    List<?> first = reap("", 2);
-    Assertions.assertEquals(1L, first.get(0));
-    Assertions.assertEquals(2L, first.get(1));
-    Assertions.assertEquals("m1.c2:CATALOG", utf8((byte[]) first.get(2)));
+        // Ordinary cache traffic (values carry a TTL) fills memory until Redis evicts.
+        long evictedBefore = evictedKeys(evicting);
+        byte[] filler = new byte[4096];
+        int i = 0;
+        while (evictedKeys(evicting) == evictedBefore && i < 100_000) {
+          evicting.set(
+              utf8(prefix + "D:filler" + i++ + ":TABLE"), filler, new SetParams().px(3_600_000));
+        }
+        Assertions.assertTrue(evictedKeys(evicting) > evictedBefore, "Redis never evicted");
 
-    List<?> second = reap(utf8((byte[]) first.get(2)), 2);
-    Assertions.assertEquals(1L, second.get(0));
-    Assertions.assertEquals(2L, second.get(1));
-    Assertions.assertEquals("m1.c4:CATALOG", utf8((byte[]) second.get(2)));
-
-    List<?> exhausted = reap(utf8((byte[]) second.get(2)), 2);
-    Assertions.assertEquals(0L, exhausted.get(0));
-    Assertions.assertEquals(0L, exhausted.get(1));
-    Assertions.assertEquals("", utf8((byte[]) exhausted.get(2)));
-
-    Assertions.assertEquals(
-        ImmutableList.of("m1.c1:CATALOG", "m1.c3:CATALOG"), jedis.zrange(idx, 0, -1));
+        // The fence and the counter carry no TTL, so volatile-lru never picks them.
+        Assertions.assertEquals("1", evicting.hget(prefix + "F", "m1.c1"));
+        Assertions.assertEquals("1", evicting.get(prefix + "G"));
+        Assertions.assertEquals(
+            0L, put(evicting, "m1.c1:CATALOG", "old", utf8((byte[]) miss.get(1)), "m1", "m1.c1"));
+      }
+    }
   }
 
-  @Test
-  void testReaperNeverUnindexesARefillThatLandedFirst() {
-    // The member is stale, but a refill lands before the reaper looks: the script checks
-    // existence and removes in one step, so it sees the refilled value and keeps the member.
-    jedis.zadd(idx, 0, "m1.c1:CATALOG");
-    jedis.set(prefix + "D:m1.c1:CATALOG", "refilled");
-
-    List<?> reply = reap("", 10);
-
-    Assertions.assertEquals(0L, reply.get(0));
-    Assertions.assertEquals(1, jedis.zcard(idx));
-  }
-
-  @Test
-  void testDropAssignsStrictlyIncreasingGenerationsEvenIfTheFenceKeyIsGone() {
-    String fence = prefix + "F:m1.c1";
-    drop("m1.c1");
-    long first = Long.parseLong(jedis.get(fence));
-    // The fence key expires or is otherwise lost; the generation counter is not.
-    jedis.del(fence);
-    drop("m1.c1");
-    long second = Long.parseLong(jedis.get(fence));
-    drop("m1.c1");
-    long third = Long.parseLong(jedis.get(fence));
-
-    Assertions.assertTrue(second > first);
-    Assertions.assertTrue(third > second);
-    Assertions.assertEquals(third, Long.parseLong(jedis.get(prefix + "G")));
-  }
-
-  @Test
-  void testClearMovesTheMetalakeFenceAndDeletesValuesWithTheIndex() {
-    jedis.set(prefix + "D:m1:METALAKE", "v");
-    jedis.zadd(idx, 0, "m1:METALAKE");
-    jedis.set(prefix + "D:m1.c1:CATALOG", "v");
-    jedis.zadd(idx, 0, "m1.c1:CATALOG");
-    String metalakeFence = prefix + "F:m1";
-    // An earlier drop of a catalog that holds no value: it plants a fence and moves the generation.
-    drop("m1.c9");
-    long generationBefore = Long.parseLong(jedis.get(prefix + "G"));
-
-    Object removed =
-        jedis.eval(
-            utf8(RedisEntityCache.CLEAR_SCRIPT),
-            ImmutableList.of(utf8(idx)),
-            ImmutableList.of(utf8(prefix), utf8(metalakeFence), utf8("0")));
-
-    Assertions.assertEquals(2L, removed);
-    Assertions.assertFalse(jedis.exists(prefix + "D:m1:METALAKE"));
-    Assertions.assertFalse(jedis.exists(prefix + "D:m1.c1:CATALOG"));
-    Assertions.assertFalse(jedis.exists(idx));
-    Assertions.assertEquals(generationBefore + 1, Long.parseLong(jedis.get(metalakeFence)));
-    // The catalog fence set by the earlier drop is left in place.
-    Assertions.assertTrue(jedis.exists(prefix + "F:m1.c9"));
-  }
-
-  private List<?> reap(String cursor, int batch) {
+  private List<?> read(JedisPooled client, String member, String... paths) {
     return (List<?>)
-        jedis.eval(
-            utf8(RedisEntityCache.REAP_SCRIPT),
-            ImmutableList.of(utf8(idx)),
-            ImmutableList.of(utf8(prefix), utf8(cursor), utf8(Integer.toString(batch))));
+        client.eval(
+            utf8(RedisEntityCache.READ_SCRIPT),
+            ImmutableList.of(utf8(prefix + "D:" + member), utf8(prefix + "F")),
+            utf8All(paths));
   }
 
-  private void drop(String identifier) {
-    jedis.eval(
+  private Object put(
+      JedisPooled client, String member, String value, String stamp, String... paths) {
+    List<byte[]> args = new java.util.ArrayList<>();
+    args.add(utf8(value));
+    args.add(utf8("3600000"));
+    args.add(utf8(stamp));
+    args.addAll(utf8All(paths));
+    return client.eval(
+        utf8(RedisEntityCache.PUT_SCRIPT),
+        ImmutableList.of(utf8(prefix + "D:" + member), utf8(prefix + "F")),
+        args);
+  }
+
+  private Object drop(JedisPooled client, String member, String path, boolean metalake) {
+    return client.eval(
         utf8(RedisEntityCache.DROP_SCRIPT),
-        ImmutableList.of(utf8(idx)),
-        ImmutableList.of(
-            utf8(prefix),
-            utf8(identifier + ":CATALOG"),
-            utf8(identifier),
-            utf8("0"),
-            utf8(identifier + ".")));
+        ImmutableList.of(utf8(prefix + "G"), utf8(prefix + "F"), utf8(prefix + "D:" + member)),
+        ImmutableList.of(utf8(path), utf8(metalake ? "1" : "0")));
+  }
+
+  private Object discard(String valueKey, String observed) {
+    return jedis.eval(
+        utf8(RedisEntityCache.DISCARD_SCRIPT),
+        ImmutableList.of(utf8(valueKey)),
+        ImmutableList.of(utf8(observed)));
+  }
+
+  private static long evictedKeys(JedisPooled client) {
+    for (String line : client.info("stats").split("\r?\n")) {
+      if (line.startsWith("evicted_keys:")) {
+        return Long.parseLong(line.substring("evicted_keys:".length()).trim());
+      }
+    }
+    throw new IllegalStateException("INFO stats reports no evicted_keys");
+  }
+
+  private static JedisPooled connect(GenericContainer<?> redis) {
+    return new JedisPooled(HostAndPort.from(redis.getHost() + ":" + redis.getMappedPort(PORT)));
+  }
+
+  private static List<byte[]> utf8All(String... values) {
+    List<byte[]> result = new java.util.ArrayList<>();
+    for (String value : values) {
+      result.add(utf8(value));
+    }
+    return result;
   }
 
   private static byte[] utf8(String value) {
@@ -214,6 +297,6 @@ public class TestRedisEntityCacheScripts {
   }
 
   private static String utf8(byte[] value) {
-    return value == null || value == NONE ? "" : new String(value, StandardCharsets.UTF_8);
+    return value == null ? "" : new String(value, StandardCharsets.UTF_8);
   }
 }

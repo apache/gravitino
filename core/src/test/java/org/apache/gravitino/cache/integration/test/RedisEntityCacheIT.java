@@ -20,6 +20,7 @@ package org.apache.gravitino.cache.integration.test;
 
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -102,6 +103,29 @@ public class RedisEntityCacheIT extends RedisEntityCacheTestBase {
     RuntimeException e =
         Assertions.assertThrows(RuntimeException.class, () -> CacheFactory.getEntityCache(config));
     Assertions.assertInstanceOf(IllegalStateException.class, e.getCause().getCause());
+  }
+
+  @Test
+  void testStartupRefusesAnAllkeysEvictionPolicy() {
+    Assumptions.assumeTrue(container != null, "needs a container this test can reconfigure");
+    try (JedisPooled admin = new JedisPooled(HostAndPort.from(address))) {
+      admin.configSet("maxmemory-policy", "allkeys-lru");
+      try {
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class, this::newNode);
+        Assertions.assertTrue(
+            ExceptionUtils.getRootCause(e).getMessage().contains("allkeys-lru"),
+            ExceptionUtils.getRootCause(e).getMessage());
+      } finally {
+        admin.configSet("maxmemory-policy", "noeviction");
+      }
+      // A policy that never evicts keys without a TTL is accepted.
+      admin.configSet("maxmemory-policy", "volatile-lru");
+      try {
+        Assertions.assertDoesNotThrow(() -> newNode());
+      } finally {
+        admin.configSet("maxmemory-policy", "noeviction");
+      }
+    }
   }
 
   @Test
