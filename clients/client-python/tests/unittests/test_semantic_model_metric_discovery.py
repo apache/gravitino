@@ -205,14 +205,19 @@ class TestSemanticModelMetricDiscovery(unittest.TestCase):
             self.full_namespace + ["extra"],
         ):
             with self.subTest(namespace=namespace):
+                expected_message = (
+                    "Expected metric namespace with 4 levels (metalake/catalog/schema/model), "
+                    f"got {len(namespace)}"
+                )
                 self._respond(
                     {
                         "code": 0,
                         "identifiers": [{"namespace": namespace, "name": "Revenue"}],
                     }
                 )
-                with self.assertRaises(IllegalArgumentException):
+                with self.assertRaises(IllegalArgumentException) as error:
                     self.models.list_metrics(self.namespace)
+                self.assertEqual(expected_message, str(error.exception))
                 self._respond(
                     {
                         "code": 0,
@@ -221,8 +226,18 @@ class TestSemanticModelMetricDiscovery(unittest.TestCase):
                         ],
                     }
                 )
-                with self.assertRaises(IllegalArgumentException):
+                with self.assertRaises(IllegalArgumentException) as error:
                     self.models.list_metric_infos(self.namespace)
+                self.assertEqual(expected_message, str(error.exception))
+
+    def test_missing_identifier_namespace_is_rejected(self):
+        self._respond({"code": 0, "identifiers": [{"name": "Revenue"}]})
+        with self.assertRaises(IllegalArgumentException) as error:
+            self.models.list_metrics(self.namespace)
+        self.assertEqual(
+            "Expected metric namespace with 4 levels (metalake/catalog/schema/model), got None",
+            str(error.exception),
+        )
 
     def test_invalid_metric_fails_entire_detailed_request(self):
         valid = {"namespace": self.full_namespace, "metric": self._metric_json()}

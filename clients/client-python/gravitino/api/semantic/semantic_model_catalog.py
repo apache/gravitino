@@ -59,8 +59,9 @@ class SemanticModelCatalog(ABC):
     def list_metrics(self, namespace: Namespace) -> list[NameIdentifier]:
         """List visible metric identifiers across the Semantic Models in a schema.
 
-        Identifiers are relative to this catalog: their namespace contains the
-        schema and Semantic Model names, followed by the exact metric name.
+        Identifiers are relative to this catalog. Each identifier's namespace
+        contains the schema and Semantic Model names, and its name is the exact
+        metric name.
         Results are ordered by model identifier and then case-sensitive metric name.
 
         Args:

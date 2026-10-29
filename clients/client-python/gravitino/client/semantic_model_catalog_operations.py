@@ -340,8 +340,12 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
 
     @staticmethod
     def _relative_metric_namespace(namespace: Namespace) -> Namespace:
-        if namespace is None or namespace.length() != 4:
-            raise IllegalArgumentException("Metric namespace must have 4 levels")
+        level_count = None if namespace is None else namespace.length()
+        if level_count != 4:
+            raise IllegalArgumentException(
+                "Expected metric namespace with 4 levels (metalake/catalog/schema/model), "
+                f"got {level_count}"
+            )
         return Namespace.of(namespace.level(2), namespace.level(3))
 
     def _get_semantic_model_full_namespace(

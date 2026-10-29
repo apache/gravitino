@@ -44,7 +44,7 @@ class SemanticModelMetric:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, SemanticModelMetric):
             return False
-        return self._namespace == other.namespace() and self._metric == other.metric()
+        return self._namespace == other._namespace and self._metric == other._metric
 
     def __hash__(self) -> int:
         return hash((self._namespace, self._metric))
