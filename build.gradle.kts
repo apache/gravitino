@@ -811,7 +811,7 @@ subprojects {
     ":common" to listOf("iceberg", "hadoop"),
     ":core" to listOf("spark", "iceberg", "kafka", "aws"),
     ":clients:client-java" to listOf("iceberg"),
-    ":catalogs:catalog-common" to listOf("doris"),
+    ":bundles:aws" to listOf("doris"),
     ":catalogs:hive-metastore-common" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-iceberg" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
