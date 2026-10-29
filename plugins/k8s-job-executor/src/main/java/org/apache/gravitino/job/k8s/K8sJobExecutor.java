@@ -55,6 +55,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
@@ -178,8 +179,8 @@ public class K8sJobExecutor implements JobExecutor {
     } catch (KubernetesClientException e) {
       if (isUnreachable(e) || e.getCode() >= HttpURLConnection.HTTP_INTERNAL_ERROR) {
         // The SparkApplication may have been created although no response or an error came back.
-        // Gravitino records no job for a failed submission, so delete it, otherwise it would run
-        // unknown.
+        // Attempt cleanup immediately. If cleanup also fails, Gravitino retains the pending
+        // registration and retries recovery and cancellation after the API server recovers.
         deleteUnsubmittedSparkApplication(jobExecutionId, context.jobId());
         throw e;
       }
@@ -200,10 +201,9 @@ public class K8sJobExecutor implements JobExecutor {
       // that is being deleted.
       GenericKubernetesResource existing =
           getSparkApplicationClient(namespace).withName(name).get();
-      if (existing == null
-          || existing.getMetadata().getDeletionTimestamp() != null
-          || !K8sJobResourceUtils.isOfJob(existing, context.jobId())) {
-        throw new IllegalStateException(
+      if (existing != null && !K8sJobResourceUtils.isOfJob(existing, context.jobId())) {
+        // Nothing was created for this job, so the submission is rejected for sure.
+        throw new JobSubmissionRejectedException(
             String.format(
                 "SparkApplication %s/%s already exists and can't be used for job %s. If it belongs"
                     + " to another Gravitino deployment sharing the namespace, use a different %s"
@@ -211,10 +211,60 @@ public class K8sJobExecutor implements JobExecutor {
                 namespace, name, context.jobId(), K8sJobExecutorConfigs.NAME_PREFIX),
             e);
       }
+      if (existing == null || existing.getMetadata().getDeletionTimestamp() != null) {
+        // A retried request may have created it before it was deleted, and its pods may still
+        // run until the deletion finishes, so the outcome is unknown rather than rejected.
+        // Recovery finds the resource until it is gone.
+        throw new IllegalStateException(
+            String.format(
+                "SparkApplication %s/%s conflicted with job %s but is being deleted or already"
+                    + " gone, so whether it was created for this job can't be told",
+                namespace, name, context.jobId()),
+            e);
+      }
     }
 
     LOG.info("Submitted job {} as {}", context.jobId(), jobExecutionId);
     return jobExecutionId.toString();
+  }
+
+  @Override
+  public Optional<String> findSubmittedJob(JobContext context, JobTemplate jobTemplate) {
+    if (!(jobTemplate instanceof SparkJobTemplate)) {
+      return Optional.empty();
+    }
+
+    // The SparkApplication of a job is named after the job id, in the namespace that the job
+    // template selects, so it's found the same way submitJob() names it. Only the name and the
+    // namespace are derived, not the whole SparkApplication, whose checks may fail on the current
+    // configurations although the job was submitted. A job is not found if the name prefix or the
+    // default namespace of the job executor changed since it was submitted. A deleting resource
+    // is retained too, so recovery can track its pods until cancellation actually finishes.
+    String namespace;
+    try {
+      namespace = SparkApplicationUtils.namespaceOf((SparkJobTemplate) jobTemplate, configs);
+    } catch (IllegalArgumentException e) {
+      // submitJob() rejects such a job before creating anything.
+      return Optional.empty();
+    }
+    K8sJobExecutionId jobExecutionId =
+        K8sJobExecutionId.of(
+            configs.cluster(),
+            K8sJobExecutionId.Kind.SPARK_APPLICATION,
+            namespace,
+            K8sJobResourceUtils.resourceName(configs, context.jobId()));
+    checkApiServerReachable();
+    try {
+      return getSparkApplication(jobExecutionId)
+          .filter(existing -> K8sJobResourceUtils.isOfJob(existing, context.jobId()))
+          .map(existing -> jobExecutionId.toString());
+    } catch (KubernetesClientException e) {
+      if (isUnreachable(e)) {
+        unreachableAtMs = clock.millis();
+        unreachableFailure = e;
+      }
+      throw e;
+    }
   }
 
   @Override
@@ -535,10 +585,12 @@ public class K8sJobExecutor implements JobExecutor {
         LOG.info("Deleted the SparkApplication of job {}, whose submission failed", jobId);
       }
     } catch (RuntimeException e) {
-      // Gravitino doesn't sweep the resources of unknown jobs, so tell how to delete it by hand.
+      // Recovery will retry through the retained registration. Also give operators a manual
+      // remedy, for example when they cannot restore the runner connection.
       LOG.warn(
           "Failed to clean up the SparkApplication {}/{} of job {}, whose submission failed. It may"
-              + " run although Gravitino has no record of it. If it exists with the label {}={},"
+              + " still run; Gravitino retains its registration for recovery. If it exists with"
+              + " the label {}={},"
               + " delete it with: kubectl delete sparkapplication -n {} {}",
           id.namespace(),
           id.name(),

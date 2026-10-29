@@ -254,6 +254,39 @@ job = client.run_job(
 </TabItem>
 </Tabs>
 
+Gravitino records a job as `QUEUED` and sets its initial owner before handing it to the job executor.
+A recovered job therefore keeps the permissions of its original submitter. If the execution id is
+not recorded within three times `gravitino.job.statusPullIntervalInMs`, another server, or the same
+server after a restart, looks the job up in the runner. A found execution is tracked, or cancelled
+if the job is `CANCELLING`. Otherwise the job is settled as `FAILED`, or `CANCELLED` if it is
+`CANCELLING`. A failed lookup is retried in the next pull. The `k8s` executor finds a job while its
+name prefix and namespace configuration remain unchanged. The local executor finds none, as the job
+state is lost with the server that submitted it.
+
+Invalid input and a rejected submission remove the job. For the `k8s` executor, a failed submission
+with an unknown outcome, such as a lost response after the runner accepted it, keeps the job as
+`CANCELLING`, so an execution found for it later is cancelled, and the job is then settled as
+`CANCELLED`. If the store cannot record the cancellation, the job is still kept and may be tracked
+as running. The error identifies the job: check it before retrying, since retrying a run request
+creates a new job. The `k8s` executor also attempts immediate cleanup, and logs a manual `kubectl`
+remedy if that fails. With a job executor that can't find a job, such as the local executor, any
+failed submission removes the job.
+
+Cancelling a job during submission persists `CANCELLING`. Once an execution is recorded, Gravitino
+cancels it and retries temporary cancellation failures during status pulls. Repeating the cancel
+request also retries cancellation without resetting its timeout. An executor that has acknowledged
+an asynchronous cancellation by reporting `CANCELLING` is monitored until it finishes.
+
+:::caution
+With several Gravitino servers, use the same `gravitino.job.statusPullIntervalInMs` and keep their
+clocks in sync. The entire registration-to-recording phase must fit within three pull intervals.
+Otherwise another server may settle the job, and cancellation of a late submission is attempted
+before its run request fails. Cancellation cannot undo completed work. If the job was already
+settled and this late cancellation fails, check the execution in the runner before retrying.
+`gravitino.job.stagingDirKeepTimeInMs` must also be longer than preparing, submitting, queueing and
+running a job of the local executor, as described below.
+:::
+
 ### List Jobs, Get a Job, and Cancel
 
 Listing can be filtered to one template. A job is identified by its id, and cancelling is a `POST`
@@ -441,10 +474,12 @@ only tracks the jobs it runs itself:
   `CANCELLED` if it was being cancelled. Like other finished jobs, it is then kept for another
   `gravitino.job.stagingDirKeepTimeInMs` before being cleaned up together with its staging
   directory.
-- To clear such a job sooner, cancel it. If the job is still `CANCELLING` more than three times
-  `gravitino.job.statusPullIntervalInMs` after the cancel request, the server running it is
-  considered gone, and another server marks the job as `CANCELLED` when it pulls job statuses. Its
-  job template can then be deleted.
+- For a job whose execution id was recorded, cancelling it can clear it sooner. If it is still
+  `CANCELLING` more than three times `gravitino.job.statusPullIntervalInMs` after the cancel request,
+  the server running it is considered gone, and another server marks it as `CANCELLED` when it
+  pulls job statuses. Its job template can then be deleted.
+- A job whose execution id was never recorded is settled within about four times
+  `gravitino.job.statusPullIntervalInMs` too, as described in [Run a Job](#run-a-job).
 
 :::caution
 The local job executor can't tell a job left behind by an exited server from a job that is still
@@ -463,10 +498,10 @@ jobs are only marked as `FAILED` once they expire as described above, which can 
 every tenth of that time. Until then, they are still reported as queued, started or cancelling, and
 they keep their job templates from being deleted.
 
-To clear these jobs sooner, cancel them. A cancelled job is marked as `CANCELLED` within about four
-times `gravitino.job.statusPullIntervalInMs`, as described above. Lowering
-`gravitino.job.stagingDirKeepTimeInMs` also shortens the time, but finished jobs are then kept for
-a shorter time, and a job that runs longer than that without changing its status is marked as
+For jobs whose execution id was recorded, cancelling them settles them as `CANCELLED` within about
+four times `gravitino.job.statusPullIntervalInMs`, as described above. Lowering
+`gravitino.job.stagingDirKeepTimeInMs` shortens retention, but finished jobs are then kept for a
+shorter time, and a job that runs longer than that without changing its status is marked as
 `FAILED`.
 :::
 
