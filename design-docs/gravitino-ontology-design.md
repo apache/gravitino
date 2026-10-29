@@ -89,7 +89,7 @@ that reference shape the scope:
 2. The steward maps the `marketing` Semantic Model onto that ontology: dataset `orders` populates
    `Account`, field `amount` identifies `Balance`.
 3. A steward creates the term "Attributed revenue" in domain Finance, binds it to the metric
-   `active_customers` and to a column, and a `MANAGE_DEFINITIONS` holder sets it to `APPROVED`.
+   `active_customers` and to a column, and a holder of the glossary's manage privilege sets it to `APPROVED`.
 4. The steward links that term to the ontology concept `Revenue`.
 5. A user asks a question; an agent resolves the word to the term, reads its bindings to find the data,
    and reads its concepts to understand what it is. Draft terms are invisible to the agent.
@@ -201,7 +201,7 @@ depends on the following parts of that contract and adopts them unchanged:
 | Aspect | Adopted behavior |
 | :--- | :--- |
 | Identity | Name unique per metalake, case-insensitive; a synonym cannot equal another term's name |
-| Lifecycle | `DRAFT` → `APPROVED` → `DEPRECATED`, set through the API by a `MANAGE_DEFINITIONS` holder |
+| Lifecycle | `DRAFT` → `APPROVED` → `DEPRECATED`, set through the term API by a holder of the glossary's manage privilege |
 | Hierarchy | Multi-parent acyclic `BROADER`, symmetric `RELATED`, cycles rejected |
 | Domains | Explicit `TermDomain` relation, not tags; domain grants govern the term |
 | Bindings | Direct bindings to catalogs, schemas, tables, views, columns, filesets, topics, models, and metrics as `(SEMANTIC_MODEL, metricName)` |
@@ -397,22 +397,32 @@ which is why this design is separate from the Semantic Model design.
 
 In-flight Gravitino designs this one depends on: [Domain](./domain-design.md) for metalake-level scope,
 tag-backed membership and the `NonEmptyDomainException` precedent, and the
-[Business Glossary](https://github.com/apache/gravitino/pull/14239) for the term object, hierarchy, bindings and `DEFINITION`
-privileges.
+[Business Glossary](https://github.com/apache/gravitino/pull/14239) for the term object, its hierarchy
+and its bindings.
 
 ## Resolved Questions
 
-Three questions this design first raised are settled by the Domain precedent, which lands first and
-which an ontology should not contradict.
+Three questions this design first raised are settled by the Domain precedent. Domain is landing on the
+`branch-domain-dev` integration branch rather than on `main` yet, but it is the project's first object
+with a lifecycle at all — `SemanticModel` has no status, only create, alter and drop — and an ontology
+should follow it rather than contradict it.
 
 1. **Scope of `Ontology`.** Metalake, as argued here. A vocabulary describes a business, not a catalog,
    and Domain already establishes the metalake as the home for business-level objects.
 2. **Status vocabulary.** `DRAFT` / `PUBLISHED`, Domain's two states. The glossary's three states exist
    to record review of a single term; a whole vocabulary has no reviewer to record.
-3. **Privilege family.** `MANAGE_ONTOLOGY` / `USE_ONTOLOGY`, ontology-specific like Domain's
-   `MANAGE_DOMAIN` / `USE_DOMAIN`, and not the glossary's `DEFINITION` family. A Define object owns its
-   own privileges; reusing the glossary's would couple a vocabulary to a term's lifecycle, and the
-   glossary's privileges are not implemented.
+3. **Privilege family.** `MANAGE_ONTOLOGY` / `USE_ONTOLOGY`, in the shape Domain establishes with
+   `MANAGE_DOMAIN` / `USE_DOMAIN`. The glossary's `DEFINITION` family is not implemented today — the
+   `Privilege` enum has no `*_DEFINITION` entry — so this design does not build on it.
+
+The two privilege shapes used across these objects are not an inconsistency. A container that a few
+stewards maintain — a domain, a vocabulary — is governed coarsely by `MANAGE_*` / `USE_*`, because
+creating it and administering it are the same decision, made by the same small group. Content that many
+people contribute — a term above all — is governed finely by `CREATE_*` / `USE_*` / `MODIFY_*` plus
+ownership, which is also the shape `SemanticModel` already ships, so the family exists rather than being
+invented here. `MANAGE_DOMAIN` cannot express "create a term without being able to approve one", so a
+term needs the finer shape; a vocabulary has no per-item reviewer to record, so the coarse shape is
+enough. The rule is governance model, not object category.
 
 ## Open Questions
 
@@ -421,7 +431,7 @@ which an ontology should not contradict.
    object.
 2. **Owner of the term-to-concept link.** Should `TermConceptRef` be specified here or in the glossary
    design, so that only one document owns it? Landing the glossary first and adding the link there may
-   be cleaner than cross-referencing.
+   be cleaner than cross-referencing. Raised in #14239.
 3. **Stable identity of a concept.** A concept is identified by name, with an optional IRI. A rename
    breaks every reference. Should Gravitino mint an internal concept id, and how would it appear in the
    exported document?
