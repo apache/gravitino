@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
-import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobScheduler;
+import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
@@ -52,7 +52,7 @@ public final class PolicyExpandPipeline {
 
   private final Function<Long, Optional<PolicyEntity>> policyLoader;
   private final PolicyTableEnumerator tableEnumerator;
-  private final CronJobScheduler cronJobScheduler;
+  private final CronJobClient cronJobClient;
   private final ExpandOccupancyGate occupancyGate;
   private final Config config;
   private final int enqueueBatchSize;
@@ -61,21 +61,21 @@ public final class PolicyExpandPipeline {
    * Loads policies through {@link PolicyMetaService}.
    *
    * @param tableEnumerator lists attached table ids
-   * @param cronJobScheduler writes cron-job rows
+   * @param cronJobClient writes cron-job rows
    * @param occupancyGate in-flight / minInterval gate
    * @param config gravitino server config for per-type minInterval fallbacks
    * @param enqueueBatchSize max cron-jobs per expand pick
    */
   public PolicyExpandPipeline(
       PolicyTableEnumerator tableEnumerator,
-      CronJobScheduler cronJobScheduler,
+      CronJobClient cronJobClient,
       ExpandOccupancyGate occupancyGate,
       Config config,
       int enqueueBatchSize) {
     this(
         PolicyExpandPipeline::loadPolicy,
         tableEnumerator,
-        cronJobScheduler,
+        cronJobClient,
         occupancyGate,
         config,
         enqueueBatchSize);
@@ -84,7 +84,7 @@ public final class PolicyExpandPipeline {
   /**
    * @param policyLoader loads the policy for the expand instance id
    * @param tableEnumerator lists attached table ids
-   * @param cronJobScheduler writes cron-job rows
+   * @param cronJobClient writes cron-job rows
    * @param occupancyGate in-flight / minInterval gate
    * @param config gravitino server config for per-type minInterval fallbacks
    * @param enqueueBatchSize max cron-jobs per expand pick
@@ -92,13 +92,13 @@ public final class PolicyExpandPipeline {
   PolicyExpandPipeline(
       Function<Long, Optional<PolicyEntity>> policyLoader,
       PolicyTableEnumerator tableEnumerator,
-      CronJobScheduler cronJobScheduler,
+      CronJobClient cronJobClient,
       ExpandOccupancyGate occupancyGate,
       Config config,
       int enqueueBatchSize) {
     this.policyLoader = Preconditions.checkNotNull(policyLoader);
     this.tableEnumerator = tableEnumerator;
-    this.cronJobScheduler = cronJobScheduler;
+    this.cronJobClient = cronJobClient;
     this.occupancyGate = occupancyGate;
     this.config = config;
     this.enqueueBatchSize = enqueueBatchSize;
@@ -149,7 +149,7 @@ public final class PolicyExpandPipeline {
             config, policy.policyType(), policyMinIntervalMs(policy.content()));
     List<ExpandTableCandidate> toEnqueue =
         tableEnumerator.listTableIds(policy, enqueueBatchSize, occupancyGate, minIntervalMs);
-    int scheduled = cronJobScheduler.enqueueDueNow(policy, toEnqueue, enqueueBatchSize);
+    int scheduled = cronJobClient.enqueueNow(policy, toEnqueue, enqueueBatchSize);
     LOG.info(
         "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}, minIntervalMs={}); next expand due {}",
         policyId,

@@ -38,6 +38,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.junit.jupiter.api.Assertions;
@@ -48,7 +49,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   private static final long TABLE_ID = 101L;
   private static final long POLICY_ID = 202L;
-  private static final String INSTANCE = CronJobIds.forTable(TABLE_ID, POLICY_ID);
+  private static final String INSTANCE = MaintenanceTaskIds.forCronTable(TABLE_ID, POLICY_ID);
   private static final long CLAIM_TIMEOUT_MS = 60_000L;
 
   @Test
@@ -94,7 +95,8 @@ class TestMaintenanceSparkSubmitPipeline {
             List.of(new Operation(POLICY_ID, "expire_snapshots")),
             shared);
 
-    pipeline(gate, actions, submitter).submit(CronJobIds.forBatch(0L, POLICY_ID), batch);
+    pipeline(gate, actions, submitter)
+        .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), batch);
 
     verify(actions, never()).tryAcquireInFlight(anyLong(), anyLong(), anyLong());
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
@@ -216,7 +218,8 @@ class TestMaintenanceSparkSubmitPipeline {
             List.of(new Operation(POLICY_ID, "expire_snapshots")),
             shared);
 
-    pipeline(mockGate(false), actions, submitter).submit(CronJobIds.forBatch(0L, POLICY_ID), batch);
+    pipeline(mockGate(false), actions, submitter)
+        .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), batch);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
@@ -285,7 +288,7 @@ class TestMaintenanceSparkSubmitPipeline {
     MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(mockGate(false), actions, submitter)
-        .submit(CronJobIds.forTable(TABLE_ID, POLICY_ID + 1), spec());
+        .submit(MaintenanceTaskIds.forCronTable(TABLE_ID, POLICY_ID + 1), spec());
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
   }
 

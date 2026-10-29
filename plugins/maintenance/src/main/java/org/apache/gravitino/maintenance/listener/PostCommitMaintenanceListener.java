@@ -28,9 +28,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
-import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobScheduler;
-import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobUpsertResult;
-import org.apache.gravitino.maintenance.scheduler.job.commit.RelationalCommitJobScheduler;
+import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient;
+import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobEnqueueResult;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -38,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Upserts a one-shot {@code commit-job} / {@code {table_id}} after a successful IRC table update
+ * Enqueues a one-shot {@code commit-job} / {@code {table_id}} after a successful IRC table update
  * (§5.2.3).
  *
  * <p>Register with {@code gravitino.eventListener.names} / {@code .{name}.class}. Enqueue builds
@@ -56,7 +55,7 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
   static final String ICEBERG_UPDATE_TABLE_EVENT =
       "org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent";
 
-  private CommitJobScheduler commitJobScheduler;
+  private CommitJobClient commitJobClient;
   private Function<NameIdentifier, TableEntity> tableLookupOverride;
 
   @Override
@@ -71,13 +70,13 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
     if (gravitinoConfig == null) {
       throw new IllegalStateException("GravitinoEnv config is not available");
     }
-    this.commitJobScheduler = new RelationalCommitJobScheduler(dataSource, gravitinoConfig);
-    LOG.info("PostCommitMaintenanceListener started (commit-job upsert with spec)");
+    this.commitJobClient = new CommitJobClient(dataSource, gravitinoConfig);
+    LOG.info("PostCommitMaintenanceListener started (commit-job enqueue with spec)");
   }
 
   @Override
   public void stop() throws RuntimeException {
-    commitJobScheduler = null;
+    commitJobClient = null;
   }
 
   @Override
@@ -94,15 +93,15 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
   }
 
   /**
-   * Resolves {@code identifier} to a table entity id and upserts {@code commit-job}.
+   * Resolves {@code identifier} to a table entity id and enqueues {@code commit-job}.
    *
    * @param identifier Gravitino table name identifier from the IRC event
    */
   @VisibleForTesting
   void enqueueCommitJob(NameIdentifier identifier) {
-    CommitJobScheduler scheduler = commitJobScheduler;
-    if (scheduler == null) {
-      LOG.debug("Ignoring IcebergUpdateTableEvent; commit-job scheduler is not started");
+    CommitJobClient client = commitJobClient;
+    if (client == null) {
+      LOG.debug("Ignoring IcebergUpdateTableEvent; commit-job client is not started");
       return;
     }
     if (identifier == null) {
@@ -110,10 +109,10 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
     }
     try {
       long tableId = resolveTableId(identifier);
-      CommitJobUpsertResult result = scheduler.upsertDueNow(tableId);
+      CommitJobEnqueueResult result = client.enqueueNow(tableId);
       switch (result) {
         case INSERTED:
-          LOG.info("Upserted commit-job for table {} ({})", tableId, identifier);
+          LOG.info("Enqueued commit-job for table {} ({})", tableId, identifier);
           break;
         case ALREADY_QUEUED:
           LOG.debug("commit-job already queued for table {} ({})", tableId, identifier);
@@ -125,18 +124,18 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
               identifier);
           break;
         default:
-          throw new IllegalStateException("Unexpected commit-job upsert result: " + result);
+          throw new IllegalStateException("Unexpected commit-job enqueue result: " + result);
       }
     } catch (NoSuchEntityException e) {
       LOG.debug("No Gravitino table for IRC update {}: {}", identifier, e.getMessage());
     } catch (RuntimeException e) {
-      LOG.warn("Failed to upsert commit-job for IRC update {}: {}", identifier, e.toString());
+      LOG.warn("Failed to enqueue commit-job for IRC update {}: {}", identifier, e.toString());
     }
   }
 
   @VisibleForTesting
-  void setCommitJobScheduler(CommitJobScheduler commitJobScheduler) {
-    this.commitJobScheduler = commitJobScheduler;
+  void setCommitJobClient(CommitJobClient commitJobClient) {
+    this.commitJobClient = commitJobClient;
   }
 
   @VisibleForTesting

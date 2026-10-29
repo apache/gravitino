@@ -26,6 +26,7 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
@@ -86,8 +87,8 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
 
-    Optional<CronJobIds.TablePolicyIds> tableIds = CronJobIds.parseTable(instanceId);
-    Optional<CronJobIds.BatchPolicyIds> batchIds = CronJobIds.parseBatch(instanceId);
+    Optional<long[]> tableIds = MaintenanceTaskIds.parseCronTable(instanceId);
+    Optional<long[]> batchIds = MaintenanceTaskIds.parseCronBatch(instanceId);
     if (tableIds.isEmpty() && batchIds.isEmpty()) {
       LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
       return;
@@ -95,8 +96,8 @@ public final class MaintenanceSparkSubmitPipeline {
 
     Operation step = spec.getOperations().get(0);
     long policyId = step.getPolicyId();
-    long expectedPolicyId =
-        tableIds.isPresent() ? tableIds.get().policyId() : batchIds.get().policyId();
+    // parseCron* returns [leftId, policyId]
+    long expectedPolicyId = tableIds.isPresent() ? tableIds.get()[1] : batchIds.get()[1];
     if (policyId != expectedPolicyId) {
       LOG.warn(
           "Skipping cron-job submit for {}: spec policyId {} != instance policyId {}",
@@ -106,7 +107,7 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
     if (tableIds.isPresent()) {
-      long expectedTableId = tableIds.get().tableId();
+      long expectedTableId = tableIds.get()[0];
       if (spec.getTables().size() != 1 || spec.getTables().get(0).getTableId() != expectedTableId) {
         LOG.warn(
             "Skipping cron-job submit for {}: spec tables {} do not match instance tableId {}",

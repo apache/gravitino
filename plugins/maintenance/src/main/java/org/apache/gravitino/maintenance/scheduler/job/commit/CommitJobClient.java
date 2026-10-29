@@ -38,6 +38,7 @@ import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -46,16 +47,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Schedules {@code commit-job} rows through a db-scheduler {@link SchedulerClient} on the
- * entity-store DataSource.
+ * Enqueues one-shot {@code commit-job} rows through a db-scheduler {@link SchedulerClient} on the
+ * entity-store DataSource (§5.2.3).
  *
- * <p>Enqueue collects the onCommit chain, drops members still inside {@code minIntervalMs}, checks
- * auth consistency, builds a {@link MaintenanceJobSpec}, and inserts only when the spec is
- * non-empty. Coalesce leaves an existing row's {@code task_data} untouched.
+ * <p>Instance id is {@code {table_id}}; bursts of commits on the same table coalesce via {@code
+ * scheduleIfNotExists}. Enqueue collects the onCommit chain, drops members still inside {@code
+ * minIntervalMs}, checks auth consistency, builds a {@link MaintenanceJobSpec}, and inserts only
+ * when the spec is non-empty. Coalesce leaves an existing row's {@code task_data} untouched.
  */
-public final class RelationalCommitJobScheduler implements CommitJobScheduler {
+public class CommitJobClient {
 
-  private static final Logger LOG = LoggerFactory.getLogger(RelationalCommitJobScheduler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CommitJobClient.class);
 
   private final DataSource dataSource;
   private final Config gravitinoConfig;
@@ -67,7 +69,7 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
    * @param dataSource relational JDBC pool shared with the entity store
    * @param gravitinoConfig server config for auth overlay and minInterval fallbacks
    */
-  public RelationalCommitJobScheduler(DataSource dataSource, Config gravitinoConfig) {
+  public CommitJobClient(DataSource dataSource, Config gravitinoConfig) {
     this(
         dataSource,
         gravitinoConfig,
@@ -87,7 +89,7 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
    * @param occupancyGate cooldown / in-flight checks for enqueue gating
    */
   @VisibleForTesting
-  public RelationalCommitJobScheduler(
+  public CommitJobClient(
       DataSource dataSource,
       Config gravitinoConfig,
       Function<Long, Optional<CollectedCommitChain>> chainCollector,
@@ -99,36 +101,43 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
     this.specFactory = new CommitJobSpecFactory(gravitinoConfig);
   }
 
-  @Override
-  public CommitJobUpsertResult upsertDueNow(long tableId) {
+  /**
+   * Builds an enqueue-time spec (chain + jobConf) and schedules a {@code commit-job} when one is
+   * not already queued and the spec is non-empty.
+   *
+   * @param tableId table entity id
+   * @return insert / coalesce / skip outcome
+   */
+  public CommitJobEnqueueResult enqueueNow(long tableId) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
-    SchedulerClient client = client(dataSource);
-    String id = Long.toString(tableId);
+    SchedulerClient client = schedulerClient(dataSource);
+    String id = MaintenanceTaskIds.forCommitTable(tableId);
     // Coalesce without rebuilding task_data: keep the first enqueue-time spec.
     if (client
         .getScheduledExecution(TaskInstanceId.of(TableMaintenanceSchedulerPools.COMMIT_JOB, id))
         .isPresent()) {
-      return CommitJobUpsertResult.ALREADY_QUEUED;
+      return CommitJobEnqueueResult.ALREADY_QUEUED;
     }
     Optional<MaintenanceJobSpec> spec = buildSpec(tableId);
     if (spec.isEmpty()) {
-      return CommitJobUpsertResult.SKIPPED;
+      return CommitJobEnqueueResult.SKIPPED;
     }
     boolean inserted =
         client.scheduleIfNotExists(
             new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, spec.get()),
             Instant.now());
-    return inserted ? CommitJobUpsertResult.INSERTED : CommitJobUpsertResult.ALREADY_QUEUED;
+    return inserted ? CommitJobEnqueueResult.INSERTED : CommitJobEnqueueResult.ALREADY_QUEUED;
   }
 
   /**
-   * Builds a SchedulerClient that can commit against the entity-store DataSource.
+   * Builds a db-scheduler {@link SchedulerClient} that can commit against the entity-store
+   * DataSource.
    *
    * @param dataSource entity-store pool
    * @return client bound to {@link TableMaintenanceSchedulerPools#COMMIT_TASKS_TABLE}
    */
   @VisibleForTesting
-  public static SchedulerClient client(DataSource dataSource) {
+  public static SchedulerClient schedulerClient(DataSource dataSource) {
     return SchedulerClient.Builder.create(
             AutocommitDataSources.wrap(dataSource), TableMaintenanceSchedulerPools.commitJobTask())
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
@@ -148,7 +157,7 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
     }
 
     long nowMs = System.currentTimeMillis();
-    List<CommitChainMember> chain = filterDueToMinInterval(tableId, members, nowMs);
+    List<CommitChainMember> chain = filterByMinInterval(tableId, members, nowMs);
     if (chain.isEmpty()) {
       LOG.debug(
           "Skipping commit-job enqueue for table {}: all onCommit types within minIntervalMs",
@@ -174,7 +183,7 @@ public final class RelationalCommitJobScheduler implements CommitJobScheduler {
     }
   }
 
-  private List<CommitChainMember> filterDueToMinInterval(
+  private List<CommitChainMember> filterByMinInterval(
       long tableId, List<CommitChainMember> collected, long nowMs) {
     List<CommitChainMember> due = new ArrayList<>();
     for (CommitChainMember member : collected) {

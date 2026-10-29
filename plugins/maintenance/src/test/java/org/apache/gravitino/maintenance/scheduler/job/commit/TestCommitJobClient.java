@@ -31,6 +31,7 @@ import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.AuditInfo;
@@ -44,7 +45,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-class TestRelationalCommitJobScheduler extends TestJDBCBackend {
+class TestCommitJobClient extends TestJDBCBackend {
 
   private static final long TABLE_ID = 101L;
   private static final long POLICY_ID = 202L;
@@ -52,40 +53,42 @@ class TestRelationalCommitJobScheduler extends TestJDBCBackend {
 
   @TestTemplate
   void testEnqueueSkipsWhenAllWithinMinInterval() {
-    RelationalCommitJobScheduler scheduler =
-        new RelationalCommitJobScheduler(
+    CommitJobClient scheduler =
+        new CommitJobClient(
             dataSource(),
             configWithUri(),
             fixedCollector(List.of(member(POLICY_ID))),
             coolingGate(POLICY_ID));
-    Assertions.assertEquals(CommitJobUpsertResult.SKIPPED, scheduler.upsertDueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobEnqueueResult.SKIPPED, scheduler.enqueueNow(TABLE_ID));
     Assertions.assertTrue(
-        RelationalCommitJobScheduler.client(dataSource())
+        CommitJobClient.schedulerClient(dataSource())
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.COMMIT_JOB, Long.toString(TABLE_ID)))
+                    TableMaintenanceSchedulerPools.COMMIT_JOB,
+                    MaintenanceTaskIds.forCommitTable(TABLE_ID)))
             .isEmpty());
   }
 
   @TestTemplate
   void testEnqueueWritesSpecAndIsIdempotent() {
-    RelationalCommitJobScheduler scheduler =
-        new RelationalCommitJobScheduler(
+    CommitJobClient scheduler =
+        new CommitJobClient(
             dataSource(),
             configWithUri(),
             fixedCollector(List.of(member(POLICY_ID))),
             allowAllGate());
 
-    Assertions.assertEquals(CommitJobUpsertResult.INSERTED, scheduler.upsertDueNow(TABLE_ID));
-    Assertions.assertEquals(CommitJobUpsertResult.ALREADY_QUEUED, scheduler.upsertDueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobEnqueueResult.INSERTED, scheduler.enqueueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobEnqueueResult.ALREADY_QUEUED, scheduler.enqueueNow(TABLE_ID));
 
-    SchedulerClient client = RelationalCommitJobScheduler.client(dataSource());
+    SchedulerClient client = CommitJobClient.schedulerClient(dataSource());
     MaintenanceJobSpec spec =
         (MaintenanceJobSpec)
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.COMMIT_JOB, Long.toString(TABLE_ID)))
+                        TableMaintenanceSchedulerPools.COMMIT_JOB,
+                        MaintenanceTaskIds.forCommitTable(TABLE_ID)))
                 .get()
                 .getData();
     Assertions.assertTrue(spec.isValid());

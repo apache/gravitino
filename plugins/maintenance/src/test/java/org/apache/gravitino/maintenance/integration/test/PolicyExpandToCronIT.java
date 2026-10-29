@@ -41,8 +41,8 @@ import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
-import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobIds;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
@@ -125,7 +125,7 @@ public class PolicyExpandToCronIT extends BaseIT {
     // tomorrow 02:00 for TIME_TRIGGER).
     PolicyExpandRegistrar.forReads(ds).scheduleAt(seeded.policyId, Instant.now().minusSeconds(5));
 
-    awaitCronCapture(CronJobIds.forTable(seeded.tableId, seeded.policyId), 30L);
+    awaitCronCapture(MaintenanceTaskIds.forCronTable(seeded.tableId, seeded.policyId), 30L);
 
     MaintenanceJobSpec spec = CAPTURED_CRON_SPEC.get();
     assertNotNull(spec);

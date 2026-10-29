@@ -28,6 +28,7 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
@@ -42,8 +43,8 @@ import org.slf4j.LoggerFactory;
  * runJob} → bind the same job id on every claim.
  *
  * <p>Chain collection, cooldown filtering, auth consistency, and jobConf merge happen at enqueue
- * (see {@link RelationalCommitJobScheduler}). The caller always deletes the one-shot {@code
- * commit-job} row after this method returns.
+ * (see {@link CommitJobClient}). The caller always deletes the one-shot {@code commit-job} row
+ * after this method returns.
  */
 public final class MaintenanceCommitSubmitPipeline {
 
@@ -77,19 +78,18 @@ public final class MaintenanceCommitSubmitPipeline {
   }
 
   /**
-   * Runs one commit-job pick for {@code instanceId} ({@code {table_id}}).
+   * Runs one commit-job pick for {@code instanceId} ({@code table:{table_id}}).
    *
    * @param instanceId db-scheduler commit-job instance id
    * @param spec enqueue-time payload; required
    */
   public void submit(String instanceId, @Nullable MaintenanceJobSpec spec) {
-    long tableId;
-    try {
-      tableId = Long.parseLong(instanceId);
-    } catch (NumberFormatException e) {
+    Optional<Long> parsed = MaintenanceTaskIds.parseCommitTable(instanceId);
+    if (parsed.isEmpty()) {
       LOG.warn("Skipping commit-job submit for unparseable instance id {}", instanceId);
       return;
     }
+    long tableId = parsed.get();
     if (tableId <= 0) {
       LOG.warn("Skipping commit-job submit for non-positive table id {}", instanceId);
       return;
