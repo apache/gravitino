@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.MaintenanceJobSubmitService;
+import org.apache.gravitino.maintenance.MaintenanceJobSubmitManager;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Cron-pool control-plane submit (§5.2.2): consume enqueue-time {@link MaintenanceJobSpec} →
- * in-flight gate → soft-slot claim → {@code runJob} → bind job id.
+ * in-flight gate → soft-slot claim → {@link MaintenanceJobSubmitManager#submitAndBind}.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same spec
  * shape; each {@link Task} becomes one Spark job. If any task table is in-flight, the whole pick
@@ -49,26 +49,26 @@ public final class MaintenanceSparkSubmitPipeline {
 
   private final CronSubmitGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
-  private final MaintenanceJobSubmitService jobSubmitter;
+  private final MaintenanceJobSubmitManager jobSubmitManager;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
   /**
    * @param occupancyGate in-flight gate (minInterval already applied at enqueue)
-   * @param actionMetaService soft-slot claim / bind
-   * @param jobSubmitter Gravitino Job submitter
-   * @param jobConfBuilder resolves enqueue-time conf-key refs before {@code runJob}
+   * @param actionMetaService soft-slot claim
+   * @param jobSubmitManager runJob + bind (and orphan cancel)
+   * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceSparkSubmitPipeline(
       CronSubmitGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
-      MaintenanceJobSubmitService jobSubmitter,
+      MaintenanceJobSubmitManager jobSubmitManager,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
     this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
-    this.jobSubmitter = Preconditions.checkNotNull(jobSubmitter);
+    this.jobSubmitManager = Preconditions.checkNotNull(jobSubmitManager);
     this.jobConfBuilder = Preconditions.checkNotNull(jobConfBuilder);
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.claimTimeoutMs = claimTimeoutMs;
@@ -168,48 +168,19 @@ public final class MaintenanceSparkSubmitPipeline {
           e.toString());
       return;
     }
-    runAndBind(spec.metalake(), jobConf, claim.get(), task.getTableId(), policyId);
-  }
 
-  private void runAndBind(
-      String metalake,
-      Map<String, String> jobConf,
-      OccupancyClaim claim,
-      long tableId,
-      long policyId) {
-    jobConf.put(MaintenanceJobTemplates.ACTION_IDS_KEY, Long.toString(claim.actionId()));
-    Long jobId = null;
-    try {
-      jobId =
-          jobSubmitter.runJob(
-              metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
-      actionMetaService.bindJobId(claim, jobId);
-      LOG.info("Submitted cron-job for table {} policy {} as job {}", tableId, policyId, jobId);
-    } catch (RuntimeException e) {
-      if (jobId != null) {
-        cancelJobQuietly(metalake, jobId);
-      }
-      releaseClaimQuietly(claim);
-      LOG.warn(
-          "Failed cron-job submit for table {} policy {}: {}", tableId, policyId, e.toString());
-    }
-  }
-
-  private void cancelJobQuietly(String metalake, long jobId) {
-    try {
-      jobSubmitter.cancelJob(metalake, jobId);
-    } catch (RuntimeException cancelError) {
-      LOG.warn(
-          "Failed to cancel orphaned cron Spark job {} under metalake {} after bind failure",
-          jobId,
-          metalake,
-          cancelError);
+    Optional<Long> jobId = jobSubmitManager.submitAndBind(spec.metalake(), jobConf, claim.get());
+    if (jobId.isPresent()) {
+      LOG.info(
+          "Submitted cron-job for table {} policy {} as job {}",
+          task.getTableId(),
+          policyId,
+          jobId.get());
     }
   }
 
   private void releaseClaimQuietly(OccupancyClaim claim) {
     try {
-      // Fence on (id, created_at) + unbound so a concurrent reclaim's live claim is not deleted.
       if (!actionMetaService.deleteUnboundClaim(claim)) {
         LOG.debug(
             "Occupancy claim {} created_at={} was not released (reclaimed or already bound)",
@@ -218,7 +189,7 @@ public final class MaintenanceSparkSubmitPipeline {
       }
     } catch (RuntimeException releaseError) {
       LOG.warn(
-          "Failed to release occupancy claim {} after submit failure",
+          "Failed to release occupancy claim {} after conf resolve failure",
           claim.actionId(),
           releaseError);
     }

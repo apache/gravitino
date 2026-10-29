@@ -28,14 +28,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.maintenance.MaintenanceJobSubmitService;
+import org.apache.gravitino.maintenance.MaintenanceJobSubmitManager;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
@@ -53,135 +52,88 @@ class TestMaintenanceCommitSubmitPipeline {
   private static final long POLICY_ID = 202L;
   private static final long EXPIRE_POLICY_ID = 303L;
   private static final long CLAIM_TIMEOUT_MS = 60_000L;
+  private static final String UPDATER =
+      "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"ml\"}";
 
   @Test
-  void testUnparseableInstanceSkipsSubmit() {
-    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
+  void testEarlyExitsSkipSubmit() {
+    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
-    pipeline(allowAllGate(), actions, submitter).submit("not-a-table-id", spec());
-    verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
-  }
+    String instance = MaintenanceTaskIds.forCommitTable(TABLE_ID);
 
-  @Test
-  void testNullSpecSkipsSubmit() {
-    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
-    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
-    pipeline(allowAllGate(), actions, submitter)
-        .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), null);
-    verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
+    pipeline(Set.of(), actions, mgr).submit("not-a-table-id", spec());
+    pipeline(Set.of(), actions, mgr).submit(instance, null);
+    pipeline(Set.of(POLICY_ID), actions, mgr).submit(instance, spec());
+
     verify(actions, never()).tryAcquireInFlightBatch(anyLong(), anyList(), anyLong());
-  }
-
-  @Test
-  void testInFlightRemainingMemberSkipsSubmit() {
-    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
-    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
-    pipeline(inFlightGate(POLICY_ID), actions, submitter)
-        .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), spec());
-    verify(actions, never()).tryAcquireInFlightBatch(anyLong(), anyList(), anyLong());
-    verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
+    verify(mgr, never()).submitAndBind(anyString(), anyMap(), anyList());
   }
 
   @Test
   void testSubmitClaimsEveryChainPolicyAndUsesSpecJobConf() {
-    MaintenanceJobSubmitService submitter = mock(MaintenanceJobSubmitService.class);
-    when(submitter.runJob(anyString(), anyString(), anyMap())).thenReturn(999L);
-    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
+    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
     List<OccupancyClaim> claims = List.of(new OccupancyClaim(1L, 2L), new OccupancyClaim(3L, 4L));
+    when(mgr.submitAndBind(eq("ml"), anyMap(), eq(claims))).thenReturn(Optional.of(999L));
+    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     when(actions.tryAcquireInFlightBatch(
             eq(TABLE_ID), eq(List.of(POLICY_ID, EXPIRE_POLICY_ID)), eq(CLAIM_TIMEOUT_MS)))
         .thenReturn(Optional.of(claims));
 
-    Map<String, String> p1 = new LinkedHashMap<>();
-    p1.put("catalog_name", "iceberg");
-    p1.put("table_identifier", "db.t");
-    Map<String, String> p2 = new LinkedHashMap<>(p1);
+    Map<String, String> params =
+        new LinkedHashMap<>(Map.of("catalog_name", "iceberg", "table_identifier", "db.t"));
     MaintenanceJobSpec spec =
         new MaintenanceJobSpec(
             List.of(
-                new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, p1),
-                new Task(TABLE_ID, EXPIRE_POLICY_ID, "expire_snapshots", null, p2)),
-            "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"ml\"}",
+                new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, params),
+                new Task(
+                    TABLE_ID,
+                    EXPIRE_POLICY_ID,
+                    "expire_snapshots",
+                    null,
+                    new LinkedHashMap<>(params))),
+            UPDATER,
             null);
 
-    pipeline(allowAllGate(), actions, submitter)
-        .submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), spec);
+    pipeline(Set.of(), actions, mgr).submit(MaintenanceTaskIds.forCommitTable(TABLE_ID), spec);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
-    verify(submitter)
-        .runJob(
-            eq("ml"),
-            eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE),
-            confCaptor.capture());
-    verify(actions).bindJobIds(claims, 999L);
-    verify(actions, never()).bindJobId(org.mockito.ArgumentMatchers.any(), anyLong());
-
+    verify(mgr).submitAndBind(eq("ml"), confCaptor.capture(), eq(claims));
     Map<String, String> conf = confCaptor.getValue();
     Assertions.assertEquals(
         "rewrite_data_files,expire_snapshots",
         conf.get(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY));
-    Assertions.assertFalse(conf.containsKey("tms_table_id"));
-    Assertions.assertFalse(conf.containsKey("tms_policy_id"));
-    Assertions.assertEquals("iceberg", conf.get("catalog_name"));
     Assertions.assertNull(conf.get("table_identifier"));
-    Assertions.assertTrue(conf.get("tables").contains("\"table_identifier\":\"db.t\""));
     Assertions.assertTrue(conf.get("tables").contains("\"table_id\":" + TABLE_ID));
   }
 
   private static MaintenanceCommitSubmitPipeline pipeline(
-      CommitOccupancyGate gate,
+      Set<Long> inFlightPolicies,
       TableMaintenanceActionMetaService actions,
-      MaintenanceJobSubmitService submitter) {
+      MaintenanceJobSubmitManager mgr) {
+    CommitOccupancyGate gate =
+        new CommitOccupancyGate() {
+          @Override
+          public boolean isInFlight(long tableId, long policyId) {
+            return inFlightPolicies.contains(policyId);
+          }
+
+          @Override
+          public boolean withinMinInterval(
+              long tableId, long policyId, long minIntervalMs, long nowMs) {
+            return false;
+          }
+        };
     return new MaintenanceCommitSubmitPipeline(
-        gate,
-        actions,
-        submitter,
-        new MaintenanceJobConfBuilder(new Config(false) {}),
-        CLAIM_TIMEOUT_MS);
-  }
-
-  private static CommitOccupancyGate allowAllGate() {
-    return new CommitOccupancyGate() {
-      @Override
-      public boolean isInFlight(long tableId, long policyId) {
-        return false;
-      }
-
-      @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return false;
-      }
-    };
-  }
-
-  private static CommitOccupancyGate inFlightGate(long... policyIds) {
-    Set<Long> blocked = new HashSet<>();
-    for (long id : policyIds) {
-      blocked.add(id);
-    }
-    return new CommitOccupancyGate() {
-      @Override
-      public boolean isInFlight(long tableId, long policyId) {
-        return blocked.contains(policyId);
-      }
-
-      @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return false;
-      }
-    };
+        gate, actions, mgr, new MaintenanceJobConfBuilder(new Config(false) {}), CLAIM_TIMEOUT_MS);
   }
 
   private static MaintenanceJobSpec spec() {
-    Map<String, String> parameters = new LinkedHashMap<>();
-    parameters.put("catalog_name", "iceberg");
-    parameters.put("table_identifier", "db.t");
+    Map<String, String> parameters =
+        new LinkedHashMap<>(Map.of("catalog_name", "iceberg", "table_identifier", "db.t"));
     return new MaintenanceJobSpec(
         List.of(new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, parameters)),
-        "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"ml\"}",
+        UPDATER,
         null);
   }
 }

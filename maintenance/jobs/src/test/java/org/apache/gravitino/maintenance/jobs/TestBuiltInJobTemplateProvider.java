@@ -73,17 +73,40 @@ public class TestBuiltInJobTemplateProvider {
   }
 
   @Test
-  public void testAllTemplatesHaveValidVersion() {
+  public void testTemplateVersionsAreValidWhenPresent() {
     BuiltInJobTemplateProvider provider = new BuiltInJobTemplateProvider();
     List<? extends JobTemplate> templates = provider.jobTemplates();
 
     for (JobTemplate template : templates) {
-      String version = template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-      assertNotNull(version, "Template should have version property: " + template.name());
+      Map<String, String> fields = template.customFields();
+      if (fields == null || !fields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY)) {
+        continue;
+      }
+      String version = fields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
       assertTrue(
           version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN),
           "Version should match pattern v\\d+: " + version);
     }
+  }
+
+  @Test
+  public void testIcebergMaintenanceTaskRegisteredWithoutVersion() {
+    assertEquals(
+        1L,
+        new BuiltInJobTemplateProvider()
+            .jobTemplates().stream()
+                .filter(template -> template.name().equals("builtin-iceberg-maintenance-task"))
+                .count());
+    JobTemplate template =
+        new BuiltInJobTemplateProvider()
+            .jobTemplates().stream()
+                .filter(t -> t.name().equals("builtin-iceberg-maintenance-task"))
+                .findFirst()
+                .orElseThrow();
+    Map<String, String> fields = template.customFields();
+    assertTrue(
+        fields == null || !fields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY),
+        "TMS maintenance template should not require a version custom field");
   }
 
   @Test
@@ -115,7 +138,7 @@ public class TestBuiltInJobTemplateProvider {
         "builtin-iceberg-maintenance-task",
         ImmutableSet.<String>builder()
             .add("catalog_name", "catalog_type", "catalog_uri", "warehouse_location")
-            .add("maintenance_types", "policy_ids", "tables")
+            .add("maintenance_types", "policy_ids", "action_ids", "tables")
             .build());
 
     for (JobTemplate template : new BuiltInJobTemplateProvider().jobTemplates()) {

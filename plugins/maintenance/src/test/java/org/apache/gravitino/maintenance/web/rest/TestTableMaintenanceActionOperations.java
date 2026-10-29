@@ -30,7 +30,7 @@ import java.lang.reflect.Field;
 import java.util.function.LongFunction;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.maintenance.MaintenanceMetricsService;
+import org.apache.gravitino.maintenance.MaintenanceMetricsManager;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
@@ -181,7 +181,7 @@ class TestTableMaintenanceActionOperations {
 
   private TableMaintenanceActionOperations operations(LongFunction<String> lookup) {
     return new TableMaintenanceActionOperations(
-        new MaintenanceMetricsService(actions, metrics, lookup));
+        new MaintenanceMetricsManager(actions, metrics, lookup));
   }
 
   private static TableMaintenanceActionPO action(long tableId, long policyId) {

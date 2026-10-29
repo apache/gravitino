@@ -40,40 +40,43 @@ import org.slf4j.LoggerFactory;
  * <p>Callbacks are keyed by {@code action_id} injected at submit time. Metrics writes require the
  * row to be bound ({@code job_id IS NOT NULL}).
  */
-public class MaintenanceMetricsService {
+public class MaintenanceMetricsManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceMetricsService.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceMetricsManager.class);
+
   private static final TableMetaService TABLE_SERVICE = TableMetaService.getInstance();
+  private static final TableMaintenanceActionMetaService ACTION_SERVICE =
+      TableMaintenanceActionMetaService.getInstance();
+  private static final TableSnapshotMetricsMetaService METRICS_SERVICE =
+      TableSnapshotMetricsMetaService.getInstance();
 
-  private final TableMaintenanceActionMetaService actionMetaService;
-  private final TableSnapshotMetricsMetaService metricsMetaService;
+  private final TableMaintenanceActionMetaService actionService;
+  private final TableSnapshotMetricsMetaService metricsService;
   private final LongFunction<String> metalakeLookup;
 
   /**
    * Production wiring.
    *
-   * @return service bound into the Jersey feature
+   * @return manager bound into the Jersey feature
    */
-  public static MaintenanceMetricsService create() {
-    return new MaintenanceMetricsService(
-        TableMaintenanceActionMetaService.getInstance(),
-        TableSnapshotMetricsMetaService.getInstance(),
-        TABLE_SERVICE::getMetalakeNameByTableId);
+  public static MaintenanceMetricsManager create() {
+    return new MaintenanceMetricsManager(
+        ACTION_SERVICE, METRICS_SERVICE, TABLE_SERVICE::getMetalakeNameByTableId);
   }
 
   /**
-   * Creates a service with explicit collaborators.
+   * Creates a manager with explicit collaborators.
    *
-   * @param actionMetaService action rows
-   * @param metricsMetaService snapshot metrics rows
+   * @param actionService action rows
+   * @param metricsService snapshot metrics rows
    * @param metalakeLookup resolves a table id to its metalake name
    */
-  public MaintenanceMetricsService(
-      TableMaintenanceActionMetaService actionMetaService,
-      TableSnapshotMetricsMetaService metricsMetaService,
+  public MaintenanceMetricsManager(
+      TableMaintenanceActionMetaService actionService,
+      TableSnapshotMetricsMetaService metricsService,
       LongFunction<String> metalakeLookup) {
-    this.actionMetaService = actionMetaService;
-    this.metricsMetaService = metricsMetaService;
+    this.actionService = actionService;
+    this.metricsService = metricsService;
     this.metalakeLookup = metalakeLookup;
   }
 
@@ -92,12 +95,12 @@ public class MaintenanceMetricsService {
     long metricsId =
         action.beforeMetricsId() != null
             ? action.beforeMetricsId()
-            : metricsMetaService.insertMetrics(
+            : metricsService.insertMetrics(
                 action.tableId(),
                 action.policyId(),
                 request.getSnapshotId(),
                 request.getMetricsJson());
-    actionMetaService.recordBeforeMetrics(actionId, metricsId);
+    actionService.recordBeforeMetrics(actionId, metricsId);
     finishActionIfRequested(actionId, action, finish, "before", metalake, metricsId);
   }
 
@@ -115,12 +118,12 @@ public class MaintenanceMetricsService {
     long metricsId =
         action.afterMetricsId() != null
             ? action.afterMetricsId()
-            : metricsMetaService.insertMetrics(
+            : metricsService.insertMetrics(
                 action.tableId(),
                 action.policyId(),
                 request.getSnapshotId(),
                 request.getMetricsJson());
-    actionMetaService.recordAfterMetrics(actionId, metricsId);
+    actionService.recordAfterMetrics(actionId, metricsId);
     finishActionIfRequested(actionId, action, finish, "after", metalake, metricsId);
   }
 
@@ -139,7 +142,7 @@ public class MaintenanceMetricsService {
             request.getTableId(),
             request.getPolicyId(),
             /*requireBound=*/ true);
-    actionMetaService.markFinished(actionId, System.currentTimeMillis());
+    actionService.markFinished(actionId, System.currentTimeMillis());
     LOG.info(
         "action finished for action_id {} metalake {} table {} policy {}",
         actionId,
@@ -166,7 +169,7 @@ public class MaintenanceMetricsService {
           metricsId);
       return;
     }
-    actionMetaService.markFinished(actionId, System.currentTimeMillis());
+    actionService.markFinished(actionId, System.currentTimeMillis());
     LOG.info(
         "{} metrics reported and action finished for action_id {} metalake {} table {} policy {} metricsId {}",
         phase,
@@ -185,7 +188,7 @@ public class MaintenanceMetricsService {
 
   private TableMaintenanceActionPO loadInFlight(
       String metalake, long actionId, long tableId, long policyId, boolean requireBound) {
-    TableMaintenanceActionPO action = actionMetaService.getById(actionId);
+    TableMaintenanceActionPO action = actionService.getById(actionId);
     if (action == null) {
       throw new NoSuchEntityException("no maintenance action for action_id=%s", actionId);
     }
