@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
-import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
 import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
@@ -66,7 +65,6 @@ public class TableSnapshotMetricsMetaService {
             .build();
     SessionUtils.doWithCommit(
         TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(metricsMeta));
-    Preconditions.checkState(metricsMeta.metricsId() != null, "insert lost generated metrics id");
     return metricsMeta.metricsId();
   }
 

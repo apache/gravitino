@@ -109,13 +109,9 @@ public class TableMaintenanceActionMetaService {
       }
       throw e;
     }
-    Preconditions.checkState(
-        actionMeta.actionId() != null, "insert did not return generated action_id");
     TableMaintenanceActionPO inserted =
         SessionUtils.getWithoutCommit(
             TableMaintenanceActionMapper.class, mapper -> mapper.selectById(actionMeta.actionId()));
-    Preconditions.checkState(
-        inserted != null && inserted.createdAt() != null, "insert lost created_at");
     return Optional.of(new OccupancyClaim(inserted.actionId(), inserted.createdAt()));
   }
 
@@ -174,11 +170,6 @@ public class TableMaintenanceActionMetaService {
     List<OccupancyClaim> claims = new ArrayList<>(policyIds.size());
     for (long policyId : policyIds) {
       TableMaintenanceActionPO unbound = mapper.selectUnboundByTableAndPolicy(tableId, policyId);
-      Preconditions.checkState(
-          unbound != null && unbound.actionId() != null && unbound.createdAt() != null,
-          "batch acquire lost unbound row for table %s policy %s",
-          tableId,
-          policyId);
       claims.add(new OccupancyClaim(unbound.actionId(), unbound.createdAt()));
     }
     return claims;
