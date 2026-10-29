@@ -54,12 +54,14 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
+import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobExecutorFactory;
 import org.apache.gravitino.job.JobHandle;
@@ -197,6 +199,106 @@ public class TestK8sJobExecutor {
     JobExecutionInfo succeeded = executor.getJobExecutionInfo(jobExecutionId);
     Assertions.assertEquals(driverStartedAt, succeeded.startedAt());
     Assertions.assertEquals(driverFinishedAt, succeeded.finishedAt());
+  }
+
+  @Test
+  public void testFindSubmittedJob() {
+    // Nothing is submitted for the job yet.
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), sparkTemplate()));
+
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    Assertions.assertEquals(
+        Optional.of(jobExecutionId), executor.findSubmittedJob(context(1L), sparkTemplate()));
+    // The SparkApplication of one job is never found for another one.
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(2L), sparkTemplate()));
+
+    // A SparkApplication with the name of the job that belongs to another job is not its execution.
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    app.getMetadata().getLabels().put(K8sJobResourceUtils.LABEL_JOB_ID, "3");
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(app)
+        .update();
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), sparkTemplate()));
+
+    // A job the k8s job executor doesn't support is never submitted.
+    ShellJobTemplate shellTemplate =
+        ShellJobTemplate.builder().withName("shell-job").withExecutable("/bin/echo").build();
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), shellTemplate));
+  }
+
+  @Test
+  public void testFindSubmittedJobByNameAndNamespaceOnly() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+
+    // Only the name and the namespace of the SparkApplication are derived, so a job is still found
+    // when the checks of a submission would reject it now, e.g. as the configurations changed.
+    SparkJobTemplate rejectedNow =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("local:///opt/spark/examples/jars/spark-examples.jar")
+            .withClassName("org.apache.spark.examples.SparkPi")
+            .withConfigs(ImmutableMap.of("spark.master", "local[*]"))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> executor.submitJob(context(2L), rejectedNow));
+    Assertions.assertEquals(
+        Optional.of(jobExecutionId), executor.findSubmittedJob(context(1L), rejectedNow));
+
+    // A job whose namespace is invalid is never submitted.
+    SparkJobTemplate invalidNamespace =
+        SparkJobTemplate.builder()
+            .withName("user-job")
+            .withExecutable("local:///opt/spark/examples/jars/spark-examples.jar")
+            .withClassName("org.apache.spark.examples.SparkPi")
+            .withConfigs(ImmutableMap.of(SparkApplicationUtils.SPARK_NAMESPACE, "Not_A_Namespace"))
+            .build();
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), invalidNamespace));
+  }
+
+  @Test
+  public void testFindSubmittedJobWhileApiServerUnreachable() {
+    try (KubernetesClient unreachable =
+        new KubernetesClientBuilder()
+            .withConfig(
+                new ConfigBuilder(Config.empty())
+                    .withMasterUrl("http://127.0.0.1:1")
+                    .withRequestRetryBackoffLimit(0)
+                    .build())
+            .build()) {
+      executor.initialize(
+          TestSparkApplicationUtils.newConfigs(
+              ImmutableMap.of(K8sJobExecutorConfigs.STATUS_CACHE_TTL_MS, "0")),
+          unreachable);
+
+      // The lookup fails rather than finds nothing, so the job isn't marked as FAILED.
+      KubernetesClientException first =
+          Assertions.assertThrows(
+              KubernetesClientException.class,
+              () -> executor.findSubmittedJob(context(1L), sparkTemplate()));
+      Assertions.assertTrue(K8sJobExecutor.isUnreachable(first), first.toString());
+      // The other queries fail right away without another request.
+      KubernetesClientException next =
+          Assertions.assertThrows(
+              KubernetesClientException.class,
+              () -> executor.findSubmittedJob(context(2L), sparkTemplate()));
+      Assertions.assertSame(first, next.getCause());
+    }
+  }
+
+  @Test
+  public void testFindSubmittedJobAfterCancellation() {
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    executor.cancelJob(jobExecutionId);
+
+    Assertions.assertEquals(
+        Optional.empty(), executor.findSubmittedJob(context(1L), sparkTemplate()));
   }
 
   @Test
@@ -656,8 +758,30 @@ public class TestK8sJobExecutor {
         .resource(created)
         .update();
 
-    Assertions.assertThrows(
-        IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    // Its pods may still run, so it is not a confirmed rejection, and recovery still finds it.
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    Assertions.assertFalse(e instanceof JobSubmissionRejectedException, e.toString());
+    Assertions.assertFalse(e instanceof IllegalArgumentException, e.toString());
+    Assertions.assertTrue(executor.findSubmittedJob(context(1L), sparkTemplate()).isPresent());
+  }
+
+  @Test
+  public void testConflictWithResourceGoneIsNotRejected() {
+    // A retried request conflicts with the SparkApplication it created, which is deleted before
+    // it is read back.
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(409, new StatusBuilder().withCode(409).build())
+        .once();
+
+    IllegalStateException e =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    Assertions.assertEquals(409, ((KubernetesClientException) e.getCause()).getCode());
   }
 
   @Test
@@ -1008,7 +1132,8 @@ public class TestK8sJobExecutor {
         .create();
 
     Assertions.assertThrows(
-        IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+        JobSubmissionRejectedException.class,
+        () -> executor.submitJob(context(1L), sparkTemplate()));
   }
 
   @Test
@@ -1539,5 +1664,51 @@ public class TestK8sJobExecutor {
         .withClassName("org.apache.spark.examples.SparkPi")
         .withArguments(ImmutableList.of("10"))
         .build();
+  }
+
+  @Test
+  public void testFailedCleanupLeavesAcceptedExecution() {
+    GenericKubernetesResource accepted =
+        SparkApplicationUtils.buildSparkApplication(
+            context(1L), sparkTemplate(), TestSparkApplicationUtils.newConfigs(ImmutableMap.of()));
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(accepted)
+        .create();
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(500, new StatusBuilder().withCode(500).withMessage("etcd timeout").build())
+        .always();
+    server
+        .expect()
+        .get()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(403, new StatusBuilder().withCode(403).build())
+        .once();
+    try (KubernetesClient noRetries = clientWithoutRetries(client.getConfiguration())) {
+      executor.initialize(TestSparkApplicationUtils.newConfigs(ImmutableMap.of()), noRetries);
+      KubernetesClientException failure =
+          Assertions.assertThrows(
+              KubernetesClientException.class,
+              () -> executor.submitJob(context(1L), sparkTemplate()));
+      Assertions.assertEquals(500, failure.getCode());
+    }
+    // The accepted execution survives the failed submission and can run when the operator recovers.
+    Assertions.assertNotNull(sparkApplication("gravitino-job-1"));
+  }
+
+  @Test
+  public void testRecoveryTracksDeletingApplication() {
+    String execution = executor.submitJob(context(1L), sparkTemplate());
+    GenericKubernetesResource app = sparkApplication("gravitino-job-1");
+    app.getMetadata().setDeletionTimestamp(Instant.now().toString());
+    // The mock CRUD dispatcher removes a resource once deletionTimestamp is set. Return a
+    // foreground deletion that is still waiting for its pods instead.
+    server.expect().get().withPath(APPS_PATH + "/gravitino-job-1").andReturn(200, app).always();
+    Assertions.assertEquals(
+        Optional.of(execution), executor.findSubmittedJob(context(1L), sparkTemplate()));
   }
 }

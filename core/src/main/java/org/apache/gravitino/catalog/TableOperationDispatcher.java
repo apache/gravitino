@@ -280,6 +280,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // at the same time.
     // 2. if the TableChange.RenameTable only change the table name, we need to acquire write lock
     // to on the schema.
+    //
+    // The read lock on the table does not order this alter against a concurrent load or another
+    // alter of the same table, and no tree lock orders them across servers. Either of them can
+    // write a stale column list over this alter and turn a column rename into a drop plus an add,
+    // which removes the renamed column's tags. See updateColumnsIfNecessaryWhenLoad and #14279.
     NameIdentifier nameIdentifierForLock = ident;
     String schemaName = ident.namespace().level(2);
     Arrays.stream(changes).forEach(TableOperationDispatcher::validateColumnChange);
@@ -1096,8 +1101,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // stored columns since, e.g. renamed a column while keeping its id. So the columns are matched
     // again against the entity being updated, which is the latest stored one. This narrows the
     // load/alter race but does not close it: if this load read the catalog before a concurrent
-    // alter and the store after it, the catalog snapshot is the stale side. Closing that needs
-    // alterTable and loadTable to exclude each other, which is tracked separately.
+    // alter and the store after it, the catalog snapshot is the stale side, and a column that the
+    // alter renamed is stored as dropped plus added, so it loses its id and its tags.
+    //
+    // A tree lock cannot close this, because tree locks are local to one server. Closing it needs
+    // the alter to record in the store that it is in progress before it calls the catalog, and
+    // the load to read the stored version, operation epoch and in-progress mark before it reads
+    // the catalog, skipping the store write while the mark is set. The load may write only if the
+    // version and epoch are unchanged and no in-progress mark is set. That needs a new EntityStore
+    // API and is tracked in #14279.
     Table tableFromCatalog = combinedTable.tableFromCatalog();
     return TreeLockUtils.doWithTreeLock(
         tableIdent,

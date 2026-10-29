@@ -25,8 +25,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
@@ -339,6 +341,42 @@ public class MetadataObjectUtil {
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the type %s", object.type()));
+    }
+  }
+
+  /**
+   * Checks metadata objects, checking each distinct table only once for tables and their columns.
+   *
+   * <p>Every object's identifier is validated. Successful table checks are shared only within this
+   * call. Like {@link #checkMetadataObject(String, MetadataObject)}, this must be called outside
+   * the tree lock because checking an object may load it into the entity store.
+   *
+   * @param metalake The metalake name.
+   * @param objects The metadata objects to check, in order.
+   * @throws NoSuchMetadataObjectException if a metadata object does not exist.
+   */
+  public static void checkMetadataObjects(String metalake, List<MetadataObject> objects) {
+    Set<NameIdentifier> checkedTables = new HashSet<>();
+    for (MetadataObject object : objects) {
+      Preconditions.checkArgument(object != null, "metadataObject cannot be null");
+      if (object.type() != MetadataObject.Type.TABLE
+          && object.type() != MetadataObject.Type.COLUMN) {
+        checkMetadataObject(metalake, object);
+        continue;
+      }
+
+      NameIdentifier identifier = toEntityIdent(metalake, object);
+      NameIdentifier tableIdentifier;
+      if (object.type() == MetadataObject.Type.COLUMN) {
+        NameIdentifierUtil.checkColumn(identifier);
+        tableIdentifier = NameIdentifier.of(identifier.namespace().levels());
+      } else {
+        NameIdentifierUtil.checkTable(identifier);
+        tableIdentifier = identifier;
+      }
+      if (checkedTables.add(tableIdentifier)) {
+        checkMetadataObject(metalake, object);
+      }
     }
   }
 

@@ -194,7 +194,8 @@ public class ExceptionHandlers {
    * Handles an existing catalog connection test failure without exposing its stack trace.
    *
    * @param e the connection test failure
-   * @return an HTTP 200 response containing the application error
+   * @return an HTTP 403 response for forbidden operations, an HTTP 200 response for known
+   *     connection test failures, or an HTTP 500 response for unexpected errors
    */
   public static Response handleExistingCatalogTestConnectionException(Exception e) {
     return handleTestConnectionException(e, false);
@@ -241,6 +242,9 @@ public class ExceptionHandlers {
 
     } else if (e instanceof NotInUseException) {
       response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof ForbiddenException) {
+      return Utils.forbidden(e.getMessage(), throwable);
 
     } else {
       return Utils.internalError(e.getMessage(), throwable);
