@@ -344,8 +344,8 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   'http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/mart/semantic-model-metrics'
 ```
 
-The default is `details=false`. If `sales_model` is the only model with metrics in this schema,
-the response is:
+The default is `details=false`; only `true` (case-insensitive) enables complete metric definitions.
+If `sales_model` is the only model with metrics in this schema, the default response is:
 
 ```json
 {
