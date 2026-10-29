@@ -30,19 +30,19 @@ import org.apache.gravitino.catalog.jdbc.TestJdbc;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.ClickHouseFixture;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.junit.jupiter.api.BeforeAll;
 
+@ClickHouseFixture(database = TestDatabaseName.CLICKHOUSE_CLICKHOUSE_ABSTRACT_IT)
 public class TestClickHouse extends TestJdbc {
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static TestDatabaseName TEST_DB_NAME;
+  @FixtureContainer protected static ClickHouseContainer clickHouseContainer;
 
   @BeforeAll
   public static void startup() throws Exception {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
     TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CLICKHOUSE_ABSTRACT_IT;
-    containerSuite.startClickHouseContainer(TEST_DB_NAME);
     DataSource dataSource = DataSourceUtils.createDataSource(getClickHouseCatalogProperties());
 
     DATABASE_OPERATIONS = new ClickHouseDatabaseOperations();
@@ -59,8 +59,6 @@ public class TestClickHouse extends TestJdbc {
 
   protected static Map<String, String> getClickHouseCatalogProperties() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
-
-    ClickHouseContainer clickHouseContainer = containerSuite.getClickHouseContainer();
 
     String jdbcUrl = clickHouseContainer.getJdbcUrl(TEST_DB_NAME);
 

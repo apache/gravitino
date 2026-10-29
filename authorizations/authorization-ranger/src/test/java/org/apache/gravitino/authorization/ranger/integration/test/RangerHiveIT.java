@@ -63,6 +63,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.integration.test.container.RangerContainer;
+import org.apache.gravitino.integration.test.container.RangerFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -83,6 +84,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@RangerFixture
 public class RangerHiveIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveIT.class);
 
@@ -92,8 +94,8 @@ public class RangerHiveIT {
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
   @BeforeAll
-  public static void setup() {
-    RangerITEnv.init(RangerITEnv.currentFunName(), true);
+  public static void setup(RangerContainer ranger) {
+    RangerITEnv.init(ranger, RangerITEnv.currentFunName(), true);
 
     rangerAuthHivePlugin = RangerITEnv.rangerAuthHivePlugin;
     rangerHelper = RangerITEnv.rangerHelper;

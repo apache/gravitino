@@ -61,9 +61,9 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
-import org.apache.gravitino.integration.test.container.DorisImageName;
+import org.apache.gravitino.integration.test.container.DorisFixture;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -100,7 +100,9 @@ import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
 @Tag("doris-multi-version")
+@DorisFixture
 public class CatalogDorisIT extends BaseIT {
+  @FixtureContainer private DorisContainer doris;
 
   private static final String provider = "jdbc-doris";
 
@@ -126,17 +128,13 @@ public class CatalogDorisIT extends BaseIT {
   private static final long MAX_WAIT_IN_SECONDS = 30;
 
   private static final long WAIT_INTERVAL_IN_SECONDS = 1;
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private GravitinoMetalake metalake;
   private String jdbcUrl;
 
   protected Catalog catalog;
-  protected DorisImageName dorisImageName = DorisImageName.VERSION_1_2;
 
   @BeforeAll
   public void startup() throws IOException {
-    containerSuite.startDorisContainer(dorisImageName);
 
     createMetalake();
     createCatalog();
@@ -174,7 +172,7 @@ public class CatalogDorisIT extends BaseIT {
   private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    DorisContainer dorisContainer = containerSuite.getDorisContainer();
+    DorisContainer dorisContainer = doris;
 
     jdbcUrl =
         String.format(

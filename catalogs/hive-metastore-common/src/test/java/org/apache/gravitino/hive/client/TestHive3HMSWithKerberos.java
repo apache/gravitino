@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.hive.client;
 
-import com.google.common.collect.ImmutableMap;
+import org.apache.gravitino.integration.test.container.HiveAuth;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
+import org.apache.gravitino.integration.test.container.HiveVersion;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
@@ -31,6 +33,7 @@ import org.junit.jupiter.api.TestInstance;
  */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@HiveFixture(version = HiveVersion.HIVE3, auth = HiveAuth.KERBEROS)
 public class TestHive3HMSWithKerberos extends TestHive2HMSWithKerberos {
 
   @BeforeAll
@@ -39,18 +42,13 @@ public class TestHive3HMSWithKerberos extends TestHive2HMSWithKerberos {
     testPrefix = "hive3_kerberos";
     catalogName = "hive"; // Hive3 default catalog
 
-    containerSuite.startKerberosHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
-    hiveContainer = containerSuite.getKerberosHiveContainer();
-
     metastoreUri =
         String.format(
-            "thrift://%s:%d",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     hdfsBasePath =
         String.format(
             "hdfs://%s:%d/tmp/gravitino_test",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     // Prepare Kerberos config (keytab/krb5) for client connections.
     prepareKerberosConfig();

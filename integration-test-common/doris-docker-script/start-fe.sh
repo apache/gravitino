@@ -31,6 +31,13 @@ PRIORITY_NETWORKS=$(echo "${CONTAINER_IP}" | awk -F '.' '{print$1"."$2"."$3".0/2
 echo "add priority_networks = ${PRIORITY_NETWORKS} to fe.conf"
 echo "priority_networks = ${PRIORITY_NETWORKS}" >> ${DORIS_FE_HOME}/conf/fe.conf
 
+# Set by docker-compose-disposable.yaml: the metadata is thrown away with the cluster, so BDB JE
+# need not sync it to disk on every commit.
+if [ "${GRAVITINO_DISPOSABLE_DATA}" = "true" ]; then
+  echo "master_sync_policy = NO_SYNC" >> ${DORIS_FE_HOME}/conf/fe.conf
+  echo "replica_sync_policy = NO_SYNC" >> ${DORIS_FE_HOME}/conf/fe.conf
+fi
+
 # Start only FE in daemon mode
 ${DORIS_FE_HOME}/bin/start_fe.sh --daemon
 

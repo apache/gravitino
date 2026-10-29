@@ -35,15 +35,23 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.idp.storage.relational.converters.IdpSQLExceptionConverterFactory;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.Fixtures;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.MySQLSpec;
+import org.apache.gravitino.integration.test.container.MySQLVersion;
+import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLSpec;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+// Containers are shared across tests and closed once per run; each test recreates its own database.
+@ExtendWith(CloseContainerExtension.class)
 public abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
@@ -66,7 +74,7 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   @AfterEach
-  void closeSuite() throws IOException {
+  void closeBackend() throws IOException {
     closeSession();
     if (backend != null) {
       backend.close();
@@ -75,7 +83,6 @@ public abstract class AbstractIdpMetaStorageTest {
 
     SqlSessionFactoryHelper.getInstance().close();
     IdpSQLExceptionConverterFactory.close();
-    ContainerSuite.getInstance().close();
 
     if (h2Path != null && Files.exists(h2Path)) {
       deleteDirectory(h2Path);
@@ -144,9 +151,9 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   private void initializeMySQLBackend(Config backendConfig) throws IOException {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startMySQLContainer(MYSQL_TEST_DATABASE);
-    MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();
+    // The backend is a test parameter, so the container comes from Fixtures, not an annotation.
+    MySQLContainer mySQLContainer =
+        Fixtures.get(new MySQLSpec(MySQLVersion.MYSQL_8_0, MYSQL_TEST_DATABASE));
     String jdbcUrl = mySQLContainer.getJdbcUrl(MYSQL_TEST_DATABASE);
 
     backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, jdbcUrl);
@@ -171,9 +178,8 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   private void initializePostgreSQLBackend(Config backendConfig) throws IOException {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startPostgreSQLContainer(POSTGRESQL_TEST_DATABASE);
-    PostgreSQLContainer postgreSQLContainer = containerSuite.getPostgreSQLContainer();
+    PostgreSQLContainer postgreSQLContainer =
+        Fixtures.get(new PostgreSQLSpec(PGImageName.VERSION_13, POSTGRESQL_TEST_DATABASE));
     String schemaName = "idp_user_" + UUID.randomUUID().toString().replace("-", "");
     String jdbcUrl = postgreSQLContainer.getJdbcUrl(POSTGRESQL_TEST_DATABASE);
 

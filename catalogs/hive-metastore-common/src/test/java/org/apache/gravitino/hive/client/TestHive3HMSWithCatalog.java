@@ -40,7 +40,7 @@ public class TestHive3HMSWithCatalog extends TestHive3HMS {
     String catalogLocation =
         String.format(
             "hdfs://%s:%d/tmp/gravitino_test/catalogs/%s",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT, catalogName);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT, catalogName);
 
     // Ensure the catalog exists; only create if missing.
     if (!hiveClient.getCatalogs().contains(catalogName)) {
