@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 
@@ -86,6 +87,16 @@ public interface SemanticModel extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Semantic Model does not support tag operations.");
+  }
+
+  /**
+   * Returns the domain operations for this Semantic Model.
+   *
+   * @return The {@link SupportsDomains} if the Semantic Model supports domain operations.
+   * @throws UnsupportedOperationException If the Semantic Model does not support domain operations.
+   */
+  default SupportsDomains supportsDomains() {
+    throw new UnsupportedOperationException("Semantic Model does not support domain operations.");
   }
 
   /**
