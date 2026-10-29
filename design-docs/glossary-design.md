@@ -47,6 +47,8 @@ find the approved term, and follow its links to the data.
    topics, models and semantic-model metrics. A term lists its objects, and an object lists its
    terms. A binding never gives access to data.
 4. **Domains**: a term belongs to zero or more domains. Grants on these domains control the term.
+   The first version allows at most one domain per term. The storage and the API already support
+   several domains, so the limit can be removed later without a migration or an API change.
 5. **Status**: `DRAFT`, `APPROVED` or `DEPRECATED`, set through the API. Agents only see `APPROVED`
    terms.
 6. **Privileges**: `VIEW_DEFINITION`, `CREATE_DEFINITION` and `MANAGE_DEFINITIONS`, granted on the
