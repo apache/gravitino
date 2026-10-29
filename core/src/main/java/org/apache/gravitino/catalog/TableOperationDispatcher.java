@@ -331,10 +331,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   IllegalArgumentException.class);
           Table alteredTable = catalogResult.table;
 
-          // The change is already applied in the catalog, and in the store if the table is
-          // stored. A result without a column list still fails, because clients require one. The
-          // hook's authorization rename and the success event are then skipped, and a retried
-          // rename fails because the table already has its new name.
+          // The change is already applied in the catalog. If the result has no column list and
+          // Gravitino has no stored columns to report instead, the alter fails, because clients
+          // require one. The hook's authorization rename and the success event are then skipped,
+          // and a retried rename fails because the table already has its new name.
           if (catalogResult.managed) {
             return checkColumnsReported(
                 ident,
@@ -412,10 +412,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 ident, newIdent);
           }
 
-          return checkColumnsReported(
-              ident,
+          EntityCombinedTable result =
               EntityCombinedTable.of(alteredTable, updatedTableEntity)
-                  .withHiddenProperties(catalogResult.hiddenProperties));
+                  .withHiddenProperties(catalogResult.hiddenProperties);
+          // The store kept the columns it had before this alter (see updateColumnsIfNecessary).
+          // Report them, so the alter completes, including the hook's authorization rename,
+          // instead of failing after the catalog has already applied it. A column drop or rename
+          // in this alter is not reflected in them.
+          if (alteredTable.columns() == null && updatedTableEntity != null) {
+            LOG.warn(
+                "Catalog {} returned altered table {} without a column list, reporting the stored "
+                    + "columns",
+                getCatalogIdentifier(ident),
+                ident);
+            result.withColumns(toColumns(updatedTableEntity.columns()));
+          }
+          return checkColumnsReported(ident, result);
         });
   }
 
@@ -791,6 +803,24 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               getCatalogIdentifier(ident), ident));
     }
     return table;
+  }
+
+  private static Column[] toColumns(@Nullable List<ColumnEntity> columnEntities) {
+    if (columnEntities == null) {
+      return new Column[0];
+    }
+    return columnEntities.stream()
+        .sorted(Comparator.comparing(ColumnEntity::position))
+        .map(
+            c ->
+                Column.of(
+                    c.name(),
+                    c.dataType(),
+                    c.comment(),
+                    c.nullable(),
+                    c.autoIncrement(),
+                    c.defaultValue()))
+        .toArray(Column[]::new);
   }
 
   private List<ColumnEntity> toColumnEntities(Column[] columns, AuditInfo audit) {

@@ -1512,14 +1512,32 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent = createTableReportingNoColumns("schema_null_columns_alter");
     Map<String, Long> ids = columnIds(tableIdent);
 
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () -> tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k3", "v3")));
+    Table altered =
+        tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k3", "v3"));
 
-    // The catalog applied the change, and the stored columns are kept.
+    // The catalog applied the change, the stored columns are kept and reported instead.
     Assertions.assertEquals(
         "v3", testCatalogOperations().loadTable(tableIdent).properties().get("k3"));
     Assertions.assertEquals(ids, columnIds(tableIdent));
+    Assertions.assertArrayEquals(
+        new String[] {"c1"}, Arrays.stream(altered.columns()).map(Column::name).toArray());
+  }
+
+  @Test
+  public void testRenameCompletesWhenCatalogReportsNoColumns() throws IOException {
+    NameIdentifier tableIdent = createTableReportingNoColumns("schema_null_columns_rename");
+    Map<String, Long> ids = columnIds(tableIdent);
+    NameIdentifier newIdent = NameIdentifier.of(tableIdent.namespace(), "table_null_columns_new");
+
+    Table altered =
+        tableOperationDispatcher.alterTable(tableIdent, TableChange.rename(newIdent.name()));
+
+    // The rename completes, so the hook's authorization rename that follows it runs too.
+    Assertions.assertEquals(newIdent.name(), altered.name());
+    Assertions.assertArrayEquals(
+        new String[] {"c1"}, Arrays.stream(altered.columns()).map(Column::name).toArray());
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+    Assertions.assertEquals(ids, columnIds(newIdent));
   }
 
   @Test

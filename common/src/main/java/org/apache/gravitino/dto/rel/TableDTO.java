@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.rel;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.rel.indexes.IndexDTO;
@@ -42,6 +43,8 @@ public class TableDTO implements Table {
   @JsonProperty("comment")
   private String comment;
 
+  // Null only for the internal connector snapshot; responses always carry a column list.
+  @Nullable
   @JsonProperty("columns")
   private ColumnDTO[] columns;
 
@@ -106,8 +109,11 @@ public class TableDTO implements Table {
   }
 
   /**
-   * @return The columns of the table.
+   * @return The columns of the table. Null only for the internal connector snapshot of a table
+   *     whose catalog reports no column list; such a table is rejected before it is returned to a
+   *     client.
    */
+  @Nullable
   @Override
   public Column[] columns() {
     return columns;
@@ -189,7 +195,7 @@ public class TableDTO implements Table {
     /** The comment associated with the table. */
     protected String comment;
     /** The columns of the table. */
-    protected ColumnDTO[] columns;
+    @Nullable protected ColumnDTO[] columns;
     /** The properties associated with the table. */
     protected Map<String, String> properties;
     /** The audit information for the table. */
@@ -231,10 +237,11 @@ public class TableDTO implements Table {
     /**
      * Sets the columns of the table.
      *
-     * @param columns The columns of the table.
+     * @param columns The columns of the table. Null is only for the internal connector snapshot of
+     *     a table whose catalog reports no column list; a DTO sent to clients always has columns.
      * @return The Builder instance.
      */
-    public S withColumns(ColumnDTO[] columns) {
+    public S withColumns(@Nullable ColumnDTO[] columns) {
       this.columns = columns;
       return (S) this;
     }
