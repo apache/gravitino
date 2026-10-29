@@ -77,7 +77,13 @@ public interface MetadataObject {
     /** A job template represents a reusable template for creating jobs in Gravitino. */
     JOB_TEMPLATE,
     /** A function represents a user-defined function registered in Gravitino. */
-    FUNCTION;
+    FUNCTION,
+    /**
+     * An ontology is a metalake-level concept graph that declares business concepts and the
+     * relationships between them. It is not a leaf object and holds no assets, so it is never a
+     * domain member and cannot be tagged itself.
+     */
+    ONTOLOGY;
   }
 
   /**
