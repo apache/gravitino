@@ -41,7 +41,7 @@ import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.job.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceSparkSubmitPipeline;
+import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceCronSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.PendingCronExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
@@ -131,12 +131,11 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
             config.expandEnqueueBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);
 
-    MaintenanceJobManager jobManager = MaintenanceJobManager.getInstance();
-    MaintenanceSparkSubmitPipeline cronSubmit =
-        new MaintenanceSparkSubmitPipeline(
+    MaintenanceCronSubmitPipeline cronSubmit =
+        new MaintenanceCronSubmitPipeline(
             occupancyGate::isInFlight,
             TableMaintenanceActionMetaService.getInstance(),
-            jobManager,
+            MaintenanceJobManager.getInstance(),
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     CRON_SUBMIT.set(cronSubmit::submit);
@@ -145,7 +144,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         new MaintenanceCommitSubmitPipeline(
             CommitOccupancyGate.of(occupancyGate),
             TableMaintenanceActionMetaService.getInstance(),
-            jobManager,
+            MaintenanceJobManager.getInstance(),
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     COMMIT_SUBMIT.set(commitSubmit::submit);

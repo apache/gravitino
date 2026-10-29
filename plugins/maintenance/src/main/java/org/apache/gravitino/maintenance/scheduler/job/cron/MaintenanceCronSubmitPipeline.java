@@ -45,9 +45,9 @@ import org.slf4j.LoggerFactory;
  * <p>Does not sample metrics or evaluate trigger-expr (both run inside Spark from enqueue-time
  * {@code rules} in task parameters).
  */
-public final class MaintenanceSparkSubmitPipeline {
+public final class MaintenanceCronSubmitPipeline {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceSparkSubmitPipeline.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceCronSubmitPipeline.class);
 
   private final CronSubmitGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
@@ -62,7 +62,7 @@ public final class MaintenanceSparkSubmitPipeline {
    * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
-  public MaintenanceSparkSubmitPipeline(
+  public MaintenanceCronSubmitPipeline(
       CronSubmitGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
       MaintenanceJobManager jobManager,

@@ -46,7 +46,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-class TestMaintenanceSparkSubmitPipeline {
+class TestMaintenanceCronSubmitPipeline {
 
   private static final long TABLE_ID = 101L;
   private static final long POLICY_ID = 202L;
@@ -163,14 +163,14 @@ class TestMaintenanceSparkSubmitPipeline {
     Assertions.assertTrue(conf.get("spark_conf").contains("basic"));
   }
 
-  private static MaintenanceSparkSubmitPipeline pipeline(
+  private static MaintenanceCronSubmitPipeline pipeline(
       boolean inFlight, TableMaintenanceActionMetaService actions, MaintenanceJobManager mgr) {
     return pipeline((t, p) -> inFlight, actions, mgr);
   }
 
-  private static MaintenanceSparkSubmitPipeline pipeline(
+  private static MaintenanceCronSubmitPipeline pipeline(
       CronSubmitGate gate, TableMaintenanceActionMetaService actions, MaintenanceJobManager mgr) {
-    return new MaintenanceSparkSubmitPipeline(
+    return new MaintenanceCronSubmitPipeline(
         gate, actions, mgr, new MaintenanceJobConfBuilder(new Config(false) {}), CLAIM_TIMEOUT_MS);
   }
 
