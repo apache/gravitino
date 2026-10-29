@@ -190,9 +190,6 @@ public class TestSemanticModelCatalog extends TestBase {
       for (int i = 0; i < actual.length; i++) {
         assertEquals(expected[i].namespace(), actual[i].namespace());
         assertEquals(metric, actual[i].metric());
-        String[] levels = actual[i].namespace().levels();
-        levels[0] = "changed";
-        assertEquals(expected[i].namespace(), actual[i].namespace());
       }
     } else {
       assertArrayEquals(

@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.client;
 
+import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.SemanticModelMetric;
@@ -40,5 +42,30 @@ final class GenericSemanticModelMetric implements SemanticModelMetric {
   @Override
   public Metric metric() {
     return metric;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (!(other instanceof GenericSemanticModelMetric)) {
+      return false;
+    }
+    GenericSemanticModelMetric that = (GenericSemanticModelMetric) other;
+    return namespace.equals(that.namespace) && metric.equals(that.metric);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int hashCode() {
+    return Objects.hash(namespace, metric);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String toString() {
+    return "GenericSemanticModelMetric{" + "namespace=" + namespace + ", metric=" + metric + '}';
   }
 }
