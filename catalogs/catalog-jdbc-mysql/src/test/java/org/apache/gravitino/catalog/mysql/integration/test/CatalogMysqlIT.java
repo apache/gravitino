@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -1266,7 +1267,7 @@ public class CatalogMysqlIT extends BaseIT {
                   indexes2);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in this Catalog"));
 
@@ -1286,7 +1287,7 @@ public class CatalogMysqlIT extends BaseIT {
                   indexes3);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in this Catalog"));
 
@@ -1552,7 +1553,7 @@ public class CatalogMysqlIT extends BaseIT {
                     new SortOrder[0],
                     Indexes.EMPTY_INDEXES));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             runtimeException.getMessage(),
             "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
 
@@ -1576,7 +1577,7 @@ public class CatalogMysqlIT extends BaseIT {
                     sortOrder,
                     index2));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             runtimeException.getMessage(),
             "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: [col_1,col_6]"));
   }
@@ -2261,7 +2262,7 @@ public class CatalogMysqlIT extends BaseIT {
                         false,
                         true)));
     Assertions.assertTrue(
-        StringUtils.contains(
+        Strings.CS.contains(
             runtimeException.getMessage(),
             "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
 

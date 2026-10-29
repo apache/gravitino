@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -38,7 +37,6 @@ import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -46,7 +44,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 
 @Tag("gravitino-docker-test")
 public class FilesetS3CatalogIT extends FilesetCatalogIT {
@@ -67,44 +64,12 @@ public class FilesetS3CatalogIT extends FilesetCatalogIT {
     containerSuite.startLocalStackContainer();
     gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
-    Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    gravitinoLocalStackContainer.executeInContainer(
-                        "awslocal", "iam", "create-user", "--user-name", "anonymous");
-                return result.getExitCode() == 0;
-              } catch (Exception e) {
-                LOG.info("LocalStack is not ready yet for: ", e);
-                return false;
-              }
-            });
-
-    gravitinoLocalStackContainer.executeInContainer("awslocal", "s3", "mb", "s3://" + bucketName);
-
-    Container.ExecResult result =
-        gravitinoLocalStackContainer.executeInContainer(
-            "awslocal", "iam", "create-access-key", "--user-name", "anonymous");
-
-    gravitinoLocalStackContainer.executeInContainer(
-        "awslocal",
-        "s3api",
-        "put-bucket-acl",
-        "--bucket",
-        "my-test-bucket",
-        "--acl",
-        "public-read-write");
-
-    // Get access key and secret key from result
-    String[] lines = result.getStdout().split("\n");
-    accessKey = lines[3].split(":")[1].trim().substring(1, 21);
-    secretKey = lines[5].split(":")[1].trim().substring(1, 41);
-
-    LOG.info("Access key: " + accessKey);
-    LOG.info("Secret key: " + secretKey);
+    // The container is ready once its health check passes. LocalStack does not enforce IAM, so
+    // the shared test keys work without creating a user.
+    gravitinoLocalStackContainer.createBucket(bucketName);
+    gravitinoLocalStackContainer.makeBucketPublic(bucketName);
+    accessKey = GravitinoLocalStackContainer.ACCESS_KEY;
+    secretKey = GravitinoLocalStackContainer.SECRET_KEY;
 
     s3Endpoint =
         String.format("http://localhost:%d", gravitinoLocalStackContainer.getMappedPort(4566));

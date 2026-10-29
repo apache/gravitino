@@ -21,16 +21,13 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.spark.sql.SparkSession;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Tag;
-import org.testcontainers.containers.Container;
 
 @Tag("gravitino-docker-test")
 public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
@@ -88,20 +85,8 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
     containerSuite.startLocalStackContainer();
     localStackContainer = containerSuite.getLocalStackContainer();
 
-    Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    localStackContainer.executeInContainer(
-                        "awslocal", "s3", "mb", "s3://" + S3_BUCKET_NAME);
-                return result.getExitCode() == 0;
-              } catch (Exception e) {
-                return false;
-              }
-            });
+    // The container is ready once its health check passes.
+    localStackContainer.createBucket(S3_BUCKET_NAME);
   }
 
   protected void initSparkEnv() {
