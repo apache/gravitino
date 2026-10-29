@@ -225,7 +225,7 @@ public class OntologyOperationDispatcher implements OntologyDispatcher {
         .withNamespace(Namespace.of(metalake))
         .withComment(comment)
         .withStatus(Ontology.Status.DRAFT)
-        .withDefinition(definition)
+        .withDefinition(OssieOntologyConverter.assignIds(definition, null))
         .withProperties(properties == null ? Collections.emptyMap() : properties)
         .withAuditInfo(
             AuditInfo.builder()

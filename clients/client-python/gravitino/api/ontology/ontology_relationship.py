@@ -25,10 +25,25 @@ from gravitino.api.ontology.ontology_role import OntologyRole
 class OntologyRelationship(ABC):
     """A relationship between concepts in an ontology.
 
+    A relationship is named within one ontology version. Gravitino mints an
+    identifier for it and carries that identifier into every later version, so a
+    stored mapping survives a rename. The identifier is internal to Gravitino and
+    never appears in an Apache Ossie document.
+
     `verbalizes` is required and holds at least one natural-language phrasing,
     because a relationship an agent cannot phrase is a relationship it cannot
     use to answer a question.
     """
+
+    @abstractmethod
+    def id(self) -> Optional[str]:
+        """The stable identifier Gravitino minted for this relationship.
+
+        Returns:
+            Optional[str]: The identifier, or `None` when the relationship has
+                not been stored yet.
+        """
+        pass
 
     @abstractmethod
     def name(self) -> str:

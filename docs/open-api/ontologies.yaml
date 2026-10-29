@@ -407,6 +407,13 @@ components:
           type: string
           nullable: true
           description: The IRI of the concept, absolute or resolved through prefixes
+        id:
+          type: string
+          nullable: true
+          description: >-
+            The stable identifier Gravitino minted for the concept. Optional on input: send it back
+            with a new name to rename the concept without breaking the references that bind it, or
+            omit it to inherit the identifier of the stored concept with the same name
       additionalProperties: false
 
     ConceptType:
@@ -459,6 +466,14 @@ components:
           type: string
           nullable: true
           description: The IRI of the relationship, absolute or resolved through prefixes
+        id:
+          type: string
+          nullable: true
+          description: >-
+            The stable identifier Gravitino minted for the relationship. Optional on input: send it
+            back with a new name to rename the relationship without breaking a stored mapping that
+            binds it, or omit it to inherit the identifier of the stored relationship with the same
+            name
       additionalProperties: false
 
     Multiplicity:

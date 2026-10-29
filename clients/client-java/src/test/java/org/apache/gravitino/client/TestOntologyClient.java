@@ -533,7 +533,8 @@ public class TestOntologyClient extends TestBase {
             Multiplicity.MANY_TO_ONE,
             null,
             null,
-            "ex:holds");
+            "ex:holds",
+            null);
     OntologyConceptDTO account =
         new OntologyConceptDTO(
             "Account",
@@ -544,10 +545,20 @@ public class TestOntologyClient extends TestBase {
             null,
             new String[] {"Account IS NOT NULL"},
             new OntologyRelationshipDTO[] {relationship},
-            "ex:Account");
+            "ex:Account",
+            null);
     OntologyConceptDTO balance =
         new OntologyConceptDTO(
-            "Balance", ConceptType.VALUE_TYPE, null, null, null, null, null, null, "ex:Balance");
+            "Balance",
+            ConceptType.VALUE_TYPE,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "ex:Balance",
+            null);
     return new OntologyDefinitionDTO(
             null,
             new String[] {"Account IS NOT NULL"},

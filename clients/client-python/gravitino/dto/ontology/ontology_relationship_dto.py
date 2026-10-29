@@ -63,6 +63,18 @@ class OntologyRelationshipDTO(
     _iri: Optional[str] = field(
         default=None, metadata=config(field_name="iri", exclude=is_none)
     )
+    _id: Optional[str] = field(
+        default=None, metadata=config(field_name="id", exclude=is_none)
+    )
+
+    def id(self) -> Optional[str]:
+        """The stable identifier Gravitino minted for this relationship.
+
+        Returns:
+            Optional[str]: The identifier, or `None` when the relationship has
+                not been stored yet.
+        """
+        return self._id
 
     def name(self) -> str:
         """The relationship name, unique across the ontology.

@@ -241,7 +241,16 @@ public class TestOntologyOperations extends BaseOperationsTest {
                 null,
                 new OntologyConceptDTO[] {
                   new OntologyConceptDTO(
-                      "Account", ConceptType.ENTITY_TYPE, null, null, null, null, null, null, null)
+                      "Account",
+                      ConceptType.ENTITY_TYPE,
+                      null,
+                      null,
+                      null,
+                      null,
+                      null,
+                      null,
+                      null,
+                      null)
                 },
                 null));
 

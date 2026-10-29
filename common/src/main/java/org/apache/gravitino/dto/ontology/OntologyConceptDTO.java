@@ -70,6 +70,11 @@ public class OntologyConceptDTO {
   @Nullable
   private final String iri;
 
+  @JsonProperty("id")
+  @Nullable
+  @EqualsAndHashCode.Exclude
+  private final String id;
+
   /**
    * Creates a new ontology concept DTO.
    *
@@ -82,6 +87,7 @@ public class OntologyConceptDTO {
    * @param requires The SQL expressions, or {@code null}.
    * @param relationships The relationships this concept declares, or {@code null}.
    * @param iri The IRI, or {@code null}.
+   * @param id The Gravitino-minted identifier, or {@code null} when it is being created.
    */
   public OntologyConceptDTO(
       String concept,
@@ -92,7 +98,8 @@ public class OntologyConceptDTO {
       @Nullable String[] identifyBy,
       @Nullable String[] requires,
       @Nullable OntologyRelationshipDTO[] relationships,
-      @Nullable String iri) {
+      @Nullable String iri,
+      @Nullable String id) {
     this.concept = concept;
     this.type = type;
     this.description = description;
@@ -102,6 +109,7 @@ public class OntologyConceptDTO {
     this.requires = requires == null ? null : requires.clone();
     this.relationships = relationships == null ? null : relationships.clone();
     this.iri = iri;
+    this.id = id;
   }
 
   /** This is the constructor that is used by Jackson deserializer. */
@@ -115,6 +123,7 @@ public class OntologyConceptDTO {
     this.requires = null;
     this.relationships = null;
     this.iri = null;
+    this.id = null;
   }
 
   /**
@@ -130,6 +139,7 @@ public class OntologyConceptDTO {
                 .map(OntologyRelationshipDTO::toOntologyRelationship)
                 .toArray(OntologyRelationship[]::new);
     return OntologyConcept.builder()
+        .withId(id)
         .withConcept(concept)
         .withType(type)
         .withDescription(description)
@@ -169,13 +179,16 @@ public class OntologyConceptDTO {
         concept.identifyBy(),
         concept.requires(),
         relationshipDTOs,
-        concept.iri());
+        concept.iri(),
+        concept.id());
   }
 
   /** Validates the concept DTO. */
   public void validate() {
     Preconditions.checkArgument(StringUtils.isNotBlank(concept), "concept must not be blank");
     Preconditions.checkArgument(type != null, "type must be set");
+    Preconditions.checkArgument(
+        id == null || StringUtils.isNotBlank(id), "id must not be blank when it is set");
     if (relationships != null) {
       for (int index = 0; index < relationships.length; index++) {
         Preconditions.checkArgument(

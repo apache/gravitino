@@ -25,9 +25,22 @@ from gravitino.api.ontology.ontology_relationship import OntologyRelationship
 class OntologyConcept(ABC):
     """One concept of an ontology.
 
-    A concept is identified by its name within the ontology. The optional IRI
-    gives it a global identity that outlives Gravitino.
+    A concept is named within one ontology version. Gravitino mints an
+    identifier for it and carries that identifier into every later version, so a
+    term reference or a mapping survives a rename. The identifier is internal to
+    Gravitino and never appears in an Apache Ossie document. The optional IRI
+    gives the concept a global name that outlives Gravitino.
     """
+
+    @abstractmethod
+    def id(self) -> Optional[str]:
+        """The stable identifier Gravitino minted for this concept.
+
+        Returns:
+            Optional[str]: The identifier, or `None` when the concept has not been
+                stored yet.
+        """
+        pass
 
     @abstractmethod
     def concept(self) -> str:

@@ -40,6 +40,7 @@ an import fills it in and an export writes it back.
 | `roles` | Relationship | The concepts the relationship connects. Each must be declared in the same definition. |
 | `multiplicity` | Relationship | `MANY_TO_ONE`, `ONE_TO_ONE`, or unset for an unconstrained relationship. |
 | `iri` | Concept, relationship | A global identifier, either absolute or a QName resolved through `prefixes`. |
+| `id` | Concept, relationship | The identifier Gravitino minted for it. Read-only, absent from an exported document. |
 | `prefixes` | Definition | A prefix-to-IRI map that resolves a QName such as `fin:Account`. |
 | `aiContext` | Definition | Context for applications that consume the vocabulary, as text or a structured object. |
 
@@ -55,6 +56,12 @@ A few rules follow from the document shape rather than from a convention:
   default cardinality.
 - An `iri` must contain a colon. An absolute IRI carries its own scheme (`://` or a `urn:` prefix); a
   QName `prefix:local` must use a prefix declared in `prefixes`. A bare name is rejected.
+- An `id` is Gravitino's own handle for a concept or a relationship. It is minted when the ontology is
+  stored, kept across versions, and never written to an exported Apache Ossie document, because the
+  specification names a concept by its `concept` string and a relationship by its `name` alone. A
+  caller sends names; sending an existing `id` alongside a new name renames the concept or
+  relationship without breaking a term reference or a mapping that binds it, and leaving it out
+  inherits the identifier of the stored object with the same name.
 
 ## Lifecycle and versions
 

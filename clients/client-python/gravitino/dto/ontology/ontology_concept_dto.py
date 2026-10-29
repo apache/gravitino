@@ -66,6 +66,18 @@ class OntologyConceptDTO(
     _iri: Optional[str] = field(
         default=None, metadata=config(field_name="iri", exclude=is_none)
     )
+    _id: Optional[str] = field(
+        default=None, metadata=config(field_name="id", exclude=is_none)
+    )
+
+    def id(self) -> Optional[str]:
+        """The stable identifier Gravitino minted for this concept.
+
+        Returns:
+            Optional[str]: The identifier, or `None` when the concept has not been
+                stored yet.
+        """
+        return self._id
 
     def concept(self) -> str:
         """The concept name, unique across the ontology.

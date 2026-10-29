@@ -66,6 +66,11 @@ public class OntologyRelationshipDTO {
   @Nullable
   private final String iri;
 
+  @JsonProperty("id")
+  @Nullable
+  @EqualsAndHashCode.Exclude
+  private final String id;
+
   /**
    * Creates a new ontology relationship DTO.
    *
@@ -77,6 +82,7 @@ public class OntologyRelationshipDTO {
    * @param derivedBy The derivation rules, or {@code null}.
    * @param requires The SQL expressions, or {@code null}.
    * @param iri The IRI, or {@code null}.
+   * @param id The Gravitino-minted identifier, or {@code null} when it is being created.
    */
   public OntologyRelationshipDTO(
       String name,
@@ -86,7 +92,8 @@ public class OntologyRelationshipDTO {
       @Nullable Multiplicity multiplicity,
       @Nullable String[] derivedBy,
       @Nullable String[] requires,
-      @Nullable String iri) {
+      @Nullable String iri,
+      @Nullable String id) {
     this.name = name;
     this.description = description;
     this.verbalizes = verbalizes == null ? null : verbalizes.clone();
@@ -95,6 +102,7 @@ public class OntologyRelationshipDTO {
     this.derivedBy = derivedBy == null ? null : derivedBy.clone();
     this.requires = requires == null ? null : requires.clone();
     this.iri = iri;
+    this.id = id;
   }
 
   /** This is the constructor that is used by Jackson deserializer. */
@@ -107,6 +115,7 @@ public class OntologyRelationshipDTO {
     this.derivedBy = null;
     this.requires = null;
     this.iri = null;
+    this.id = null;
   }
 
   /**
@@ -122,6 +131,7 @@ public class OntologyRelationshipDTO {
                 .map(OntologyRoleDTO::toOntologyRole)
                 .toArray(OntologyRole[]::new);
     return OntologyRelationship.builder()
+        .withId(id)
         .withName(name)
         .withDescription(description)
         .withVerbalizes(verbalizes)
@@ -159,12 +169,15 @@ public class OntologyRelationshipDTO {
         relationship.multiplicity(),
         relationship.derivedBy(),
         relationship.requires(),
-        relationship.iri());
+        relationship.iri(),
+        relationship.id());
   }
 
   /** Validates the relationship DTO. */
   public void validate() {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
+    Preconditions.checkArgument(
+        id == null || StringUtils.isNotBlank(id), "id must not be blank when it is set");
     Preconditions.checkArgument(
         verbalizes != null && verbalizes.length > 0, "verbalizes must have at least one entry");
     for (int index = 0; index < verbalizes.length; index++) {
