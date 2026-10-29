@@ -135,6 +135,41 @@ public class TestSQLScripts extends TestJDBCBackend {
   }
 
   /**
+   * Verifies the PostgreSQL 1.1.0-to-1.2.0 upgrade script can be re-run as a whole after a
+   * completed upgrade: every statement is guarded by IF NOT EXISTS or is naturally idempotent
+   * (COMMENT ON). The scope is limited to this script; other upgrade scripts are not claimed to be
+   * retryable. The created indexes must exist with the expected columns and uniqueness.
+   */
+  @TestTemplate
+  public void testUpgradeToOneTwoIsIdempotent() throws SQLException, IOException {
+    if (!"postgresql".equals(backendType)) {
+      return;
+    }
+    Path scriptDir = upgradeScriptDirectory();
+    File upgrade = scriptDir.resolve("upgrade-1.1.0-to-1.2.0-postgresql.sql").toFile();
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.1.0-postgresql.sql").toFile());
+    executeScript(upgrade);
+    // A retry after a completed upgrade must succeed; no statement may fail again.
+    executeScript(upgrade);
+
+    // Index entries are formatted as "table:index name:ordinal position:column:non-unique".
+    List<String> indexes = readSchemaIndexes(Set.of("function_meta", "function_version_info"));
+    List<String> expectedIndexes =
+        List.of(
+            "function_meta:idx_function_meta_catalog_id:1:catalog_id:true",
+            "function_meta:idx_function_meta_metalake_id:1:metalake_id:true",
+            "function_version_info:idx_function_version_catalog_id:1:catalog_id:true",
+            "function_version_info:idx_function_version_metalake_id:1:metalake_id:true",
+            "function_version_info:idx_function_version_schema_id:1:schema_id:true");
+    for (String expectedIndex : expectedIndexes) {
+      Assertions.assertTrue(
+          indexes.contains(expectedIndex),
+          "Expected index entry missing after the re-run: " + expectedIndex);
+    }
+  }
+
+  /**
    * Verifies every MySQL upgrade script from 0.5.0 onward can be re-run as a whole after a
    * completed upgrade: guarded DDL (ADD COLUMN, DROP INDEX, CREATE INDEX, ...) must skip instead of
    * failing. The retried upgrade must keep the columns and indexes of the first upgrade, and match
