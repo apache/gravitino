@@ -27,7 +27,7 @@ import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;

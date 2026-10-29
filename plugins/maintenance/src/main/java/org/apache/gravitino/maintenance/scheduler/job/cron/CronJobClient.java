@@ -44,6 +44,7 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.meta.PolicyEntity;
