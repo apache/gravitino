@@ -91,7 +91,7 @@ class TestNearestPolicyTableEnumerator {
             tagMetaService,
             schemaMetaService,
             tableMetaService,
-            nearest,
+            () -> nearest,
             schemaDispatcher,
             tableDispatcher);
     when(schemaMetaService.listSchemasByNamespace(any())).thenReturn(List.of());
@@ -391,7 +391,7 @@ class TestNearestPolicyTableEnumerator {
         tagMetaService,
         schemaMetaService,
         tableMetaService,
-        nearest,
+        () -> nearest,
         schemas,
         tables);
   }
