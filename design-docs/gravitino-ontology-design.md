@@ -61,10 +61,13 @@ that reference shape the scope:
    design, not a second entity defined here.
 4. **A bridge between the two**: a term can reference the concepts it elaborates, so a human reads the
    term and a machine resolves the concept.
-5. **Privileges consistent with the 2.0 Define objects**: ontology, mapping and term access use the
-   `DEFINITION` privileges, and none of them grants access to data.
-6. **Lifecycle consistency**: ontologies follow the glossary's `DRAFT` / `APPROVED` / `DEPRECATED`
-   model rather than inventing a third state set.
+5. **Privileges consistent with Domain**: ontology and mapping access use `MANAGE_ONTOLOGY` and
+   `USE_ONTOLOGY`, the shape Domain establishes with `MANAGE_DOMAIN` and `USE_DOMAIN`, and none of
+   them grants access to data. Term access keeps the glossary's own privileges, because a term is a
+   glossary object.
+6. **Lifecycle consistency with Domain**: ontologies use `DRAFT` / `PUBLISHED`, the same two states
+   as Domain, rather than inventing a third state set. A term keeps the glossary's three-state
+   lifecycle.
 
 ## Non-Goals
 
@@ -81,7 +84,7 @@ that reference shape the scope:
 
 ## Usage Scenario
 
-1. A steward with `CREATE_DEFINITION` creates ontology Finance, whose concepts include `Account` and
+1. A steward with `MANAGE_ONTOLOGY` creates ontology Finance, whose concepts include `Account` and
    `Balance` and whose relationships carry natural-language phrasings.
 2. The steward maps the `marketing` Semantic Model onto that ontology: dataset `orders` populates
    `Account`, field `amount` identifies `Balance`.
@@ -99,7 +102,7 @@ This design adds three objects and one reference:
 
 ```
 Ontology        { id, name, comment, ossieVersion, definition,
-                  status: DRAFT | APPROVED | DEPRECATED, properties, audit_info }
+                  status: DRAFT | PUBLISHED, properties, audit_info }
 OntologyVersion { ontologyId, version, definition, audit_info }
 OntologyMapping { id, name, ontologyId, semanticModelRef, definition, audit_info }
 TermConceptRef  { termId, ontologyId, concept, iri?, audit_info }
@@ -252,34 +255,57 @@ written.
   holds no assets.
 - **Ontology mapping** answers *which part of a Semantic Model implements a concept*.
 
+All four sit above the same assets and none of them grants access to data. They are complements, not
+layers that replace one another: a domain says where an asset belongs, an ontology says what the
+business's concepts are, a mapping says which dataset populates a concept, and a term says what a word
+means to people.
+
+### Relationship to semantic query planning
+
+The semantic query planning contract (issue #14308) lets a caller send metrics, dimensions and filters
+against a Semantic Model and receive SQL, with Gravitino owning model resolution, authorization and the
+response envelope and a `SemanticQueryPlanner` SPI owning SQL generation.
+
+An ontology does not replace that contract and is not a prerequisite for it. The two meet at one point:
+once `OntologyMapping` exists, a planner can accept concept names as the vocabulary of a query and
+resolve them through the mapping to the datasets and fields of the Semantic Model. That is a
+capability of the planner, behind the same endpoint, not a second planning API. Until mappings exist,
+planning works against a Semantic Model alone, exactly as #14308 specifies.
+
 ### Status and visibility
 
-`Ontology` follows the glossary's three-state model rather than Domain's two-state one:
+`Ontology` follows Domain's two-state model rather than the glossary's three-state one. A vocabulary
+is either being drafted or it is published; `APPROVED` and `DEPRECATED` exist in the glossary to
+record review of a single term, and a whole vocabulary has no reviewer to record.
 
 | Status | Visible to | Set by | Delete |
 | :--- | :--- | :--- | :--- |
-| `DRAFT` | `CREATE_DEFINITION` or `MANAGE_DEFINITIONS` | creation | creator, or `MANAGE_DEFINITIONS` |
-| `APPROVED` | `VIEW_DEFINITION` | `MANAGE_DEFINITIONS` | not allowed; deprecate first |
-| `DEPRECATED` | `VIEW_DEFINITION`, not MCP | `MANAGE_DEFINITIONS` | `MANAGE_DEFINITIONS` |
+| `DRAFT` | `MANAGE_ONTOLOGY` | creation | creator, or `MANAGE_ONTOLOGY` |
+| `PUBLISHED` | `USE_ONTOLOGY` | `MANAGE_ONTOLOGY` | not allowed while a mapping or term reference points at it |
 
 A `DRAFT` ontology is omitted from lists, returns 404 on get, and is not returned by a mapping whose
 caller could not otherwise see it. `TermConceptRef` rows pointing at a draft ontology are visible only
-to a caller who can see that ontology.
+to a caller who can see that ontology. Publishing and unpublishing are status changes, not deletes, so
+a published mapping can be unpublished without being lost.
 
 ### Access control
 
-Ontologies use the same `DEFINITION` privileges as glossary terms, so a Define object does not
-introduce its own privilege family:
+Ontologies use a privilege family of their own, in the shape Domain establishes with `MANAGE_DOMAIN`
+and `USE_DOMAIN`. A Define object therefore does not reuse the glossary's privileges, which govern a
+term rather than a vocabulary:
 
 | Privilege | On | Allows |
 | :--- | :--- | :--- |
-| `VIEW_DEFINITION` | Metalake, domain | Read approved and deprecated ontologies and mappings |
-| `CREATE_DEFINITION` | Metalake, domain | Create ontologies and mappings; see and edit own drafts |
-| `MANAGE_DEFINITIONS` | Metalake, domain | Edit any ontology; set status; delete deprecated ontologies |
+| `USE_ONTOLOGY` | Metalake, ontology | Read published ontologies and the mappings that reference them |
+| `MANAGE_ONTOLOGY` | Metalake, ontology | Create, edit, publish, unpublish and delete ontologies and mappings; see and edit drafts |
+
+`MANAGE_ONTOLOGY` includes `USE_ONTOLOGY`; the creator, the ontology owner and the metalake owner
+hold both. There is no separate `CREATE_ONTOLOGY`, for the same reason Domain has no `CREATE_DOMAIN`:
+creating is a manage operation on the metalake, and the creator owns what it creates.
 
 Three rules are part of the contract:
 
-- **Creating a mapping needs both sides.** The caller needs `CREATE_DEFINITION` on the ontology and
+- **Creating a mapping needs both sides.** The caller needs `MANAGE_ONTOLOGY` on the ontology and
   `USE_SEMANTIC_MODEL` on the target model. Checking one side would let a caller attach a vocabulary
   they do not control to a model they do, or the reverse.
 - **Referencing a concept needs the term edit privilege and ontology visibility.** Adding a
@@ -374,33 +400,42 @@ tag-backed membership and the `NonEmptyDomainException` precedent, and the
 [Business Glossary](https://github.com/apache/gravitino/pull/14239) for the term object, hierarchy, bindings and `DEFINITION`
 privileges.
 
+## Resolved Questions
+
+Three questions this design first raised are settled by the Domain precedent, which lands first and
+which an ontology should not contradict.
+
+1. **Scope of `Ontology`.** Metalake, as argued here. A vocabulary describes a business, not a catalog,
+   and Domain already establishes the metalake as the home for business-level objects.
+2. **Status vocabulary.** `DRAFT` / `PUBLISHED`, Domain's two states. The glossary's three states exist
+   to record review of a single term; a whole vocabulary has no reviewer to record.
+3. **Privilege family.** `MANAGE_ONTOLOGY` / `USE_ONTOLOGY`, ontology-specific like Domain's
+   `MANAGE_DOMAIN` / `USE_DOMAIN`, and not the glossary's `DEFINITION` family. A Define object owns its
+   own privileges; reusing the glossary's would couple a vocabulary to a term's lifecycle, and the
+   glossary's privileges are not implemented.
+
 ## Open Questions
 
-1. **Scope of `Ontology`.** Metalake, as argued here, or schema like Semantic Model?
-2. **Placement of `OntologyMapping`.** A metalake object, or a child of the Semantic Model it maps? The
+1. **Placement of `OntologyMapping`.** A metalake object, or a child of the Semantic Model it maps? The
    Ossie document embeds `semantic_model`, which argues for the child; reuse across models argues for the
    object.
-3. **Status vocabulary.** This design adopts the glossary's `DRAFT` / `APPROVED` / `DEPRECATED`, which
-   differs from Domain's `DRAFT` / `PUBLISHED`. Should the two be unified before either lands?
-4. **Privilege family.** Reuse the `DEFINITION` privileges, as proposed, or introduce ontology-specific
-   ones the way Domain introduces `MANAGE_DOMAIN` / `USE_DOMAIN`? This is the same question the glossary
-   design raises, and one answer should serve both.
-5. **Owner of the term-to-concept link.** Should `TermConceptRef` be specified here or in the glossary
+2. **Owner of the term-to-concept link.** Should `TermConceptRef` be specified here or in the glossary
    design, so that only one document owns it? Landing the glossary first and adding the link there may
    be cleaner than cross-referencing.
-6. **Stable identity of a concept.** A concept is identified by name, with an optional IRI. A rename
+3. **Stable identity of a concept.** A concept is identified by name, with an optional IRI. A rename
    breaks every reference. Should Gravitino mint an internal concept id, and how would it appear in the
    exported document?
-7. **Specification version.** `0.2.0.dev0` is pre-release. Does a stored ontology keep the version it was
+4. **Specification version.** `0.2.0.dev0` is pre-release. Does a stored ontology keep the version it was
    written against and get migrated on write, or is it pinned as Semantic Models are?
 
 ## Task Breakdown
 
 ### Phase 0: Prerequisites
 
-- [ ] Land the Business Glossary design, and agree the `DEFINITION` privilege family and the status
-      vocabulary in open questions 3 and 4
+- [x] Settle the scope, the status vocabulary and the privilege family on the Domain precedent, as
+      recorded in Resolved Questions
 - [ ] Decide whether the term-to-concept link belongs in this design or the glossary design
+- [ ] Land the Business Glossary design, which Phase 3 depends on
 
 ### Phase 1: Ontology
 
@@ -409,7 +444,7 @@ privileges.
 - [ ] Ossie ontology validation: closed root, required `verbalizes`, closed concept `type`
 - [ ] Ossie import and export for ontology documents
 - [ ] Server services, REST resources and OpenAPI definitions
-- [ ] `DEFINITION` privileges, ownership and authorization filtering
+- [ ] `MANAGE_ONTOLOGY` / `USE_ONTOLOGY` privileges, ownership and authorization filtering
 
 ### Phase 2: Mappings
 
@@ -430,3 +465,9 @@ privileges.
 - [ ] Java and Python clients
 - [ ] MCP ontology tools and the two concept-lookup tools
 - [ ] OpenAPI specification and user documentation
+
+### Phase 5: Concept-aware query planning
+
+- [ ] A planner behind the #14308 `SemanticQueryPlanner` SPI that resolves concept names through
+      `OntologyMapping` to semantic-model datasets and fields
+- [ ] Tests that plan the same query by metric name and by concept name and compare the generated SQL
