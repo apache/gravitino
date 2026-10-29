@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -49,6 +50,7 @@ import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import org.apache.gravitino.dto.ontology.OntologyDefinitionDTO;
 import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogSetRequest;
@@ -59,6 +61,9 @@ import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
 import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
 import org.apache.gravitino.dto.requests.JobTemplateUpdatesRequest;
+import org.apache.gravitino.dto.requests.OntologyCreateRequest;
+import org.apache.gravitino.dto.requests.OntologyUpdateRequest;
+import org.apache.gravitino.dto.requests.OntologyUpdatesRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
@@ -87,6 +92,8 @@ import org.apache.gravitino.dto.responses.JobResponse;
 import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.OntologyListResponse;
+import org.apache.gravitino.dto.responses.OntologyResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
@@ -106,6 +113,7 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.IllegalOntologyException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.InUseException;
@@ -116,12 +124,15 @@ import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchOntologyException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.NonEmptyOntologyException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.OntologyAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -130,6 +141,10 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.ontology.Ontology;
+import org.apache.gravitino.ontology.OntologyChange;
+import org.apache.gravitino.ontology.OntologyDefinition;
+import org.apache.gravitino.ontology.SupportsOntologies;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
@@ -156,7 +171,8 @@ public class GravitinoMetalake extends MetalakeDTO
         SupportsRoles,
         SupportsJobs,
         PolicyOperations,
-        SupportsSecrets {
+        SupportsSecrets,
+        SupportsOntologies {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
@@ -1009,6 +1025,214 @@ public class GravitinoMetalake extends MetalakeDTO
                     new GenericTag(association.getTag(), restClient, this.name()),
                     association.getSelector().toSelector()))
         .toArray(PolicyTagAssociation[]::new);
+  }
+
+  /**
+   * List all the ontology names under the current metalake.
+   *
+   * @return A list of the ontology names under the current metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  @Override
+  public String[] listOntologies() throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            formatOntologyRequestPath(),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ontologyErrorHandler());
+    resp.validate();
+    return resp.getNames();
+  }
+
+  /**
+   * List all the ontologies with detailed information under the current metalake.
+   *
+   * @return A list of {@link Ontology} under the current metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  @Override
+  public Ontology[] listOntologiesInfo() throws NoSuchMetalakeException {
+    Map<String, String> params = ImmutableMap.of("details", "true");
+    OntologyListResponse resp =
+        restClient.get(
+            formatOntologyRequestPath(),
+            params,
+            OntologyListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ontologyErrorHandler());
+    resp.validate();
+    return resp.getOntologies();
+  }
+
+  /**
+   * Get an ontology by its name under the current metalake.
+   *
+   * @param name The name of the ontology.
+   * @return The ontology.
+   * @throws NoSuchOntologyException If the ontology does not exist or is not visible to the caller.
+   */
+  @Override
+  public Ontology getOntology(String name) throws NoSuchOntologyException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "ontology name must not be null or empty");
+
+    OntologyResponse resp =
+        restClient.get(
+            formatOntologyRequestPath(name),
+            OntologyResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ontologyErrorHandler());
+    resp.validate();
+    return resp.getOntology();
+  }
+
+  /**
+   * Create an ontology under the current metalake.
+   *
+   * @param name The name of the ontology.
+   * @param comment The comment of the ontology, or {@code null}.
+   * @param properties The Gravitino-specific properties of the ontology, or {@code null}.
+   * @param definition The concept graph of the ontology.
+   * @return The created ontology.
+   * @throws OntologyAlreadyExistsException If the ontology already exists.
+   * @throws IllegalOntologyException If the definition is not a valid ontology.
+   */
+  @Override
+  public Ontology createOntology(
+      String name,
+      @Nullable String comment,
+      @Nullable Map<String, String> properties,
+      OntologyDefinition definition)
+      throws OntologyAlreadyExistsException, IllegalOntologyException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "ontology name must not be null or empty");
+    Preconditions.checkArgument(definition != null, "ontology definition must not be null");
+
+    OntologyCreateRequest req =
+        new OntologyCreateRequest(
+            name, comment, properties, OntologyDefinitionDTO.fromOntologyDefinition(definition));
+    req.validate();
+
+    OntologyResponse resp =
+        restClient.post(
+            formatOntologyRequestPath(),
+            req,
+            OntologyResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ontologyErrorHandler());
+    resp.validate();
+    return resp.getOntology();
+  }
+
+  /**
+   * Alter an ontology under the current metalake.
+   *
+   * @param name The name of the ontology.
+   * @param changes The changes to apply to the ontology.
+   * @return The altered ontology.
+   * @throws NoSuchOntologyException If the ontology does not exist or is not visible to the caller.
+   * @throws OntologyAlreadyExistsException If the ontology is renamed and the new name is taken.
+   * @throws IllegalOntologyException If a replacement definition is not a valid ontology.
+   * @throws IllegalArgumentException If the changes cannot be applied to the ontology.
+   */
+  @Override
+  public Ontology alterOntology(String name, OntologyChange... changes)
+      throws NoSuchOntologyException, OntologyAlreadyExistsException, IllegalOntologyException,
+          IllegalArgumentException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "ontology name must not be null or empty");
+    Preconditions.checkArgument(changes != null, "ontology changes must not be null");
+
+    List<OntologyUpdateRequest> updates =
+        Arrays.stream(changes)
+            .map(GravitinoMetalake::toOntologyUpdateRequest)
+            .collect(Collectors.toList());
+    OntologyUpdatesRequest req = new OntologyUpdatesRequest(updates);
+    req.validate();
+
+    OntologyResponse resp =
+        restClient.put(
+            formatOntologyRequestPath(name),
+            req,
+            OntologyResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ontologyErrorHandler());
+    resp.validate();
+    return resp.getOntology();
+  }
+
+  /**
+   * Delete an ontology under the current metalake.
+   *
+   * @param name The name of the ontology.
+   * @return True if the ontology is deleted, false if it does not exist.
+   * @throws NonEmptyOntologyException If a mapping or a term reference still points at the
+   *     ontology.
+   */
+  @Override
+  public boolean deleteOntology(String name) throws NonEmptyOntologyException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "ontology name must not be null or empty");
+
+    DropResponse resp =
+        restClient.delete(
+            formatOntologyRequestPath(name),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ontologyErrorHandler());
+    resp.validate();
+    return resp.dropped();
+  }
+
+  /**
+   * Converts an ontology change to the REST request that carries it.
+   *
+   * @param change The ontology change.
+   * @return The update request.
+   * @throws IllegalArgumentException If the change is {@code null} or of an unknown type.
+   */
+  static OntologyUpdateRequest toOntologyUpdateRequest(OntologyChange change) {
+    Preconditions.checkArgument(change != null, "ontology change must not be null");
+
+    if (change instanceof OntologyChange.RenameOntology) {
+      return new OntologyUpdateRequest.RenameOntologyRequest(
+          ((OntologyChange.RenameOntology) change).getNewName());
+
+    } else if (change instanceof OntologyChange.UpdateComment) {
+      return new OntologyUpdateRequest.UpdateOntologyCommentRequest(
+          ((OntologyChange.UpdateComment) change).getNewComment());
+
+    } else if (change instanceof OntologyChange.SetProperty) {
+      OntologyChange.SetProperty setProperty = (OntologyChange.SetProperty) change;
+      return new OntologyUpdateRequest.SetOntologyPropertyRequest(
+          setProperty.getProperty(), setProperty.getValue());
+
+    } else if (change instanceof OntologyChange.RemoveProperty) {
+      return new OntologyUpdateRequest.RemoveOntologyPropertyRequest(
+          ((OntologyChange.RemoveProperty) change).getProperty());
+
+    } else if (change instanceof OntologyChange.ReplaceDefinition) {
+      return new OntologyUpdateRequest.ReplaceOntologyDefinitionRequest(
+          OntologyDefinitionDTO.fromOntologyDefinition(
+              ((OntologyChange.ReplaceDefinition) change).getDefinition()));
+
+    } else if (change instanceof OntologyChange.UpdateStatus) {
+      return new OntologyUpdateRequest.UpdateOntologyStatusRequest(
+          ((OntologyChange.UpdateStatus) change).getStatus());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  private String formatOntologyRequestPath() {
+    return String.format("api/metalakes/%s/ontologies", RESTUtils.encodeString(this.name()));
+  }
+
+  private String formatOntologyRequestPath(String ontologyName) {
+    return formatOntologyRequestPath() + "/" + RESTUtils.encodeString(ontologyName);
   }
 
   private String policyTagPath(String tagName) {

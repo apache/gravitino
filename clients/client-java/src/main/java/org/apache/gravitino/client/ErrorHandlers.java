@@ -37,6 +37,7 @@ import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalJobTemplateOperationException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.IllegalOntologyException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
@@ -60,6 +61,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
+import org.apache.gravitino.exceptions.NoSuchOntologyException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -71,10 +73,13 @@ import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyOntologyException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OntologyAlreadyExistsException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
@@ -241,6 +246,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> policyErrorHandler() {
     return PolicyErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to ontology operations.
+   *
+   * @return A Consumer representing the ontology error handler.
+   */
+  public static Consumer<ErrorResponse> ontologyErrorHandler() {
+    return OntologyErrorHandler.INSTANCE;
   }
 
   /**
@@ -1178,6 +1192,59 @@ public class ErrorHandlers {
           } else {
             throw new AlreadyExistsException(errorMessage);
           }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Ontology operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class OntologyErrorHandler extends RestErrorHandler {
+
+    private static final OntologyErrorHandler INSTANCE = new OntologyErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          if (IllegalOntologyException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new IllegalOntologyException(errorMessage);
+          }
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (NoSuchMetalakeException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (NoSuchOntologyException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new NoSuchOntologyException(errorMessage);
+          }
+          throw new NotFoundException(errorMessage);
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (OntologyAlreadyExistsException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new OntologyAlreadyExistsException(errorMessage);
+          }
+          throw new AlreadyExistsException(errorMessage);
+
+        case ErrorConstants.NON_EMPTY_CODE:
+          if (NonEmptyOntologyException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NonEmptyOntologyException(errorMessage);
+          }
+          throw new NonEmptyEntityException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
           throw new MetalakeNotInUseException(errorMessage);
