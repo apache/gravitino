@@ -265,8 +265,6 @@ public class CatalogHive2IT extends BaseIT {
       sparkSession.close();
     }
 
-    ContainerSuite.getInstance().close();
-
     if (fileSystem != null) {
       fileSystem.close();
     }

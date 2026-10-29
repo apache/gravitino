@@ -37,8 +37,9 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.functions.StringLengthFunction;
@@ -56,10 +57,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Setup Hive, Gravitino, Spark, Metalake environment to execute SparkSQL. */
+@HiveFixture
 public abstract class SparkEnvIT extends SparkUtilIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  @FixtureContainer private HiveContainer hive;
 
   protected static final String icebergRestServiceName = "iceberg-rest";
   protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
@@ -236,17 +238,13 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   }
 
   private void initHiveEnv() {
-    containerSuite.startHiveContainer();
     hiveMetastoreUri =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "thrift://%s:%d", hive.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     warehouse =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 
   protected void initCatalogEnv() throws Exception {}
@@ -292,9 +290,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     conf.set(
         "fs.defaultFS",
         String.format(
-            "hdfs://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT));
+            "hdfs://%s:%d", hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
     try {
       hdfs = FileSystem.get(conf);
     } catch (IOException e) {

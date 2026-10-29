@@ -28,7 +28,6 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrd
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.collect.Maps;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -54,7 +53,9 @@ import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ClickHouseContainer;
+import org.apache.gravitino.integration.test.container.ClickHouseFixture;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -82,6 +83,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@ClickHouseFixture(nodes = 3, database = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT)
 public class CatalogClickHouseClusterIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-clickhouse";
@@ -105,16 +107,12 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   private GravitinoMetalake metalake;
   private Catalog catalog;
   private ClickHouseService clickHouseService;
-  private ClickHouseContainer clickHouseClusterContainer;
+  @FixtureContainer private ClickHouseContainer clickHouseClusterContainer;
   private List<ClickHouseContainer> clickHouseClusterContainers;
   private final TestDatabaseName TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT;
 
   @BeforeAll
   public void startup() {
-    String remoteServersConfig =
-        Paths.get("src", "test", "resources", "remote_servers.xml").toAbsolutePath().toString();
-    containerSuite.startClickHouseClusterContainer(TEST_DB_NAME, remoteServersConfig);
-    clickHouseClusterContainer = containerSuite.getClickHouseClusterContainer();
     clickHouseClusterContainers = containerSuite.getClickHouseClusterContainers();
     Assertions.assertEquals(3, clickHouseClusterContainers.size());
 

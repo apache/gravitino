@@ -24,7 +24,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
+import org.apache.gravitino.integration.test.container.FixtureContainer;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.HiveFixture;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.paimon.catalog.Catalog;
 import org.junit.jupiter.api.Assertions;
@@ -32,7 +34,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@HiveFixture
 public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
+
+  @FixtureContainer private HiveContainer hive;
 
   @Override
   protected Map<String, String> initPaimonCatalogProperties() {
@@ -45,8 +50,7 @@ public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
     WAREHOUSE =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse-catalog-paimon/",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+            hive.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);

@@ -45,6 +45,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.KerberosHdfs;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -88,6 +89,8 @@ public class HiveUserAuthenticationIT extends BaseIT {
 
   private static GravitinoAdminClient adminClient;
 
+  private static KerberosHdfs hdfs;
+
   protected static HiveContainer kerberosHiveContainer;
 
   static String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
@@ -116,6 +119,7 @@ public class HiveUserAuthenticationIT extends BaseIT {
 
     // Prepare kerberos related-config;
     prepareKerberosConfig();
+    hdfs = KerberosHdfs.of(kerberosHiveContainer, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
 
     // Config kerberos configuration for Gravitino server
     addKerberosConfig();
@@ -126,6 +130,11 @@ public class HiveUserAuthenticationIT extends BaseIT {
 
   @AfterAll
   public void stop() {
+    // Restore the warehouse first: the HDFS client needs the Kerberos settings cleared below.
+    if (hdfs != null) {
+      hdfs.setPermission("/user/hive/warehouse", "755", true);
+    }
+
     // Reset the UGI
     UserGroupInformation.reset();
 
@@ -236,8 +245,7 @@ public class HiveUserAuthenticationIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to give the user the permission to create schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse");
+    hdfs.setPermission("/user/hive/warehouse", "777", true);
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -272,12 +280,6 @@ public class HiveUserAuthenticationIT extends BaseIT {
 
     // Drop catalog
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME, true));
-  }
-
-  @AfterAll
-  static void restoreFilePermission() {
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "755", "/user/hive/warehouse");
   }
 
   private static Column[] createColumns() {
