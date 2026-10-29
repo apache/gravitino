@@ -34,13 +34,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.maintenance.MaintenanceJobSubmitManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -57,7 +57,7 @@ class TestMaintenanceCommitSubmitPipeline {
 
   @Test
   void testEarlyExitsSkipSubmit() {
-    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     String instance = MaintenanceTaskIds.forCommitTable(TABLE_ID);
 
@@ -71,7 +71,7 @@ class TestMaintenanceCommitSubmitPipeline {
 
   @Test
   void testSubmitClaimsEveryChainPolicyAndUsesSpecJobConf() {
-    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     List<OccupancyClaim> claims = List.of(new OccupancyClaim(1L, 2L), new OccupancyClaim(3L, 4L));
     when(mgr.submitAndBind(eq("ml"), anyMap(), eq(claims))).thenReturn(Optional.of(999L));
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
@@ -110,7 +110,7 @@ class TestMaintenanceCommitSubmitPipeline {
   private static MaintenanceCommitSubmitPipeline pipeline(
       Set<Long> inFlightPolicies,
       TableMaintenanceActionMetaService actions,
-      MaintenanceJobSubmitManager mgr) {
+      MaintenanceJobManager mgr) {
     CommitOccupancyGate gate =
         new CommitOccupancyGate() {
           @Override

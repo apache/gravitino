@@ -24,13 +24,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.MaintenanceJobSubmitManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Commit-pool control-plane submit (§5.2.3): consume enqueue-time {@link MaintenanceJobSpec} →
  * abort if any step is in-flight → soft-slot claim for every chain policy → {@link
- * MaintenanceJobSubmitManager#submitAndBind} for one chained Spark job.
+ * MaintenanceJobManager#submitAndBind} for one chained Spark job.
  *
  * <p>Chain collection, cooldown filtering, auth consistency, and task_data assembly happen at
  * enqueue (see {@link CommitJobClient}). The caller always deletes the one-shot {@code commit-job}
@@ -50,26 +50,26 @@ public final class MaintenanceCommitSubmitPipeline {
 
   private final CommitOccupancyGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
-  private final MaintenanceJobSubmitManager jobSubmitManager;
+  private final MaintenanceJobManager jobManager;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
   /**
    * @param occupancyGate in-flight checks
    * @param actionMetaService soft-slot claim
-   * @param jobSubmitManager runJob + bind (and orphan cancel)
+   * @param jobManager runJob + bind (and orphan cancel)
    * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceCommitSubmitPipeline(
       CommitOccupancyGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
-      MaintenanceJobSubmitManager jobSubmitManager,
+      MaintenanceJobManager jobManager,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
     this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
-    this.jobSubmitManager = Preconditions.checkNotNull(jobSubmitManager);
+    this.jobManager = Preconditions.checkNotNull(jobManager);
     this.jobConfBuilder = Preconditions.checkNotNull(jobConfBuilder);
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.claimTimeoutMs = claimTimeoutMs;
@@ -140,7 +140,7 @@ public final class MaintenanceCommitSubmitPipeline {
       return;
     }
 
-    Optional<Long> jobId = jobSubmitManager.submitAndBind(spec.metalake(), jobConf, claims.get());
+    Optional<Long> jobId = jobManager.submitAndBind(spec.metalake(), jobConf, claims.get());
     if (jobId.isPresent()) {
       LOG.info(
           "Submitted commit-job for table {} as job {} (chain={}, policies={})",

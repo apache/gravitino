@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.scheduler.job.cron;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,11 +35,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.maintenance.MaintenanceJobSubmitManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -55,7 +56,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   @Test
   void testEarlyExitsSkipClaimAndSubmit() {
-    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
 
     pipeline(false, actions, mgr).submit("not-a-cron-id", spec());
@@ -67,37 +68,38 @@ class TestMaintenanceSparkSubmitPipeline {
         .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), batchSpec(10L, 11L));
 
     verify(actions, never()).tryAcquireInFlight(anyLong(), anyLong(), anyLong());
-    verify(mgr, never()).submitAndBind(anyString(), anyMap(), any(OccupancyClaim.class));
+    verify(mgr, never()).submitAndBind(anyString(), anyMap(), anyList());
   }
 
   @Test
   void testLostClaimRaceSkipsSubmit() {
-    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.empty());
     pipeline(false, actions, mgr).submit(INSTANCE, spec());
-    verify(mgr, never()).submitAndBind(anyString(), anyMap(), any(OccupancyClaim.class));
+    verify(mgr, never()).submitAndBind(anyString(), anyMap(), anyList());
   }
 
   @Test
   void testSuccessfulSubmitCallsSubmitAndBind() {
-    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     OccupancyClaim claim = new OccupancyClaim(7L, 1_000L);
-    when(mgr.submitAndBind(eq("metalake"), anyMap(), eq(claim))).thenReturn(Optional.of(999L));
+    when(mgr.submitAndBind(eq("metalake"), anyMap(), eq(List.of(claim))))
+        .thenReturn(Optional.of(999L));
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(claim));
 
     pipeline(false, actions, mgr).submit(INSTANCE, spec());
 
-    verify(mgr).submitAndBind(eq("metalake"), anyMap(), eq(claim));
+    verify(mgr).submitAndBind(eq("metalake"), anyMap(), eq(List.of(claim)));
     verify(actions, never()).deleteUnboundClaim(any());
   }
 
   @Test
   void testConfResolveFailureReleasesClaimWithoutSubmit() {
-    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     OccupancyClaim claim = new OccupancyClaim(8L, 2_000L);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
@@ -107,13 +109,13 @@ class TestMaintenanceSparkSubmitPipeline {
     Assertions.assertDoesNotThrow(
         () -> pipeline(false, actions, mgr).submit(INSTANCE, spec(Map.of(), "{not-json")));
     verify(actions).deleteUnboundClaim(claim);
-    verify(mgr, never()).submitAndBind(anyString(), anyMap(), any(OccupancyClaim.class));
+    verify(mgr, never()).submitAndBind(anyString(), anyMap(), anyList());
   }
 
   @Test
   void testBatchSubmitOneSparkJobPerTable() {
-    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
-    when(mgr.submitAndBind(anyString(), anyMap(), any(OccupancyClaim.class)))
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
+    when(mgr.submitAndBind(anyString(), anyMap(), anyList()))
         .thenReturn(Optional.of(555L), Optional.of(556L));
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     OccupancyClaim claimA = new OccupancyClaim(1L, 10L);
@@ -128,18 +130,18 @@ class TestMaintenanceSparkSubmitPipeline {
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confs = ArgumentCaptor.forClass(Map.class);
-    ArgumentCaptor<OccupancyClaim> claims = ArgumentCaptor.forClass(OccupancyClaim.class);
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<OccupancyClaim>> claims = ArgumentCaptor.forClass(List.class);
     verify(mgr, times(2)).submitAndBind(eq("metalake"), confs.capture(), claims.capture());
     Assertions.assertTrue(confs.getAllValues().get(0).get("tables").contains("db.t1"));
     Assertions.assertTrue(confs.getAllValues().get(1).get("tables").contains("db.t2"));
-    Assertions.assertEquals(List.of(claimA, claimB), claims.getAllValues());
+    Assertions.assertEquals(List.of(List.of(claimA), List.of(claimB)), claims.getAllValues());
   }
 
   @Test
   void testConsumesSpecJobConfWithoutRebuild() {
-    MaintenanceJobSubmitManager mgr = mock(MaintenanceJobSubmitManager.class);
-    when(mgr.submitAndBind(anyString(), anyMap(), any(OccupancyClaim.class)))
-        .thenReturn(Optional.of(1L));
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
+    when(mgr.submitAndBind(anyString(), anyMap(), anyList())).thenReturn(Optional.of(1L));
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(new OccupancyClaim(1L, 1L)));
@@ -151,7 +153,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
-    verify(mgr).submitAndBind(eq("metalake"), confCaptor.capture(), any(OccupancyClaim.class));
+    verify(mgr).submitAndBind(eq("metalake"), confCaptor.capture(), anyList());
     Map<String, String> conf = confCaptor.getValue();
     Assertions.assertNull(conf.get("table_identifier"));
     Assertions.assertEquals("binpack", conf.get("strategy"));
@@ -161,16 +163,12 @@ class TestMaintenanceSparkSubmitPipeline {
   }
 
   private static MaintenanceSparkSubmitPipeline pipeline(
-      boolean inFlight,
-      TableMaintenanceActionMetaService actions,
-      MaintenanceJobSubmitManager mgr) {
+      boolean inFlight, TableMaintenanceActionMetaService actions, MaintenanceJobManager mgr) {
     return pipeline((t, p) -> inFlight, actions, mgr);
   }
 
   private static MaintenanceSparkSubmitPipeline pipeline(
-      CronSubmitGate gate,
-      TableMaintenanceActionMetaService actions,
-      MaintenanceJobSubmitManager mgr) {
+      CronSubmitGate gate, TableMaintenanceActionMetaService actions, MaintenanceJobManager mgr) {
     return new MaintenanceSparkSubmitPipeline(
         gate, actions, mgr, new MaintenanceJobConfBuilder(new Config(false) {}), CLAIM_TIMEOUT_MS);
   }

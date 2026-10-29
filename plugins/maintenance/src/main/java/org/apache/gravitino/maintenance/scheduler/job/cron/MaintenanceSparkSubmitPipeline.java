@@ -19,22 +19,23 @@
 package org.apache.gravitino.maintenance.scheduler.job.cron;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.MaintenanceJobSubmitManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Cron-pool control-plane submit (§5.2.2): consume enqueue-time {@link MaintenanceJobSpec} →
- * in-flight gate → soft-slot claim → {@link MaintenanceJobSubmitManager#submitAndBind}.
+ * in-flight gate → soft-slot claim → {@link MaintenanceJobManager#submitAndBind}.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same spec
  * shape; each {@link Task} becomes one Spark job. If any task table is in-flight, the whole pick
@@ -49,26 +50,26 @@ public final class MaintenanceSparkSubmitPipeline {
 
   private final CronSubmitGate occupancyGate;
   private final TableMaintenanceActionMetaService actionMetaService;
-  private final MaintenanceJobSubmitManager jobSubmitManager;
+  private final MaintenanceJobManager jobManager;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
   /**
    * @param occupancyGate in-flight gate (minInterval already applied at enqueue)
    * @param actionMetaService soft-slot claim
-   * @param jobSubmitManager runJob + bind (and orphan cancel)
+   * @param jobManager runJob + bind (and orphan cancel)
    * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceSparkSubmitPipeline(
       CronSubmitGate occupancyGate,
       TableMaintenanceActionMetaService actionMetaService,
-      MaintenanceJobSubmitManager jobSubmitManager,
+      MaintenanceJobManager jobManager,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
     this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
-    this.jobSubmitManager = Preconditions.checkNotNull(jobSubmitManager);
+    this.jobManager = Preconditions.checkNotNull(jobManager);
     this.jobConfBuilder = Preconditions.checkNotNull(jobConfBuilder);
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.claimTimeoutMs = claimTimeoutMs;
@@ -169,7 +170,7 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
 
-    Optional<Long> jobId = jobSubmitManager.submitAndBind(spec.metalake(), jobConf, claim.get());
+    Optional<Long> jobId = jobManager.submitAndBind(spec.metalake(), jobConf, List.of(claim.get()));
     if (jobId.isPresent()) {
       LOG.info(
           "Submitted cron-job for table {} policy {} as job {}",

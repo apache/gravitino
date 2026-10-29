@@ -34,7 +34,7 @@ import java.util.function.Supplier;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.maintenance.MaintenanceJobSubmitManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitOccupancyGate;
@@ -135,7 +135,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         new MaintenanceSparkSubmitPipeline(
             occupancyGate::isInFlight,
             TableMaintenanceActionMetaService.getInstance(),
-            MaintenanceJobSubmitManager.create(),
+            MaintenanceJobManager.create(),
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     CRON_SUBMIT.set(cronSubmit::submit);
@@ -144,7 +144,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
         new MaintenanceCommitSubmitPipeline(
             CommitOccupancyGate.of(occupancyGate),
             TableMaintenanceActionMetaService.getInstance(),
-            MaintenanceJobSubmitManager.create(),
+            MaintenanceJobManager.create(),
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     COMMIT_SUBMIT.set(commitSubmit::submit);
