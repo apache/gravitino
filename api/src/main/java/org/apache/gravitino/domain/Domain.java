@@ -197,7 +197,8 @@ public interface Domain extends Auditable {
    * @throws NoSuchTagException If the tag does not exist.
    * @throws BackingTagAlreadyBoundException If the binding conflicts with the backing tag of
    *     another domain.
-   * @throws ForbiddenException If the caller does not own the tag or the metalake.
+   * @throws ForbiddenException If a tag is set and the caller owns neither the tag nor the
+   *     metalake. Removing the backing tag needs no privilege on the tag.
    * @throws IllegalArgumentException If the value is not allowed by the tag.
    */
   Domain updateBackingTag(@Nullable TagValue backingTag)
@@ -210,6 +211,9 @@ public interface Domain extends Auditable {
    * <p>The backing tag is always given explicitly. With {@code createBackingTag} set, a new tag
    * without values is created with the given name and owned by the caller; otherwise the given
    * existing tag, with its optional value, is bound. An existing tag is never adopted implicitly.
+   *
+   * <p>The sub-domain, a new backing tag and the link to this domain are created together: if the
+   * creation fails, none of them is created, and an existing tag to bind is left unchanged.
    *
    * @param name The name of the sub-domain.
    * @param comment The comment of the sub-domain, or null.

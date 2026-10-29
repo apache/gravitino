@@ -35,7 +35,11 @@ import org.apache.gravitino.annotation.Evolving;
  * Trading.
  *
  * <p>To add an object to a domain or remove it, associate the domain's backing tag with the object
- * or remove it, through {@link org.apache.gravitino.tag.SupportsTags}.
+ * or remove it, through {@link org.apache.gravitino.tag.SupportsTags}. That changes only the tags
+ * assigned to the object itself, and the domains are then derived again from its effective tags. An
+ * object that inherits the backing tag from its schema or catalog stays in the domain until the tag
+ * is removed there, and removing a tag from the object can make an inherited assignment of the same
+ * tag take effect again.
  */
 @Evolving
 public interface SupportsDomains {

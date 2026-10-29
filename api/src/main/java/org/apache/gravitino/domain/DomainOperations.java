@@ -75,6 +75,9 @@ public interface DomainOperations {
    * without values is created with the given name and owned by the caller; otherwise the given
    * existing tag, with its optional value, is bound. An existing tag is never adopted implicitly.
    *
+   * <p>The domain and a new backing tag are created together: if the creation fails, neither is
+   * created, and an existing tag to bind is left unchanged.
+   *
    * @param name The name of the domain.
    * @param comment The comment of the domain, or null.
    * @param properties The properties of the domain, or null.
