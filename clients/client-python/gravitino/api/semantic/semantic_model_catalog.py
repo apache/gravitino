@@ -74,7 +74,7 @@ class SemanticModelCatalog(ABC):
             NoSuchSchemaException: If the schema does not exist.
             UnsupportedOperationException: If metric discovery is not supported.
         """
-        raise UnsupportedOperationException("Metric discovery is not supported")
+        raise UnsupportedOperationException("Metric listing is not supported")
 
     def list_metric_infos(self, namespace: Namespace) -> list[SemanticModelMetric]:
         """List complete visible metrics across the Semantic Models in a schema.
@@ -93,7 +93,7 @@ class SemanticModelCatalog(ABC):
             NoSuchSchemaException: If the schema does not exist.
             UnsupportedOperationException: If metric discovery is not supported.
         """
-        raise UnsupportedOperationException("Metric discovery is not supported")
+        raise UnsupportedOperationException("Metric info listing is not supported")
 
     @abstractmethod
     def load_semantic_model(self, identifier: NameIdentifier) -> SemanticModel:

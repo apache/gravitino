@@ -138,10 +138,11 @@ class TestSemanticModelMetricDiscovery(unittest.TestCase):
             ),
             [CustomExtension("vendor", '{"opaque": "雪"}')],
         )
-        self.assertEqual(
-            SemanticModelMetric(Namespace.of("schema #?", "a.model"), expected),
-            actual[0],
+        expected_info = SemanticModelMetric(
+            Namespace.of("schema #?", "a.model"), expected
         )
+        self.assertEqual(expected_info, actual[0])
+        self.assertEqual(hash(expected_info), hash(actual[0]))
         self.assertEqual(
             ["Revenue", "revenue", "Revenue"], [info.metric().name() for info in actual]
         )
