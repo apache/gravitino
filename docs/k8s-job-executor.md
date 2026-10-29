@@ -315,10 +315,14 @@ For example:
 FROM apache/spark:3.5.9-java17
 USER root
 COPY gravitino-jobs-*.jar /opt/gravitino/jobs/gravitino-jobs.jar
-ADD https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.11.0/iceberg-spark-runtime-3.5_2.12-1.11.0.jar /opt/spark/jars/
+ADD --checksum=sha256:94b8e36fc329f0293d44ba9e01b784a56e9501affec1842d898144c51f6e486a https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.11.0/iceberg-spark-runtime-3.5_2.12-1.11.0.jar /opt/spark/jars/
 RUN chmod 644 /opt/gravitino/jobs/gravitino-jobs.jar /opt/spark/jars/iceberg-spark-runtime-3.5_2.12-1.11.0.jar
 USER spark
 ```
+
+The build fails if the downloaded jar doesn't match `--checksum`, the SHA-256 that Maven Central
+publishes for it. To build without network access, put the jar next to the Dockerfile and `COPY` it
+instead.
 
 An image without the Iceberg Spark runtime also works if every job gets the runtime through a
 server-level default, or through the `spark_conf` of a built-in Iceberg job, see
@@ -661,7 +665,7 @@ cat > spark-image/Dockerfile <<'EOF'
 FROM apache/spark:3.5.9-java17
 USER root
 COPY gravitino-jobs-*.jar /opt/gravitino/jobs/gravitino-jobs.jar
-ADD https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.11.0/iceberg-spark-runtime-3.5_2.12-1.11.0.jar /opt/spark/jars/
+ADD --checksum=sha256:94b8e36fc329f0293d44ba9e01b784a56e9501affec1842d898144c51f6e486a https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.11.0/iceberg-spark-runtime-3.5_2.12-1.11.0.jar /opt/spark/jars/
 RUN chmod 644 /opt/gravitino/jobs/gravitino-jobs.jar /opt/spark/jars/iceberg-spark-runtime-3.5_2.12-1.11.0.jar
 USER spark
 EOF
