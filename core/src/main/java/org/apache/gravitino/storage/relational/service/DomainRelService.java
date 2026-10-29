@@ -23,12 +23,10 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -61,11 +59,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * the sub-domain, so the edge read under that lock is current. Each locked row is re-read and must
  * still have the observed name, otherwise the change fails as if it did not exist.
  *
- * <p>The hierarchy stays acyclic. Attaching or re-pointing a domain walks the ancestors of the new
- * parent and is refused if the domain is among them. Two such changes on disjoint domains can still
- * close a cycle together, so they hold the metalake row exclusively, which runs them one at a time
- * within a metalake and lets each walk see the edges of the ones before it. Removing an edge cannot
- * close a cycle and holds the metalake row shared.
+ * <p>This service does not enforce the shape of the hierarchy. The domain manager keeps it one
+ * level deep, which also keeps it acyclic.
  */
 public class DomainRelService {
 
@@ -147,8 +142,7 @@ public class DomainRelService {
    * @throws IOException If the edge cannot be stored.
    * @throws NoSuchEntityException If either domain does not exist.
    * @throws EntityAlreadyExistsException If the domain already has a parent.
-   * @throws IllegalArgumentException If the parent is the domain itself, is in another metalake, or
-   *     is a sub-domain of the domain at any depth.
+   * @throws IllegalArgumentException If the parent is the domain itself or is in another metalake.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -167,7 +161,6 @@ public class DomainRelService {
               throw new EntityAlreadyExistsException(
                   "The domain %s already has a parent", childIdent);
             }
-            checkNotAncestor(childIdent, childPO, parentIdent, parentPO);
             DomainRelPO domainRelPO =
                 DomainRelPO.initializeDomainRelPO(
                     childPO.metalakeId(), parentPO.domainId(), childPO.domainId(), auditInfo);
@@ -189,8 +182,8 @@ public class DomainRelService {
    * @param auditInfo The audit info of the change; the edge keeps its creator.
    * @throws IOException If the edge cannot be stored.
    * @throws NoSuchEntityException If either domain does not exist, or the domain has no parent.
-   * @throws IllegalArgumentException If the new parent is the domain itself, is in another
-   *     metalake, or is a sub-domain of the domain at any depth.
+   * @throws IllegalArgumentException If the new parent is the domain itself or is in another
+   *     metalake.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -212,7 +205,6 @@ public class DomainRelService {
             if (Objects.equals(oldDomainRelPO.parentId(), newParentPO.domainId())) {
               return;
             }
-            checkNotAncestor(childIdent, childPO, newParentIdent, newParentPO);
             DomainRelPO newDomainRelPO =
                 DomainRelPO.updateDomainRelPO(oldDomainRelPO, newParentPO.domainId(), auditInfo);
             OccWriteSupport.updateWithVersion(
@@ -277,18 +269,10 @@ public class DomainRelService {
     softDeleteDomainRel(domainId);
   }
 
-  // A change that adds an edge to parentPO can close a cycle, so it holds the metalake row
-  // exclusively; removing an edge, with no parentPO, holds it shared.
   private void lockMetalakeAndDomains(
       NameIdentifier childIdent, DomainPO childPO, @Nullable DomainPO parentPO) {
-    String metalakeName = childIdent.namespace().level(0);
-    if (parentPO == null) {
-      MetalakeMetaService.getInstance()
-          .lockMetalakeForChildWrite(metalakeName, childPO.metalakeId());
-    } else {
-      MetalakeMetaService.getInstance()
-          .lockMetalakeExclusivelyForChildWrite(metalakeName, childPO.metalakeId());
-    }
+    MetalakeMetaService.getInstance()
+        .lockMetalakeForChildWrite(childIdent.namespace().level(0), childPO.metalakeId());
     if (parentPO == null) {
       lockDomain(childPO, true);
     } else if (childPO.domainId() < parentPO.domainId()) {
@@ -315,28 +299,6 @@ public class DomainRelService {
         current ->
             Objects.equals(current.domainName(), observedDomainPO.domainName())
                 && Objects.equals(current.metalakeId(), observedDomainPO.metalakeId()));
-  }
-
-  // Runs under the exclusive metalake lock, so no other change of the hierarchy moves the
-  // ancestors while they are walked.
-  private void checkNotAncestor(
-      NameIdentifier childIdent, DomainPO childPO, NameIdentifier parentIdent, DomainPO parentPO) {
-    Set<Long> visitedIds = new HashSet<>();
-    Long ancestorId = parentPO.domainId();
-    while (ancestorId != null) {
-      Preconditions.checkArgument(
-          !Objects.equals(ancestorId, childPO.domainId()),
-          "The domain %s cannot be a sub-domain of %s, which is its own sub-domain",
-          childIdent,
-          parentIdent);
-      Preconditions.checkState(
-          visitedIds.add(ancestorId),
-          "The ancestors of domain %s form a cycle at domain ID %s",
-          parentIdent,
-          ancestorId);
-      DomainRelPO ancestorRelPO = selectDomainRel(ancestorId);
-      ancestorId = ancestorRelPO == null ? null : ancestorRelPO.parentId();
-    }
   }
 
   @Nullable

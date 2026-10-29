@@ -462,22 +462,6 @@ public class MetalakeMetaService {
         current -> Objects.equals(current.getMetalakeName(), name));
   }
 
-  /**
-   * Locks and validates a metalake exclusively, which serializes a write with every other write
-   * that locks the metalake in the current transaction.
-   */
-  void lockMetalakeExclusivelyForChildWrite(String name, Long metalakeId) {
-    OccWriteSupport.lockParentForChildWrite(
-        name,
-        Entity.EntityType.METALAKE,
-        () ->
-            SessionUtils.getWithoutCommit(
-                MetalakeMetaMapper.class,
-                mapper -> mapper.selectMetalakeMetaByIdForUpdate(metalakeId)),
-        null,
-        current -> Objects.equals(current.getMetalakeName(), name));
-  }
-
   private RuntimeException metalakeWriteFailure(
       NameIdentifier identifier, Long metalakeId, String observedName) {
     return OccWriteSupport.writeFailure(
