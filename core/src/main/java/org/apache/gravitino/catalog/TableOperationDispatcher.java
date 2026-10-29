@@ -331,8 +331,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   IllegalArgumentException.class);
           Table alteredTable = catalogResult.table;
 
-          // The change is already applied in the catalog. A result without a column list fails
-          // after the store is updated, but can't be returned to clients, which require one.
+          // The change is already applied in the catalog, and in the store if the table is
+          // stored. A result without a column list still fails, because clients require one. The
+          // hook's authorization rename and the success event are then skipped, and a retried
+          // rename fails because the table already has its new name.
           if (catalogResult.managed) {
             return checkColumnsReported(
                 ident,
@@ -728,6 +730,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             NoSuchSchemaException.class,
             TableAlreadyExistsException.class);
     Table table = catalogResult.table;
+    // Fail before storing the table, as a missing column list failed the snapshot before.
+    checkColumnsReported(ident, table);
 
     // If the table is managed by Gravitino, we don't need to create TableEntity and store it again.
     if (catalogResult.managed) {

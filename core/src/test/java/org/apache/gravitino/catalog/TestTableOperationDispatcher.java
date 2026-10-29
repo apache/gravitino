@@ -1522,6 +1522,60 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(ids, columnIds(tableIdent));
   }
 
+  @Test
+  public void testAlterUnstoredTableFailsWhenCatalogReportsNoColumns() {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_null_columns_unstored");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_columns");
+    // Created in the catalog only, so Gravitino has no stored table and no id for it.
+    testCatalogOperations()
+        .replaceTable(
+            tableIdent,
+            TestTable.builder()
+                .withName(tableIdent.name())
+                .withProperties(props)
+                .withAuditInfo(
+                    AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+                .build());
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k3", "v3")));
+    Assertions.assertEquals(
+        "v3", testCatalogOperations().loadTable(tableIdent).properties().get("k3"));
+  }
+
+  @Test
+  public void testCreateFailsWhenCatalogReportsNoColumns() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_null_columns_create");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_columns");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("c1")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+
+    TestCatalogOperations ops = testCatalogOperations();
+    ops.setReportNoColumnsOnCreate(true);
+    try {
+      Assertions.assertThrows(
+          IllegalStateException.class,
+          () ->
+              tableOperationDispatcher.createTable(
+                  tableIdent, columns, "comment", props, new Transform[0]));
+    } finally {
+      ops.setReportNoColumnsOnCreate(false);
+    }
+
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+  }
+
   private NameIdentifier createTableReportingNoColumns(String schemaName) {
     Namespace tableNs = Namespace.of(metalake, catalog, schemaName);
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
