@@ -36,6 +36,8 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.responses.ErrorConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.SecretsResponse;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
@@ -127,6 +129,13 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   public void testGetSecretsForModel() {
     testGetSecretsForObject(
         MetadataObjects.parse("catalog.schema.model", MetadataObject.Type.MODEL));
+  }
+
+  @Test
+  public void testGetSecretsForUnsupportedObjectType() {
+    testGetSecretsForUnsupportedObject(MetadataObjects.parse("tag", MetadataObject.Type.TAG));
+    testGetSecretsForUnsupportedObject(
+        MetadataObjects.parse("catalog.schema.table.column", MetadataObject.Type.COLUMN));
   }
 
   @Test
@@ -319,6 +328,23 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
     secretResponse = response.readEntity(SecretsResponse.class);
     Assertions.assertEquals(0, secretResponse.getCode());
     Assertions.assertTrue(secretResponse.getSecrets().isEmpty());
+  }
+
+  private void testGetSecretsForUnsupportedObject(MetadataObject metadataObject) {
+    Response response =
+        target(basePath(metalake))
+            .path(metadataObject.type().toString())
+            .path(metadataObject.fullName())
+            .path("/secrets")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertTrue(
+        errorResponse.getMessage().contains("Doesn't support secret property operations"));
   }
 
   private String basePath(String metalake) {
