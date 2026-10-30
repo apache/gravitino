@@ -109,7 +109,7 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
     }
     try {
       long tableId = resolveTableId(identifier);
-      CommitJobEnqueueResult result = client.enqueueNow(tableId);
+      CommitJobEnqueueResult result = client.enqueueNow(tableId, identifier);
       switch (result) {
         case INSERTED:
           LOG.info("Enqueued commit-job for table {} ({})", tableId, identifier);

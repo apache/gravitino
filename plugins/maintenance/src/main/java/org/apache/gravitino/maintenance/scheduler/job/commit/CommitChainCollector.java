@@ -20,27 +20,27 @@ package org.apache.gravitino.maintenance.scheduler.job.commit;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestMaintenancePolicyResolver;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestMaintenancePolicyResolver.Decision;
-import org.apache.gravitino.maintenance.storage.MetalakeNames;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,17 +61,14 @@ public final class CommitChainCollector {
 
   private final Function<Long, Optional<PolicyEntity>> policyLoader;
   private final Supplier<EntityStore> entityStoreSupplier;
-  private final Function<Long, Optional<TableContext>> tableContextResolver;
 
   /**
-   * Production collector using {@link PolicyMetaService}, {@link GravitinoEnv#entityStore()}, and
-   * relational table refs.
+   * Production collector using {@link PolicyMetaService} and {@link GravitinoEnv#entityStore()}.
    */
   public CommitChainCollector() {
     this(
         id -> Optional.ofNullable(PolicyMetaService.getInstance().getPolicyById(id)),
-        () -> GravitinoEnv.getInstance().entityStore(),
-        CommitChainCollector::resolveTableContext);
+        () -> GravitinoEnv.getInstance().entityStore());
   }
 
   /**
@@ -79,36 +76,47 @@ public final class CommitChainCollector {
    *
    * @param policyLoader loads policies by id
    * @param entityStoreSupplier entity store supplier
-   * @param tableContextResolver resolves metalake + metadata object for a table id
    */
   CommitChainCollector(
       Function<Long, Optional<PolicyEntity>> policyLoader,
-      Supplier<EntityStore> entityStoreSupplier,
-      Function<Long, Optional<TableContext>> tableContextResolver) {
+      Supplier<EntityStore> entityStoreSupplier) {
     this.policyLoader = Preconditions.checkNotNull(policyLoader);
     this.entityStoreSupplier = Preconditions.checkNotNull(entityStoreSupplier);
-    this.tableContextResolver = Preconditions.checkNotNull(tableContextResolver);
   }
 
   /**
-   * Collects the onCommit chain and the Spark table ref in one metadata resolution pass.
+   * Collects the onCommit chain for a table whose metalake, catalog, and schema.table are already
+   * known from the commit event.
    *
    * @param tableId table entity id
-   * @return collected chain (members may be empty) when the table resolves; empty when metadata is
-   *     unknown
+   * @param identifier {@code metalake.catalog.schema.table} from the commit event
+   * @return collected chain (members may be empty) when the identifier names a table; empty when it
+   *     does not
    */
-  public Optional<CollectedCommitChain> collect(long tableId) {
-    Optional<TableContext> ctx = tableContextResolver.apply(tableId);
-    if (ctx.isEmpty()) {
-      LOG.info("Skipping commit chain for table {}: could not resolve table metadata", tableId);
+  public Optional<CollectedCommitChain> collect(long tableId, NameIdentifier identifier) {
+    if (!usableTableIdentifier(identifier)) {
+      LOG.info(
+          "Skipping commit chain for table {}: missing catalog and schema on {}",
+          tableId,
+          identifier);
       return Optional.empty();
     }
-    TableContext table = ctx.get();
+    MetadataObject tableObject;
+    try {
+      tableObject = NameIdentifierUtil.toMetadataObject(identifier, Entity.EntityType.TABLE);
+    } catch (IllegalArgumentException e) {
+      LOG.info("Skipping commit chain for table {}: {}", tableId, e.getMessage());
+      return Optional.empty();
+    }
+    String metalake = identifier.namespace().level(0);
+    ResolvedTableRef tableRef =
+        new ResolvedTableRef(
+            tableId, identifier.namespace().level(1), sparkTableIdentifier(identifier));
     NearestMaintenancePolicyResolver nearest =
         new NearestMaintenancePolicyResolver(entityStoreSupplier.get());
     List<PolicyEntity> chain = new ArrayList<>();
     for (Policy.BuiltInType type : CHAIN_ORDER) {
-      Decision decision = nearest.resolve(table.metalake(), table.tableObject(), type);
+      Decision decision = nearest.resolve(metalake, tableObject, type);
       if (decision.kind() == Decision.Kind.CONFLICT) {
         // Match expand fail-closed: ambiguous same-level policies skip the whole table.
         LOG.error(
@@ -135,7 +143,7 @@ public final class CommitChainCollector {
       }
       chain.add(policy);
     }
-    return Optional.of(new CollectedCommitChain(chain, table.tableRef()));
+    return Optional.of(new CollectedCommitChain(chain, tableRef));
   }
 
   @Nullable
@@ -146,49 +154,39 @@ public final class CommitChainCollector {
     return ((ExecutablePolicyContent) content).executionSpec().commitTrigger();
   }
 
-  private static Optional<TableContext> resolveTableContext(long tableId) {
-    String metalake = MetalakeNames.forTableId(tableId);
-    if (metalake == null || metalake.isEmpty()) {
-      return Optional.empty();
+  private static boolean usableTableIdentifier(@Nullable NameIdentifier identifier) {
+    if (identifier == null || identifier.name() == null || identifier.name().isBlank()) {
+      return false;
     }
-    List<ResolvedTableRef> refs = MaintenanceTableRefs.resolve(List.of(tableId));
-    if (refs.isEmpty()) {
-      return Optional.empty();
+    Namespace namespace = identifier.namespace();
+    if (namespace == null || namespace.length() < 3) {
+      return false;
     }
-    ResolvedTableRef ref = refs.get(0);
-    String[] parts = ref.tableIdentifier().split("\\.");
-    if (parts.length < 2) {
-      return Optional.empty();
+    for (int i = 0; i < namespace.length(); i++) {
+      String level = namespace.level(i);
+      if (level == null || level.isBlank()) {
+        return false;
+      }
     }
-    List<String> names = new ArrayList<>();
-    names.add(ref.catalogName());
-    names.addAll(Arrays.asList(parts));
-    MetadataObject tableObject = MetadataObjects.of(names, MetadataObject.Type.TABLE);
-    return Optional.of(new TableContext(metalake, tableObject, ref));
+    return true;
   }
 
-  /** Metalake + metadata object + Spark ref for nearest-policy walks and spec build. */
-  static final class TableContext {
-    private final String metalake;
-    private final MetadataObject tableObject;
-    private final ResolvedTableRef tableRef;
-
-    TableContext(String metalake, MetadataObject tableObject, ResolvedTableRef tableRef) {
-      this.metalake = metalake;
-      this.tableObject = tableObject;
-      this.tableRef = tableRef;
+  /**
+   * {@code schema.table}, including extra schema levels when the namespace is deeper than three.
+   */
+  private static String sparkTableIdentifier(NameIdentifier identifier) {
+    Namespace namespace = identifier.namespace();
+    StringBuilder builder = new StringBuilder();
+    for (int i = 2; i < namespace.length(); i++) {
+      if (builder.length() > 0) {
+        builder.append('.');
+      }
+      builder.append(namespace.level(i));
     }
-
-    String metalake() {
-      return metalake;
+    if (builder.length() > 0) {
+      builder.append('.');
     }
-
-    MetadataObject tableObject() {
-      return tableObject;
-    }
-
-    ResolvedTableRef tableRef() {
-      return tableRef;
-    }
+    builder.append(identifier.name());
+    return builder.toString();
   }
 }

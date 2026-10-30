@@ -24,23 +24,34 @@ import org.apache.gravitino.MetadataObject;
 
 /**
  * One enqueueable table after nearest-policy and occupancy gating, with the metadata level where
- * the winning policy was selected.
+ * the winning policy was selected and the catalog / table names already known at expand time.
  */
 public final class ExpandTableCandidate {
 
   private final long tableId;
   private final MetadataObject.Type winnerLevel;
+  private final String catalogName;
+  private final String tableIdentifier;
 
   /**
    * @param tableId table entity id
    * @param winnerLevel {@link MetadataObject.Type#TABLE}, {@link MetadataObject.Type#SCHEMA}, or
    *     {@link MetadataObject.Type#CATALOG}
+   * @param catalogName catalog name from the table metadata object
+   * @param tableIdentifier {@code schema.table} Spark identifier
    */
-  public ExpandTableCandidate(long tableId, MetadataObject.Type winnerLevel) {
+  public ExpandTableCandidate(
+      long tableId, MetadataObject.Type winnerLevel, String catalogName, String tableIdentifier) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
     Preconditions.checkNotNull(winnerLevel, "winnerLevel must not be null");
+    Preconditions.checkArgument(
+        catalogName != null && !catalogName.isBlank(), "catalogName must not be blank");
+    Preconditions.checkArgument(
+        tableIdentifier != null && !tableIdentifier.isBlank(), "tableIdentifier must not be blank");
     this.tableId = tableId;
     this.winnerLevel = winnerLevel;
+    this.catalogName = catalogName;
+    this.tableIdentifier = tableIdentifier;
   }
 
   /**
@@ -55,6 +66,20 @@ public final class ExpandTableCandidate {
    */
   public MetadataObject.Type winnerLevel() {
     return winnerLevel;
+  }
+
+  /**
+   * @return catalog name
+   */
+  public String catalogName() {
+    return catalogName;
+  }
+
+  /**
+   * @return {@code schema.table} Spark identifier
+   */
+  public String tableIdentifier() {
+    return tableIdentifier;
   }
 
   /**
@@ -73,16 +98,27 @@ public final class ExpandTableCandidate {
       return false;
     }
     ExpandTableCandidate that = (ExpandTableCandidate) o;
-    return tableId == that.tableId && winnerLevel == that.winnerLevel;
+    return tableId == that.tableId
+        && winnerLevel == that.winnerLevel
+        && catalogName.equals(that.catalogName)
+        && tableIdentifier.equals(that.tableIdentifier);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tableId, winnerLevel);
+    return Objects.hash(tableId, winnerLevel, catalogName, tableIdentifier);
   }
 
   @Override
   public String toString() {
-    return "ExpandTableCandidate{tableId=" + tableId + ", winnerLevel=" + winnerLevel + '}';
+    return "ExpandTableCandidate{tableId="
+        + tableId
+        + ", winnerLevel="
+        + winnerLevel
+        + ", catalogName="
+        + catalogName
+        + ", tableIdentifier="
+        + tableIdentifier
+        + '}';
   }
 }

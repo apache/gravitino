@@ -23,7 +23,6 @@ import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
 import com.github.kagkarlsson.scheduler.task.TaskInstance;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
@@ -44,10 +42,10 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
+import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
@@ -97,32 +95,15 @@ public class CronJobClient {
   private final DataSource dataSource;
   private final Config gravitinoConfig;
   private final MaintenanceJobSpecFactory specFactory;
-  private final Function<List<Long>, List<ResolvedTableRef>> tableRefResolver;
 
   /**
    * @param dataSource relational JDBC pool shared with the entity store
    * @param gravitinoConfig server config for jobConf overlay
    */
   public CronJobClient(DataSource dataSource, Config gravitinoConfig) {
-    this(dataSource, gravitinoConfig, MaintenanceTableRefs::resolve);
-  }
-
-  /**
-   * Visible for tests that inject table-id resolution without a JDBC catalog store.
-   *
-   * @param dataSource relational JDBC pool
-   * @param gravitinoConfig server config
-   * @param tableRefResolver resolves entity ids to catalog + schema.table
-   */
-  @VisibleForTesting
-  public CronJobClient(
-      DataSource dataSource,
-      Config gravitinoConfig,
-      Function<List<Long>, List<ResolvedTableRef>> tableRefResolver) {
     this.dataSource = Preconditions.checkNotNull(dataSource);
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
     this.specFactory = new MaintenanceJobSpecFactory(this.gravitinoConfig);
-    this.tableRefResolver = Preconditions.checkNotNull(tableRefResolver);
   }
 
   /**
@@ -157,7 +138,7 @@ public class CronJobClient {
     int scheduled = 0;
     int limit = Math.min(candidates.size(), expandLimit);
     for (ExpandTableCandidate candidate : candidates.subList(0, limit)) {
-      Optional<MaintenanceJobSpec> spec = buildSpec(policy, List.of(candidate.tableId()));
+      Optional<MaintenanceJobSpec> spec = buildSpec(policy, List.of(candidate));
       if (spec.isEmpty()) {
         continue;
       }
@@ -192,28 +173,34 @@ public class CronJobClient {
       List<ExpandTableCandidate> slice,
       int batchCapacity,
       Instant due) {
-    List<Long> batchable = new ArrayList<>();
-    List<Long> tableLevel = new ArrayList<>();
+    List<ExpandTableCandidate> batchable = new ArrayList<>();
+    List<ExpandTableCandidate> tableLevel = new ArrayList<>();
     for (ExpandTableCandidate candidate : slice) {
       if (isTableAlreadyQueued(client, candidate.tableId(), policy.id())) {
         continue;
       }
       if (candidate.batchableForSnapshotExpiry()) {
-        batchable.add(candidate.tableId());
+        batchable.add(candidate);
       } else {
-        tableLevel.add(candidate.tableId());
+        tableLevel.add(candidate);
       }
     }
     int scheduled = 0;
     if (!batchable.isEmpty()) {
-      for (Map.Entry<String, List<Long>> entry : groupByCatalog(batchable).entrySet()) {
+      Map<String, List<ExpandTableCandidate>> byCatalog = new LinkedHashMap<>();
+      for (ExpandTableCandidate candidate : batchable) {
+        byCatalog
+            .computeIfAbsent(candidate.catalogName(), ignored -> new ArrayList<>())
+            .add(candidate);
+      }
+      for (Map.Entry<String, List<ExpandTableCandidate>> entry : byCatalog.entrySet()) {
         scheduled +=
             enqueueSameCatalog(
                 client, policy, entry.getKey(), entry.getValue(), batchCapacity, due);
       }
     }
-    for (Long tableId : tableLevel) {
-      scheduled += enqueueTableSnapshotExpiry(client, policy, tableId, batchCapacity, due);
+    for (ExpandTableCandidate candidate : tableLevel) {
+      scheduled += enqueueTableSnapshotExpiry(client, policy, candidate, batchCapacity, due);
     }
     coalesceOpenExpireJobs(client, batchCapacity);
     return scheduled;
@@ -225,17 +212,17 @@ public class CronJobClient {
    * batch:} rows into it (target instance id unchanged).
    */
   private int enqueueTableSnapshotExpiry(
-      SchedulerClient client, PolicyEntity policy, long tableId, int batchCapacity, Instant due) {
+      SchedulerClient client,
+      PolicyEntity policy,
+      ExpandTableCandidate candidate,
+      int batchCapacity,
+      Instant due) {
+    long tableId = candidate.tableId();
     if (isTableAlreadyQueued(client, tableId, policy.id())) {
       return 0;
     }
-    List<ResolvedTableRef> resolved = tableRefResolver.apply(List.of(tableId));
-    if (resolved.isEmpty()) {
-      LOG.warn("Skipping unresolved table {} from snapshot-expiry table enqueue", tableId);
-      return 0;
-    }
-    String catalogName = resolved.get(0).catalogName();
-    Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, List.of(tableId));
+    String catalogName = candidate.catalogName();
+    Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, List.of(candidate));
     if (enqueueSpec.isEmpty()) {
       return 0;
     }
@@ -278,32 +265,14 @@ public class CronJobClient {
     return 1;
   }
 
-  private Map<String, List<Long>> groupByCatalog(List<Long> tableIds) {
-    List<ResolvedTableRef> resolved = tableRefResolver.apply(tableIds);
-    Map<Long, ResolvedTableRef> byId = new LinkedHashMap<>();
-    for (ResolvedTableRef ref : resolved) {
-      byId.put(ref.tableId(), ref);
-    }
-    Map<String, List<Long>> byCatalog = new LinkedHashMap<>();
-    for (Long tableId : tableIds) {
-      ResolvedTableRef ref = byId.get(tableId);
-      if (ref == null) {
-        LOG.warn("Skipping unresolved table {} from snapshot-expiry batch enqueue", tableId);
-        continue;
-      }
-      byCatalog.computeIfAbsent(ref.catalogName(), ignored -> new ArrayList<>()).add(tableId);
-    }
-    return byCatalog;
-  }
-
   private int enqueueSameCatalog(
       SchedulerClient client,
       PolicyEntity policy,
       String catalogName,
-      List<Long> tableIds,
+      List<ExpandTableCandidate> tables,
       int batchCapacity,
       Instant due) {
-    List<Long> remaining = new ArrayList<>(tableIds);
+    List<ExpandTableCandidate> remaining = new ArrayList<>(tables);
     int newRows = 0;
     while (!remaining.isEmpty()) {
       Optional<QueuedExpireJob> incompleteBatch =
@@ -312,17 +281,17 @@ public class CronJobClient {
         QueuedExpireJob target = incompleteBatch.get();
         int remainingCapacity = batchCapacity - target.spec.tableIds().size();
         int takeCount = Math.min(remainingCapacity, remaining.size());
-        List<Long> enqueueTableIds = new ArrayList<>(remaining.subList(0, takeCount));
-        Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, enqueueTableIds);
+        List<ExpandTableCandidate> enqueueTables = new ArrayList<>(remaining.subList(0, takeCount));
+        Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, enqueueTables);
         if (enqueueSpec.isPresent()) {
           List<QueuedExpireJob> peers =
               selectQueuedJobsToClaim(
                   client,
                   catalogName,
-                  remainingCapacity - enqueueTableIds.size(),
+                  remainingCapacity - enqueueTables.size(),
                   batchCapacity,
                   Set.of(target.instanceId.getId()),
-                  unionTableIds(target.spec.tableIds(), enqueueTableIds));
+                  unionTableIds(target.spec.tableIds(), tableIds(enqueueTables)));
           if (coalesceInto(
               client,
               target,
@@ -336,8 +305,8 @@ public class CronJobClient {
         }
       }
       int takeCount = Math.min(batchCapacity, remaining.size());
-      List<Long> enqueueTableIds = new ArrayList<>(remaining.subList(0, takeCount));
-      Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, enqueueTableIds);
+      List<ExpandTableCandidate> enqueueTables = new ArrayList<>(remaining.subList(0, takeCount));
+      Optional<MaintenanceJobSpec> enqueueSpec = buildSpec(policy, enqueueTables);
       if (enqueueSpec.isPresent()) {
         Optional<QueuedExpireJob> batchJob =
             scheduleBatchJob(client, policy, enqueueSpec.get(), due);
@@ -358,7 +327,7 @@ public class CronJobClient {
           continue;
         }
       }
-      Long droppedTableId = remaining.remove(0);
+      long droppedTableId = remaining.remove(0).tableId();
       LOG.warn(
           "Dropping table {} from snapshot-expiry enqueue for policy {} after failed batch build",
           droppedTableId,
@@ -418,6 +387,14 @@ public class CronJobClient {
     return underCapacity.stream()
         .filter(job -> !job.isBatch)
         .min(Comparator.comparing(job -> job.instanceId.getId()));
+  }
+
+  private static List<Long> tableIds(List<ExpandTableCandidate> tables) {
+    List<Long> ids = new ArrayList<>(tables.size());
+    for (ExpandTableCandidate table : tables) {
+      ids.add(table.tableId());
+    }
+    return ids;
   }
 
   private static Set<Long> unionTableIds(List<Long> left, List<Long> right) {
@@ -683,19 +660,14 @@ public class CronJobClient {
         .findFirst();
   }
 
-  private Optional<MaintenanceJobSpec> buildSpec(PolicyEntity policy, List<Long> tableIds) {
-    List<ResolvedTableRef> resolved = tableRefResolver.apply(tableIds);
-    if (resolved.size() != tableIds.size()) {
-      LOG.warn(
-          "Skipping cron-job enqueue for policy {}: resolved {} of {} table ids {}",
-          policy.id(),
-          resolved.size(),
-          tableIds.size(),
-          tableIds);
-      return Optional.empty();
+  private Optional<MaintenanceJobSpec> buildSpec(
+      PolicyEntity policy, List<ExpandTableCandidate> tables) {
+    List<ResolvedTableRef> refs = new ArrayList<>(tables.size());
+    for (ExpandTableCandidate table : tables) {
+      refs.add(new ResolvedTableRef(table.tableId(), table.catalogName(), table.tableIdentifier()));
     }
     try {
-      return Optional.of(specFactory.forCron(policy, resolved));
+      return Optional.of(specFactory.forCron(policy, refs));
     } catch (RuntimeException e) {
       LOG.warn(
           "Skipping cron-job enqueue for policy {}: failed to build jobConf / MaintenanceJobSpec: {}",

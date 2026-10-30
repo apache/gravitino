@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.listener;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -55,14 +56,15 @@ class TestPostCommitMaintenanceListener {
 
     listener.onPostEvent(new OtherEvent("u", NameIdentifier.of("ml", "c", "s", "t")));
 
-    verify(scheduler, never()).enqueueNow(anyLong());
+    verify(scheduler, never()).enqueueNow(anyLong(), any());
   }
 
   @Test
   void testEnqueueUpsertsCommitJob() {
     PostCommitMaintenanceListener listener = new PostCommitMaintenanceListener();
     CommitJobClient scheduler = mock(CommitJobClient.class);
-    when(scheduler.enqueueNow(eq(42L))).thenReturn(CommitJobEnqueueResult.INSERTED);
+    NameIdentifier identifier = NameIdentifier.of("ml", "c", "s", "t");
+    when(scheduler.enqueueNow(eq(42L), eq(identifier))).thenReturn(CommitJobEnqueueResult.INSERTED);
     listener.setCommitJobClient(scheduler);
     listener.setTableLookup(
         ident ->
@@ -74,9 +76,9 @@ class TestPostCommitMaintenanceListener {
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
                 .build());
 
-    listener.enqueueCommitJob(NameIdentifier.of("ml", "c", "s", "t"));
+    listener.enqueueCommitJob(identifier);
 
-    verify(scheduler).enqueueNow(42L);
+    verify(scheduler).enqueueNow(42L, identifier);
   }
 
   @Test

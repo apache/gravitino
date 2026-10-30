@@ -20,7 +20,7 @@ package org.apache.gravitino.maintenance.scheduler.job.commit;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
+import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**

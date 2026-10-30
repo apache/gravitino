@@ -28,10 +28,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
@@ -64,7 +65,7 @@ public class CommitJobClient {
 
   private final DataSource dataSource;
   private final Config gravitinoConfig;
-  private final Function<Long, Optional<CollectedCommitChain>> chainCollector;
+  private final BiFunction<Long, NameIdentifier, Optional<CollectedCommitChain>> chainCollector;
   private final CommitOccupancyGate occupancyGate;
   private final MaintenanceJobSpecFactory specFactory;
 
@@ -88,14 +89,14 @@ public class CommitJobClient {
    *
    * @param dataSource JDBC pool
    * @param gravitinoConfig server config
-   * @param chainCollector returns the collected onCommit chain for a table id
+   * @param chainCollector returns the collected onCommit chain for a table id and its name
    * @param occupancyGate cooldown / in-flight checks for enqueue gating
    */
   @VisibleForTesting
   public CommitJobClient(
       DataSource dataSource,
       Config gravitinoConfig,
-      Function<Long, Optional<CollectedCommitChain>> chainCollector,
+      BiFunction<Long, NameIdentifier, Optional<CollectedCommitChain>> chainCollector,
       CommitOccupancyGate occupancyGate) {
     this.dataSource = Preconditions.checkNotNull(dataSource);
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
@@ -109,10 +110,12 @@ public class CommitJobClient {
    * not already queued and the spec is non-empty.
    *
    * @param tableId table entity id
+   * @param identifier {@code metalake.catalog.schema.table} from the commit event
    * @return insert / coalesce / skip outcome
    */
-  public CommitJobEnqueueResult enqueueNow(long tableId) {
+  public CommitJobEnqueueResult enqueueNow(long tableId, NameIdentifier identifier) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
+    Preconditions.checkNotNull(identifier, "identifier must not be null");
     SchedulerClient client = schedulerClient(dataSource);
     String id = MaintenanceTaskIds.forCommitTable(tableId);
     // Coalesce without rebuilding task_data: keep the first enqueue-time spec.
@@ -121,7 +124,7 @@ public class CommitJobClient {
         .isPresent()) {
       return CommitJobEnqueueResult.ALREADY_QUEUED;
     }
-    Optional<MaintenanceJobSpec> spec = buildSpec(tableId);
+    Optional<MaintenanceJobSpec> spec = buildSpec(tableId, identifier);
     if (spec.isEmpty()) {
       return CommitJobEnqueueResult.SKIPPED;
     }
@@ -148,8 +151,8 @@ public class CommitJobClient {
         .build();
   }
 
-  private Optional<MaintenanceJobSpec> buildSpec(long tableId) {
-    Optional<CollectedCommitChain> collected = chainCollector.apply(tableId);
+  private Optional<MaintenanceJobSpec> buildSpec(long tableId, NameIdentifier identifier) {
+    Optional<CollectedCommitChain> collected = chainCollector.apply(tableId, identifier);
     if (collected.isEmpty()) {
       return Optional.empty();
     }

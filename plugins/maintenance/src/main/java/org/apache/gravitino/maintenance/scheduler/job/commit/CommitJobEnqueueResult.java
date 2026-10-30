@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.maintenance.scheduler.job.commit;
 
+import org.apache.gravitino.NameIdentifier;
+
 /**
- * Outcome of {@link CommitJobClient#enqueueNow(long)}.
+ * Outcome of {@link CommitJobClient#enqueueNow(long, NameIdentifier)}.
  *
  * <p>Distinguishes coalesce ({@link #ALREADY_QUEUED}) from enqueue gate skips ({@link #SKIPPED}) so
  * callers do not log "already queued" when no spec was written.

@@ -167,8 +167,8 @@ class TestPolicyExpandPipeline {
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
     List<ExpandTableCandidate> candidates =
         List.of(
-            new ExpandTableCandidate(10L, MetadataObject.Type.SCHEMA),
-            new ExpandTableCandidate(11L, MetadataObject.Type.SCHEMA));
+            new ExpandTableCandidate(10L, MetadataObject.Type.SCHEMA, "iceberg", "db.t10"),
+            new ExpandTableCandidate(11L, MetadataObject.Type.SCHEMA, "iceberg", "db.t11"));
     when(tables.listTableIds(
             eq(policy),
             eq(5),
@@ -202,7 +202,8 @@ class TestPolicyExpandPipeline {
   }
 
   private static ExpandTableCandidate c(long tableId) {
-    return new ExpandTableCandidate(tableId, MetadataObject.Type.TABLE);
+    return new ExpandTableCandidate(
+        tableId, MetadataObject.Type.TABLE, "iceberg", "db.t" + tableId);
   }
 
   private static ExpandOccupancyGate allowAll() {

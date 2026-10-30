@@ -521,7 +521,16 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
           scan.minIntervalMs);
       return;
     }
-    scan.acceptedByTableId.put(tableId, new ExpandTableCandidate(tableId, winnerLevel.type()));
+    String fullName = tableObject.fullName();
+    int dot = fullName.indexOf('.');
+    if (dot <= 0 || dot >= fullName.length() - 1) {
+      LOG.warn("Skip table {} with unusable name {}", tableId, fullName);
+      return;
+    }
+    scan.acceptedByTableId.put(
+        tableId,
+        new ExpandTableCandidate(
+            tableId, winnerLevel.type(), fullName.substring(0, dot), fullName.substring(dot + 1)));
   }
 
   /** Mutable progress for one {@link #listTableIds} call. */

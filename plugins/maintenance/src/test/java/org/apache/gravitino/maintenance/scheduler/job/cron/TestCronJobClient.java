@@ -38,7 +38,6 @@ import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -335,7 +334,7 @@ class TestCronJobClient extends TestJDBCBackend {
   @TestTemplate
   void testSnapshotExpiryDoesNotMergeDifferentCatalogs() {
     DataSource dataSource = dataSource();
-    CronJobClient scheduler = multiCatalogScheduler(dataSource);
+    CronJobClient scheduler = scheduler(dataSource);
 
     Assertions.assertEquals(
         1,
@@ -466,24 +465,7 @@ class TestCronJobClient extends TestJDBCBackend {
   }
 
   private static CronJobClient scheduler(DataSource dataSource) {
-    return new CronJobClient(
-        dataSource,
-        configWithUri(),
-        ids ->
-            ids.stream()
-                .map(id -> new ResolvedTableRef(id, "iceberg", "db.t" + id))
-                .collect(Collectors.toList()));
-  }
-
-  /** Tables with id &gt;= 1000 resolve to catalog {@code other}; others to {@code iceberg}. */
-  private static CronJobClient multiCatalogScheduler(DataSource dataSource) {
-    return new CronJobClient(
-        dataSource,
-        configWithUri(),
-        ids ->
-            ids.stream()
-                .map(id -> new ResolvedTableRef(id, id >= 1000L ? "other" : "iceberg", "db.t" + id))
-                .collect(Collectors.toList()));
+    return new CronJobClient(dataSource, configWithUri());
   }
 
   private static DataSource dataSource() {
@@ -505,7 +487,8 @@ class TestCronJobClient extends TestJDBCBackend {
   }
 
   private static ExpandTableCandidate candidate(long tableId, MetadataObject.Type level) {
-    return new ExpandTableCandidate(tableId, level);
+    String catalog = tableId >= 1000L ? "other" : "iceberg";
+    return new ExpandTableCandidate(tableId, level, catalog, "db.t" + tableId);
   }
 
   private static List<ExpandTableCandidate> schemaCandidates(long fromInclusive, long toInclusive) {

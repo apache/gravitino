@@ -26,14 +26,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
+import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -48,6 +49,7 @@ import org.junit.jupiter.api.TestTemplate;
 class TestCommitJobClient extends TestJDBCBackend {
 
   private static final long TABLE_ID = 101L;
+  private static final NameIdentifier TABLE = NameIdentifier.of("ml", "iceberg", "db", "t");
   private static final long POLICY_ID = 202L;
   private static final String GRAVITINO_URI = "http://localhost:8090";
 
@@ -59,7 +61,7 @@ class TestCommitJobClient extends TestJDBCBackend {
             configWithUri(),
             fixedCollector(List.of(policy(POLICY_ID))),
             coolingGate(POLICY_ID));
-    Assertions.assertEquals(CommitJobEnqueueResult.SKIPPED, scheduler.enqueueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobEnqueueResult.SKIPPED, scheduler.enqueueNow(TABLE_ID, TABLE));
     Assertions.assertTrue(
         CommitJobClient.schedulerClient(dataSource())
             .getScheduledExecution(
@@ -78,8 +80,9 @@ class TestCommitJobClient extends TestJDBCBackend {
             fixedCollector(List.of(policy(POLICY_ID))),
             allowAllGate());
 
-    Assertions.assertEquals(CommitJobEnqueueResult.INSERTED, scheduler.enqueueNow(TABLE_ID));
-    Assertions.assertEquals(CommitJobEnqueueResult.ALREADY_QUEUED, scheduler.enqueueNow(TABLE_ID));
+    Assertions.assertEquals(CommitJobEnqueueResult.INSERTED, scheduler.enqueueNow(TABLE_ID, TABLE));
+    Assertions.assertEquals(
+        CommitJobEnqueueResult.ALREADY_QUEUED, scheduler.enqueueNow(TABLE_ID, TABLE));
 
     SchedulerClient client = CommitJobClient.schedulerClient(dataSource());
     MaintenanceJobSpec spec =
@@ -99,11 +102,11 @@ class TestCommitJobClient extends TestJDBCBackend {
     Assertions.assertFalse(spec.getTasks().get(0).getParameters().containsKey("updater_options"));
   }
 
-  private static Function<Long, Optional<CollectedCommitChain>> fixedCollector(
+  private static BiFunction<Long, NameIdentifier, Optional<CollectedCommitChain>> fixedCollector(
       List<PolicyEntity> policies) {
     ResolvedTableRef ref = new ResolvedTableRef(TABLE_ID, "iceberg", "db.t");
     CollectedCommitChain collected = new CollectedCommitChain(policies, ref);
-    return tableId -> tableId == TABLE_ID ? Optional.of(collected) : Optional.empty();
+    return (tableId, identifier) -> tableId == TABLE_ID ? Optional.of(collected) : Optional.empty();
   }
 
   private static CommitOccupancyGate allowAllGate() {

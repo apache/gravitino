@@ -24,7 +24,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.MetadataObject;
@@ -33,7 +32,6 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
@@ -61,11 +59,9 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
     PolicyEntity policyA = expirePolicy(9L);
     PolicyEntity policyB = expirePolicy(10L);
     PolicyTableEnumerator tablesA =
-        (policy, limit, gate, minIntervalMs) ->
-            List.of(new ExpandTableCandidate(21L, MetadataObject.Type.TABLE));
+        (policy, limit, gate, minIntervalMs) -> List.of(candidate(21L, MetadataObject.Type.TABLE));
     PolicyTableEnumerator tablesB =
-        (policy, limit, gate, minIntervalMs) ->
-            List.of(new ExpandTableCandidate(22L, MetadataObject.Type.TABLE));
+        (policy, limit, gate, minIntervalMs) -> List.of(candidate(22L, MetadataObject.Type.TABLE));
 
     PolicyExpandPipeline expandA =
         new PolicyExpandPipeline(
@@ -123,8 +119,7 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
     PolicyExpandPipeline tableExpand =
         new PolicyExpandPipeline(
             id -> Optional.of(policy),
-            (p, limit, gate, min) ->
-                List.of(new ExpandTableCandidate(99L, MetadataObject.Type.TABLE)),
+            (p, limit, gate, min) -> List.of(candidate(99L, MetadataObject.Type.TABLE)),
             cronJobs,
             (t, p, m, n) -> false,
             configWithUri(),
@@ -134,8 +129,8 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
             id -> Optional.of(policy),
             (p, limit, gate, min) ->
                 List.of(
-                    new ExpandTableCandidate(10L, MetadataObject.Type.SCHEMA),
-                    new ExpandTableCandidate(11L, MetadataObject.Type.SCHEMA)),
+                    candidate(10L, MetadataObject.Type.SCHEMA),
+                    candidate(11L, MetadataObject.Type.SCHEMA)),
             cronJobs,
             (t, p, m, n) -> false,
             configWithUri(),
@@ -164,14 +159,12 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
     Assertions.assertEquals(List.of(10L, 11L, 99L), data.tableIds());
   }
 
+  private static ExpandTableCandidate candidate(long tableId, MetadataObject.Type level) {
+    return new ExpandTableCandidate(tableId, level, "iceberg", "db.t" + tableId);
+  }
+
   private static CronJobClient cronScheduler(DataSource dataSource) {
-    return new CronJobClient(
-        dataSource,
-        configWithUri(),
-        ids ->
-            ids.stream()
-                .map(id -> new ResolvedTableRef(id, "iceberg", "db.t" + id))
-                .collect(Collectors.toList()));
+    return new CronJobClient(dataSource, configWithUri());
   }
 
   private static DataSource dataSource() {
