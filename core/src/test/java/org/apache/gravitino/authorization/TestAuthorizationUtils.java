@@ -41,6 +41,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -644,6 +645,111 @@ class TestAuthorizationUtils {
     Assertions.assertEquals(MetadataObject.Type.CATALOG, removal.metadataObject().type());
     Assertions.assertEquals("canonical_catalog", removal.metadataObject().fullName());
     Assertions.assertEquals(locations, removal.getLocations());
+  }
+
+  @Test
+  void testLoadMetadataObjectLocationReportsLookupFailure() {
+    NameIdentifier catalogIdent = NameIdentifier.of("metalake", "hive_catalog");
+    GravitinoEnv env = mockEnvWithFailingHiveDefaultSchema(Mockito.mock(CatalogManager.class));
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+
+      AuthorizationPluginException e =
+          Assertions.assertThrows(
+              AuthorizationPluginException.class,
+              () ->
+                  AuthorizationUtils.loadMetadataObjectLocation(
+                      catalogIdent, Entity.EntityType.CATALOG));
+      Assertions.assertTrue(e.getMessage().contains(catalogIdent.toString()), e.getMessage());
+      Assertions.assertTrue(
+          AuthorizationUtils.getMetadataObjectLocation(catalogIdent, Entity.EntityType.CATALOG)
+              .isEmpty());
+    }
+  }
+
+  @Test
+  void testRemoveCatalogPrivilegesRefusesWhenRequiredLocationsAreUnknown() {
+    NameIdentifier catalogIdent = NameIdentifier.of("metalake", "hive_catalog");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin plugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    Mockito.when(catalog.name()).thenReturn(catalogIdent.name());
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(plugin);
+    Mockito.when(plugin.requiresLocations()).thenReturn(true);
+
+    GravitinoEnv env = mockEnvWithFailingHiveDefaultSchema(catalogManager);
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+
+      AuthorizationPluginException e =
+          Assertions.assertThrows(
+              AuthorizationPluginException.class,
+              () -> AuthorizationUtils.removeCatalogPrivileges(catalogIdent));
+      Assertions.assertTrue(e.getMessage().contains(catalogIdent.toString()), e.getMessage());
+    }
+
+    Mockito.verify(plugin, Mockito.never()).onMetadataUpdated(Mockito.any());
+  }
+
+  @Test
+  void testRemoveCatalogPrivilegesProceedsWhenPluginNeedsNoLocations() {
+    NameIdentifier catalogIdent = NameIdentifier.of("metalake", "hive_catalog");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin plugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    Mockito.when(catalog.name()).thenReturn(catalogIdent.name());
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(plugin);
+    Mockito.when(plugin.requiresLocations()).thenReturn(false);
+
+    GravitinoEnv env = mockEnvWithFailingHiveDefaultSchema(catalogManager);
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+      AuthorizationUtils.removeCatalogPrivileges(catalogIdent);
+    }
+
+    // A plugin without path-based privileges still removes the catalog's privileges.
+    ArgumentCaptor<MetadataObjectChange[]> changes =
+        ArgumentCaptor.forClass(MetadataObjectChange[].class);
+    Mockito.verify(plugin).onMetadataUpdated(changes.capture());
+    MetadataObjectChange.RemoveMetadataObject removal =
+        Assertions.assertInstanceOf(
+            MetadataObjectChange.RemoveMetadataObject.class, changes.getValue()[0]);
+    Assertions.assertTrue(removal.getLocations().isEmpty());
+  }
+
+  @Test
+  void testRemoveCatalogPrivilegesSkipsLookupFailureWithoutPlugin() {
+    NameIdentifier catalogIdent = NameIdentifier.of("metalake", "hive_catalog");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(null);
+
+    GravitinoEnv env = mockEnvWithFailingHiveDefaultSchema(catalogManager);
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertDoesNotThrow(() -> AuthorizationUtils.removeCatalogPrivileges(catalogIdent));
+    }
+  }
+
+  private static GravitinoEnv mockEnvWithFailingHiveDefaultSchema(CatalogManager catalogManager) {
+    Catalog hiveCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(hiveCatalog.provider()).thenReturn("hive");
+    CatalogDispatcher catalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    Mockito.when(catalogDispatcher.loadCatalog(Mockito.any())).thenReturn(hiveCatalog);
+    SchemaDispatcher schemaDispatcher = Mockito.mock(SchemaDispatcher.class);
+    Mockito.when(schemaDispatcher.loadSchema(Mockito.any()))
+        .thenThrow(new RuntimeException("metastore unreachable"));
+
+    GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(env.internalAccessControlDispatcher())
+        .thenReturn(Mockito.mock(AccessControlDispatcher.class));
+    Mockito.when(env.internalCatalogDispatcher()).thenReturn(catalogDispatcher);
+    Mockito.when(env.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
+    Mockito.when(env.catalogManager()).thenReturn(catalogManager);
+    return env;
   }
 
   @Test

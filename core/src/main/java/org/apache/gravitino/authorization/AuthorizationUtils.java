@@ -387,8 +387,52 @@ public class AuthorizationUtils {
    * @param locations the catalog storage locations
    */
   public static void removeCatalogPrivileges(NameIdentifier catalogIdent, List<String> locations) {
+    removeCatalogPrivileges(catalogIdent, locations, null);
+  }
+
+  /**
+   * Looks up the catalog's storage locations, then removes its privileges using the live catalog's
+   * name while its operation lease is held.
+   *
+   * <p>If the lookup fails and the catalog's authorization plugin {@link
+   * AuthorizationPlugin#requiresLocations() requires locations}, this refuses with an exception
+   * before any plugin is called, so the caller does not delete the catalog while its path-based
+   * privileges remain. A plugin that does not need locations still removes the catalog's
+   * privileges.
+   *
+   * @param catalogIdent the identifier used to load the catalog
+   * @throws AuthorizationPluginException if a plugin requires the locations and they cannot be
+   *     looked up
+   */
+  public static void removeCatalogPrivileges(NameIdentifier catalogIdent)
+      throws AuthorizationPluginException {
+    List<String> locations;
+    AuthorizationPluginException lookupFailure = null;
+    try {
+      locations = loadMetadataObjectLocation(catalogIdent, Entity.EntityType.CATALOG);
+    } catch (AuthorizationPluginException e) {
+      LOG.warn("Failed to get location paths for catalog {}", catalogIdent, e);
+      locations = Collections.emptyList();
+      lookupFailure = e;
+    }
+    removeCatalogPrivileges(catalogIdent, locations, lookupFailure);
+  }
+
+  private static void removeCatalogPrivileges(
+      NameIdentifier catalogIdent,
+      List<String> locations,
+      @Nullable AuthorizationPluginException lookupFailure) {
     callAuthorizationPluginImpl(
         (authorizationPlugin, catalogName) -> {
+          if (lookupFailure != null && authorizationPlugin.requiresLocations()) {
+            throw new AuthorizationPluginException(
+                lookupFailure,
+                "Cannot remove the privileges of catalog %s: its storage locations could not be"
+                    + " looked up, so its path-based privileges would remain. Fix the lookup, or"
+                    + " remove the catalog's authorization provider first to drop it without"
+                    + " cleanup",
+                catalogIdent);
+          }
           MetadataObject metadataObject =
               MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
           authorizationPlugin.onMetadataUpdated(
@@ -639,8 +683,36 @@ public class AuthorizationUtils {
     return null;
   }
 
+  /**
+   * Gets the storage locations of a metadata object, or an empty list when the lookup fails.
+   *
+   * <p>An empty result cannot tell "no locations" apart from "the lookup failed". Callers that must
+   * not lose path-based privileges use {@link #loadMetadataObjectLocation} instead.
+   *
+   * @param ident the identifier of the metadata object
+   * @param type the entity type of the metadata object
+   * @return the storage locations, or an empty list if there are none or the lookup failed
+   */
   public static List<String> getMetadataObjectLocation(
       NameIdentifier ident, Entity.EntityType type) {
+    try {
+      return loadMetadataObjectLocation(ident, type);
+    } catch (AuthorizationPluginException e) {
+      LOG.warn("Failed to get location paths for metadata object {} type {}", ident, type, e);
+      return new ArrayList<>();
+    }
+  }
+
+  /**
+   * Loads the storage locations of a metadata object, failing when the lookup fails.
+   *
+   * @param ident the identifier of the metadata object
+   * @param type the entity type of the metadata object
+   * @return the storage locations; empty when authorization is disabled or the object has none
+   * @throws AuthorizationPluginException if the locations cannot be looked up
+   */
+  public static List<String> loadMetadataObjectLocation(
+      NameIdentifier ident, Entity.EntityType type) throws AuthorizationPluginException {
     List<String> locations = new ArrayList<>();
 
     // If we don't enable authorization, the location should return empty collection.
@@ -752,8 +824,11 @@ public class AuthorizationUtils {
           throw new AuthorizationPluginException(
               "Failed to get location paths for metadata object %s type %s", ident, type);
       }
+    } catch (AuthorizationPluginException e) {
+      throw e;
     } catch (Exception e) {
-      LOG.warn("Failed to get location paths for metadata object {} type {}", ident, type, e);
+      throw new AuthorizationPluginException(
+          e, "Failed to get location paths for metadata object %s type %s", ident, type);
     }
 
     return locations;
