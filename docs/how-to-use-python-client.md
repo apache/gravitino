@@ -55,6 +55,23 @@ extras.
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 3. [Manage Semantic Model metadata using Gravitino Python API](./manage-semantic-model-metadata-using-gravitino.md?language=python)
 
+### HTTP Error Handling
+
+Valid Gravitino and OAuth2 error responses retain their existing domain exceptions.
+When an HTTP error has an empty, unreadable or invalid error response, the client raises
+`gravitino.exceptions.base.HTTPResponseException`, a subclass of `RESTException`.
+Its `status_code`, `request_method` and `endpoint` attributes describe the HTTP status,
+the original client request method and its origin (scheme, hostname and optional port).
+Applications can catch `RESTException` to include these fallback failures.
+
+Fallback diagnostics omit URL credentials, paths, query parameters, fragments, request data,
+response headers and response bodies. The default traceback suppresses the underlying
+HTTP and decoding exception chain. Existing domain error messages are unchanged.
+This replaces the decoding or validation exceptions previously exposed for invalid HTTP
+error responses, and bypasses custom error handlers for empty or invalid error responses.
+Connection failures and timeouts before an HTTP error response retain their existing behavior.
+The client does not retry requests as part of this error handling.
+
 ### Semantic Model Ossie Import and Export
 
 Use `as_semantic_model_catalog()` on a loaded relational catalog to manage Semantic Models.
