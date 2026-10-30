@@ -462,7 +462,7 @@ metric expressions.
 An empty result is a successful discovery response. Missing schemas, denied parent access, and
 unsupported operations are reported as errors. Storage or decoding failures fail the request
 instead of returning partial results. See the
-[REST API reference](./api/rest/gravitino-rest-api#tag/semantic-model/operation/listSemanticModelMetrics)
+[REST API reference](./api/rest/gravitino-rest-api)
 for response and error details.
 
 ### Alter a Semantic Model
