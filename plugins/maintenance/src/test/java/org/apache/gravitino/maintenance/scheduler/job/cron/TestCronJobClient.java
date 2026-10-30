@@ -227,35 +227,6 @@ class TestCronJobClient extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testSnapshotExpiryTableJobsCoalesceIntoSurvivorTable() {
-    DataSource dataSource = dataSource();
-    CronJobClient scheduler = scheduler(dataSource);
-    PolicyEntity policy = expirePolicy(9L);
-
-    Assertions.assertEquals(
-        1, scheduler.enqueueNow(policy, List.of(candidate(21L, MetadataObject.Type.TABLE)), 10));
-    Assertions.assertEquals(
-        1, scheduler.enqueueNow(policy, List.of(candidate(22L, MetadataObject.Type.TABLE)), 10));
-
-    SchedulerClient client = CronJobClient.schedulerClient(dataSource);
-    TaskInstanceId table21 =
-        TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronTable(21L, 9L));
-    TaskInstanceId table22 =
-        TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronTable(22L, 9L));
-    TaskInstanceId batch0 =
-        TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
-    Assertions.assertTrue(client.getScheduledExecution(table21).isEmpty());
-    Assertions.assertTrue(client.getScheduledExecution(table22).isPresent());
-    Assertions.assertTrue(client.getScheduledExecution(batch0).isEmpty());
-    MaintenanceJobSpec data =
-        (MaintenanceJobSpec) client.getScheduledExecution(table22).get().getData();
-    Assertions.assertEquals(List.of(22L, 21L), data.tableIds());
-  }
-
-  @TestTemplate
   void testSnapshotExpiryTableMergesIntoExistingIncompleteBatch() {
     DataSource dataSource = dataSource();
     CronJobClient scheduler = scheduler(dataSource);

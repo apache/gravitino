@@ -85,22 +85,6 @@ class TestMaintenanceCronSubmitPipeline {
   }
 
   @Test
-  void testSuccessfulSubmitCallsSubmitAndBind() {
-    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
-    OccupancyClaim claim = new OccupancyClaim(7L, 1_000L);
-    when(mgr.submitAndBind(eq("metalake"), anyMap(), eq(List.of(claim))))
-        .thenReturn(Optional.of(999L));
-    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
-    when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
-        .thenReturn(Optional.of(claim));
-
-    pipeline(false, actions, mgr).submit(INSTANCE, spec());
-
-    verify(mgr).submitAndBind(eq("metalake"), anyMap(), eq(List.of(claim)));
-    verify(actions, never()).deleteUnboundClaim(any());
-  }
-
-  @Test
   void testConfResolveFailureReleasesClaimWithoutSubmit() {
     MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
@@ -142,83 +126,39 @@ class TestMaintenanceCronSubmitPipeline {
   }
 
   @Test
-  void testTableInstanceSubmitAllowsAbsorbedPeerTables() {
+  void testMixedPolicySpecSubmitsEachTask() {
     long peerTable = TABLE_ID + 1;
-    long peerPolicy = POLICY_ID + 1;
+    long policyB = POLICY_ID + 1;
     MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
-    when(mgr.submitAndBind(anyString(), anyMap(), anyList()))
-        .thenReturn(Optional.of(1L), Optional.of(2L));
+    when(mgr.submitAndBind(anyString(), anyMap(), anyList())).thenReturn(Optional.of(1L));
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(new OccupancyClaim(1L, 10L)));
-    when(actions.tryAcquireInFlight(peerTable, peerPolicy, CLAIM_TIMEOUT_MS))
+    when(actions.tryAcquireInFlight(peerTable, policyB, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(new OccupancyClaim(2L, 20L)));
+    MaintenanceJobSpec mixed = expireSpec(TABLE_ID, POLICY_ID, peerTable, policyB);
 
-    Map<String, String> p1 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t");
-    Map<String, String> p2 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t2");
-    MaintenanceJobSpec coalesced =
-        new MaintenanceJobSpec(
-            List.of(
-                new Task(TABLE_ID, POLICY_ID, "expire_snapshots", null, new LinkedHashMap<>(p1)),
-                new Task(peerTable, peerPolicy, "expire_snapshots", null, new LinkedHashMap<>(p2))),
-            UPDATER,
-            null);
+    MaintenanceCronSubmitPipeline submit = pipeline(false, actions, mgr);
+    submit.submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), mixed);
+    submit.submit(INSTANCE, mixed);
 
-    pipeline(false, actions, mgr).submit(INSTANCE, coalesced);
-
-    verify(mgr, times(2)).submitAndBind(eq("metalake"), anyMap(), anyList());
-  }
-
-  @Test
-  void testBatchSubmitAllowsMixedPolicyIds() {
-    long policyB = POLICY_ID + 1;
-    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
-    when(mgr.submitAndBind(anyString(), anyMap(), anyList()))
-        .thenReturn(Optional.of(555L), Optional.of(556L));
-    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
-    OccupancyClaim claimA = new OccupancyClaim(1L, 10L);
-    OccupancyClaim claimB = new OccupancyClaim(2L, 20L);
-    when(actions.tryAcquireInFlight(10L, POLICY_ID, CLAIM_TIMEOUT_MS))
-        .thenReturn(Optional.of(claimA));
-    when(actions.tryAcquireInFlight(11L, policyB, CLAIM_TIMEOUT_MS))
-        .thenReturn(Optional.of(claimB));
-
-    Map<String, String> p1 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t1");
-    Map<String, String> p2 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t2");
-    MaintenanceJobSpec mixed =
-        new MaintenanceJobSpec(
-            List.of(
-                new Task(10L, POLICY_ID, "expire_snapshots", null, new LinkedHashMap<>(p1)),
-                new Task(11L, policyB, "expire_snapshots", null, new LinkedHashMap<>(p2))),
-            UPDATER,
-            null);
-
-    pipeline(false, actions, mgr).submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), mixed);
-
-    verify(actions).tryAcquireInFlight(10L, POLICY_ID, CLAIM_TIMEOUT_MS);
-    verify(actions).tryAcquireInFlight(11L, policyB, CLAIM_TIMEOUT_MS);
-    verify(mgr, times(2)).submitAndBind(eq("metalake"), anyMap(), anyList());
+    verify(actions, times(2)).tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS);
+    verify(actions, times(2)).tryAcquireInFlight(peerTable, policyB, CLAIM_TIMEOUT_MS);
+    verify(mgr, times(4)).submitAndBind(eq("metalake"), anyMap(), anyList());
   }
 
   @Test
   void testBatchInFlightUsesPerTaskPolicyId() {
+    long peerTable = TABLE_ID + 1;
     long policyB = POLICY_ID + 1;
     MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
 
-    Map<String, String> p1 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t1");
-    Map<String, String> p2 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t2");
-    MaintenanceJobSpec mixed =
-        new MaintenanceJobSpec(
-            List.of(
-                new Task(10L, POLICY_ID, "expire_snapshots", null, new LinkedHashMap<>(p1)),
-                new Task(11L, policyB, "expire_snapshots", null, new LinkedHashMap<>(p2))),
-            UPDATER,
-            null);
-
-    // In-flight only for (11, policyB) — must abort whole batch; wrong if gated on POLICY_ID alone.
-    pipeline((t, p) -> t == 11L && p == policyB, actions, mgr)
-        .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), mixed);
+    // In-flight only for the peer policy. Abort the whole batch; wrong if gated on POLICY_ID alone.
+    pipeline((t, p) -> t == peerTable && p == policyB, actions, mgr)
+        .submit(
+            MaintenanceTaskIds.forCronBatch(0L, POLICY_ID),
+            expireSpec(TABLE_ID, POLICY_ID, peerTable, policyB));
 
     verify(actions, never()).tryAcquireInFlight(anyLong(), anyLong(), anyLong());
     verify(mgr, never()).submitAndBind(anyString(), anyMap(), anyList());
@@ -240,6 +180,7 @@ class TestMaintenanceCronSubmitPipeline {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
     verify(mgr).submitAndBind(eq("metalake"), confCaptor.capture(), anyList());
+    verify(actions, never()).deleteUnboundClaim(any());
     Map<String, String> conf = confCaptor.getValue();
     Assertions.assertNull(conf.get("table_identifier"));
     Assertions.assertEquals("binpack", conf.get("strategy"));
@@ -289,13 +230,23 @@ class TestMaintenanceCronSubmitPipeline {
   }
 
   private static MaintenanceJobSpec batchSpec(long table1, long table2) {
-    Map<String, String> p1 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t1");
-    Map<String, String> p2 = Map.of("catalog_name", "iceberg", "table_identifier", "db.t2");
+    return expireSpec(table1, POLICY_ID, table2, POLICY_ID);
+  }
+
+  private static MaintenanceJobSpec expireSpec(
+      long table1, long policy1, long table2, long policy2) {
     return new MaintenanceJobSpec(
-        List.of(
-            new Task(table1, POLICY_ID, "expire_snapshots", null, new LinkedHashMap<>(p1)),
-            new Task(table2, POLICY_ID, "expire_snapshots", null, new LinkedHashMap<>(p2))),
+        List.of(expireTask(table1, policy1, "db.t1"), expireTask(table2, policy2, "db.t2")),
         UPDATER,
         null);
+  }
+
+  private static Task expireTask(long tableId, long policyId, String identifier) {
+    return new Task(
+        tableId,
+        policyId,
+        "expire_snapshots",
+        null,
+        new LinkedHashMap<>(Map.of("catalog_name", "iceberg", "table_identifier", identifier)));
   }
 }
